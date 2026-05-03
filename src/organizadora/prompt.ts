@@ -2,30 +2,55 @@
  * Monta o prompt para a LLM Organizadora.
  *
  * O schema de fatos continua moto-pneus-v1. O texto do prompt foi revisado
- * como prompt v2 para melhorar intencao, localizacao, garantia/reclamacao e
- * desfechos sem ampliar demais o custo de tokens.
+ * como prompt v3-4: a secao "VALORES PERMITIDOS" agora e gerada a partir
+ * de FACT_KEY_SCHEMAS para evitar drift entre prompt e zod.
  */
 
+import { z } from 'zod';
 import type { OpenAIMessage } from '../shared/llm-clients/openai.js';
 import type { MessageForPrompt } from '../shared/repositories/core-reader.repository.js';
+import { FACT_KEY_SCHEMAS, VALID_FACT_KEYS } from '../shared/zod/fact-keys.js';
 
 const SCHEMA_VERSION = 'moto-pneus-v1';
-const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3-3';
+const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3-4';
 
-// Fact keys permitidas (espelho da whitelist em zod/fact-keys.ts, sem importar o modulo inteiro aqui)
-const ALLOWED_FACT_KEYS = [
-  'moto_marca', 'moto_modelo', 'moto_ano', 'moto_cilindrada', 'moto_uso',
-  'medida_pneu', 'posicao_pneu', 'marca_pneu_preferida', 'marca_pneu_recusada', 'quantidade_pneus',
-  'intencao_cliente', 'motivo_compra', 'urgencia',
-  'preferencia_principal', 'faixa_preco_desejada', 'aceita_alternativa',
-  'bairro_mencionado', 'municipio_mencionado', 'modalidade_entrega', 'perguntou_entrega_hoje',
-  'forma_pagamento',
-  'pediu_desconto', 'perguntou_parcelamento', 'achou_caro',
-  'concorrente_citado', 'preco_concorrente',
-  'produto_oferecido', 'produto_aceito', 'produto_recusado_motivo',
-  'pediu_humano',
-  'nome_cliente',
-].join(', ');
+const ALLOWED_FACT_KEYS = VALID_FACT_KEYS.join(', ');
+
+/**
+ * Gera a secao "VALORES PERMITIDOS" do prompt a partir de FACT_KEY_SCHEMAS.
+ * Mantem o prompt sincronizado com a fonte de verdade (zod) para evitar
+ * schema_violation por valores enum/tipo errados.
+ */
+function buildAllowedValuesSection(): string {
+  const lines: string[] = [];
+  for (const key of VALID_FACT_KEYS) {
+    const schema = FACT_KEY_SCHEMAS[key];
+    const description = describeSchema(schema);
+    if (description) {
+      lines.push(`- ${key}: ${description}`);
+    }
+  }
+  return lines.join('\n');
+}
+
+function describeSchema(schema: z.ZodTypeAny): string | null {
+  if (schema instanceof z.ZodEnum) {
+    return (schema.options as readonly string[]).join(' | ');
+  }
+  if (schema instanceof z.ZodNumber) {
+    const isInt = schema._def.checks.some((c) => c.kind === 'int');
+    return isInt ? 'numero inteiro (nao string)' : 'numero (nao string)';
+  }
+  if (schema instanceof z.ZodBoolean) {
+    return 'true ou false (nao string)';
+  }
+  if (schema instanceof z.ZodString) {
+    return 'texto livre (nao boolean, nao numero)';
+  }
+  return null;
+}
+
+const ALLOWED_VALUES_SECTION = buildAllowedValuesSection();
 
 const SYSTEM_PROMPT = `Voce e um extrator de dados estruturados de conversas de atendimento de uma loja de pneus de moto.
 
@@ -41,6 +66,10 @@ REGRAS OBRIGATORIAS:
 7. Para campos booleanos, use true ou false, nunca strings.
 8. Para medida_pneu, normalize para "140/70-17". Exemplos: "100/80 18", "100 80 18" e "100/80 aro 18" viram "100/80-18".
 9. Forma de pagamento e modalidade de entrega literais tambem sao complementadas por regras deterministicas no codigo. Extraia esses campos apenas quando a evidencia estiver clara.
+10. Use APENAS os valores listados em VALORES PERMITIDOS abaixo. Nao invente sinonimos: "credito" deve virar "cartao_credito", "retirada na loja" deve virar "retirada", numeros vem como numero (nao string).
+
+VALORES PERMITIDOS (use exatamente um dos valores listados; campos nao listados aceitam texto livre dentro do schema):
+${ALLOWED_VALUES_SECTION}
 
 INTENCAO_CLIENTE:
 Extraia intencao_cliente sempre que houver pedido comercial, duvida comercial, garantia ou reclamacao. Nao deixe de extrair apenas porque faltou modelo, medida ou posicao.
@@ -148,4 +177,4 @@ export function buildOrganizadoraPrompt(
   ];
 }
 
-export { SCHEMA_VERSION, EXTRACTOR_VERSION };
+export { SCHEMA_VERSION, EXTRACTOR_VERSION, buildAllowedValuesSection };
