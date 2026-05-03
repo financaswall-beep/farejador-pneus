@@ -448,3 +448,56 @@ Validacao local:
 - `npm run typecheck`: passou.
 - `npm run build`: passou.
 - `npm test`: 267 testes passaram.
+
+## Resultado v3.2 2026-05-03
+
+Deploy usado:
+
+- Commit: `6a36aee feat: tune organizadora prompt v3.2`.
+- `extractor_version` confirmado no banco: `moto-pneus-hybrid-v3-2`.
+
+Resumo bruto da rodada:
+
+- Casos avaliados: 32.
+- Passaram: 29.
+- Falharam: 3.
+- Jobs `done`: 31.
+- Jobs ausentes/timeout: 1.
+- Jobs `failed`: 0.
+- Zero facts: 3.
+- Zero facts correto: 2.
+- Estimativa media de prompt por conversa: 1492 tokens.
+
+Observacao operacional:
+
+- `S24-mensagem-unica-densa` foi capturado em `core.*`, mas nao teve job inicial em `ops.enrichment_jobs`.
+- O caso foi re-enfileirado manualmente com `ops.enqueue_enrichment_job` para medir a extracao sem misturar falha operacional.
+
+Resumo apos re-enfileirar o job ausente:
+
+- Casos com job `done`: 32.
+- Passaram: 30.
+- Falharam: 2.
+
+Comparativo recente:
+
+| metrica | v3.1 apos reenqueue | pos-auditoria | v3.2 apos reenqueue |
+| --- | ---: | ---: | ---: |
+| casos aprovados | 27 | 28 | 30 |
+| casos reprovados | 5 | 4 | 2 |
+| jobs `done` finais | 32 | 32 | 32 |
+| media estimada de tokens | 1492 | 1492 | 1492 |
+
+Falhas restantes:
+
+| caso | faltou | fatos extraidos |
+| --- | --- | --- |
+| `S08-uso-delivery-urgente` | `moto_uso` | `motivo_compra`, `urgencia` |
+| `S22-viagem-seguranca` | `urgencia` | `motivo_compra`, `preferencia_principal` |
+
+Leitura:
+
+- O v3.2 corrigiu `S16-preco-alvo` e `S25-erros-digitacao`.
+- O v3.2 tambem corrigiu `motivo_compra` em `S08` e `S22`.
+- Restam 2 ajustes semanticos pequenos: `delivery` como `moto_uso = "trabalho"` e `vou viajar sexta` como `urgencia = "media"` ou `alta`, conforme regra escolhida.
+- Ainda apareceu 1 caso operacional sem job inicial, entao a auditoria de enfileiramento continua util para diagnosticar recorrencia.
