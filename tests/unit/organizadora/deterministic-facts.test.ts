@@ -30,10 +30,28 @@ describe('inferDeterministicFacts', () => {
   it('nao duplica forma_pagamento quando a LLM ja extraiu', () => {
     const facts = inferDeterministicFacts(
       [msg('quero pagar em dinheiro')],
-      [{ fact_key: 'forma_pagamento' }],
+      [{ fact_key: 'forma_pagamento', fact_value: 'dinheiro' }],
     );
 
     expect(facts.some((fact) => fact.fact_key === 'forma_pagamento')).toBe(false);
+  });
+
+  it('complementa quando a LLM extraiu a mesma chave com valor invalido', () => {
+    expect(inferDeterministicFacts(
+      [msg('posso retirar na loja?')],
+      [{ fact_key: 'modalidade_entrega', fact_value: 'retirar na loja' }],
+    )).toContainEqual(expect.objectContaining({
+      fact_key: 'modalidade_entrega',
+      fact_value: 'retirada',
+    }));
+
+    expect(inferDeterministicFacts(
+      [msg('da pra pagar metade pix metade cartao?')],
+      [{ fact_key: 'forma_pagamento', fact_value: 'metade pix metade cartao' }],
+    )).toContainEqual(expect.objectContaining({
+      fact_key: 'forma_pagamento',
+      fact_value: 'indefinido',
+    }));
   });
 
   it('marca pagamento misto como indefinido', () => {

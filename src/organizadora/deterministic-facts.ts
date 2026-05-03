@@ -1,5 +1,6 @@
 import type { ExtractedFact } from '../shared/zod/llm-organizadora.js';
 import type { MessageForPrompt } from '../shared/repositories/core-reader.repository.js';
+import { validateFactValue } from '../shared/zod/fact-keys.js';
 
 export const DETERMINISTIC_FACT_SOURCE = 'deterministic_literal_organizadora_v1';
 
@@ -20,9 +21,9 @@ const PAYMENT_PATTERNS = [
   { value: 'pix', regex: /\bpix\b/i },
   { value: 'dinheiro', regex: /\bdinheiro\b/i },
   { value: 'boleto', regex: /\bboleto\b/i },
-  { value: 'cartao_credito', regex: /\bcr[eé]dito\b/i },
-  { value: 'cartao_debito', regex: /\bd[eé]bito\b/i },
-  { value: 'indefinido', regex: /\bcart[aã]o\b/i },
+  { value: 'cartao_credito', regex: /\bcr[e\u00e9]dito\b/i },
+  { value: 'cartao_debito', regex: /\bd[e\u00e9]bito\b/i },
+  { value: 'indefinido', regex: /\bcart[a\u00e3]o\b/i },
 ] as const;
 
 const DELIVERY_PATTERNS = [
@@ -37,9 +38,13 @@ const DELIVERY_PATTERNS = [
 
 export function inferDeterministicFacts(
   messages: MessageForPrompt[],
-  existingFacts: Array<Pick<ExtractedFact, 'fact_key'>>,
+  existingFacts: Array<Pick<ExtractedFact, 'fact_key' | 'fact_value'>>,
 ): DeterministicFact[] {
-  const existingKeys = new Set(existingFacts.map((fact) => fact.fact_key));
+  const existingKeys = new Set(
+    existingFacts
+      .filter((fact) => validateFactValue(fact.fact_key, fact.fact_value)?.success === true)
+      .map((fact) => fact.fact_key),
+  );
   const facts: DeterministicFact[] = [];
 
   if (!existingKeys.has('forma_pagamento')) {

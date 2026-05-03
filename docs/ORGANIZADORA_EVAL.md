@@ -258,3 +258,60 @@ Prompt ajustado no v3:
 Estimativa:
 
 - runner atualizado para v3: estimativa fixa aproximada de 1460 tokens + transcricao.
+
+## Resultado v3 2026-05-03
+
+Deploy usado:
+
+- Commit: `8e4c886 feat: add organizadora hybrid literals`.
+- `extractor_version` confirmado no banco: `moto-pneus-hybrid-v3`.
+
+Resumo v3:
+
+- Casos avaliados: 32.
+- Passaram: 25.
+- Falharam: 7.
+- Jobs `done`: 31.
+- Jobs com timeout/ausentes: 1.
+- Jobs `failed`: 0.
+- Zero facts: 3.
+- Zero facts correto: 2.
+- Estimativa media de prompt por conversa: 1492 tokens.
+
+Comparativo v2 -> v3:
+
+| metrica | v2 | v3 | delta |
+| --- | ---: | ---: | ---: |
+| casos aprovados | 20 | 25 | +5 |
+| casos reprovados | 12 | 7 | -5 |
+| jobs `done` | 30 | 31 | +1 |
+| jobs ausentes/timeout | 2 | 1 | -1 |
+| zero facts correto | 2 | 2 | 0 |
+| media estimada de tokens | 1382 | 1492 | +110 |
+
+Principais fatos obrigatorios ausentes no v3:
+
+| fact_key | ausencias |
+| --- | ---: |
+| `motivo_compra` | 2 |
+| `moto_modelo` | 1 |
+| `modalidade_entrega` | 1 |
+| `preferencia_principal` | 1 |
+| `perguntou_entrega_hoje` | 1 |
+| `forma_pagamento` | 1 |
+
+Leitura:
+
+- O hibrido melhorou a matriz sem transformar o prompt em um texto gigante.
+- `forma_pagamento` e `modalidade_entrega` melhoraram, mas duas falhas revelaram um bug de ordem: quando a LLM retornava a chave com valor invalido, o codigo deterministico pulava a complementacao.
+- Exemplo: LLM retornou `modalidade_entrega="retirar na loja"`; o schema aceita apenas `retirada`, entao o fact era rejeitado.
+- Exemplo: LLM retornou `forma_pagamento="metade pix metade cartao"`; o schema aceita `indefinido`, entao o fact era rejeitado.
+
+## Hibrido v3.1
+
+Correcoes implementadas depois da rodada v3:
+
+- `extractor_version` passa a ser `moto-pneus-hybrid-v3-1`.
+- O codigo deterministico agora so considera uma chave "ja existente" se o valor da LLM tambem for valido no schema.
+- Se a LLM trouxer `modalidade_entrega` ou `forma_pagamento` com valor invalido, a regra literal ainda pode complementar com valor valido.
+- Mantida a restricao: hibrido somente para `forma_pagamento` e `modalidade_entrega`.

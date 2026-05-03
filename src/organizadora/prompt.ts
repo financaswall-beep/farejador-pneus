@@ -10,7 +10,7 @@ import type { OpenAIMessage } from '../shared/llm-clients/openai.js';
 import type { MessageForPrompt } from '../shared/repositories/core-reader.repository.js';
 
 const SCHEMA_VERSION = 'moto-pneus-v1';
-const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3';
+const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3-1';
 
 // Fact keys permitidas (espelho da whitelist em zod/fact-keys.ts, sem importar o modulo inteiro aqui)
 const ALLOWED_FACT_KEYS = [
