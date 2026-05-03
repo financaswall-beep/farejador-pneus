@@ -315,3 +315,56 @@ Correcoes implementadas depois da rodada v3:
 - O codigo deterministico agora so considera uma chave "ja existente" se o valor da LLM tambem for valido no schema.
 - Se a LLM trouxer `modalidade_entrega` ou `forma_pagamento` com valor invalido, a regra literal ainda pode complementar com valor valido.
 - Mantida a restricao: hibrido somente para `forma_pagamento` e `modalidade_entrega`.
+
+## Resultado v3.1 2026-05-03
+
+Deploy usado:
+
+- Commit: `f838881 fix: complement invalid organizadora literals`.
+- `extractor_version` confirmado no banco: `moto-pneus-hybrid-v3-1`.
+
+Resumo bruto da rodada:
+
+- Casos avaliados: 32.
+- Passaram: 25.
+- Falharam: 7.
+- Jobs `done`: 30.
+- Jobs com timeout/ausentes: 2.
+- Jobs `failed`: 0.
+- Estimativa media de prompt por conversa: 1492 tokens.
+
+Observacao operacional:
+
+- Dois casos foram capturados em `core.*`, mas nao tiveram job criado inicialmente em `ops.enrichment_jobs`.
+- Esses dois foram re-enfileirados manualmente com `ops.enqueue_enrichment_job` para medir a Organizadora sem misturar falha operacional de fila.
+
+Resumo apos re-enfileirar os 2 jobs ausentes:
+
+- Casos com job `done`: 32.
+- Passaram: 27.
+- Falharam: 5.
+
+Comparativo v2 -> v3 -> v3.1:
+
+| metrica | v2 | v3 | v3.1 apos reenqueue |
+| --- | ---: | ---: | ---: |
+| casos aprovados | 20 | 25 | 27 |
+| casos reprovados | 12 | 7 | 5 |
+| jobs `done` finais | 30 | 31 | 32 |
+| media estimada de tokens | 1382 | 1492 | 1492 |
+
+Falhas restantes da extracao:
+
+| caso | faltou |
+| --- | --- |
+| `S08-uso-delivery-urgente` | `motivo_compra` |
+| `S14-reclamacao` | `urgencia` |
+| `S16-preco-alvo` | `preferencia_principal` |
+| `S22-viagem-seguranca` | `motivo_compra` |
+| `S25-erros-digitacao` | `perguntou_entrega_hoje` |
+
+Leitura:
+
+- A correcao v3.1 resolveu os casos de `retirada` e `pagamento misto` sem aumentar o prompt.
+- As 5 falhas restantes sao mais de interpretacao semantica do prompt/schema, nao das regras deterministicas de pagamento/entrega.
+- Ainda existe um problema separado de enfileiramento: algumas conversas sao capturadas em `core.*`, mas nao geram job da Organizadora.
