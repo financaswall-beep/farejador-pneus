@@ -7,7 +7,7 @@ este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
 
 ## Resumo Executivo
 
-Organizadora esta em producao e calibrada no prompt v3.3. A Atendente ja tem
+Organizadora esta em producao e calibrada no prompt v3.4. A Atendente ja tem
 fundacao de estado, tools, Planner, Executor/guardrails, Worker Shadow e
 Generator Shadow (gera resposta candidata auditavel, nao envia ao Chatwoot).
 
@@ -20,7 +20,7 @@ Nada responde cliente automaticamente.
 | Fase 1 - webhook/raw/core/admin | Concluida e em prod |
 | Fase 1.5 - hardening | Concluida |
 | Fase 2a - enrichment deterministico | Concluida |
-| Organizadora LLM | Em producao |
+| Organizadora LLM | Em producao, v3.4 |
 | `analytics.fact_evidence` | Implementado |
 | Analytics marts v1 | Implementadas |
 | Commerce schema/views/helpers | Implementado |
@@ -30,7 +30,7 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
 | Atendente Sprint 5 - Worker Shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator Shadow | Implementado, desligado por default |
+| Atendente Sprint 6 - Generator Shadow | Implementado; em prod atual com LLM real em shadow |
 | Critic | Nao existe |
 | Envio Chatwoot pela Atendente | Nao existe |
 
@@ -120,21 +120,39 @@ Worker Shadow:
   `agent.session_current` para a conversa antes do enqueue
 - log-only: gera candidato shadow, sem envio Chatwoot
 
-## Organizadora v3.3
+## Organizadora v3.4
 
-- `extractor_version`: `moto-pneus-hybrid-v3-3`
-- Prompt atual: `src/organizadora/prompt.ts`, 151 linhas no arquivo.
-- Matriz sintetica expandida: 46/48 aprovados em 2026-05-03.
-- Falhas restantes registradas em `docs/ORGANIZADORA_EVAL.md`.
+- `extractor_version`: `moto-pneus-hybrid-v3-4`
+- Prompt atual: `src/organizadora/prompt.ts`, com secao de valores permitidos
+  gerada a partir de `FACT_KEY_SCHEMAS`.
+- Fix validado em prod: `concorrente_citado` saiu como string,
+  `moto_cilindrada` saiu como number e aliases de entrega/pagamento deixaram
+  de gerar novos `schema_violation` nas conversas testadas.
+- Matriz sintetica expandida v3.3: 46/48 aprovados em 2026-05-03; v3.4 cobre
+  especificamente o gap de schema violations observado em producao.
 - Proxima acao da Organizadora: observar conversas reais antes de novo ajuste.
+
+## Atendente Generator Shadow Em Producao
+
+- `ATENDENTE_SHADOW_ENABLED=true` no ambiente atual.
+- `GENERATOR_LLM_ENABLED=true` no ambiente atual, com chave e modelo do
+  Generator configurados.
+- Teste com 6 conversas Chatwoot criou jobs, turns e eventos
+  `generator_produced` em shadow.
+- Respostas candidatas foram gravadas em `agent.turns`; nenhuma mensagem foi
+  enviada ao cliente.
+- Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
+  dados faltantes sem inventar preco, estoque ou frete.
 
 ## Validacao Atual
 
-Ultima validacao (pos Sprint 6):
+Ultima validacao (pos Sprint 6 + Organizadora v3.4):
 
-- `npm test`: 289/289 verde.
+- `npm test`: 296/296 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
+- Teste em prod com 6 conversas: Atendente shadow e Organizadora v3.4
+  funcionaram; sem novos `schema_violation` observados nas conversas novas.
 
 ## Proxima Fase
 
@@ -158,7 +176,8 @@ Limites da Sprint 7:
 
 - sem envio Chatwoot;
 - sem atendimento automatico;
-- `GENERATOR_LLM_ENABLED=false` por default;
+- `GENERATOR_LLM_ENABLED=false` por default no codigo; em prod atual pode ficar
+  `true` para shadow auditavel, ainda sem envio Chatwoot;
 - log-only/shadow-only.
 
 ## Documentos De Apoio

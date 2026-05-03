@@ -17,6 +17,7 @@ Atualizado: 2026-05-03
 - [x] Atendente Sprint 4: Executor/guardrails.
 - [x] Atendente Sprint 5: Worker Shadow minimalista.
 - [x] Atendente Sprint 6: Generator shadow.
+- [x] Generator LLM real validado em shadow, sem envio Chatwoot.
 - [ ] Critic.
 - [ ] Envio Chatwoot pela Atendente.
 
@@ -38,6 +39,8 @@ Legenda: feito, em andamento, proximo, futuro.
 - [x] Deploy Coolify do Farejador validado.
 - [x] Supabase Connection Pooler validado no Coolify.
 - [x] Chatwoot real conectado ao Farejador em shadow mode.
+- [x] Teste de 6 conversas Chatwoot em prod validou Organizadora v3.4 e
+  Generator LLM real em shadow.
 
 ## 2. Schema do banco
 
@@ -145,8 +148,9 @@ Legenda: feito, em andamento, proximo, futuro.
 
 Ressalvas antes de producao plena:
 
-- [ ] Shadow mode com webhooks reais por periodo combinado.
-  - Observacao 2026-05-03: Organizadora v3.3 calibrada em matriz sintetica expandida com 46/48 aprovados; ainda precisa observacao em conversas reais.
+- [x] Shadow mode com webhooks reais validado em 2026-05-03.
+  - Observacao: Organizadora v3.4 e Generator LLM real foram testados com 6
+    conversas Chatwoot; sem envio ao cliente e sem novos `schema_violation`.
 - [x] ~~Rotacionar secrets antes de producao plena.~~ Dispensado em 26/04/2026: o repo base `farejador-base-v1` sera arquivado como template; fork operacional sera repo novo com secrets novos por construcao.
 - [x] ~~Configurar `DATABASE_CA_CERT` no Coolify para SSL com validacao de certificado.~~ Resolvido em 26/04/2026: Supabase connection pooler nao suporta validacao de cadeia. SSL permanece ativo via `rejectUnauthorized:false` (conexao criptografada). Variavel removida do `env.ts` e do `db.ts`.
 
@@ -231,8 +235,9 @@ Pendente da F1.5:
 - [x] `0024_atendente_v1_state_extensions.sql` (estado reentrante da Atendente)
 - [x] `0025_planner_foundation.sql` (Planner foundation)
 - [x] `0026_tool_executor_events.sql` (eventos do Tool Executor)
+- [x] `0027_generator_shadow_events.sql` (evento `generator_produced`)
 - [x] Cada migration idempotente (CREATE/ALTER IF NOT EXISTS)
-- [x] Migrations 0013-0026 aplicadas/validadas no Supabase atual
+- [x] Migrations 0013-0027 aplicadas/validadas no Supabase atual
 - [ ] Testes de integracao por migration (Kimi escreve depois)
 
 ### 7.3 Etapa C - Codigo TypeScript
@@ -257,13 +262,16 @@ Pendente da F1.5:
 - [x] `.env.example` — variáveis da Organizadora documentadas
 - [x] `src/app/server.ts` — integra startOrganizadora() no boot quando ORGANIZADORA_ENABLED=true
 - [x] `npm run typecheck` verde (0 erros)
-- [x] `npm test` verde (267/267 em 2026-05-03)
+- [x] `npm test` verde (296/296 em 2026-05-03)
 - [x] `simulate-chatwoot.bat` / `simulate-chatwoot.cjs` — simulador direto ao Farejador (bypassa Chatwoot)
 - [x] `chatwoot-chat.bat` / `chatwoot-chat.cjs` — simulador via API Chatwoot real (conversas aparecem no Chatwoot)
 - [x] `src/atendente/validators/` - SayValidator, ActionValidator e validacao de tool results
 - [x] `src/atendente/worker.ts` - Worker Shadow log-only da Atendente
 - [x] `src/shared/repositories/ops-atendente.repository.ts` - fila da Atendente
 - [x] Generator shadow da Atendente
+- [x] Enqueue da Atendente em `message_created` atras de
+  `ATENDENTE_SHADOW_ENABLED=true`, com seed de `agent.session_current` antes
+  do job.
 
 **Bugs encontrados e corrigidos em 2026-04-29:**
 - [x] `src/shared/llm-clients/openai.ts`: `max_tokens` → `max_completion_tokens` (gpt-5.x rejeita `max_tokens` com HTTP 400)
@@ -278,6 +286,9 @@ Pendente da F1.5:
 - [x] Evidence corretamente vinculada (frase exata da conversa como evidência)
 - [x] Teste com conversa longa/densa sintetica validado na matriz v3.3: `S24` extraiu nome, bairro, medida, modelo, posicao, pagamento e entrega.
 - [x] Organizadora v3.3 avaliada em 48 cenarios sinteticos: 46 passaram, 2 falhas pequenas documentadas em `docs/ORGANIZADORA_EVAL.md`.
+- [x] Organizadora v3.4 validada em prod: corrigiu aliases/tipos que geravam
+  `schema_violation` (`cartao`, `retirada_na_loja`, `moto_cilindrada` string,
+  `concorrente_citado` boolean).
 
 ### 7.4 Etapa D - Shadow Assistido (5 semanas)
 
@@ -295,6 +306,8 @@ Pendente da F1.5:
 ### 7.5 Etapa E - Atendente em v1
 
 - [x] Generator shadow
+- [x] Generator LLM real rodando em shadow e gravando respostas candidatas em
+  `agent.turns`, sem envio Chatwoot
 - [ ] Critic shadow
 - [ ] Sugestao assistida para humano
 - [ ] Atendente liga envio Chatwoot somente apos autorizacao explicita

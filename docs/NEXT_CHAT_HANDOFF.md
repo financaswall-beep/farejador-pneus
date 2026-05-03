@@ -56,10 +56,11 @@ Atendente:
   em raw/core/analytics/commerce. Controlado por `GENERATOR_LLM_ENABLED`
   (default false). Migration `0027_generator_shadow_events.sql` aplicada no
   Supabase atual em 2026-05-03 (adiciona 'generator_produced' ao CHECK de
-  `agent.session_events`).
-- Organizadora v3.3 calibrada:
-  prompt `moto-pneus-hybrid-v3-3`, matriz expandida com 46/48 aprovados
-  apos deploy em 2026-05-03.
+  `agent.session_events`). Em producao atual, LLM real esta habilitado em
+  shadow com `GENERATOR_OPENAI_API_KEY` e `GENERATOR_MODEL` configurados.
+- Organizadora v3.4 calibrada:
+  prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
+  de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
 
 ## O Que Ainda Nao Existe
 
@@ -70,21 +71,25 @@ Atendente:
 
 ## Validacao Atual
 
-Ultima validacao local (pos Sprint 6):
+Ultima validacao local (pos Sprint 6 + Organizadora v3.4):
 
-- `npm test`: 289/289 verde.
+- `npm test`: 296/296 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 - Migration `0027` aplicada/verificada no Supabase atual.
+- Teste em producao com 6 conversas Chatwoot: Atendente shadow criou jobs,
+  turns e eventos `generator_produced`; Generator LLM real gerou respostas
+  candidatas em `agent.turns` sem envio ao cliente.
+- Organizadora v3.4 extraiu facts novos sem novos `schema_violation`.
 - Scripts operacionais locais foram higienizados em 2026-05-03 para depender de
   `.env` e nao manter secrets/endpoints reais hardcoded no repo.
 
 Ultimos commits enviados para `origin/main` e `pneus/main`:
 
-- `834151d docs: record organizadora v3.3 eval`
-- `7beb37c feat: tune organizadora prompt v3.3`
-- `d6669e6 test: expand organizadora eval matrix`
-- `fec54ad feat: add atendente shadow worker`
+- `56dfc0e feat: tune organizadora prompt v3.4`
+- `b9757ba fix: seed atendente shadow sessions`
+- `706d9f9 feat: enqueue atendente shadow jobs`
+- `866bae6 feat: add atendente generator shadow (sprint 6)`
 
 ## Proxima Fase
 

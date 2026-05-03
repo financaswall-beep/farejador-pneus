@@ -34,9 +34,12 @@ Implementado:
   Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
   grava em `agent.turns` (status='generated'|'blocked') e auditoria em
   `agent.session_events` (event_type='generator_produced'). Nunca envia ao Chatwoot.
-  Controlado por `GENERATOR_LLM_ENABLED` (default false).
-- Organizadora v3.3: prompt `moto-pneus-hybrid-v3-3`, matriz expandida 48
-  casos com 46 aprovados, 2 falhas pequenas registradas.
+  Controlado por `GENERATOR_LLM_ENABLED` (default false). Em producao atual,
+  o Generator LLM real foi habilitado em shadow com `GENERATOR_OPENAI_API_KEY`
+  e `GENERATOR_MODEL` configurados.
+- Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
+  valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
+  que geravam `schema_violation`.
 
 Nao implementado/nao ligado:
 
@@ -46,12 +49,18 @@ Nao implementado/nao ligado:
 
 ## Ultimas Validacoes
 
-- `npm test`: 289/289 verde.
+- `npm test`: 296/296 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 - Migration `0027_generator_shadow_events.sql` aplicada no Supabase atual em
   2026-05-03 e verificada: `generator_produced` aceito no CHECK de
   `agent.session_events`.
+- Teste em producao com 6 conversas Chatwoot: `ops.atendente_jobs`,
+  `agent.turns` e eventos `generator_produced` gravando em shadow; Generator
+  LLM real gerou respostas candidatas sem envio ao cliente.
+- Organizadora v3.4 validada em conversas novas: extraiu facts como
+  `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
+  `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.
 - Scripts operacionais locais higienizados em 2026-05-03 para nao carregar
   `DATABASE_URL`, endpoint real de Chatwoot ou identificador de inbox como
   default hardcoded. Devem ser executados sempre com `.env` local.
@@ -59,10 +68,10 @@ Nao implementado/nao ligado:
 
 ## Ultimos Commits Relevantes
 
-- `834151d docs: record organizadora v3.3 eval`
-- `7beb37c feat: tune organizadora prompt v3.3`
-- `fec54ad feat: add atendente shadow worker`
-- `05395d8 fix: share deterministic event ids`
+- `56dfc0e feat: tune organizadora prompt v3.4`
+- `b9757ba fix: seed atendente shadow sessions`
+- `706d9f9 feat: enqueue atendente shadow jobs`
+- `866bae6 feat: add atendente generator shadow (sprint 6)`
 
 Remotes sincronizados:
 
