@@ -55,10 +55,9 @@ Responsabilidades:
 - postar resposta no Chatwoot via API;
 - gravar `agent.turns` (idempotente).
 
-Nota: o Sprint 1 da Atendente implementa apenas a fundacao deterministica local
-do estado reentrante (`session_items`, `session_slots`, `applyAction` e
-ActionValidator inicial). O Worker, Planner LLM, Generator e envio Chatwoot
-ainda nao existem.
+Nota de estado em 03/05/2026: a Atendente ja tem estado reentrante, Planner
+foundation, Tool Executor e Worker Shadow log-only. Ainda nao existem Generator,
+Critic nem envio Chatwoot pela Atendente.
 
 Nao pode:
 

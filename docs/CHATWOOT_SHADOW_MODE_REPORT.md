@@ -2,6 +2,12 @@
 
 Atualizado: 25/04/2026
 
+> Nota de manutencao 2026-05-03: este relatorio e historico da entrada em
+> shadow mode da Fase 1. Alguns itens citados aqui como pendentes ja foram
+> resolvidos ou substituidos. Para o estado vivo, use `docs/PROJECT.md`,
+> `docs/NEXT_CHAT_HANDOFF.md` e
+> `docs/phase3-agent-architecture/00-estado-de-implementacao.md`.
+
 ## Resumo executivo
 
 O Farejador foi publicado no Coolify, conectado ao Supabase e recebeu webhooks reais
@@ -34,8 +40,11 @@ Concluido:
 Pendente antes de considerar producao plena:
 
 - Rodar shadow mode por periodo combinado com o webhook ligado.
-- Rotacionar secrets antes de producao plena.
-- Configurar `DATABASE_CA_CERT` no Coolify.
+- Rotacionar secrets antes de producao plena. Dispensado para o repo base
+  arquivado; fork operacional usa secrets proprios.
+- `DATABASE_CA_CERT` foi removido: o pooler do Supabase usado aqui nao suporta
+  validacao de cadeia como planejado; SSL permanece ativo via
+  `rejectUnauthorized:false`.
 - Criar harness de integracao automatizado com Postgres real.
 
 ## Acesso e endpoints
@@ -327,8 +336,8 @@ Proximos passos operacionais:
 
 1. Manter o webhook ligado por um periodo curto e monitorado.
 2. Acompanhar `raw.raw_events` por `pending`, `failed` e `skipped`.
-3. Configurar `DATABASE_CA_CERT` no Coolify.
-4. Rotacionar secrets antes de producao plena, pois foram manipulados manualmente durante os testes.
+3. Confirmar SSL via pooler Supabase; `DATABASE_CA_CERT` foi removido do runtime.
+4. Rotacionar secrets se este relatorio for usado fora do ambiente local/controlado.
 5. Criar harness de integracao automatizado com Postgres real.
 6. Quando o projeto sair do shadow mode, decidir entre:
    - manter skip de `message_updated`;
@@ -390,8 +399,8 @@ Favor avaliar periodo de shadow mode, rotacao de secrets, `DATABASE_CA_CERT` e h
   do banco se necessario.
 - `message_updated` esta filtrado no worker, mas ainda deve ser monitorado em volume.
 - A inbox API pode nao permitir selecao granular de eventos no painel.
-- Ainda falta rotacao de secrets antes de producao plena.
-- Ainda falta configurar `DATABASE_CA_CERT` no Coolify.
+- Rotacao de secrets deve ser reavaliada no fork operacional.
+- `DATABASE_CA_CERT` nao e mais pendencia deste runtime.
 
 ## Veredito
 

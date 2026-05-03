@@ -1,10 +1,10 @@
 # Farejador - Visao Atual do Projeto
 
-Atualizado: 2026-04-29.
+Atualizado: 2026-05-03.
 
 Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
-Postgres/Supabase e prepara uma fundacao auditavel para analytics, Organizadora
-LLM e, no futuro, uma Atendente em shadow/controle humano.
+Postgres/Supabase e prepara uma fundacao auditavel para analytics,
+Organizadora LLM e Atendente em shadow/controle humano.
 
 ## Status Executivo
 
@@ -19,7 +19,8 @@ LLM e, no futuro, uma Atendente em shadow/controle humano.
 | Atendente Sprint 2 - tools deterministicas | Implementado |
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
-| Atendente Sprint 5 - worker shadow | Proxima fase |
+| Atendente Sprint 5 - worker shadow | Implementado, desligado por default |
+| Atendente Sprint 6 - Generator shadow | Proxima fase |
 
 ## O Que Esta Ligado
 
@@ -28,6 +29,8 @@ LLM e, no futuro, uma Atendente em shadow/controle humano.
 - Enrichment deterministico -> `analytics.*`.
 - Organizadora LLM -> `analytics.conversation_facts` e
   `analytics.fact_evidence`.
+- Atendente Shadow Worker -> `agent.*`/`ops.*` quando
+  `ATENDENTE_SHADOW_ENABLED=true`, sem Generator e sem envio Chatwoot.
 - Migrations ate `0026` aplicadas/validadas no Supabase atual.
 
 ## O Que Ainda Nao Esta Ligado
@@ -36,7 +39,6 @@ LLM e, no futuro, uma Atendente em shadow/controle humano.
 - Nao existe envio Chatwoot pela Atendente.
 - Planner LLM fica desligado por default (`PLANNER_LLM_ENABLED=false`).
 - Generator, Critic e Reflection Loop ainda nao existem.
-- Worker shadow da Atendente ainda nao existe.
 
 ## Invariantes
 
@@ -44,6 +46,8 @@ LLM e, no futuro, uma Atendente em shadow/controle humano.
 - Organizadora escreve somente em `analytics.*` e incidentes em `ops.*`.
 - Atendente, quando existir, deve consumir `core.*`, `analytics.*` e
   `commerce.*`; nunca deve alterar `raw.*`, `core.*` ou `commerce.*`.
+- Atendente Shadow pode gravar auditoria/estado em `agent.*` e incidentes em
+  `ops.*`; nunca envia mensagem ao cliente.
 - Tudo respeita `environment` (`prod`/`test`).
 - Dados sensiveis nunca entram em scripts temporarios versionados.
 

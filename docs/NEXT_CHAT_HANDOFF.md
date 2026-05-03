@@ -1,14 +1,15 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-04-29.
+Atualizado: 2026-05-03.
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
 ## Onde Estamos
 
-Estamos construindo a Atendente por camadas, mas ela ainda nao atende cliente.
-O sistema atual em producao captura Chatwoot, normaliza, roda Organizadora LLM e
-prepara dados/estado para uma futura Atendente em shadow.
+Estamos construindo a Atendente por camadas, mas ela ainda nao envia mensagem ao
+cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
+Organizadora LLM, roda a fundacao da Atendente em modo shadow quando habilitada
+e prepara dados/estado para o Generator futuro.
 
 ## Ja Implementado
 
@@ -37,10 +38,17 @@ Atendente:
 - Hardening pos-auditoria:
   logger estruturado, dinheiro com milhar, ids deterministicos compartilhados,
   idempotencia por turno no Planner.
+- Sprint 5: Worker Shadow minimalista:
+  `src/atendente/worker.ts`, consumo de `ops.atendente_jobs`,
+  `buildPlannerContext`, `planTurn`, `recordPlannerDecision`,
+  `executeToolRequests`, `recordToolExecutionResults`, sem Generator e sem
+  envio Chatwoot. Desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
+- Organizadora v3.3 calibrada:
+  prompt `moto-pneus-hybrid-v3-3`, matriz expandida com 46/48 aprovados
+  apos deploy em 2026-05-03.
 
 ## O Que Ainda Nao Existe
 
-- Worker shadow da Atendente.
 - Generator.
 - Critic.
 - Reflection loop.
@@ -51,21 +59,23 @@ Atendente:
 
 Ultima validacao local conhecida:
 
-- `npm test`: 253/253 verde.
+- `npm test`: 267/267 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 
 Ultimos commits enviados para `origin/main` e `pneus/main`:
 
-- `e46cf74 feat: add tool executor guardrails`
-- `79847a2 fix: harden atendente guardrails`
-- `05395d8 fix: share deterministic event ids`
+- `834151d docs: record organizadora v3.3 eval`
+- `7beb37c feat: tune organizadora prompt v3.3`
+- `d6669e6 test: expand organizadora eval matrix`
+- `fec54ad feat: add atendente shadow worker`
 
 ## Proxima Fase
 
-Sprint 5: Worker Shadow minimalista.
+Sprint 6: Generator shadow da Atendente.
 
-Objetivo: exercitar o pipeline real sem Generator e sem enviar nada ao cliente.
+Objetivo: gerar uma resposta candidata em auditoria, ainda sem enviar nada ao
+cliente.
 
 Fluxo esperado:
 
@@ -74,23 +84,22 @@ ops.atendente_jobs
   -> worker pega job
   -> buildPlannerContext
   -> planTurn
-  -> recordPlannerDecision
   -> executeToolRequests
-  -> recordToolExecutionResults
-  -> grava auditoria/turno shadow
+  -> Generator cria resposta candidata
+  -> validadores bloqueiam fala sem lastro
+  -> grava auditoria shadow
   -> para
 ```
 
 Nao fazer ainda:
 
-- nao chamar Generator;
-- nao criar texto para cliente;
 - nao enviar Chatwoot;
-- nao ativar Planner LLM por default;
+- nao ativar envio automatico;
 - nao criar pedido automatico.
+- nao remover o modo shadow/log-only.
 
 ## Pergunta Para Comecar O Proximo Chat
 
-"Quero abrir a Sprint 5: implementar o Worker Shadow minimalista da Atendente,
-log-only, sem Generator e sem envio Chatwoot. Antes de codar, confira o estado
-do repo e proponha o menor plano seguro."
+"Quero abrir a Sprint 6: desenhar o Generator shadow da Atendente, sem envio
+Chatwoot. Antes de codar, confira o estado do repo e proponha o menor plano
+seguro."

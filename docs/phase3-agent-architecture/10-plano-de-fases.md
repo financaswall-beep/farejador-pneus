@@ -72,8 +72,12 @@ Feature flags sugeridas:
 
 ```text
 ORGANIZADORA_ENABLED=true
-ATENDENTE_ENABLED=false
+ATENDENTE_SHADOW_ENABLED=false
+PLANNER_LLM_ENABLED=false
 ```
+
+Estado em 03/05/2026: Worker Shadow da Atendente ja existe e continua
+log-only. A proxima fase e Generator shadow, ainda sem envio Chatwoot.
 
 ## Fase E - Atendente ligada gradualmente
 

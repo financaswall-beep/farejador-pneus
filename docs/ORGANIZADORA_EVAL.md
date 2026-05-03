@@ -1,5 +1,13 @@
 # Avaliacao da Organizadora
 
+Estado atual em 2026-05-03:
+
+- Prompt ativo: `moto-pneus-hybrid-v3-3`.
+- Arquivo do prompt: `src/organizadora/prompt.ts`.
+- Matriz sintetica expandida: 46/48 aprovados.
+- Decisao atual: encerrar ajustes em teste sintetico e observar conversas reais
+  antes de novo aumento de prompt.
+
 Este documento define como medir a qualidade da Organizadora antes de alterar o prompt.
 
 ## Objetivo

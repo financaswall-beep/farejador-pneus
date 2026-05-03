@@ -1,14 +1,14 @@
 # Briefing Para Codex - Farejador
 
-Atualizado: 2026-04-29.
+Atualizado: 2026-05-03.
 
 ## Leitura Rapida
 
 Voce esta no repo `C:\Farejador agente`. Responda em portugues brasileiro.
 
 O projeto ja passou da captura basica: webhook, normalizacao, enrichment,
-Organizadora LLM e fundacao da Atendente estao implementados. O bot ainda nao
-responde clientes.
+Organizadora LLM, Worker Shadow da Atendente e fundacao de estado/tools/planner
+estao implementados. O bot ainda nao responde clientes.
 
 ## Estado Da Atendente
 
@@ -19,15 +19,16 @@ Implementado:
 - `src/atendente/planner/*` - Context Builder, Planner schemas/service/prompt.
 - `src/atendente/executor/*` - executor de tools.
 - `src/atendente/validators/*` - validacao inicial de fala/acoes.
+- `src/atendente/worker.ts` - Worker Shadow log-only.
 - `src/shared/deterministic-id.ts` - UUID deterministico para eventos.
 
 Desligado/inexistente:
 
-- Worker shadow.
+- Worker Shadow existe, mas fica desligado por default
+  (`ATENDENTE_SHADOW_ENABLED=false`).
 - Generator.
 - Critic.
 - Envio Chatwoot.
-- `ATENDENTE_ENABLED`.
 
 ## Principio De Arquitetura
 
@@ -41,17 +42,15 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Sprint 5: criar Worker Shadow da Atendente, sem Generator e sem envio Chatwoot.
+Sprint 6: criar Generator shadow da Atendente, sem envio Chatwoot.
 
 Escopo esperado:
 
-- consumir `ops.atendente_jobs`;
-- montar contexto com `buildPlannerContext`;
-- chamar `planTurn`;
-- gravar `planner_decided`;
-- executar `tool_requests`;
-- gravar `tool_executed/tool_failed`;
-- registrar um turno shadow/auditoria;
+- receber contexto/plano/resultados de tools;
+- gerar texto candidato sem enviar;
+- validar com `SayValidator`/`ActionValidator`;
+- gravar auditoria shadow;
+- manter fallback seguro quando faltar dado;
 - nao enviar mensagem para Chatwoot.
 
 ## Comandos De Validacao
@@ -64,7 +63,7 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 253/253 verde
+- `npm test`: 267/267 verde
 - `npm run typecheck`: verde
 - `npm run build`: verde
 

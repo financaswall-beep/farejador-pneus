@@ -37,7 +37,8 @@ voce digita como cliente
   -> analytics.fact_evidence recebe a prova literal
 ```
 
-Ele nao testa a LLM Atendente, porque a Atendente ainda nao existe/nao esta ligada.
+Ele nao testa a LLM Atendente. Em 03/05/2026, existe apenas o Worker Shadow
+log-only da Atendente; Generator e envio Chatwoot continuam fora deste teste.
 
 No Shadow Assistido, quem responde e voce, manualmente, pelo Chatwoot.
 

@@ -1,14 +1,15 @@
 # 00 - Estado de Implementacao da Fase 3
 
-Atualizado: 2026-04-29.
+Atualizado: 2026-05-03.
 
 Este e o estado vivo da Fase 3. Historico detalhado anterior permanece no git;
 este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
 
 ## Resumo Executivo
 
-Organizadora esta em producao. A Atendente ja tem fundacao de estado, tools,
-Planner e Executor/guardrails, mas ainda nao tem runtime de atendimento.
+Organizadora esta em producao e calibrada no prompt v3.3. A Atendente ja tem
+fundacao de estado, tools, Planner, Executor/guardrails e Worker Shadow
+minimalista. Ainda nao existe Generator nem envio Chatwoot.
 
 Nada responde cliente automaticamente.
 
@@ -28,7 +29,8 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 2 - tools deterministicas | Implementado |
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
-| Atendente Sprint 5 - Worker Shadow | Proxima fase |
+| Atendente Sprint 5 - Worker Shadow | Implementado, desligado por default |
+| Atendente Sprint 6 - Generator Shadow | Proxima fase |
 | Generator | Nao existe |
 | Critic | Nao existe |
 | Envio Chatwoot pela Atendente | Nao existe |
@@ -108,17 +110,32 @@ Executor/Guardrails:
 - `src/atendente/validators/tool-results.ts`
 - `src/shared/deterministic-id.ts`
 
+Worker Shadow:
+
+- `src/atendente/worker.ts`
+- `src/shared/repositories/ops-atendente.repository.ts`
+- `ATENDENTE_SHADOW_ENABLED=false` por default
+- log-only: sem Generator, sem `say_text`, sem envio Chatwoot
+
+## Organizadora v3.3
+
+- `extractor_version`: `moto-pneus-hybrid-v3-3`
+- Prompt atual: `src/organizadora/prompt.ts`, 151 linhas no arquivo.
+- Matriz sintetica expandida: 46/48 aprovados em 2026-05-03.
+- Falhas restantes registradas em `docs/ORGANIZADORA_EVAL.md`.
+- Proxima acao da Organizadora: observar conversas reais antes de novo ajuste.
+
 ## Validacao Atual
 
 Ultima validacao conhecida:
 
-- `npm test`: 253/253 verde.
+- `npm test`: 267/267 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 
 ## Proxima Fase
 
-Sprint 5: Worker Shadow minimalista da Atendente.
+Sprint 6: Generator Shadow da Atendente.
 
 Fluxo desejado:
 
@@ -127,16 +144,15 @@ ops.atendente_jobs
   -> Worker Shadow
   -> buildPlannerContext
   -> planTurn
-  -> recordPlannerDecision
   -> executeToolRequests
-  -> recordToolExecutionResults
+  -> Generator cria resposta candidata
+  -> validadores aprovam/bloqueiam
   -> grava auditoria shadow
   -> para
 ```
 
-Limites da Sprint 5:
+Limites da Sprint 6:
 
-- sem Generator;
 - sem Critic;
 - sem envio Chatwoot;
 - sem atendimento automatico;

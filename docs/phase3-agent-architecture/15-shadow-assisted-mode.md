@@ -46,15 +46,21 @@ Esse volume e suficiente para observar dados reais antes de automatizar o atendi
 
 ```text
 ORGANIZADORA_ENABLED=true
-ATENDENTE_ENABLED=false
+ATENDENTE_SHADOW_ENABLED=false
+PLANNER_LLM_ENABLED=false
 SUPERVISORA_ENABLED=false
 ```
 
-Quando chegar a hora de testar a Atendente:
+Quando chegar a hora de testar a Atendente em log-only:
 
 ```text
-ATENDENTE_ENABLED=true
+ATENDENTE_SHADOW_ENABLED=true
 ```
+
+Mesmo com `ATENDENTE_SHADOW_ENABLED=true`, o sistema nao envia mensagem para o
+Chatwoot: o Worker Shadow apenas monta contexto, planeja, executa tools e grava
+auditoria. Envio Chatwoot so entra em fase posterior e com autorizacao
+explicita.
 
 ## O que a Organizadora deve aprender nesse periodo
 

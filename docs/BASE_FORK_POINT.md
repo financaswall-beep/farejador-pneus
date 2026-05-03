@@ -1,6 +1,6 @@
 # Ponto de bifurcacao do Farejador Base
 
-Atualizado: 26/04/2026
+Atualizado: 03/05/2026
 
 ## Objetivo
 
@@ -15,6 +15,12 @@ ser reaproveitado em outros segmentos, como:
 - servicos locais.
 
 ## Veredito curto
+
+Nota de 03/05/2026: este documento virou referencia historica da fronteira
+da base generica. O fork operacional de pneus ja evoluiu com Organizadora LLM
+e Worker Shadow da Atendente. Para o estado vivo, use `docs/PROJECT.md`,
+`docs/NEXT_CHAT_HANDOFF.md` e
+`docs/phase3-agent-architecture/00-estado-de-implementacao.md`.
 
 Codigo pronto para tag `farejador-base-v1`. Tag aguardando checklist operacional.
 

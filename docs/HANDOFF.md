@@ -1,14 +1,14 @@
 # Handoff - Farejador
 
-Atualizado: 2026-04-29.
+Atualizado: 2026-05-03.
 
 Este arquivo e o handoff operacional curto. Para contexto completo da proxima
 conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
 
 ## Estado Atual
 
-O sistema esta em Fase 3, com a Organizadora em producao e a Atendente sendo
-construida por camadas, ainda sem responder clientes.
+O sistema esta em Fase 3, com a Organizadora em producao/calibrada e a
+Atendente construida em camadas. A Atendente ainda nao responde clientes.
 
 Implementado:
 
@@ -23,10 +23,13 @@ Implementado:
 - Atendente Sprint 3: Context Builder, Planner schema/service, policy schemas.
 - Atendente Sprint 4: Tool Executor, eventos `tool_executed/tool_failed`,
   `SayValidator` inicial e `ActionValidator` reforcado.
+- Atendente Sprint 5: Worker Shadow minimalista (`src/atendente/worker.ts`),
+  log-only, desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
+- Organizadora v3.3: prompt `moto-pneus-hybrid-v3-3`, matriz expandida 48
+  casos com 46 aprovados, 2 falhas pequenas registradas.
 
 Nao implementado/nao ligado:
 
-- Worker shadow da Atendente.
 - Generator.
 - Critic.
 - Envio Chatwoot pela Atendente.
@@ -34,15 +37,16 @@ Nao implementado/nao ligado:
 
 ## Ultimas Validacoes
 
-- `npm test`: 253/253 verde.
+- `npm test`: 267/267 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 - Migrations ate `0026` validadas/aplicadas no Supabase atual.
 
 ## Ultimos Commits Relevantes
 
-- `e46cf74 feat: add tool executor guardrails`
-- `79847a2 fix: harden atendente guardrails`
+- `834151d docs: record organizadora v3.3 eval`
+- `7beb37c feat: tune organizadora prompt v3.3`
+- `fec54ad feat: add atendente shadow worker`
 - `05395d8 fix: share deterministic event ids`
 
 Remotes sincronizados:
@@ -52,26 +56,27 @@ Remotes sincronizados:
 
 ## Proxima Fase Recomendada
 
-Sprint 5: Worker Shadow minimalista da Atendente.
+Sprint 6: Generator shadow da Atendente.
 
-Objetivo: rodar pipeline real sem enviar nada ao cliente:
+Objetivo: criar resposta candidata auditavel sem enviar nada ao cliente:
 
 ```text
 ops.atendente_jobs
   -> worker pega job
   -> Context Builder
-  -> Planner mock/flagado
+  -> Planner
   -> Tool Executor
-  -> grava agent.turns/session_events
-  -> STOP, sem Generator e sem Chatwoot
+  -> Generator shadow
+  -> validadores
+  -> grava auditoria
+  -> STOP, sem envio Chatwoot
 ```
 
 Por que fazer assim:
 
-- valida a costura real entre estado, planner e tools;
-- nao cria risco de resposta para cliente;
+- valida qualidade de resposta sem risco de envio;
 - gera material de auditoria para Wallace/Opus;
-- prepara o terreno para Generator no Sprint 6.
+- prepara o terreno para Critic e, depois, sugestao assistida.
 
 ## Cuidados
 
@@ -79,4 +84,5 @@ Por que fazer assim:
 - Scripts temporarios na raiz foram removidos; nao recriar scripts com token ou
   dados reais fora de `tmp/`.
 - `.env` e `.env.codex` nunca devem ser commitados.
-- Atendente deve continuar desligada ate Wallace mandar ativar explicitamente.
+- `ATENDENTE_SHADOW_ENABLED` pode rodar em log-only; envio Chatwoot continua
+  inexistente/desligado ate Wallace mandar ativar explicitamente.

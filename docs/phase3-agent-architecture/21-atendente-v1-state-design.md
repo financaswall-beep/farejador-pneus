@@ -1,5 +1,9 @@
 # 21 — Atendente v1: State Design (Sprint 1)
 
+> **Nota 2026-05-03:** este documento continua sendo a referencia historica
+> do Sprint 1 de estado. Sprints 2-5 ja foram implementados; o estado vivo fica
+> em `00-estado-de-implementacao.md`.
+
 > **Status:** Aprovado por Opus + Codex em 2026-04-29.
 > **Sprint:** 1 de N da implementação da Atendente.
 > **Escopo:** Fundação determinística do estado reentrante. Sem LLM, sem envio Chatwoot, sem Generator, sem Critic.
@@ -818,10 +822,11 @@ Arquivo: `src/atendente/state/__tests__/apply-action.test.ts`
 |--------|------|
 | 2 | Tools determinísticas + testes (5 tools obrigatórias) |
 | 3 | Planner LLM constrained + skills reentrantes |
-| 4 | Generator + SayValidator + ActionValidator completo |
-| 5 | Atendente Shadow rodando sem enviar Chatwoot |
-| 6 | Golden set + Critic seletivo + métricas |
-| 7+ | Envio controlado para casos simples |
+| 4 | Tool Executor + guardrails |
+| 5 | Atendente Shadow log-only sem enviar Chatwoot |
+| 6 | Generator shadow + validadores |
+| 7 | Golden set + Critic seletivo + metricas |
+| 8+ | Envio controlado para casos simples |
 
 ---
 

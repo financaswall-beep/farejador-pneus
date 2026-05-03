@@ -13,8 +13,8 @@ registro arquitetural; o estado vivo fica em `00-estado-de-implementacao.md`.
 - Atendente Sprint 2: tools deterministicas implementadas.
 - Atendente Sprint 3: Planner foundation implementado.
 - Atendente Sprint 4: Executor/guardrails implementados.
-- Proxima fase: Sprint 5 Worker Shadow, ainda sem Generator e sem envio
-  Chatwoot.
+- Atendente Sprint 5: Worker Shadow implementado, desligado por default.
+- Proxima fase: Sprint 6 Generator Shadow, ainda sem envio Chatwoot.
 
 ## Indice Principal
 
