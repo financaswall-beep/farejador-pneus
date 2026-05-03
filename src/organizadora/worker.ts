@@ -34,7 +34,7 @@ import {
   listMessagesForOrganizadora,
   getContactByConversationId,
 } from '../shared/repositories/core-reader.repository.js';
-import { buildOrganizadoraPrompt, SCHEMA_VERSION } from './prompt.js';
+import { buildOrganizadoraPrompt, EXTRACTOR_VERSION, SCHEMA_VERSION } from './prompt.js';
 import { parseOrganizadoraResponse } from '../shared/zod/llm-organizadora.js';
 import { validateFactValue } from '../shared/zod/fact-keys.js';
 import type { IncidentInsert } from '../shared/repositories/ops-phase3.repository.js';
@@ -239,13 +239,13 @@ async function processJob(
           truth_type: fact.truth_type,
           source: EXTRACTOR_SOURCE,
           confidence_level: fact.confidence_level,
-          extractor_version: SCHEMA_VERSION,
+          extractor_version: EXTRACTOR_VERSION,
         },
         {
           from_message_id: fact.from_message_id,
           evidence_text: fact.evidence_text,
           evidence_type: fact.evidence_type,
-          extractor_version: SCHEMA_VERSION,
+          extractor_version: EXTRACTOR_VERSION,
         },
       );
       await client.query(`RELEASE SAVEPOINT ${sp}`);
