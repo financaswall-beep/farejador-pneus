@@ -13,6 +13,8 @@ const planTurnMock = vi.fn();
 const recordPlannerDecisionMock = vi.fn();
 const executeToolRequestsMock = vi.fn();
 const recordToolExecutionResultsMock = vi.fn();
+const generateTurnMock = vi.fn();
+const recordGeneratorResultMock = vi.fn();
 
 vi.mock('../../../src/atendente/planner/context-builder.js', () => ({
   buildPlannerContext: buildPlannerContextMock,
@@ -28,6 +30,11 @@ vi.mock('../../../src/atendente/executor/tool-executor.js', () => ({
   recordToolExecutionResults: recordToolExecutionResultsMock,
 }));
 
+vi.mock('../../../src/atendente/generator/service.js', () => ({
+  generateTurn: generateTurnMock,
+  recordGeneratorResult: recordGeneratorResultMock,
+}));
+
 let processAtendenteJob: typeof import('../../../src/atendente/worker.js').processAtendenteJob;
 let classifyJobFailure: typeof import('../../../src/atendente/worker.js').classifyJobFailure;
 let startAtendenteShadow: typeof import('../../../src/atendente/worker.js').startAtendenteShadow;
@@ -39,6 +46,7 @@ beforeAll(async () => {
   process.env.ADMIN_AUTH_TOKEN = 'test';
   process.env.PLANNER_LLM_ENABLED = 'false';
   process.env.ATENDENTE_SHADOW_ENABLED = 'false';
+  process.env.GENERATOR_LLM_ENABLED = 'false';
   const worker = await import('../../../src/atendente/worker.js');
   processAtendenteJob = worker.processAtendenteJob;
   classifyJobFailure = worker.classifyJobFailure;
@@ -82,6 +90,20 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
     ]);
     recordToolExecutionResultsMock.mockResolvedValueOnce(undefined);
 
+    generateTurnMock.mockResolvedValueOnce({
+      say_text: 'Encontrei opções para você.',
+      actions: [],
+      blocked: false,
+      block_reason: null,
+      used_llm: false,
+      fallback_used: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      duration_ms: 1,
+    });
+    const fakeTurnId = '00000000-0000-4000-8000-00000000abcd';
+    recordGeneratorResultMock.mockResolvedValueOnce(fakeTurnId);
+
     const client = { query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ '?column?': 1 }] }) };
     const summary = await processAtendenteJob(client as never, fakeJob());
 
@@ -93,12 +115,23 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
     expect(recordPlannerDecisionMock).toHaveBeenCalledWith(client, context, decision);
     expect(executeToolRequestsMock).toHaveBeenCalledTimes(1);
     expect(recordToolExecutionResultsMock).toHaveBeenCalledTimes(1);
+    expect(generateTurnMock).toHaveBeenCalledTimes(1);
+    expect(recordGeneratorResultMock).toHaveBeenCalledWith(
+      client,
+      context,
+      'buscar_e_ofertar',
+      expect.objectContaining({ blocked: false }),
+      triggerMessageId,
+    );
     expect(summary).toEqual({
       skill: 'buscar_e_ofertar',
       used_llm: false,
       fallback_used: false,
       turn_index: 3,
       tool_results: expect.arrayContaining([expect.objectContaining({ tool: 'buscarProduto', ok: true })]),
+      generator_blocked: false,
+      generator_block_reason: null,
+      turn_id: fakeTurnId,
     });
   });
 
@@ -123,6 +156,18 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
       duration_ms: 0,
     });
     recordPlannerDecisionMock.mockResolvedValueOnce(undefined);
+    generateTurnMock.mockResolvedValueOnce({
+      say_text: 'Preciso de mais informações.',
+      actions: [],
+      blocked: false,
+      block_reason: null,
+      used_llm: false,
+      fallback_used: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      duration_ms: 0,
+    });
+    recordGeneratorResultMock.mockResolvedValueOnce('00000000-0000-4000-8000-000000000099');
 
     const client = { query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ '?column?': 1 }] }) };
     const summary = await processAtendenteJob(client as never, fakeJob());
@@ -173,6 +218,8 @@ function resetMocks(): void {
   recordPlannerDecisionMock.mockReset();
   executeToolRequestsMock.mockReset();
   recordToolExecutionResultsMock.mockReset();
+  generateTurnMock.mockReset();
+  recordGeneratorResultMock.mockReset();
 }
 
 function fakeJob(): AtendenteJobRow {

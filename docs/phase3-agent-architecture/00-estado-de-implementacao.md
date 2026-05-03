@@ -8,8 +8,8 @@ este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
 ## Resumo Executivo
 
 Organizadora esta em producao e calibrada no prompt v3.3. A Atendente ja tem
-fundacao de estado, tools, Planner, Executor/guardrails e Worker Shadow
-minimalista. Ainda nao existe Generator nem envio Chatwoot.
+fundacao de estado, tools, Planner, Executor/guardrails, Worker Shadow e
+Generator Shadow (gera resposta candidata auditavel, nao envia ao Chatwoot).
 
 Nada responde cliente automaticamente.
 
@@ -30,8 +30,7 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
 | Atendente Sprint 5 - Worker Shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator Shadow | Proxima fase |
-| Generator | Nao existe |
+| Atendente Sprint 6 - Generator Shadow | Implementado, desligado por default |
 | Critic | Nao existe |
 | Envio Chatwoot pela Atendente | Nao existe |
 
@@ -51,6 +50,7 @@ Nada responde cliente automaticamente.
 - `0024_atendente_v1_state_extensions.sql`
 - `0025_planner_foundation.sql`
 - `0026_tool_executor_events.sql`
+- `0027_generator_shadow_events.sql` (pendente de apply no Supabase)
 
 ## Codigo Da Organizadora
 
@@ -127,15 +127,15 @@ Worker Shadow:
 
 ## Validacao Atual
 
-Ultima validacao conhecida:
+Ultima validacao (pos Sprint 6):
 
-- `npm test`: 267/267 verde.
+- `npm test`: 287/287 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 
 ## Proxima Fase
 
-Sprint 6: Generator Shadow da Atendente.
+Sprint 7: Critic Shadow da Atendente.
 
 Fluxo desejado:
 
@@ -146,17 +146,16 @@ ops.atendente_jobs
   -> planTurn
   -> executeToolRequests
   -> Generator cria resposta candidata
-  -> validadores aprovam/bloqueiam
+  -> Critic avalia o candidato
   -> grava auditoria shadow
   -> para
 ```
 
-Limites da Sprint 6:
+Limites da Sprint 7:
 
-- sem Critic;
 - sem envio Chatwoot;
 - sem atendimento automatico;
-- `PLANNER_LLM_ENABLED=false` por default;
+- `GENERATOR_LLM_ENABLED=false` por default;
 - log-only/shadow-only.
 
 ## Documentos De Apoio

@@ -8,7 +8,8 @@ conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
 ## Estado Atual
 
 O sistema esta em Fase 3, com a Organizadora em producao/calibrada e a
-Atendente construida em camadas. A Atendente ainda nao responde clientes.
+Atendente construida em camadas. A Atendente ainda nao responde clientes
+automaticamente.
 
 Implementado:
 
@@ -25,25 +26,31 @@ Implementado:
   `SayValidator` inicial e `ActionValidator` reforcado.
 - Atendente Sprint 5: Worker Shadow minimalista (`src/atendente/worker.ts`),
   log-only, desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
+- Atendente Sprint 6: Generator Shadow (`src/atendente/generator/service.ts`).
+  Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
+  grava em `agent.turns` (status='generated'|'blocked') e auditoria em
+  `agent.session_events` (event_type='generator_produced'). Nunca envia ao Chatwoot.
+  Controlado por `GENERATOR_LLM_ENABLED` (default false).
 - Organizadora v3.3: prompt `moto-pneus-hybrid-v3-3`, matriz expandida 48
   casos com 46 aprovados, 2 falhas pequenas registradas.
 
 Nao implementado/nao ligado:
 
-- Generator.
 - Critic.
 - Envio Chatwoot pela Atendente.
 - Qualquer atendimento automatico ao cliente.
 
 ## Ultimas Validacoes
 
-- `npm test`: 267/267 verde.
+- `npm test`: 287/287 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
+- Migration `0027_generator_shadow_events.sql` criada (adiciona
+  `generator_produced` ao CHECK de `agent.session_events`). Aplicar no Supabase.
 - Scripts operacionais locais higienizados em 2026-05-03 para nao carregar
   `DATABASE_URL`, endpoint real de Chatwoot ou identificador de inbox como
   default hardcoded. Devem ser executados sempre com `.env` local.
-- Migrations ate `0026` validadas/aplicadas no Supabase atual.
+- Migrations ate `0027` criadas; `0027` pendente de apply no Supabase.
 
 ## Ultimos Commits Relevantes
 
@@ -59,9 +66,9 @@ Remotes sincronizados:
 
 ## Proxima Fase Recomendada
 
-Sprint 6: Generator shadow da Atendente.
+Sprint 7: Critic Shadow da Atendente.
 
-Objetivo: criar resposta candidata auditavel sem enviar nada ao cliente:
+Objetivo: avaliar a resposta candidata do Generator antes de qualquer envio:
 
 ```text
 ops.atendente_jobs
@@ -69,17 +76,15 @@ ops.atendente_jobs
   -> Context Builder
   -> Planner
   -> Tool Executor
-  -> Generator shadow
-  -> validadores
+  -> Generator shadow (gera candidato)
+  -> Critic shadow (avalia candidato)
   -> grava auditoria
   -> STOP, sem envio Chatwoot
 ```
 
-Por que fazer assim:
-
-- valida qualidade de resposta sem risco de envio;
-- gera material de auditoria para Wallace/Opus;
-- prepara o terreno para Critic e, depois, sugestao assistida.
+Alternativamente, se Critic for considerado prematuro, proxima fase pode ser:
+- ativar envio Chatwoot controlado para conversas de teste em shadow mode;
+- monitorar qualidade por 1-2 semanas antes de ativar em producao.
 
 ## Cuidados
 

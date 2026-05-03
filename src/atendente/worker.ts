@@ -1,13 +1,11 @@
 /**
- * Atendente Worker Shadow - Sprint 5.
+ * Atendente Worker Shadow - Sprint 6.
  *
- * Log-only: Context Builder -> Planner -> Tool Executor -> auditoria.
+ * Fluxo: Context Builder -> Planner -> Tool Executor -> Generator Shadow -> auditoria.
  *
  * Limites desta sprint:
- * - sem Generator;
- * - sem say_text;
  * - sem envio Chatwoot;
- * - sem agent.turns;
+ * - sem atendimento automático ao cliente.
  * - worker desligado por default.
  */
 
@@ -32,6 +30,7 @@ import {
 } from './executor/tool-executor.js';
 import { buildPlannerContext } from './planner/context-builder.js';
 import { planTurn, recordPlannerDecision } from './planner/service.js';
+import { generateTurn, recordGeneratorResult } from './generator/service.js';
 
 const WORKER_ID = `atendente-shadow-${randomUUID().slice(0, 8)}`;
 const MISSING_STATE_PREFIX = 'planner_context_missing_state:';
@@ -57,6 +56,9 @@ export async function processAtendenteJob(
   fallback_used: boolean;
   turn_index: number;
   tool_results: ToolExecutionResult[];
+  generator_blocked: boolean;
+  generator_block_reason: string | null;
+  turn_id: string;
 }> {
   await lockSessionForJob(client, job);
 
@@ -72,14 +74,26 @@ export async function processAtendenteJob(
     await recordToolExecutionResults(client, context, toolResults);
   }
 
+  const generatorResult = await generateTurn(context, decision, toolResults);
+  const turnId = await recordGeneratorResult(
+    client,
+    context,
+    decision.output.skill,
+    generatorResult,
+    job.trigger_message_id,
+  );
+
   await markShadowTurnProcessed(client, job, turnIndex);
 
   return {
     skill: decision.output.skill,
-    used_llm: decision.used_llm,
-    fallback_used: decision.fallback_used,
+    used_llm: decision.used_llm || generatorResult.used_llm,
+    fallback_used: decision.fallback_used || generatorResult.fallback_used,
     turn_index: turnIndex,
     tool_results: toolResults,
+    generator_blocked: generatorResult.blocked,
+    generator_block_reason: generatorResult.block_reason,
+    turn_id: turnId,
   };
 }
 
@@ -123,8 +137,12 @@ export async function pollAndAttend(): Promise<void> {
           fallback_used: summary.fallback_used,
           tool_count: summary.tool_results.length,
           tool_failures: summary.tool_results.filter((result) => !result.ok).length,
+          generator_blocked: summary.generator_blocked,
+          generator_block_reason: summary.generator_block_reason,
+          turn_id: summary.turn_id,
         },
         'atendente shadow: job processed',
+        // Sem envio Chatwoot — log-only.
       );
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
@@ -188,6 +206,7 @@ export function startAtendenteShadow(): () => void {
       worker_id: WORKER_ID,
       poll_interval_ms: env.ATENDENTE_SHADOW_POLL_INTERVAL_MS,
       planner_llm_enabled: env.PLANNER_LLM_ENABLED,
+      generator_llm_enabled: env.GENERATOR_LLM_ENABLED,
     },
     'atendente shadow: starting',
   );

@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-03.
+Atualizado: 2026-05-03 (Sprint 6 concluida).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -8,8 +8,8 @@ Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
 Estamos construindo a Atendente por camadas, mas ela ainda nao envia mensagem ao
 cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
-Organizadora LLM, roda a fundacao da Atendente em modo shadow quando habilitada
-e prepara dados/estado para o Generator futuro.
+Organizadora LLM, roda a fundacao da Atendente em shadow incluindo o Generator
+(que gera resposta candidata auditavel, mas nao envia nada).
 
 ## Ja Implementado
 
@@ -41,15 +41,22 @@ Atendente:
 - Sprint 5: Worker Shadow minimalista:
   `src/atendente/worker.ts`, consumo de `ops.atendente_jobs`,
   `buildPlannerContext`, `planTurn`, `recordPlannerDecision`,
-  `executeToolRequests`, `recordToolExecutionResults`, sem Generator e sem
-  envio Chatwoot. Desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
+  `executeToolRequests`, `recordToolExecutionResults`. Desligado por default
+  via `ATENDENTE_SHADOW_ENABLED=false`.
+- Sprint 6: Generator Shadow:
+  `src/atendente/generator/service.ts`, gera resposta candidata auditavel,
+  valida com `SayValidator`/`ActionValidator`, grava em `agent.turns`
+  (status='generated'|'blocked') e `agent.session_events`
+  (event_type='generator_produced'). Nunca envia ao Chatwoot. Nunca escreve
+  em raw/core/analytics/commerce. Controlado por `GENERATOR_LLM_ENABLED`
+  (default false). Migration `0027_generator_shadow_events.sql` criada
+  (adiciona 'generator_produced' ao CHECK de `agent.session_events`).
 - Organizadora v3.3 calibrada:
   prompt `moto-pneus-hybrid-v3-3`, matriz expandida com 46/48 aprovados
   apos deploy em 2026-05-03.
 
 ## O Que Ainda Nao Existe
 
-- Generator.
 - Critic.
 - Reflection loop.
 - Envio Chatwoot pela Atendente.
@@ -57,11 +64,12 @@ Atendente:
 
 ## Validacao Atual
 
-Ultima validacao local conhecida:
+Ultima validacao local (pos Sprint 6):
 
-- `npm test`: 267/267 verde.
+- `npm test`: 287/287 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
+- Migration `0027` criada, pendente de apply no Supabase.
 - Scripts operacionais locais foram higienizados em 2026-05-03 para depender de
   `.env` e nao manter secrets/endpoints reais hardcoded no repo.
 
@@ -74,10 +82,11 @@ Ultimos commits enviados para `origin/main` e `pneus/main`:
 
 ## Proxima Fase
 
-Sprint 6: Generator shadow da Atendente.
+Sprint 7: Critic Shadow da Atendente.
 
-Objetivo: gerar uma resposta candidata em auditoria, ainda sem enviar nada ao
-cliente.
+Objetivo: avaliar a resposta candidata do Generator antes de qualquer envio ao
+cliente. O Critic deve ser capaz de bloquear ou aprovar o candidato, registrando
+auditoria em `agent.*` e `ops.*`.
 
 Fluxo esperado:
 
@@ -88,9 +97,9 @@ ops.atendente_jobs
   -> planTurn
   -> executeToolRequests
   -> Generator cria resposta candidata
-  -> validadores bloqueiam fala sem lastro
+  -> Critic avalia o candidato
   -> grava auditoria shadow
-  -> para
+  -> para (sem envio Chatwoot)
 ```
 
 Nao fazer ainda:
@@ -102,6 +111,6 @@ Nao fazer ainda:
 
 ## Pergunta Para Comecar O Proximo Chat
 
-"Quero abrir a Sprint 6: desenhar o Generator shadow da Atendente, sem envio
+"Quero abrir a Sprint 7: desenhar o Critic shadow da Atendente, sem envio
 Chatwoot. Antes de codar, confira o estado do repo e proponha o menor plano
 seguro."

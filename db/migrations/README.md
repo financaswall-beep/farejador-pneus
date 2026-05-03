@@ -32,6 +32,7 @@ Ordem de execução:
 24. `0024_atendente_v1_state_extensions.sql` - extensoes aditivas para o Sprint 1 da Atendente v1: versionamento e idempotencia em `agent.session_current`/`agent.session_events`, novos `event_type`, `agent.session_items` e `agent.session_slots` para estado reentrante com procedencia.
 25. `0025_planner_foundation.sql` - base do Sprint 3 Planner: adiciona `planner_decided`, `aliases` em `commerce.vehicle_models`, `commerce.resolve_vehicle_model` e realinha helpers para `fitment_position`, `fitment_source`, `match_similarity`.
 26. `0026_tool_executor_events.sql` - base do Sprint 4 Executor: adiciona `tool_executed` e `tool_failed` ao ledger `agent.session_events`.
+27. `0027_generator_shadow_events.sql` - base do Sprint 6 Generator Shadow: adiciona `generator_produced` ao ledger `agent.session_events` para auditoria da resposta candidata, sem envio Chatwoot.
 
 ## Convenções
 

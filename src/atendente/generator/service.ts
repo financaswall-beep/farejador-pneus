@@ -1,0 +1,338 @@
+/**
+ * Generator Shadow — Sprint 6.
+ *
+ * Responsabilidades:
+ * - Gerar resposta candidata auditável a partir de contexto + plano + tools.
+ * - Validar com SayValidator e ActionValidator antes de registrar.
+ * - Gravar resultado em agent.turns (status='generated'|'blocked') e
+ *   audit em agent.session_events (event_type='generator_produced').
+ * - NUNCA enviar mensagem ao Chatwoot.
+ * - NUNCA escrever em raw.*, core.*, analytics.* ou commerce.*.
+ *
+ * Hierarquia de dados (maior procedência prevalece):
+ *   confirmed > observed > tool/sistema > inferred_from_organizadora > histórico
+ */
+
+import type { PoolClient } from 'pg';
+import { env } from '../../shared/config/env.js';
+import { deterministicUuid } from '../../shared/deterministic-id.js';
+import { callOpenAI } from '../../shared/llm-clients/openai.js';
+import { logger } from '../../shared/logger.js';
+import type { PlannerContext } from '../planner/context-builder.js';
+import type { SkillName } from '../planner/schemas.js';
+import type { PlannerDecisionResult } from '../planner/service.js';
+import type { ToolExecutionResult } from '../executor/tool-executor.js';
+import { validateSay } from '../validators/say-validator.js';
+import { validateAction } from '../validators/action-validator.js';
+import type { ToolResultForValidation } from '../validators/tool-results.js';
+import { buildGeneratorMessages } from './prompt.js';
+import {
+  generatorOutputRawSchema,
+  generatorPromptVersion,
+  generatorAgentVersion,
+  SAFE_FALLBACK_SAY,
+  type GeneratorAction,
+  type GeneratorResult,
+} from './schemas.js';
+
+// ------------------------------------------------------------------
+// Validação
+// ------------------------------------------------------------------
+
+function toValidationCtx(toolResults: ToolExecutionResult[]): {
+  recent_tool_results: ToolResultForValidation[];
+} {
+  return {
+    recent_tool_results: toolResults.map((result) => ({
+      tool: result.tool,
+      ok: result.ok,
+      output: result.output,
+    })),
+  };
+}
+
+function runValidators(
+  say: string,
+  actions: GeneratorAction[],
+  toolResults: ToolExecutionResult[],
+  context: PlannerContext,
+): { blocked: boolean; block_reason: string | null } {
+  const validationCtx = toValidationCtx(toolResults);
+
+  const sayResult = validateSay(say, validationCtx);
+  if (!sayResult.valid) {
+    return { blocked: true, block_reason: sayResult.reason };
+  }
+
+  for (const action of actions) {
+    const actionResult = validateAction(context.state, action, validationCtx);
+    if (!actionResult.valid) {
+      return { blocked: true, block_reason: `action_blocked:${actionResult.reason}` };
+    }
+  }
+
+  return { blocked: false, block_reason: null };
+}
+
+// ------------------------------------------------------------------
+// Caminho mock (LLM desligado)
+// ------------------------------------------------------------------
+
+function mockGenerateTurn(
+  context: PlannerContext,
+  decision: PlannerDecisionResult,
+  toolResults: ToolExecutionResult[],
+): GeneratorResult {
+  const skill = decision.output.skill;
+  const hasOkToolResults = toolResults.some((result) => result.ok);
+  const missing = decision.output.missing_slots;
+
+  let say: string;
+  const actions: GeneratorAction[] = [];
+
+  switch (skill) {
+    case 'escalar_humano':
+      say = 'Vou transferir você para um atendente humano agora.';
+      break;
+    case 'pedir_dados_faltantes':
+      say =
+        missing.length > 0
+          ? `Para te ajudar melhor, preciso de mais informações: ${missing.join(', ')}.`
+          : 'Poderia me fornecer mais detalhes?';
+      break;
+    case 'buscar_e_ofertar':
+      // Sem tool results → não posso ofertar nada com lastro
+      say = hasOkToolResults
+        ? 'Encontrei algumas opções para você. Posso detalhar mais?'
+        : SAFE_FALLBACK_SAY;
+      break;
+    case 'responder_logistica':
+      // Sem calcularFrete → não posso prometer frete
+      say = hasOkToolResults
+        ? 'Aqui estão as informações de entrega disponíveis.'
+        : SAFE_FALLBACK_SAY;
+      break;
+    case 'tratar_objecao':
+      say = 'Entendo sua preocupação. Posso esclarecer melhor?';
+      break;
+    case 'registrar_intencao_fechamento':
+      say = 'Ótimo! Para finalizarmos, vou encaminhar para um atendente confirmar os detalhes.';
+      break;
+    default:
+      say = 'Como posso te ajudar?';
+  }
+
+  const validation = runValidators(say, actions, toolResults, context);
+  const usedSafeFallback = say === SAFE_FALLBACK_SAY;
+
+  return {
+    say_text: validation.blocked ? null : say,
+    actions: validation.blocked ? [] : actions,
+    blocked: validation.blocked,
+    block_reason: validation.block_reason,
+    used_llm: false,
+    fallback_used: usedSafeFallback,
+    input_tokens: 0,
+    output_tokens: 0,
+    duration_ms: 0,
+  };
+}
+
+// ------------------------------------------------------------------
+// Caminho fallback (erro ou falta de chave)
+// ------------------------------------------------------------------
+
+function fallbackResult(reason: string): GeneratorResult {
+  return {
+    say_text: null,
+    actions: [],
+    blocked: true,
+    block_reason: reason,
+    used_llm: false,
+    fallback_used: true,
+    input_tokens: 0,
+    output_tokens: 0,
+    duration_ms: 0,
+  };
+}
+
+// ------------------------------------------------------------------
+// Entrada principal
+// ------------------------------------------------------------------
+
+/**
+ * Gera resposta candidata auditável.
+ * Nunca envia ao Chatwoot; nunca escreve em raw/core/analytics/commerce.
+ */
+export async function generateTurn(
+  context: PlannerContext,
+  decision: PlannerDecisionResult,
+  toolResults: ToolExecutionResult[],
+): Promise<GeneratorResult> {
+  if (!env.GENERATOR_LLM_ENABLED) {
+    return mockGenerateTurn(context, decision, toolResults);
+  }
+
+  if (!env.GENERATOR_OPENAI_API_KEY) {
+    logger.warn(
+      { conversation_id: context.conversation_id },
+      'generator: GENERATOR_LLM_ENABLED sem GENERATOR_OPENAI_API_KEY — usando fallback',
+    );
+    return fallbackResult('generator_llm_enabled_without_key');
+  }
+
+  const startedAt = Date.now();
+
+  try {
+    const messages = buildGeneratorMessages(context, decision, toolResults);
+    const llmResult = await callOpenAI({
+      apiKey: env.GENERATOR_OPENAI_API_KEY,
+      model: env.GENERATOR_MODEL,
+      messages,
+      timeoutMs: env.OPENAI_TIMEOUT_MS,
+      maxTokens: 1000,
+      temperature: 0.2,
+    });
+
+    const parsed = generatorOutputRawSchema.safeParse(JSON.parse(llmResult.content));
+    if (!parsed.success) {
+      logger.warn(
+        { conversation_id: context.conversation_id, error: parsed.error.message },
+        'generator: schema validation failed — usando fallback',
+      );
+      return {
+        ...fallbackResult(`generator_schema_failed:${parsed.error.message}`),
+        input_tokens: llmResult.inputTokens,
+        output_tokens: llmResult.outputTokens,
+        duration_ms: llmResult.durationMs,
+        used_llm: true,
+      };
+    }
+
+    const { say, actions } = parsed.data;
+    const validation = runValidators(say, actions, toolResults, context);
+
+    return {
+      say_text: validation.blocked ? null : say,
+      actions: validation.blocked ? [] : actions,
+      blocked: validation.blocked,
+      block_reason: validation.block_reason,
+      used_llm: true,
+      fallback_used: false,
+      input_tokens: llmResult.inputTokens,
+      output_tokens: llmResult.outputTokens,
+      duration_ms: llmResult.durationMs,
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn(
+      { conversation_id: context.conversation_id, error: errorMsg },
+      'generator: LLM call failed — usando fallback',
+    );
+    return {
+      ...fallbackResult(`generator_llm_failed:${errorMsg}`),
+      duration_ms: Date.now() - startedAt,
+      used_llm: true,
+    };
+  }
+}
+
+// ------------------------------------------------------------------
+// Persistência de auditoria
+// ------------------------------------------------------------------
+
+/**
+ * Grava resultado em agent.turns e agent.session_events.
+ * Retorna o turn_id gerado.
+ * Nunca envia ao Chatwoot.
+ */
+export async function recordGeneratorResult(
+  client: PoolClient,
+  context: PlannerContext,
+  selectedSkill: SkillName,
+  result: GeneratorResult,
+  triggerMessageId: string,
+): Promise<string> {
+  const turnId = deterministicUuid([
+    'generator_turn',
+    context.environment,
+    context.conversation_id,
+    String(context.state.turn_index + 1),
+    generatorAgentVersion,
+    triggerMessageId,
+  ]);
+
+  const contextHash = deterministicUuid([
+    'context_hash',
+    context.environment,
+    context.conversation_id,
+    String(context.state.turn_index + 1),
+  ]);
+
+  // Grava em agent.turns — shadow: status='generated' ou 'blocked'.
+  // Não preenche delivered_message_id (envio não existe ainda).
+  await client.query(
+    `INSERT INTO agent.turns
+       (id, environment, conversation_id, trigger_message_id,
+        selected_skill, agent_version, context_hash,
+        say_text, actions, status,
+        llm_duration_ms, llm_input_tokens, llm_output_tokens,
+        error_message)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     ON CONFLICT (environment, trigger_message_id, agent_version) DO NOTHING`,
+    [
+      turnId,
+      context.environment,
+      context.conversation_id,
+      triggerMessageId,
+      selectedSkill,
+      generatorAgentVersion,
+      contextHash,
+      result.blocked ? null : result.say_text,
+      JSON.stringify(result.blocked ? [] : result.actions),
+      result.blocked ? 'blocked' : 'generated',
+      result.duration_ms,
+      result.input_tokens,
+      result.output_tokens,
+      result.block_reason,
+    ],
+  );
+
+  // Grava evento de auditoria em agent.session_events.
+  await client.query(
+    `INSERT INTO agent.session_events
+       (environment, conversation_id, turn_index, event_type, skill_name,
+        event_payload, emitted_by, action_id)
+     VALUES ($1, $2, $3, 'generator_produced', $4, $5, 'system', $6)
+     ON CONFLICT (action_id) DO NOTHING`,
+    [
+      context.environment,
+      context.conversation_id,
+      context.state.turn_index + 1,
+      selectedSkill,
+      JSON.stringify({
+        turn_id: turnId,
+        say_text: result.blocked ? null : result.say_text,
+        blocked: result.blocked,
+        block_reason: result.block_reason,
+        actions_count: result.actions.length,
+        used_llm: result.used_llm,
+        fallback_used: result.fallback_used,
+        prompt_version: generatorPromptVersion,
+        agent_version: generatorAgentVersion,
+        input_tokens: result.input_tokens,
+        output_tokens: result.output_tokens,
+        duration_ms: result.duration_ms,
+      }),
+      deterministicUuid([
+        'generator_produced',
+        context.environment,
+        context.conversation_id,
+        String(context.state.turn_index + 1),
+        generatorAgentVersion,
+      ]),
+    ],
+  );
+
+  return turnId;
+}

@@ -16,8 +16,7 @@ Atualizado: 2026-05-03
 - [x] Atendente Sprint 3: Planner foundation.
 - [x] Atendente Sprint 4: Executor/guardrails.
 - [x] Atendente Sprint 5: Worker Shadow minimalista.
-- [ ] Atendente Sprint 6: Generator shadow.
-- [ ] Generator.
+- [x] Atendente Sprint 6: Generator shadow.
 - [ ] Critic.
 - [ ] Envio Chatwoot pela Atendente.
 
@@ -264,7 +263,7 @@ Pendente da F1.5:
 - [x] `src/atendente/validators/` - SayValidator, ActionValidator e validacao de tool results
 - [x] `src/atendente/worker.ts` - Worker Shadow log-only da Atendente
 - [x] `src/shared/repositories/ops-atendente.repository.ts` - fila da Atendente
-- [ ] Generator shadow da Atendente
+- [x] Generator shadow da Atendente
 
 **Bugs encontrados e corrigidos em 2026-04-29:**
 - [x] `src/shared/llm-clients/openai.ts`: `max_tokens` → `max_completion_tokens` (gpt-5.x rejeita `max_tokens` com HTTP 400)
@@ -295,7 +294,7 @@ Pendente da F1.5:
 
 ### 7.5 Etapa E - Atendente em v1
 
-- [ ] Generator shadow
+- [x] Generator shadow
 - [ ] Critic shadow
 - [ ] Sugestao assistida para humano
 - [ ] Atendente liga envio Chatwoot somente apos autorizacao explicita

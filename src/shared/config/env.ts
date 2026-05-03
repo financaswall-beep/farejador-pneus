@@ -27,9 +27,13 @@ const envSchema = z.object({
   PLANNER_LLM_ENABLED: booleanStringSchema,
   PLANNER_OPENAI_API_KEY: z.string().min(1).optional(),
   PLANNER_MODEL: z.string().min(1).default('gpt-4o-mini'),
-  // Atendente Shadow Worker (Sprint 5): log-only, sem Generator e sem Chatwoot.
+  // Atendente Shadow Worker (Sprint 5): log-only, sem envio Chatwoot.
   ATENDENTE_SHADOW_ENABLED: booleanStringSchema,
   ATENDENTE_SHADOW_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
+  // Generator Shadow (Sprint 6): gera resposta candidata auditavel, sem envio Chatwoot.
+  GENERATOR_LLM_ENABLED: booleanStringSchema,
+  GENERATOR_OPENAI_API_KEY: z.string().min(1).optional(),
+  GENERATOR_MODEL: z.string().min(1).default('gpt-4o-mini'),
   SKIP_EVENT_TYPES: z
     .string()
     .default('')

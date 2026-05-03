@@ -36,6 +36,9 @@ com validacao Zod, exceto overrides explicitamente documentados como
 | `PLANNER_MODEL` | nao | Modelo do Planner. Default `gpt-4o-mini`. | `gpt-4o-mini` |
 | `ATENDENTE_SHADOW_ENABLED` | nao | Liga Worker Shadow log-only da Atendente. Default `false`. | `true` |
 | `ATENDENTE_SHADOW_POLL_INTERVAL_MS` | nao | Intervalo de polling do Worker Shadow. Default `5000`. | `5000` |
+| `GENERATOR_LLM_ENABLED` | nao | Liga o Generator Shadow com LLM real. Default `false`. Quando `false`, usa respostas mock/fallback seguras (sem custo, sem rede). | `false` |
+| `GENERATOR_OPENAI_API_KEY` | se Generator LLM ligado | Chave OpenAI especifica do Generator. Obrigatoria quando `GENERATOR_LLM_ENABLED=true`. | `sk-...` |
+| `GENERATOR_MODEL` | nao | Modelo do Generator. Default `gpt-4o-mini`. | `gpt-4o-mini` |
 | `SEGMENTS_DIR` | nao | Override do diretorio `segments/`. Lido direto de `process.env` pelo loader de regras. | `/opt/farejador/segments` |
 
 ## Variaveis Removidas
