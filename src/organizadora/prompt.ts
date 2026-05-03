@@ -10,7 +10,7 @@ import type { OpenAIMessage } from '../shared/llm-clients/openai.js';
 import type { MessageForPrompt } from '../shared/repositories/core-reader.repository.js';
 
 const SCHEMA_VERSION = 'moto-pneus-v1';
-const EXTRACTOR_VERSION = 'moto-pneus-prompt-v2';
+const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3';
 
 // Fact keys permitidas (espelho da whitelist em zod/fact-keys.ts, sem importar o modulo inteiro aqui)
 const ALLOWED_FACT_KEYS = [
@@ -29,7 +29,7 @@ const ALLOWED_FACT_KEYS = [
 
 const SYSTEM_PROMPT = `Voce e um extrator de dados estruturados de conversas de atendimento de uma loja de pneus de moto.
 
-Sua tarefa: ler a conversa abaixo e extrair fatos relevantes sobre cliente, veiculo, produto procurado, entrega, pagamento, negociacao e desfecho comercial.
+Sua tarefa: ler a conversa abaixo e extrair fatos relevantes sobre cliente, veiculo, produto procurado, negociacao e desfecho comercial.
 
 REGRAS OBRIGATORIAS:
 1. Extraia SOMENTE fatos das seguintes chaves permitidas: ${ALLOWED_FACT_KEYS}
@@ -40,6 +40,7 @@ REGRAS OBRIGATORIAS:
 6. Nao invente fatos. Nao use informacoes de fora da conversa.
 7. Para campos booleanos, use true ou false, nunca strings.
 8. Para medida_pneu, normalize para "140/70-17". Exemplos: "100/80 18", "100 80 18" e "100/80 aro 18" viram "100/80-18".
+9. Forma de pagamento e modalidade de entrega literais tambem sao complementadas por regras deterministicas no codigo. Extraia esses campos apenas quando a evidencia estiver clara.
 
 INTENCAO_CLIENTE:
 Extraia intencao_cliente sempre que houver pedido comercial, duvida comercial, garantia ou reclamacao. Nao deixe de extrair apenas porque faltou modelo, medida ou posicao.
@@ -65,6 +66,12 @@ GARANTIA, RECLAMACAO E DESFECHO:
 - "vou deixar pra depois", "ficou caro", "comprei em outra loja" indicam produto_recusado_motivo quando houver motivo claro.
 - "ficou caro", "achei caro", "mais barato em outro lugar" tambem indicam achou_caro = true.
 - "comprei em outra loja" ou "comprei no concorrente" indica produto_recusado_motivo = "comprou_concorrente".
+
+PRECO, URGENCIA E USO:
+- "ate 220", "ate 190", "no maximo 250", "tenho 200 reais" indicam faixa_preco_desejada.
+- "furou agora", "preciso resolver hoje", "pegar ainda hoje" indicam urgencia = "alta".
+- "uso todo dia pra trabalhar", "trabalho com a moto" indicam moto_uso = "trabalho".
+- "vou deixar pra depois" junto com "caro" indica produto_recusado_motivo = "preco".
 
 CORRECOES:
 Se o cliente disser "na verdade", "errei", "corrigindo", "nao e X e Y", extraia o novo valor com truth_type = "corrected". O evidence_text deve vir da mensagem de correcao.

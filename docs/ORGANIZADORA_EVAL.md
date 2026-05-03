@@ -146,3 +146,115 @@ Estimativa de custo:
 
 - baseline v1 registrado: media aproximada de 557 tokens de prompt por conversa;
 - runner atualizado para v2: estimativa fixa aproximada de 1350 tokens + transcricao.
+
+## Resultado v2 2026-05-03
+
+Deploy usado:
+
+- Commit: `54d8886 feat: add organizadora prompt v2 eval`.
+- `extractor_version` confirmado no banco: `moto-pneus-prompt-v2`.
+
+Runner:
+
+```powershell
+$env:FAREJADOR_ENV='prod'
+node --env-file=.env scripts\rodar-baseline-organizadora.cjs --limit=32 --force-ready --jobTimeoutMs=360000
+```
+
+Resumo v2:
+
+- Casos avaliados: 32.
+- Passaram: 20.
+- Falharam: 12.
+- Jobs `done`: 30.
+- Jobs ausentes/timeout: 2.
+- Jobs `failed`: 0.
+- Casos com zero facts: 5.
+- Zero facts correto: 2.
+- Estimativa media de prompt por conversa: 1382 tokens.
+- Facts gravados: 100, todos com `extractor_version='moto-pneus-prompt-v2'`.
+
+Comparativo v1 -> v2:
+
+| metrica | v1 | v2 | delta |
+| --- | ---: | ---: | ---: |
+| casos aprovados | 10 | 20 | +10 |
+| casos reprovados | 22 | 12 | -10 |
+| jobs `done` | 31 | 30 | -1 |
+| jobs ausentes/timeout | 1 | 2 | +1 |
+| zero facts correto | 2 | 2 | 0 |
+| media estimada de tokens | 557 | 1382 | +825 |
+| ausencias de `intencao_cliente` | 13 | 1 | -12 |
+
+Principais fatos obrigatorios ausentes no v2:
+
+| fact_key | ausencias |
+| --- | ---: |
+| `modalidade_entrega` | 3 |
+| `urgencia` | 3 |
+| `moto_uso` | 2 |
+| `faixa_preco_desejada` | 2 |
+| `forma_pagamento` | 2 |
+| `perguntou_entrega_hoje` | 2 |
+| `motivo_compra` | 1 |
+| `preferencia_principal` | 1 |
+| `produto_recusado_motivo` | 1 |
+| `nome_cliente` | 1 |
+| `bairro_mencionado` | 1 |
+| `medida_pneu` | 1 |
+| `moto_modelo` | 1 |
+| `posicao_pneu` | 1 |
+| `intencao_cliente` | 1 |
+
+Leitura:
+
+- O prompt v2 resolveu quase todo o problema de `intencao_cliente`.
+- Garantia, reclamacao, compatibilidade, pedido vago comercial e municipio passaram a se comportar melhor.
+- O custo estimado subiu de ~557 para ~1382 tokens por conversa.
+- Os novos gargalos sao `modalidade_entrega`, `urgencia`, `moto_uso`, `faixa_preco_desejada` e pagamento misto.
+- Dois casos (`S08`, `S24`) foram capturados em `core.*`, mas nao tiveram job em `ops.enrichment_jobs`; isso deve ser investigado como problema operacional de enfileiramento, separado do prompt.
+
+## Hibrido v3
+
+Implementado depois do resultado v2.
+
+Decisao:
+
+- `schema_version` continua `moto-pneus-v1`.
+- `extractor_version` passa a ser `moto-pneus-hybrid-v3`.
+- Facts gerados por regra literal usam `source='deterministic_literal_organizadora_v1'`.
+- Facts gerados pela LLM continuam usando `source='llm_openai_organizadora_v1'`.
+
+Regras deterministicas adicionadas:
+
+- `forma_pagamento`:
+  - `pix` -> `pix`;
+  - `dinheiro` -> `dinheiro`;
+  - `boleto` -> `boleto`;
+  - `credito/credito com acento` -> `cartao_credito`;
+  - `debito/debito com acento` -> `cartao_debito`;
+  - `cartao/cartao com acento` sem tipo claro -> `indefinido`;
+  - pagamento misto, como `pix` + `cartao`, -> `indefinido`.
+- `modalidade_entrega`:
+  - `entrega`, `entregar`, `frete` -> `entrega`;
+  - `retirar`, `retirada`, `buscar na loja`, `pegar na loja` -> `retirada`.
+
+Exclusoes intencionais:
+
+- `motoboy` nao gera `modalidade_entrega`, porque pode significar uso/profissao do cliente.
+- `delivery` tambem nao gera `modalidade_entrega`, pelo mesmo motivo.
+
+Comportamento conservador:
+
+- As regras so complementam facts ausentes; se a LLM ja extraiu a chave, o codigo nao duplica.
+- As regras usam apenas mensagens do cliente (`sender_type='contact'`).
+
+Prompt ajustado no v3:
+
+- removeu o peso de pagamento/entrega da tarefa principal;
+- deixou claro que pagamento e entrega literais sao complementados em codigo;
+- adicionou poucas linhas para `faixa_preco_desejada`, `urgencia`, `moto_uso` e recusa por preco.
+
+Estimativa:
+
+- runner atualizado para v3: estimativa fixa aproximada de 1460 tokens + transcricao.

@@ -259,7 +259,7 @@ function scoreCase(testCase, factKeys, job) {
 }
 
 function estimatePromptTokens(testCase) {
-  const fixedPromptTokens = 1350;
+  const fixedPromptTokens = 1460;
   const transcript = testCase.messages
     .map((message, index) => `[msg_id: uuid-${index}] CLIENTE: ${message}`)
     .join('\n');

@@ -35,7 +35,9 @@ import {
   getContactByConversationId,
 } from '../shared/repositories/core-reader.repository.js';
 import { buildOrganizadoraPrompt, EXTRACTOR_VERSION, SCHEMA_VERSION } from './prompt.js';
+import { inferDeterministicFacts } from './deterministic-facts.js';
 import { parseOrganizadoraResponse } from '../shared/zod/llm-organizadora.js';
+import type { ExtractedFact } from '../shared/zod/llm-organizadora.js';
 import { validateFactValue } from '../shared/zod/fact-keys.js';
 import type { IncidentInsert } from '../shared/repositories/ops-phase3.repository.js';
 import { validateFactEvidence } from './evidence.js';
@@ -43,6 +45,8 @@ import { validateFactEvidence } from './evidence.js';
 const WORKER_ID = `organizadora-${randomUUID().slice(0, 8)}`;
 const EXTRACTOR_SOURCE = 'llm_openai_organizadora_v1';
 const MIN_CONFIDENCE = 0.55;
+
+type FactForWrite = ExtractedFact & { source?: string };
 
 async function logIncidentCommitted(incident: IncidentInsert): Promise<void> {
   const incidentClient = await pool.connect();
@@ -143,8 +147,13 @@ async function processJob(
     throw new Error(`organizadora: llm response invalid — ${parsed.error}`);
   }
 
-  const { facts } = parsed.data;
-  logger.info({ job_id: jobId, fact_count: facts.length }, 'organizadora: facts extracted');
+  const llmFacts = parsed.data.facts;
+  const deterministicFacts = inferDeterministicFacts(messages, llmFacts);
+  const facts: FactForWrite[] = [...llmFacts, ...deterministicFacts];
+  logger.info(
+    { job_id: jobId, fact_count: facts.length, llm_fact_count: llmFacts.length, deterministic_fact_count: deterministicFacts.length },
+    'organizadora: facts extracted',
+  );
 
   // 5. Validar e gravar cada fact
   let savedCount = 0;
@@ -237,7 +246,7 @@ async function processJob(
           observed_at: new Date(),
           message_id: fact.from_message_id,
           truth_type: fact.truth_type,
-          source: EXTRACTOR_SOURCE,
+          source: fact.source ?? EXTRACTOR_SOURCE,
           confidence_level: fact.confidence_level,
           extractor_version: EXTRACTOR_VERSION,
         },
