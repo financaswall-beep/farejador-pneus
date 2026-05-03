@@ -43,14 +43,19 @@ Atendente:
   `buildPlannerContext`, `planTurn`, `recordPlannerDecision`,
   `executeToolRequests`, `recordToolExecutionResults`. Desligado por default
   via `ATENDENTE_SHADOW_ENABLED=false`.
+- Enqueue da Atendente:
+  `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
+  `message_created` quando `ATENDENTE_SHADOW_ENABLED=true`, via
+  `ops.enqueue_atendente_job` idempotente por `trigger_message_id`.
 - Sprint 6: Generator Shadow:
   `src/atendente/generator/service.ts`, gera resposta candidata auditavel,
   valida com `SayValidator`/`ActionValidator`, grava em `agent.turns`
   (status='generated'|'blocked') e `agent.session_events`
   (event_type='generator_produced'). Nunca envia ao Chatwoot. Nunca escreve
   em raw/core/analytics/commerce. Controlado por `GENERATOR_LLM_ENABLED`
-  (default false). Migration `0027_generator_shadow_events.sql` criada
-  (adiciona 'generator_produced' ao CHECK de `agent.session_events`).
+  (default false). Migration `0027_generator_shadow_events.sql` aplicada no
+  Supabase atual em 2026-05-03 (adiciona 'generator_produced' ao CHECK de
+  `agent.session_events`).
 - Organizadora v3.3 calibrada:
   prompt `moto-pneus-hybrid-v3-3`, matriz expandida com 46/48 aprovados
   apos deploy em 2026-05-03.
@@ -66,10 +71,10 @@ Atendente:
 
 Ultima validacao local (pos Sprint 6):
 
-- `npm test`: 287/287 verde.
+- `npm test`: 289/289 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
-- Migration `0027` criada, pendente de apply no Supabase.
+- Migration `0027` aplicada/verificada no Supabase atual.
 - Scripts operacionais locais foram higienizados em 2026-05-03 para depender de
   `.env` e nao manter secrets/endpoints reais hardcoded no repo.
 

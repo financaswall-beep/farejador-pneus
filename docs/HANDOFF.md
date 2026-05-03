@@ -26,6 +26,9 @@ Implementado:
   `SayValidator` inicial e `ActionValidator` reforcado.
 - Atendente Sprint 5: Worker Shadow minimalista (`src/atendente/worker.ts`),
   log-only, desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
+- Normalizacao enfileira `ops.atendente_jobs` em `message_created` quando
+  `ATENDENTE_SHADOW_ENABLED=true`, usando `ops.enqueue_atendente_job`
+  idempotente por mensagem.
 - Atendente Sprint 6: Generator Shadow (`src/atendente/generator/service.ts`).
   Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
   grava em `agent.turns` (status='generated'|'blocked') e auditoria em
@@ -42,15 +45,16 @@ Nao implementado/nao ligado:
 
 ## Ultimas Validacoes
 
-- `npm test`: 287/287 verde.
+- `npm test`: 289/289 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
-- Migration `0027_generator_shadow_events.sql` criada (adiciona
-  `generator_produced` ao CHECK de `agent.session_events`). Aplicar no Supabase.
+- Migration `0027_generator_shadow_events.sql` aplicada no Supabase atual em
+  2026-05-03 e verificada: `generator_produced` aceito no CHECK de
+  `agent.session_events`.
 - Scripts operacionais locais higienizados em 2026-05-03 para nao carregar
   `DATABASE_URL`, endpoint real de Chatwoot ou identificador de inbox como
   default hardcoded. Devem ser executados sempre com `.env` local.
-- Migrations ate `0027` criadas; `0027` pendente de apply no Supabase.
+- Migrations ate `0027` criadas/aplicadas no Supabase atual.
 
 ## Ultimos Commits Relevantes
 

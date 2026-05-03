@@ -16,6 +16,19 @@ export interface AtendenteJobRow {
   attempts: number;
 }
 
+export async function enqueueAtendenteJob(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  triggerMessageId: string,
+): Promise<string> {
+  const result = await client.query<{ enqueue_atendente_job: string }>(
+    `SELECT ops.enqueue_atendente_job($1, $2, $3) AS enqueue_atendente_job`,
+    [environment, conversationId, triggerMessageId],
+  );
+  return result.rows[0]!.enqueue_atendente_job;
+}
+
 export async function pickAtendenteJob(
   client: PoolClient,
   environment: Environment,

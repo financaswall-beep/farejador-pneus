@@ -19,6 +19,8 @@ import { insertAssignment } from '../persistence/assignments.repository.js';
 import { insertReaction } from '../persistence/reactions.repository.js';
 import { upsertTags } from '../persistence/tags.repository.js';
 import { enqueueOrganizadoraJob } from '../persistence/enrichment-jobs.repository.js';
+import { enqueueAtendenteJob } from '../shared/repositories/ops-atendente.repository.js';
+import type { Environment } from '../shared/types/chatwoot.js';
 
 export interface RawEvent {
   id: number;
@@ -222,6 +224,33 @@ export async function dispatch(
               message_id: upsertedMessage.messageId,
             },
             'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
+          );
+        }
+
+        if (env.ATENDENTE_SHADOW_ENABLED) {
+          const jobId = await enqueueAtendenteJob(
+            client,
+            environment as Environment,
+            upsertedMessage.conversationId,
+            upsertedMessage.messageId,
+          );
+          logger.info(
+            {
+              raw_event_id: rawEventId,
+              conversation_id: upsertedMessage.conversationId,
+              message_id: upsertedMessage.messageId,
+              atendente_job_id: jobId,
+            },
+            'normalization: atendente job enqueued',
+          );
+        } else {
+          logger.info(
+            {
+              raw_event_id: rawEventId,
+              conversation_id: upsertedMessage.conversationId,
+              message_id: upsertedMessage.messageId,
+            },
+            'normalization: atendente job skipped because ATENDENTE_SHADOW_ENABLED=false',
           );
         }
       }

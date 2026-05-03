@@ -50,7 +50,7 @@ Nada responde cliente automaticamente.
 - `0024_atendente_v1_state_extensions.sql`
 - `0025_planner_foundation.sql`
 - `0026_tool_executor_events.sql`
-- `0027_generator_shadow_events.sql` (pendente de apply no Supabase)
+- `0027_generator_shadow_events.sql` (aplicada/verificada no Supabase atual em 2026-05-03)
 
 ## Codigo Da Organizadora
 
@@ -115,7 +115,9 @@ Worker Shadow:
 - `src/atendente/worker.ts`
 - `src/shared/repositories/ops-atendente.repository.ts`
 - `ATENDENTE_SHADOW_ENABLED=false` por default
-- log-only: sem Generator, sem `say_text`, sem envio Chatwoot
+- `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
+  `message_created` quando `ATENDENTE_SHADOW_ENABLED=true`
+- log-only: gera candidato shadow, sem envio Chatwoot
 
 ## Organizadora v3.3
 
@@ -129,7 +131,7 @@ Worker Shadow:
 
 Ultima validacao (pos Sprint 6):
 
-- `npm test`: 287/287 verde.
+- `npm test`: 289/289 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 

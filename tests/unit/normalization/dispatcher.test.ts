@@ -8,6 +8,7 @@ const baseEnv = {
   CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: '300',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
   ORGANIZADORA_ENABLED: 'false',
+  ATENDENTE_SHADOW_ENABLED: 'false',
 };
 
 function createMockClient(): {
@@ -18,6 +19,11 @@ function createMockClient(): {
       if (sql.includes('ops.enqueue_enrichment_job')) {
         return Promise.resolve({
           rows: [{ enqueue_enrichment_job: 'job-uuid-1' }],
+        });
+      }
+      if (sql.includes('ops.enqueue_atendente_job')) {
+        return Promise.resolve({
+          rows: [{ enqueue_atendente_job: 'atendente-job-uuid-1' }],
         });
       }
 
@@ -293,6 +299,67 @@ describe('dispatcher', () => {
         message_id: 'uuid-1',
       },
       'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
+    );
+  });
+
+  it('enqueues atendente job for message_created when shadow is enabled', async () => {
+    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 57,
+      event_type: 'message_created',
+      payload: messageCreated,
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_atendente_job'),
+    );
+    expect(enqueueCall).toBeDefined();
+    expect(enqueueCall?.[1]).toEqual([
+      environment,
+      'conversation-uuid',
+      'uuid-1',
+    ]);
+    expect(loggerInfo).toHaveBeenCalledWith(
+      {
+        raw_event_id: 57,
+        conversation_id: 'conversation-uuid',
+        message_id: 'uuid-1',
+        atendente_job_id: 'atendente-job-uuid-1',
+      },
+      'normalization: atendente job enqueued',
+    );
+  });
+
+  it('does not enqueue atendente job when shadow is disabled', async () => {
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 58,
+      event_type: 'message_created',
+      payload: messageCreated,
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_atendente_job'),
+    );
+    expect(enqueueCall).toBeUndefined();
+    expect(loggerInfo).toHaveBeenCalledWith(
+      {
+        raw_event_id: 58,
+        conversation_id: 'conversation-uuid',
+        message_id: 'uuid-1',
+      },
+      'normalization: atendente job skipped because ATENDENTE_SHADOW_ENABLED=false',
     );
   });
 
