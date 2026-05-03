@@ -563,3 +563,34 @@ Leitura:
 - A qualidade nao se manteve no mesmo patamar quando a matriz ficou mais diversa.
 - Parte das falhas e prompt/schema; parte sao expectativas de avaliador que podem estar rigorosas demais, principalmente `S37`, `S39` e `S44`.
 - Proximo passo recomendado: antes de mexer no prompt, revisar se os `required` desses novos casos representam fatos obrigatorios mesmo ou se alguns devem virar opcionais.
+
+## Prompt v3.3 enxuto
+
+Implementado depois da matriz expandida de 48 casos.
+
+Decisao:
+
+- `schema_version` continua `moto-pneus-v1`.
+- `extractor_version` passa a ser `moto-pneus-hybrid-v3-3`.
+- A mudanca segue enxuta: poucas linhas de prompt, sem exemplos longos.
+- A matriz tambem foi ajustada onde o avaliador estava exigindo fato discutivel.
+
+Ajustes de avaliador:
+
+- `S37-garantia-com-marca`: `marca_pneu_preferida` virou opcional, porque a marca citada em garantia nao significa preferencia de compra.
+- `S39-pagamento-credito-parcelado`: `produto_aceito` virou opcional, porque o aceite depende da condicao de parcelar.
+- `S44-preco-concorrente-sem-recusa`: `produto_aceito` virou opcional, porque o aceite depende de cobrir o preco concorrente.
+
+Regras adicionadas ao prompt:
+
+- `delivery`, `ifood` e uso por app como `moto_uso`;
+- viagem/estrada/amanha como `urgencia` media;
+- pagamento, desconto e parcelamento como indicio de `intencao_cliente`;
+- modelo seguido de ano como `moto_ano`;
+- `par`, `os dois pneus`, `dianteiro e traseiro` como `quantidade_pneus=2` e `posicao_pneu=ambos`.
+
+Objetivo:
+
+- Atacar casos comuns e faceis (`S08`, `S09`, `S11`, `S22`, `S46`);
+- Deixar casos raros ou semanticamente discutiveis fora da cobranca dura;
+- Manter o prompt pequeno para nao inflar custo de tokens.

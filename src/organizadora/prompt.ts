@@ -10,7 +10,7 @@ import type { OpenAIMessage } from '../shared/llm-clients/openai.js';
 import type { MessageForPrompt } from '../shared/repositories/core-reader.repository.js';
 
 const SCHEMA_VERSION = 'moto-pneus-v1';
-const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3-2';
+const EXTRACTOR_VERSION = 'moto-pneus-hybrid-v3-3';
 
 // Fact keys permitidas (espelho da whitelist em zod/fact-keys.ts, sem importar o modulo inteiro aqui)
 const ALLOWED_FACT_KEYS = [
@@ -71,11 +71,16 @@ PRECO, URGENCIA E USO:
 - "ate 220", "ate 190", "no maximo 250", "tenho 200 reais" indicam faixa_preco_desejada.
 - "furou agora", "preciso resolver hoje", "pegar ainda hoje" indicam urgencia = "alta".
 - "uso todo dia pra trabalhar", "trabalho com a moto" indicam moto_uso = "trabalho".
+- "trabalho de delivery", "rodo no ifood", "uso em app" indicam moto_uso = "delivery".
 - "vou deixar pra depois" junto com "caro" indica produto_recusado_motivo = "preco".
 - "pneu furou", "furou agora" indicam motivo_compra = "pneu_furou"; "pneu careca" indica "pneu_careca".
 - "vou viajar", "viajar sexta" indicam motivo_compra = "viagem_proxima"; "delivery" como uso do cliente indica "delivery_app".
+- "vou viajar sexta", "ate amanha", "amanha cedo", "pegar estrada" indicam urgencia = "media"; se for hoje/agora, use "alta".
 - "barato", "bom mas barato" indicam preferencia_principal = "preco"; "qualidade" indica "qualidade".
 - "tem hj?", "tem hoje?", "entrega hj?", "chega hoje?" indicam perguntou_entrega_hoje = true.
+- Perguntas sobre cartao, pix, desconto ou parcelamento indicam intencao_cliente = "consultar_preco" quando nao houver outra intencao mais clara.
+- Modelo seguido de ano, como "XRE 300 2020" ou "CG 160 2019", indica moto_ano.
+- "par", "os dois pneus", "dianteiro e traseiro" indicam quantidade_pneus = 2 e posicao_pneu = "ambos".
 
 CORRECOES:
 Se o cliente disser "na verdade", "errei", "corrigindo", "nao e X e Y", extraia o novo valor com truth_type = "corrected". O evidence_text deve vir da mensagem de correcao.
