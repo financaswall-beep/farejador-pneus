@@ -421,3 +421,30 @@ Leitura:
 - O problema operacional de job ausente nao apareceu na rodada completa apos a auditoria: 32/32 jobs foram criados e concluidos.
 - O gargalo atual voltou a ser somente semantico, concentrado em 4 padroes.
 - A proxima melhoria deve ser pequena e focada: `motivo_compra`, `preferencia_principal` e `perguntou_entrega_hoje`.
+
+## Prompt v3.2 enxuto
+
+Implementado para atacar somente as 4 falhas semanticas restantes da rodada 28/32.
+
+Decisao:
+
+- `schema_version` continua `moto-pneus-v1`.
+- `extractor_version` passa a ser `moto-pneus-hybrid-v3-2`.
+- O prompt principal subiu de 69 para 73 linhas.
+- O arquivo `src/organizadora/prompt.ts` subiu de 142 para 146 linhas.
+
+Regras adicionadas:
+
+- `pneu furou` / `furou agora` -> `motivo_compra = "pneu_furou"`.
+- `pneu careca` -> `motivo_compra = "pneu_careca"`.
+- `vou viajar` / `viajar sexta` -> `motivo_compra = "viagem_proxima"`.
+- `delivery` como uso do cliente -> `motivo_compra = "delivery_app"`.
+- `barato` / `bom mas barato` -> `preferencia_principal = "preco"`.
+- `qualidade` -> `preferencia_principal = "qualidade"`.
+- `tem hj?`, `tem hoje?`, `entrega hj?`, `chega hoje?` -> `perguntou_entrega_hoje = true`.
+
+Validacao local:
+
+- `npm run typecheck`: passou.
+- `npm run build`: passou.
+- `npm test`: 267 testes passaram.
