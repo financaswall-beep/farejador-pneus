@@ -8,7 +8,7 @@ Este guia explica como subir o **fazer-ai/chatwoot** e o **Farejador** no seu Co
 
 - Coolify v4 instalado e acessível.
 - Domínio/subdomínio ou IP público do servidor.
-- Para teste sem domínio, este guia usa `http://76.13.164.152:3000` para o Farejador.
+- Para teste sem dominio, use `http://<farejador-host>:3000` para o Farejador.
 - Acesso ao painel do Coolify.
 
 ---
@@ -117,7 +117,7 @@ No painel do serviço `farejador`, configure:
 | `DATABASE_SSL` | `true` (se usar Supabase ou SSL forçado) ou `false` (se for Postgres interno sem SSL) |
 | `CHATWOOT_HMAC_SECRET` | **Você deve gerar** — veja abaixo. |
 | `CHATWOOT_WEBHOOK_MAX_AGE_SECONDS` | `300` |
-| `CHATWOOT_API_BASE_URL` | Para o teste atual: `http://76.13.164.152/api/v1`. Em produção com domínio, use `https://chatwoot.seudominio.com/api/v1`. |
+| `CHATWOOT_API_BASE_URL` | Para teste sem dominio: `http://<chatwoot-host>/api/v1`. Em producao com dominio, use `https://chatwoot.seudominio.com/api/v1`. |
 | `CHATWOOT_API_TOKEN` | Token de acesso da API do Chatwoot — veja abaixo como gerar. |
 | `CHATWOOT_ACCOUNT_ID` | ID da conta no Chatwoot (geralmente `1` para a primeira conta). |
 | `ADMIN_AUTH_TOKEN` | **Você deve gerar** — veja abaixo. |
@@ -164,7 +164,7 @@ Faça esta etapa somente depois de:
 1. No painel do Chatwoot, vá em **Configurações** → **Aplicativos** → **Webhooks**.
 2. Crie um novo webhook com a URL do Farejador:
    ```
-   http://76.13.164.152:3000/webhooks/chatwoot
+   http://<farejador-host>:3000/webhooks/chatwoot
    ```
 3. No campo **Secret**, cole o mesmo valor que você gerou para `CHATWOOT_HMAC_SECRET` no Farejador.
 4. Selecione os eventos que o Farejador deve receber. No mínimo:
@@ -220,7 +220,7 @@ As migrations estão em `db/migrations/` como arquivos `.sql` e devem ser execut
 ### Health check
 
 ```bash
-curl http://76.13.164.152:3000/healthz
+curl http://<farejador-host>:3000/healthz
 ```
 
 Esperado:
@@ -237,7 +237,7 @@ Use o script de teste local ou envie uma mensagem real pelo Chatwoot.
 ```bash
 curl -X POST \
   -H "Authorization: Bearer <ADMIN_AUTH_TOKEN>" \
-  http://76.13.164.152:3000/admin/replay/1
+  http://<farejador-host>:3000/admin/replay/1
 ```
 
 Esperado (se existir o raw_event 1):

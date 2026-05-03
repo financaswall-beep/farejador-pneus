@@ -52,7 +52,7 @@ Pendente antes de considerar producao plena:
 Chatwoot:
 
 ```text
-http://76.13.164.152/app/accounts/1/dashboard
+http://<chatwoot-host>/app/accounts/1/dashboard
 ```
 
 Account ID:
@@ -64,25 +64,25 @@ Account ID:
 API base URL:
 
 ```text
-http://76.13.164.152/api/v1
+http://<chatwoot-host>/api/v1
 ```
 
 Farejador:
 
 ```text
-http://76.13.164.152:3000
+http://<farejador-host>:3000
 ```
 
 Health:
 
 ```text
-http://76.13.164.152:3000/healthz
+http://<farejador-host>:3000/healthz
 ```
 
 Webhook:
 
 ```text
-http://76.13.164.152:3000/webhooks/chatwoot
+http://<farejador-host>:3000/webhooks/chatwoot
 ```
 
 Repositorio:
@@ -129,7 +129,7 @@ DATABASE_POOL_MAX=10
 DATABASE_SSL=true
 CHATWOOT_HMAC_SECRET=<secret da inbox/webhook Chatwoot>
 CHATWOOT_WEBHOOK_MAX_AGE_SECONDS=300
-CHATWOOT_API_BASE_URL=http://76.13.164.152/api/v1
+CHATWOOT_API_BASE_URL=http://<chatwoot-host>/api/v1
 CHATWOOT_API_TOKEN=<token de acesso Chatwoot>
 CHATWOOT_ACCOUNT_ID=1
 ADMIN_AUTH_TOKEN=<token admin Farejador>
@@ -155,7 +155,7 @@ Farejador Teste
 7. Configurada URL de webhook da inbox:
 
 ```text
-http://76.13.164.152:3000/webhooks/chatwoot
+http://<farejador-host>:3000/webhooks/chatwoot
 ```
 
 8. Primeiro teste real nao caiu no raw porque havia divergencia de HMAC:
@@ -309,7 +309,7 @@ Conclusao:
 Webhook da inbox API:
 
 ```text
-http://76.13.164.152:3000/webhooks/chatwoot
+http://<farejador-host>:3000/webhooks/chatwoot
 ```
 
 Status: ligado para shadow mode controlado.

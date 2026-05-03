@@ -62,6 +62,8 @@ Ultima validacao local conhecida:
 - `npm test`: 267/267 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
+- Scripts operacionais locais foram higienizados em 2026-05-03 para depender de
+  `.env` e nao manter secrets/endpoints reais hardcoded no repo.
 
 Ultimos commits enviados para `origin/main` e `pneus/main`:
 

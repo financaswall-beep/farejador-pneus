@@ -19,7 +19,7 @@ const args = new Set(process.argv.slice(2));
 const CONFIRM = args.has('--confirm');
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const CHATWOOT_BASE_URL = (process.env.CHATWOOT_PUBLIC_BASE_URL || 'http://76.13.164.152').replace(/\/$/, '');
+const CHATWOOT_BASE_URL = (process.env.CHATWOOT_PUBLIC_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
 const CHATWOOT_ACCOUNT_ID = process.env.CHATWOOT_ACCOUNT_ID || '1';
 const CHATWOOT_API_TOKEN = process.env.CHATWOOT_API_TOKEN || '';
 

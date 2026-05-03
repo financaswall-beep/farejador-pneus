@@ -40,6 +40,9 @@ Nao implementado/nao ligado:
 - `npm test`: 267/267 verde.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
+- Scripts operacionais locais higienizados em 2026-05-03 para nao carregar
+  `DATABASE_URL`, endpoint real de Chatwoot ou identificador de inbox como
+  default hardcoded. Devem ser executados sempre com `.env` local.
 - Migrations ate `0026` validadas/aplicadas no Supabase atual.
 
 ## Ultimos Commits Relevantes
@@ -81,8 +84,8 @@ Por que fazer assim:
 ## Cuidados
 
 - Nao limpar nem reverter arquivos que o usuario criou sem revisar.
-- Scripts temporarios na raiz foram removidos; nao recriar scripts com token ou
-  dados reais fora de `tmp/`.
+- Nao recriar scripts com token, connection string, endpoint real ou dados
+  operacionais sensiveis hardcoded. Use `.env` local.
 - `.env` e `.env.codex` nunca devem ser commitados.
 - `ATENDENTE_SHADOW_ENABLED` pode rodar em log-only; envio Chatwoot continua
   inexistente/desligado ate Wallace mandar ativar explicitamente.

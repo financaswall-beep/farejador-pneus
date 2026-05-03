@@ -33,6 +33,8 @@ Legenda: feito, em andamento, proximo, futuro.
 - [x] `.env.codex` configurado para validacao local.
 - [x] Conexao Supabase validada.
 - [x] Migrations aplicadas no Supabase usado na validacao.
+- [x] Scripts operacionais higienizados para usar `.env` em vez de secrets ou
+  endpoints reais hardcoded.
 - [x] GitHub remoto atualizado ate F1-03.
 - [x] Deploy Coolify do Farejador validado.
 - [x] Supabase Connection Pooler validado no Coolify.
