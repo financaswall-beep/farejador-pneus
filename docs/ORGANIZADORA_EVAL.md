@@ -594,3 +594,52 @@ Objetivo:
 - Atacar casos comuns e faceis (`S08`, `S09`, `S11`, `S22`, `S46`);
 - Deixar casos raros ou semanticamente discutiveis fora da cobranca dura;
 - Manter o prompt pequeno para nao inflar custo de tokens.
+
+## Resultado v3.3 2026-05-03
+
+Deploy usado:
+
+- Commit: `7beb37c feat: tune organizadora prompt v3.3`.
+- `extractor_version` observado nos facts: `moto-pneus-hybrid-v3-3`.
+
+Rodada:
+
+```powershell
+$env:FAREJADOR_ENV='prod'
+node --env-file=.env scripts\rodar-baseline-organizadora.cjs --limit=48 --force-ready --jobTimeoutMs=360000
+```
+
+Observacao operacional:
+
+- A injecao dos 48 casos ocorreu, mas a primeira espera estourou antes da fila drenar.
+- Foi necessario criar 1 job ausente (`S24`) e liberar pendentes do mesmo batch de teste para medir qualidade da Organizadora sem misturar problema de fila.
+- Resultado final apos a fila drenar: 48/48 jobs `done`, 0 jobs `failed`.
+
+Resumo final:
+
+- Casos avaliados: 48.
+- Passaram: 46.
+- Falharam: 2.
+- Jobs `done`: 48.
+- Jobs ausentes/timeout: 0.
+- Jobs `failed`: 0.
+
+Comparativo:
+
+| matriz | passaram | total | aproveitamento |
+| --- | ---: | ---: | ---: |
+| v3.2 expandida | 39 | 48 | 81.25% |
+| v3.3 expandida | 46 | 48 | 95.83% |
+
+Falhas restantes:
+
+| caso | faltou | leitura |
+| --- | --- | --- |
+| `S14-reclamacao` | `urgencia` | Extraiu `intencao_cliente`; "preciso resolver isso" ficou fraco para urgencia. |
+| `S38-reclamacao-atraso-entrega` | `modalidade_entrega` | Extraiu `intencao_cliente` e `urgencia`; nao marcou entrega em "falaram que entregava ontem". |
+
+Leitura:
+
+- O v3.3 recuperou a generalizacao da matriz expandida sem inflar muito o prompt.
+- As falhas restantes sao pequenas e podem ser tratadas depois com regra enxuta ou ajuste da regua, se forem frequentes em conversa real.
+- A parte operacional ainda merece observacao: apareceu novamente 1 conversa capturada sem job inicial.
