@@ -501,3 +501,65 @@ Leitura:
 - O v3.2 tambem corrigiu `motivo_compra` em `S08` e `S22`.
 - Restam 2 ajustes semanticos pequenos: `delivery` como `moto_uso = "trabalho"` e `vou viajar sexta` como `urgencia = "media"` ou `alta`, conforme regra escolhida.
 - Ainda apareceu 1 caso operacional sem job inicial, entao a auditoria de enfileiramento continua util para diagnosticar recorrencia.
+
+## Matriz expandida 48 casos 2026-05-03
+
+Foram adicionados 16 novos cenarios (`S33` a `S48`) para testar generalizacao sem mexer no prompt v3.2:
+
+- uso por app/trabalho;
+- retirada com debito;
+- compra sem modelo;
+- correcao de posicao;
+- garantia com marca;
+- reclamacao de entrega atrasada;
+- credito/parcelamento;
+- municipio com bairro;
+- audio sem transcricao seguido de texto util;
+- zero facts por agradecimento;
+- recusa e preferencia de marca;
+- preco de concorrente sem recusa final;
+- urgencia para amanha;
+- par de pneus;
+- cartao generico;
+- marca e medida sem moto.
+
+Resultado bruto:
+
+- Casos avaliados: 48.
+- Passaram: 39.
+- Falharam: 9.
+- Jobs `done`: 48.
+- Jobs ausentes/timeout: 0.
+- Jobs `failed`: 0.
+- Zero facts: 3.
+- Zero facts correto: 3.
+- Estimativa media de prompt por conversa: 1491 tokens.
+
+Comparativo de aproveitamento:
+
+| matriz | passaram | total | aproveitamento |
+| --- | ---: | ---: | ---: |
+| v3.2 original | 30 | 32 | 93.75% |
+| v3.2 expandida | 39 | 48 | 81.25% |
+| apenas novos casos | 9 | 16 | 56.25% |
+
+Falhas da matriz expandida:
+
+| caso | faltou | observacao |
+| --- | --- | --- |
+| `S08-uso-delivery-urgente` | `moto_uso` | ja era falha conhecida; extraiu `motivo_compra` e `urgencia`. |
+| `S09-parcelamento` | `intencao_cliente` | extraiu pagamento, parcelamento e desconto; faltou intencao comercial. |
+| `S11-ano-cilindrada` | `moto_ano` | extraiu modelo e posicao; perdeu ano `2020`. |
+| `S22-viagem-seguranca` | `urgencia` | ja era falha conhecida; extraiu motivo e preferencia. |
+| `S37-garantia-com-marca` | `marca_pneu_preferida` | extraiu `produto_oferecido=Technic`; expectativa pode ser discutivel porque marca foi citada em garantia, nao como preferencia. |
+| `S38-reclamacao-atraso-entrega` | `modalidade_entrega` | extraiu reclamacao, urgencia e entrega hoje; perdeu modalidade. |
+| `S39-pagamento-credito-parcelado` | `produto_aceito` | extraiu pagamento, parcelamento e intencao; aceite era condicional. |
+| `S44-preco-concorrente-sem-recusa` | `produto_aceito` | extraiu preco concorrente, desconto e intencao; aceite era condicional. |
+| `S46-quantidade-casal` | `posicao_pneu` | extraiu quantidade, modelo e cilindrada; nao gerou posicao para dianteiro+traseiro. |
+
+Leitura:
+
+- A Organizadora segue estavel operacionalmente: 48/48 jobs concluidos.
+- A qualidade nao se manteve no mesmo patamar quando a matriz ficou mais diversa.
+- Parte das falhas e prompt/schema; parte sao expectativas de avaliador que podem estar rigorosas demais, principalmente `S37`, `S39` e `S44`.
+- Proximo passo recomendado: antes de mexer no prompt, revisar se os `required` desses novos casos representam fatos obrigatorios mesmo ou se alguns devem virar opcionais.
