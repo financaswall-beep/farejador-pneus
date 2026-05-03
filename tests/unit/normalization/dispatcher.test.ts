@@ -7,14 +7,23 @@ const baseEnv = {
   CHATWOOT_HMAC_SECRET: 'test-secret',
   CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: '300',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
+  ORGANIZADORA_ENABLED: 'false',
 };
 
 function createMockClient(): {
   query: ReturnType<typeof vi.fn>;
 } {
   return {
-    query: vi.fn().mockResolvedValue({
-      rows: [{ id: 'uuid-1', conversation_id: 'conversation-uuid' }],
+    query: vi.fn().mockImplementation((sql: string) => {
+      if (sql.includes('ops.enqueue_enrichment_job')) {
+        return Promise.resolve({
+          rows: [{ enqueue_enrichment_job: 'job-uuid-1' }],
+        });
+      }
+
+      return Promise.resolve({
+        rows: [{ id: 'uuid-1', conversation_id: 'conversation-uuid' }],
+      });
     }),
   };
 }
@@ -22,15 +31,17 @@ function createMockClient(): {
 const environment = 'prod';
 const lastEventAt = new Date('2026-04-23T12:00:00Z');
 let loggerWarn: ReturnType<typeof vi.fn>;
+let loggerInfo: ReturnType<typeof vi.fn>;
 
 describe('dispatcher', () => {
   beforeEach(() => {
     vi.resetModules();
+    loggerInfo = vi.fn();
     loggerWarn = vi.fn();
     Object.assign(process.env, baseEnv);
     vi.doMock('pino', () => ({
       default: vi.fn(() => ({
-        info: vi.fn(),
+        info: loggerInfo,
         warn: loggerWarn,
         error: vi.fn(),
       })),
@@ -220,6 +231,69 @@ describe('dispatcher', () => {
       (c[0] as string).includes('INSERT INTO core.messages'),
     );
     expect(msgUpsert).toBeDefined();
+  });
+
+  it('enqueues organizadora job for message_created when enabled', async () => {
+    process.env.ORGANIZADORA_ENABLED = 'true';
+    process.env.ORGANIZADORA_DEBOUNCE_SECONDS = '10';
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 55,
+      event_type: 'message_created',
+      payload: messageCreated,
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_enrichment_job'),
+    );
+    expect(enqueueCall).toBeDefined();
+    expect(enqueueCall?.[1]).toEqual([
+      environment,
+      'conversation-uuid',
+      'uuid-1',
+      10,
+    ]);
+    expect(loggerInfo).toHaveBeenCalledWith(
+      {
+        raw_event_id: 55,
+        conversation_id: 'conversation-uuid',
+        message_id: 'uuid-1',
+        enrichment_job_id: 'job-uuid-1',
+      },
+      'normalization: organizadora job enqueued',
+    );
+  });
+
+  it('logs when organizadora enqueue is skipped by config', async () => {
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 56,
+      event_type: 'message_created',
+      payload: messageCreated,
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_enrichment_job'),
+    );
+    expect(enqueueCall).toBeUndefined();
+    expect(loggerWarn).toHaveBeenCalledWith(
+      {
+        raw_event_id: 56,
+        conversation_id: 'conversation-uuid',
+        message_id: 'uuid-1',
+      },
+      'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
+    );
   });
 
   it('upserts nested contact before message when sender is present', async () => {

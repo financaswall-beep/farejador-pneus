@@ -195,10 +195,35 @@ export async function dispatch(
       const message = mapMessage(payload, environment, lastEventAt);
       const upsertedMessage = await upsertMessage(client, message);
 
-      // Enfileira job da Organizadora para a conversa (debounce configurável via env).
-      // Só para message_created — message_updated não dispara nova extração.
-      if (eventType === 'message_created' && env.ORGANIZADORA_ENABLED) {
-        await enqueueOrganizadoraJob(client, environment, upsertedMessage.conversationId, upsertedMessage.messageId);
+      // Enfileira job da Organizadora para a conversa (debounce configuravel via env).
+      // So para message_created; message_updated nao dispara nova extracao.
+      if (eventType === 'message_created') {
+        if (env.ORGANIZADORA_ENABLED) {
+          const jobId = await enqueueOrganizadoraJob(
+            client,
+            environment,
+            upsertedMessage.conversationId,
+            upsertedMessage.messageId,
+          );
+          logger.info(
+            {
+              raw_event_id: rawEventId,
+              conversation_id: upsertedMessage.conversationId,
+              message_id: upsertedMessage.messageId,
+              enrichment_job_id: jobId,
+            },
+            'normalization: organizadora job enqueued',
+          );
+        } else {
+          logger.warn(
+            {
+              raw_event_id: rawEventId,
+              conversation_id: upsertedMessage.conversationId,
+              message_id: upsertedMessage.messageId,
+            },
+            'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
+          );
+        }
       }
 
       const attachments = (payload.attachments ?? []) as Array<
