@@ -19,7 +19,10 @@ import { insertAssignment } from '../persistence/assignments.repository.js';
 import { insertReaction } from '../persistence/reactions.repository.js';
 import { upsertTags } from '../persistence/tags.repository.js';
 import { enqueueOrganizadoraJob } from '../persistence/enrichment-jobs.repository.js';
-import { enqueueAtendenteJob } from '../shared/repositories/ops-atendente.repository.js';
+import {
+  enqueueAtendenteJob,
+  ensureAtendenteSession,
+} from '../shared/repositories/ops-atendente.repository.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 
 export interface RawEvent {
@@ -228,6 +231,12 @@ export async function dispatch(
         }
 
         if (env.ATENDENTE_SHADOW_ENABLED) {
+          const sessionId = await ensureAtendenteSession(
+            client,
+            environment as Environment,
+            upsertedMessage.conversationId,
+            upsertedMessage.messageId,
+          );
           const jobId = await enqueueAtendenteJob(
             client,
             environment as Environment,
@@ -239,6 +248,7 @@ export async function dispatch(
               raw_event_id: rawEventId,
               conversation_id: upsertedMessage.conversationId,
               message_id: upsertedMessage.messageId,
+              agent_session_id: sessionId,
               atendente_job_id: jobId,
             },
             'normalization: atendente job enqueued',

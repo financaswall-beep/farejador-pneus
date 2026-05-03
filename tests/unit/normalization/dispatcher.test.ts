@@ -26,6 +26,11 @@ function createMockClient(): {
           rows: [{ enqueue_atendente_job: 'atendente-job-uuid-1' }],
         });
       }
+      if (sql.includes('INSERT INTO agent.session_current')) {
+        return Promise.resolve({
+          rows: [{ id: 'agent-session-uuid-1' }],
+        });
+      }
 
       return Promise.resolve({
         rows: [{ id: 'uuid-1', conversation_id: 'conversation-uuid' }],
@@ -316,6 +321,16 @@ describe('dispatcher', () => {
       chatwoot_timestamp: lastEventAt,
     });
 
+    const sessionCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('INSERT INTO agent.session_current'),
+    );
+    expect(sessionCall).toBeDefined();
+    expect(sessionCall?.[1]).toEqual([
+      environment,
+      'conversation-uuid',
+      'uuid-1',
+    ]);
+
     const enqueueCall = client.query.mock.calls.find((call) =>
       (call[0] as string).includes('ops.enqueue_atendente_job'),
     );
@@ -330,6 +345,7 @@ describe('dispatcher', () => {
         raw_event_id: 57,
         conversation_id: 'conversation-uuid',
         message_id: 'uuid-1',
+        agent_session_id: 'agent-session-uuid-1',
         atendente_job_id: 'atendente-job-uuid-1',
       },
       'normalization: atendente job enqueued',
@@ -352,7 +368,11 @@ describe('dispatcher', () => {
     const enqueueCall = client.query.mock.calls.find((call) =>
       (call[0] as string).includes('ops.enqueue_atendente_job'),
     );
+    const sessionCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('INSERT INTO agent.session_current'),
+    );
     expect(enqueueCall).toBeUndefined();
+    expect(sessionCall).toBeUndefined();
     expect(loggerInfo).toHaveBeenCalledWith(
       {
         raw_event_id: 58,

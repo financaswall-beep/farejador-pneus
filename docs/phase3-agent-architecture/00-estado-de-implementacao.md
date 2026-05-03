@@ -116,7 +116,8 @@ Worker Shadow:
 - `src/shared/repositories/ops-atendente.repository.ts`
 - `ATENDENTE_SHADOW_ENABLED=false` por default
 - `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
-  `message_created` quando `ATENDENTE_SHADOW_ENABLED=true`
+  `message_created` quando `ATENDENTE_SHADOW_ENABLED=true` e garante
+  `agent.session_current` para a conversa antes do enqueue
 - log-only: gera candidato shadow, sem envio Chatwoot
 
 ## Organizadora v3.3

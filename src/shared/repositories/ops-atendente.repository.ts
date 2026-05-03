@@ -16,6 +16,25 @@ export interface AtendenteJobRow {
   attempts: number;
 }
 
+export async function ensureAtendenteSession(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  triggerMessageId: string,
+): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `INSERT INTO agent.session_current
+       (environment, conversation_id, last_customer_message_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (environment, conversation_id) DO UPDATE
+     SET last_customer_message_id = EXCLUDED.last_customer_message_id,
+         updated_at = now()
+     RETURNING id`,
+    [environment, conversationId, triggerMessageId],
+  );
+  return result.rows[0]!.id;
+}
+
 export async function enqueueAtendenteJob(
   client: PoolClient,
   environment: Environment,

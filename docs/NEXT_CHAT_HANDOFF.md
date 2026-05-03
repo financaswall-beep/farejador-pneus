@@ -46,7 +46,8 @@ Atendente:
 - Enqueue da Atendente:
   `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
   `message_created` quando `ATENDENTE_SHADOW_ENABLED=true`, via
-  `ops.enqueue_atendente_job` idempotente por `trigger_message_id`.
+  `ops.enqueue_atendente_job` idempotente por `trigger_message_id`. Antes do
+  enqueue, cria/atualiza `agent.session_current` para a conversa.
 - Sprint 6: Generator Shadow:
   `src/atendente/generator/service.ts`, gera resposta candidata auditavel,
   valida com `SayValidator`/`ActionValidator`, grava em `agent.turns`

@@ -28,7 +28,8 @@ Implementado:
   log-only, desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
 - Normalizacao enfileira `ops.atendente_jobs` em `message_created` quando
   `ATENDENTE_SHADOW_ENABLED=true`, usando `ops.enqueue_atendente_job`
-  idempotente por mensagem.
+  idempotente por mensagem. Antes do enqueue, garante `agent.session_current`
+  para a conversa.
 - Atendente Sprint 6: Generator Shadow (`src/atendente/generator/service.ts`).
   Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
   grava em `agent.turns` (status='generated'|'blocked') e auditoria em
