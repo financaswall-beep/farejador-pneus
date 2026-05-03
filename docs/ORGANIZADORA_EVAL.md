@@ -368,3 +368,56 @@ Leitura:
 - A correcao v3.1 resolveu os casos de `retirada` e `pagamento misto` sem aumentar o prompt.
 - As 5 falhas restantes sao mais de interpretacao semantica do prompt/schema, nao das regras deterministicas de pagamento/entrega.
 - Ainda existe um problema separado de enfileiramento: algumas conversas sao capturadas em `core.*`, mas nao geram job da Organizadora.
+
+## Auditoria do enfileiramento 2026-05-03
+
+Commit de auditoria:
+
+- `87e1a88 test: audit organizadora enqueue path`.
+
+Mudancas:
+
+- `message_created` agora registra log quando enfileira job da Organizadora, incluindo `raw_event_id`, `conversation_id`, `message_id` e `enrichment_job_id`.
+- Se `ORGANIZADORA_ENABLED=false`, o normalizador registra aviso explicito em vez de pular silenciosamente.
+- Testes unitarios cobrem os dois caminhos: enfileira quando ligado, pula com aviso quando desligado.
+
+Validacao local:
+
+- `npm run typecheck`: passou.
+- `npm run build`: passou.
+- `npm test`: 267 testes passaram.
+
+Rodada curta apos deploy:
+
+- 8 casos avaliados.
+- Jobs `done`: 8.
+- Jobs ausentes/timeout: 0.
+- Passaram: 7.
+- Falha restante: `S08`, faltando `motivo_compra`.
+
+Rodada completa apos deploy:
+
+- 32 casos avaliados.
+- Jobs `done`: 32.
+- Jobs ausentes/timeout: 0.
+- Jobs `failed`: 0.
+- Passaram: 28.
+- Falharam: 4.
+- Zero facts: 2.
+- Zero facts correto: 2.
+- Estimativa media de prompt por conversa: 1492 tokens.
+
+Falhas restantes:
+
+| caso | faltou |
+| --- | --- |
+| `S08-uso-delivery-urgente` | `motivo_compra` |
+| `S16-preco-alvo` | `preferencia_principal` |
+| `S22-viagem-seguranca` | `motivo_compra` |
+| `S25-erros-digitacao` | `perguntou_entrega_hoje` |
+
+Leitura:
+
+- O problema operacional de job ausente nao apareceu na rodada completa apos a auditoria: 32/32 jobs foram criados e concluidos.
+- O gargalo atual voltou a ser somente semantico, concentrado em 4 padroes.
+- A proxima melhoria deve ser pequena e focada: `motivo_compra`, `preferencia_principal` e `perguntou_entrega_hoje`.
