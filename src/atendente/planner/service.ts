@@ -130,6 +130,18 @@ function mockPlanTurn(context: PlannerContext): PlannerOutput {
     };
   }
 
+  if (mentionsStoreInfoQuestion(text) && context.available_tools.includes('buscarPoliticaComercial')) {
+    return {
+      skill: 'responder_geral',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment } }],
+      risk_flags: [],
+      confidence: 0.85,
+      rationale: 'Cliente perguntou sobre informacao geral da loja.',
+      prompt_version: plannerPromptVersion,
+    };
+  }
+
   if (mentionsPolicyQuestion(text) && context.available_tools.includes('buscarPoliticaComercial')) {
     return {
       skill: 'tratar_objecao',
@@ -305,12 +317,20 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
       { tool: 'buscarPoliticaComercial', input: { environment: context.environment } },
     ].slice(0, 5);
     normalized.tool_requests = normalizedToolRequests;
-    if (['pedir_dados_faltantes', 'responder_geral', 'escalar_humano'].includes(String(normalized.skill))) {
+    const latestText = latestCustomerText(context);
+    if (mentionsStoreInfoQuestion(latestText)) {
+      // info geral da loja: endereco, horario, montagem — nao precisa de produto
+      if (['pedir_dados_faltantes', 'escalar_humano'].includes(String(normalized.skill))) {
+        normalized.skill = 'responder_geral';
+        normalized.missing_slots = [];
+        normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.75), 0.8);
+      }
+    } else if (['pedir_dados_faltantes', 'escalar_humano'].includes(String(normalized.skill))) {
       normalized.skill = 'tratar_objecao';
       normalized.missing_slots = [];
       normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.7), 0.75);
     }
-    normalized.rationale = appendRationale(candidate.rationale, 'Pergunta de politica comercial com tool garantida.');
+    normalized.rationale = appendRationale(candidate.rationale, 'Pergunta de politica/info da loja com tool garantida.');
   }
 
   if (candidate.skill === 'buscar_e_ofertar' && normalizedToolRequests.length === 0) {
@@ -325,7 +345,8 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
 
 function shouldEnsurePolicyTool(context: PlannerContext, normalizedToolRequests: unknown[]): boolean {
   if (!context.available_tools.includes('buscarPoliticaComercial')) return false;
-  if (!mentionsPolicyQuestion(latestCustomerText(context))) return false;
+  const text = latestCustomerText(context);
+  if (!mentionsPolicyQuestion(text) && !mentionsStoreInfoQuestion(text)) return false;
   return !normalizedToolRequests.some((request) => {
     if (!request || typeof request !== 'object' || Array.isArray(request)) return false;
     return (request as Record<string, unknown>).tool === 'buscarPoliticaComercial';
@@ -344,6 +365,19 @@ function mentionsPolicyQuestion(text: string): boolean {
   if (/\b(pagamento|forma de pagamento|condicao de pagamento|no cartao|cartao muda)\b/.test(normalized)) return true;
   if (/\b(troca|trocar|devolucao|devolver|garantia)\b/.test(normalized)) return true;
   if (/\b(horario|funcionamento|que horas|fecha|fecham|abre|abrem|domingo|sabado)\b/.test(normalized)) return true;
+  return false;
+}
+
+function mentionsStoreInfoQuestion(text: string): boolean {
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  // perguntas sobre localizacao/endereco
+  if (/\b(endereco|onde fica|como chegar|localizacao|maps|link do mapa|onde voces ficam)\b/.test(normalized)) return true;
+  // perguntas sobre servicos gerais sem produto mencionado
+  if (/\b(faz montagem|fazem montagem|faz balanceamento|tem montagem|tem estacionamento)\b/.test(normalized)) return true;
+  // perguntas de horario / dias de funcionamento
+  if (/\b(que horas abre|que horas fecha|horario de atendimento|quando abrem|quando fecham|aberto agora)\b/.test(normalized)) return true;
+  if (/\b(abrem|abre|funcionam|funcionamos)\b/.test(normalized)) return true;
+  if (/\b(domingo|feriado)\b/.test(normalized)) return true;
   return false;
 }
 

@@ -176,6 +176,49 @@ describe('Planner Sprint 3', () => {
     });
   });
 
+  it('mock planner usa responder_geral para pergunta de endereco', async () => {
+    const result = await planTurn(
+      context({
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000014',
+            role: 'customer',
+            text: 'Onde fica a loja de voces?',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output).toMatchObject({
+      skill: 'responder_geral',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
+      prompt_version: plannerPromptVersion,
+    });
+  });
+
+  it('mock planner usa responder_geral para pergunta de montagem', async () => {
+    const result = await planTurn(
+      context({
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000015',
+            role: 'customer',
+            text: 'Voces fazem montagem na hora?',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output).toMatchObject({
+      skill: 'responder_geral',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
+    });
+  });
+
   it('mock planner usa fatos da Organizadora para buscar produto', async () => {
     const result = await planTurn(
       context({
@@ -366,6 +409,39 @@ describe('Planner Sprint 3', () => {
 
     expect(normalized).toMatchObject({
       skill: 'tratar_objecao',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
+      prompt_version: plannerPromptVersion,
+    });
+  });
+
+  it('garante responder_geral + politica quando Planner usa pedir_dados_faltantes para pergunta de endereco', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'pedir_dados_faltantes',
+          missing_slots: ['moto_modelo', 'medida_pneu'],
+          tool_requests: [],
+          risk_flags: [],
+          confidence: 0.6,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.1',
+        },
+        context({
+          recent_messages: [
+            {
+              id: '00000000-0000-4000-8000-000000000016',
+              role: 'customer',
+              text: 'Voces abrem domingo?',
+              sent_at: baseTime,
+            },
+          ],
+        }),
+      ),
+    );
+
+    expect(normalized).toMatchObject({
+      skill: 'responder_geral',
       missing_slots: [],
       tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
       prompt_version: plannerPromptVersion,
