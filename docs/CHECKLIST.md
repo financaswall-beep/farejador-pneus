@@ -1,6 +1,6 @@
 # Checklist Master - Farejador
 
-Atualizado: 2026-05-03
+Atualizado: 2026-05-05
 
 > Nota: este checklist preserva historico das Fases 1/2a. Para o estado vivo
 > da Fase 3 e proximo passo, use `docs/NEXT_CHAT_HANDOFF.md` e
@@ -18,8 +18,14 @@ Atualizado: 2026-05-03
 - [x] Atendente Sprint 5: Worker Shadow minimalista.
 - [x] Atendente Sprint 6: Generator shadow.
 - [x] Generator LLM real validado em shadow, sem envio Chatwoot.
-- [ ] Critic.
-- [ ] Envio Chatwoot pela Atendente.
+- [x] Atendente Sprint 6.5: loop de estado (applyActionAndPersistInTx).
+- [x] Atendente Sprint 6.6: bridge Organizadora → Context Builder.
+- [x] Atendente Sprint 6.7: Say Validator endurecido.
+- [x] Atendente Sprint 6.8: filtro sender_type no dispatcher.
+- [x] Atendente Sprint 6.9: nota interna Chatwoot ao escalar.
+- [ ] Critic (Sprint 7).
+- [ ] Envio Chatwoot pela Atendente (Sprint 8).
+- [ ] Seed catalogo commerce.* (Sprint 6.10).
 
 Legenda: feito, em andamento, proximo, futuro.
 

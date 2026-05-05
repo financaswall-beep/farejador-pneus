@@ -1,6 +1,6 @@
 # Farejador - Visao Atual do Projeto
 
-Atualizado: 2026-05-03.
+Atualizado: 2026-05-05.
 
 Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
 Postgres/Supabase e prepara uma fundacao auditavel para analytics,
@@ -20,7 +20,16 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
 | Atendente Sprint 5 - worker shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator shadow | Proxima fase |
+| Atendente Sprint 6 - Generator shadow | Implementado; LLM real em shadow |
+| Atendente Sprint 6.5 - loop de estado | Implementado |
+| Atendente Sprint 6.6 - bridge Organizadora | Implementado |
+| Atendente Sprint 6.7 - Say Validator endurecido | Implementado |
+| Atendente Sprint 6.8 - filtro sender_type | Implementado |
+| Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod |
+| Ajuste pre-Critic - memoria operacional do Generator | Implementado |
+| Critic (Sprint 7) | Proxima fase |
+| Envio Chatwoot (Sprint 8) | Proxima fase |
+| Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
 
 ## O Que Esta Ligado
 
@@ -30,15 +39,21 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - Organizadora LLM -> `analytics.conversation_facts` e
   `analytics.fact_evidence`.
 - Atendente Shadow Worker -> `agent.*`/`ops.*` quando
-  `ATENDENTE_SHADOW_ENABLED=true`, sem Generator e sem envio Chatwoot.
-- Migrations ate `0026` aplicadas/validadas no Supabase atual.
+  `ATENDENTE_SHADOW_ENABLED=true`; Generator LLM real ativo em shadow.
+- Generator recebe `state.items`, `organizer_facts` e `derived_signals` e emite
+  actions de memoria operacional em tempo real (`create_item`, `update_slot`,
+  `update_draft`).
+- Nota interna Chatwoot (`private: true`) ao emitir `escalate`.
+- Migrations ate `0027` aplicadas/validadas no Supabase atual.
 
 ## O Que Ainda Nao Esta Ligado
 
 - Nenhum bot responde cliente.
 - Nao existe envio Chatwoot pela Atendente.
 - Planner LLM fica desligado por default (`PLANNER_LLM_ENABLED=false`).
-- Generator, Critic e Reflection Loop ainda nao existem.
+- Critic e Reflection Loop ainda nao existem.
+- Nenhum envio de mensagem ao cliente (Sprint 8 pendente).
+- Catalogo `commerce.*` vazio (seed pendente — Sprint 6.10).
 
 ## Invariantes
 

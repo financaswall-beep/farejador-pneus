@@ -1,6 +1,6 @@
 # 00 - Estado de Implementacao da Fase 3
 
-Atualizado: 2026-05-03.
+Atualizado: 2026-05-05.
 
 Este e o estado vivo da Fase 3. Historico detalhado anterior permanece no git;
 este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
@@ -30,9 +30,16 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 3 - Planner foundation | Implementado |
 | Atendente Sprint 4 - Executor/guardrails | Implementado |
 | Atendente Sprint 5 - Worker Shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator Shadow | Implementado; em prod atual com LLM real em shadow |
-| Critic | Nao existe |
-| Envio Chatwoot pela Atendente | Nao existe |
+| Atendente Sprint 6 - Generator Shadow | Implementado; LLM real em shadow |
+| Atendente Sprint 6.5 - loop de estado | Implementado |
+| Atendente Sprint 6.6 - bridge Organizadora | Implementado |
+| Atendente Sprint 6.7 - Say Validator endurecido | Implementado |
+| Atendente Sprint 6.8 - filtro sender_type | Implementado |
+| Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod (e35ca31) |
+| Ajuste pre-Critic - memoria operacional Generator | Implementado |
+| Critic (Sprint 7) | Nao existe |
+| Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
+| Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
 
 ## Migrations Relevantes Da Fase 3
 
@@ -148,37 +155,28 @@ Worker Shadow:
 
 Ultima validacao (pos Sprint 6 + Organizadora v3.4):
 
-- `npm test`: 296/296 verde.
+- `npm test`: 316/316 verde, 49 arquivos.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
-- Teste em prod com 6 conversas: Atendente shadow e Organizadora v3.4
-  funcionaram; sem novos `schema_violation` observados nas conversas novas.
+- Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
+  job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
+  LLM real gpt-5.4, sem alucinacao comercial.
+- Organizadora: 120 enrichment_jobs done, 4 facts corretos, confianca > 0.95.
+- Deploy Coolify commit e35ca31: 2026-05-05 10:07, rolling update completed.
 
 ## Proxima Fase
 
 Sprint 7: Critic Shadow da Atendente.
+- Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
+- Sem envio Chatwoot no Critic.
+- Memoria operacional do Generator ja calibrada antes desta sprint.
 
-Fluxo desejado:
+Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
+- Tabelas `products`, `tire_specs`, `vehicle_fitments` vazias; `buscar_e_ofertar` retorna lista vazia.
 
-```text
-ops.atendente_jobs
-  -> Worker Shadow
-  -> buildPlannerContext
-  -> planTurn
-  -> executeToolRequests
-  -> Generator cria resposta candidata
-  -> Critic avalia o candidato
-  -> grava auditoria shadow
-  -> para
-```
-
-Limites da Sprint 7:
-
-- sem envio Chatwoot;
-- sem atendimento automatico;
-- `GENERATOR_LLM_ENABLED=false` por default no codigo; em prod atual pode ficar
-  `true` para shadow auditavel, ainda sem envio Chatwoot;
-- log-only/shadow-only.
+Sprint 8: envio controlado ao Chatwoot.
+- `ChatwootApiClient.postMessage()` + worker envia turn `generated` aprovado.
+- Controlado por `ATENDENTE_SEND_ENABLED=false` (default off).
 
 ## Documentos De Apoio
 

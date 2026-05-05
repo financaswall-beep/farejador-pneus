@@ -56,11 +56,15 @@ const baseTime = '2026-05-03T12:00:00.000Z';
 let generatorPromptVersion: string;
 
 let generateTurn: typeof import('../../../../src/atendente/generator/service.js').generateTurn;
+let buildGeneratorMessages: typeof import('../../../../src/atendente/generator/prompt.js').buildGeneratorMessages;
 let SAFE_FALLBACK_SAY: string;
 
 beforeAll(async () => {
   const module = await import('../../../../src/atendente/generator/service.js');
   generateTurn = module.generateTurn;
+
+  const prompt = await import('../../../../src/atendente/generator/prompt.js');
+  buildGeneratorMessages = prompt.buildGeneratorMessages;
 
   const schemas = await import('../../../../src/atendente/generator/schemas.js');
   SAFE_FALLBACK_SAY = schemas.SAFE_FALLBACK_SAY;
@@ -456,5 +460,149 @@ describe('Generator Shadow — skills no modo mock', () => {
     expect(result.blocked).toBe(false);
     expect(result.say_text).toBeTruthy();
     expect(result.say_text).not.toMatch(/R\$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Memória operacional em tempo real
+// ---------------------------------------------------------------------------
+
+describe('Generator Shadow — memória operacional em tempo real', () => {
+  it('prompt instrui criar slots por mensagem, inclusive múltiplos itens', () => {
+    const messages = buildGeneratorMessages(makeContext(), makeDecision('pedir_dados_faltantes'), []);
+    const systemPrompt = messages[0]!.content;
+
+    expect(systemPrompt).toContain('REGRAS DE MEMORIA EM TEMPO REAL');
+    expect(systemPrompt).toContain('Para cada dado novo dito pelo cliente na mensagem atual, emita update_slot');
+    expect(systemPrompt).toContain('Se o cliente citar dois pneus/produtos na mesma mensagem, crie/atualize dois itens separados');
+    expect(systemPrompt).toContain('Para pagamento mencionado, use update_draft.payment_method e update_slot global forma_pagamento');
+  });
+
+  it('inclui items completos e organizer_facts no contexto entregue ao LLM', () => {
+    const context = makeContext({
+      state: makeState({
+        items: [
+          {
+            id: '00000000-0000-4000-8000-000000000010',
+            status: 'aberto',
+            is_active: true,
+            created_at: baseTime,
+            slots: {},
+          },
+        ],
+      }),
+      organizer_facts: [
+        {
+          fact_key: 'medida_pneu',
+          fact_value: '140/70-17',
+          observed_at: baseTime,
+          message_id: '00000000-0000-4000-8000-0000000000f1',
+          truth_type: 'observed',
+          source: 'llm',
+          confidence_level: 0.99,
+          extractor_version: 'test',
+          latest_evidence_text: '140/70-17',
+          latest_evidence_message_id: '00000000-0000-4000-8000-0000000000f1',
+          latest_evidence_type: 'message',
+        },
+      ],
+    });
+
+    const messages = buildGeneratorMessages(context, makeDecision('pedir_dados_faltantes'), []);
+    const payload = JSON.parse(messages[1]!.content);
+
+    expect(payload.context.state_summary.items).toHaveLength(1);
+    expect(payload.context.organizer_facts).toHaveLength(1);
+    expect(payload.context.organizer_facts[0].fact_value).toBe('140/70-17');
+  });
+
+  it('hidrata e preserva slots de dois pneus e dados globais emitidos no mesmo turno', async () => {
+    enableLlm();
+    const latestMessageId = '00000000-0000-4000-8000-0000000000f2';
+    const firstItemId = '00000000-0000-4000-8000-000000000101';
+    const secondItemId = '00000000-0000-4000-8000-000000000102';
+    queueLlm('Anotei os dois pneus, o endereço e o pagamento. Vou conferir as opções para você.', [
+      { type: 'create_item', item_id: firstItemId, make_active: true },
+      {
+        type: 'update_slot',
+        scope: 'item',
+        item_id: firstItemId,
+        slot_key: 'medida_pneu',
+        value: '140/70-17',
+        source: 'observed',
+        confidence: 0.99,
+        evidence_text: '140/70-17',
+        set_by_message_id: latestMessageId,
+      },
+      { type: 'create_item', item_id: secondItemId, make_active: true },
+      {
+        type: 'update_slot',
+        scope: 'item',
+        item_id: secondItemId,
+        slot_key: 'medida_pneu',
+        value: '110/70-17',
+        source: 'observed',
+        confidence: 0.99,
+        evidence_text: '110/70-17',
+        set_by_message_id: latestMessageId,
+      },
+      {
+        type: 'update_slot',
+        scope: 'global',
+        item_id: null,
+        slot_key: 'forma_pagamento',
+        value: 'cartao_credito',
+        source: 'observed',
+        confidence: 0.95,
+        evidence_text: 'vou pagar no cartão',
+        set_by_message_id: latestMessageId,
+      },
+      { type: 'update_draft', payment_method: 'cartao_credito' },
+    ]);
+
+    const context = makeContext({
+      recent_messages: [
+        {
+          id: latestMessageId,
+          role: 'customer',
+          text: 'quero um pneu 140/70-17 e outro 110/70-17 e vou pagar no cartão',
+          sent_at: baseTime,
+        },
+      ],
+    });
+
+    const result = await generateTurn(context, makeDecision('pedir_dados_faltantes'), []);
+
+    expect(result.blocked).toBe(false);
+    expect(result.actions).toHaveLength(6);
+    expect(result.actions.map((action) => action.type)).toEqual([
+      'create_item',
+      'update_slot',
+      'create_item',
+      'update_slot',
+      'update_slot',
+      'update_draft',
+    ]);
+    expect(result.actions[1]).toMatchObject({
+      type: 'update_slot',
+      item_id: firstItemId,
+      slot_key: 'medida_pneu',
+      value: '140/70-17',
+      set_by_skill: 'pedir_dados_faltantes',
+    });
+    expect(result.actions[3]).toMatchObject({
+      type: 'update_slot',
+      item_id: secondItemId,
+      slot_key: 'medida_pneu',
+      value: '110/70-17',
+    });
+    expect(result.actions[4]).toMatchObject({
+      type: 'update_slot',
+      scope: 'global',
+      item_id: null,
+      slot_key: 'forma_pagamento',
+      value: 'cartao_credito',
+    });
+    disableLlm();
   });
 });

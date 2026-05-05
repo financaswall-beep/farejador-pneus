@@ -1,6 +1,6 @@
 # Handoff - Farejador
 
-Atualizado: 2026-05-03.
+Atualizado: 2026-05-05.
 
 Este arquivo e o handoff operacional curto. Para contexto completo da proxima
 conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
@@ -40,16 +40,38 @@ Implementado:
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
+- Sprint 6.5: loop de estado — worker itera actions e aplica via
+  `applyActionAndPersistInTx`. Persiste `session_items`, `session_slots`,
+  `cart_current`, `cart_events`, `order_drafts`, `pending_confirmations`,
+  `escalations`. Commit `63e40e8`.
+- Sprint 6.6: bridge Organizadora -> Context Builder — lê
+  `analytics.conversation_facts` e entrega `organizer_facts` ao Planner.
+  Commit `63e40e8`.
+- Sprint 6.7: Say Validator endurecido — bloqueia afirmacoes comerciais sem
+  evidencia (estoque/prazo/compatibilidade exigem tool correspondente).
+  6 novos testes. Commit `79c0d19`.
+- Sprint 6.8: filtro sender_type no dispatcher — so enfileira job para
+  `sender_type='contact'`; bots/agentes/sistema descartados com log info.
+  2 novos testes. Commit `193b4ef`.
+- Sprint 6.9: nota interna Chatwoot ao escalar — `ChatwootApiClient.createNote()`
+  posta nota `private: true` quando `escalate` é emitido, fora da transacao.
+  No-op se variaveis Chatwoot ausentes. 5 novos testes. Commit `e35ca31`.
+  Deploy 2026-05-05.
+- Ajuste pre-Critic: Generator calibrado para memoria operacional em tempo real.
+  Emite `create_item`, `update_slot` e `update_draft` para dados novos do cliente
+  na propria mensagem; contexto inclui `state.items`, `organizer_facts` e
+  `derived_signals`. 3 novos testes.
 
 Nao implementado/nao ligado:
 
-- Critic.
-- Envio Chatwoot pela Atendente.
+- Critic (Sprint 7).
+- Envio Chatwoot pela Atendente (Sprint 8).
+- Seed do catalogo commerce.* (Sprint 6.10).
 - Qualquer atendimento automatico ao cliente.
 
 ## Ultimas Validacoes
 
-- `npm test`: 296/296 verde.
+- `npm test`: 316/316 verde, 49 arquivos.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
 - Migration `0027_generator_shadow_events.sql` aplicada no Supabase atual em
@@ -68,9 +90,11 @@ Nao implementado/nao ligado:
 
 ## Ultimos Commits Relevantes
 
+- `e35ca31 feat(atendente): Sprint 6.9 restante — nota interna Chatwoot ao escalar`
+- `193b4ef feat(dispatcher): Sprint 6.8 — filtrar sender_type`
+- `79c0d19 feat(atendente): Sprint 6.7 — Say Validator endurecido`
+- `63e40e8 feat(atendente): Sprints 6.5 + 6.6 — loop de estado e bridge Organizadora`
 - `56dfc0e feat: tune organizadora prompt v3.4`
-- `b9757ba fix: seed atendente shadow sessions`
-- `706d9f9 feat: enqueue atendente shadow jobs`
 - `866bae6 feat: add atendente generator shadow (sprint 6)`
 
 Remotes sincronizados:
@@ -81,24 +105,17 @@ Remotes sincronizados:
 ## Proxima Fase Recomendada
 
 Sprint 7: Critic Shadow da Atendente.
+- Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
+- Nao envia ao Chatwoot no Critic.
+- Agora pode seguir porque a memoria operacional do Generator foi calibrada.
 
-Objetivo: avaliar a resposta candidata do Generator antes de qualquer envio:
+Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
+- `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios; `buscar_e_ofertar` retorna lista vazia.
+- Desbloqueio: trazer CSV/dump real da loja.
 
-```text
-ops.atendente_jobs
-  -> worker pega job
-  -> Context Builder
-  -> Planner
-  -> Tool Executor
-  -> Generator shadow (gera candidato)
-  -> Critic shadow (avalia candidato)
-  -> grava auditoria
-  -> STOP, sem envio Chatwoot
-```
-
-Alternativamente, se Critic for considerado prematuro, proxima fase pode ser:
-- ativar envio Chatwoot controlado para conversas de teste em shadow mode;
-- monitorar qualidade por 1-2 semanas antes de ativar em producao.
+Sprint 8: envio controlado ao Chatwoot.
+- `ChatwootApiClient.postMessage()` + worker envia turn `generated` aprovado.
+- Controlado por `ATENDENTE_SEND_ENABLED=false` (default off).
 
 ## Cuidados
 

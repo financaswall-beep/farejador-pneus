@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-03 (Sprint 6 concluida).
+Atualizado: 2026-05-05 (Sprints 6.5–6.9 concluidas, em producao).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -61,45 +61,86 @@ Atendente:
 - Organizadora v3.4 calibrada:
   prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
   de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
+- Sprint 6.5 (loop de estado):
+  `worker.ts` itera `generatorResult.actions` e aplica cada action via
+  `applyActionAndPersistInTx`. Persiste `session_items`, `session_slots`,
+  `cart_current`, `cart_current_items`, `cart_events`, `order_drafts`,
+  `pending_confirmations`, `escalations`. Commit `63e40e8`.
+- Sprint 6.6 (bridge Organizadora → Context Builder):
+  Context Builder le `analytics.conversation_facts` e entrega `organizer_facts`
+  ao Planner. Atendente usa fatos extraidos de turnos anteriores. Commit `63e40e8`.
+- Sprint 6.7 (Say Validator endurecido):
+  Bloqueia afirmacoes comerciais sem evidencia: estoque exige `verificarEstoque`,
+  prazo exige `calcularFrete`, compatibilidade exige `buscarCompatibilidade`.
+  6 novos testes. Suite: 306 testes. Commit `79c0d19`.
+- Sprint 6.8 (filtro sender_type no dispatcher):
+  `dispatcher.ts` so enfileira job para `sender_type='contact'`. Mensagens de
+  bot, agente humano e sistema descartadas com log `info`. 2 novos testes.
+  Suite: 308 testes. Commit `193b4ef`.
+- Sprint 6.9 (nota interna Chatwoot ao escalar):
+  `ChatwootApiClient.createNote()` — POST `/messages` com `private: true`,
+  retry em 5xx/429, timeout 10s. `src/atendente/handlers/escalate.ts` consulta
+  `core.conversations`, formata nota com rotulo do motivo + summary_text do LLM,
+  chama `createNote` fora da transacao (falha de API nao reverte estado DB).
+  No-op silencioso se `CHATWOOT_API_BASE_URL`/`TOKEN`/`ACCOUNT_ID` ausentes.
+  5 novos testes. Suite: 313 testes. Commit `e35ca31`. Deploy 2026-05-05.
+- Ajuste pre-Critic (memoria operacional em tempo real):
+  Generator prompt calibrado para emitir `create_item`, `update_slot` e
+  `update_draft` sempre que o cliente informar dados novos na mensagem atual,
+  inclusive multiplos pneus/produtos no mesmo turno. O contexto do Generator
+  agora recebe `state.items`, `organizer_facts` e `derived_signals`, nao apenas
+  o item ativo. 3 novos testes. Suite: 316 testes.
 
 ## O Que Ainda Nao Existe
 
-- Critic.
+- Critic (Sprint 7).
 - Reflection loop.
-- Envio Chatwoot pela Atendente.
+- Envio Chatwoot pela Atendente (Sprint 8).
+- Seed do catalogo `commerce.*` (Sprint 6.10 — depende de dados da loja).
 - Atendimento automatico.
 
 ## Validacao Atual
 
-Ultima validacao local (pos Sprint 6 + Organizadora v3.4):
+Ultima validacao local (pos ajuste de memoria operacional, 2026-05-05):
 
-- `npm test`: 296/296 verde.
+- `npx vitest run`: 316/316 verde, 49 arquivos.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
-- Migration `0027` aplicada/verificada no Supabase atual.
-- Teste em producao com 6 conversas Chatwoot: Atendente shadow criou jobs,
-  turns e eventos `generator_produced`; Generator LLM real gerou respostas
-  candidatas em `agent.turns` sem envio ao cliente.
-- Organizadora v3.4 extraiu facts novos sem novos `schema_violation`.
-- Scripts operacionais locais foram higienizados em 2026-05-03 para depender de
-  `.env` e nao manter secrets/endpoints reais hardcoded no repo.
+- Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
+  job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
+  LLM real gpt-5.4, sem alucinacao comercial.
+- Organizadora: 120 enrichment_jobs done, 4 facts corretos extraidos,
+  confianca media > 0.95.
 
 Ultimos commits enviados para `origin/main` e `pneus/main`:
 
-- `56dfc0e feat: tune organizadora prompt v3.4`
-- `b9757ba fix: seed atendente shadow sessions`
-- `706d9f9 feat: enqueue atendente shadow jobs`
-- `866bae6 feat: add atendente generator shadow (sprint 6)`
+- `e35ca31 feat(atendente): Sprint 6.9 restante — nota interna Chatwoot ao escalar`
+- `193b4ef feat(dispatcher): Sprint 6.8 — filtrar sender_type`
+- `79c0d19 feat(atendente): Sprint 6.7 — Say Validator endurecido`
+- `63e40e8 feat(atendente): Sprints 6.5 + 6.6 — loop de estado e bridge Organizadora`
 
 ## Proxima Fase
 
-Sprint 7: Critic Shadow da Atendente.
+Três frentes em paralelo (ordenadas por prioridade):
 
-Objetivo: avaliar a resposta candidata do Generator antes de qualquer envio ao
-cliente. O Critic deve ser capaz de bloquear ou aprovar o candidato, registrando
-auditoria em `agent.*` e `ops.*`.
+**Sprint 7 — Critic Shadow**:
+- Segundo passe LLM avalia o candidato do Generator
+- Bloqueia ou aprova, grava auditoria em `agent.*` e `ops.*`
+- Nao envia ao Chatwoot no Critic
+- Agora faz sentido seguir porque a memoria operacional do Generator foi calibrada.
 
-Fluxo esperado:
+**Sprint 6.10 — Seed catalogo `commerce.*`** (bloqueado por dados da loja):
+- `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios
+- `buscar_e_ofertar` retorna lista vazia — bot faz teatro
+- Desbloqueio: Wallace traz CSV/dump real da loja
+
+**Sprint 8 — Envio controlado ao Chatwoot**:
+- `ChatwootApiClient.postMessage()` — POST `/messages` com `private: false`
+- Worker envia turn `status='generated'` aprovado pelo fluxo de segurança
+- Controlado por env var `ATENDENTE_SEND_ENABLED=false` (default off)
+- Nao fazer: nao criar pedido automatico; nao enviar sem validator/Critic.
+
+Fluxo alvo pos-Sprint 8:
 
 ```text
 ops.atendente_jobs
@@ -108,16 +149,9 @@ ops.atendente_jobs
   -> planTurn
   -> executeToolRequests
   -> Generator cria resposta candidata
-  -> Critic avalia o candidato
-  -> grava auditoria shadow
-  -> para (sem envio Chatwoot)
+  -> [Sprint 7] Critic avalia
+  -> [Sprint 8] envia ao Chatwoot se aprovado
 ```
-
-Nao fazer ainda:
-
-- nao enviar Chatwoot;
-- nao ativar envio automatico;
-- nao criar pedido automatico.
 - nao remover o modo shadow/log-only.
 
 ## Pergunta Para Comecar O Proximo Chat
