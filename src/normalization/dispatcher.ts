@@ -231,28 +231,43 @@ export async function dispatch(
         }
 
         if (env.ATENDENTE_SHADOW_ENABLED) {
-          const sessionId = await ensureAtendenteSession(
-            client,
-            environment as Environment,
-            upsertedMessage.conversationId,
-            upsertedMessage.messageId,
-          );
-          const jobId = await enqueueAtendenteJob(
-            client,
-            environment as Environment,
-            upsertedMessage.conversationId,
-            upsertedMessage.messageId,
-          );
-          logger.info(
-            {
-              raw_event_id: rawEventId,
-              conversation_id: upsertedMessage.conversationId,
-              message_id: upsertedMessage.messageId,
-              agent_session_id: sessionId,
-              atendente_job_id: jobId,
-            },
-            'normalization: atendente job enqueued',
-          );
+          // Só processa mensagens do contato (cliente real).
+          // Mensagens de bot, agente humano e sistema não disparam o Atendente
+          // para evitar que o bot responda a si mesmo quando o envio Chatwoot for habilitado.
+          if (message.senderType !== 'contact') {
+            logger.info(
+              {
+                raw_event_id: rawEventId,
+                conversation_id: upsertedMessage.conversationId,
+                message_id: upsertedMessage.messageId,
+                sender_type: message.senderType,
+              },
+              'normalization: atendente job skipped — sender_type is not contact',
+            );
+          } else {
+            const sessionId = await ensureAtendenteSession(
+              client,
+              environment as Environment,
+              upsertedMessage.conversationId,
+              upsertedMessage.messageId,
+            );
+            const jobId = await enqueueAtendenteJob(
+              client,
+              environment as Environment,
+              upsertedMessage.conversationId,
+              upsertedMessage.messageId,
+            );
+            logger.info(
+              {
+                raw_event_id: rawEventId,
+                conversation_id: upsertedMessage.conversationId,
+                message_id: upsertedMessage.messageId,
+                agent_session_id: sessionId,
+                atendente_job_id: jobId,
+              },
+              'normalization: atendente job enqueued',
+            );
+          }
         } else {
           logger.info(
             {

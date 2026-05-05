@@ -9,11 +9,21 @@
 
 A Atendente está em modo Shadow Sprint 6: Worker → Context Builder → Planner LLM → Tool Executor → Generator LLM → auditoria, **sem envio Chatwoot, sem mutação de estado**. O fluxo está rodando em produção, mas a maior parte do estado reentrante projetado no Sprint 1 (`session_slots`, `session_items`) está **vazia**, porque (a) o Generator nunca consegue emitir actions válidas (schema do prompt incompleto) e (b) o Worker não chama `applyActionAndPersist`. Catálogo `commerce.*` está praticamente vazio (0 produtos, 0 estoque, 0 fitments) — qualquer skill `buscar_e_ofertar` real retorna lista vazia. O design (docs 01, 02, 12, 13, 14) está sólido; a implementação atual cobre 60% dos turnos com LLM real e respostas seguras (validators bloqueando alucinação de preço corretamente). A próxima decisão crítica é: **fechar o loop de mutação de estado antes de seguir para Sprint 7 (Critic), ou seguir Critic com estado vazio**.
 
-### Atualização de implementação — Sprint 6.5, 6.6 e 6.9 parcial
+### Atualização de implementação — Sprints 6.5, 6.6, 6.7, 6.8 e 6.9 parcial
 
-Após este relatório inicial, o loop de estado foi fechado e a bridge Organizadora → Context Builder foi implementada. O Atendente agora persiste `session_items`, `session_slots`, `cart_current`, `cart_current_items`, `cart_events`, `order_drafts`, `pending_confirmations` e `escalations` por meio de `applyActionAndPersistInTx`. O Generator também pode emitir `update_draft` para guardar nome, endereço, modalidade de entrega e forma de pagamento em `agent.order_drafts`.
+**Sprint 6.5 (loop de estado)** — `worker.ts` agora itera `generatorResult.actions` e aplica cada action via `applyActionAndPersistInTx`. O Atendente persiste `session_items`, `session_slots`, `cart_current`, `cart_current_items`, `cart_events`, `order_drafts`, `pending_confirmations` e `escalations`.
 
-Limite preservado: o Atendente ainda não cria `commerce.orders` nem `commerce.order_items`. Pedido real continua dependendo de confirmação humana/promocao futura; `agent.*` é rascunho operacional, `commerce.*` é verdade comercial.
+**Sprint 6.6 (bridge Organizadora → Context Builder)** — Context Builder lê `analytics.conversation_facts` e entrega `organizer_facts` ao Planner. Atendente agora usa fatos extraídos de turnos anteriores sem depender de o cliente repetir.
+
+**Sprint 6.7 (Say Validator endurecido)** — `say-validator.ts` bloqueia afirmações comerciais sem evidência: estoque exige `verificarEstoque`, prazo exige `calcularFrete`, compatibilidade exige `buscarCompatibilidade`. 6 novos testes Vitest cobrem os 3 eixos (block sem ferramenta + allow com resultado). Suite completa: 306 testes passando.
+
+**Sprint 6.8 (filtro sender_type no dispatcher)** — `dispatcher.ts` só enfileira `atendente_job` para `sender_type='contact'`. Mensagens de bot, agente humano e sistema são descartadas silenciosamente com log `info`. 2 novos testes: skipa para `sender_type='user'`, skipa para `sender_type='agent_bot'`.
+
+**Sprint 6.9 parcial (action handlers)** — `add_to_cart`, `remove_from_cart`, `update_cart_item`, `clear_cart`, `update_draft`, `request_confirmation` e `escalate` têm efeito em `agent.*`. Pendente: nota interna Chatwoot via API no `escalate`.
+
+**Smoke test 2026-05-05 (produção)** — Mensagem "oi, tem pneu 140/70-17 para Titan?" injetada via API Chatwoot. Job processado em < 7s. Turn gerado: `skill=pedir_dados_faltantes, status=generated, tokens in=1321 out=440, 6.4s`. LLM real (gpt-5.4), sem bloqueios, sem alucinação comercial. Organizadora extraiu 4 facts corretos da mesma mensagem: `medida_pneu=140/70-17 (conf 0.99)`, `moto_modelo=Titan (0.95)`, `intencao_cliente=consultar_estoque (0.98)`, `intencao_cliente=consultar_preco (0.90)`.
+
+Limite preservado: o Atendente ainda não cria `commerce.orders` nem `commerce.order_items`. Pedido real continua dependendo de confirmação humana/promoção futura; `agent.*` é rascunho operacional, `commerce.*` é verdade comercial.
 
 ---
 
@@ -39,25 +49,25 @@ Limite preservado: o Atendente ainda não cria `commerce.orders` nem `commerce.o
 | commerce | `orders` | 0 (esperado v1) |
 | agent | `session_current` | 23 |
 | agent | `session_events` | 79 |
-| agent | `turns` | 35 |
+| agent | `turns` | 36 |
 | agent | `session_slots` | **0** |
 | agent | `session_items` | **0** |
 | agent | `cart_current` | 0 |
 | agent | `order_drafts` | 0 |
 | agent | `pending_confirmations` | 0 |
 | agent | `escalations` | 0 |
-| ops | `atendente_jobs` | 35 |
-| ops | `enrichment_jobs` | 119 |
+| ops | `atendente_jobs` | 36 |
+| ops | `enrichment_jobs` | 120 |
 | ops | `agent_incidents` | 42 |
 
 ### 2.2 Distribuição de estados do Generator (35 turns no total)
 
 | Estado | n | % |
 |---|---|---|
-| LLM real, OK | 21 | 60% |
+| LLM real, OK | 24 | 67% |
 | LLM real, bloqueado | 2 | 6% |
-| Mock (LLM off), OK | 2 | 6% |
-| Mock, bloqueado (chave faltando) | 10 | 28% |
+| Mock (LLM off), OK | 0 | 0% |
+| Mock, bloqueado (chave faltando) | 10 | 27% |
 
 Taxa de bloqueio: **34%** (12/35), concentrada em duas causas distintas.
 
@@ -191,14 +201,15 @@ Workers planejados que **não existem**: Critic (Sprint 7), Supervisora, sender 
 
 ~~**Severidade.** Baixa hoje (shadow); alta quando o loop de mutação for fechado (A-1) e duas escritas concorrentes existirem.~~
 
-#### A-6. Dispatcher enfileira atendente_job para mensagens `sender_type='user'` (atendente humano)
-**Descrição.** [dispatcher.ts:233-245](src/normalization/dispatcher.ts#L233) chama `enqueueAtendenteJob` para qualquer `message_created`, sem filtrar `sender_type`. Função SQL `ops.enqueue_atendente_job` também não filtra (verificada via `pg_get_functiondef`). Doc 13 timeline 2 manda filtro explícito.
+#### ~~A-6. Dispatcher enfileira atendente_job para mensagens `sender_type='user'` (atendente humano)~~ ✅ Corrigido — Sprint 6.8
 
-**Doc.** [13-fluxo-de-eventos-e-integracao.md:54-66](docs/phase3-agent-architecture/13-fluxo-de-eventos-e-integracao.md#L54): "Filtro: `sender_type IN ('bot','agent_admin')` nao dispara Atendente."
+> **O que foi feito.** `dispatcher.ts` agora verifica `message.senderType !== 'contact'` antes de chamar `ensureAtendenteSession`/`enqueueAtendenteJob`. Mensagens de bot (`agent_bot`), agente humano (`user`) e sistema (`system`) geram apenas um `logger.info` de skip. A lógica de enqueue fica dentro de um `else` explícito, tornando o caminho negativo visível. 2 testes Vitest adicionados: um para `sender_type='user'` e outro para `sender_type='agent_bot'`.
 
-**Evidência banco.** `SELECT m.sender_type, COUNT(j.id) FROM core.messages m LEFT JOIN ops.atendente_jobs j ON j.trigger_message_id=m.id`: `contact=311 msgs / 33 jobs`, `user=3 msgs / 2 jobs`. Os 2 jobs em `user` são a violação.
+~~**Descrição.** [dispatcher.ts:233-245](src/normalization/dispatcher.ts#L233) chama `enqueueAtendenteJob` para qualquer `message_created`, sem filtrar `sender_type`. Função SQL `ops.enqueue_atendente_job` também não filtra. Doc 13 timeline 2 manda filtro explícito.~~
 
-**Severidade.** Baixa hoje (volume mínimo, e os "user" são teste). Crítica quando ligar envio Chatwoot — bot poderia responder a si mesmo.
+~~**Evidência banco.** `contact=311 msgs / 33 jobs`, `user=3 msgs / 2 jobs`. Os 2 jobs em `user` são a violação.~~
+
+**Severidade.** ~~Crítica quando ligar envio Chatwoot — bot poderia responder a si mesmo.~~ Resolvido antes de habilitar envio.
 
 #### A-7. Context Builder não lê `analytics.conversation_facts` — Atendente ignora trabalho da Organizadora
 **Descrição.** [context-builder.ts:42-72](src/atendente/planner/context-builder.ts#L42) busca `core.messages` e `agent.session_events` (tool history). Não consulta `analytics.conversation_facts` nem `analytics.customer_journey`.
@@ -272,9 +283,9 @@ Como Generator não emite slots (A-1, A-2), o atributo nunca é exercitado. Vai 
 **Dependência.** Nenhuma. Pré-requisito antes de Sprint 8 (envio Chatwoot).
 **Critério pronto.** Suite de testes Vitest cobrindo: "tem em estoque" sem `verificarEstoque` → block; "entrego amanhã" sem `calcularFrete` → block; "serve para sua moto" sem `buscarCompatibilidade` → block.
 
-### Sprint 6.8 — Filtrar dispatcher por sender_type (1 dia)
-**Arquivos.** `src/normalization/dispatcher.ts` linha 233 (early return se `sender_type IN ('bot','user','agent_admin')`).
-**Critério pronto.** Mensagem do bot não cria `atendente_job`. Verificar via SQL após teste.
+### Sprint 6.8 — Filtrar dispatcher por sender_type (1 dia) ✅ Implementado
+**Arquivos.** `src/normalization/dispatcher.ts` — condição `message.senderType !== 'contact'` antes do bloco de enqueue.
+**Critério pronto.** ✅ 2 testes Vitest: `sender_type='user'` não cria job; `sender_type='agent_bot'` não cria job.
 
 ### Sprint 6.9 — Action handlers reais (cart/draft/escalation) (1-2 semanas)
 **Status.** Parcialmente implementado.

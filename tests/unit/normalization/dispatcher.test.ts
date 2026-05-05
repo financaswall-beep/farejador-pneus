@@ -383,6 +383,75 @@ describe('dispatcher', () => {
     );
   });
 
+  it('does not enqueue atendente job for message from human agent (sender_type=user)', async () => {
+    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 59,
+      event_type: 'message_created',
+      payload: {
+        id: 600,
+        message_type: 'outgoing',
+        content: 'Olá, posso ajudar?',
+        sender_type: 'User',
+        conversation: { id: 303 },
+      },
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_atendente_job'),
+    );
+    const sessionCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('INSERT INTO agent.session_current'),
+    );
+    expect(enqueueCall).toBeUndefined();
+    expect(sessionCall).toBeUndefined();
+    expect(loggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        raw_event_id: 59,
+        sender_type: 'user',
+      }),
+      'normalization: atendente job skipped — sender_type is not contact',
+    );
+  });
+
+  it('does not enqueue atendente job for message from bot (sender_type=agent_bot)', async () => {
+    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+    const { dispatch } = await loadDispatcher();
+    const client = createMockClient();
+
+    await dispatch(client as unknown as import('pg').PoolClient, {
+      id: 60,
+      event_type: 'message_created',
+      payload: {
+        id: 601,
+        message_type: 'outgoing',
+        content: 'Resposta automática do bot.',
+        sender_type: 'agent_bot',
+        conversation: { id: 303 },
+      },
+      environment,
+      chatwoot_timestamp: lastEventAt,
+    });
+
+    const enqueueCall = client.query.mock.calls.find((call) =>
+      (call[0] as string).includes('ops.enqueue_atendente_job'),
+    );
+    expect(enqueueCall).toBeUndefined();
+    expect(loggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        raw_event_id: 60,
+        sender_type: 'agent_bot',
+      }),
+      'normalization: atendente job skipped — sender_type is not contact',
+    );
+  });
+
+
   it('upserts nested contact before message when sender is present', async () => {
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
