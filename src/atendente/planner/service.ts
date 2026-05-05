@@ -128,7 +128,9 @@ function mockPlanTurn(context: PlannerContext): PlannerOutput {
   }
 
   if (text.includes('frete') || text.includes('entrega')) {
-    const bairro = context.state.global_slots.bairro?.value_json;
+    const bairro = context.state.global_slots.bairro?.value_json ?? findOrganizerStringFact(context, [
+      'bairro_mencionado',
+    ]);
     return {
       skill: 'responder_logistica',
       missing_slots: typeof bairro === 'string' ? [] : ['bairro'],
@@ -156,9 +158,15 @@ function mockPlanTurn(context: PlannerContext): PlannerOutput {
   }
 
   const activeItem = context.state.items.find((item) => item.is_active);
-  const medida = activeItem?.slots.medida_pneu?.value_json;
-  const marca = activeItem?.slots.marca_preferida?.value_json;
-  const moto = activeItem?.slots.moto_modelo?.value_json;
+  const medida = activeItem?.slots.medida_pneu?.value_json ?? findOrganizerStringFact(context, [
+    'medida_pneu',
+  ]);
+  const marca = activeItem?.slots.marca_preferida?.value_json ?? findOrganizerStringFact(context, [
+    'marca_pneu_preferida',
+  ]);
+  const moto = activeItem?.slots.moto_modelo?.value_json ?? findOrganizerStringFact(context, [
+    'moto_modelo',
+  ]);
   if (typeof medida === 'string' || typeof marca === 'string') {
     return {
       skill: 'buscar_e_ofertar',
@@ -203,6 +211,31 @@ function mockPlanTurn(context: PlannerContext): PlannerOutput {
     rationale: 'Ainda faltam dados para buscar produto com seguranca.',
     prompt_version: plannerPromptVersion,
   };
+}
+
+function findOrganizerStringFact(context: PlannerContext, factKeys: string[]): string | undefined {
+  const fact = context.organizer_facts.find(
+    (candidate) => factKeys.includes(candidate.fact_key) && isUsableOrganizerFact(candidate),
+  );
+  return extractStringValue(fact?.fact_value);
+}
+
+function isUsableOrganizerFact(fact: PlannerContext['organizer_facts'][number]): boolean {
+  if (fact.truth_type === 'predicted') return false;
+  return fact.confidence_level === null || fact.confidence_level >= 0.5;
+}
+
+function extractStringValue(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim() !== '') return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ['text', 'value', 'size', 'brand', 'name', 'modelo']) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim() !== '') return candidate;
+  }
+
+  return undefined;
 }
 
 async function callPlannerModel(

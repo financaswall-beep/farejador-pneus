@@ -115,6 +115,7 @@ function plannerContext(): PlannerContext {
     recent_messages: [],
     available_tools: ['buscarProduto'],
     recent_tool_results: [],
+    organizer_facts: [],
     derived_signals: state.derived_signals,
   };
 }

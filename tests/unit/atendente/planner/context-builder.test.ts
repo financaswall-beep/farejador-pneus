@@ -11,17 +11,21 @@ vi.mock('../../../../src/atendente/state/agent-state.repository.js', () => ({
 describe('buildPlannerContext', () => {
   it('nao transforma planner_decided antigo em recent_tool_results falso', async () => {
     const { buildPlannerContext } = await import('../../../../src/atendente/planner/context-builder.js');
-    const query = vi.fn().mockResolvedValueOnce({
-      rows: [
-        {
-          id: '00000000-0000-4000-8000-000000000010',
-          sender_type: 'contact',
-          message_type: 'incoming',
-          content: 'tem pneu pra Bros?',
-          sent_at: new Date(baseTime),
-        },
-      ],
-    }).mockResolvedValueOnce({ rows: [] });
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: '00000000-0000-4000-8000-000000000010',
+            sender_type: 'contact',
+            message_type: 'incoming',
+            content: 'tem pneu pra Bros?',
+            sent_at: new Date(baseTime),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
 
     const context = await buildPlannerContext({ query } as never, 'test', conversationId);
 
@@ -34,9 +38,11 @@ describe('buildPlannerContext', () => {
       },
     ]);
     expect(context.recent_tool_results).toEqual([]);
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(context.organizer_facts).toEqual([]);
+    expect(query).toHaveBeenCalledTimes(3);
     expect(query.mock.calls[0]?.[0]).toContain('FROM core.messages');
     expect(query.mock.calls[1]?.[0]).toContain("event_type IN ('tool_executed', 'tool_failed')");
+    expect(query.mock.calls[2]?.[0]).toContain('FROM analytics.current_facts');
   });
 
   it('le tool_executed e tool_failed reais como recent_tool_results', async () => {
@@ -57,13 +63,57 @@ describe('buildPlannerContext', () => {
             occurred_at: new Date('2026-04-29T12:01:00.000Z'),
           },
         ],
-      });
+      })
+      .mockResolvedValueOnce({ rows: [] });
 
     const context = await buildPlannerContext({ query } as never, 'test', conversationId);
 
     expect(context.recent_tool_results).toEqual([
       expect.objectContaining({ tool: 'buscarProduto', ok: true }),
       expect.objectContaining({ tool: 'calcularFrete', ok: false }),
+    ]);
+  });
+
+  it('le fatos atuais da Organizadora como organizer_facts', async () => {
+    const { buildPlannerContext } = await import('../../../../src/atendente/planner/context-builder.js');
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            fact_key: 'medida_pneu',
+            fact_value: '120/80-18',
+            observed_at: new Date(baseTime),
+            message_id: '00000000-0000-4000-8000-000000000010',
+            truth_type: 'observed',
+            source: 'organizadora_llm',
+            confidence_level: 0.91,
+            extractor_version: 'organizadora_v3.4',
+            latest_evidence_text: 'preciso 120/80-18',
+            latest_evidence_message_id: '00000000-0000-4000-8000-000000000010',
+            latest_evidence_type: 'literal',
+          },
+        ],
+      });
+
+    const context = await buildPlannerContext({ query } as never, 'test', conversationId);
+
+    expect(context.organizer_facts).toEqual([
+      {
+        fact_key: 'medida_pneu',
+        fact_value: '120/80-18',
+        observed_at: baseTime,
+        message_id: '00000000-0000-4000-8000-000000000010',
+        truth_type: 'observed',
+        source: 'organizadora_llm',
+        confidence_level: 0.91,
+        extractor_version: 'organizadora_v3.4',
+        latest_evidence_text: 'preciso 120/80-18',
+        latest_evidence_message_id: '00000000-0000-4000-8000-000000000010',
+        latest_evidence_type: 'literal',
+      },
     ]);
   });
 });

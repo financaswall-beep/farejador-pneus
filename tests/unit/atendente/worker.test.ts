@@ -132,6 +132,8 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
       generator_blocked: false,
       generator_block_reason: null,
       turn_id: fakeTurnId,
+      actions_persisted: 0,
+      actions_failed: 0,
     });
   });
 
@@ -242,6 +244,7 @@ function plannerContext(): PlannerContext {
     recent_messages: [],
     available_tools: ['buscarProduto'],
     recent_tool_results: [],
+    organizer_facts: [],
     derived_signals: state.derived_signals,
   };
 }

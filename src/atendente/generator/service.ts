@@ -1,9 +1,10 @@
 /**
- * Generator Shadow — Sprint 6.
+ * Generator Shadow — Sprint 6 + Sprint 6.5 (Caminho B).
  *
  * Responsabilidades:
  * - Gerar resposta candidata auditável a partir de contexto + plano + tools.
  * - Validar com SayValidator e ActionValidator antes de registrar.
+ * - Hidratar actions cruas com meta-campos (action_id, turn_index, emitted_at, emitted_by).
  * - Gravar resultado em agent.turns (status='generated'|'blocked') e
  *   audit em agent.session_events (event_type='generator_produced').
  * - NUNCA enviar mensagem ao Chatwoot.
@@ -18,6 +19,7 @@ import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 import { callOpenAI } from '../../shared/llm-clients/openai.js';
 import { logger } from '../../shared/logger.js';
+import type { AgentAction } from '../../shared/zod/agent-actions.js';
 import type { PlannerContext } from '../planner/context-builder.js';
 import type { SkillName } from '../planner/schemas.js';
 import type { PlannerDecisionResult } from '../planner/service.js';
@@ -30,8 +32,9 @@ import {
   generatorOutputRawSchema,
   generatorPromptVersion,
   generatorAgentVersion,
+  hydrateGeneratorActions,
   SAFE_FALLBACK_SAY,
-  type GeneratorAction,
+  type GeneratorRawAction,
   type GeneratorResult,
 } from './schemas.js';
 
@@ -53,7 +56,7 @@ function toValidationCtx(toolResults: ToolExecutionResult[]): {
 
 function runValidators(
   say: string,
-  actions: GeneratorAction[],
+  actions: AgentAction[],
   toolResults: ToolExecutionResult[],
   context: PlannerContext,
 ): { blocked: boolean; block_reason: string | null } {
@@ -84,11 +87,14 @@ function mockGenerateTurn(
   toolResults: ToolExecutionResult[],
 ): GeneratorResult {
   const skill = decision.output.skill;
-  const hasOkToolResults = toolResults.some((result) => result.ok);
+  // Sprint 6.5 fix do A-3: tool result é "útil" só se ok=true E output não-vazio.
+  const hasUsefulToolResults = toolResults.some(
+    (result) => result.ok && hasNonEmptyOutput(result.output),
+  );
   const missing = decision.output.missing_slots;
 
   let say: string;
-  const actions: GeneratorAction[] = [];
+  const actions: AgentAction[] = [];
 
   switch (skill) {
     case 'escalar_humano':
@@ -101,14 +107,14 @@ function mockGenerateTurn(
           : 'Poderia me fornecer mais detalhes?';
       break;
     case 'buscar_e_ofertar':
-      // Sem tool results → não posso ofertar nada com lastro
-      say = hasOkToolResults
+      // Sem tool results úteis → não posso ofertar nada com lastro
+      say = hasUsefulToolResults
         ? 'Encontrei algumas opções para você. Posso detalhar mais?'
         : SAFE_FALLBACK_SAY;
       break;
     case 'responder_logistica':
       // Sem calcularFrete → não posso prometer frete
-      say = hasOkToolResults
+      say = hasUsefulToolResults
         ? 'Aqui estão as informações de entrega disponíveis.'
         : SAFE_FALLBACK_SAY;
       break;
@@ -138,6 +144,13 @@ function mockGenerateTurn(
   };
 }
 
+function hasNonEmptyOutput(output: unknown): boolean {
+  if (output === null || output === undefined) return false;
+  if (Array.isArray(output)) return output.length > 0;
+  if (typeof output === 'object') return Object.keys(output as Record<string, unknown>).length > 0;
+  return true;
+}
+
 // ------------------------------------------------------------------
 // Caminho fallback (erro ou falta de chave)
 // ------------------------------------------------------------------
@@ -163,6 +176,9 @@ function fallbackResult(reason: string): GeneratorResult {
 /**
  * Gera resposta candidata auditável.
  * Nunca envia ao Chatwoot; nunca escreve em raw/core/analytics/commerce.
+ *
+ * Sprint 6.5: o LLM devolve actions cruas; aqui hidratamos antes de validar
+ * para que campos meta nunca virem block_reason.
  */
 export async function generateTurn(
   context: PlannerContext,
@@ -209,7 +225,34 @@ export async function generateTurn(
       };
     }
 
-    const { say, actions } = parsed.data;
+    const { say, actions: rawActions } = parsed.data;
+
+    // Sprint 6.5 — Caminho B: hidrata cada action com meta determinístico.
+    const turnIndex = context.state.turn_index + 1;
+    const emittedAt = new Date().toISOString();
+    const { actions, invalid_indexes } = hydrateGeneratorActions(rawActions as GeneratorRawAction[], {
+      conversation_id: context.conversation_id,
+      turn_index: turnIndex,
+      emitted_at: emittedAt,
+      selected_skill: decision.output.skill,
+    });
+
+    if (invalid_indexes.length > 0) {
+      logger.warn(
+        { conversation_id: context.conversation_id, invalid_indexes },
+        'generator: actions com payload inválido — bloqueando turno',
+      );
+      return {
+        ...fallbackResult(
+          `generator_action_hydration_failed:indexes=${invalid_indexes.join(',')}`,
+        ),
+        input_tokens: llmResult.inputTokens,
+        output_tokens: llmResult.outputTokens,
+        duration_ms: llmResult.durationMs,
+        used_llm: true,
+      };
+    }
+
     const validation = runValidators(say, actions, toolResults, context);
 
     return {
@@ -245,6 +288,9 @@ export async function generateTurn(
  * Grava resultado em agent.turns e agent.session_events.
  * Retorna o turn_id gerado.
  * Nunca envia ao Chatwoot.
+ *
+ * Sprint 6.5: actions persistidas via applyActionAndPersist são responsabilidade
+ * do caller (worker), não desta função. Esta função só registra auditoria do turno.
  */
 export async function recordGeneratorResult(
   client: PoolClient,

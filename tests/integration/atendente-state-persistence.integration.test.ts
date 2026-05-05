@@ -1,0 +1,386 @@
+/**
+ * Integration test do Sprint 6.5 — Caminho B.
+ *
+ * Garante que applyActionAndPersistInTx, contra Postgres real:
+ *  - persiste update_slot em agent.session_slots
+ *  - incrementa session_current.version
+ *  - emite slot_set em agent.session_events
+ *  - é idempotente por action_id
+ *  - falha por conflito de versão otimista
+ *  - persiste create_item em agent.session_items
+ *
+ * Os unit tests do worker mockam client.query, então não exercitam SQL real.
+ * Este teste fecha essa lacuna.
+ *
+ * Infraestrutura: tenta testcontainers (Docker local) primeiro.
+ * Se não houver Docker, usa DATABASE_URL de .env.codex (Supabase/Postgres externo).
+ *
+ * Nota de limpeza: agent.session_events é append-only (trigger bloqueia DELETE)
+ * e o cascade de core.conversations → session_events também é bloqueado.
+ * Por isso, ao rodar contra Supabase externo, conversas e events ficam acumulados
+ * no banco de teste — comportamento aceitável para o ambiente 'test'.
+ * session_slots, session_items e session_current SÃO limpos.
+ */
+
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { Pool } from 'pg';
+import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres';
+import {
+  AgentStateVersionConflictError,
+  applyActionAndPersistInTx,
+  loadCurrent,
+} from '../../src/atendente/state/agent-state.repository.js';
+import type {
+  CreateItemAction,
+  UpdateSlotAction,
+} from '../../src/shared/zod/agent-actions.js';
+
+// ─── Infraestrutura ───────────────────────────────────────────────────────────
+
+let db: IntegrationDb | null = null;
+let testPool: Pool;
+
+/** Par criado em cada beforeEach — usado para cleanup parcial no Supabase externo. */
+const createdPairs: Array<{ conversationId: string; contactId: string }> = [];
+
+let conversationId: string;
+
+beforeAll(async () => {
+  try {
+    db = await startPostgres();
+    testPool = db.pool;
+  } catch {
+    const url = loadCodexDatabaseUrl();
+    if (!url) {
+      throw new Error(
+        'Sem Docker local e sem .env.codex com DATABASE_URL — impossível rodar integration tests.',
+      );
+    }
+    testPool = new Pool({
+      connectionString: url,
+      ssl: { rejectUnauthorized: false },
+      max: 3,
+    });
+  }
+});
+
+afterAll(async () => {
+  if (db) {
+    await stopPostgres(db);
+    return;
+  }
+  // Supabase externo: limpa o que é possível.
+  // session_events é append-only (trigger bloqueia DELETE) e core.conversations
+  // tem CASCADE para session_events, então conversas também não podem ser deletadas.
+  // Limpamos: slots, items, session_current, contacts.
+  for (const { conversationId: cid, contactId: ctid } of createdPairs) {
+    try {
+      await testPool.query(
+        `DELETE FROM agent.session_slots WHERE environment = 'test' AND conversation_id = $1`,
+        [cid],
+      );
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(
+        `DELETE FROM agent.session_items WHERE environment = 'test' AND conversation_id = $1`,
+        [cid],
+      );
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(
+        `DELETE FROM agent.session_current WHERE environment = 'test' AND conversation_id = $1`,
+        [cid],
+      );
+    } catch { /* silencioso */ }
+    try {
+      // Anula FK antes de deletar contact (conversa fica órfã mas não bloqueia)
+      await testPool.query(`UPDATE core.conversations SET contact_id = NULL WHERE id = $1`, [cid]);
+      await testPool.query(`DELETE FROM core.contacts WHERE id = $1`, [ctid]);
+    } catch { /* silencioso */ }
+  }
+  await testPool.end();
+});
+
+beforeEach(async () => {
+  // Cria contact + conversation + session_current zerados pra cada teste
+  const contact = await testPool.query<{ id: string }>(
+    `INSERT INTO core.contacts (environment, chatwoot_contact_id, name)
+     VALUES ('test', $1, 'Teste 6.5')
+     RETURNING id`,
+    [Math.floor(Math.random() * 1_000_000_000)],
+  );
+  const contactId = contact.rows[0]!.id;
+
+  const conv = await testPool.query<{ id: string }>(
+    `INSERT INTO core.conversations
+       (environment, chatwoot_conversation_id, chatwoot_account_id,
+        contact_id, current_status, started_at)
+     VALUES ('test', $1, 1, $2, 'open', now())
+     RETURNING id`,
+    [Math.floor(Math.random() * 1_000_000_000), contactId],
+  );
+  conversationId = conv.rows[0]!.id;
+
+  createdPairs.push({ conversationId, contactId });
+
+  await testPool.query(
+    `INSERT INTO agent.session_current (environment, conversation_id, status)
+     VALUES ('test', $1, 'active')`,
+    [conversationId],
+  );
+});
+
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
+
+/**
+ * Constrói um UpdateSlotAction. action_id é obrigatório para garantir unicidade
+ * entre runs contra Supabase compartilhado (idempotency check é global).
+ */
+function makeUpdateSlotAction(
+  itemId: string | null,
+  actionId: string,
+  overrides: Partial<UpdateSlotAction> = {},
+): UpdateSlotAction {
+  return {
+    type: 'update_slot',
+    action_id: actionId,
+    turn_index: 1,
+    emitted_at: '2026-05-04T12:00:00.000Z',
+    emitted_by: 'generator',
+    scope: itemId ? 'item' : 'global',
+    item_id: itemId,
+    slot_key: itemId ? 'medida_pneu' : 'bairro',
+    value: itemId ? '140/70-17' : 'Bonsucesso',
+    source: 'observed',
+    confidence: 0.95,
+    evidence_text: itemId ? 'pneu 140/70-17' : 'sou de Bonsucesso',
+    set_by_message_id: '00000000-0000-4000-8000-0000000000aa',
+    set_by_skill: 'buscar_e_ofertar',
+    ...overrides,
+  };
+}
+
+function makeCreateItemAction(itemId: string, actionId: string): CreateItemAction {
+  return {
+    type: 'create_item',
+    action_id: actionId,
+    turn_index: 1,
+    emitted_at: '2026-05-04T12:00:00.000Z',
+    emitted_by: 'generator',
+    item_id: itemId,
+    make_active: true,
+  };
+}
+
+// ─── Testes ───────────────────────────────────────────────────────────────────
+
+describe('Sprint 6.5 — applyActionAndPersistInTx contra Postgres real', () => {
+  it('persiste update_slot global, incrementa version e emite slot_set', async () => {
+    const actionId = randomUUID();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state = await loadCurrent(client, 'test', conversationId);
+      expect(state).not.toBeNull();
+      expect(state!.version).toBe(0);
+
+      const action = makeUpdateSlotAction(null, actionId);
+      const next = await applyActionAndPersistInTx(client, state!, action);
+      expect(next.version).toBe(1);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    // Lê de volta direto do banco
+    const slot = await testPool.query(
+      `SELECT scope, slot_key, value_json, source, stale, requires_confirmation
+       FROM agent.session_slots
+       WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(slot.rowCount).toBe(1);
+    expect(slot.rows[0]!.scope).toBe('global');
+    expect(slot.rows[0]!.slot_key).toBe('bairro');
+    expect(slot.rows[0]!.value_json).toBe('Bonsucesso');
+    expect(slot.rows[0]!.source).toBe('observed');
+    expect(slot.rows[0]!.stale).toBe('fresh');
+
+    const version = await testPool.query<{ version: string }>(
+      `SELECT version::text AS version FROM agent.session_current WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(version.rows[0]!.version).toBe('1');
+
+    const event = await testPool.query<{ event_type: string; emitted_by: string }>(
+      `SELECT event_type, emitted_by FROM agent.session_events WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(event.rows[0]!.event_type).toBe('slot_set');
+    expect(event.rows[0]!.emitted_by).toBe('generator');
+  });
+
+  it('persiste create_item + update_slot item em sequência', async () => {
+    const itemId = randomUUID();
+    const actionCreate = randomUUID();
+    const actionSlot = randomUUID();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const state1 = await applyActionAndPersistInTx(
+        client,
+        state0!,
+        makeCreateItemAction(itemId, actionCreate),
+      );
+      const state2 = await applyActionAndPersistInTx(
+        client,
+        state1,
+        makeUpdateSlotAction(itemId, actionSlot),
+      );
+      expect(state2.version).toBe(2);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const items = await testPool.query(
+      `SELECT id, status, is_active FROM agent.session_items WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(items.rowCount).toBe(1);
+    expect(items.rows[0]!.id).toBe(itemId);
+    expect(items.rows[0]!.is_active).toBe(true);
+
+    const slot = await testPool.query(
+      `SELECT scope, slot_key, item_id FROM agent.session_slots WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(slot.rowCount).toBe(1);
+    expect(slot.rows[0]!.scope).toBe('item');
+    expect(slot.rows[0]!.item_id).toBe(itemId);
+  });
+
+  it('é idempotente: action_id repetido vira no-op silencioso', async () => {
+    const actionId = randomUUID(); // único neste run
+    const action = makeUpdateSlotAction(null, actionId);
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const state1 = await applyActionAndPersistInTx(client, state0!, action);
+      expect(state1.version).toBe(1);
+
+      // Mesma action_id - deve retornar estado de entrada sem incrementar
+      const state2 = await applyActionAndPersistInTx(client, state1, action);
+      expect(state2).toBe(state1);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const count = await testPool.query<{ c: string }>(
+      `SELECT count(*)::text AS c FROM agent.session_events
+       WHERE conversation_id = $1 AND event_type = 'slot_set'`,
+      [conversationId],
+    );
+    expect(count.rows[0]!.c).toBe('1');
+  });
+
+  it('falha com AgentStateVersionConflictError quando version desbatida', async () => {
+    const actionId = randomUUID();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+
+      // Simula que outro processo já avançou a versão pra 1
+      await client.query(
+        `UPDATE agent.session_current SET version = version + 1 WHERE conversation_id = $1`,
+        [conversationId],
+      );
+
+      // state0.version ainda é 0; mas no banco já está 1 → conflito
+      const action = makeUpdateSlotAction(null, actionId);
+      await expect(applyActionAndPersistInTx(client, state0!, action)).rejects.toBeInstanceOf(
+        AgentStateVersionConflictError,
+      );
+      await client.query('ROLLBACK');
+    } finally {
+      client.release();
+    }
+  });
+
+  it('SAVEPOINT do worker: action que falha não derruba as anteriores', async () => {
+    // Reproduz o padrão do worker: SAVEPOINT por action.
+    // Action 1: cria item (persiste). Action 2: slot item com item_id null = violação.
+    // Esperado: state final tem slot da action 1, version=2.
+    const itemId = randomUUID();
+    const actionCreate = randomUUID();
+    const actionSlot = randomUUID();
+    const actionBroken = randomUUID();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const state1 = await applyActionAndPersistInTx(
+        client,
+        state0!,
+        makeCreateItemAction(itemId, actionCreate),
+      );
+
+      await client.query('SAVEPOINT a1');
+      const state2 = await applyActionAndPersistInTx(
+        client,
+        state1,
+        makeUpdateSlotAction(itemId, actionSlot),
+      );
+      await client.query('RELEASE SAVEPOINT a1');
+
+      // Action que vai falhar: item slot sem item_id
+      await client.query('SAVEPOINT a2');
+      const broken: UpdateSlotAction = {
+        ...makeUpdateSlotAction(null, actionBroken),
+        scope: 'item',
+        item_id: null,
+        slot_key: 'medida_pneu',
+      };
+      await expect(applyActionAndPersistInTx(client, state2, broken)).rejects.toThrow();
+      await client.query('ROLLBACK TO SAVEPOINT a2');
+
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const slots = await testPool.query(
+      `SELECT slot_key FROM agent.session_slots WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(slots.rowCount).toBe(1);
+    expect(slots.rows[0]!.slot_key).toBe('medida_pneu');
+
+    const version = await testPool.query<{ version: string }>(
+      `SELECT version::text AS version FROM agent.session_current WHERE conversation_id = $1`,
+      [conversationId],
+    );
+    expect(version.rows[0]!.version).toBe('2');
+  });
+});
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+function loadCodexDatabaseUrl(): string | null {
+  try {
+    const text = readFileSync('.env.codex', 'utf-8');
+    for (const line of text.split(/\r?\n/)) {
+      const match = line.match(/^DATABASE_URL=(.*)$/);
+      if (match) return match[1]!.trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

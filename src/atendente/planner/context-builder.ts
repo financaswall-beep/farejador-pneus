@@ -18,6 +18,20 @@ export interface ToolResultSummary {
   occurred_at: string;
 }
 
+export interface OrganizerFactSummary {
+  fact_key: string;
+  fact_value: unknown;
+  observed_at: string | null;
+  message_id: string | null;
+  truth_type: string;
+  source: string;
+  confidence_level: number | null;
+  extractor_version: string;
+  latest_evidence_text: string | null;
+  latest_evidence_message_id: string | null;
+  latest_evidence_type: string | null;
+}
+
 export interface PlannerContext {
   environment: Environment;
   conversation_id: string;
@@ -25,6 +39,7 @@ export interface PlannerContext {
   recent_messages: PlannerMessage[];
   available_tools: ToolName[];
   recent_tool_results: ToolResultSummary[];
+  organizer_facts: OrganizerFactSummary[];
   derived_signals: ConversationState['derived_signals'];
 }
 
@@ -70,6 +85,37 @@ export async function buildPlannerContext(
      LIMIT 5`,
     [environment, conversationId],
   );
+  const organizerFacts = await client.query<{
+    fact_key: string;
+    fact_value: unknown;
+    observed_at: Date | null;
+    message_id: string | null;
+    truth_type: string;
+    source: string;
+    confidence_level: number | null;
+    extractor_version: string;
+    latest_evidence_text: string | null;
+    latest_evidence_message_id: string | null;
+    latest_evidence_type: string | null;
+  }>(
+    `SELECT fact_key,
+            fact_value,
+            observed_at,
+            message_id,
+            truth_type,
+            source,
+            confidence_level::float8 AS confidence_level,
+            extractor_version,
+            latest_evidence_text,
+            latest_evidence_message_id,
+            latest_evidence_type
+     FROM analytics.current_facts
+     WHERE environment = $1
+       AND conversation_id = $2
+     ORDER BY observed_at DESC NULLS LAST, fact_key ASC
+     LIMIT 25`,
+    [environment, conversationId],
+  );
 
   return {
     environment,
@@ -100,6 +146,19 @@ export async function buildPlannerContext(
         },
       ];
     }),
+    organizer_facts: organizerFacts.rows.map((fact) => ({
+      fact_key: fact.fact_key,
+      fact_value: fact.fact_value,
+      observed_at: fact.observed_at?.toISOString() ?? null,
+      message_id: fact.message_id,
+      truth_type: fact.truth_type,
+      source: fact.source,
+      confidence_level: fact.confidence_level,
+      extractor_version: fact.extractor_version,
+      latest_evidence_text: fact.latest_evidence_text,
+      latest_evidence_message_id: fact.latest_evidence_message_id,
+      latest_evidence_type: fact.latest_evidence_type,
+    })),
     derived_signals: state.derived_signals,
   };
 }

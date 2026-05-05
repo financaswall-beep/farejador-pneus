@@ -1,8 +1,8 @@
 /**
- * Prompt do Generator Shadow — Sprint 6.
+ * Prompt do Generator Shadow — Sprint 6.5 (Caminho B, v1.1.0).
  *
- * O Generator recebe contexto + decisão do Planner + resultados das tools
- * e redige a resposta final ao cliente.
+ * Mudança em relação ao v1.0.0: actions vêm em formato CRU (sem campos meta).
+ * O código hidrata action_id, turn_index, emitted_at, emitted_by depois.
  *
  * Regras absolutas incorporadas no system prompt:
  * - Nunca inventar preço, estoque, frete ou compatibilidade.
@@ -36,14 +36,50 @@ export function buildGeneratorMessages(
         '4. NAO invente compatibilidade. Use apenas dados de tool_results.',
         `5. Se faltar dado operacional, responda exatamente: "${SAFE_FALLBACK_SAY}"`,
         '6. NAO crie pedido. NAO envie mensagem ao Chatwoot.',
-        '7. Actions podem conter update_slot, create_item, record_offer — nunca add_to_cart sem confirmacao explicita do cliente.',
+        '7. Voce so pode emitir tres tipos de action: update_slot, create_item, record_offer.',
+        '   Outras actions (add_to_cart, escalate, etc) nao sao aceitas neste turno.',
         '',
         'FORMATO DE SAIDA — JSON estrito:',
-        '{ "say": string, "actions": AgentAction[], "rationale": string, "prompt_version": string }',
-        'say: resposta direta ao cliente (max 2000 chars)',
-        'actions: array de AgentAction validadas pelo schema (pode ser vazio [])',
-        'rationale: justificativa interna max 500 chars (nao enviada ao cliente)',
-        `prompt_version: exatamente "${generatorPromptVersion}"`,
+        '{ "say": string, "actions": RawAction[], "rationale": string, "prompt_version": string }',
+        '',
+        'CADA RawAction segue UM dos formatos abaixo (sem campos meta — o codigo preenche):',
+        '',
+        '— update_slot —',
+        '{',
+        '  "type": "update_slot",',
+        '  "scope": "global" | "item",',
+        '  "item_id": "<uuid>" | null,        // null se scope=global',
+        '  "slot_key": "<chave da whitelist>", // ex: moto_modelo, medida_pneu, bairro',
+        '  "value": <valor compativel com a chave>,',
+        '  "source": "observed" | "inferred" | "confirmed" | "offered_to_client" |',
+        '            "inferred_from_history" | "inferred_from_organizadora",',
+        '  "confidence": <numero entre 0 e 1>,',
+        '  "evidence_text": "<trecho literal da mensagem do cliente>" | null,',
+        '  "set_by_message_id": "<uuid da mensagem do cliente>" | null',
+        '}',
+        '',
+        '— create_item —',
+        '{ "type": "create_item", "item_id": "<uuid>", "make_active": true }',
+        '',
+        '— record_offer —',
+        '{',
+        '  "type": "record_offer",',
+        '  "offer_id": "<uuid>",',
+        '  "item_id": "<uuid de session_items existente>",',
+        '  "products": [ { ...campos do produto retornado por buscarProduto... } ],',
+        '  "expires_at": "<ISO datetime>"',
+        '}',
+        '',
+        'Whitelist de slot_key:',
+        '  global: nome, bairro, municipio, forma_pagamento',
+        '  item: moto_modelo, moto_ano, moto_cilindrada, medida_pneu, posicao_pneu,',
+        '        quantidade, marca_preferida, marca_recusada, faixa_preco_max',
+        '',
+        'Regras finais:',
+        '- say: max 2000 chars, resposta direta ao cliente.',
+        '- actions: array (pode ser []). Sempre que afirmar fato novo do cliente, emita update_slot.',
+        '- rationale: max 500 chars, justificativa interna nao enviada ao cliente.',
+        `- prompt_version: exatamente "${generatorPromptVersion}".`,
       ].join('\n'),
     },
     {
@@ -78,7 +114,7 @@ export function buildGeneratorMessages(
         })),
         output_contract: {
           say: 'resposta para o cliente, max 2000 chars',
-          actions: 'array de AgentAction (pode ser [])',
+          actions: 'array de RawAction (pode ser [])',
           rationale: 'justificativa interna, max 500 chars',
           prompt_version: generatorPromptVersion,
         },

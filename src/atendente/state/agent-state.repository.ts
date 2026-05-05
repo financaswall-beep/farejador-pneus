@@ -276,7 +276,14 @@ export async function loadCurrent(
   return state;
 }
 
-export async function applyActionAndPersist(
+/**
+ * Aplica e persiste action **assumindo que já existe transação ativa no client**.
+ * Use quando o caller (ex: worker) controla BEGIN/COMMIT.
+ *
+ * Retorna o estado novo com version incrementada. Lança
+ * AgentStateVersionConflictError se outra escrita avançou a versão.
+ */
+export async function applyActionAndPersistInTx(
   client: PoolClient,
   state: ConversationState,
   action: AgentAction,
@@ -297,60 +304,88 @@ export async function applyActionAndPersist(
   const result = applyAction(state, action);
   const nextVersion = state.version + 1;
 
-  await client.query('BEGIN');
-  try {
-    const update = await client.query(
-      `UPDATE agent.session_current
-       SET version = version + 1,
-           turn_index = GREATEST(turn_index, $3),
-           current_skill = $4
-       WHERE environment = $1
-         AND conversation_id = $2
-         AND version = $5`,
+  const update = await client.query(
+    `UPDATE agent.session_current
+     SET version = version + 1,
+         turn_index = GREATEST(turn_index, $3),
+         current_skill = $4
+     WHERE environment = $1
+       AND conversation_id = $2
+       AND version = $5`,
+    [
+      state.environment,
+      state.conversation_id,
+      result.state.turn_index,
+      result.state.current_skill,
+      state.version,
+    ],
+  );
+
+  if (update.rowCount !== 1) {
+    throw new AgentStateVersionConflictError(state.conversation_id, state.version);
+  }
+
+  await syncSessionItems(client, result.state);
+  await syncSessionSlots(client, result.state);
+
+  for (const event of result.events_to_emit) {
+    await client.query(
+      `INSERT INTO agent.session_events
+         (environment, conversation_id, action_id, turn_index, event_type,
+          skill_name, event_payload, resulting_state_version, emitted_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (action_id) DO NOTHING`,
       [
         state.environment,
         state.conversation_id,
+        event.action_id ?? null,
         result.state.turn_index,
+        event.event_type,
         result.state.current_skill,
-        state.version,
+        JSON.stringify(event.event_payload),
+        nextVersion,
+        event.emitted_by ?? null,
       ],
     );
+  }
 
-    if (update.rowCount !== 1) {
-      throw new AgentStateVersionConflictError(state.conversation_id, state.version);
+  return { ...result.state, version: nextVersion };
+}
+
+/**
+ * Versão pública que abre/encerra própria transação. Mantida para
+ * callers que não controlam tx (testes, scripts ad-hoc).
+ *
+ * Idempotência: se action_id já existe em session_events, retorna estado
+ * de entrada sem abrir transação (no-op silencioso).
+ */
+export async function applyActionAndPersist(
+  client: PoolClient,
+  state: ConversationState,
+  action: AgentAction,
+): Promise<ConversationState> {
+  if ('action_id' in action) {
+    const existing = await client.query(
+      `SELECT 1
+       FROM agent.session_events
+       WHERE action_id = $1
+       LIMIT 1`,
+      [action.action_id],
+    );
+    if (existing.rowCount && existing.rowCount > 0) {
+      return state;
     }
+  }
 
-    await syncSessionItems(client, result.state);
-    await syncSessionSlots(client, result.state);
-
-    for (const event of result.events_to_emit) {
-      await client.query(
-        `INSERT INTO agent.session_events
-           (environment, conversation_id, action_id, turn_index, event_type,
-            skill_name, event_payload, resulting_state_version, emitted_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (action_id) DO NOTHING`,
-        [
-          state.environment,
-          state.conversation_id,
-          event.action_id ?? null,
-          result.state.turn_index,
-          event.event_type,
-          result.state.current_skill,
-          JSON.stringify(event.event_payload),
-          nextVersion,
-          event.emitted_by ?? null,
-        ],
-      );
-    }
-
+  await client.query('BEGIN');
+  try {
+    const next = await applyActionAndPersistInTx(client, state, action);
     await client.query('COMMIT');
+    return next;
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   }
-
-  return { ...result.state, version: nextVersion };
 }
 
 async function syncSessionItems(client: PoolClient, state: ConversationState): Promise<void> {

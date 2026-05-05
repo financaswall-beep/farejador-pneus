@@ -53,7 +53,7 @@ vi.mock('../../../../src/shared/logger.js', () => ({
 
 const conversationId = '00000000-0000-4000-8000-000000000001';
 const baseTime = '2026-05-03T12:00:00.000Z';
-const generatorPromptVersion = 'generator_v1.0.0';
+let generatorPromptVersion: string;
 
 let generateTurn: typeof import('../../../../src/atendente/generator/service.js').generateTurn;
 let SAFE_FALLBACK_SAY: string;
@@ -64,6 +64,7 @@ beforeAll(async () => {
 
   const schemas = await import('../../../../src/atendente/generator/schemas.js');
   SAFE_FALLBACK_SAY = schemas.SAFE_FALLBACK_SAY;
+  generatorPromptVersion = schemas.generatorPromptVersion;
 });
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,7 @@ function makeContext(overrides: Partial<PlannerContext> = {}): PlannerContext {
     recent_messages: [],
     available_tools: ['buscarProduto', 'verificarEstoque', 'calcularFrete'],
     recent_tool_results: [],
+    organizer_facts: [],
     derived_signals: state.derived_signals,
     ...overrides,
   };

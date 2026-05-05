@@ -70,6 +70,7 @@ function context(overrides: Partial<PlannerContext> = {}): PlannerContext {
       'buscarPoliticaComercial',
     ],
     recent_tool_results: [],
+    organizer_facts: [],
     derived_signals: s.derived_signals,
     ...overrides,
   };
@@ -149,6 +150,41 @@ describe('Planner Sprint 3', () => {
     ]);
   });
 
+  it('mock planner usa fatos da Organizadora para buscar produto', async () => {
+    const result = await planTurn(
+      context({
+        organizer_facts: [
+          organizerFact('medida_pneu', '120/80-18'),
+          organizerFact('marca_pneu_preferida', 'Michelin'),
+        ],
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000011',
+            role: 'customer',
+            text: 'tem esse pneu?',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output).toMatchObject({
+      skill: 'buscar_e_ofertar',
+      tool_requests: [
+        {
+          tool: 'buscarProduto',
+          input: {
+            environment: 'test',
+            medida_pneu: '120/80-18',
+            marca: 'Michelin',
+            apenas_com_estoque: true,
+            limit: 10,
+          },
+        },
+      ],
+    });
+  });
+
   it('fallbackPlannerOutput sempre retorna schema valido', () => {
     expect(plannerOutputSchema.parse(fallbackPlannerOutput('falha'))).toMatchObject({
       skill: 'escalar_humano',
@@ -207,3 +243,19 @@ describe('Planner Sprint 3', () => {
     expect(query.mock.calls[0]?.[1]?.[5]).toBe(query.mock.calls[1]?.[1]?.[5]);
   });
 });
+
+function organizerFact(factKey: string, factValue: unknown): PlannerContext['organizer_facts'][number] {
+  return {
+    fact_key: factKey,
+    fact_value: factValue,
+    observed_at: baseTime,
+    message_id: '00000000-0000-4000-8000-000000000010',
+    truth_type: 'observed',
+    source: 'organizadora_llm',
+    confidence_level: 0.9,
+    extractor_version: 'organizadora_v3.4',
+    latest_evidence_text: null,
+    latest_evidence_message_id: null,
+    latest_evidence_type: null,
+  };
+}

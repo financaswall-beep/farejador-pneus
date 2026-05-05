@@ -31,6 +31,10 @@ import {
 import { buildPlannerContext } from './planner/context-builder.js';
 import { planTurn, recordPlannerDecision } from './planner/service.js';
 import { generateTurn, recordGeneratorResult } from './generator/service.js';
+import {
+  AgentStateVersionConflictError,
+  applyActionAndPersistInTx,
+} from './state/agent-state.repository.js';
 
 const WORKER_ID = `atendente-shadow-${randomUUID().slice(0, 8)}`;
 const MISSING_STATE_PREFIX = 'planner_context_missing_state:';
@@ -59,6 +63,8 @@ export async function processAtendenteJob(
   generator_blocked: boolean;
   generator_block_reason: string | null;
   turn_id: string;
+  actions_persisted: number;
+  actions_failed: number;
 }> {
   await lockSessionForJob(client, job);
 
@@ -83,6 +89,46 @@ export async function processAtendenteJob(
     job.trigger_message_id,
   );
 
+  // Sprint 6.5: fechar loop de mutação de estado.
+  // Aplica cada action válida, isoladamente via SAVEPOINT — uma falha
+  // não derruba auditoria do turno nem outras actions independentes.
+  let actionsPersisted = 0;
+  let actionsFailed = 0;
+  if (!generatorResult.blocked && generatorResult.actions.length > 0) {
+    let currentState = context.state;
+    for (const action of generatorResult.actions) {
+      const savepoint = `apply_${actionsPersisted + actionsFailed}`;
+      await client.query(`SAVEPOINT ${savepoint}`);
+      try {
+        currentState = await applyActionAndPersistInTx(client, currentState, action);
+        actionsPersisted += 1;
+        await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+      } catch (err) {
+        actionsFailed += 1;
+        await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        const message = err instanceof Error ? err.message : String(err);
+        const isVersionConflict = err instanceof AgentStateVersionConflictError;
+        logger.warn(
+          {
+            worker_id: WORKER_ID,
+            shadow: true,
+            conversation_id: job.conversation_id,
+            turn_id: turnId,
+            action_type: action.type,
+            action_id: 'action_id' in action ? action.action_id : undefined,
+            version_conflict: isVersionConflict,
+            error: message,
+          },
+          'atendente shadow: action persist failed (continuing)',
+        );
+        // Em conflito de versão, recarregamos pra próximas actions usarem version atual.
+        if (isVersionConflict) {
+          break;
+        }
+      }
+    }
+  }
+
   await markShadowTurnProcessed(client, job, turnIndex);
 
   return {
@@ -94,6 +140,8 @@ export async function processAtendenteJob(
     generator_blocked: generatorResult.blocked,
     generator_block_reason: generatorResult.block_reason,
     turn_id: turnId,
+    actions_persisted: actionsPersisted,
+    actions_failed: actionsFailed,
   };
 }
 
@@ -139,6 +187,8 @@ export async function pollAndAttend(): Promise<void> {
           tool_failures: summary.tool_results.filter((result) => !result.ok).length,
           generator_blocked: summary.generator_blocked,
           generator_block_reason: summary.generator_block_reason,
+          actions_persisted: summary.actions_persisted,
+          actions_failed: summary.actions_failed,
           turn_id: summary.turn_id,
         },
         'atendente shadow: job processed',

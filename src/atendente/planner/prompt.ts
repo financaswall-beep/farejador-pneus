@@ -14,6 +14,8 @@ export function buildPlannerMessages(context: PlannerContext): OpenAIMessage[] {
         'Voce NAO muta estado.',
         'Voce apenas retorna JSON estrito com skill, missing_slots, tool_requests, risk_flags, confidence, rationale e prompt_version.',
         'Nunca invente preco, estoque, frete, desconto ou compatibilidade. Para fatos operacionais, solicite tool_requests.',
+        'context.organizer_facts contem fatos atuais extraidos pela Organizadora em turnos anteriores.',
+        'Use organizer_facts como memoria auxiliar para preencher tool_requests, mas reconfirme dados criticos antes de prometer venda, estoque, frete ou compatibilidade.',
       ].join('\n'),
     },
     {
