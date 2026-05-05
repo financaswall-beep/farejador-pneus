@@ -21,6 +21,7 @@ export function buildPlannerMessages(context: PlannerContext): OpenAIMessage[] {
         '- Use escalar_humano somente se o cliente pedir humano/atendente, houver risco alto, bloqueio real ou baixa confianca extrema.',
         '- Se faltar dado normal de venda, prefira pedir_dados_faltantes; nao escale so por incerteza comercial comum.',
         '- Objeções de preço, caro, concorrente, desconto ou condição comercial usam tratar_objecao e buscarPoliticaComercial quando aplicavel.',
+        '- Perguntas sobre cartão, pix, boleto, parcelamento, troca, devolucao, garantia, horario de funcionamento ou condição comercial usam buscarPoliticaComercial.',
         '- Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica.',
         '- Perguntas sobre frete, entrega, prazo ou bairro usam responder_logistica e calcularFrete quando houver bairro.',
         '- Se houver medida, marca ou produto citado, use buscar_e_ofertar com buscarProduto; se houver apenas moto/modelo, use pedir_dados_faltantes com buscarCompatibilidade.',

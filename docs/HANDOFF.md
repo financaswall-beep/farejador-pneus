@@ -133,6 +133,16 @@ Nao implementado/nao ligado:
   cartao_debito]`, `prazo_troca=7 dias`, `garantia_descricao` da montagem e
   `horario_funcionamento` segunda a sabado 8h-17h. Testes: 351/351 verde;
   typecheck e build verdes.
+- Pos-redeploy `56d73ca`, run focado `policy-20260505154005`: 6/6 mensagens,
+  6/6 jobs processed, 6/6 turns generated, zero blocked. Confirmado em eventos:
+  `planner_v1.2.1` + `generator_v1.3.0`. Parcelamento/pagamento acionou
+  `buscarPoliticaComercial` e respondeu corretamente: maximo 4x; boleto nao
+  aceito; Pix/cartao credito/cartao debito aceitos. Achado: perguntas de troca,
+  garantia e horario ficaram em fallback seguro porque o Planner nao chamou a
+  tool apesar das politicas existirem. Correcao local `planner_v1.2.2`: prompt
+  explicita boleto/parcelamento/troca/devolucao/garantia/horario e
+  normalizacao garante `buscarPoliticaComercial` em pergunta de politica quando
+  a tool esta disponivel. Testes: 353/353 verde; typecheck e build verdes.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.

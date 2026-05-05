@@ -155,6 +155,27 @@ describe('Planner Sprint 3', () => {
     ]);
   });
 
+  it('mock planner solicita politica comercial para horario de funcionamento', async () => {
+    const result = await planTurn(
+      context({
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000012',
+            role: 'customer',
+            text: 'Que horas voces fecham hoje?',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output).toMatchObject({
+      skill: 'tratar_objecao',
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
+      prompt_version: plannerPromptVersion,
+    });
+  });
+
   it('mock planner usa fatos da Organizadora para buscar produto', async () => {
     const result = await planTurn(
       context({
@@ -203,6 +224,7 @@ describe('Planner Sprint 3', () => {
 
     expect(systemPrompt).toContain('Use escalar_humano somente se o cliente pedir humano/atendente');
     expect(systemPrompt).toContain('Objeções de preço, caro, concorrente, desconto ou condição comercial usam tratar_objecao');
+    expect(systemPrompt).toContain('Perguntas sobre cartão, pix, boleto, parcelamento, troca, devolucao, garantia, horario de funcionamento');
     expect(systemPrompt).toContain('Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica');
     expect(systemPrompt).toContain('Não repita escalar_humano em turnos seguidos');
     expect(systemPrompt).toContain('posicao_pneu deve ser exatamente front, rear ou both');
@@ -313,6 +335,39 @@ describe('Planner Sprint 3', () => {
       missing_slots: ['medida_pneu'],
       tool_requests: [],
       confidence: 0.65,
+      prompt_version: plannerPromptVersion,
+    });
+  });
+
+  it('garante buscarPoliticaComercial quando Planner esquece tool em pergunta de politica', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'pedir_dados_faltantes',
+          missing_slots: ['medida_pneu'],
+          tool_requests: [],
+          risk_flags: [],
+          confidence: 0.7,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.1',
+        },
+        context({
+          recent_messages: [
+            {
+              id: '00000000-0000-4000-8000-000000000013',
+              role: 'customer',
+              text: 'Se o pneu nao servir eu posso trocar?',
+              sent_at: baseTime,
+            },
+          ],
+        }),
+      ),
+    );
+
+    expect(normalized).toMatchObject({
+      skill: 'tratar_objecao',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
       prompt_version: plannerPromptVersion,
     });
   });

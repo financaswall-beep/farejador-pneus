@@ -130,6 +130,18 @@ function mockPlanTurn(context: PlannerContext): PlannerOutput {
     };
   }
 
+  if (mentionsPolicyQuestion(text) && context.available_tools.includes('buscarPoliticaComercial')) {
+    return {
+      skill: 'tratar_objecao',
+      missing_slots: [],
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment } }],
+      risk_flags: [],
+      confidence: 0.82,
+      rationale: 'Cliente perguntou sobre politica comercial.',
+      prompt_version: plannerPromptVersion,
+    };
+  }
+
   if (text.includes('frete') || text.includes('entrega')) {
     const bairro = context.state.global_slots.bairro?.value_json ?? findOrganizerStringFact(context, [
       'bairro_mencionado',
@@ -273,7 +285,7 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
 
   const candidate = raw as Record<string, unknown>;
-  const normalizedToolRequests = normalizeToolRequests(candidate.tool_requests, context);
+  let normalizedToolRequests = normalizeToolRequests(candidate.tool_requests, context);
   const rawMissingSlots = Array.isArray(candidate.missing_slots) ? candidate.missing_slots : [];
   const missingSlots = rawMissingSlots.filter((slot) => sessionSlotKeySchema.safeParse(slot).success);
   const rawRiskFlags = Array.isArray(candidate.risk_flags) ? candidate.risk_flags : [];
@@ -287,6 +299,20 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
     prompt_version: plannerPromptVersion,
   };
 
+  if (shouldEnsurePolicyTool(context, normalizedToolRequests)) {
+    normalizedToolRequests = [
+      ...normalizedToolRequests,
+      { tool: 'buscarPoliticaComercial', input: { environment: context.environment } },
+    ].slice(0, 5);
+    normalized.tool_requests = normalizedToolRequests;
+    if (['pedir_dados_faltantes', 'responder_geral', 'escalar_humano'].includes(String(normalized.skill))) {
+      normalized.skill = 'tratar_objecao';
+      normalized.missing_slots = [];
+      normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.7), 0.75);
+    }
+    normalized.rationale = appendRationale(candidate.rationale, 'Pergunta de politica comercial com tool garantida.');
+  }
+
   if (candidate.skill === 'buscar_e_ofertar' && normalizedToolRequests.length === 0) {
     normalized.skill = 'pedir_dados_faltantes';
     normalized.missing_slots = missingSlots.length > 0 ? missingSlots : ['medida_pneu'];
@@ -295,6 +321,30 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
   }
 
   return normalized;
+}
+
+function shouldEnsurePolicyTool(context: PlannerContext, normalizedToolRequests: unknown[]): boolean {
+  if (!context.available_tools.includes('buscarPoliticaComercial')) return false;
+  if (!mentionsPolicyQuestion(latestCustomerText(context))) return false;
+  return !normalizedToolRequests.some((request) => {
+    if (!request || typeof request !== 'object' || Array.isArray(request)) return false;
+    return (request as Record<string, unknown>).tool === 'buscarPoliticaComercial';
+  });
+}
+
+function latestCustomerText(context: PlannerContext): string {
+  const last = [...context.recent_messages].reverse().find((message) => message.role === 'customer');
+  return last?.text ?? '';
+}
+
+function mentionsPolicyQuestion(text: string): boolean {
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\b(parcel|parcela|parcelam|vezes|\d+\s*x)\b/.test(normalized)) return true;
+  if (/\b(aceita|aceitam|recebe|recebem)\b[^.!?]*(pix|boleto|cartao|debito|credito|dinheiro)/.test(normalized)) return true;
+  if (/\b(pagamento|forma de pagamento|condicao de pagamento|no cartao|cartao muda)\b/.test(normalized)) return true;
+  if (/\b(troca|trocar|devolucao|devolver|garantia)\b/.test(normalized)) return true;
+  if (/\b(horario|funcionamento|que horas|fecha|fecham|abre|abrem|domingo|sabado)\b/.test(normalized)) return true;
+  return false;
 }
 
 function normalizeToolRequests(rawToolRequests: unknown, context: PlannerContext): unknown[] {
