@@ -17,6 +17,10 @@ export const policyValueSchemas = {
     installments: z.number().int().min(1),
     min_installment_brl: z.number().min(0).optional(),
   }),
+  prazo_troca: z.object({
+    days: z.number().int().min(0),
+    condition: z.string().trim().min(1).optional(),
+  }),
 
   // --- chaves informativas (texto livre / booleano) ---
   area_entrega: z.string(),
@@ -27,6 +31,7 @@ export const policyValueSchemas = {
   horario_funcionamento: z.string(),
   link_maps: z.string(),
   politica_montagem: z.string(),
+  politica_devolucao: z.string(),
   prazo_entrega_descricao: z.string(),
   rotas_hoje: z.string().nullable(),
   telefone_atendimento_humano: z.string(),

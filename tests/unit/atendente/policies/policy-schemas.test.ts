@@ -15,4 +15,11 @@ describe('POLICY_VALUE_SCHEMAS', () => {
       'unsupported_policy_key:politica_solteira',
     );
   });
+
+  it('valida prazo_troca estruturado', () => {
+    expect(parsePolicyValue('prazo_troca', { days: 7, condition: 'produto sem uso' })).toEqual({
+      days: 7,
+      condition: 'produto sem uso',
+    });
+  });
 });

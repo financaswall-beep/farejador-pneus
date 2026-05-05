@@ -188,4 +188,112 @@ describe('SayValidator inicial', () => {
       }),
     ).toEqual({ valid: true });
   });
+
+  it.each([
+    ['parcelamento', 'Parcelamos em até 4x sem juros.'],
+    ['troca', 'Você pode trocar em até 7 dias após a compra.'],
+    ['devolucao', 'Aceitamos devolução em até 7 dias.'],
+    ['garantia', 'A garantia cobre o serviço de montagem.'],
+    ['forma_pagamento', 'Aceitamos Pix e cartão.'],
+    ['horario', 'Atendemos de segunda a sábado, das 8h às 17h.'],
+  ])('bloqueia claim de politica sem buscarPoliticaComercial: %s', (_category, say) => {
+    expect(validateSay(say, { recent_tool_results: [] })).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_without_tool_result',
+    });
+  });
+
+  it.each([
+    ['parcelamento', 'Parcelamos em até 4x sem juros.'],
+    ['troca', 'Você pode trocar em até 7 dias após a compra.'],
+    ['devolucao', 'Aceitamos devolução em até 7 dias.'],
+    ['garantia', 'A garantia cobre o serviço de montagem.'],
+    ['forma_pagamento', 'Aceitamos Pix e cartão.'],
+    ['horario', 'Atendemos de segunda a sábado, das 8h às 17h.'],
+  ])('permite claim de politica com buscarPoliticaComercial: %s', (_category, say) => {
+    expect(
+      validateSay(say, {
+        recent_tool_results: [policyToolResult()],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it.each([
+    'Vou verificar a garantia com a loja antes de te confirmar.',
+    'Preciso confirmar se aceita parcelamento em mais vezes.',
+    'Você perguntou sobre troca; vou anotar pra te responder certinho.',
+  ])('permite meta-fala de politica sem tool: %s', (say) => {
+    expect(validateSay(say, { recent_tool_results: [] })).toEqual({ valid: true });
+  });
+
+  it('bloqueia claim de politica quando buscarPoliticaComercial retornou vazio', () => {
+    expect(
+      validateSay('Parcelamos em até 4x sem juros.', {
+        recent_tool_results: [{ tool: 'buscarPoliticaComercial', ok: true, output: [] }],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_without_tool_result',
+    });
+  });
+
+  it('bloqueia parcelamento diferente da politica retornada', () => {
+    expect(
+      validateSay('Parcelamos em até 6x sem juros.', {
+        recent_tool_results: [policyToolResult()],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_mismatches_tool_result',
+    });
+  });
+
+  it('bloqueia forma de pagamento diferente da politica retornada', () => {
+    expect(
+      validateSay('Aceitamos boleto para pagamento.', {
+        recent_tool_results: [policyToolResult()],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_mismatches_tool_result',
+    });
+  });
+
+  it('nao bloqueia dado observado de pagamento do cliente', () => {
+    expect(validateSay('Perfeito, anotei pagamento no pix.', { recent_tool_results: [] })).toEqual({ valid: true });
+  });
 });
+
+function policyToolResult() {
+  return {
+    tool: 'buscarPoliticaComercial' as const,
+    ok: true,
+    output: [
+      {
+        policy_key: 'parcelamento_maximo',
+        policy_value: { installments: 4 },
+        policy_version: '1.0',
+      },
+      {
+        policy_key: 'formas_pagamento_aceitas',
+        policy_value: ['pix', 'cartao_credito', 'cartao_debito'],
+        policy_version: '1.0',
+      },
+      {
+        policy_key: 'garantia_descricao',
+        policy_value: 'Garantia cobre o serviço de montagem realizado na loja.',
+        policy_version: '1.0',
+      },
+      {
+        policy_key: 'prazo_troca',
+        policy_value: { days: 7, condition: 'produto sem uso' },
+        policy_version: '1.0',
+      },
+      {
+        policy_key: 'horario_funcionamento',
+        policy_value: 'Atendemos de segunda a sábado, das 8h às 17h.',
+        policy_version: '1.0',
+      },
+    ],
+  };
+}

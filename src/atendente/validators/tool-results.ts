@@ -54,6 +54,12 @@ export function hasCompatibilityEvidence(results: ToolResultForValidation[]): bo
   );
 }
 
+export function collectPolicyResults(results: ToolResultForValidation[]): unknown[] {
+  return results
+    .filter((result) => result.ok && result.tool === 'buscarPoliticaComercial' && hasNonEmptyOutput(result.output))
+    .flatMap((result) => (Array.isArray(result.output) ? result.output : [result.output]));
+}
+
 function collectProductIds(value: unknown, out: Set<string>, depth = 0): void {
   if (depth > MAX_COLLECT_DEPTH) return;
   if (Array.isArray(value)) {

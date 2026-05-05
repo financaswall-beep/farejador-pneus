@@ -123,6 +123,16 @@ Nao implementado/nao ligado:
   tool input com estado/fatos da Organizadora e downgrade seguro de
   `buscar_e_ofertar` sem tool valida para `pedir_dados_faltantes` em vez de
   fallback humano. Testes: 331/331 verde; typecheck verde.
+- Sprint 6.7.5 local: SayValidator agora tambem bloqueia claims factuais de
+  politica comercial sem `buscarPoliticaComercial` relevante
+  (`policy_claim_without_tool_result`) e mismatches basicos de parcelamento/
+  forma de pagamento (`policy_claim_mismatches_tool_result`). Mantem meta-fala
+  liberada (ex.: "vou verificar", "preciso confirmar") para preservar conversa
+  interpretativa. `commerce.store_policies` em prod foi atualizado com
+  `parcelamento_maximo=4`, `formas_pagamento_aceitas=[pix, cartao_credito,
+  cartao_debito]`, `prazo_troca=7 dias`, `garantia_descricao` da montagem e
+  `horario_funcionamento` segunda a sabado 8h-17h. Testes: 351/351 verde;
+  typecheck e build verdes.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.
