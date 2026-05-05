@@ -134,6 +134,7 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
       turn_id: fakeTurnId,
       actions_persisted: 0,
       actions_failed: 0,
+      escalated_actions: [],
     });
   });
 

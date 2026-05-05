@@ -35,6 +35,8 @@ import {
   AgentStateVersionConflictError,
   applyActionAndPersistInTx,
 } from './state/agent-state.repository.js';
+import type { EscalateAction } from '../shared/zod/agent-actions.js';
+import { postEscalateNote } from './handlers/escalate.js';
 
 const WORKER_ID = `atendente-shadow-${randomUUID().slice(0, 8)}`;
 const MISSING_STATE_PREFIX = 'planner_context_missing_state:';
@@ -65,6 +67,7 @@ export async function processAtendenteJob(
   turn_id: string;
   actions_persisted: number;
   actions_failed: number;
+  escalated_actions: EscalateAction[];
 }> {
   await lockSessionForJob(client, job);
 
@@ -94,6 +97,7 @@ export async function processAtendenteJob(
   // não derruba auditoria do turno nem outras actions independentes.
   let actionsPersisted = 0;
   let actionsFailed = 0;
+  const escalatedActions: EscalateAction[] = [];
   if (!generatorResult.blocked && generatorResult.actions.length > 0) {
     let currentState = context.state;
     for (const action of generatorResult.actions) {
@@ -103,6 +107,9 @@ export async function processAtendenteJob(
         currentState = await applyActionAndPersistInTx(client, currentState, action);
         actionsPersisted += 1;
         await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+        if (action.type === 'escalate') {
+          escalatedActions.push(action);
+        }
       } catch (err) {
         actionsFailed += 1;
         await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
@@ -142,6 +149,7 @@ export async function processAtendenteJob(
     turn_id: turnId,
     actions_persisted: actionsPersisted,
     actions_failed: actionsFailed,
+    escalated_actions: escalatedActions,
   };
 }
 
@@ -171,6 +179,12 @@ export async function pollAndAttend(): Promise<void> {
       const summary = await processAtendenteJob(client, job);
       await markAtendenteJobProcessed(client, job.id);
       await client.query('COMMIT');
+
+      // Após COMMIT: efeitos externos que não devem reverter a transação.
+      // Falha aqui não desfaz o estado já persistido no banco.
+      for (const escalateAction of summary.escalated_actions) {
+        await postEscalateNote(client, job.environment, job.conversation_id, escalateAction);
+      }
 
       logger.info(
         {
