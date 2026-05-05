@@ -1,5 +1,6 @@
 import type {
   AddObjectionAction,
+  AddToCartAction,
   AgentAction,
   ClearCartAction,
   CreateItemAction,
@@ -67,6 +68,21 @@ function deterministicId(state: ConversationState, action: AgentAction, suffix: 
 
 function addSeconds(isoTimestamp: string, seconds: number): string {
   return new Date(Date.parse(isoTimestamp) + seconds * 1000).toISOString();
+}
+
+function draftStatusFor(action: UpdateDraftAction, current?: ConversationState['order_draft']): 'collecting' | 'ready' {
+  const customerName = action.customer_name ?? current?.customer_name ?? null;
+  const deliveryAddress = action.delivery_address ?? current?.delivery_address ?? null;
+  const fulfillmentMode = action.fulfillment_mode ?? current?.fulfillment_mode ?? null;
+  const paymentMethod = action.payment_method ?? current?.payment_method ?? null;
+
+  if (!customerName || !fulfillmentMode || !paymentMethod) {
+    return 'collecting';
+  }
+  if (fulfillmentMode === 'delivery' && !deliveryAddress) {
+    return 'collecting';
+  }
+  return 'ready';
 }
 
 function eventFor(action: AgentAction, eventType: string, payload?: Record<string, unknown>): SessionEventInsert {
@@ -325,10 +341,98 @@ function applyEscalate(state: ConversationState, action: EscalateAction): ApplyR
   };
 }
 
-function applyNoStateMutation(state: ConversationState, action: AgentAction, eventType: string): ApplyResult {
+function applyAddToCart(state: ConversationState, action: AddToCartAction): ApplyResult {
   const next = cloneState(state);
+  const existing = next.cart.find(
+    (item) => item.product_id === action.product_id && item.item_status !== 'removed',
+  );
+  const cartItemId = existing?.id ?? deterministicId(state, action, 'cart_item');
+
+  if (existing) {
+    existing.quantity = action.quantity;
+    existing.unit_price = action.unit_price ?? existing.unit_price ?? null;
+    existing.item_status = 'proposed';
+  } else {
+    next.cart.push({
+      id: cartItemId,
+      product_id: action.product_id,
+      quantity: action.quantity,
+      unit_price: action.unit_price ?? null,
+      item_status: 'proposed',
+    });
+  }
+
+  const offeredItemId = next.last_offer?.products.some(
+    (product) => product.product_id === action.product_id,
+  )
+    ? next.last_offer.item_id
+    : null;
+  if (offeredItemId) {
+    const item = next.items.find((candidate) => candidate.id === offeredItemId);
+    if (item) {
+      item.status = 'no_carrinho';
+      item.updated_at = actionTimestamp(state, action);
+    }
+  }
+
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, eventType)] };
+  return {
+    state: next,
+    events_to_emit: [eventFor(action, 'cart_proposed', { action, cart_item_id: cartItemId })],
+  };
+}
+
+function applyRemoveFromCart(state: ConversationState, action: RemoveFromCartAction): ApplyResult {
+  const next = cloneState(state);
+  const item = next.cart.find((candidate) => candidate.id === action.cart_item_id);
+  if (item) {
+    item.item_status = 'removed';
+  }
+  touch(next, action);
+  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+}
+
+function applyUpdateCartItem(state: ConversationState, action: UpdateCartItemAction): ApplyResult {
+  const next = cloneState(state);
+  const item = next.cart.find((candidate) => candidate.id === action.cart_item_id);
+  if (!item || item.item_status === 'removed') {
+    throw new Error(`cart_item_not_found:${action.cart_item_id}`);
+  }
+  item.quantity = action.quantity;
+  touch(next, action);
+  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+}
+
+function applyClearCart(state: ConversationState, action: ClearCartAction): ApplyResult {
+  const next = cloneState(state);
+  for (const item of next.cart) {
+    item.item_status = 'removed';
+  }
+  touch(next, action);
+  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+}
+
+function applyUpdateDraft(state: ConversationState, action: UpdateDraftAction): ApplyResult {
+  const next = cloneState(state);
+  const timestamp = actionTimestamp(state, action);
+  const current = next.order_draft ?? null;
+
+  next.order_draft = {
+    customer_name: action.customer_name ?? current?.customer_name ?? null,
+    delivery_address: action.delivery_address ?? current?.delivery_address ?? null,
+    geo_resolution_id: current?.geo_resolution_id ?? null,
+    fulfillment_mode: action.fulfillment_mode ?? current?.fulfillment_mode ?? null,
+    payment_method: action.payment_method ?? current?.payment_method ?? null,
+    draft_status: draftStatusFor(action, current),
+    promoted_order_id: current?.promoted_order_id ?? null,
+    promoted_by: current?.promoted_by ?? null,
+    promoted_at: current?.promoted_at ?? null,
+    created_at: current?.created_at ?? timestamp,
+    updated_at: timestamp,
+  };
+
+  touch(next, action);
+  return { state: next, events_to_emit: [eventFor(action, 'fact_corrected')] };
 }
 
 export function applyAction(state: ConversationState, action: AgentAction): ApplyResult {
@@ -362,13 +466,15 @@ export function applyAction(state: ConversationState, action: AgentAction): Appl
     case 'escalate':
       return applyEscalate(state, action);
     case 'add_to_cart':
-      return applyNoStateMutation(state, action, 'cart_proposed');
+      return applyAddToCart(state, action);
     case 'remove_from_cart':
+      return applyRemoveFromCart(state, action);
     case 'update_cart_item':
+      return applyUpdateCartItem(state, action);
     case 'clear_cart':
-      return applyNoStateMutation(state, action, 'cart_proposed');
+      return applyClearCart(state, action);
     case 'update_draft':
-      return applyNoStateMutation(state, action, 'fact_corrected');
+      return applyUpdateDraft(state, action);
   }
 }
 

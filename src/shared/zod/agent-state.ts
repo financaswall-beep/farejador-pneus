@@ -118,6 +118,21 @@ export const pendingConfirmationStateSchema = z.object({
   expires_at: z.string().datetime(),
 });
 
+export const orderDraftStateSchema = z.object({
+  customer_name: z.string().nullable().default(null),
+  delivery_address: z.string().nullable().default(null),
+  geo_resolution_id: z.string().uuid().nullable().default(null),
+  fulfillment_mode: z.enum(['delivery', 'pickup']).nullable().default(null),
+  payment_method: paymentMethodSchema.nullable().default(null),
+  draft_status: z.enum(['collecting', 'ready', 'promoted', 'abandoned']).default('collecting'),
+  promoted_order_id: z.string().uuid().nullable().default(null),
+  promoted_by: z.string().nullable().default(null),
+  promoted_at: z.string().datetime().nullable().default(null),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type OrderDraftState = z.infer<typeof orderDraftStateSchema>;
+
 export const globalSlotsStateSchema = z.object({
   nome: slotValueSchema.optional(),
   bairro: slotValueSchema.optional(),
@@ -158,6 +173,7 @@ export const conversationStateSchema = z.object({
   ),
   global_slots: globalSlotsStateSchema.default({}),
   cart: z.array(cartLineStateSchema).default([]),
+  order_draft: orderDraftStateSchema.nullable().optional(),
   pending_confirmation: pendingConfirmationStateSchema.nullable().default(null),
   last_offer: z
     .object({

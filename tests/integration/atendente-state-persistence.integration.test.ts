@@ -33,7 +33,11 @@ import {
   loadCurrent,
 } from '../../src/atendente/state/agent-state.repository.js';
 import type {
+  AddToCartAction,
+  EscalateAction,
   CreateItemAction,
+  RequestConfirmationAction,
+  UpdateDraftAction,
   UpdateSlotAction,
 } from '../../src/shared/zod/agent-actions.js';
 
@@ -44,6 +48,7 @@ let testPool: Pool;
 
 /** Par criado em cada beforeEach — usado para cleanup parcial no Supabase externo. */
 const createdPairs: Array<{ conversationId: string; contactId: string }> = [];
+const createdProductIds: string[] = [];
 
 let conversationId: string;
 
@@ -74,8 +79,31 @@ afterAll(async () => {
   // Supabase externo: limpa o que é possível.
   // session_events é append-only (trigger bloqueia DELETE) e core.conversations
   // tem CASCADE para session_events, então conversas também não podem ser deletadas.
-  // Limpamos: slots, items, session_current, contacts.
+  // Limpamos: slots, items, carrinho, drafts, confirmações, escalações, session_current, contacts.
   for (const { conversationId: cid, contactId: ctid } of createdPairs) {
+    try {
+      await testPool.query(`DELETE FROM agent.cart_events WHERE environment = 'test' AND conversation_id = $1`, [cid]);
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(
+        `DELETE FROM agent.cart_current_items
+         WHERE environment = 'test'
+           AND cart_id IN (SELECT id FROM agent.cart_current WHERE environment = 'test' AND conversation_id = $1)`,
+        [cid],
+      );
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(`DELETE FROM agent.cart_current WHERE environment = 'test' AND conversation_id = $1`, [cid]);
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(`DELETE FROM agent.order_drafts WHERE environment = 'test' AND conversation_id = $1`, [cid]);
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(`DELETE FROM agent.pending_confirmations WHERE environment = 'test' AND conversation_id = $1`, [cid]);
+    } catch { /* silencioso */ }
+    try {
+      await testPool.query(`DELETE FROM agent.escalations WHERE environment = 'test' AND conversation_id = $1`, [cid]);
+    } catch { /* silencioso */ }
     try {
       await testPool.query(
         `DELETE FROM agent.session_slots WHERE environment = 'test' AND conversation_id = $1`,
@@ -98,6 +126,11 @@ afterAll(async () => {
       // Anula FK antes de deletar contact (conversa fica órfã mas não bloqueia)
       await testPool.query(`UPDATE core.conversations SET contact_id = NULL WHERE id = $1`, [cid]);
       await testPool.query(`DELETE FROM core.contacts WHERE id = $1`, [ctid]);
+    } catch { /* silencioso */ }
+  }
+  for (const productId of createdProductIds) {
+    try {
+      await testPool.query(`DELETE FROM commerce.products WHERE environment = 'test' AND id = $1`, [productId]);
     } catch { /* silencioso */ }
   }
   await testPool.end();
@@ -174,9 +207,58 @@ function makeCreateItemAction(itemId: string, actionId: string): CreateItemActio
   };
 }
 
+function makeAddToCartAction(productId: string): AddToCartAction {
+  return {
+    type: 'add_to_cart',
+    product_id: productId,
+    quantity: 2,
+    unit_price: 189.9,
+  };
+}
+
+function makeUpdateDraftAction(): UpdateDraftAction {
+  return {
+    type: 'update_draft',
+    customer_name: 'Cliente Teste',
+    delivery_address: 'Rua Teste, 123',
+    fulfillment_mode: 'delivery',
+    payment_method: 'pix',
+  };
+}
+
+function makeRequestConfirmationAction(): RequestConfirmationAction {
+  return {
+    type: 'request_confirmation',
+    confirmation_type: 'order_confirmation',
+    expected_facts: { medida_pneu: '140/70-17', quantidade: 2 },
+    expires_in_seconds: 3600,
+  };
+}
+
+function makeEscalateAction(): EscalateAction {
+  return {
+    type: 'escalate',
+    reason: 'ready_to_close',
+    summary_text: 'Cliente quer fechar pedido com entrega e pagamento por pix.',
+  };
+}
+
+async function createProduct(): Promise<string> {
+  const result = await testPool.query<{ id: string }>(
+    `INSERT INTO commerce.products
+       (environment, product_code, product_name, product_type, brand)
+     VALUES ('test', $1, 'Pneu Teste 140/70-17', 'tire', 'Teste')
+     RETURNING id`,
+    [`TEST-${randomUUID()}`],
+  );
+  const productId = result.rows[0]!.id;
+  createdProductIds.push(productId);
+  return productId;
+}
+
 // ─── Testes ───────────────────────────────────────────────────────────────────
 
-describe('Sprint 6.5 — applyActionAndPersistInTx contra Postgres real', () => {
+describe('Sprint 6.5/6.9 — applyActionAndPersistInTx contra Postgres real', () => {
   it('persiste update_slot global, incrementa version e emite slot_set', async () => {
     const actionId = randomUUID();
     const client = await testPool.connect();
@@ -367,6 +449,117 @@ describe('Sprint 6.5 — applyActionAndPersistInTx contra Postgres real', () => 
       [conversationId],
     );
     expect(version.rows[0]!.version).toBe('2');
+  });
+
+  it('persiste add_to_cart em cart_current, cart_current_items e cart_events', async () => {
+    const productId = await createProduct();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const next = await applyActionAndPersistInTx(client, state0!, makeAddToCartAction(productId));
+      expect(next.cart).toHaveLength(1);
+      expect(next.version).toBe(1);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const cart = await testPool.query<{ cart_status: string; estimated_total: string | null }>(
+      `SELECT cart_status, estimated_total::text AS estimated_total
+       FROM agent.cart_current
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(cart.rows[0]!.cart_status).toBe('proposed');
+    expect(cart.rows[0]!.estimated_total).toBe('379.80');
+
+    const items = await testPool.query(
+      `SELECT product_id, quantity, unit_price::text AS unit_price, item_status
+       FROM agent.cart_current_items
+       WHERE environment = 'test'`,
+    );
+    expect(items.rows.some((row) => row.product_id === productId && row.quantity === 2)).toBe(true);
+
+    const event = await testPool.query<{ event_type: string }>(
+      `SELECT event_type
+       FROM agent.cart_events
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(event.rows[0]!.event_type).toBe('proposed');
+  });
+
+  it('persiste update_draft, request_confirmation e escalation nas tabelas operacionais', async () => {
+    const itemId = randomUUID();
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const state1 = await applyActionAndPersistInTx(
+        client,
+        state0!,
+        makeCreateItemAction(itemId, randomUUID()),
+      );
+      const state2 = await applyActionAndPersistInTx(
+        client,
+        state1,
+        makeUpdateSlotAction(itemId, randomUUID(), {
+          slot_key: 'quantidade',
+          value: 2,
+          source: 'confirmed',
+        }),
+      );
+      const state3 = await applyActionAndPersistInTx(
+        client,
+        state2,
+        makeUpdateSlotAction(itemId, randomUUID(), {
+          slot_key: 'medida_pneu',
+          value: '140/70-17',
+          source: 'confirmed',
+        }),
+      );
+      const state4 = await applyActionAndPersistInTx(client, state3, makeUpdateDraftAction());
+      const state5 = await applyActionAndPersistInTx(client, state4, makeRequestConfirmationAction());
+      const state6 = await applyActionAndPersistInTx(client, state5, makeEscalateAction());
+      expect(state6.status).toBe('escalated');
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const draft = await testPool.query<{ draft_status: string; payment_method: string }>(
+      `SELECT draft_status, payment_method
+       FROM agent.order_drafts
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(draft.rows[0]!.draft_status).toBe('ready');
+    expect(draft.rows[0]!.payment_method).toBe('pix');
+
+    const confirmation = await testPool.query<{ confirmation_type: string; status: string }>(
+      `SELECT confirmation_type, status
+       FROM agent.pending_confirmations
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(confirmation.rows[0]!.confirmation_type).toBe('order_confirmation');
+    expect(confirmation.rows[0]!.status).toBe('open');
+
+    const escalation = await testPool.query<{ reason: string; status: string }>(
+      `SELECT reason, status
+       FROM agent.escalations
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(escalation.rows[0]!.reason).toBe('ready_to_close');
+    expect(escalation.rows[0]!.status).toBe('waiting');
+
+    const session = await testPool.query<{ status: string }>(
+      `SELECT status FROM agent.session_current WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(session.rows[0]!.status).toBe('escalated');
   });
 });
 

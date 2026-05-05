@@ -463,6 +463,39 @@ describe('applyAction - estado reentrante da Atendente', () => {
     expect(applyAction(initial, action)).toEqual(applyAction(initial, action));
   });
 
+  it('add_to_cart cria linha viva no carrinho sem escrever em commerce.orders', () => {
+    const productId = '00000000-0000-4000-8000-000000000040';
+    const result = applyAction(state(), {
+      type: 'add_to_cart',
+      product_id: productId,
+      quantity: 2,
+      unit_price: 189.9,
+    });
+
+    expect(result.state.cart).toHaveLength(1);
+    expect(result.state.cart[0]!.product_id).toBe(productId);
+    expect(result.state.cart[0]!.quantity).toBe(2);
+    expect(result.state.cart[0]!.unit_price).toBe(189.9);
+    expect(result.events_to_emit[0]!.event_type).toBe('cart_proposed');
+  });
+
+  it('update_draft guarda checkout e marca ready quando dados minimos existem', () => {
+    const result = applyAction(state(), {
+      type: 'update_draft',
+      customer_name: 'Joao Silva',
+      delivery_address: 'Rua das Flores, 123',
+      fulfillment_mode: 'delivery',
+      payment_method: 'pix',
+    });
+
+    expect(result.state.order_draft?.customer_name).toBe('Joao Silva');
+    expect(result.state.order_draft?.delivery_address).toBe('Rua das Flores, 123');
+    expect(result.state.order_draft?.fulfillment_mode).toBe('delivery');
+    expect(result.state.order_draft?.payment_method).toBe('pix');
+    expect(result.state.order_draft?.draft_status).toBe('ready');
+    expect(result.events_to_emit[0]!.event_type).toBe('fact_corrected');
+  });
+
   it('applyActionAndPersist faz no-op quando action_id ja existe', async () => {
     const queries: string[] = [];
     const client = {

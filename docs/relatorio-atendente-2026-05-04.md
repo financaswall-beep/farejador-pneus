@@ -9,6 +9,12 @@
 
 A Atendente está em modo Shadow Sprint 6: Worker → Context Builder → Planner LLM → Tool Executor → Generator LLM → auditoria, **sem envio Chatwoot, sem mutação de estado**. O fluxo está rodando em produção, mas a maior parte do estado reentrante projetado no Sprint 1 (`session_slots`, `session_items`) está **vazia**, porque (a) o Generator nunca consegue emitir actions válidas (schema do prompt incompleto) e (b) o Worker não chama `applyActionAndPersist`. Catálogo `commerce.*` está praticamente vazio (0 produtos, 0 estoque, 0 fitments) — qualquer skill `buscar_e_ofertar` real retorna lista vazia. O design (docs 01, 02, 12, 13, 14) está sólido; a implementação atual cobre 60% dos turnos com LLM real e respostas seguras (validators bloqueando alucinação de preço corretamente). A próxima decisão crítica é: **fechar o loop de mutação de estado antes de seguir para Sprint 7 (Critic), ou seguir Critic com estado vazio**.
 
+### Atualização de implementação — Sprint 6.5, 6.6 e 6.9 parcial
+
+Após este relatório inicial, o loop de estado foi fechado e a bridge Organizadora → Context Builder foi implementada. O Atendente agora persiste `session_items`, `session_slots`, `cart_current`, `cart_current_items`, `cart_events`, `order_drafts`, `pending_confirmations` e `escalations` por meio de `applyActionAndPersistInTx`. O Generator também pode emitir `update_draft` para guardar nome, endereço, modalidade de entrega e forma de pagamento em `agent.order_drafts`.
+
+Limite preservado: o Atendente ainda não cria `commerce.orders` nem `commerce.order_items`. Pedido real continua dependendo de confirmação humana/promocao futura; `agent.*` é rascunho operacional, `commerce.*` é verdade comercial.
+
 ---
 
 ## 2. Estado real (factual, com números)
@@ -221,13 +227,13 @@ Workers planejados que **não existem**: Critic (Sprint 7), Supervisora, sender 
 ### C. Lacunas (faltando ou parcial)
 
 #### C-1. Bridge `analytics.conversation_facts` → Context Builder
-Falta o item 4 do pipeline doc 12. Não há ADR descartando — é só atraso de implementação. **Bloqueador real** do ROI do Shadow.
+Implementado no Sprint 6.6. O Context Builder lê `analytics.current_facts` e entrega `organizer_facts` ao Planner como memória auxiliar de turnos anteriores. Fatos críticos ainda precisam ser reconfirmados antes de promessa comercial.
 
 #### C-2. Catálogo `commerce.products`/`prices`/`stock_levels`/`tire_specs`/`vehicle_models`/`vehicle_fitments` vazios
 Schema existe (`0013_commerce_layer.sql`), seed manual nunca foi feito. **Sem isso, `buscar_e_ofertar` é teatro.** Não bloqueia Sprint 7 (Critic), mas bloqueia qualquer avaliação séria de qualidade.
 
 #### C-3. Action handlers de cart/draft/confirmation/escalation
-Tabelas `agent.cart_current`, `order_drafts`, `pending_confirmations`, `escalations` permanecem vazias. `applyAction` ([apply-action.ts:282-371](src/atendente/state/apply-action.ts#L282)) trata `add_to_cart`, `update_draft`, etc como `applyNoStateMutation` (só emite evento, não escreve nas tabelas). Esperado pela arquitetura, código atual não cumpre.
+Implementado parcialmente no Sprint 6.9. `add_to_cart`, `remove_from_cart`, `update_cart_item`, `clear_cart`, `update_draft`, `request_confirmation` e `escalate` agora têm efeito operacional em `agent.*`. Ainda falta a parte externa do `escalate`: criar nota interna no Chatwoot via API.
 
 #### C-4. Critic (Sprint 7) ainda não existe
 Doc 00 lista como próxima fase. Brief sugere validar se ainda faz sentido — ver Seção 5.
@@ -268,9 +274,10 @@ Como Generator não emite slots (A-1, A-2), o atributo nunca é exercitado. Vai 
 **Critério pronto.** Mensagem do bot não cria `atendente_job`. Verificar via SQL após teste.
 
 ### Sprint 6.9 — Action handlers reais (cart/draft/escalation) (1-2 semanas)
-**Arquivos.** `src/atendente/state/apply-action.ts` (substituir `applyNoStateMutation` por handlers que efetivamente escrevem em `agent.cart_current_items`, `agent.order_drafts`, `agent.pending_confirmations`, `agent.escalations`); novo `src/atendente/handlers/escalate.ts` (criar nota interna no Chatwoot via API — usa env `CHATWOOT_API_TOKEN` já existente).
+**Status.** Parcialmente implementado.
+**Arquivos.** `src/atendente/state/apply-action.ts` substitui handlers sem mutação por handlers de carrinho/draft/confirmação/escalação. `src/atendente/state/agent-state.repository.ts` persiste os efeitos em `agent.cart_current_items`, `agent.cart_events`, `agent.order_drafts`, `agent.pending_confirmations` e `agent.escalations`. Pendente: novo `src/atendente/handlers/escalate.ts` para criar nota interna no Chatwoot via API.
 **Dependência.** 6.5 (loop de persistência aberto primeiro).
-**Critério pronto.** Após 1 turno simulando "cliente confirma compra", `agent.escalations` recebe linha e Chatwoot mostra nota interna estruturada (doc 13 §"Promocao carrinho -> pedido v1").
+**Critério pronto.** Parte banco validada por teste de integração: `agent.escalations` recebe linha, `agent.order_drafts` fica `ready` quando nome/endereço/entrega/pagamento existem, e `agent.cart_current_items` recebe item do carrinho. Falta Chatwoot mostrar nota interna estruturada (doc 13 §"Promocao carrinho -> pedido v1").
 
 ### Sprint 6.10 — Catálogo mínimo (paralelo, depende de Wallace) (variável)
 **Objetivo.** Popular `commerce.products`, `product_prices`, `stock_levels`, `tire_specs`, `vehicle_models`, `vehicle_fitments` com pelo menos top-20 medidas/marcas reais da loja.

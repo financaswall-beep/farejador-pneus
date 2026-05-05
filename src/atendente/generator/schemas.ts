@@ -24,6 +24,7 @@ import {
   type AgentAction,
   type CreateItemAction,
   type RecordOfferAction,
+  type UpdateDraftAction,
   type UpdateSlotAction,
 } from '../../shared/zod/agent-actions.js';
 import {
@@ -34,7 +35,7 @@ import {
 } from '../../shared/zod/agent-state.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 
-export const generatorPromptVersion = 'generator_v1.1.0';
+export const generatorPromptVersion = 'generator_v1.2.0';
 export const generatorAgentVersion = 'atendente_v1.0.0';
 
 // ------------------------------------------------------------------
@@ -73,10 +74,19 @@ const recordOfferRawSchema = z.object({
   expires_at: z.string().datetime(),
 });
 
+const updateDraftRawSchema = z.object({
+  type: z.literal('update_draft'),
+  customer_name: z.string().min(1).max(120).optional(),
+  delivery_address: z.string().min(1).max(500).optional(),
+  fulfillment_mode: z.enum(['delivery', 'pickup']).optional(),
+  payment_method: z.enum(['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto']).optional(),
+});
+
 export const generatorRawActionSchema = z.discriminatedUnion('type', [
   updateSlotRawSchema,
   createItemRawSchema,
   recordOfferRawSchema,
+  updateDraftRawSchema,
 ]);
 export type GeneratorRawAction = z.infer<typeof generatorRawActionSchema>;
 
@@ -129,7 +139,7 @@ export function hydrateGeneratorAction(
     emitted_by: 'generator' as const,
   };
 
-  let candidate: UpdateSlotAction | CreateItemAction | RecordOfferAction;
+  let candidate: UpdateSlotAction | CreateItemAction | RecordOfferAction | UpdateDraftAction;
 
   switch (raw.type) {
     case 'update_slot':
@@ -163,6 +173,15 @@ export function hydrateGeneratorAction(
         item_id: raw.item_id,
         products: raw.products,
         expires_at: raw.expires_at,
+      };
+      break;
+    case 'update_draft':
+      candidate = {
+        type: 'update_draft',
+        customer_name: raw.customer_name,
+        delivery_address: raw.delivery_address,
+        fulfillment_mode: raw.fulfillment_mode,
+        payment_method: raw.payment_method,
       };
       break;
   }
