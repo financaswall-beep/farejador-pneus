@@ -71,6 +71,17 @@ describe('SayValidator inicial', () => {
     });
   });
 
+  it('bloqueia disponibilidade de marca sem verificarEstoque', () => {
+    expect(
+      validateSay('Preciso ver se temos Michelin disponível para sua moto.', {
+        recent_tool_results: [],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'stock_claim_without_verificar_estoque',
+    });
+  });
+
   it('permite promessa de estoque quando verificarEstoque retornou dado', () => {
     expect(
       validateSay('Temos esse pneu em estoque.', {
@@ -88,6 +99,28 @@ describe('SayValidator inicial', () => {
   it('bloqueia promessa de prazo ou entrega sem calcularFrete', () => {
     expect(
       validateSay('Entregamos amanhã no seu bairro.', { recent_tool_results: [] }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'delivery_claim_without_calcular_frete',
+    });
+  });
+
+  it('bloqueia prazo padrao sem calcularFrete', () => {
+    expect(
+      validateSay('O prazo padrão é para o dia seguinte após a confirmação.', {
+        recent_tool_results: [],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'delivery_claim_without_calcular_frete',
+    });
+  });
+
+  it('bloqueia cobertura de entrega sem calcularFrete', () => {
+    expect(
+      validateSay('Entregamos no Rio de Janeiro, incluindo a Zona Norte.', {
+        recent_tool_results: [],
+      }),
     ).toMatchObject({
       valid: false,
       reason: 'delivery_claim_without_calcular_frete',
@@ -132,6 +165,26 @@ describe('SayValidator inicial', () => {
             ],
           },
         ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('bloqueia fallback seguro misturado com resposta util', () => {
+    expect(
+      validateSay(
+        'Perfeito, já anotei a medida 140/70-17. Desculpe, não consigo confirmar essa informação agora. Um atendente poderá te ajudar em breve.',
+        { recent_tool_results: [] },
+      ),
+    ).toMatchObject({
+      valid: false,
+      reason: 'mixed_safe_fallback_with_other_content',
+    });
+  });
+
+  it('permite fallback seguro sozinho', () => {
+    expect(
+      validateSay('Desculpe, não consigo confirmar essa informação agora. Um atendente poderá te ajudar em breve.', {
+        recent_tool_results: [],
       }),
     ).toEqual({ valid: true });
   });

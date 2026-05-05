@@ -15,8 +15,16 @@ export interface SayValidationContext {
   recent_tool_results: ToolResultForValidation[];
 }
 
+const SAFE_FALLBACK_PHRASE = normalizeText(
+  'Desculpe, não consigo confirmar essa informação agora. Um atendente poderá te ajudar em breve.',
+);
+
 export function validateSay(say: string, context: SayValidationContext): SayValidationResult {
   const normalizedSay = normalizeText(say);
+
+  if (mixesSafeFallbackWithOtherContent(normalizedSay)) {
+    return block('mixed_safe_fallback_with_other_content');
+  }
 
   if (mentionsStockClaim(normalizedSay) && !hasStockEvidence(context.recent_tool_results)) {
     return block('stock_claim_without_verificar_estoque');
@@ -72,9 +80,15 @@ function normalizeText(text: string): string {
     .toLowerCase();
 }
 
+function mixesSafeFallbackWithOtherContent(text: string): boolean {
+  if (!text.includes(SAFE_FALLBACK_PHRASE)) return false;
+  return text.replace(SAFE_FALLBACK_PHRASE, '').replace(/[\s.,!?;:()\[\]"'`-]/g, '').length > 0;
+}
+
 function mentionsStockClaim(text: string): boolean {
   return [
     /\btem(?:os)?\s+(?:\w+\s+){0,4}(?:em\s+)?estoque\b/,
+    /\btem(?:os)?\s+(?:\w+\s+){0,5}disponivel\b/,
     /\b(?:produto|pneu|modelo|medida)\s+(?:esta\s+)?disponivel\b/,
     /\bdisponivel\s+(?:em\s+)?estoque\b/,
     /\bpronta\s+entrega\b/,
@@ -86,7 +100,9 @@ function mentionsDeliveryClaim(text: string): boolean {
   return [
     /\bfrete\s+(?:fica|sai|custa|e|gratis|disponivel|indisponivel)\b/,
     /\b(?:entrega|delivery)\s+(?:disponivel|indisponivel|gratis|e)\b/,
+    /\bentregamos\s+(?:em|no|na|nos|nas|para|pra)\b/,
     /\b(?:entregamos|chega|recebe)\b.{0,40}\b(?:hoje|amanha|em\s+\d+\s+dias?|ate\s+\w+)\b/,
+    /\bprazo\b.{0,60}\b(?:hoje|amanha|dia\s+seguinte|em\s+\d+\s+dias?|ate\s+\w+)\b/,
     /\b(?:prazo|previsao)\s+(?:de\s+)?(?:entrega|chegada)\b/,
     /\b\d+\s+dias?\s+(?:uteis\s+)?(?:para\s+)?(?:entrega|chegar|receber)\b/,
   ].some((pattern) => pattern.test(text));

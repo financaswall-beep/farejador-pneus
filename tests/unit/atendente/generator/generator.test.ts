@@ -478,6 +478,14 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     expect(systemPrompt).toContain('Para pagamento mencionado, use update_draft.payment_method e update_slot global forma_pagamento');
   });
 
+  it('prompt proibe misturar fallback seguro com resposta util', () => {
+    const messages = buildGeneratorMessages(makeContext(), makeDecision('escalar_humano'), []);
+    const systemPrompt = messages[0]!.content;
+
+    expect(systemPrompt).toContain('NAO cole a frase de fallback seguro no final de uma resposta útil');
+    expect(systemPrompt).toContain('so pode aparecer sozinha, exatamente igual, nunca misturada com outro texto');
+  });
+
   it('inclui items completos e organizer_facts no contexto entregue ao LLM', () => {
     const context = makeContext({
       state: makeState({

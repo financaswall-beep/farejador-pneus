@@ -9,6 +9,7 @@ import type { ConversationState } from '../../../../src/shared/zod/agent-state.j
 
 let planTurn: typeof import('../../../../src/atendente/planner/service.js').planTurn;
 let recordPlannerDecision: typeof import('../../../../src/atendente/planner/service.js').recordPlannerDecision;
+let buildPlannerMessages: typeof import('../../../../src/atendente/planner/prompt.js').buildPlannerMessages;
 
 beforeAll(async () => {
   process.env.FAREJADOR_ENV = 'test';
@@ -19,6 +20,8 @@ beforeAll(async () => {
   const service = await import('../../../../src/atendente/planner/service.js');
   planTurn = service.planTurn;
   recordPlannerDecision = service.recordPlannerDecision;
+  const prompt = await import('../../../../src/atendente/planner/prompt.js');
+  buildPlannerMessages = prompt.buildPlannerMessages;
 });
 
 const baseTime = '2026-04-29T12:00:00.000Z';
@@ -190,6 +193,16 @@ describe('Planner Sprint 3', () => {
       skill: 'escalar_humano',
       confidence: 0,
     });
+  });
+
+  it('prompt orienta skill especializada antes de escalar humano', () => {
+    const messages = buildPlannerMessages(context());
+    const systemPrompt = messages[0]!.content;
+
+    expect(systemPrompt).toContain('Use escalar_humano somente se o cliente pedir humano/atendente');
+    expect(systemPrompt).toContain('Objeções de preço, caro, concorrente, desconto ou condição comercial usam tratar_objecao');
+    expect(systemPrompt).toContain('Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica');
+    expect(systemPrompt).toContain('Não repita escalar_humano em turnos seguidos');
   });
 
   it('recordPlannerDecision grava evento planner_decided auditavel', async () => {

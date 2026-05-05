@@ -67,6 +67,11 @@ Implementado:
   Emite `create_item`, `update_slot` e `update_draft` para dados novos do cliente
   na propria mensagem; contexto inclui `state.items`, `organizer_facts` e
   `derived_signals`. 3 novos testes.
+- Sprint 6.9 calibracao de prompts: SayValidator endurecido com 3 novos padroes
+  (`mixed_safe_fallback_with_other_content`, variante de stock Michelin, variantes
+  de prazo/entrega). Planner bumped para `planner_v1.2.0` com secao ROTEAMENTO
+  CONVERSACIONAL (7 regras). Generator bumped para `generator_v1.3.0` com regras
+  9 e 10 sobre fallback. 8 novos testes. 328/328 verde. Build verde.
 
 Nao implementado/nao ligado:
 
@@ -97,6 +102,16 @@ Nao implementado/nao ligado:
   12/18 ok, 6/18 review. Problemas: frase generica de escalacao em 5 respostas,
   uma resposta com politica/logistica sem lastro suficiente e uma resposta com
   `temos Michelin disponivel` sem evidencia de estoque/catalogo.
+- Auditoria `multiturn-20260505132047`: o deploy Coolify das 13:18 implantou
+  `ce5ad8e` (docs-only), anterior ao commit local `032759c` com a calibracao.
+  O banco confirma que o run usou `planner_v1.1.0` + `generator_v1.2.0`, nao
+  `planner_v1.2.0` + `generator_v1.3.0`. Resultado factual do run antigo:
+  18/18 mensagens, 18/18 jobs processed, 18/18 turns generated, 8/18 ok,
+  10/18 review. Achado principal: muitas escalacoes vieram de
+  `planner_schema_failed` (contrato/schema invalido: `traseiro` vs `rear`,
+  `moto_ano` string, `municipio: null`, `buscarProduto` sem campo obrigatorio),
+  nao de validacao real da calibracao nova. Relatorio completo:
+  `docs/relatorio-atendente-2026-05-05.md`.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.
