@@ -1,4 +1,11 @@
-import { collectDeliveryFees, collectToolPrices, type ToolResultForValidation } from './tool-results.js';
+import {
+  collectDeliveryFees,
+  collectToolPrices,
+  hasCompatibilityEvidence,
+  hasDeliveryEvidence,
+  hasStockEvidence,
+  type ToolResultForValidation,
+} from './tool-results.js';
 
 export type SayValidationResult =
   | { valid: true }
@@ -9,6 +16,20 @@ export interface SayValidationContext {
 }
 
 export function validateSay(say: string, context: SayValidationContext): SayValidationResult {
+  const normalizedSay = normalizeText(say);
+
+  if (mentionsStockClaim(normalizedSay) && !hasStockEvidence(context.recent_tool_results)) {
+    return block('stock_claim_without_verificar_estoque');
+  }
+
+  if (mentionsDeliveryClaim(normalizedSay) && !hasDeliveryEvidence(context.recent_tool_results)) {
+    return block('delivery_claim_without_calcular_frete');
+  }
+
+  if (mentionsCompatibilityClaim(normalizedSay) && !hasCompatibilityEvidence(context.recent_tool_results)) {
+    return block('fitment_claim_without_buscar_compatibilidade');
+  }
+
   const mentionedMoney = extractMoneyValues(say);
   if (mentionedMoney.length === 0) return { valid: true };
 
@@ -42,6 +63,42 @@ function extractMoneyValues(text: string): number[] {
     if (Number.isFinite(amount)) out.push(amount);
   }
   return out;
+}
+
+function normalizeText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function mentionsStockClaim(text: string): boolean {
+  return [
+    /\btem(?:os)?\s+(?:\w+\s+){0,4}(?:em\s+)?estoque\b/,
+    /\b(?:produto|pneu|modelo|medida)\s+(?:esta\s+)?disponivel\b/,
+    /\bdisponivel\s+(?:em\s+)?estoque\b/,
+    /\bpronta\s+entrega\b/,
+    /\b(?:quantidade|unidades?)\s+(?:disponivel|em\s+estoque)\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function mentionsDeliveryClaim(text: string): boolean {
+  return [
+    /\bfrete\s+(?:fica|sai|custa|e|gratis|disponivel|indisponivel)\b/,
+    /\b(?:entrega|delivery)\s+(?:disponivel|indisponivel|gratis|e)\b/,
+    /\b(?:entregamos|chega|recebe)\b.{0,40}\b(?:hoje|amanha|em\s+\d+\s+dias?|ate\s+\w+)\b/,
+    /\b(?:prazo|previsao)\s+(?:de\s+)?(?:entrega|chegada)\b/,
+    /\b\d+\s+dias?\s+(?:uteis\s+)?(?:para\s+)?(?:entrega|chegar|receber)\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function mentionsCompatibilityClaim(text: string): boolean {
+  return [
+    /\b(?:serve|servem)\s+(?:na|no|para|pra)\b/,
+    /\bcompativel\s+(?:com|para|pra)\b/,
+    /\b(?:pneu|medida|modelo)\s+(?:certo|correto|ideal)\s+(?:para|pra)\b/,
+    /\bencaixa\s+(?:na|no)\b/,
+  ].some((pattern) => pattern.test(text));
 }
 
 function hasApproxAmount(values: Set<number>, amount: number): boolean {

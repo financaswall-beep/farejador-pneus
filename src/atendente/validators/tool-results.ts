@@ -33,6 +33,27 @@ export function collectDeliveryFees(results: ToolResultForValidation[]): Set<num
   return fees;
 }
 
+export function hasStockEvidence(results: ToolResultForValidation[]): boolean {
+  return results.some(
+    (result) => result.ok && result.tool === 'verificarEstoque' && hasNonEmptyOutput(result.output),
+  );
+}
+
+export function hasDeliveryEvidence(results: ToolResultForValidation[]): boolean {
+  return results.some(
+    (result) => result.ok && result.tool === 'calcularFrete' && hasNonEmptyOutput(result.output),
+  );
+}
+
+export function hasCompatibilityEvidence(results: ToolResultForValidation[]): boolean {
+  return results.some(
+    (result) =>
+      result.ok &&
+      result.tool === 'buscarCompatibilidade' &&
+      hasNonEmptyCompatibilityOutput(result.output),
+  );
+}
+
 function collectProductIds(value: unknown, out: Set<string>, depth = 0): void {
   if (depth > MAX_COLLECT_DEPTH) return;
   if (Array.isArray(value)) {
@@ -48,6 +69,22 @@ function collectProductIds(value: unknown, out: Set<string>, depth = 0): void {
 function collectPrices(value: unknown, out: Set<number>): void {
   collectFieldNumbers(value, 'price_amount', out, 0);
   collectFieldNumbers(value, 'current_price', out, 0);
+}
+
+function hasNonEmptyOutput(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+  return true;
+}
+
+function hasNonEmptyCompatibilityOutput(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const produtos = (item as Record<string, unknown>).produtos;
+    return Array.isArray(produtos) && produtos.length > 0;
+  });
 }
 
 function collectFieldNumbers(value: unknown, field: string, out: Set<number>, depth: number): void {

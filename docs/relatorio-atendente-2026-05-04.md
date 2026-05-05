@@ -165,12 +165,15 @@ Workers planejados que **não existem**: Critic (Sprint 7), Supervisora, sender 
 
 ~~**Severidade.** Média (só atinge mock; LLM real foi correto). Vira alta quando shadow rodar sem chave e cair em mock.~~
 
-#### A-4. Say Validator só checa preço (R$); estoque, prazo e fitment passam livres
-**Descrição.** [say-validator.ts:11-28](src/atendente/validators/say-validator.ts#L11) só extrai padrões `R$`. Não valida menção a estoque ("temos em estoque", "tem disponível"), prazo de entrega ("entrego amanhã", "chega hoje") nem certeza de fitment.
+#### ~~A-4. Say Validator só checa preço (R$); estoque, prazo e fitment passam livres~~ ✅ Corrigido — Sprint 6.7
+
+> **O que foi feito.** `say-validator.ts` agora bloqueia afirmações comerciais sem evidência operacional: estoque exige `verificarEstoque`, prazo/frete exige `calcularFrete`, e compatibilidade/fitment exige `buscarCompatibilidade` com produto compatível. A validação de valores em dinheiro foi preservada.
+
+~~**Descrição.** [say-validator.ts:11-28](src/atendente/validators/say-validator.ts#L11) só extrai padrões `R$`. Não valida menção a estoque ("temos em estoque", "tem disponível"), prazo de entrega ("entrego amanhã", "chega hoje") nem certeza de fitment.~~
 
 **Doc.** [09-skills-router-e-validadores.md:138-145](docs/phase3-agent-architecture/09-skills-router-e-validadores.md#L138): "Estoque: se `say` diz que tem em estoque, a skill precisa ter retornado disponibilidade; Promessa de prazo: se `say` promete entrega hoje/amanha, `calcular_entrega` precisa ter retornado prazo; Fitment descoberto: discovery `pending` ou `approved` nao vira certeza de venda no texto."
 
-**Evidência banco.** Turno `01:51:40` ("Entregamos sim, mas para confirmar o prazo em Nova Iguaçu preciso do seu bairro"): contém promessa de entrega, sem ter chamado `calcularFrete`. Validator não bloqueou.
+~~**Evidência banco.** Turno `01:51:40` ("Entregamos sim, mas para confirmar o prazo em Nova Iguaçu preciso do seu bairro"): contém promessa de entrega, sem ter chamado `calcularFrete`. Validator não bloqueou.~~
 
 **Severidade.** Alta antes de ligar envio Chatwoot. Hoje é shadow, então só polui auditoria.
 
@@ -263,11 +266,11 @@ Como Generator não emite slots (A-1, A-2), o atributo nunca é exercitado. Vai 
 **Dependência.** Independente de 6.5; pode ser paralelo.
 **Critério pronto.** Em conversa real testada (ex: `693653b6`), Planner pede `buscarProduto` com `medida_pneu=120/80-18` (extraído pela Organizadora) sem o cliente repetir.
 
-### Sprint 6.7 — Endurecer Say Validator (2 dias)
+### Sprint 6.7 — Endurecer Say Validator (2 dias) ✅ Implementado
 **Objetivo.** Cobrir estoque/prazo/fitment, não só preço.
-**Arquivos.** `src/atendente/validators/say-validator.ts` (lexicons negativos por categoria + correlação com tool result presente); `src/atendente/validators/tool-results.ts` (exportar `collectStockClaims`, `collectDeliveryPromises`).
+**Arquivos.** `src/atendente/validators/say-validator.ts` (lexicons por categoria + correlação com tool result presente); `src/atendente/validators/tool-results.ts` (evidência de estoque, entrega e compatibilidade).
 **Dependência.** Nenhuma. Pré-requisito antes de Sprint 8 (envio Chatwoot).
-**Critério pronto.** Suite de testes Vitest cobrindo: "tem em estoque" sem `verificarEstoque` → block; "entrego amanhã" sem `calcularFrete` → block.
+**Critério pronto.** Suite de testes Vitest cobrindo: "tem em estoque" sem `verificarEstoque` → block; "entrego amanhã" sem `calcularFrete` → block; "serve para sua moto" sem `buscarCompatibilidade` → block.
 
 ### Sprint 6.8 — Filtrar dispatcher por sender_type (1 dia)
 **Arquivos.** `src/normalization/dispatcher.ts` linha 233 (early return se `sender_type IN ('bot','user','agent_admin')`).
