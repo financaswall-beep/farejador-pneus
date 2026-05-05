@@ -1,5 +1,6 @@
 import {
   collectDeliveryFees,
+  collectPolicyMoney,
   collectPolicyResults,
   collectToolPrices,
   hasCompatibilityEvidence,
@@ -55,7 +56,8 @@ export function validateSay(say: string, context: SayValidationContext): SayVali
 
   const knownPrices = collectToolPrices(context.recent_tool_results);
   const knownFees = collectDeliveryFees(context.recent_tool_results);
-  const knownAmounts = new Set([...knownPrices, ...knownFees]);
+  const knownPolicyMoney = collectPolicyMoney(context.recent_tool_results);
+  const knownAmounts = new Set([...knownPrices, ...knownFees, ...knownPolicyMoney]);
   if (knownAmounts.size === 0) {
     return block('money_mentioned_without_tool_result');
   }
@@ -113,9 +115,12 @@ function mentionsDeliveryClaim(text: string): boolean {
     /\bfrete\s+(?:fica|sai|custa|e|gratis|disponivel|indisponivel)\b/,
     /\b(?:entrega|delivery)\s+(?:disponivel|indisponivel|gratis|e)\b/,
     /\bentregamos\s+(?:em|no|na|nos|nas|para|pra)\b/,
-    /\b(?:entregamos|chega|recebe)\b.{0,40}\b(?:hoje|amanha|em\s+\d+\s+dias?|ate\s+\w+)\b/,
-    /\bprazo\b.{0,60}\b(?:hoje|amanha|dia\s+seguinte|em\s+\d+\s+dias?|ate\s+\w+)\b/,
-    /\b(?:prazo|previsao)\s+(?:de\s+)?(?:entrega|chegada)\b/,
+    // "chega amanhã", "entregamos em 2 dias", "chega no dia seguinte" — mas NÃO "troca em X dias"
+    /\b(?:entregamos|chega|recebe)\b.{0,40}\b(?:hoje|amanha|dia\s+seguinte|em\s+\d+\s+dias?|ate\s+\w+)\b/,
+    // "prazo de entrega", "prazo de chegada" — específico para contexto logístico
+    /\b(?:prazo|previsao)\s+(?:de\s+)?(?:entrega|chegada|envio|despacho)\b/,
+    // "prazo padrão para o dia seguinte" — mas NÃO "prazo de troca/garantia/devolucao"
+    /\bprazo\b(?!.{0,60}\b(?:troca|devolucao|garantia|retorno|reembolso)\b).{0,60}\b(?:dia\s+seguinte|amanha|hoje)\b/,
     /\b\d+\s+dias?\s+(?:uteis\s+)?(?:para\s+)?(?:entrega|chegar|receber)\b/,
   ].some((pattern) => pattern.test(text));
 }

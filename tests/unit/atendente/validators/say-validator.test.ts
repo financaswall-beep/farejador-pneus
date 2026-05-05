@@ -141,6 +141,24 @@ describe('SayValidator inicial', () => {
     ).toEqual({ valid: true });
   });
 
+  it('nao bloqueia prazo de troca como claim de entrega', () => {
+    // "prazo de troca em até 7 dias" nao e uma promessa de entrega
+    expect(
+      validateSay('O prazo de troca é de até 7 dias conforme nossa política.', {
+        recent_tool_results: [policyToolResult()],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('nao bloqueia prazo de troca sem calcularFrete', () => {
+    // a regra delivery_claim so deve disparar para promessas de entrega logistica
+    expect(
+      validateSay('Você tem até 7 dias para trocar o produto.', {
+        recent_tool_results: [policyToolResult()],
+      }),
+    ).toEqual({ valid: true });
+  });
+
   it('bloqueia compatibilidade sem buscarCompatibilidade', () => {
     expect(
       validateSay('Esse pneu serve para sua Titan 160.', { recent_tool_results: [] }),
@@ -261,6 +279,38 @@ describe('SayValidator inicial', () => {
 
   it('nao bloqueia dado observado de pagamento do cliente', () => {
     expect(validateSay('Perfeito, anotei pagamento no pix.', { recent_tool_results: [] })).toEqual({ valid: true });
+  });
+
+  it('permite valor monetario de politica_montagem quando buscarPoliticaComercial retornou dado', () => {
+    // Generator echa "montagem gratuita acima de R$180, caso contrario R$15"
+    // Os valores R$180 e R$15 estao no texto da politica retornada — deve ser permitido
+    expect(
+      validateSay(
+        'A montagem é grátis para compras acima de R$180. Para valores menores, custa R$15.',
+        {
+          recent_tool_results: [
+            {
+              tool: 'buscarPoliticaComercial' as const,
+              ok: true,
+              output: [
+                {
+                  policy_key: 'politica_montagem',
+                  policy_value:
+                    'A montagem é grátis pra quem compra pneu acima de R$180 aqui com a gente. Se o valor for menor do que isso, cobra só R$15 pela montagem.',
+                  policy_version: '1.0',
+                },
+              ],
+            },
+          ],
+        },
+      ),
+    ).toEqual({ valid: true });
+  });
+
+  it('bloqueia valor monetario sem nenhuma tool result', () => {
+    expect(
+      validateSay('A montagem custa R$15.', { recent_tool_results: [] }),
+    ).toMatchObject({ valid: false, reason: 'money_mentioned_without_tool_result' });
   });
 });
 

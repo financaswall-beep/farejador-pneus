@@ -33,6 +33,42 @@ export function collectDeliveryFees(results: ToolResultForValidation[]): Set<num
   return fees;
 }
 
+/**
+ * Extrai valores monetários (R$) dos textos de políticas comerciais retornadas
+ * por buscarPoliticaComercial. Usado para permitir que o Generator repita
+ * preços/taxas que estão explicitamente na política (ex.: montagem R$15).
+ */
+export function collectPolicyMoney(results: ToolResultForValidation[]): Set<number> {
+  const amounts = new Set<number>();
+  for (const result of results.filter((item) => item.ok && item.tool === 'buscarPoliticaComercial')) {
+    extractMoneyFromValue(result.output, amounts);
+  }
+  return amounts;
+}
+
+function extractMoneyFromValue(value: unknown, out: Set<number>): void {
+  if (typeof value === 'string') {
+    const pattern = /r\$\s*((?:\d{1,3}(?:\.\d{3})+)|\d+)(?:,(\d{2}))?/gi;
+    for (const match of value.matchAll(pattern)) {
+      const whole = match[1]?.replace(/\./g, '');
+      if (!whole) continue;
+      const cents = match[2] ?? '00';
+      const amount = Number(`${whole}.${cents}`);
+      if (Number.isFinite(amount)) out.add(amount);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) extractMoneyFromValue(item, out);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const nested of Object.values(value as Record<string, unknown>)) {
+      extractMoneyFromValue(nested, out);
+    }
+  }
+}
+
 export function hasStockEvidence(results: ToolResultForValidation[]): boolean {
   return results.some(
     (result) => result.ok && result.tool === 'verificarEstoque' && hasNonEmptyOutput(result.output),
