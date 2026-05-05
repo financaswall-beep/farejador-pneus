@@ -91,6 +91,12 @@ Nao implementado/nao ligado:
   foram recuperados manualmente. A correcao implementada nesta sessao adiciona
   reconciliador automatico e endpoint admin para que lacunas desse tipo sejam
   recuperadas sem perder turno da Atendente.
+- Pos-redeploy `cc42bfa`, run real `multiturn-20260505124936`: 6 conversas com
+  3 mensagens cada; 18/18 mensagens, 18/18 jobs e 18/18 turns em `prod`. Zero
+  job faltante. Dois jobs atrasaram mais de 30s, mas processaram. Qualidade LLM:
+  12/18 ok, 6/18 review. Problemas: frase generica de escalacao em 5 respostas,
+  uma resposta com politica/logistica sem lastro suficiente e uma resposta com
+  `temos Michelin disponivel` sem evidencia de estoque/catalogo.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.
@@ -119,6 +125,9 @@ Sprint 7: Critic Shadow da Atendente.
 - Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
 - Nao envia ao Chatwoot no Critic.
 - Agora pode seguir porque a memoria operacional do Generator foi calibrada.
+- Deve priorizar bloqueio de claims sem lastro detectados no run multi-turn:
+  disponibilidade de marca/produto, politica/prazo de entrega e fallback
+  generico de escalacao quando ha resposta util segura.
 
 Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
 - `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios; `buscar_e_ofertar` retorna lista vazia.

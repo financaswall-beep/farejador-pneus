@@ -173,6 +173,12 @@ Ultima validacao (pos Sprint 6 + Organizadora v3.4):
   12 mensagens `message_created/contact` foram normalizadas, mas 6 jobs nasceram
   so apos enfileiramento manual. O hardening de fila adiciona reconciliador
   automatico + endpoint admin para impedir mensagem de cliente sem job.
+- Validacao pos-redeploy do hardening (`cc42bfa`), run
+  `multiturn-20260505124936`: 6 conversas com 3 mensagens cada no Chatwoot real;
+  18/18 mensagens normalizadas em `prod`, 18/18 jobs e 18/18 turns. Zero job
+  faltante. Dois jobs tiveram atraso >30s, mas foram recuperados/processados.
+  Auditoria de qualidade: 12/18 ok, 6/18 review por frase generica de escalacao,
+  uma alegacao de politica/logistica e uma alegacao de disponibilidade de marca.
 - Organizadora: 120 enrichment_jobs done, 4 facts corretos, confianca > 0.95.
 - Deploy Coolify commit e35ca31: 2026-05-05 10:07, rolling update completed.
 
@@ -182,6 +188,10 @@ Sprint 7: Critic Shadow da Atendente.
 - Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
 - Sem envio Chatwoot no Critic.
 - Memoria operacional do Generator ja calibrada antes desta sprint.
+- Antes de envio real, Critic/SayValidator devem bloquear alegacoes comerciais
+  sem lastro, especialmente `temos <marca> disponivel`, prazo/politica de
+  entrega e frases genericas de escalacao em respostas que poderiam pedir dado
+  faltante de forma mais natural.
 
 Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
 - Tabelas `products`, `tire_specs`, `vehicle_fitments` vazias; `buscar_e_ofertar` retorna lista vazia.
