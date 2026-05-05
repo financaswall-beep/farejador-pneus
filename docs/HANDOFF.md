@@ -112,6 +112,17 @@ Nao implementado/nao ligado:
   `moto_ano` string, `municipio: null`, `buscarProduto` sem campo obrigatorio),
   nao de validacao real da calibracao nova. Relatorio completo:
   `docs/relatorio-atendente-2026-05-05.md`.
+- Pos-deploy correto `a07f78f`, run `multiturn-20260505135703`: banco confirmou
+  `planner_v1.2.0` + `generator_v1.3.0` em 18/18 turns. Resultado: 18/18 jobs
+  processed, 17 generated, 1 blocked; 8/18 ok, 10/18 review. `escalar_humano`
+  caiu de 12/18 para 9/18 e `tratar_objecao` apareceu 2 vezes. Gargalo real:
+  6/18 `planner_schema_failed` por contrato de tool (`buscarProduto` sem
+  medida/marca/product_code, `moto_ano` string, `posicao_pneu` em PT). Solucao
+  local aplicada em `planner_v1.2.1`: normalizacao antes da validacao estrita
+  (`traseiro` -> `rear`, ano string -> number, null omitido), enriquecimento de
+  tool input com estado/fatos da Organizadora e downgrade seguro de
+  `buscar_e_ofertar` sem tool valida para `pedir_dados_faltantes` em vez de
+  fallback humano. Testes: 331/331 verde; typecheck verde.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.

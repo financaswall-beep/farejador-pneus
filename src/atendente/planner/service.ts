@@ -2,12 +2,15 @@ import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 import { callOpenAI } from '../../shared/llm-clients/openai.js';
+import { sessionSlotKeySchema } from '../../shared/zod/agent-state.js';
 import type { PlannerContext } from './context-builder.js';
 import { buildPlannerMessages } from './prompt.js';
 import {
   fallbackPlannerOutput,
   plannerOutputSchema,
   plannerPromptVersion,
+  riskFlagSchema,
+  toolRequestSchema,
   type PlannerOutput,
 } from './schemas.js';
 
@@ -259,11 +262,150 @@ async function callPlannerModel(
     temperature: 0,
   });
   return {
-    output: plannerOutputSchema.parse(JSON.parse(result.content)),
+    output: plannerOutputSchema.parse(normalizePlannerOutputCandidate(JSON.parse(result.content), context)),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     durationMs: result.durationMs,
   };
+}
+
+export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerContext): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+
+  const candidate = raw as Record<string, unknown>;
+  const normalizedToolRequests = normalizeToolRequests(candidate.tool_requests, context);
+  const rawMissingSlots = Array.isArray(candidate.missing_slots) ? candidate.missing_slots : [];
+  const missingSlots = rawMissingSlots.filter((slot) => sessionSlotKeySchema.safeParse(slot).success);
+  const rawRiskFlags = Array.isArray(candidate.risk_flags) ? candidate.risk_flags : [];
+  const riskFlags = rawRiskFlags.filter((flag) => riskFlagSchema.safeParse(flag).success);
+
+  const normalized: Record<string, unknown> = {
+    ...candidate,
+    missing_slots: missingSlots,
+    tool_requests: normalizedToolRequests,
+    risk_flags: riskFlags,
+    prompt_version: plannerPromptVersion,
+  };
+
+  if (candidate.skill === 'buscar_e_ofertar' && normalizedToolRequests.length === 0) {
+    normalized.skill = 'pedir_dados_faltantes';
+    normalized.missing_slots = missingSlots.length > 0 ? missingSlots : ['medida_pneu'];
+    normalized.confidence = Math.min(numberOrDefault(candidate.confidence, 0.55), 0.65);
+    normalized.rationale = appendRationale(candidate.rationale, 'buscar_e_ofertar sem tool valida; pedindo dados faltantes.');
+  }
+
+  return normalized;
+}
+
+function normalizeToolRequests(rawToolRequests: unknown, context: PlannerContext): unknown[] {
+  if (!Array.isArray(rawToolRequests)) return [];
+
+  const normalized: unknown[] = [];
+  for (const rawRequest of rawToolRequests) {
+    const request = normalizeToolRequest(rawRequest, context);
+    if (request) normalized.push(request);
+  }
+  return normalized.slice(0, 5);
+}
+
+function normalizeToolRequest(rawRequest: unknown, context: PlannerContext): unknown | null {
+  if (!rawRequest || typeof rawRequest !== 'object' || Array.isArray(rawRequest)) return null;
+
+  const request = rawRequest as Record<string, unknown>;
+  const tool = request.tool;
+  if (typeof tool !== 'string') return null;
+
+  const input = stripNullish(inputRecord(request.input));
+  input.environment = typeof input.environment === 'string' ? input.environment : context.environment;
+  normalizeCommonToolInput(input);
+
+  if (tool === 'buscarProduto') enrichBuscarProdutoInput(input, context);
+  if (tool === 'buscarCompatibilidade') enrichBuscarCompatibilidadeInput(input, context);
+  if (tool === 'calcularFrete') enrichCalcularFreteInput(input, context);
+
+  const candidate = { tool, input };
+  const parsed = toolRequestSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
+}
+
+function inputRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return { ...(value as Record<string, unknown>) };
+}
+
+function stripNullish(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== null && value !== undefined));
+}
+
+function normalizeCommonToolInput(input: Record<string, unknown>): void {
+  if (typeof input.posicao_pneu === 'string') {
+    const normalizedPosition = normalizeTirePosition(input.posicao_pneu);
+    if (normalizedPosition) input.posicao_pneu = normalizedPosition;
+  }
+
+  if (typeof input.moto_ano === 'string' && /^\d{4}$/.test(input.moto_ano.trim())) {
+    input.moto_ano = Number(input.moto_ano.trim());
+  }
+
+  if (typeof input.limit === 'string' && /^\d+$/.test(input.limit.trim())) {
+    input.limit = Number(input.limit.trim());
+  }
+}
+
+function normalizeTirePosition(value: string): 'front' | 'rear' | 'both' | undefined {
+  const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  if (['front', 'dianteiro', 'frente'].includes(normalized)) return 'front';
+  if (['rear', 'traseiro', 'tras'].includes(normalized)) return 'rear';
+  if (['both', 'ambos', 'par', 'dianteiro e traseiro', 'frente e tras'].includes(normalized)) return 'both';
+  return undefined;
+}
+
+function enrichBuscarProdutoInput(input: Record<string, unknown>, context: PlannerContext): void {
+  const activeItem = context.state.items.find((item) => item.is_active) ?? context.state.items[0];
+  if (typeof input.medida_pneu !== 'string') {
+    input.medida_pneu = slotString(activeItem?.slots.medida_pneu?.value_json) ?? findOrganizerStringFact(context, ['medida_pneu']);
+  }
+  if (typeof input.marca !== 'string') {
+    input.marca = slotString(activeItem?.slots.marca_preferida?.value_json) ?? findOrganizerStringFact(context, ['marca_pneu_preferida', 'marca_preferida']);
+  }
+  if (typeof input.posicao_pneu !== 'string') {
+    const position = slotString(activeItem?.slots.posicao_pneu?.value_json) ?? findOrganizerStringFact(context, ['posicao_pneu']);
+    const normalizedPosition = position ? normalizeTirePosition(position) : undefined;
+    if (normalizedPosition) input.posicao_pneu = normalizedPosition;
+  }
+}
+
+function enrichBuscarCompatibilidadeInput(input: Record<string, unknown>, context: PlannerContext): void {
+  const activeItem = context.state.items.find((item) => item.is_active) ?? context.state.items[0];
+  if (typeof input.moto_modelo !== 'string') {
+    input.moto_modelo = slotString(activeItem?.slots.moto_modelo?.value_json) ?? findOrganizerStringFact(context, ['moto_modelo']);
+  }
+  if (typeof input.moto_ano !== 'number') {
+    const year = slotString(activeItem?.slots.moto_ano?.value_json) ?? findOrganizerStringFact(context, ['moto_ano']);
+    if (year && /^\d{4}$/.test(year.trim())) input.moto_ano = Number(year.trim());
+  }
+}
+
+function enrichCalcularFreteInput(input: Record<string, unknown>, context: PlannerContext): void {
+  if (typeof input.bairro !== 'string') {
+    input.bairro = slotString(context.state.global_slots.bairro?.value_json) ?? findOrganizerStringFact(context, ['bairro_mencionado', 'bairro']);
+  }
+  if (typeof input.municipio !== 'string') {
+    input.municipio = slotString(context.state.global_slots.municipio?.value_json) ?? findOrganizerStringFact(context, ['municipio_mencionado', 'municipio']);
+  }
+}
+
+function slotString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function numberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function appendRationale(value: unknown, suffix: string): string {
+  const prefix = typeof value === 'string' && value.trim() !== '' ? value.trim() : 'planner output normalizado.';
+  return `${prefix} ${suffix}`.slice(0, 500);
 }
 
 function fallbackResult(reason: string): PlannerDecisionResult {

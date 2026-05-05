@@ -9,6 +9,7 @@ import type { ConversationState } from '../../../../src/shared/zod/agent-state.j
 
 let planTurn: typeof import('../../../../src/atendente/planner/service.js').planTurn;
 let recordPlannerDecision: typeof import('../../../../src/atendente/planner/service.js').recordPlannerDecision;
+let normalizePlannerOutputCandidate: typeof import('../../../../src/atendente/planner/service.js').normalizePlannerOutputCandidate;
 let buildPlannerMessages: typeof import('../../../../src/atendente/planner/prompt.js').buildPlannerMessages;
 
 beforeAll(async () => {
@@ -20,6 +21,7 @@ beforeAll(async () => {
   const service = await import('../../../../src/atendente/planner/service.js');
   planTurn = service.planTurn;
   recordPlannerDecision = service.recordPlannerDecision;
+  normalizePlannerOutputCandidate = service.normalizePlannerOutputCandidate;
   const prompt = await import('../../../../src/atendente/planner/prompt.js');
   buildPlannerMessages = prompt.buildPlannerMessages;
 });
@@ -203,6 +205,116 @@ describe('Planner Sprint 3', () => {
     expect(systemPrompt).toContain('Objeções de preço, caro, concorrente, desconto ou condição comercial usam tratar_objecao');
     expect(systemPrompt).toContain('Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica');
     expect(systemPrompt).toContain('Não repita escalar_humano em turnos seguidos');
+    expect(systemPrompt).toContain('posicao_pneu deve ser exatamente front, rear ou both');
+    expect(systemPrompt).toContain('buscarProduto exige pelo menos um destes campos');
+  });
+
+  it('normaliza input de tool antes de validar output do Planner', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'pedir_dados_faltantes',
+          missing_slots: [],
+          tool_requests: [
+            {
+              tool: 'buscarCompatibilidade',
+              input: {
+                environment: 'test',
+                moto_modelo: 'Bros 160',
+                moto_ano: '2022',
+                posicao_pneu: 'traseiro',
+              },
+            },
+          ],
+          risk_flags: ['compatibilidade_precisa_confirmacao_por_tool', 'low_confidence'],
+          confidence: 0.7,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.0',
+        },
+        context(),
+      ),
+    );
+
+    expect(normalized.tool_requests).toEqual([
+      {
+        tool: 'buscarCompatibilidade',
+        input: {
+          environment: 'test',
+          moto_modelo: 'Bros 160',
+          moto_ano: 2022,
+          posicao_pneu: 'rear',
+          limit: 10,
+        },
+      },
+    ]);
+    expect(normalized.risk_flags).toEqual(['low_confidence']);
+    expect(normalized.prompt_version).toBe(plannerPromptVersion);
+  });
+
+  it('enriquece buscarProduto com fatos antes de validar', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'buscar_e_ofertar',
+          missing_slots: [],
+          tool_requests: [
+            {
+              tool: 'buscarProduto',
+              input: { environment: 'test', posicao_pneu: 'traseiro' },
+            },
+          ],
+          risk_flags: ['mentions_stock'],
+          confidence: 0.8,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.0',
+        },
+        context({
+          organizer_facts: [
+            organizerFact('medida_pneu', '140/70-17'),
+            organizerFact('marca_pneu_preferida', 'Michelin'),
+          ],
+        }),
+      ),
+    );
+
+    expect(normalized.tool_requests).toEqual([
+      {
+        tool: 'buscarProduto',
+        input: {
+          environment: 'test',
+          medida_pneu: '140/70-17',
+          marca: 'Michelin',
+          posicao_pneu: 'rear',
+          apenas_com_estoque: false,
+          limit: 10,
+        },
+      },
+    ]);
+  });
+
+  it('nao deixa buscarProduto invalido virar fallback de humano', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'buscar_e_ofertar',
+          missing_slots: [],
+          tool_requests: [{ tool: 'buscarProduto', input: { environment: 'test' } }],
+          risk_flags: [],
+          confidence: 0.9,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.0',
+        },
+        context(),
+      ),
+    );
+
+    expect(normalized).toMatchObject({
+      skill: 'pedir_dados_faltantes',
+      missing_slots: ['medida_pneu'],
+      tool_requests: [],
+      confidence: 0.65,
+      prompt_version: plannerPromptVersion,
+    });
   });
 
   it('recordPlannerDecision grava evento planner_decided auditavel', async () => {
