@@ -1221,6 +1221,13 @@ Fila do worker da Atendente. Cada mensagem do cliente vira um job. Worker pega e
 
 Status: pending, processing, processed, failed.
 
+Hardening operacional: o caminho principal continua sendo o `dispatcher` criar
+o job na normalizacao do `message_created`. Como rede de seguranca,
+`src/atendente/reconcile-jobs.ts` procura mensagens publicas de cliente em
+`core.messages` sem job correspondente e chama `ops.enqueue_atendente_job` de
+forma idempotente. Isso cobre janelas de redeploy, queda de worker ou falha
+transitoria sem misturar `raw.*`, `core.*` e `agent.*`.
+
 ### `ops.unhandled_messages`
 
 Mensagens que cairam em `responder_geral` (skill de fallback). Sao insumo para criar skill nova.

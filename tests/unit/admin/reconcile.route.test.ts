@@ -9,7 +9,10 @@ const baseEnv = {
   ADMIN_AUTH_TOKEN: 'test-admin-token',
 };
 
-async function loadReconcileRoute(reconcileMock: ReturnType<typeof vi.fn>) {
+async function loadReconcileRoute(
+  reconcileMock: ReturnType<typeof vi.fn>,
+  reconcileAtendenteJobsMock: ReturnType<typeof vi.fn> = vi.fn(),
+) {
   vi.resetModules();
   Object.assign(process.env, baseEnv);
   vi.doMock('pino', () => ({
@@ -21,6 +24,9 @@ async function loadReconcileRoute(reconcileMock: ReturnType<typeof vi.fn>) {
   }));
   vi.doMock('../../../src/admin/reconcile.service.js', () => ({
     reconcile: reconcileMock,
+  }));
+  vi.doMock('../../../src/atendente/reconcile-jobs.js', () => ({
+    reconcileMissingAtendenteJobsWithPool: reconcileAtendenteJobsMock,
   }));
 
   return import('../../../src/admin/reconcile.route.js');
@@ -57,6 +63,7 @@ describe('registerReconcileRoute', () => {
   afterEach(() => {
     vi.doUnmock('pino');
     vi.doUnmock('../../../src/admin/reconcile.service.js');
+    vi.doUnmock('../../../src/atendente/reconcile-jobs.js');
     vi.resetModules();
   });
 
@@ -191,5 +198,69 @@ describe('registerReconcileRoute', () => {
 
     expect(reply.statusCode).toBe(502);
     expect(reply.payload).toEqual({ error: 'chatwoot_api_unavailable' });
+  });
+
+  it('returns 200 with atendente job reconciliation counters', async () => {
+    const result = {
+      candidates: 2,
+      reconciled: 2,
+      jobs: [
+        {
+          conversation_id: 'conversation-1',
+          trigger_message_id: 'message-1',
+          atendente_job_id: 'job-1',
+          agent_session_id: 'session-1',
+        },
+      ],
+    };
+    const reconcileMock = vi.fn();
+    const reconcileAtendenteJobsMock = vi.fn().mockResolvedValue(result);
+    const { registerReconcileRoute } = await loadReconcileRoute(reconcileMock, reconcileAtendenteJobsMock);
+    const fastify = createFastify();
+    await registerReconcileRoute(fastify);
+    const reply = createReply();
+
+    await fastify._routes['/admin/reconcile/atendente-jobs'].handler(
+      {
+        body: {
+          since: '2026-05-05T00:00:00Z',
+          until: '2026-05-05T12:00:00Z',
+          limit: 50,
+        },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(reply.payload).toEqual(result);
+    expect(reconcileAtendenteJobsMock).toHaveBeenCalledWith({
+      since: new Date('2026-05-05T00:00:00Z'),
+      until: new Date('2026-05-05T12:00:00Z'),
+      environment: 'prod',
+      limit: 50,
+    });
+    expect(reconcileMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when atendente jobs reconciliation limit is too large', async () => {
+    const reconcileAtendenteJobsMock = vi.fn();
+    const { registerReconcileRoute } = await loadReconcileRoute(vi.fn(), reconcileAtendenteJobsMock);
+    const fastify = createFastify();
+    await registerReconcileRoute(fastify);
+    const reply = createReply();
+
+    await fastify._routes['/admin/reconcile/atendente-jobs'].handler(
+      {
+        body: {
+          since: '2026-05-05T00:00:00Z',
+          until: '2026-05-05T12:00:00Z',
+          limit: 501,
+        },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(400);
+    expect(reconcileAtendenteJobsMock).not.toHaveBeenCalled();
   });
 });

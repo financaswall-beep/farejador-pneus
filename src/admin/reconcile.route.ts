@@ -3,20 +3,28 @@ import { z } from 'zod';
 import { requireAdminAuth } from './auth.js';
 import { ChatwootApiError } from './chatwoot-api.client.js';
 import { reconcile } from './reconcile.service.js';
+import { reconcileMissingAtendenteJobsWithPool } from '../atendente/reconcile-jobs.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 
 const MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-const bodySchema = z
+const reconcileBodyBaseSchema = z
   .object({
     since: z.string().datetime(),
     until: z.string().datetime(),
     environment: z.enum(['prod', 'test']).optional(),
-  })
-  .refine((value) => new Date(value.since) < new Date(value.until), {
+  });
+
+const bodySchema = reconcileBodyBaseSchema.refine((value) => new Date(value.since) < new Date(value.until), {
     message: 'since must be before until',
   });
+
+const atendenteJobsBodySchema = reconcileBodyBaseSchema.extend({
+  limit: z.number().int().min(1).max(500).optional(),
+}).refine((value) => new Date(value.since) < new Date(value.until), {
+  message: 'since must be before until',
+});
 
 export async function registerReconcileRoute(fastify: FastifyInstance): Promise<void> {
   fastify.post('/admin/reconcile', {
@@ -56,6 +64,36 @@ export async function registerReconcileRoute(fastify: FastifyInstance): Promise<
         }
 
         logger.error({ err }, 'admin reconcile failed');
+        return reply.status(500).send({ error: 'internal_server_error' });
+      }
+    },
+  });
+
+  fastify.post('/admin/reconcile/atendente-jobs', {
+    preHandler: requireAdminAuth,
+    handler: async (request, reply) => {
+      const parsed = atendenteJobsBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid body' });
+      }
+
+      const since = new Date(parsed.data.since);
+      const until = new Date(parsed.data.until);
+      if (until.getTime() - since.getTime() > MAX_WINDOW_MS) {
+        return reply.status(400).send({ error: 'window too large, max 7 days' });
+      }
+
+      try {
+        const result = await reconcileMissingAtendenteJobsWithPool({
+          since,
+          until,
+          environment: parsed.data.environment ?? env.FAREJADOR_ENV,
+          limit: parsed.data.limit ?? 100,
+        });
+
+        return reply.status(200).send(result);
+      } catch (err) {
+        logger.error({ err }, 'admin atendente jobs reconciliation failed');
         return reply.status(500).send({ error: 'internal_server_error' });
       }
     },

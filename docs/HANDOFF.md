@@ -30,6 +30,12 @@ Implementado:
   `ATENDENTE_SHADOW_ENABLED=true`, usando `ops.enqueue_atendente_job`
   idempotente por mensagem. Antes do enqueue, garante `agent.session_current`
   para a conversa.
+- Hardening de fila da Atendente: `src/atendente/reconcile-jobs.ts` busca
+  mensagens publicas de cliente em `core.messages` sem job em
+  `ops.atendente_jobs` e cria os jobs faltantes com o mesmo caminho idempotente
+  (`ensureAtendenteSession` + `ops.enqueue_atendente_job`). O worker shadow roda
+  essa reconciliacao a cada minuto para as ultimas 24h; admin pode chamar
+  `POST /admin/reconcile/atendente-jobs` para uma janela controlada.
 - Atendente Sprint 6: Generator Shadow (`src/atendente/generator/service.ts`).
   Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
   grava em `agent.turns` (status='generated'|'blocked') e auditoria em
@@ -80,6 +86,11 @@ Nao implementado/nao ligado:
 - Teste em producao com 6 conversas Chatwoot: `ops.atendente_jobs`,
   `agent.turns` e eventos `generator_produced` gravando em shadow; Generator
   LLM real gerou respostas candidatas sem envio ao cliente.
+- Teste em producao com 12 conversas Chatwoot em 2026-05-05: todas as mensagens
+  chegaram como `message_created/contact`; 6 jobs nasceram automaticamente e 6
+  foram recuperados manualmente. A correcao implementada nesta sessao adiciona
+  reconciliador automatico e endpoint admin para que lacunas desse tipo sejam
+  recuperadas sem perder turno da Atendente.
 - Organizadora v3.4 validada em conversas novas: extraiu facts como
   `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
   `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.

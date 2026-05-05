@@ -50,6 +50,12 @@ Ordem garantida: o Atendente so e acionado **depois** de `core.messages` ter a m
 
 Sem race condition. Latencia somada e aceitavel.
 
+Rede de seguranca: se uma mensagem publica de cliente foi gravada em
+`core.messages`, mas o job em `ops.atendente_jobs` nao nasceu por falha
+operacional transitoria, o reconciliador da Atendente reexecuta apenas o passo
+de fila. Ele nao reprocessa `raw.*`, nao altera a mensagem normalizada e usa o
+mesmo `ops.enqueue_atendente_job` idempotente do caminho principal.
+
 ## Timeline 2 - Mensagem outgoing (bot -> cliente)
 
 ```text

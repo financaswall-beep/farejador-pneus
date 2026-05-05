@@ -37,9 +37,15 @@ import {
 } from './state/agent-state.repository.js';
 import type { EscalateAction } from '../shared/zod/agent-actions.js';
 import { postEscalateNote } from './handlers/escalate.js';
+import {
+  createDefaultAtendenteJobReconcileInput,
+  reconcileMissingAtendenteJobsWithPool,
+} from './reconcile-jobs.js';
 
 const WORKER_ID = `atendente-shadow-${randomUUID().slice(0, 8)}`;
 const MISSING_STATE_PREFIX = 'planner_context_missing_state:';
+const RECONCILE_INTERVAL_MS = 60_000;
+let lastReconcileAt = 0;
 
 export function classifyJobFailure(error: unknown): {
   incident_type: IncidentType;
@@ -279,6 +285,7 @@ export function startAtendenteShadow(): () => void {
 
   async function loop(): Promise<void> {
     if (stopped) return;
+    await reconcileAtendenteJobsIfDue();
     await pollAndAttend();
     setTimeout(loop, env.ATENDENTE_SHADOW_POLL_INTERVAL_MS);
   }
@@ -289,6 +296,31 @@ export function startAtendenteShadow(): () => void {
     stopped = true;
     logger.info({ worker_id: WORKER_ID }, 'atendente shadow: stopping');
   };
+}
+
+async function reconcileAtendenteJobsIfDue(now = new Date()): Promise<void> {
+  if (now.getTime() - lastReconcileAt < RECONCILE_INTERVAL_MS) {
+    return;
+  }
+
+  lastReconcileAt = now.getTime();
+  try {
+    const result = await reconcileMissingAtendenteJobsWithPool(
+      createDefaultAtendenteJobReconcileInput(now),
+    );
+    if (result.reconciled > 0) {
+      logger.warn(
+        {
+          worker_id: WORKER_ID,
+          reconciled: result.reconciled,
+          candidates: result.candidates,
+        },
+        'atendente shadow: reconciled missing jobs',
+      );
+    }
+  } catch (err) {
+    logger.error({ worker_id: WORKER_ID, err }, 'atendente shadow: job reconciliation failed');
+  }
 }
 
 async function lockSessionForJob(client: PoolClient, job: AtendenteJobRow): Promise<void> {

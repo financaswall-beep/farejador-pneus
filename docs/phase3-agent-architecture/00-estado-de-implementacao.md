@@ -37,6 +37,7 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 6.8 - filtro sender_type | Implementado |
 | Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod (e35ca31) |
 | Ajuste pre-Critic - memoria operacional Generator | Implementado |
+| Hardening fila Atendente - reconciliador de jobs | Implementado |
 | Critic (Sprint 7) | Nao existe |
 | Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
 | Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
@@ -121,10 +122,17 @@ Worker Shadow:
 
 - `src/atendente/worker.ts`
 - `src/shared/repositories/ops-atendente.repository.ts`
+- `src/atendente/reconcile-jobs.ts`
 - `ATENDENTE_SHADOW_ENABLED=false` por default
 - `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
   `message_created` quando `ATENDENTE_SHADOW_ENABLED=true` e garante
   `agent.session_current` para a conversa antes do enqueue
+- `src/atendente/reconcile-jobs.ts` corrige lacunas: busca mensagens `contact`
+  publicas em `core.messages` sem job correspondente e chama o mesmo
+  `ensureAtendenteSession` + `ops.enqueue_atendente_job` idempotente. O worker
+  shadow roda essa varredura leve a cada minuto para as ultimas 24h.
+- endpoint admin `POST /admin/reconcile/atendente-jobs` permite reconciliar uma
+  janela controlada, com limite maximo de 500 mensagens por chamada
 - log-only: gera candidato shadow, sem envio Chatwoot
 
 ## Organizadora v3.4
@@ -161,6 +169,10 @@ Ultima validacao (pos Sprint 6 + Organizadora v3.4):
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.
+- Teste real 12 conversas Chatwoot em 2026-05-05 revelou lacuna operacional:
+  12 mensagens `message_created/contact` foram normalizadas, mas 6 jobs nasceram
+  so apos enfileiramento manual. O hardening de fila adiciona reconciliador
+  automatico + endpoint admin para impedir mensagem de cliente sem job.
 - Organizadora: 120 enrichment_jobs done, 4 facts corretos, confianca > 0.95.
 - Deploy Coolify commit e35ca31: 2026-05-05 10:07, rolling update completed.
 
