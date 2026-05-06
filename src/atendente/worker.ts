@@ -77,7 +77,7 @@ export async function processAtendenteJob(
 }> {
   await lockSessionForJob(client, job);
 
-  const context = await buildPlannerContext(client, job.environment, job.conversation_id);
+  const context = await buildPlannerContext(client, job.environment, job.conversation_id, job.trigger_message_id);
   const turnIndex = context.state.turn_index + 1;
 
   const decision = await planTurn(context);

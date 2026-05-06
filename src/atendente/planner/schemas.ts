@@ -8,7 +8,7 @@ import {
   verificarEstoqueInputSchema,
 } from '../tools/commerce-tools.js';
 
-export const plannerPromptVersion = 'planner_v1.2.3';
+export const plannerPromptVersion = 'planner_v1.2.4';
 
 export const skillNameSchema = z.enum([
   'responder_geral',

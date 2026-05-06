@@ -47,6 +47,7 @@ export async function buildPlannerContext(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
+  triggerMessageId?: string,
 ): Promise<PlannerContext> {
   const state = await loadCurrent(client, environment, conversationId);
   if (!state) {
@@ -67,9 +68,10 @@ export async function buildPlannerContext(
        AND is_private = false
        AND content IS NOT NULL
        AND content != ''
+       AND ($3::uuid IS NULL OR sent_at <= (SELECT sent_at FROM core.messages WHERE id = $3::uuid))
      ORDER BY sent_at DESC
      LIMIT 10`,
-    [environment, conversationId],
+    [environment, conversationId, triggerMessageId ?? null],
   );
   const toolEvents = await client.query<{
     event_type: 'tool_executed' | 'tool_failed';

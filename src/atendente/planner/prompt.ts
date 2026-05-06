@@ -25,6 +25,8 @@ export function buildPlannerMessages(context: PlannerContext): OpenAIMessage[] {
         '- Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica.',
         '- Perguntas sobre frete, entrega, prazo ou bairro usam responder_logistica e calcularFrete quando houver bairro.',
         '- Se houver medida, marca ou produto citado, use buscar_e_ofertar com buscarProduto; se houver apenas moto/modelo, use pedir_dados_faltantes com buscarCompatibilidade.',
+        '- Se o cliente apresentar a moto mas NAO perguntar sobre produto/compra ainda (ex: "Tenho uma Biz 125"), use pedir_dados_faltantes para registrar e perguntar o que precisa; NAO use tratar_objecao nesses casos.',
+        '- tratar_objecao e exclusivo para: objecao de preco, comparacao com concorrente, reclamacao, resistencia a compra ou duvida de valor. Informacao nova de moto ou pergunta de disponibilidade NAO e objecao.',
         '- Não repita escalar_humano em turnos seguidos se ainda existe uma pergunta objetiva ou dado faltante que pode ser tratado por skill especializada.',
         '- Perguntas sobre endereco, localizacao, como chegar, se faz montagem, formas de pagamento aceitas ou info geral da loja usam responder_geral + buscarPoliticaComercial. NAO use pedir_dados_faltantes nesses casos.',
         '- pedir_dados_faltantes serve apenas quando o cliente quer comprar/cotar/verificar pneu e falta dado essencial (moto, medida, bairro). NAO use para responder perguntas sobre a loja.',

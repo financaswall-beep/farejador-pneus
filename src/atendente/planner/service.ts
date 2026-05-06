@@ -375,8 +375,8 @@ function mentionsStoreInfoQuestion(text: string): boolean {
   // perguntas sobre servicos gerais sem produto mencionado
   if (/\b(faz montagem|fazem montagem|faz balanceamento|tem montagem|tem estacionamento)\b/.test(normalized)) return true;
   // perguntas de horario / dias de funcionamento
-  if (/\b(que horas abre|que horas fecha|horario de atendimento|quando abrem|quando fecham|aberto agora)\b/.test(normalized)) return true;
-  if (/\b(abrem|abre|funcionam|funcionamos)\b/.test(normalized)) return true;
+  if (/\b(que horas abre|que horas fecha|que horas abrem|que horas fecham|horario de atendimento|quando abrem|quando fecham|aberto agora|voces abrem hoje|abrem hoje)\b/.test(normalized)) return true;
+  if (/\b(abrem|abre|fecham|fecha|funcionam|funcionamos)\b/.test(normalized)) return true;
   if (/\b(domingo|feriado)\b/.test(normalized)) return true;
   return false;
 }

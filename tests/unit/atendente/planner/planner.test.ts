@@ -155,7 +155,7 @@ describe('Planner Sprint 3', () => {
     ]);
   });
 
-  it('mock planner solicita politica comercial para horario de funcionamento', async () => {
+  it('mock planner usa responder_geral para horario de funcionamento', async () => {
     const result = await planTurn(
       context({
         recent_messages: [
@@ -170,7 +170,7 @@ describe('Planner Sprint 3', () => {
     );
 
     expect(result.output).toMatchObject({
-      skill: 'tratar_objecao',
+      skill: 'responder_geral',
       tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
       prompt_version: plannerPromptVersion,
     });
@@ -497,6 +497,43 @@ describe('Planner Sprint 3', () => {
     });
 
     expect(query.mock.calls[0]?.[1]?.[5]).toBe(query.mock.calls[1]?.[1]?.[5]);
+  });
+
+  it('mock planner usa pedir_dados_faltantes quando cliente so apresenta a moto sem pedir produto', async () => {
+    const result = await planTurn(
+      context({
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000030',
+            role: 'customer',
+            text: 'Minha moto e Biz 125 2019.',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output.skill).not.toBe('tratar_objecao');
+  });
+
+  it('mock planner usa responder_geral quando cliente pergunta voces abrem hoje', async () => {
+    const result = await planTurn(
+      context({
+        recent_messages: [
+          {
+            id: '00000000-0000-4000-8000-000000000031',
+            role: 'customer',
+            text: 'Voces abrem hoje?',
+            sent_at: baseTime,
+          },
+        ],
+      }),
+    );
+
+    expect(result.output).toMatchObject({
+      skill: 'responder_geral',
+      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
+    });
   });
 });
 
