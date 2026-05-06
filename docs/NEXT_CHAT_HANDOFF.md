@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-05 (Sprints 6.5–6.9 concluidas, em producao).
+Atualizado: 2026-05-06 (planner_v1.2.5 + generator_v1.3.1 + dedup facts — em producao).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -10,6 +10,11 @@ Estamos construindo a Atendente por camadas, mas ela ainda nao envia mensagem ao
 cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
 Organizadora LLM, roda a fundacao da Atendente em shadow incluindo o Generator
 (que gera resposta candidata auditavel, mas nao envia nada).
+
+**Ultimo marco (2026-05-06):** tres bugs diagnosticados e corrigidos via auditoria
+de producao. Planner `v1.2.5` e Generator `v1.3.1` em prod. 366 testes verdes.
+Pipeline Organizadora -> Planner -> Tool -> Generator validado end-to-end.
+Unico gap remanescente e o catalogo `commerce.*` vazio (dados da loja).
 
 ## Ja Implementado
 
@@ -90,6 +95,29 @@ Atendente:
   inclusive multiplos pneus/produtos no mesmo turno. O contexto do Generator
   agora recebe `state.items`, `organizer_facts` e `derived_signals`, nao apenas
   o item ativo. 3 novos testes. Suite: 316 testes.
+- Fix planner_v1.2.5 (2026-05-06):
+  Bug: Planner ignorava `organizer_facts` e pedia dados ja conhecidos.
+  Correcao: nova regra de prompt + normalizer deterministico pos-LLM em
+  `normalizePlannerOutputCandidate` que promove `pedir_dados_faltantes` para
+  `buscar_e_ofertar+buscarCompatibilidade` quando: (a) skill e
+  `pedir_dados_faltantes`, (b) cliente fez pergunta de compatibilidade, (c)
+  `organizer_facts` tem `moto_modelo` com conf>=0.85, (d) tool disponivel.
+  Novos helpers: `mentionsProductCompatibilityQuestion`, `findOrganizerStringFact`,
+  `findOrganizerNumberFact`. 1 novo teste. Commit `cb5a7f8`.
+- Fix generator_v1.3.1 (2026-05-06):
+  Bug: Generator usava SAFE_FALLBACK quando skill era `pedir_dados_faltantes`.
+  Correcao: regras 5a/5b no prompt do Generator + novo bloco no SayValidator.
+  `SayValidationContext` ganhou campo `selected_skill?: string`.
+  `runValidators` e `toValidationCtx` passam `skill` para o validator.
+  Razao de bloqueio: `safe_fallback_not_allowed_for_pedir_dados_faltantes`.
+  2 novos testes. Commit `cb5a7f8`.
+- Fix phase3 dedup (2026-05-06):
+  Bug: facts identicos (mesmo valor, mesma truth_type, conf>=existente) eram
+  inseridos como nova linha e depois supersedidos, poluindo o ledger.
+  Correcao: `writeFactWithEvidence` faz deep-equal check via `deepEqualJsonValue`
+  + `canonicalJson` antes do INSERT. Se identico, apenas anexa evidence ao fact
+  existente e retorna o id existente. 1 novo teste. Commit `cb5a7f8`.
+- Suite: 366/366 verde. Deploy 2026-05-06, ativo em prod em ~50s.
 
 ## O Que Ainda Nao Existe
 
@@ -97,23 +125,32 @@ Atendente:
 - Reflection loop.
 - Envio Chatwoot pela Atendente (Sprint 8).
 - Seed do catalogo `commerce.*` (Sprint 6.10 — depende de dados da loja).
+  Este e o principal gap operacional: buscarCompatibilidade e buscarProduto
+  retornam [] porque nao ha vehicles, products, fitments cadastrados.
 - Atendimento automatico.
 
 ## Validacao Atual
 
-Ultima validacao local (pos ajuste de memoria operacional, 2026-05-05):
+Ultima validacao (2026-05-06, pos fix planner_v1.2.5 + generator_v1.3.1):
 
-- `npx vitest run`: 316/316 verde, 49 arquivos.
+- `npx vitest run`: 366/366 verde, 50 arquivos.
 - `npm run typecheck`: verde.
 - `npm run build`: verde.
-- Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
-  job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
-  LLM real gpt-5.4, sem alucinacao comercial.
-- Organizadora: 120 enrichment_jobs done, 4 facts corretos extraidos,
-  confianca media > 0.95.
+- Deploy: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
+- Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
+- Validacao end-to-end conv 441:
+  "Minha moto e Biz 125 2019." + "Qual pneu traseiro serve pra ela?"
+  -> Planner v1.2.5: skill=buscar_e_ofertar, buscarCompatibilidade({Biz,2019,rear}), conf=0.96.
+  -> buscarCompatibilidade retornou [] (catalogo vazio — correto).
+  -> Generator nao aluciou; SAFE_FALLBACK por ausencia de resultado de tool.
+- Auditoria qualidade Organizadora (convs 441/442/445):
+  Conv 441: 8 facts corretos, incluindo autocorrecao moto_modelo CG->Biz (truth_type=corrected), conf 0.84-0.99.
+  Conv 442: 3 facts corretos (bairro, municipio, intencao), conf 0.98-0.99.
+  Conv 445: 6 facts corretos (Bros 160 2022, Michelin, traseiro), conf 0.94-0.99.
 
-Ultimos commits enviados para `origin/main` e `pneus/main`:
+Ultimos commits em `pneus/main` (producao):
 
+- `cb5a7f8 fix: planner v1.2.5 promove organizer_facts a buscarCompatibilidade; generator v1.3.1 proibe SAFE_FALLBACK em pedir_dados_faltantes; phase3 dedup facts identicos`
 - `e35ca31 feat(atendente): Sprint 6.9 restante — nota interna Chatwoot ao escalar`
 - `193b4ef feat(dispatcher): Sprint 6.8 — filtrar sender_type`
 - `79c0d19 feat(atendente): Sprint 6.7 — Say Validator endurecido`
@@ -121,40 +158,35 @@ Ultimos commits enviados para `origin/main` e `pneus/main`:
 
 ## Proxima Fase
 
-Três frentes em paralelo (ordenadas por prioridade):
+Duas frentes (ordenadas por prioridade):
+
+**Sprint 6.10 — Seed catalogo `commerce.*`** (desbloqueante principal):
+- `commerce.vehicle_models`, `commerce.products`, `commerce.vehicle_compatibilities`,
+  `commerce.delivery_zones` estao vazios ou incompletos.
+- Enquanto vazio, `buscarCompatibilidade` e `buscarProduto` retornam `[]` e o
+  Generator cai no SAFE_FALLBACK em qualquer pergunta de produto.
+- Desbloqueio: Wallace traz CSV/dump real da loja com modelos e pneus.
+- Apos seed: pipeline completo funcionara — Organizadora extrai moto, Planner
+  chama buscarCompatibilidade, Generator oferta produto real.
 
 **Sprint 7 — Critic Shadow**:
-- Segundo passe LLM avalia o candidato do Generator
-- Bloqueia ou aprova, grava auditoria em `agent.*` e `ops.*`
-- Nao envia ao Chatwoot no Critic
-- Agora faz sentido seguir porque a memoria operacional do Generator foi calibrada.
-
-**Sprint 6.10 — Seed catalogo `commerce.*`** (bloqueado por dados da loja):
-- `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios
-- `buscar_e_ofertar` retorna lista vazia — bot faz teatro
-- Desbloqueio: Wallace traz CSV/dump real da loja
+- Segundo passe LLM avalia o candidato do Generator.
+- Bloqueia ou aprova, grava auditoria em `agent.*` e `ops.*`.
+- Nao envia ao Chatwoot no Critic.
+- Faz sentido agora porque: Planner usa organizer_facts, Generator nao alucina,
+  estado reentrante funciona, dedup de facts limpo.
 
 **Sprint 8 — Envio controlado ao Chatwoot**:
-- `ChatwootApiClient.postMessage()` — POST `/messages` com `private: false`
-- Worker envia turn `status='generated'` aprovado pelo fluxo de segurança
-- Controlado por env var `ATENDENTE_SEND_ENABLED=false` (default off)
-- Nao fazer: nao criar pedido automatico; nao enviar sem validator/Critic.
-
-Fluxo alvo pos-Sprint 8:
-
-```text
-ops.atendente_jobs
-  -> worker pega job
-  -> buildPlannerContext
-  -> planTurn
-  -> executeToolRequests
-  -> Generator cria resposta candidata
-  -> [Sprint 7] Critic avalia
-  -> [Sprint 8] envia ao Chatwoot se aprovado
-```
-- nao remover o modo shadow/log-only.
+- `ChatwootApiClient.postMessage()` com `private: false`.
+- Controlado por `ATENDENTE_SEND_ENABLED=false` (default off).
+- Dependencia: Sprint 7 (Critic) antes de habilitar envio.
 
 ## Pergunta Para Comecar O Proximo Chat
+
+"Quero popular o catalogo commerce.* com dados reais da loja. Mostre o schema
+das tabelas relevantes e o formato de importacao esperado (CSV ou SQL direto)."
+
+Ou, se catalogo nao estiver disponivel:
 
 "Quero abrir a Sprint 7: desenhar o Critic shadow da Atendente, sem envio
 Chatwoot. Antes de codar, confira o estado do repo e proponha o menor plano

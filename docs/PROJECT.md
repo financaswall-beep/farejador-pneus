@@ -1,6 +1,6 @@
 # Farejador - Visao Atual do Projeto
 
-Atualizado: 2026-05-05.
+Atualizado: 2026-05-06.
 
 Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
 Postgres/Supabase e prepara uma fundacao auditavel para analytics,
@@ -27,6 +27,9 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | Atendente Sprint 6.8 - filtro sender_type | Implementado |
 | Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod |
 | Ajuste pre-Critic - memoria operacional do Generator | Implementado |
+| Fix planner_v1.2.5 - Planner usa organizer_facts | Implementado em prod |
+| Fix generator_v1.3.1 - Generator proibe SAFE_FALLBACK em pedir_dados_faltantes | Implementado em prod |
+| Fix phase3 repo - dedup de facts identicos por valor | Implementado em prod |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -44,6 +47,14 @@ Organizadora LLM e Atendente em shadow/controle humano.
   actions de memoria operacional em tempo real (`create_item`, `update_slot`,
   `update_draft`).
 - Nota interna Chatwoot (`private: true`) ao emitir `escalate`.
+- Planner `planner_v1.2.5` promove `pedir_dados_faltantes` para
+  `buscar_e_ofertar+buscarCompatibilidade` quando `organizer_facts` ja contem
+  `moto_modelo` com conf >= 0.85 e cliente pergunta compatibilidade.
+- Generator `generator_v1.3.1` proibe resposta SAFE_FALLBACK quando skill e
+  `pedir_dados_faltantes`; SayValidator bloqueia com razao
+  `safe_fallback_not_allowed_for_pedir_dados_faltantes`.
+- `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
+  antes de inserir nova linha — so anexa evidence ao fact existente.
 - Migrations ate `0027` aplicadas/validadas no Supabase atual.
 
 ## O Que Ainda Nao Esta Ligado

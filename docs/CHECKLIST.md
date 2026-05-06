@@ -1,6 +1,6 @@
 # Checklist Master - Farejador
 
-Atualizado: 2026-05-05
+Atualizado: 2026-05-06
 
 > Nota: este checklist preserva historico das Fases 1/2a. Para o estado vivo
 > da Fase 3 e proximo passo, use `docs/NEXT_CHAT_HANDOFF.md` e
@@ -23,6 +23,11 @@ Atualizado: 2026-05-05
 - [x] Atendente Sprint 6.7: Say Validator endurecido.
 - [x] Atendente Sprint 6.8: filtro sender_type no dispatcher.
 - [x] Atendente Sprint 6.9: nota interna Chatwoot ao escalar.
+- [x] Ajuste pre-Critic: memoria operacional do Generator (create_item, update_slot em tempo real).
+- [x] Fix planner_v1.2.5: Planner usa organizer_facts para buscarCompatibilidade.
+- [x] Fix generator_v1.3.1: Generator proibe SAFE_FALLBACK em pedir_dados_faltantes.
+- [x] Fix phase3 dedup: facts identicos nao geram nova linha no ledger.
+- [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
 - [ ] Critic (Sprint 7).
 - [ ] Envio Chatwoot pela Atendente (Sprint 8).
 - [ ] Seed catalogo commerce.* (Sprint 6.10).

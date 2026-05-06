@@ -1,6 +1,6 @@
 # Handoff - Farejador
 
-Atualizado: 2026-05-05.
+Atualizado: 2026-05-06.
 
 Este arquivo e o handoff operacional curto. Para contexto completo da proxima
 conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
@@ -72,6 +72,28 @@ Implementado:
   de prazo/entrega). Planner bumped para `planner_v1.2.0` com secao ROTEAMENTO
   CONVERSACIONAL (7 regras). Generator bumped para `generator_v1.3.0` com regras
   9 e 10 sobre fallback. 8 novos testes. 328/328 verde. Build verde.
+- Fix planner_v1.2.5 + generator_v1.3.1 (2026-05-06):
+  Tres bugs diagnosticados via auditoria de producao e corrigidos:
+  (1) Planner ignorava `organizer_facts` com alta confianca e pedia dados ja
+  conhecidos (`pedir_dados_faltantes` em vez de `buscar_e_ofertar`). Corrigido
+  via regra de prompt + normalizer deterministico pos-LLM que promove a skill
+  quando `moto_modelo` conf>=0.85 e cliente pergunta compatibilidade.
+  Versao: `planner_v1.2.5`. 1 novo teste.
+  (2) Generator usava SAFE_FALLBACK quando skill era `pedir_dados_faltantes`,
+  em vez de perguntar o slot ausente. Corrigido via regra de prompt (regras 5a/5b)
+  e novo bloco no SayValidator (`safe_fallback_not_allowed_for_pedir_dados_faltantes`).
+  Versao: `generator_v1.3.1`. 2 novos testes.
+  (3) Facts identicos eram inseridos como nova linha e depois supersedidos,
+  poluindo o ledger. Corrigido com deep-equal check em `writeFactWithEvidence`
+  antes do INSERT — se ativo e identical, apenas annexa evidence ao fact existente.
+  1 novo teste. Commit `cb5a7f8`. Deploy 2026-05-06. 366/366 verde.
+- Validacao end-to-end prod 2026-05-06:
+  Conv 441 — "Qual pneu traseiro serve pra ela?" (moto Biz 125 2019 ja em
+  organizer_facts) -> Planner v1.2.5 escolheu `buscar_e_ofertar +
+  buscarCompatibilidade({moto_modelo:'Biz', moto_ano:2019, posicao:'rear'})`
+  com confidence 0.96. Antes (v1.2.4) retornava `pedir_dados_faltantes`.
+  buscarCompatibilidade retornou [] (catálogo vazio — comportamento correto).
+  Generator nao aluciou; usou SAFE_FALLBACK por ausencia de resultado de tool.
 
 Nao implementado/nao ligado:
 
@@ -79,6 +101,19 @@ Nao implementado/nao ligado:
 - Envio Chatwoot pela Atendente (Sprint 8).
 - Seed do catalogo commerce.* (Sprint 6.10).
 - Qualquer atendimento automatico ao cliente.
+
+## Ultimas Validacoes
+
+- `npx vitest run`: 366/366 verde, 50 arquivos.
+- `npm run typecheck`: verde.
+- Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
+  Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
+- Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,
+  buscarCompatibilidade chamado com {Biz, 2019, rear}, confidence 0.96.
+- Qualidade Organizadora confirmada: todos os facts das convs 441/442/445
+  extraidos corretamente, confianca 0.84-0.99. Autocorrecao de truth_type
+  (corrected) funcionando quando cliente corrigiu moto no mesmo dialogo.
+- Catalogo commerce.* ainda vazio — proximo desbloqueio operacional.
 
 ## Ultimas Validacoes
 
