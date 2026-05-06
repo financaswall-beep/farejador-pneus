@@ -340,7 +340,64 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
     normalized.rationale = appendRationale(candidate.rationale, 'buscar_e_ofertar sem tool valida; pedindo dados faltantes.');
   }
 
+  // v1.2.5: se Planner escolheu pedir_dados_faltantes mas organizer_facts ja tem moto_modelo
+  // e o cliente perguntou sobre produto/compatibilidade, promove para buscar_e_ofertar+buscarCompatibilidade.
+  if (
+    String(normalized.skill) === 'pedir_dados_faltantes' &&
+    !(normalized.tool_requests as unknown[]).some((r) => isToolRequest(r, 'buscarCompatibilidade')) &&
+    mentionsProductCompatibilityQuestion(latestCustomerText(context)) &&
+    context.available_tools.includes('buscarCompatibilidade')
+  ) {
+    const moto = findOrganizerStringFact(context, ['moto_modelo']);
+    if (typeof moto === 'string' && moto.trim() !== '') {
+      const ano = findOrganizerNumberFact(context, ['moto_ano']);
+      const posicao = findOrganizerStringFact(context, ['posicao_pneu']);
+      const compatInput: Record<string, unknown> = { environment: context.environment, moto_modelo: moto, limit: 10 };
+      if (typeof ano === 'number') compatInput.moto_ano = ano;
+      const normalizedPos = typeof posicao === 'string' ? normalizeTirePosition(posicao) : undefined;
+      if (normalizedPos) compatInput.posicao_pneu = normalizedPos;
+
+      const compatRequest = toolRequestSchema.safeParse({ tool: 'buscarCompatibilidade', input: compatInput });
+      if (compatRequest.success) {
+        normalized.skill = 'buscar_e_ofertar';
+        normalized.missing_slots = [];
+        normalized.tool_requests = [...(normalized.tool_requests as unknown[]), compatRequest.data].slice(0, 5);
+        normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.7), 0.78);
+        normalized.rationale = appendRationale(
+          candidate.rationale,
+          'organizer_facts ja tem moto; promovendo para buscar_e_ofertar+buscarCompatibilidade.',
+        );
+      }
+    }
+  }
+
   return normalized;
+}
+
+function isToolRequest(value: unknown, expectedTool: string): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return (value as Record<string, unknown>).tool === expectedTool;
+}
+
+function mentionsProductCompatibilityQuestion(text: string): boolean {
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\b(qual|que)\b.{0,30}\b(pneu|medida|modelo)\b.{0,30}\b(serve|cabe|encaixa|combina|recomenda|indica)\b/.test(normalized)) return true;
+  if (/\b(qual|que)\b.{0,30}\b(pneu|medida)\b.{0,40}\b(pra|para)\s+(ela|ele|minha|meu|essa|esse)\b/.test(normalized)) return true;
+  if (/\b(qual|que)\b.{0,5}(pneu|medida)\s+(serve|combina|cabe)\b/.test(normalized)) return true;
+  if (/\b(serve|cabe|combina|encaixa|recomenda|indica)\b.{0,30}\b(pra|para)\b.{0,15}\b(minha|meu|essa|esse|ela|ele)\b/.test(normalized)) return true;
+  if (/\b(o\s+que|que\s+pneu)\b.{0,30}\b(usar|colocar|trocar)\b/.test(normalized)) return true;
+  return false;
+}
+
+function findOrganizerNumberFact(context: PlannerContext, factKeys: string[]): number | undefined {
+  const fact = context.organizer_facts.find(
+    (candidate) => factKeys.includes(candidate.fact_key) && isUsableOrganizerFact(candidate),
+  );
+  if (!fact) return undefined;
+  const value = fact.fact_value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return Number(value.trim());
+  return undefined;
 }
 
 function shouldEnsurePolicyTool(context: PlannerContext, normalizedToolRequests: unknown[]): boolean {

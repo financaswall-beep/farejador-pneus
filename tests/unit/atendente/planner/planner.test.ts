@@ -535,6 +535,48 @@ describe('Planner Sprint 3', () => {
       tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
     });
   });
+
+  it('v1.2.5: promove pedir_dados_faltantes para buscar_e_ofertar quando organizer_facts ja tem moto e cliente pergunta qual pneu serve', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'pedir_dados_faltantes',
+          missing_slots: ['medida_pneu'],
+          tool_requests: [],
+          risk_flags: [],
+          confidence: 0.6,
+          rationale: 'falta medida',
+          prompt_version: 'planner_v1.2.5',
+        },
+        context({
+          recent_messages: [
+            {
+              id: '00000000-0000-4000-8000-000000000099',
+              role: 'customer',
+              text: 'Qual pneu serve pra ela?',
+              sent_at: baseTime,
+            },
+          ],
+          organizer_facts: [
+            organizerFact('moto_modelo', 'CG'),
+            organizerFact('moto_ano', 2023),
+            organizerFact('moto_cilindrada', 160),
+          ],
+        }),
+      ),
+    );
+
+    expect(normalized.skill).toBe('buscar_e_ofertar');
+    expect(normalized.missing_slots).toEqual([]);
+    expect(normalized.tool_requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool: 'buscarCompatibilidade',
+          input: expect.objectContaining({ moto_modelo: 'CG', moto_ano: 2023 }),
+        }),
+      ]),
+    );
+  });
 });
 
 function organizerFact(factKey: string, factValue: unknown): PlannerContext['organizer_facts'][number] {

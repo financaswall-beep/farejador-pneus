@@ -15,6 +15,8 @@ export type SayValidationResult =
 
 export interface SayValidationContext {
   recent_tool_results: ToolResultForValidation[];
+  /** Skill selecionada pelo Planner; quando 'pedir_dados_faltantes' o fallback seguro fica proibido. */
+  selected_skill?: string;
 }
 
 const SAFE_FALLBACK_PHRASE = normalizeText(
@@ -26,6 +28,12 @@ export function validateSay(say: string, context: SayValidationContext): SayVali
 
   if (mixesSafeFallbackWithOtherContent(normalizedSay)) {
     return block('mixed_safe_fallback_with_other_content');
+  }
+
+  // Sprint v1.3.1: skill 'pedir_dados_faltantes' nao pode terminar em fallback seco.
+  // Em vez disso, o Generator deve pedir o slot ausente.
+  if (context.selected_skill === 'pedir_dados_faltantes' && isExactSafeFallback(normalizedSay)) {
+    return block('safe_fallback_not_allowed_for_pedir_dados_faltantes');
   }
 
   if (mentionsStockClaim(normalizedSay) && !hasStockEvidence(context.recent_tool_results)) {
@@ -97,6 +105,12 @@ function normalizeText(text: string): string {
 function mixesSafeFallbackWithOtherContent(text: string): boolean {
   if (!text.includes(SAFE_FALLBACK_PHRASE)) return false;
   return text.replace(SAFE_FALLBACK_PHRASE, '').replace(/[\s.,!?;:()\[\]"'`-]/g, '').length > 0;
+}
+
+function isExactSafeFallback(text: string): boolean {
+  if (!text.includes(SAFE_FALLBACK_PHRASE)) return false;
+  // Mesma logica do mixed-check, mas invertida: sobra apenas pontuacao/whitespace.
+  return text.replace(SAFE_FALLBACK_PHRASE, '').replace(/[\s.,!?;:()\[\]"'`-]/g, '').length === 0;
 }
 
 function mentionsStockClaim(text: string): boolean {

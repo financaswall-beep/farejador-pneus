@@ -38,6 +38,7 @@ interface ActiveFactRow {
   id: string;
   truth_type: TruthType;
   confidence_level: string | null;
+  fact_value: unknown;
 }
 
 /**
@@ -55,6 +56,32 @@ export async function writeFactWithEvidence(
   evidence: Omit<EvidenceInsert, 'fact_id' | 'environment'>,
 ): Promise<string> {
   const activeFact = await findActiveFact(client, fact);
+
+  // Dedup: se o fact ativo ja tem o mesmo valor (deep equal), mesma truth_type e confidence >= novo,
+  // nao insere linha nova; apenas anexa evidence ao fact existente. Mantem ledger limpo.
+  if (
+    activeFact &&
+    activeFact.truth_type === fact.truth_type &&
+    Number(activeFact.confidence_level ?? 0) >= fact.confidence_level &&
+    deepEqualJsonValue(activeFact.fact_value, fact.fact_value)
+  ) {
+    await client.query(
+      `INSERT INTO analytics.fact_evidence
+         (environment, fact_id, from_message_id, evidence_text, evidence_type, extractor_version)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (fact_id, from_message_id, evidence_type) DO NOTHING`,
+      [
+        fact.environment,
+        activeFact.id,
+        evidence.from_message_id,
+        evidence.evidence_text,
+        evidence.evidence_type,
+        evidence.extractor_version,
+      ],
+    );
+    return activeFact.id;
+  }
+
   const supersedesActive = activeFact ? shouldSupersedeFact(fact, activeFact) : false;
   const supersededBy = activeFact && !supersedesActive ? activeFact.id : null;
 
@@ -116,7 +143,7 @@ async function findActiveFact(
   fact: Pick<FactInsert, 'environment' | 'conversation_id' | 'fact_key'>,
 ): Promise<ActiveFactRow | null> {
   const result = await client.query<ActiveFactRow>(
-    `SELECT id, truth_type, confidence_level::text AS confidence_level
+    `SELECT id, truth_type, confidence_level::text AS confidence_level, fact_value
      FROM analytics.conversation_facts
      WHERE environment = $1
        AND conversation_id = $2
@@ -127,6 +154,23 @@ async function findActiveFact(
     [fact.environment, fact.conversation_id, fact.fact_key],
   );
   return result.rows[0] ?? null;
+}
+
+function deepEqualJsonValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return false;
+  // Comparacao via JSON.stringify com chaves ordenadas — suficiente para JSONB simples.
+  return canonicalJson(a) === canonicalJson(b);
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
 }
 
 function truthRank(truthType: TruthType): number {

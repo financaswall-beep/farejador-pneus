@@ -42,8 +42,9 @@ import {
 // Validação
 // ------------------------------------------------------------------
 
-function toValidationCtx(toolResults: ToolExecutionResult[]): {
+function toValidationCtx(toolResults: ToolExecutionResult[], selectedSkill?: SkillName): {
   recent_tool_results: ToolResultForValidation[];
+  selected_skill?: string;
 } {
   return {
     recent_tool_results: toolResults.map((result) => ({
@@ -51,6 +52,7 @@ function toValidationCtx(toolResults: ToolExecutionResult[]): {
       ok: result.ok,
       output: result.output,
     })),
+    selected_skill: selectedSkill,
   };
 }
 
@@ -59,8 +61,9 @@ function runValidators(
   actions: AgentAction[],
   toolResults: ToolExecutionResult[],
   context: PlannerContext,
+  selectedSkill?: SkillName,
 ): { blocked: boolean; block_reason: string | null } {
-  const validationCtx = toValidationCtx(toolResults);
+  const validationCtx = toValidationCtx(toolResults, selectedSkill);
 
   const sayResult = validateSay(say, validationCtx);
   if (!sayResult.valid) {
@@ -128,7 +131,7 @@ function mockGenerateTurn(
       say = 'Como posso te ajudar?';
   }
 
-  const validation = runValidators(say, actions, toolResults, context);
+  const validation = runValidators(say, actions, toolResults, context, skill);
   const usedSafeFallback = say === SAFE_FALLBACK_SAY;
 
   return {
@@ -253,7 +256,7 @@ export async function generateTurn(
       };
     }
 
-    const validation = runValidators(say, actions, toolResults, context);
+    const validation = runValidators(say, actions, toolResults, context, decision.output.skill);
 
     return {
       say_text: validation.blocked ? null : say,

@@ -207,6 +207,27 @@ describe('SayValidator inicial', () => {
     ).toEqual({ valid: true });
   });
 
+  it('bloqueia fallback seguro quando skill e pedir_dados_faltantes', () => {
+    expect(
+      validateSay('Desculpe, não consigo confirmar essa informação agora. Um atendente poderá te ajudar em breve.', {
+        recent_tool_results: [],
+        selected_skill: 'pedir_dados_faltantes',
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'safe_fallback_not_allowed_for_pedir_dados_faltantes',
+    });
+  });
+
+  it('permite resposta util em pedir_dados_faltantes', () => {
+    expect(
+      validateSay('Me passa a medida do pneu traseiro, ex.: 110/90-17.', {
+        recent_tool_results: [],
+        selected_skill: 'pedir_dados_faltantes',
+      }),
+    ).toEqual({ valid: true });
+  });
+
   it.each([
     ['parcelamento', 'Parcelamos em até 4x sem juros.'],
     ['troca', 'Você pode trocar em até 7 dias após a compra.'],
