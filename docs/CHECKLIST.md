@@ -1,6 +1,6 @@
 # Checklist Master - Farejador
 
-Atualizado: 2026-05-06
+Atualizado: 2026-05-07
 
 > Nota: este checklist preserva historico das Fases 1/2a. Para o estado vivo
 > da Fase 3 e proximo passo, use `docs/NEXT_CHAT_HANDOFF.md` e
@@ -27,6 +27,8 @@ Atualizado: 2026-05-06
 - [x] Fix planner_v1.2.5: Planner usa organizer_facts para buscarCompatibilidade.
 - [x] Fix generator_v1.3.1: Generator proibe SAFE_FALLBACK em pedir_dados_faltantes.
 - [x] Fix phase3 dedup: facts identicos nao geram nova linha no ledger.
+- [x] PR 1 Generator audit: turns bloqueados preservam candidato em
+  `blocked_say_text`/`blocked_payload`; `update_draft` tem metacampos.
 - [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
 - [ ] Critic (Sprint 7).
 - [ ] Envio Chatwoot pela Atendente (Sprint 8).
@@ -247,8 +249,9 @@ Pendente da F1.5:
 - [x] `0025_planner_foundation.sql` (Planner foundation)
 - [x] `0026_tool_executor_events.sql` (eventos do Tool Executor)
 - [x] `0027_generator_shadow_events.sql` (evento `generator_produced`)
+- [x] `0028_generator_blocked_turn_audit.sql` (candidato bloqueado em `agent.turns`)
 - [x] Cada migration idempotente (CREATE/ALTER IF NOT EXISTS)
-- [x] Migrations 0013-0027 aplicadas/validadas no Supabase atual
+- [x] Migration `0028` aplicada/validada no Supabase atual para este deploy/push
 - [ ] Testes de integracao por migration (Kimi escreve depois)
 
 ### 7.3 Etapa C - Codigo TypeScript
@@ -319,6 +322,8 @@ Pendente da F1.5:
 - [x] Generator shadow
 - [x] Generator LLM real rodando em shadow e gravando respostas candidatas em
   `agent.turns`, sem envio Chatwoot
+- [x] Turns bloqueados mantem auditoria do candidato em `blocked_say_text` e
+  `blocked_payload`, sem enviar a frase ao cliente
 - [ ] Critic shadow
 - [ ] Sugestao assistida para humano
 - [ ] Atendente liga envio Chatwoot somente apos autorizacao explicita

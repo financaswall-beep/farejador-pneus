@@ -71,6 +71,7 @@ Guarda:
 - versao do agente;
 - hash do contexto;
 - output `{ say, actions }`;
+- candidato bloqueado (`blocked_say_text`, `blocked_actions`, `blocked_payload`), quando o validator barra a resposta;
 - status;
 - mensagem enviada no Chatwoot, se houver.
 

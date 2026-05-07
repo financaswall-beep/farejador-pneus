@@ -33,6 +33,7 @@ Ordem de execução:
 25. `0025_planner_foundation.sql` - base do Sprint 3 Planner: adiciona `planner_decided`, `aliases` em `commerce.vehicle_models`, `commerce.resolve_vehicle_model` e realinha helpers para `fitment_position`, `fitment_source`, `match_similarity`.
 26. `0026_tool_executor_events.sql` - base do Sprint 4 Executor: adiciona `tool_executed` e `tool_failed` ao ledger `agent.session_events`.
 27. `0027_generator_shadow_events.sql` - base do Sprint 6 Generator Shadow: adiciona `generator_produced` ao ledger `agent.session_events` para auditoria da resposta candidata, sem envio Chatwoot.
+28. `0028_generator_blocked_turn_audit.sql` - PR 1 de hardening: adiciona `blocked_say_text`, `blocked_actions` e `blocked_payload` em `agent.turns` para auditar o texto/actions candidatos quando o Generator e bloqueado pelo Say/Action Validator.
 
 ## Convenções
 

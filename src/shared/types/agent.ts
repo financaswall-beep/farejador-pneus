@@ -73,6 +73,12 @@ export interface Turn {
   say_text: string | null;
   /** JSON array of AgentAction (see zod/agent-actions.ts). */
   actions: unknown[];
+  /** Candidate text kept only when status='blocked'. */
+  blocked_say_text: string | null;
+  /** Candidate actions kept only when status='blocked'. */
+  blocked_actions: unknown[];
+  /** Audit snapshot for blocked turns. */
+  blocked_payload: Record<string, unknown> | null;
   status: TurnStatus;
   /** Logical FK → core.messages(id). */
   delivered_message_id: string | null;

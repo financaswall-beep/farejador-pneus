@@ -39,11 +39,12 @@ LLM nunca toca banco. Action nunca executa sem validacao.
    (debounce por conversation_id, last_message_id atualizado)
 7. Farejador aciona Atendente passando session_id e message_id
 8. Context Builder le banco (cart_current, order_drafts, facts, etc)
-9. Atendente recebe prompt, devolve { say, actions }
-10. Validator valida cada action
-11. Action handler executa (grava agent.cart_*, agent.order_drafts, etc)
-12. Atendente envia mensagem ao Chatwoot
-13. Atendente grava agent.turns (idempotente por trigger_message_id)
+9. Atendente recebe prompt, devolve `{ say, actions }`
+10. Say/Action Validators validam texto e actions
+11. Atendente grava `agent.turns` (idempotente por trigger_message_id)
+    - se bloqueado: `say_text=NULL` e candidato preservado em `blocked_say_text`/`blocked_payload`
+12. Action handler executa actions aprovadas (grava agent.cart_*, agent.order_drafts, etc)
+13. Futuro Sprint 8: Atendente envia mensagem ao Chatwoot somente quando envio estiver habilitado
 ```
 
 Ordem garantida: o Atendente so e acionado **depois** de `core.messages` ter a mensagem.

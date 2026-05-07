@@ -219,6 +219,10 @@ function makeAddToCartAction(productId: string): AddToCartAction {
 function makeUpdateDraftAction(): UpdateDraftAction {
   return {
     type: 'update_draft',
+    action_id: randomUUID(),
+    turn_index: 1,
+    emitted_at: '2026-05-04T12:00:00.000Z',
+    emitted_by: 'generator',
     customer_name: 'Cliente Teste',
     delivery_address: 'Rua Teste, 123',
     fulfillment_mode: 'delivery',

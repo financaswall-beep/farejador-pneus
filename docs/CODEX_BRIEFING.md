@@ -1,6 +1,6 @@
 # Briefing Para Codex - Farejador
 
-Atualizado: 2026-05-05.
+Atualizado: 2026-05-07.
 
 ## Leitura Rapida
 
@@ -32,6 +32,9 @@ Implementado:
 - Ajuste pre-Critic: Generator calibrado para emitir memoria operacional em
     tempo real (`create_item`, `update_slot`, `update_draft`) e recebe
     `state.items` + `organizer_facts` no contexto.
+- PR 1 Generator audit: turns bloqueados preservam candidato em
+    `blocked_say_text`/`blocked_payload`; `update_draft` agora tem
+    `action_id` e demais metacampos obrigatorios.
 
 Desligado/inexistente:
 
@@ -52,14 +55,14 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Sprint 7: Critic Shadow da Atendente.
+Proximo lote recomendado: PR 2 de estado/contexto. A migration 0028 ja foi
+aplicada e o PR 1 esta pronto para rodar em shadow.
 
 Escopo:
 
-- avaliar resposta candidata do Generator antes de qualquer envio;
-- bloquear ou aprovar com motivo auditavel;
-- gravar auditoria em `agent.*`/`ops.*`;
-- nao enviar mensagem para Chatwoot nesta sprint.
+- Bug 8: limite de mensagens do Context Builder configuravel.
+- Bug 16: popular `derived_signals.stale_slots`.
+- Bug 1/Bug 6: invalidar oferta/slots quando cliente muda moto/medida/dados.
 
 Alternativa imediata se dados disponiveis:
 
@@ -75,9 +78,9 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 316/316 verde, 49 arquivos
+- `npm test`: 367/367 verde, 50 arquivos
 - `npm run typecheck`: verde
-- `npm run build`: verde
+- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde
 
 ## Arquivos De Estado
 

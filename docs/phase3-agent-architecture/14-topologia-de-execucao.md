@@ -51,13 +51,14 @@ Responsabilidades:
 - escolher skill via Planner constrained sobre o estado reentrante;
 - chamar LLM Atendente;
 - aplicar Say Validator + Action Validator;
+- gravar `agent.turns` (idempotente). Em turn bloqueado, `say_text` fica
+  `NULL` e o candidato fica em `blocked_say_text`/`blocked_payload`;
 - executar action handlers (gravam `agent.*`);
-- postar resposta no Chatwoot via API;
-- gravar `agent.turns` (idempotente).
+- postar resposta no Chatwoot via API apenas quando Sprint 8/envio estiver habilitado.
 
-Nota de estado em 03/05/2026: a Atendente ja tem estado reentrante, Planner
-foundation, Tool Executor e Worker Shadow log-only. Ainda nao existem Generator,
-Critic nem envio Chatwoot pela Atendente.
+Nota de estado em 07/05/2026: a Atendente ja tem estado reentrante, Planner,
+Tool Executor, Worker Shadow log-only e Generator Shadow. Critic e envio
+Chatwoot pela Atendente ainda nao existem.
 
 Nao pode:
 

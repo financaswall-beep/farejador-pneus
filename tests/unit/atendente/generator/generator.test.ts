@@ -56,12 +56,14 @@ const baseTime = '2026-05-03T12:00:00.000Z';
 let generatorPromptVersion: string;
 
 let generateTurn: typeof import('../../../../src/atendente/generator/service.js').generateTurn;
+let recordGeneratorResult: typeof import('../../../../src/atendente/generator/service.js').recordGeneratorResult;
 let buildGeneratorMessages: typeof import('../../../../src/atendente/generator/prompt.js').buildGeneratorMessages;
 let SAFE_FALLBACK_SAY: string;
 
 beforeAll(async () => {
   const module = await import('../../../../src/atendente/generator/service.js');
   generateTurn = module.generateTurn;
+  recordGeneratorResult = module.recordGeneratorResult;
 
   const prompt = await import('../../../../src/atendente/generator/prompt.js');
   buildGeneratorMessages = prompt.buildGeneratorMessages;
@@ -225,6 +227,7 @@ describe('Generator Shadow — não inventa preço sem tool', () => {
     expect(result.blocked).toBe(true);
     expect(result.block_reason).toBe('money_mentioned_without_tool_result');
     expect(result.say_text).toBeNull();
+    expect(result.candidate_say_text).toBe('O pneu custa R$ 350,00.');
     expect(result.used_llm).toBe(true);
     disableLlm();
   });
@@ -611,6 +614,67 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
       slot_key: 'forma_pagamento',
       value: 'cartao_credito',
     });
+    expect(result.actions[5]).toMatchObject({
+      type: 'update_draft',
+      action_id: expect.any(String),
+      turn_index: 2,
+      emitted_by: 'generator',
+      payment_method: 'cartao_credito',
+    });
     disableLlm();
+  });
+});
+
+describe('Generator Shadow — auditoria de bloqueios', () => {
+  it('recordGeneratorResult persiste o candidato bloqueado para auditoria', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'responder_logistica',
+      {
+        say_text: null,
+        actions: [],
+        blocked: true,
+        block_reason: 'delivery_claim_without_calcular_frete',
+        candidate_say_text: 'Entregamos amanhã no seu bairro.',
+        candidate_actions: [],
+        candidate_raw_actions: [],
+        used_llm: true,
+        fallback_used: false,
+        input_tokens: 11,
+        output_tokens: 7,
+        duration_ms: 123,
+      },
+      '00000000-0000-4000-8000-0000000000ee',
+    );
+
+    expect(queries[0]!.sql).toContain('blocked_say_text');
+    expect(queries[0]!.sql).toContain('blocked_actions');
+    expect(queries[0]!.sql).toContain('blocked_payload');
+    expect(queries[0]!.params[14]).toBe('Entregamos amanhã no seu bairro.');
+    expect(queries[0]!.params[15]).toBe('[]');
+
+    const blockedPayload = JSON.parse(queries[0]!.params[16] as string);
+    expect(blockedPayload).toMatchObject({
+      say_text: 'Entregamos amanhã no seu bairro.',
+      block_reason: 'delivery_claim_without_calcular_frete',
+      used_llm: true,
+    });
+
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    expect(eventPayload).toMatchObject({
+      say_text: null,
+      blocked: true,
+      blocked_say_text: 'Entregamos amanhã no seu bairro.',
+      block_reason: 'delivery_claim_without_calcular_frete',
+    });
   });
 });

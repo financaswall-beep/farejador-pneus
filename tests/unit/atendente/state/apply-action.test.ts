@@ -480,13 +480,13 @@ describe('applyAction - estado reentrante da Atendente', () => {
   });
 
   it('update_draft guarda checkout e marca ready quando dados minimos existem', () => {
-    const result = applyAction(state(), {
+    const result = applyAction(state(), baseAction({
       type: 'update_draft',
       customer_name: 'Joao Silva',
       delivery_address: 'Rua das Flores, 123',
       fulfillment_mode: 'delivery',
       payment_method: 'pix',
-    });
+    }));
 
     expect(result.state.order_draft?.customer_name).toBe('Joao Silva');
     expect(result.state.order_draft?.delivery_address).toBe('Rua das Flores, 123');

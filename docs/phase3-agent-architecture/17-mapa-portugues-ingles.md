@@ -271,7 +271,10 @@ Padrao para todas as tabelas:
 | hash do contexto | `context_hash` |
 | output `say` | `say_text` |
 | output `actions` | `actions` (JSONB) |
-| status | `status` (`generated`, `validated`, `delivered`, `failed`) |
+| candidato bloqueado (texto) | `blocked_say_text` |
+| candidato bloqueado (actions) | `blocked_actions` (JSONB) |
+| auditoria do bloqueio | `blocked_payload` (JSONB) |
+| status | `status` (`generated`, `validated`, `delivered`, `failed`, `blocked`) |
 | mensagem enviada | `delivered_message_id` |
 
 UNIQUE: `(environment, trigger_message_id, agent_version)`.

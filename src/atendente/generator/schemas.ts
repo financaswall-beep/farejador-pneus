@@ -177,6 +177,7 @@ export function hydrateGeneratorAction(
       break;
     case 'update_draft':
       candidate = {
+        ...base,
         type: 'update_draft',
         customer_name: raw.customer_name,
         delivery_address: raw.delivery_address,
@@ -243,6 +244,12 @@ export interface GeneratorResult {
   blocked: boolean;
   /** Motivo do bloqueio, preenchido quando blocked=true. */
   block_reason: string | null;
+  /** Texto candidato bloqueado. Preenchido apenas quando havia candidato auditavel. */
+  candidate_say_text: string | null;
+  /** Actions candidatas hidratadas antes do bloqueio. */
+  candidate_actions: AgentAction[];
+  /** Actions cruas recebidas da LLM, quando disponiveis para auditoria. */
+  candidate_raw_actions?: unknown[];
   used_llm: boolean;
   fallback_used: boolean;
   input_tokens: number;

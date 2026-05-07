@@ -23,6 +23,13 @@ import {
   staleFlagSchema,
 } from './agent-state.js';
 
+const stateActionBaseSchema = z.object({
+  action_id: z.string().uuid(),
+  turn_index: z.number().int().min(0),
+  emitted_at: z.string().datetime(),
+  emitted_by: z.enum(['generator', 'system', 'human_override']),
+});
+
 // ------------------------------------------------------------------
 // Cart actions
 // ------------------------------------------------------------------
@@ -59,7 +66,7 @@ export const clearCartSchema = z.object({
 // ------------------------------------------------------------------
 
 /** Update checkout slots in agent.order_drafts. Partial — only supplied fields are written. */
-export const updateDraftSchema = z.object({
+export const updateDraftSchema = stateActionBaseSchema.extend({
   type: z.literal('update_draft'),
   customer_name: z.string().min(1).max(120).optional(),
   delivery_address: z.string().min(1).max(500).optional(),
@@ -129,13 +136,6 @@ export const selectSkillSchema = z.object({
 // ------------------------------------------------------------------
 // Atendente v1 reentrant state actions
 // ------------------------------------------------------------------
-
-const stateActionBaseSchema = z.object({
-  action_id: z.string().uuid(),
-  turn_index: z.number().int().min(0),
-  emitted_at: z.string().datetime(),
-  emitted_by: z.enum(['generator', 'system', 'human_override']),
-});
 
 export const updateSlotSchema = stateActionBaseSchema.extend({
   type: z.literal('update_slot'),

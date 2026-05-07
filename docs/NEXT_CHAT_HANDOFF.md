@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-06 (planner_v1.2.5 + generator_v1.3.1 + dedup facts — em producao).
+Atualizado: 2026-05-07 (PR 1 Generator audit implementado e migration 0028 aplicada).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -11,10 +11,11 @@ cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
 Organizadora LLM, roda a fundacao da Atendente em shadow incluindo o Generator
 (que gera resposta candidata auditavel, mas nao envia nada).
 
-**Ultimo marco (2026-05-06):** tres bugs diagnosticados e corrigidos via auditoria
-de producao. Planner `v1.2.5` e Generator `v1.3.1` em prod. 366 testes verdes.
-Pipeline Organizadora -> Planner -> Tool -> Generator validado end-to-end.
-Unico gap remanescente e o catalogo `commerce.*` vazio (dados da loja).
+**Ultimo marco (2026-05-07):** PR 1 do hardening implementado.
+Turns bloqueados agora preservam candidato em `blocked_say_text`/`blocked_payload`
+e `update_draft` ganhou metacampos/idempotencia. 367 testes unitarios verdes +
+integration especifico 7/7. Migration `0028` aplicada e verificada no Supabase
+atual.
 
 ## Ja Implementado
 
@@ -63,6 +64,12 @@ Atendente:
   Supabase atual em 2026-05-03 (adiciona 'generator_produced' ao CHECK de
   `agent.session_events`). Em producao atual, LLM real esta habilitado em
   shadow com `GENERATOR_OPENAI_API_KEY` e `GENERATOR_MODEL` configurados.
+- PR 1 Generator audit (2026-05-07): migration
+  `0028_generator_blocked_turn_audit.sql` adiciona `blocked_say_text`,
+  `blocked_actions`, `blocked_payload` em `agent.turns`; `recordGeneratorResult`
+  grava o candidato bloqueado; `update_draft` agora exige e recebe
+  `action_id`, `turn_index`, `emitted_at`, `emitted_by`. Migration aplicada e
+  verificada no Supabase atual.
 - Organizadora v3.4 calibrada:
   prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
   de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
@@ -117,7 +124,7 @@ Atendente:
   Correcao: `writeFactWithEvidence` faz deep-equal check via `deepEqualJsonValue`
   + `canonicalJson` antes do INSERT. Se identico, apenas anexa evidence ao fact
   existente e retorna o id existente. 1 novo teste. Commit `cb5a7f8`.
-- Suite: 366/366 verde. Deploy 2026-05-06, ativo em prod em ~50s.
+- Suite verde naquele ciclo. Deploy 2026-05-06, ativo em prod em ~50s.
 
 ## O Que Ainda Nao Existe
 
@@ -131,12 +138,12 @@ Atendente:
 
 ## Validacao Atual
 
-Ultima validacao (2026-05-06, pos fix planner_v1.2.5 + generator_v1.3.1):
+Ultima validacao (2026-05-07, pos PR 1 Generator audit):
 
-- `npx vitest run`: 366/366 verde, 50 arquivos.
+- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
-- `npm run build`: verde.
-- Deploy: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
+- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:
   "Minha moto e Biz 125 2019." + "Qual pneu traseiro serve pra ela?"

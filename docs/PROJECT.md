@@ -1,6 +1,6 @@
 # Farejador - Visao Atual do Projeto
 
-Atualizado: 2026-05-06.
+Atualizado: 2026-05-07.
 
 Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
 Postgres/Supabase e prepara uma fundacao auditavel para analytics,
@@ -30,6 +30,7 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | Fix planner_v1.2.5 - Planner usa organizer_facts | Implementado em prod |
 | Fix generator_v1.3.1 - Generator proibe SAFE_FALLBACK em pedir_dados_faltantes | Implementado em prod |
 | Fix phase3 repo - dedup de facts identicos por valor | Implementado em prod |
+| PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -53,9 +54,15 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - Generator `generator_v1.3.1` proibe resposta SAFE_FALLBACK quando skill e
   `pedir_dados_faltantes`; SayValidator bloqueia com razao
   `safe_fallback_not_allowed_for_pedir_dados_faltantes`.
+- `agent.turns` preserva candidato bloqueado em `blocked_say_text`,
+  `blocked_actions` e `blocked_payload`; `say_text` continua `NULL` quando
+  `status='blocked'`.
+- `update_draft` emitido pelo Generator agora carrega `action_id`,
+  `turn_index`, `emitted_at` e `emitted_by`, permitindo idempotencia igual as
+  demais actions de estado.
 - `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
   antes de inserir nova linha — so anexa evidence ao fact existente.
-- Migrations ate `0027` aplicadas/validadas no Supabase atual.
+- Migrations ate `0028` aplicadas/validadas no Supabase atual.
 
 ## O Que Ainda Nao Esta Ligado
 

@@ -1106,7 +1106,9 @@ Historico imutavel do que o agente decidiu na sessao. Append-only. Skill ativada
 
 ### `agent.turns`
 
-Cada resposta da LLM Atendente. Guarda mensagem que disparou, skill escolhida, output `{ say, actions }`, mensagem enviada no Chatwoot.
+Cada resposta da LLM Atendente. Guarda mensagem que disparou, skill escolhida, output `{ say, actions }` e, no futuro, mensagem enviada no Chatwoot.
+
+Quando `status='blocked'`, `say_text` fica `NULL` por seguranca, mas o candidato bloqueado fica auditavel em `blocked_say_text`, `blocked_actions` e `blocked_payload`. Isso permite ver o que o Generator tentou dizer sem expor a frase ao cliente.
 
 Idempotente: mesmo `trigger_message_id` + `agent_version` nao gera dois turnos.
 

@@ -139,6 +139,8 @@ function mockGenerateTurn(
     actions: validation.blocked ? [] : actions,
     blocked: validation.blocked,
     block_reason: validation.block_reason,
+    candidate_say_text: validation.blocked ? say : null,
+    candidate_actions: validation.blocked ? actions : [],
     used_llm: false,
     fallback_used: usedSafeFallback,
     input_tokens: 0,
@@ -164,6 +166,8 @@ function fallbackResult(reason: string): GeneratorResult {
     actions: [],
     blocked: true,
     block_reason: reason,
+    candidate_say_text: null,
+    candidate_actions: [],
     used_llm: false,
     fallback_used: true,
     input_tokens: 0,
@@ -249,6 +253,9 @@ export async function generateTurn(
         ...fallbackResult(
           `generator_action_hydration_failed:indexes=${invalid_indexes.join(',')}`,
         ),
+        candidate_say_text: say,
+        candidate_actions: actions,
+        candidate_raw_actions: rawActions,
         input_tokens: llmResult.inputTokens,
         output_tokens: llmResult.outputTokens,
         duration_ms: llmResult.durationMs,
@@ -263,6 +270,9 @@ export async function generateTurn(
       actions: validation.blocked ? [] : actions,
       blocked: validation.blocked,
       block_reason: validation.block_reason,
+      candidate_say_text: validation.blocked ? say : null,
+      candidate_actions: validation.blocked ? actions : [],
+      candidate_raw_actions: validation.blocked ? rawActions : undefined,
       used_llm: true,
       fallback_used: false,
       input_tokens: llmResult.inputTokens,
@@ -320,14 +330,32 @@ export async function recordGeneratorResult(
 
   // Grava em agent.turns — shadow: status='generated' ou 'blocked'.
   // Não preenche delivered_message_id (envio não existe ainda).
+  const blockedSayText = result.blocked ? result.candidate_say_text : null;
+  const blockedActions = result.blocked ? result.candidate_actions : [];
+  const blockedPayload = result.blocked
+    ? {
+        say_text: blockedSayText,
+        actions: blockedActions,
+        raw_actions: result.candidate_raw_actions ?? null,
+        block_reason: result.block_reason,
+        used_llm: result.used_llm,
+        fallback_used: result.fallback_used,
+        prompt_version: generatorPromptVersion,
+        agent_version: generatorAgentVersion,
+        input_tokens: result.input_tokens,
+        output_tokens: result.output_tokens,
+        duration_ms: result.duration_ms,
+      }
+    : null;
+
   await client.query(
     `INSERT INTO agent.turns
        (id, environment, conversation_id, trigger_message_id,
         selected_skill, agent_version, context_hash,
         say_text, actions, status,
         llm_duration_ms, llm_input_tokens, llm_output_tokens,
-        error_message)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        error_message, blocked_say_text, blocked_actions, blocked_payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      ON CONFLICT (environment, trigger_message_id, agent_version) DO NOTHING`,
     [
       turnId,
@@ -344,6 +372,9 @@ export async function recordGeneratorResult(
       result.input_tokens,
       result.output_tokens,
       result.block_reason,
+      blockedSayText,
+      JSON.stringify(blockedActions),
+      blockedPayload ? JSON.stringify(blockedPayload) : null,
     ],
   );
 
@@ -364,6 +395,8 @@ export async function recordGeneratorResult(
         say_text: result.blocked ? null : result.say_text,
         blocked: result.blocked,
         block_reason: result.block_reason,
+        blocked_say_text: blockedSayText,
+        blocked_actions_count: blockedActions.length,
         actions_count: result.actions.length,
         used_llm: result.used_llm,
         fallback_used: result.fallback_used,

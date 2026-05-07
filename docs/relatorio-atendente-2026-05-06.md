@@ -194,7 +194,7 @@ Avaliação dos facts extraídos nas convs de validação:
 | Planner | planner_v1.2.5 | Em prod |
 | Generator | generator_v1.3.1 | Em prod |
 | Organizadora | moto-pneus-hybrid-v3-4 | Em prod |
-| Testes | 366/366 | Verde |
+| Testes | Suite daquele ciclo | Verde |
 | Catálogo commerce.* | Vazio | Bloqueado por dados da loja |
 | Critic (Sprint 7) | Não iniciado | Próxima fase |
 | Envio Chatwoot (Sprint 8) | Não iniciado | Futura fase |

@@ -156,16 +156,20 @@ Worker Shadow:
   `generator_produced` em shadow.
 - Respostas candidatas foram gravadas em `agent.turns`; nenhuma mensagem foi
   enviada ao cliente.
+- Hardening PR 1 (2026-05-07): turns bloqueados passam a preservar candidato
+  em `blocked_say_text`/`blocked_actions`/`blocked_payload`, e `update_draft`
+  agora recebe metacampos (`action_id`, `turn_index`, `emitted_at`,
+  `emitted_by`) como as demais actions emitidas pelo Generator.
 - Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
   dados faltantes sem inventar preco, estoque ou frete.
 
 ## Validacao Atual
 
-Ultima validacao (pos Sprint 6 + Organizadora v3.4):
+Ultima validacao (pos PR 1 Generator audit):
 
-- `npm test`: 316/316 verde, 49 arquivos.
+- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
-- `npm run build`: verde.
+- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

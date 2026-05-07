@@ -1,6 +1,6 @@
 # Handoff - Farejador
 
-Atualizado: 2026-05-06.
+Atualizado: 2026-05-07.
 
 Este arquivo e o handoff operacional curto. Para contexto completo da proxima
 conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
@@ -43,6 +43,11 @@ Implementado:
   Controlado por `GENERATOR_LLM_ENABLED` (default false). Em producao atual,
   o Generator LLM real foi habilitado em shadow com `GENERATOR_OPENAI_API_KEY`
   e `GENERATOR_MODEL` configurados.
+- PR 1 de hardening do Generator (2026-05-07): `agent.turns` ganhou
+  `blocked_say_text`, `blocked_actions` e `blocked_payload` para preservar
+  candidatos bloqueados sem enviar nada ao cliente. `update_draft` agora e
+  hidratado com `action_id`, `turn_index`, `emitted_at` e `emitted_by`, e o
+  schema exige esses metacampos.
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
@@ -86,7 +91,7 @@ Implementado:
   (3) Facts identicos eram inseridos como nova linha e depois supersedidos,
   poluindo o ledger. Corrigido com deep-equal check em `writeFactWithEvidence`
   antes do INSERT — se ativo e identical, apenas annexa evidence ao fact existente.
-  1 novo teste. Commit `cb5a7f8`. Deploy 2026-05-06. 366/366 verde.
+  1 novo teste. Commit `cb5a7f8`. Deploy 2026-05-06. Suite verde naquele ciclo.
 - Validacao end-to-end prod 2026-05-06:
   Conv 441 — "Qual pneu traseiro serve pra ela?" (moto Biz 125 2019 ja em
   organizer_facts) -> Planner v1.2.5 escolheu `buscar_e_ofertar +
@@ -104,8 +109,9 @@ Nao implementado/nao ligado:
 
 ## Ultimas Validacoes
 
-- `npx vitest run`: 366/366 verde, 50 arquivos.
+- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
+- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,
@@ -114,77 +120,6 @@ Nao implementado/nao ligado:
   extraidos corretamente, confianca 0.84-0.99. Autocorrecao de truth_type
   (corrected) funcionando quando cliente corrigiu moto no mesmo dialogo.
 - Catalogo commerce.* ainda vazio — proximo desbloqueio operacional.
-
-## Ultimas Validacoes
-
-- `npm test`: 316/316 verde, 49 arquivos.
-- `npm run typecheck`: verde.
-- `npm run build`: verde.
-- Migration `0027_generator_shadow_events.sql` aplicada no Supabase atual em
-  2026-05-03 e verificada: `generator_produced` aceito no CHECK de
-  `agent.session_events`.
-- Teste em producao com 6 conversas Chatwoot: `ops.atendente_jobs`,
-  `agent.turns` e eventos `generator_produced` gravando em shadow; Generator
-  LLM real gerou respostas candidatas sem envio ao cliente.
-- Teste em producao com 12 conversas Chatwoot em 2026-05-05: todas as mensagens
-  chegaram como `message_created/contact`; 6 jobs nasceram automaticamente e 6
-  foram recuperados manualmente. A correcao implementada nesta sessao adiciona
-  reconciliador automatico e endpoint admin para que lacunas desse tipo sejam
-  recuperadas sem perder turno da Atendente.
-- Pos-redeploy `cc42bfa`, run real `multiturn-20260505124936`: 6 conversas com
-  3 mensagens cada; 18/18 mensagens, 18/18 jobs e 18/18 turns em `prod`. Zero
-  job faltante. Dois jobs atrasaram mais de 30s, mas processaram. Qualidade LLM:
-  12/18 ok, 6/18 review. Problemas: frase generica de escalacao em 5 respostas,
-  uma resposta com politica/logistica sem lastro suficiente e uma resposta com
-  `temos Michelin disponivel` sem evidencia de estoque/catalogo.
-- Auditoria `multiturn-20260505132047`: o deploy Coolify das 13:18 implantou
-  `ce5ad8e` (docs-only), anterior ao commit local `032759c` com a calibracao.
-  O banco confirma que o run usou `planner_v1.1.0` + `generator_v1.2.0`, nao
-  `planner_v1.2.0` + `generator_v1.3.0`. Resultado factual do run antigo:
-  18/18 mensagens, 18/18 jobs processed, 18/18 turns generated, 8/18 ok,
-  10/18 review. Achado principal: muitas escalacoes vieram de
-  `planner_schema_failed` (contrato/schema invalido: `traseiro` vs `rear`,
-  `moto_ano` string, `municipio: null`, `buscarProduto` sem campo obrigatorio),
-  nao de validacao real da calibracao nova. Relatorio completo:
-  `docs/relatorio-atendente-2026-05-05.md`.
-- Pos-deploy correto `a07f78f`, run `multiturn-20260505135703`: banco confirmou
-  `planner_v1.2.0` + `generator_v1.3.0` em 18/18 turns. Resultado: 18/18 jobs
-  processed, 17 generated, 1 blocked; 8/18 ok, 10/18 review. `escalar_humano`
-  caiu de 12/18 para 9/18 e `tratar_objecao` apareceu 2 vezes. Gargalo real:
-  6/18 `planner_schema_failed` por contrato de tool (`buscarProduto` sem
-  medida/marca/product_code, `moto_ano` string, `posicao_pneu` em PT). Solucao
-  local aplicada em `planner_v1.2.1`: normalizacao antes da validacao estrita
-  (`traseiro` -> `rear`, ano string -> number, null omitido), enriquecimento de
-  tool input com estado/fatos da Organizadora e downgrade seguro de
-  `buscar_e_ofertar` sem tool valida para `pedir_dados_faltantes` em vez de
-  fallback humano. Testes: 331/331 verde; typecheck verde.
-- Sprint 6.7.5 local: SayValidator agora tambem bloqueia claims factuais de
-  politica comercial sem `buscarPoliticaComercial` relevante
-  (`policy_claim_without_tool_result`) e mismatches basicos de parcelamento/
-  forma de pagamento (`policy_claim_mismatches_tool_result`). Mantem meta-fala
-  liberada (ex.: "vou verificar", "preciso confirmar") para preservar conversa
-  interpretativa. `commerce.store_policies` em prod foi atualizado com
-  `parcelamento_maximo=4`, `formas_pagamento_aceitas=[pix, cartao_credito,
-  cartao_debito]`, `prazo_troca=7 dias`, `garantia_descricao` da montagem e
-  `horario_funcionamento` segunda a sabado 8h-17h. Testes: 351/351 verde;
-  typecheck e build verdes.
-- Pos-redeploy `56d73ca`, run focado `policy-20260505154005`: 6/6 mensagens,
-  6/6 jobs processed, 6/6 turns generated, zero blocked. Confirmado em eventos:
-  `planner_v1.2.1` + `generator_v1.3.0`. Parcelamento/pagamento acionou
-  `buscarPoliticaComercial` e respondeu corretamente: maximo 4x; boleto nao
-  aceito; Pix/cartao credito/cartao debito aceitos. Achado: perguntas de troca,
-  garantia e horario ficaram em fallback seguro porque o Planner nao chamou a
-  tool apesar das politicas existirem. Correcao local `planner_v1.2.2`: prompt
-  explicita boleto/parcelamento/troca/devolucao/garantia/horario e
-  normalizacao garante `buscarPoliticaComercial` em pergunta de politica quando
-  a tool esta disponivel. Testes: 353/353 verde; typecheck e build verdes.
-- Organizadora v3.4 validada em conversas novas: extraiu facts como
-  `moto_modelo`, `medida_pneu`, `posicao_pneu`, `bairro_mencionado`,
-  `concorrente_citado` e `moto_cilindrada` sem novos `schema_violation`.
-- Scripts operacionais locais higienizados em 2026-05-03 para nao carregar
-  `DATABASE_URL`, endpoint real de Chatwoot ou identificador de inbox como
-  default hardcoded. Devem ser executados sempre com `.env` local.
-- Migrations ate `0027` criadas/aplicadas no Supabase atual.
 
 ## Ultimos Commits Relevantes
 

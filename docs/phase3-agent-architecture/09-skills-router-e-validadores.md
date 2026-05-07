@@ -32,7 +32,9 @@ Action Handlers   (executam, gravam agent.*, postam Chatwoot)
 agent.turns + agent.session_events (auditoria)
 ```
 
-Se Say Validator bloqueia: registra incidente, devolve fallback educado.
+Se Say Validator bloqueia: o cliente nao recebe a frase candidata; o turno fica
+`status='blocked'` em `agent.turns`, com `say_text=NULL` e candidato preservado
+em `blocked_say_text`/`blocked_payload` para auditoria.
 
 Se Action Validator bloqueia uma action: registra incidente, demais actions seguem se forem independentes.
 
