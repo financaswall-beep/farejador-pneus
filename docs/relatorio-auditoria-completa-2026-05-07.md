@@ -497,6 +497,9 @@ A regra atual ("~5 semanas em shadow") é vaga. Cravando critérios concretos:
 
 ---
 
+| 2026-05-08 | **Execucao Codex PR 4:** Bug 11 implementado com reclaim de `ops.enrichment_jobs` `running` vencido via `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`; Bug 12 parcialmente implementado com `ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` e `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`; Bug 13 documentado como limitacao conhecida sem historico versionado de mensagem editada. Testes locais: `npm test` 381/381, typecheck e build verdes; integracao parcial passou em 2 suites e 3 suites dependentes de Testcontainers nao rodaram por falta de runtime Docker. | Codex |
+| 2026-05-08 | **Smoke PR4 pos-redeploy:** conversas Chatwoot `454`-`459`. Organizadora processou 6/6 `enrichment_jobs` como `done`, tentativa 1, sem erro, com facts corretos para Titan 160, Biz 125/Pirelli/par, CB 300/140-70-17, Jardim America/entrega, Mercado Livre/achou_caro e Fazer 250. Planner `planner_v1.2.5` e Generator `generator_v1.3.2` rodaram com LLM real. Achados: Planner chamou `verificarEstoque` uma vez sem `product_id` (tool_failed seguro) e Generator fez claim de marca ("Tem Pirelli sim...") sem lastro; reforca prioridade do PR5 Say Validator comercial. | Codex |
+
 ## 12. Ordem de Execução das Correções
 
 Plano executável dos 17 bugs cravados em 5 PRs sequenciais + trabalho paralelo do Wallace no catálogo. Cada PR é independente e pode ser revisado/mergeado isoladamente.

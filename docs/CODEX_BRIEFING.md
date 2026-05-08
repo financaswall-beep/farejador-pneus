@@ -120,6 +120,15 @@ Ultima validacao conhecida:
   `payment_method=pix`, `fulfillment_mode=delivery`,
   `delivery_address=Rua das Flores 123, Meier`; `agent.session_events` gravou
   `draft_updated`. A resposta nao prometeu estoque; pediu confirmacao humana.
+- Smoke PR4 pos-redeploy (2026-05-08, Chatwoot conversas `454`-`459`):
+  Organizadora processou 6/6 `enrichment_jobs` como `done`, tentativa 1, sem
+  `last_error`; salvou facts como Titan 160/dianteiro, Biz 125/Pirelli/par, CB
+  300/140-70-17/traseiro/urgencia alta, Jardim America/entrega, Mercado
+  Livre/achou_caro, Fazer 250/110-70-17. Planner e Generator usaram LLM real
+  (`planner_v1.2.5`, `generator_v1.3.2`). Achados: Planner chamou
+  `verificarEstoque` uma vez sem `product_id` (tool_failed seguro), e Generator
+  disse "Tem Pirelli sim..." sem lastro comercial; isso confirma a prioridade do
+  PR5 Say Validator comercial.
 
 ## Arquivos De Estado
 

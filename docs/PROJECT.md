@@ -105,6 +105,12 @@ Organizadora LLM e Atendente em shadow/controle humano.
   gravou `draft_updated`. Resposta segura: dados anotados e confirmação humana
   de produto/estoque antes de fechar.
 
+- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora 6/6
+  jobs `done` sem erro; Planner e Generator rodaram com LLM real. Achados:
+  Planner chamou `verificarEstoque` sem `product_id` uma vez, e Generator fez
+  claim de marca ("Tem Pirelli sim...") sem lastro. Isso vira insumo direto do
+  PR5 comercial.
+
 ## O Que Ainda Nao Esta Ligado
 
 - Nenhum bot responde cliente.

@@ -149,6 +149,11 @@ Nao implementado/nao ligado:
   gerou `update_draft` com `customer_name=Joao Teste`, `payment_method=pix`,
   `fulfillment_mode=delivery`, `delivery_address=Rua das Flores 123, Meier`;
   `session_events` gravou `draft_updated`. Resposta nao prometeu estoque.
+- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora
+  processou 6/6 jobs como `done`, tentativa 1, sem erro. Planner e Generator
+  rodaram com LLM real. Achados para proximo hardening: Planner emitiu uma
+  chamada invalida a `verificarEstoque` sem `product_id`, e Generator afirmou
+  "Tem Pirelli sim..." antes de lastro comercial. Sem envio ao cliente.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

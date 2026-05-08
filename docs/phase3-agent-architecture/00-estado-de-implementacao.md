@@ -212,6 +212,11 @@ Ultima validacao (PR 4 local):
   `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` e os limites principais passaram para
   env (`ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`,
   `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`).
+- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora
+  processou 6/6 jobs como `done`, tentativa 1, sem `last_error`; Planner e
+  Generator usaram LLM real. Achados: Planner tentou `verificarEstoque` sem
+  `product_id` em um turno; Generator fez claim de marca ("Tem Pirelli sim...")
+  antes de lastro. Sem envio ao cliente.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.
