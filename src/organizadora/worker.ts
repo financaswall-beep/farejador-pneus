@@ -44,7 +44,6 @@ import { validateFactEvidence } from './evidence.js';
 
 const WORKER_ID = `organizadora-${randomUUID().slice(0, 8)}`;
 const EXTRACTOR_SOURCE = 'llm_openai_organizadora_v1';
-const MIN_CONFIDENCE = 0.55;
 
 type FactForWrite = ExtractedFact & { source?: string };
 
@@ -161,7 +160,7 @@ async function processJob(
 
   for (const fact of facts) {
     // 5a. Confidence mínima
-    if (fact.confidence_level < MIN_CONFIDENCE) {
+    if (fact.confidence_level < env.ORGANIZADORA_MIN_CONFIDENCE) {
       logger.debug(
         { fact_key: fact.fact_key, confidence: fact.confidence_level },
         'organizadora: fact below min confidence, skipping',
@@ -287,7 +286,7 @@ export async function pollAndOrganize(): Promise<void> {
 
     await client.query('BEGIN');
 
-    const job = await pickEnrichmentJob(client, env.FAREJADOR_ENV);
+    const job = await pickEnrichmentJob(client, env.FAREJADOR_ENV, env.ORGANIZADORA_STALE_JOB_AFTER_SECONDS);
 
     if (!job) {
       await client.query('COMMIT');
@@ -336,7 +335,13 @@ export function startOrganizadora(): () => void {
   }
 
   logger.info(
-    { worker_id: WORKER_ID, model: env.OPENAI_MODEL, poll_interval_ms: env.ORGANIZADORA_POLL_INTERVAL_MS },
+    {
+      worker_id: WORKER_ID,
+      model: env.OPENAI_MODEL,
+      poll_interval_ms: env.ORGANIZADORA_POLL_INTERVAL_MS,
+      min_confidence: env.ORGANIZADORA_MIN_CONFIDENCE,
+      stale_job_after_seconds: env.ORGANIZADORA_STALE_JOB_AFTER_SECONDS,
+    },
     'organizadora: starting',
   );
 

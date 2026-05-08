@@ -85,8 +85,8 @@ export async function buildPlannerContext(
        AND conversation_id = $2
        AND event_type IN ('tool_executed', 'tool_failed')
      ORDER BY occurred_at DESC
-     LIMIT 5`,
-    [environment, conversationId],
+     LIMIT $3`,
+    [environment, conversationId, env.ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT],
   );
   const organizerFacts = await client.query<{
     fact_key: string;
@@ -116,8 +116,8 @@ export async function buildPlannerContext(
      WHERE environment = $1
        AND conversation_id = $2
      ORDER BY observed_at DESC NULLS LAST, fact_key ASC
-     LIMIT 25`,
-    [environment, conversationId],
+     LIMIT $3`,
+    [environment, conversationId, env.ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT],
   );
 
   return {

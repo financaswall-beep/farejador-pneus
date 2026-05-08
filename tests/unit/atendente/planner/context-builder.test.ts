@@ -14,6 +14,8 @@ process.env.PLANNER_LLM_ENABLED = 'false';
 process.env.ATENDENTE_SHADOW_ENABLED = 'false';
 process.env.GENERATOR_LLM_ENABLED = 'false';
 process.env.ATENDENTE_CONTEXT_MESSAGES_LIMIT = '20';
+process.env.ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT = '7';
+process.env.ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT = '31';
 
 vi.mock('../../../../src/atendente/state/agent-state.repository.js', () => ({
   loadCurrent: vi.fn(async () => state()),
@@ -54,7 +56,9 @@ describe('buildPlannerContext', () => {
     expect(query.mock.calls[0]?.[0]).toContain('FROM core.messages');
     expect(query.mock.calls[0]?.[1]).toEqual(['test', conversationId, null, 20]);
     expect(query.mock.calls[1]?.[0]).toContain("event_type IN ('tool_executed', 'tool_failed')");
+    expect(query.mock.calls[1]?.[1]).toEqual(['test', conversationId, 7]);
     expect(query.mock.calls[2]?.[0]).toContain('FROM analytics.current_facts');
+    expect(query.mock.calls[2]?.[1]).toEqual(['test', conversationId, 31]);
   });
 
   it('le tool_executed e tool_failed reais como recent_tool_results', async () => {

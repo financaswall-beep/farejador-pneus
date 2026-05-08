@@ -66,14 +66,17 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Proximo lote recomendado: PR 4 de Organizadora/ops, depois do deploy e smoke
-LLM do PR 3.
+Proximo lote recomendado apos PR 4: PR 5 Say Validator comercial ou catalogo
+commerce, depois do deploy e smoke LLM do PR 4.
 
 Escopo:
 
-- Bug 11: lease/reclaim em `ops.enrichment_jobs`.
-- Bug 12: magic numbers para env.
-- Bug 13: decisao/documentacao sobre mensagem editada em evidence.
+- Bug 11 PR4: lease/reclaim em `ops.enrichment_jobs` implementado com
+  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`.
+- Bug 12 PR4: magic numbers principais movidos para env
+  (`ORGANIZADORA_MIN_CONFIDENCE`, limites de tool events e organizer_facts).
+- Bug 13 PR4: mensagem editada documentada como limitacao conhecida enquanto
+  nao existir historico versionado de `core.messages`; sem bypass no validator.
 
 Alternativa imediata se dados disponiveis:
 
@@ -89,10 +92,13 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 380/380 verde, 51 arquivos
+- PR4 local (2026-05-08): `npm test`: 381/381 verde, 52 arquivos
 - `npm run typecheck`: verde
-- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde
 - `npm run build`: verde
+- `npm run test:integration`: 13 testes passaram em 2 arquivos
+  (`atendente-state-persistence`, `atendente-commerce-tools`); 3 suites nao
+  rodaram porque Testcontainers/Docker nao esta disponivel neste ambiente
+  (`Could not find a working container runtime strategy`).
 - Smoke LLM real (2026-05-08) via Chatwoot fake `pr12-chatwoot-1778211526899`:
   Organizadora + Planner + Generator rodaram em shadow; 15 facts salvos,
   Planner `planner_v1.2.5`, Generator `generator_v1.3.1`, 13 mensagens no

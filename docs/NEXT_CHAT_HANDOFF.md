@@ -229,9 +229,13 @@ Duas frentes (ordenadas por prioridade):
   chama buscarCompatibilidade, Generator oferta produto real.
 
 **PR 4 — Organizadora/ops**:
-- Bug 11: lease/reclaim em `ops.enrichment_jobs` para recuperar job zumbi.
-- Bug 12: mover magic numbers para env com defaults.
-- Bug 13: decidir/documentar tratamento de mensagem editada em evidence.
+- Bug 11: lease/reclaim em `ops.enrichment_jobs` implementado para recuperar
+  job zumbi apos `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`.
+- Bug 12: magic numbers principais movidos para env com defaults:
+  `ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` e
+  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`.
+- Bug 13: decisao documentada; mensagem editada segue como limitacao conhecida
+  ate existir historico versionado de `core.messages`.
 
 Depois disso, voltar para **PR 5 Say Validator comercial** ou **Sprint 7
 Supervisora/Critic shadow**, dependendo do resultado do smoke PR3 e da
@@ -249,6 +253,6 @@ das tabelas relevantes e o formato de importacao esperado (CSV ou SQL direto)."
 
 Ou, se catalogo nao estiver disponivel:
 
-"Quero abrir o PR 4: hardening de Organizadora/ops. Primeiro leia o estado do
-repo, implemente lease/reclaim de enrichment_jobs, parametrizacao de magic
-numbers e documente a decisao sobre evidence em mensagem editada."
+"Quero abrir o PR 5: Say Validator comercial. Primeiro leia os blocks reais
+persistidos, reduza falso positivo se existir e so depois adicione bloqueios de
+desconto, promocao, marca e oferta custom sem lastro."

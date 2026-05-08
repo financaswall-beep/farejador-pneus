@@ -129,25 +129,28 @@ CREATE INDEX tire_specs_normalized_size_idx
   ON commerce.tire_specs (tire_size_normalized);
 ```
 
-### Bug 11 [M] — Sem lease/heartbeat em enrichment_jobs
+### Bug 11 [M] — Sem lease/heartbeat em enrichment_jobs [feito PR4]
 - **Arquivo:** [ops-phase3.repository.ts:30-43](../src/shared/repositories/ops-phase3.repository.ts)
 - **Sintoma:** `WHERE status IN ('pending', 'queued')`. Worker que crashar com job em `'running'` deixa job zumbi. `locked_at` é gravado mas nunca consultado.
 - **Atenuante:** Atendente tem reconciliador via [reconcile-jobs.ts](../src/atendente/reconcile-jobs.ts). Organizadora não tem.
-- **Fix:** adicionar à query de pickup:
+- **Fix aplicado em 2026-05-08:** query de pickup recupera job `running` com lock vencido:
 ```sql
 OR (status = 'running' AND locked_at < now() - interval '15 minutes')
 ```
+- Implementado como `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` (default `900`) em `pickEnrichmentJob`, ainda com `FOR UPDATE SKIP LOCKED`.
 
-### Bug 12 [B] — Magic numbers hardcoded
-- `MIN_CONFIDENCE = 0.55` em [organizadora/worker.ts:47](../src/organizadora/worker.ts).
-- `LIMIT 10/25/5` em context-builder.
-- `INTERVAL '24 hours'` em pending_confirmations expiry.
-- **Fix:** mover para env com defaults sensatos.
+### Bug 12 [B] — Magic numbers hardcoded [parcialmente feito PR4]
+- `MIN_CONFIDENCE = 0.55` virou `ORGANIZADORA_MIN_CONFIDENCE`.
+- Lease de job zumbi virou `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`.
+- `LIMIT 5` de tool events virou `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`.
+- `LIMIT 25` de organizer_facts virou `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`.
+- **Ainda pendente fora do PR4:** expiração default de `request_confirmation` continua no handler puro para não acoplar `applyAction` ao parser global de env.
 
-### Bug 13 [B] — `validateFactEvidence` quebra se mensagem foi editada
+### Bug 13 [B] — `validateFactEvidence` quebra se mensagem foi editada [documentado PR4]
 - **Arquivo:** [evidence.ts:11-22](../src/organizadora/evidence.ts)
 - **Sintoma:** compara `messageContent` atual contra `evidence_text` capturado na extração. Mensagem editada → content novo ≠ evidence velho. Replay rejeita fact que era válido.
 - **Severidade:** baixa. Edição no WhatsApp é raro.
+- **Decisão PR4:** aceitar como limitação conhecida enquanto não existir histórico versionado de mensagens editadas. Não criar bypass no validator, porque isso enfraqueceria a garantia de evidence literal. Se o projeto precisar suportar replay perfeito de mensagem editada, o próximo passo correto é persistir versão anterior de `core.messages` ou evento de edição auditável antes de mudar `validateFactEvidence`.
 
 ### Bug 14 [A] — Say Validator não cobre 4 categorias críticas
 - **Arquivo:** [say-validator.ts](../src/atendente/validators/say-validator.ts)
@@ -344,7 +347,7 @@ Se `contatos_bug > 0`, abrir incidente.
   - Notifica Wallace via email/Chatwoot nota interna
 - [x] D18: Bug 2 — Diferenciar event types de carrinho em session_events (nova migration estendendo CHECK).
 - [ ] D19: Bug 9 — Tool execution paralela (Promise.all). Bug 10 — index funcional em tire_size normalizado (migration).
-- [ ] D20: Bug 12 — Mover magic numbers para env (MIN_CONFIDENCE, limits).
+- [x] D20: Bug 12 — Mover magic numbers para env (MIN_CONFIDENCE e limits de contexto; TTL de `request_confirmation` fica pendente).
 - [ ] D21: Atualizar docs 09, 11, 14.
 
 **Saída da semana 3:** Supervisora rodando, gerando flags do dia anterior. Code freeze pra Sprint 8.
@@ -397,15 +400,15 @@ Matriz Bug → Severidade → Semana/PR → Esforço. Inclui os 17 bugs cravados
 | Normalizador de interrupção de checkout | infra | 2 | 1 dia | [planner/service.ts](../src/atendente/planner/service.ts) |
 | Teste unitário "checkout interrompido por troca de produto" | infra | 2 | meio dia | `tests/unit/atendente/` |
 | **Bug 5** — `intent_to_close_recorded` action emitida | **B** | 2 | meio dia | [generator/schemas.ts](../src/atendente/generator/schemas.ts) + [apply-action.ts](../src/atendente/state/apply-action.ts) |
-| **Bug 11** — Lease em enrichment_jobs | **M** | 2 | 1h | [ops-phase3.repository.ts:30-43](../src/shared/repositories/ops-phase3.repository.ts) |
+| **Bug 11** — Lease em enrichment_jobs | **M** | Feito PR4 | 1h | [ops-phase3.repository.ts](../src/shared/repositories/ops-phase3.repository.ts) |
 | Supervisora batch (em vez de Critic) | infra | 3 | 2-3 dias | novo worker |
 | **Bug 2** — Event types diferenciados em session_events | **M** | 3 | 2h + migration | [apply-action.ts](../src/atendente/state/apply-action.ts) + 0029 |
 | **Bug 9** — Tool execution paralela | **B** | 3 | 1h | [tool-executor.ts:22-31](../src/atendente/executor/tool-executor.ts) |
 | **Bug 10** [REVISADO POR CODEX] — Index funcional em `tire_specs` (não `products`) | **M** | 3 | 30 min + migration | `commerce.tire_specs` |
-| **Bug 12** — Magic numbers para env | **B** | 3 | meio dia | [organizadora/worker.ts:47](../src/organizadora/worker.ts) |
+| **Bug 12** — Magic numbers para env | **B** | Parcial PR4 | meio dia | [env.ts](../src/shared/config/env.ts) |
 | Atualizar docs 09, 11, 14 com mapping atual | drift | 3 | 30 min cada | [docs/phase3-agent-architecture/](../docs/phase3-agent-architecture/) |
 | **Bug 7** — UPSERT em `syncSessionSlots` (DELETE→reinsert) | **B** | 4-5 (pós-piloto) | meio dia | [agent-state.repository.ts:679-700](../src/atendente/state/agent-state.repository.ts) |
-| **Bug 13** — `validateFactEvidence` lida com message_updated | **B** | 4-5 (pós-piloto) | 2h | [evidence.ts:11-22](../src/organizadora/evidence.ts) |
+| **Bug 13** — `validateFactEvidence` lida com message_updated | **B** | Documentado PR4 | 2h futuro se houver histórico de edição | [evidence.ts:11-22](../src/organizadora/evidence.ts) |
 
 **Resumo por semana:**
 
@@ -554,12 +557,12 @@ Três bugs de pre-condition e semântica de eventos. Migration de evento types v
 
 Três bugs de hardening operacional. Não bloqueiam Sprint 8, mas são limpeza importante antes de operação contínua.
 
-- **Bug 11** — Lease/reclaim de jobs zumbis em `ops.enrichment_jobs`. Adicionar à query de pickup em [ops-phase3.repository.ts:30-43](../src/shared/repositories/ops-phase3.repository.ts#L30-L43):
+- **Bug 11 [feito PR4]** — Lease/reclaim de jobs zumbis em `ops.enrichment_jobs`. A query de pickup em [ops-phase3.repository.ts](../src/shared/repositories/ops-phase3.repository.ts) agora recupera `running` vencido:
   ```sql
   OR (status = 'running' AND locked_at < now() - interval '15 minutes')
   ```
-- **Bug 12** — Mover magic numbers para env: `MIN_CONFIDENCE` ([organizadora/worker.ts:47](../src/organizadora/worker.ts#L47)), `LIMIT 25` de organizer_facts, `LIMIT 5` de tool events, `INTERVAL '24 hours'` de pending_confirmations expiry.
-- **Bug 13** — `validateFactEvidence` em [evidence.ts:11-22](../src/organizadora/evidence.ts#L11-L22): documentar decisão sobre mensagem editada. Opções: (a) re-validar contra histórico de versões da mensagem se tabela existir, (b) marcar evidence como `superseded` em vez de rejeitar, (c) aceitar gap atual e documentar como limitação conhecida. **Decisão pendente** — Wallace precisa escolher antes do fix.
+- **Bug 12 [parcialmente feito PR4]** — Movidos para env: `ORGANIZADORA_MIN_CONFIDENCE`, `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`, `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`. Pendente: TTL default de `request_confirmation`.
+- **Bug 13 [documentado PR4]** — `validateFactEvidence` em [evidence.ts:11-22](../src/organizadora/evidence.ts#L11-L22): aceitar gap atual como limitação conhecida. Sem histórico versionado de mensagens editadas, não há evidence antiga confiável para replay perfeito.
 
 ### PR 5 — Say Validator comercial
 

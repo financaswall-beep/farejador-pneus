@@ -24,6 +24,8 @@ const envSchema = z.object({
   OPENAI_TIMEOUT_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('30000'),
   ORGANIZADORA_DEBOUNCE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(10)).default('90'),
   ORGANIZADORA_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
+  ORGANIZADORA_MIN_CONFIDENCE: z.string().transform(Number).pipe(z.number().min(0).max(1)).default('0.55'),
+  ORGANIZADORA_STALE_JOB_AFTER_SECONDS: z.string().transform(Number).pipe(z.number().int().min(60)).default('900'),
   PLANNER_LLM_ENABLED: booleanStringSchema,
   PLANNER_OPENAI_API_KEY: z.string().min(1).optional(),
   PLANNER_MODEL: z.string().min(1).default('gpt-4o-mini'),
@@ -31,6 +33,8 @@ const envSchema = z.object({
   ATENDENTE_SHADOW_ENABLED: booleanStringSchema,
   ATENDENTE_SHADOW_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   ATENDENTE_CONTEXT_MESSAGES_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).default('20'),
+  ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(50)).default('5'),
+  ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).default('25'),
   // Generator Shadow (Sprint 6): gera resposta candidata auditavel, sem envio Chatwoot.
   GENERATOR_LLM_ENABLED: booleanStringSchema,
   GENERATOR_OPENAI_API_KEY: z.string().min(1).optional(),

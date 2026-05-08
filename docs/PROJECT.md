@@ -69,6 +69,11 @@ Organizadora LLM e Atendente em shadow/controle humano.
   dados e chamar humano para confirmar produto/estoque, sem claim comercial.
 - Context Builder usa `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20) em vez de
   10 mensagens fixas; `loadCurrent` expõe `derived_signals.stale_slots`.
+- PR4 Organizadora/ops: `ops.enrichment_jobs` recupera job zumbi apos
+  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` (default 900s), e limites principais
+  agora sao configuraveis por env (`ORGANIZADORA_MIN_CONFIDENCE`,
+  `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`,
+  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`).
 - Troca de item ativo e mudanças em slots comerciais reais invalidam ofertas
   antigas para evitar vender com moto/posição/pagamento antigo.
 - Action Validator bloqueia actions sem pre-condição: item inexistente em

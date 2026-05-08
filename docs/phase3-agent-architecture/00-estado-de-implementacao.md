@@ -185,12 +185,14 @@ Worker Shadow:
 
 ## Validacao Atual
 
-Ultima validacao (PR 3):
+Ultima validacao (PR 4 local):
 
 - `npm run typecheck`: verde.
-- `npm test`: 380/380 verde, 51 arquivos.
-- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
+- `npm test`: 381/381 verde, 52 arquivos.
 - `npm run build`: verde.
+- `npm run test:integration`: 13 testes passaram em 2 arquivos; 3 suites nao
+  rodaram por falta de runtime Testcontainers/Docker no ambiente local.
+- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
 - Migration `0029`: aplicada/verificada no Supabase atual antes do push.
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`: 13 mensagens
   ingeridas, 15 facts da Organizadora, Planner LLM e Generator LLM em shadow,
@@ -206,6 +208,10 @@ Ultima validacao (PR 3):
 - Smoke `generator_v1.3.2` pos-deploy (Chatwoot conversa `453`): segundo turn
   emitiu `update_draft` com nome, pix, delivery e endereco; `session_events`
   gravou `draft_updated`; resposta pediu confirmacao humana de produto/estoque.
+- PR4 Organizadora/ops local: `ops.enrichment_jobs` recupera job zumbi por
+  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` e os limites principais passaram para
+  env (`ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`,
+  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`).
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

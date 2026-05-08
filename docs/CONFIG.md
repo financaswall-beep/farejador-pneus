@@ -31,12 +31,16 @@ com validacao Zod, exceto overrides explicitamente documentados como
 | `OPENAI_TIMEOUT_MS` | nao | Timeout da chamada OpenAI da Organizadora. Default `30000`. | `30000` |
 | `ORGANIZADORA_DEBOUNCE_SECONDS` | nao | Espera apos a ultima mensagem antes de organizar. Default `90`. | `90` |
 | `ORGANIZADORA_POLL_INTERVAL_MS` | nao | Intervalo de polling do worker da Organizadora. Default `5000`. | `5000` |
+| `ORGANIZADORA_MIN_CONFIDENCE` | nao | Confidence minima para salvar fato extraido pela Organizadora. Default `0.55`. | `0.55` |
+| `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` | nao | Depois desse tempo, job `running` da Organizadora pode ser recuperado por outro worker. Default `900` (15 min). | `900` |
 | `PLANNER_LLM_ENABLED` | nao | Liga Planner LLM da Atendente. Default `false`. | `false` |
 | `PLANNER_OPENAI_API_KEY` | se Planner LLM ligado | Chave OpenAI especifica do Planner. | `sk-...` |
 | `PLANNER_MODEL` | nao | Modelo do Planner. Default `gpt-4o-mini`. | `gpt-4o-mini` |
 | `ATENDENTE_SHADOW_ENABLED` | nao | Liga Worker Shadow log-only da Atendente. Default `false`. | `true` |
 | `ATENDENTE_SHADOW_POLL_INTERVAL_MS` | nao | Intervalo de polling do Worker Shadow. Default `5000`. | `5000` |
 | `ATENDENTE_CONTEXT_MESSAGES_LIMIT` | nao | Quantas mensagens recentes o Context Builder entrega ao Planner/Generator. Default `20`, maximo `100`. | `20` |
+| `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` | nao | Quantos resultados recentes de tools entram no contexto do Planner. Default `5`, maximo `50`. | `5` |
+| `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT` | nao | Quantos fatos atuais da Organizadora entram no contexto do Planner. Default `25`, maximo `100`. | `25` |
 | `GENERATOR_LLM_ENABLED` | nao | Liga o Generator Shadow com LLM real. Default `false`. Quando `false`, usa respostas mock/fallback seguras (sem custo, sem rede). | `false` |
 | `GENERATOR_OPENAI_API_KEY` | se Generator LLM ligado | Chave OpenAI especifica do Generator. Obrigatoria quando `GENERATOR_LLM_ENABLED=true`. | `sk-...` |
 | `GENERATOR_MODEL` | nao | Modelo do Generator. Default `gpt-4o-mini`. | `gpt-4o-mini` |

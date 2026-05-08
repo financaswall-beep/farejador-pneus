@@ -26,18 +26,26 @@ export interface EnrichmentJobRow {
 export async function pickEnrichmentJob(
   client: PoolClient,
   environment: Environment,
+  staleJobAfterSeconds: number,
 ): Promise<EnrichmentJobRow | null> {
   const result = await client.query<EnrichmentJobRow>(
     `SELECT id, environment, conversation_id, last_message_id, job_type
      FROM ops.enrichment_jobs
      WHERE environment = $1
-       AND status IN ('pending', 'queued')
        AND not_before <= now()
        AND job_type = 'organize_conversation'
+       AND (
+         status IN ('pending', 'queued')
+         OR (
+           status = 'running'
+           AND locked_at IS NOT NULL
+           AND locked_at < now() - ($2::int * interval '1 second')
+         )
+       )
      ORDER BY not_before
      LIMIT 1
      FOR UPDATE SKIP LOCKED`,
-    [environment],
+    [environment, staleJobAfterSeconds],
   );
   return result.rows[0] ?? null;
 }

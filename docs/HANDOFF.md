@@ -174,10 +174,14 @@ Remotes sincronizados:
 
 ## Proxima Fase Recomendada
 
-PR 4: Organizadora/ops.
-- Lease/reclaim para `ops.enrichment_jobs` zumbi.
-- Magic numbers principais para env.
-- Decisao/documentacao sobre evidence quando mensagem original foi editada.
+PR 4: Organizadora/ops concluido localmente.
+- `ops.enrichment_jobs` agora recupera job `running` zumbi apos
+  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` (default 900s).
+- `ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` e
+  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT` removem magic numbers do codigo.
+- Bug 13 documentado: mensagem editada segue como limitacao conhecida ate
+  existir historico versionado de `core.messages`; nao foi criado bypass no
+  validator de evidence.
 
 Depois do PR 4, escolher entre PR 5 (Say Validator comercial, depende de
 amostra real de `blocked_say_text`) e Sprint 7/Supervisora shadow.
