@@ -253,11 +253,36 @@ function applySetActiveItem(state: ConversationState, action: SetActiveItemActio
   if (item.status === 'descartado') {
     throw new Error('cannot_activate_discarded_item');
   }
+  const previousActive = activeItem(next);
+  const changedActiveItem = previousActive !== null && previousActive.id !== action.item_id;
+  const events: SessionEventInsert[] = [eventFor(action, 'active_item_changed')];
+
   for (const candidate of next.items) {
     candidate.is_active = candidate.id === action.item_id;
   }
+  if (changedActiveItem && previousActive) {
+    previousActive.updated_at = action.emitted_at;
+    if (next.last_offer?.item_id === previousActive.id && !next.last_offer.invalidated) {
+      invalidateOffer(next, 'active_item_changed');
+      events.push(eventFor(action, 'offer_invalidated', { reason: 'active_item_changed', item_id: previousActive.id }));
+    }
+
+    for (const [slotKey, slot] of Object.entries(previousActive.slots ?? {})) {
+      if (!slot) continue;
+      slot.stale = 'stale_strong';
+      slot.requires_confirmation = true;
+      events.push(
+        eventFor(action, 'slot_marked_stale', {
+          item_id: previousActive.id,
+          slot_key: slotKey,
+          stale: 'stale_strong',
+          reason: 'active_item_changed',
+        }),
+      );
+    }
+  }
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, 'active_item_changed')] };
+  return { state: next, events_to_emit: events };
 }
 
 function applyUpdateItemStatus(state: ConversationState, action: UpdateItemStatusAction): ApplyResult {

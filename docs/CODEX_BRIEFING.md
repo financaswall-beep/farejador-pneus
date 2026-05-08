@@ -1,6 +1,6 @@
 # Briefing Para Codex - Farejador
 
-Atualizado: 2026-05-07.
+Atualizado: 2026-05-08.
 
 ## Leitura Rapida
 
@@ -35,6 +35,10 @@ Implementado:
 - PR 1 Generator audit: turns bloqueados preservam candidato em
     `blocked_say_text`/`blocked_payload`; `update_draft` agora tem
     `action_id` e demais metacampos obrigatorios.
+- PR 2 Estado/contexto: Context Builder usa limite configuravel
+    `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20), `loadCurrent` popula
+    `derived_signals.stale_slots`, e troca de item/slots comerciais invalida
+    oferta antiga.
 
 Desligado/inexistente:
 
@@ -55,14 +59,13 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Proximo lote recomendado: PR 2 de estado/contexto. A migration 0028 ja foi
-aplicada e o PR 1 esta pronto para rodar em shadow.
+Proximo lote recomendado: PR 3 de validators/eventos, depois de fechar a
+validacao completa e push do PR 2.
 
 Escopo:
 
-- Bug 8: limite de mensagens do Context Builder configuravel.
-- Bug 16: popular `derived_signals.stale_slots`.
-- Bug 1/Bug 6: invalidar oferta/slots quando cliente muda moto/medida/dados.
+- Bug 15: pre-condicoes no Action Validator.
+- Bug 2/Bug 4: semantica correta dos eventos de carrinho.
 
 Alternativa imediata se dados disponiveis:
 
@@ -78,7 +81,7 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 367/367 verde, 50 arquivos
+- `npm test`: 371/371 verde, 51 arquivos
 - `npm run typecheck`: verde
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde
 

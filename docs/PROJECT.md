@@ -1,6 +1,6 @@
 # Farejador - Visao Atual do Projeto
 
-Atualizado: 2026-05-07.
+Atualizado: 2026-05-08.
 
 Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
 Postgres/Supabase e prepara uma fundacao auditavel para analytics,
@@ -31,6 +31,7 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | Fix generator_v1.3.1 - Generator proibe SAFE_FALLBACK em pedir_dados_faltantes | Implementado em prod |
 | Fix phase3 repo - dedup de facts identicos por valor | Implementado em prod |
 | PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
+| PR 2 Estado/contexto - invalidações + contexto configurável | Implementado e testado; aguardando push |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -60,6 +61,10 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - `update_draft` emitido pelo Generator agora carrega `action_id`,
   `turn_index`, `emitted_at` e `emitted_by`, permitindo idempotencia igual as
   demais actions de estado.
+- Context Builder usa `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20) em vez de
+  10 mensagens fixas; `loadCurrent` expõe `derived_signals.stale_slots`.
+- Troca de item ativo e mudanças em slots comerciais reais invalidam ofertas
+  antigas para evitar vender com moto/posição/pagamento antigo.
 - `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
   antes de inserir nova linha — so anexa evidence ao fact existente.
 - Migrations ate `0028` aplicadas/validadas no Supabase atual.

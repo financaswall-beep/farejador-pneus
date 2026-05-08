@@ -516,10 +516,12 @@ Plano executável dos 17 bugs cravados em 5 PRs sequenciais + trabalho paralelo 
 
 Quatro bugs de hardening do estado da Atendente. Independem de PR 1, mas faz sentido vir depois pra evitar conflito de migração.
 
-- **Bug 8** — Tornar limit de mensagens do Context Builder configurável via env (`ATENDENTE_CONTEXT_MESSAGES_LIMIT`, default 20). Substitui o `LIMIT 10` hardcoded em [context-builder.ts:73](../src/atendente/planner/context-builder.ts#L73).
-- **Bug 16** — `loadCurrent` popula `derived_signals.stale_slots` lendo `agent.session_slots` onde `stale != 'fresh'` ([agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts#L230-L236)).
-- **Bug 1** — `applySetActiveItem` em [apply-action.ts:250-261](../src/atendente/state/apply-action.ts#L250-L261) deve invalidar oferta + marcar slots do item antigo como `stale_strong`. Cenário "Bros 160 → Biz 125" precisa funcionar limpo.
-- **Bug 6** — Expandir `INVALIDATION_RULES` em [invalidation-rules.ts](../src/atendente/state/invalidation-rules.ts) com slot_keys que faltam: `posicao_pneu`, `marca_preferida`, `marca_recusada` (item) + `municipio`, `forma_pagamento` (global) + `moto_cilindrada`, `quantidade`, `faixa_preco_max` (item). **Não usar fact_keys** (`moto_marca`, `municipio_mencionado`) — esses são da Organizadora.
+**Status Codex 2026-05-08:** implementação concluída nos quatro itens. `npm run typecheck` verde, `npm test` verde (371/371, 51 arquivos) e integração de persistência da Atendente verde (7/7).
+
+- **Bug 8 [feito local]** — Tornar limit de mensagens do Context Builder configurável via env (`ATENDENTE_CONTEXT_MESSAGES_LIMIT`, default 20). Substitui o `LIMIT 10` hardcoded em [context-builder.ts:73](../src/atendente/planner/context-builder.ts#L73).
+- **Bug 16 [feito local]** — `loadCurrent` popula `derived_signals.stale_slots` lendo `agent.session_slots` onde `stale != 'fresh'` ([agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts#L230-L236)).
+- **Bug 1 [feito local]** — `applySetActiveItem` em [apply-action.ts:250-261](../src/atendente/state/apply-action.ts#L250-L261) invalida oferta ligada ao item antigo + marca slots do item antigo como `stale_strong`. Cenário "Bros 160 → Biz 125" passa a funcionar limpo.
+- **Bug 6 [feito local]** — Expandir `INVALIDATION_RULES` em [invalidation-rules.ts](../src/atendente/state/invalidation-rules.ts) com slot_keys que faltam: `posicao_pneu`, `marca_preferida`, `marca_recusada` (item) + `municipio`, `forma_pagamento` (global) + `moto_cilindrada`, `quantidade`, `faixa_preco_max` (item). **Não usar fact_keys** (`moto_marca`, `municipio_mencionado`) — esses são da Organizadora.
 
 ### PR 3 — Validator de actions e eventos
 

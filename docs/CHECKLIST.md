@@ -1,6 +1,6 @@
 # Checklist Master - Farejador
 
-Atualizado: 2026-05-07
+Atualizado: 2026-05-08
 
 > Nota: este checklist preserva historico das Fases 1/2a. Para o estado vivo
 > da Fase 3 e proximo passo, use `docs/NEXT_CHAT_HANDOFF.md` e
@@ -29,6 +29,8 @@ Atualizado: 2026-05-07
 - [x] Fix phase3 dedup: facts identicos nao geram nova linha no ledger.
 - [x] PR 1 Generator audit: turns bloqueados preservam candidato em
   `blocked_say_text`/`blocked_payload`; `update_draft` tem metacampos.
+- [x] PR 2 Estado/contexto: Context Builder com limite configuravel,
+  `stale_slots` carregado do banco e invalidações ampliadas de oferta/slots.
 - [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
 - [ ] Critic (Sprint 7).
 - [ ] Envio Chatwoot pela Atendente (Sprint 8).

@@ -30,6 +30,7 @@ const envSchema = z.object({
   // Atendente Shadow Worker (Sprint 5): log-only, sem envio Chatwoot.
   ATENDENTE_SHADOW_ENABLED: booleanStringSchema,
   ATENDENTE_SHADOW_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
+  ATENDENTE_CONTEXT_MESSAGES_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).default('20'),
   // Generator Shadow (Sprint 6): gera resposta candidata auditavel, sem envio Chatwoot.
   GENERATOR_LLM_ENABLED: booleanStringSchema,
   GENERATOR_OPENAI_API_KEY: z.string().min(1).optional(),

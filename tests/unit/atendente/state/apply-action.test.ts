@@ -69,6 +69,13 @@ function slot(value: unknown, source: SlotValue['source']): SlotValue {
   };
 }
 
+function namedSlot(slotKey: SlotValue['slot_key'], value: unknown, source: SlotValue['source'] = 'observed'): SlotValue {
+  return {
+    ...slot(value, source),
+    slot_key: slotKey,
+  };
+}
+
 describe('applyAction - estado reentrante da Atendente', () => {
   it('cria item ativo sem depender de etapa linear', () => {
     const result = applyAction(
@@ -150,6 +157,132 @@ describe('applyAction - estado reentrante da Atendente', () => {
     expect(result.state.last_offer?.invalidated).toBe(true);
     expect(result.state.items[0]!.slots.medida_pneu?.value_json).toBe('175/70 R17');
     expect(result.state.items[0]!.slots.medida_pneu?.stale).toBe('stale');
+  });
+
+  it('troca de item ativo invalida oferta do item antigo e marca slots antigos como stale_strong', () => {
+    const secondItemId = '00000000-0000-4000-8000-000000000011';
+    const initial = state({
+      items: [
+        {
+          id: itemId,
+          status: 'ofertado',
+          is_active: true,
+          created_at: baseTime,
+          slots: {
+            moto_modelo: namedSlot('moto_modelo', 'Bros 160'),
+            medida_pneu: namedSlot('medida_pneu', '110/90-17', 'confirmed'),
+          },
+        },
+        {
+          id: secondItemId,
+          status: 'aberto',
+          is_active: false,
+          created_at: baseTime,
+          slots: {
+            moto_modelo: {
+              ...namedSlot('moto_modelo', 'Biz 125'),
+              item_id: secondItemId,
+            },
+          },
+        },
+      ],
+      last_offer: {
+        offer_id: '00000000-0000-4000-8000-000000000020',
+        item_id: itemId,
+        products: [{ sku: 'P-BROS' }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+        invalidated: false,
+        invalidation_reason: null,
+      },
+    });
+
+    const result = applyAction(
+      initial,
+      baseAction({ type: 'set_active_item', item_id: secondItemId }),
+    );
+
+    expect(result.state.items.find((item) => item.id === itemId)?.is_active).toBe(false);
+    expect(result.state.items.find((item) => item.id === secondItemId)?.is_active).toBe(true);
+    expect(result.state.last_offer?.invalidated).toBe(true);
+    expect(result.state.last_offer?.invalidation_reason).toBe('active_item_changed');
+    expect(result.state.items[0]!.slots.moto_modelo?.stale).toBe('stale_strong');
+    expect(result.state.items[0]!.slots.medida_pneu?.stale).toBe('stale_strong');
+    expect(result.events_to_emit.map((event) => event.event_type)).toEqual([
+      'active_item_changed',
+      'offer_invalidated',
+      'slot_marked_stale',
+      'slot_marked_stale',
+    ]);
+  });
+
+  it('troca de posicao do pneu invalida oferta para nao vender dianteiro como traseiro', () => {
+    const initial = state({
+      items: [
+        {
+          id: itemId,
+          status: 'ofertado',
+          is_active: true,
+          created_at: baseTime,
+          slots: {
+            posicao_pneu: namedSlot('posicao_pneu', 'dianteiro'),
+          },
+        },
+      ],
+      last_offer: {
+        offer_id: '00000000-0000-4000-8000-000000000020',
+        item_id: itemId,
+        products: [{ sku: 'P-FRONT' }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+        invalidated: false,
+        invalidation_reason: null,
+      },
+    });
+
+    const result = applyAction(
+      initial,
+      baseAction({
+        type: 'update_slot',
+        scope: 'item',
+        item_id: itemId,
+        slot_key: 'posicao_pneu',
+        value: 'traseiro',
+        source: 'observed',
+        confidence: 1,
+      }),
+    );
+
+    expect(result.state.last_offer?.invalidated).toBe(true);
+    expect(result.state.last_offer?.invalidation_reason).toBe('item.posicao_pneu_changed');
+  });
+
+  it('troca de forma de pagamento global invalida oferta com condicao comercial antiga', () => {
+    const initial = state({
+      last_offer: {
+        offer_id: '00000000-0000-4000-8000-000000000020',
+        item_id: itemId,
+        products: [{ sku: 'P1', price: 120 }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+        invalidated: false,
+        invalidation_reason: null,
+      },
+    });
+
+    const result = applyAction(
+      initial,
+      baseAction({
+        type: 'update_slot',
+        scope: 'global',
+        item_id: null,
+        slot_key: 'forma_pagamento',
+        value: 'cartao_credito',
+        source: 'observed',
+        confidence: 1,
+      }),
+    );
+
+    expect(result.state.global_slots.forma_pagamento?.value_json).toBe('cartao_credito');
+    expect(result.state.last_offer?.invalidated).toBe(true);
+    expect(result.state.last_offer?.invalidation_reason).toBe('global.forma_pagamento_changed');
   });
 
   it('troca de moto deleta medida inferred', () => {

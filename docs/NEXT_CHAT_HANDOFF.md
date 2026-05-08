@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-07 (PR 1 Generator audit implementado e migration 0028 aplicada).
+Atualizado: 2026-05-08 (PR 2 Estado/contexto implementado e testado).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -11,11 +11,10 @@ cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
 Organizadora LLM, roda a fundacao da Atendente em shadow incluindo o Generator
 (que gera resposta candidata auditavel, mas nao envia nada).
 
-**Ultimo marco (2026-05-07):** PR 1 do hardening implementado.
-Turns bloqueados agora preservam candidato em `blocked_say_text`/`blocked_payload`
-e `update_draft` ganhou metacampos/idempotencia. 367 testes unitarios verdes +
-integration especifico 7/7. Migration `0028` aplicada e verificada no Supabase
-atual.
+**Ultimo marco (2026-05-08):** PR 2 de estado/contexto implementado e testado.
+Context Builder agora usa limite configuravel (default 20), `loadCurrent`
+popula `derived_signals.stale_slots`, e troca de item/slots comerciais invalida
+oferta antiga. Typecheck, suite unitária completa e integração de estado verdes.
 
 ## Ja Implementado
 
@@ -70,6 +69,12 @@ Atendente:
   grava o candidato bloqueado; `update_draft` agora exige e recebe
   `action_id`, `turn_index`, `emitted_at`, `emitted_by`. Migration aplicada e
   verificada no Supabase atual.
+- PR 2 Estado/contexto (2026-05-08): `ATENDENTE_CONTEXT_MESSAGES_LIMIT`
+  controla quantas mensagens recentes entram no contexto (default 20);
+  `loadCurrent` deriva `stale_slots` dos slots persistidos com `stale != 'fresh'`;
+  `set_active_item` invalida oferta do item antigo e marca slots antigos como
+  `stale_strong`; `INVALIDATION_RULES` cobre posição, marca, município,
+  pagamento, cilindrada, quantidade e faixa de preço.
 - Organizadora v3.4 calibrada:
   prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
   de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
@@ -138,10 +143,10 @@ Atendente:
 
 ## Validacao Atual
 
-Ultima validacao (2026-05-07, pos PR 1 Generator audit):
+Ultima validacao (2026-05-08, PR 2):
 
-- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
+- `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.

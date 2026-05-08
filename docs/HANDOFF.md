@@ -1,6 +1,6 @@
 # Handoff - Farejador
 
-Atualizado: 2026-05-07.
+Atualizado: 2026-05-08.
 
 Este arquivo e o handoff operacional curto. Para contexto completo da proxima
 conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
@@ -48,6 +48,11 @@ Implementado:
   candidatos bloqueados sem enviar nada ao cliente. `update_draft` agora e
   hidratado com `action_id`, `turn_index`, `emitted_at` e `emitted_by`, e o
   schema exige esses metacampos.
+- PR 2 de estado/contexto (2026-05-08): Context Builder usa
+  `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20), `loadCurrent` popula
+  `derived_signals.stale_slots`, `set_active_item` invalida oferta do item
+  antigo e marca slots antigos como `stale_strong`, e `INVALIDATION_RULES`
+  cobre slots comerciais reais que faltavam.
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
@@ -109,8 +114,8 @@ Nao implementado/nao ligado:
 
 ## Ultimas Validacoes
 
-- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
+- `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).

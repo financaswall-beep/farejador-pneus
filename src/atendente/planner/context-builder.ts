@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { Environment } from '../../shared/types/chatwoot.js';
 import type { ConversationState } from '../../shared/zod/agent-state.js';
+import { env } from '../../shared/config/env.js';
 import { loadCurrent } from '../state/agent-state.repository.js';
 import type { ToolName } from './schemas.js';
 
@@ -67,11 +68,11 @@ export async function buildPlannerContext(
        AND conversation_id = $2
        AND is_private = false
        AND content IS NOT NULL
-       AND content != ''
-       AND ($3::uuid IS NULL OR sent_at <= (SELECT sent_at FROM core.messages WHERE id = $3::uuid))
+     AND content != ''
+     AND ($3::uuid IS NULL OR sent_at <= (SELECT sent_at FROM core.messages WHERE id = $3::uuid))
      ORDER BY sent_at DESC
-     LIMIT 10`,
-    [environment, conversationId, triggerMessageId ?? null],
+     LIMIT $4`,
+    [environment, conversationId, triggerMessageId ?? null, env.ATENDENTE_CONTEXT_MESSAGES_LIMIT],
   );
   const toolEvents = await client.query<{
     event_type: 'tool_executed' | 'tool_failed';

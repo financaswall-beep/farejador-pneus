@@ -265,6 +265,10 @@ export async function loadCurrent(
         item.slots[slot.slot_key as keyof typeof item.slots] = stateSlot;
       }
     }
+
+    if (slot.stale !== 'fresh' && !state.derived_signals.stale_slots.includes(slot.slot_key)) {
+      state.derived_signals.stale_slots.push(slot.slot_key);
+    }
   }
 
   for (const event of events.rows) {

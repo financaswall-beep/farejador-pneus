@@ -4,6 +4,17 @@ import type { ConversationState } from '../../../../src/shared/zod/agent-state.j
 const conversationId = '00000000-0000-4000-8000-000000000001';
 const baseTime = '2026-04-29T12:00:00.000Z';
 
+process.env.FAREJADOR_ENV = 'test';
+process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/farejador_test';
+process.env.CHATWOOT_HMAC_SECRET = 'test-secret';
+process.env.ADMIN_AUTH_TOKEN = 'test-admin-token';
+process.env.DATABASE_SSL = 'false';
+process.env.ORGANIZADORA_ENABLED = 'false';
+process.env.PLANNER_LLM_ENABLED = 'false';
+process.env.ATENDENTE_SHADOW_ENABLED = 'false';
+process.env.GENERATOR_LLM_ENABLED = 'false';
+process.env.ATENDENTE_CONTEXT_MESSAGES_LIMIT = '20';
+
 vi.mock('../../../../src/atendente/state/agent-state.repository.js', () => ({
   loadCurrent: vi.fn(async () => state()),
 }));
@@ -41,6 +52,7 @@ describe('buildPlannerContext', () => {
     expect(context.organizer_facts).toEqual([]);
     expect(query).toHaveBeenCalledTimes(3);
     expect(query.mock.calls[0]?.[0]).toContain('FROM core.messages');
+    expect(query.mock.calls[0]?.[1]).toEqual(['test', conversationId, null, 20]);
     expect(query.mock.calls[1]?.[0]).toContain("event_type IN ('tool_executed', 'tool_failed')");
     expect(query.mock.calls[2]?.[0]).toContain('FROM analytics.current_facts');
   });

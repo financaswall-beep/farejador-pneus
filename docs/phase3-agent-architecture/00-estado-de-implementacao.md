@@ -160,15 +160,20 @@ Worker Shadow:
   em `blocked_say_text`/`blocked_actions`/`blocked_payload`, e `update_draft`
   agora recebe metacampos (`action_id`, `turn_index`, `emitted_at`,
   `emitted_by`) como as demais actions emitidas pelo Generator.
+- Hardening PR 2 (2026-05-08): contexto recente deixou de ser fixo em
+  10 mensagens e passa a usar `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20);
+  `derived_signals.stale_slots` reflete slots persistidos com `stale != 'fresh'`;
+  trocar item ativo invalida a oferta do item antigo e marca seus slots como
+  `stale_strong`.
 - Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
   dados faltantes sem inventar preco, estoque ou frete.
 
 ## Validacao Atual
 
-Ultima validacao (pos PR 1 Generator audit):
+Ultima validacao (PR 2):
 
-- `npm test`: 367/367 verde, 50 arquivos.
 - `npm run typecheck`: verde.
+- `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,

@@ -56,7 +56,24 @@ export const INVALIDATION_RULES: InvalidationRule[] = [
         action: 'delete',
       },
     ],
-    invalidate_offer: false,
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'moto_cilindrada',
+    effects: [
+      {
+        slot_key: 'medida_pneu',
+        if_source: ['inferred', 'inferred_from_history', 'inferred_from_organizadora'],
+        action: 'delete',
+      },
+      {
+        slot_key: 'medida_pneu',
+        if_source: ['observed', 'confirmed'],
+        action: 'mark_stale',
+      },
+    ],
+    invalidate_offer: true,
   },
   {
     trigger_scope: 'global',
@@ -65,8 +82,50 @@ export const INVALIDATION_RULES: InvalidationRule[] = [
     invalidate_offer: true,
   },
   {
+    trigger_scope: 'global',
+    trigger_slot: 'municipio',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'global',
+    trigger_slot: 'forma_pagamento',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
     trigger_scope: 'item',
     trigger_slot: 'medida_pneu',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'posicao_pneu',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'quantidade',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'marca_preferida',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'marca_recusada',
+    effects: [],
+    invalidate_offer: true,
+  },
+  {
+    trigger_scope: 'item',
+    trigger_slot: 'faixa_preco_max',
     effects: [],
     invalidate_offer: true,
   },
