@@ -1102,7 +1102,20 @@ Uma linha por conversa.
 
 ### `agent.session_events`
 
-Historico imutavel do que o agente decidiu na sessao. Append-only. Skill ativada, confirmacao pedida, carrinho proposto, humano chamado.
+Historico imutavel do que o agente decidiu na sessao. Append-only. Skill
+ativada, confirmacao pedida, mudanca de carrinho, rascunho de pedido, humano
+chamado.
+
+Eventos de carrinho/draft atuais:
+
+- `cart_added` - item entrou no carrinho.
+- `cart_removed` - item foi removido.
+- `cart_updated` - quantidade do item mudou.
+- `cart_cleared` - carrinho foi limpo.
+- `draft_updated` - rascunho de checkout mudou.
+
+O tipo legado `cart_proposed` continua aceito no banco para historico antigo,
+mas novas actions de carrinho usam os tipos especificos acima.
 
 ### `agent.turns`
 
@@ -1122,7 +1135,11 @@ Carrinho atual da conversa. So itens (pneu, medida, quantidade). Endereco e paga
 
 ### `agent.cart_events`
 
-Historico imutavel do carrinho. Eventos: proposed, confirmed, validated, promoted, removed, replaced, cleared.
+Historico imutavel do carrinho. Eventos: proposed, confirmed, validated,
+promoted, removed, replaced, updated, cleared.
+
+`updated` significa mudanca de quantidade no mesmo item. `replaced` fica
+reservado para uma troca real de produto quando essa action existir.
 
 ### `agent.order_drafts`
 

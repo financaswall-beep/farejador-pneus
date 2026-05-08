@@ -31,6 +31,9 @@ Atualizado: 2026-05-08
   `blocked_say_text`/`blocked_payload`; `update_draft` tem metacampos.
 - [x] PR 2 Estado/contexto: Context Builder com limite configuravel,
   `stale_slots` carregado do banco e invalidações ampliadas de oferta/slots.
+- [x] PR 3 Validators/eventos: Action Validator com pre-condicoes de
+  carrinho/draft/escalacao; eventos semanticos em `session_events` e
+  `cart_events.updated`.
 - [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
 - [ ] Critic (Sprint 7).
 - [ ] Envio Chatwoot pela Atendente (Sprint 8).
@@ -252,8 +255,9 @@ Pendente da F1.5:
 - [x] `0026_tool_executor_events.sql` (eventos do Tool Executor)
 - [x] `0027_generator_shadow_events.sql` (evento `generator_produced`)
 - [x] `0028_generator_blocked_turn_audit.sql` (candidato bloqueado em `agent.turns`)
+- [x] `0029_cart_action_events_hardening.sql` (eventos semanticos de carrinho/draft)
 - [x] Cada migration idempotente (CREATE/ALTER IF NOT EXISTS)
-- [x] Migration `0028` aplicada/validada no Supabase atual para este deploy/push
+- [x] Migration `0029` aplicada/validada no Supabase atual para este deploy/push
 - [ ] Testes de integracao por migration (Kimi escreve depois)
 
 ### 7.3 Etapa C - Codigo TypeScript

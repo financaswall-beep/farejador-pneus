@@ -255,7 +255,7 @@ Padrao para todas as tabelas:
 | Negocio | Coluna |
 |---------|--------|
 | conversa | `conversation_id` (FK) |
-| tipo evento | `event_type` (`skill_selected`, `confirmation_requested`, `cart_proposed`, `human_called`, `bot_resumed`) |
+| tipo evento | `event_type` (`skill_selected`, `confirmation_requested`, `cart_proposed`, `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`, `draft_updated`, `human_called`, `bot_resumed`) |
 | skill | `skill_name` |
 | detalhes | `event_payload` (JSONB) |
 | ocorrido em | `occurred_at` |

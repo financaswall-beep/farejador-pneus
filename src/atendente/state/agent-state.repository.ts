@@ -556,7 +556,7 @@ function cartEventFor(
   previous: ConversationState,
   next: ConversationState,
   action: AgentAction,
-): { eventType: 'proposed' | 'removed' | 'replaced' | 'cleared'; affectedItemId: string | null } {
+): { eventType: 'proposed' | 'removed' | 'replaced' | 'updated' | 'cleared'; affectedItemId: string | null } {
   switch (action.type) {
     case 'add_to_cart': {
       const item = next.cart.find(
@@ -567,7 +567,7 @@ function cartEventFor(
     case 'remove_from_cart':
       return { eventType: 'removed', affectedItemId: action.cart_item_id };
     case 'update_cart_item':
-      return { eventType: 'replaced', affectedItemId: action.cart_item_id };
+      return { eventType: 'updated', affectedItemId: action.cart_item_id };
     case 'clear_cart':
       return { eventType: 'cleared', affectedItemId: null };
     default:

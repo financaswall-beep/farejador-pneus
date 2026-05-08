@@ -20,6 +20,18 @@ function itemExists(state: ConversationState, itemId: string): boolean {
   return state.items.some((item) => item.id === itemId);
 }
 
+function liveCartItemExists(state: ConversationState, cartItemId: string): boolean {
+  return state.cart.some((item) => item.id === cartItemId && item.item_status !== 'removed');
+}
+
+function hasConfirmedCartItem(state: ConversationState): boolean {
+  return state.cart.some((item) => item.item_status === 'confirmed');
+}
+
+function hasOpenPendingConfirmation(state: ConversationState): boolean {
+  return state.pending_confirmation?.status === 'open';
+}
+
 export interface ActionValidationContext {
   recent_tool_results?: ToolResultForValidation[];
 }
@@ -146,10 +158,30 @@ export function validateAction(
       return { valid: true };
     }
     case 'remove_from_cart':
+      return liveCartItemExists(state, action.cart_item_id)
+        ? { valid: true }
+        : block('cart_item_not_found');
     case 'update_cart_item':
+      return liveCartItemExists(state, action.cart_item_id)
+        ? { valid: true }
+        : block('cart_item_not_found');
     case 'clear_cart':
-    case 'update_draft':
+      return hasOpenPendingConfirmation(state)
+        ? block('clear_cart_blocked_by_pending_confirmation')
+        : { valid: true };
+    case 'update_draft': {
+      const fulfillmentMode = action.fulfillment_mode ?? state.order_draft?.fulfillment_mode ?? null;
+      const deliveryAddress = action.delivery_address ?? state.order_draft?.delivery_address ?? null;
+      if (fulfillmentMode === 'delivery' && !deliveryAddress) {
+        return block('delivery_draft_requires_address');
+      }
+      return { valid: true };
+    }
     case 'escalate':
+      if (action.reason === 'ready_to_close' && !hasConfirmedCartItem(state)) {
+        return block('ready_to_close_requires_confirmed_cart');
+      }
+      return { valid: true };
     case 'select_skill':
       return { valid: true };
   }

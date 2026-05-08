@@ -609,7 +609,31 @@ describe('applyAction - estado reentrante da Atendente', () => {
     expect(result.state.cart[0]!.product_id).toBe(productId);
     expect(result.state.cart[0]!.quantity).toBe(2);
     expect(result.state.cart[0]!.unit_price).toBe(189.9);
-    expect(result.events_to_emit[0]!.event_type).toBe('cart_proposed');
+    expect(result.events_to_emit[0]!.event_type).toBe('cart_added');
+  });
+
+  it('update_cart_item emite evento semantico de quantidade atualizada', () => {
+    const result = applyAction(
+      state({
+        cart: [
+          {
+            id: '00000000-0000-4000-8000-000000000041',
+            product_id: '00000000-0000-4000-8000-000000000040',
+            quantity: 1,
+            unit_price: 189.9,
+            item_status: 'proposed',
+          },
+        ],
+      }),
+      {
+        type: 'update_cart_item',
+        cart_item_id: '00000000-0000-4000-8000-000000000041',
+        quantity: 3,
+      },
+    );
+
+    expect(result.state.cart[0]!.quantity).toBe(3);
+    expect(result.events_to_emit[0]!.event_type).toBe('cart_updated');
   });
 
   it('update_draft guarda checkout e marca ready quando dados minimos existem', () => {
@@ -626,7 +650,7 @@ describe('applyAction - estado reentrante da Atendente', () => {
     expect(result.state.order_draft?.fulfillment_mode).toBe('delivery');
     expect(result.state.order_draft?.payment_method).toBe('pix');
     expect(result.state.order_draft?.draft_status).toBe('ready');
-    expect(result.events_to_emit[0]!.event_type).toBe('fact_corrected');
+    expect(result.events_to_emit[0]!.event_type).toBe('draft_updated');
   });
 
   it('applyActionAndPersist faz no-op quando action_id ja existe', async () => {

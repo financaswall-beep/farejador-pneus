@@ -1,6 +1,6 @@
 # Next Chat Handoff - Farejador
 
-Atualizado: 2026-05-08 (PR 2 Estado/contexto implementado e testado).
+Atualizado: 2026-05-08 (PR 3 Validators/eventos implementado e testado).
 
 Use este resumo para continuar em outro chat sem reler a conversa inteira.
 
@@ -11,10 +11,13 @@ cliente. O sistema atual em producao captura Chatwoot, normaliza, roda
 Organizadora LLM, roda a fundacao da Atendente em shadow incluindo o Generator
 (que gera resposta candidata auditavel, mas nao envia nada).
 
-**Ultimo marco (2026-05-08):** PR 2 de estado/contexto implementado e testado.
-Context Builder agora usa limite configuravel (default 20), `loadCurrent`
-popula `derived_signals.stale_slots`, e troca de item/slots comerciais invalida
-oferta antiga. Typecheck, suite unitária completa e integração de estado verdes.
+**Ultimo marco (2026-05-08):** PR 3 de validators/eventos implementado e
+testado. Action Validator agora bloqueia carrinho/draft/escalacao sem
+pre-condicao, `session_events` separa eventos de carrinho/draft
+(`cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`,
+`draft_updated`), e `update_cart_item` grava `updated` em `agent.cart_events`.
+Migration `0029_cart_action_events_hardening.sql` aplicada e verificada no
+Supabase atual antes dos testes.
 
 ## Ja Implementado
 
@@ -75,6 +78,12 @@ Atendente:
   `set_active_item` invalida oferta do item antigo e marca slots antigos como
   `stale_strong`; `INVALIDATION_RULES` cobre posição, marca, município,
   pagamento, cilindrada, quantidade e faixa de preço.
+- PR 3 Validators/eventos (2026-05-08): `ActionValidator` valida
+  `remove_from_cart`/`update_cart_item` contra item vivo no carrinho; bloqueia
+  `clear_cart` com confirmacao aberta; bloqueia `update_draft` de delivery sem
+  endereco; bloqueia `escalate reason=ready_to_close` sem carrinho confirmado.
+  `applyAction` emite eventos semanticos de carrinho/draft e `cart_events`
+  usa `updated` para alteracao de quantidade. Migration `0029` aplicada.
 - Organizadora v3.4 calibrada:
   prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
   de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
@@ -143,11 +152,15 @@ Atendente:
 
 ## Validacao Atual
 
-Ultima validacao (2026-05-08, PR 2):
+Ultima validacao (2026-05-08, PR 3):
 
 - `npm run typecheck`: verde.
-- `npm test`: 371/371 verde, 51 arquivos.
-- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- `npm test`: 379/379 verde, 51 arquivos.
+- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
+- `npm run build`: verde.
+- Migration `0029_cart_action_events_hardening.sql`: aplicada/verificada no
+  Supabase atual (`session_events` aceita `cart_added`; `cart_events` aceita
+  `updated`).
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`, conversa
   Chatwoot `451`: Organizadora salvou 15 facts (`moto-pneus-hybrid-v3-4`),
   Planner LLM usou `planner_v1.2.5` com `buscar_e_ofertar` e tools
@@ -192,12 +205,14 @@ Duas frentes (ordenadas por prioridade):
 - Apos seed: pipeline completo funcionara — Organizadora extrai moto, Planner
   chama buscarCompatibilidade, Generator oferta produto real.
 
-**Sprint 7 — Critic Shadow**:
-- Segundo passe LLM avalia o candidato do Generator.
-- Bloqueia ou aprova, grava auditoria em `agent.*` e `ops.*`.
-- Nao envia ao Chatwoot no Critic.
-- Faz sentido agora porque: Planner usa organizer_facts, Generator nao alucina,
-  estado reentrante funciona, dedup de facts limpo.
+**PR 4 — Organizadora/ops**:
+- Bug 11: lease/reclaim em `ops.enrichment_jobs` para recuperar job zumbi.
+- Bug 12: mover magic numbers para env com defaults.
+- Bug 13: decidir/documentar tratamento de mensagem editada em evidence.
+
+Depois disso, voltar para **PR 5 Say Validator comercial** ou **Sprint 7
+Supervisora/Critic shadow**, dependendo do resultado do smoke PR3 e da
+prioridade comercial.
 
 **Sprint 8 — Envio controlado ao Chatwoot**:
 - `ChatwootApiClient.postMessage()` com `private: false`.
@@ -211,6 +226,6 @@ das tabelas relevantes e o formato de importacao esperado (CSV ou SQL direto)."
 
 Ou, se catalogo nao estiver disponivel:
 
-"Quero abrir a Sprint 7: desenhar o Critic shadow da Atendente, sem envio
-Chatwoot. Antes de codar, confira o estado do repo e proponha o menor plano
-seguro."
+"Quero abrir o PR 4: hardening de Organizadora/ops. Primeiro leia o estado do
+repo, implemente lease/reclaim de enrichment_jobs, parametrizacao de magic
+numbers e documente a decisao sobre evidence em mensagem editada."

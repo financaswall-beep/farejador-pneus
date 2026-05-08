@@ -403,7 +403,7 @@ function applyAddToCart(state: ConversationState, action: AddToCartAction): Appl
   touch(next, action);
   return {
     state: next,
-    events_to_emit: [eventFor(action, 'cart_proposed', { action, cart_item_id: cartItemId })],
+    events_to_emit: [eventFor(action, 'cart_added', { action, cart_item_id: cartItemId })],
   };
 }
 
@@ -414,7 +414,7 @@ function applyRemoveFromCart(state: ConversationState, action: RemoveFromCartAct
     item.item_status = 'removed';
   }
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+  return { state: next, events_to_emit: [eventFor(action, 'cart_removed')] };
 }
 
 function applyUpdateCartItem(state: ConversationState, action: UpdateCartItemAction): ApplyResult {
@@ -425,7 +425,7 @@ function applyUpdateCartItem(state: ConversationState, action: UpdateCartItemAct
   }
   item.quantity = action.quantity;
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+  return { state: next, events_to_emit: [eventFor(action, 'cart_updated')] };
 }
 
 function applyClearCart(state: ConversationState, action: ClearCartAction): ApplyResult {
@@ -434,7 +434,7 @@ function applyClearCart(state: ConversationState, action: ClearCartAction): Appl
     item.item_status = 'removed';
   }
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, 'cart_proposed')] };
+  return { state: next, events_to_emit: [eventFor(action, 'cart_cleared')] };
 }
 
 function applyUpdateDraft(state: ConversationState, action: UpdateDraftAction): ApplyResult {
@@ -457,7 +457,7 @@ function applyUpdateDraft(state: ConversationState, action: UpdateDraftAction): 
   };
 
   touch(next, action);
-  return { state: next, events_to_emit: [eventFor(action, 'fact_corrected')] };
+  return { state: next, events_to_emit: [eventFor(action, 'draft_updated')] };
 }
 
 export function applyAction(state: ConversationState, action: AgentAction): ApplyResult {

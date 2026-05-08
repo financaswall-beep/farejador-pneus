@@ -1,6 +1,6 @@
 # 00 - Estado de Implementacao da Fase 3
 
-Atualizado: 2026-05-05.
+Atualizado: 2026-05-08.
 
 Este e o estado vivo da Fase 3. Historico detalhado anterior permanece no git;
 este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
@@ -38,6 +38,9 @@ Nada responde cliente automaticamente.
 | Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod (e35ca31) |
 | Ajuste pre-Critic - memoria operacional Generator | Implementado |
 | Hardening fila Atendente - reconciliador de jobs | Implementado |
+| PR 1 - auditoria de turns bloqueados | Implementado |
+| PR 2 - estado/contexto | Implementado |
+| PR 3 - validators/eventos | Implementado; aguardando smoke LLM pos-deploy |
 | Critic (Sprint 7) | Nao existe |
 | Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
 | Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
@@ -59,6 +62,8 @@ Nada responde cliente automaticamente.
 - `0025_planner_foundation.sql`
 - `0026_tool_executor_events.sql`
 - `0027_generator_shadow_events.sql` (aplicada/verificada no Supabase atual em 2026-05-03)
+- `0028_generator_blocked_turn_audit.sql` (aplicada/verificada em 2026-05-07)
+- `0029_cart_action_events_hardening.sql` (aplicada/verificada em 2026-05-08)
 
 ## Codigo Da Organizadora
 
@@ -165,16 +170,22 @@ Worker Shadow:
   `derived_signals.stale_slots` reflete slots persistidos com `stale != 'fresh'`;
   trocar item ativo invalida a oferta do item antigo e marca seus slots como
   `stale_strong`.
+- Hardening PR 3 (2026-05-08): `ActionValidator` valida pre-condicoes de
+  carrinho/draft/escalacao; `session_events` ganhou eventos especificos
+  `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared` e
+  `draft_updated`; `cart_events` agora usa `updated` para mudanca de quantidade.
 - Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
   dados faltantes sem inventar preco, estoque ou frete.
 
 ## Validacao Atual
 
-Ultima validacao (PR 2):
+Ultima validacao (PR 3):
 
 - `npm run typecheck`: verde.
-- `npm test`: 371/371 verde, 51 arquivos.
-- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- `npm test`: 379/379 verde, 51 arquivos.
+- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
+- `npm run build`: verde.
+- Migration `0029`: aplicada/verificada no Supabase atual antes do push.
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`: 13 mensagens
   ingeridas, 15 facts da Organizadora, Planner LLM e Generator LLM em shadow,
   sem envio ao cliente.

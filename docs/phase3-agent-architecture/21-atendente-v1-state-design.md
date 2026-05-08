@@ -198,7 +198,9 @@ ALTER TABLE agent.session_events
     'item_created','active_item_changed','item_status_changed',
     'offer_made','offer_invalidated',
     'objection_raised','human_requested',
-    'unsupported_observation','intent_to_close_recorded'
+    'unsupported_observation','intent_to_close_recorded',
+    -- PR3 hardening: eventos semanticos de carrinho/draft
+    'cart_added','cart_removed','cart_updated','cart_cleared','draft_updated'
   ));
 
 -- ------------------------------------------------------------

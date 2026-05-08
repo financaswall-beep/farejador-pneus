@@ -37,6 +37,7 @@ import type {
   EscalateAction,
   CreateItemAction,
   RequestConfirmationAction,
+  UpdateCartItemAction,
   UpdateDraftAction,
   UpdateSlotAction,
 } from '../../src/shared/zod/agent-actions.js';
@@ -227,6 +228,14 @@ function makeUpdateDraftAction(): UpdateDraftAction {
     delivery_address: 'Rua Teste, 123',
     fulfillment_mode: 'delivery',
     payment_method: 'pix',
+  };
+}
+
+function makeUpdateCartItemAction(cartItemId: string): UpdateCartItemAction {
+  return {
+    type: 'update_cart_item',
+    cart_item_id: cartItemId,
+    quantity: 3,
   };
 }
 
@@ -492,6 +501,59 @@ describe('Sprint 6.5/6.9 — applyActionAndPersistInTx contra Postgres real', ()
       [conversationId],
     );
     expect(event.rows[0]!.event_type).toBe('proposed');
+
+    const sessionEvent = await testPool.query<{ event_type: string }>(
+      `SELECT event_type
+       FROM agent.session_events
+       WHERE environment = 'test' AND conversation_id = $1`,
+      [conversationId],
+    );
+    expect(sessionEvent.rows[0]!.event_type).toBe('cart_added');
+  });
+
+  it('persiste update_cart_item como cart_updated e cart_event updated', async () => {
+    const productId = await createProduct();
+    let cartItemId: string;
+    const client = await testPool.connect();
+    try {
+      await client.query('BEGIN');
+      const state0 = await loadCurrent(client, 'test', conversationId);
+      const state1 = await applyActionAndPersistInTx(client, state0!, makeAddToCartAction(productId));
+      cartItemId = state1.cart[0]!.id;
+      const state2 = await applyActionAndPersistInTx(client, state1, makeUpdateCartItemAction(cartItemId));
+      expect(state2.cart[0]!.quantity).toBe(3);
+      expect(state2.version).toBe(2);
+      await client.query('COMMIT');
+    } finally {
+      client.release();
+    }
+
+    const item = await testPool.query<{ quantity: number }>(
+      `SELECT quantity
+       FROM agent.cart_current_items
+       WHERE environment = 'test'
+         AND cart_id IN (SELECT id FROM agent.cart_current WHERE environment = 'test' AND conversation_id = $1)`,
+      [conversationId],
+    );
+    expect(item.rows[0]!.quantity).toBe(3);
+
+    const cartEvents = await testPool.query<{ event_type: string }>(
+      `SELECT event_type
+       FROM agent.cart_events
+       WHERE environment = 'test' AND conversation_id = $1
+       ORDER BY occurred_at ASC`,
+      [conversationId],
+    );
+    expect(cartEvents.rows.map((row) => row.event_type)).toEqual(['proposed', 'updated']);
+
+    const sessionEvents = await testPool.query<{ event_type: string }>(
+      `SELECT event_type
+       FROM agent.session_events
+       WHERE environment = 'test' AND conversation_id = $1
+       ORDER BY turn_index ASC, event_type ASC`,
+      [conversationId],
+    );
+    expect(sessionEvents.rows.map((row) => row.event_type)).toEqual(['cart_added', 'cart_updated']);
   });
 
   it('persiste update_draft, request_confirmation e escalation nas tabelas operacionais', async () => {

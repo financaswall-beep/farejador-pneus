@@ -1,6 +1,6 @@
 # Auditoria Completa — Estado e Cronograma de Hardening
 **Data inicial:** 2026-05-07
-**Última revisão:** 2026-05-07 (pós-auditoria cruzada com Codex)
+**Última revisão:** 2026-05-08 (PR 3 implementado por Codex)
 **Escopo:** Auditoria linha a linha de 16 arquivos TypeScript críticos, 8 migrations, 13 docs de arquitetura, AGENTS.md, env config e estrutura de testes.
 **Objetivo:** Mapear bugs reais com referência de linha, refutar suspeitas infundadas e produzir cronograma realista até Sprint 8 (envio Chatwoot).
 
@@ -299,7 +299,7 @@ Se `contatos_bug > 0`, abrir incidente.
 **Dev (PR 1 primeiro; depois quick wins de estado/validator):**
 - [ ] D1: **PR 1 / Bug 14a** — persistir candidato bloqueado do Generator (`blocked_say_text` / `blocked_actions` / `blocked_payload`) para permitir auditoria real do Say Validator.
 - [ ] D1-D2: **PR 1 / Bug 17** — `update_draft` com `...base` em `hydrateGeneratorAction` + `updateDraftSchema` exigindo metacampos.
-- [ ] D2: Bug 15 — Action Validator: pre-condição em `escalate`, `update_draft`, `clear_cart`.
+- [x] D2: Bug 15 — Action Validator: pre-condição em `escalate`, `update_draft`, `clear_cart`.
 - [ ] D2: Bug 8 — Context Builder limit configurável via env. Default sobe pra 20.
 - [ ] D3: Bug 1 — `applySetActiveItem` invalida oferta + slots de item antigo.
 - [ ] D3: Bug 16 — `loadCurrent` popula `derived_signals.stale_slots`.
@@ -317,7 +317,7 @@ Se `contatos_bug > 0`, abrir incidente.
 **Dev:**
 - [ ] D8–D10: Sub-fluxo checkout linear nomeado. Skill `coletar_dados_pedido` interna ao `registrar_intencao_fechamento` com slot order fixo: `nome → bairro → modalidade → pagamento → confirmação`. Generator dentro dessa skill tem prompt restrito.
 - [ ] **REMOVIDO da Semana 2 (correção Codex):** Bug 3 (`replace_cart_item`) é prospectivo — fazer junto com sprint de expansão do action set do Generator, não antes. Não consome capacidade de dev nesta semana.
-- [ ] D11: Bug 4 — Mapeamento correto de cart_events (`replaced` só pra mudança de produto).
+- [x] D11: Bug 4 — Mapeamento correto de cart_events (`replaced` só pra mudança de produto).
 - [ ] D12: Normalizador determinístico de "interrupção de checkout": se `current_skill='registrar_intencao_fechamento'` e mensagem cita produto/medida/marca/troca, força saída pra `buscar_e_ofertar`. Em código TS, igual ao fix v1.2.5.
 - [ ] D13: Teste unitário "checkout interrompido por troca de produto" cobrindo:
   - cart com item A
@@ -342,7 +342,7 @@ Se `contatos_bug > 0`, abrir incidente.
   - Chama LLM com prompt de auditoria (modelo barato, gpt-4o-mini)
   - Grava em nova tabela `ops.quality_flags`
   - Notifica Wallace via email/Chatwoot nota interna
-- [ ] D18: Bug 2 — Diferenciar event types de carrinho em session_events (nova migration estendendo CHECK).
+- [x] D18: Bug 2 — Diferenciar event types de carrinho em session_events (nova migration estendendo CHECK).
 - [ ] D19: Bug 9 — Tool execution paralela (Promise.all). Bug 10 — index funcional em tire_size normalizado (migration).
 - [ ] D20: Bug 12 — Mover magic numbers para env (MIN_CONFIDENCE, limits).
 - [ ] D21: Atualizar docs 09, 11, 14.
@@ -488,6 +488,7 @@ A regra atual ("~5 semanas em shadow") é vaga. Cravando critérios concretos:
 | 2026-05-07 | Revisão cruzada com banco vivo + leitura do subset emitível do Generator | Codex |
 | 2026-05-07 | Incorporadas correções: Bug 0/catálogo (subdimensionado, não vazio), Bug 3 (prospectivo), Bug 6 (slot_keys reais), Bug 10 (tire_specs, não products). Adicionado Bug 17 (update_draft sem `...base`). Adicionada seção 4.5 (limitações) e seção 6.5 (cronograma específico dos 17 bugs) | Claude (Opus) |
 | 2026-05-07 | **Limpeza pós-Codex (rodada 2):** removido Bug 3 da Semana 2 (estava contradizendo a própria seção 6.5). Trocado palpite de volume fixo de catálogo pelo critério data-driven com top 5 medidas reais (82,61% da demanda). V1-V5 marcadas como fechadas em vez de pendentes. Adicionado Bug 14a (persistir texto candidato bloqueado) como pré-requisito de Bug 14, porque `agent.turns.say_text` é null quando `status='blocked'`. Adicionada nota de aliases em `commerce.vehicle_models` antes de Wallace cadastrar | Claude (Opus) |
+| 2026-05-08 | **Execução Codex PR 3:** Bug 15 implementado no Action Validator; Bug 2 implementado com migration `0029_cart_action_events_hardening.sql` e eventos semânticos em `session_events`; Bug 4 implementado com `cart_events.updated`. Migration `0029` aplicada/verificada no Supabase atual. Testes: typecheck verde, `npm test` 379/379, integração Atendente 8/8, build verde. Smoke LLM fica pendente até deploy do commit. | Codex |
 
 ---
 
@@ -516,7 +517,7 @@ Plano executável dos 17 bugs cravados em 5 PRs sequenciais + trabalho paralelo 
 
 Quatro bugs de hardening do estado da Atendente. Independem de PR 1, mas faz sentido vir depois pra evitar conflito de migração.
 
-**Status Codex 2026-05-08:** implementação concluída nos quatro itens. `npm run typecheck` verde, `npm test` verde (371/371, 51 arquivos) e integração de persistência da Atendente verde (7/7). Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899` validou Organizadora + Planner + Generator em shadow: 13 mensagens ingeridas, 15 facts salvos, Planner `planner_v1.2.5` com `buscar_e_ofertar`, Generator `generator_v1.3.1` com 5 actions e 0 bloqueios. Sem envio ao cliente.
+**Status Codex 2026-05-08:** implementação concluída nos quatro itens. Na validação do PR 2: `npm run typecheck` verde, `npm test` 371/371, integração de persistência da Atendente 7/7. Após o PR 3, a suíte atual subiu para 379/379 e a integração da Atendente para 8/8. Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899` validou Organizadora + Planner + Generator em shadow: 13 mensagens ingeridas, 15 facts salvos, Planner `planner_v1.2.5` com `buscar_e_ofertar`, Generator `generator_v1.3.1` com 5 actions e 0 bloqueios. Sem envio ao cliente.
 
 **Avaliação qualitativa do smoke LLM real (Codex, 2026-05-08):**
 
@@ -537,13 +538,15 @@ Quatro bugs de hardening do estado da Atendente. Independem de PR 1, mas faz sen
 
 Três bugs de pre-condition e semântica de eventos. Migration de evento types vai junto.
 
-- **Bug 15** — Adicionar pre-condition em [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts#L148-L154) para os 5 cases que hoje retornam `{ valid: true }` em branco:
+**Status Codex 2026-05-08:** implementado e testado deterministicamente. Migration `0029_cart_action_events_hardening.sql` aplicada/verificada no Supabase atual antes dos testes. Validação: `npm run typecheck` verde, `npm test` 379/379, integração `atendente-state-persistence` 8/8 e `npm run build` verde. Smoke LLM real pendente de deploy do commit PR3.
+
+- **Bug 15 [feito local]** — Adicionar pre-condition em [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts#L148-L154) para os 5 cases que hoje retornam `{ valid: true }` em branco:
   - `escalate`: validar `reason='ready_to_close'` exige cart confirmado.
   - `update_draft`: validar consistência (ex.: `fulfillment_mode='delivery'` exige `delivery_address`).
   - `clear_cart`: bloquear se há `pending_confirmation` aberta de cart.
   - `remove_from_cart`, `update_cart_item`: validar `cart_item_id` existe.
-- **Bug 2** — Diferenciar event types de carrinho em `agent.session_events`. Hoje toda mudança vira `cart_proposed`. Criar **migration 0029** estendendo CHECK constraint com `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`, `draft_updated`. Atualizar emissão em [apply-action.ts](../src/atendente/state/apply-action.ts).
-- **Bug 4** — Corrigir mapeamento em [agent-state.repository.ts:566](../src/atendente/state/agent-state.repository.ts#L566) — `update_cart_item` (que só muda quantity) deve emitir `'updated'` em `cart_events`, não `'replaced'`. `replaced` fica reservado para troca real de produto (que entra com Bug 3 quando o action set do Generator for expandido).
+- **Bug 2 [feito local]** — Diferenciar event types de carrinho em `agent.session_events`. Hoje toda mudança vira `cart_proposed`. Criar **migration 0029** estendendo CHECK constraint com `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`, `draft_updated`. Atualizar emissão em [apply-action.ts](../src/atendente/state/apply-action.ts).
+- **Bug 4 [feito local]** — Corrigir mapeamento em [agent-state.repository.ts:566](../src/atendente/state/agent-state.repository.ts#L566) — `update_cart_item` (que só muda quantity) deve emitir `'updated'` em `cart_events`, não `'replaced'`. `replaced` fica reservado para troca real de produto (que entra com Bug 3 quando o action set do Generator for expandido).
 
 ### PR 4 — Organizadora e ops
 

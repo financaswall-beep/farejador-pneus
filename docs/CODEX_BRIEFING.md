@@ -39,6 +39,9 @@ Implementado:
     `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20), `loadCurrent` popula
     `derived_signals.stale_slots`, e troca de item/slots comerciais invalida
     oferta antiga.
+- PR 3 Validators/eventos: Action Validator bloqueia carrinho/draft/escalacao
+    sem pre-condicao; `session_events` usa eventos semanticos de carrinho/draft;
+    `update_cart_item` grava `updated` em `agent.cart_events`.
 
 Desligado/inexistente:
 
@@ -59,13 +62,14 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Proximo lote recomendado: PR 3 de validators/eventos, depois de fechar a
-validacao completa e push do PR 2.
+Proximo lote recomendado: PR 4 de Organizadora/ops, depois do deploy e smoke
+LLM do PR 3.
 
 Escopo:
 
-- Bug 15: pre-condicoes no Action Validator.
-- Bug 2/Bug 4: semantica correta dos eventos de carrinho.
+- Bug 11: lease/reclaim em `ops.enrichment_jobs`.
+- Bug 12: magic numbers para env.
+- Bug 13: decisao/documentacao sobre mensagem editada em evidence.
 
 Alternativa imediata se dados disponiveis:
 
@@ -81,9 +85,10 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 371/371 verde, 51 arquivos
+- `npm test`: 379/379 verde, 51 arquivos
 - `npm run typecheck`: verde
-- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde
+- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde
+- `npm run build`: verde
 - Smoke LLM real (2026-05-08) via Chatwoot fake `pr12-chatwoot-1778211526899`:
   Organizadora + Planner + Generator rodaram em shadow; 15 facts salvos,
   Planner `planner_v1.2.5`, Generator `generator_v1.3.1`, 13 mensagens no

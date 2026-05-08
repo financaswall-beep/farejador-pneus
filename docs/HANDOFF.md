@@ -53,6 +53,12 @@ Implementado:
   `derived_signals.stale_slots`, `set_active_item` invalida oferta do item
   antigo e marca slots antigos como `stale_strong`, e `INVALIDATION_RULES`
   cobre slots comerciais reais que faltavam.
+- PR 3 de validators/eventos (2026-05-08): `ActionValidator` ganhou
+  pre-condicoes para carrinho, draft de delivery e escalacao `ready_to_close`;
+  `session_events` agora diferencia `cart_added`, `cart_removed`,
+  `cart_updated`, `cart_cleared` e `draft_updated`; `cart_events` grava
+  `updated` quando `update_cart_item` muda apenas quantidade. Migration `0029`
+  aplicada e verificada no Supabase atual.
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
@@ -115,8 +121,9 @@ Nao implementado/nao ligado:
 ## Ultimas Validacoes
 
 - `npm run typecheck`: verde.
-- `npm test`: 371/371 verde, 51 arquivos.
-- `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- `npm test`: 379/379 verde, 51 arquivos.
+- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
+- `npm run build`: verde.
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`
   (conversa `451`): Organizadora, Planner e Generator rodaram em shadow.
   Organizadora salvou 15 facts; Planner LLM (`planner_v1.2.5`) selecionou
@@ -151,13 +158,13 @@ Remotes sincronizados:
 
 ## Proxima Fase Recomendada
 
-Sprint 7: Critic Shadow da Atendente.
-- Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
-- Nao envia ao Chatwoot no Critic.
-- Agora pode seguir porque a memoria operacional do Generator foi calibrada.
-- Deve priorizar bloqueio de claims sem lastro detectados no run multi-turn:
-  disponibilidade de marca/produto, politica/prazo de entrega e fallback
-  generico de escalacao quando ha resposta util segura.
+PR 4: Organizadora/ops.
+- Lease/reclaim para `ops.enrichment_jobs` zumbi.
+- Magic numbers principais para env.
+- Decisao/documentacao sobre evidence quando mensagem original foi editada.
+
+Depois do PR 4, escolher entre PR 5 (Say Validator comercial, depende de
+amostra real de `blocked_say_text`) e Sprint 7/Supervisora shadow.
 
 Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
 - `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios; `buscar_e_ofertar` retorna lista vazia.

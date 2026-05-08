@@ -31,7 +31,8 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | Fix generator_v1.3.1 - Generator proibe SAFE_FALLBACK em pedir_dados_faltantes | Implementado em prod |
 | Fix phase3 repo - dedup de facts identicos por valor | Implementado em prod |
 | PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
-| PR 2 Estado/contexto - invalidações + contexto configurável | Implementado e testado; aguardando push |
+| PR 2 Estado/contexto - invalidações + contexto configurável | Implementado, testado e publicado |
+| PR 3 Validators/eventos - pre-condições + eventos semânticos | Implementado e testado; aguardando smoke LLM pós-deploy |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -65,14 +66,24 @@ Organizadora LLM e Atendente em shadow/controle humano.
   10 mensagens fixas; `loadCurrent` expõe `derived_signals.stale_slots`.
 - Troca de item ativo e mudanças em slots comerciais reais invalidam ofertas
   antigas para evitar vender com moto/posição/pagamento antigo.
+- Action Validator bloqueia actions sem pre-condição: item inexistente em
+  `remove_from_cart`/`update_cart_item`, `clear_cart` com confirmação aberta,
+  draft de delivery sem endereço e `ready_to_close` sem carrinho confirmado.
+- `agent.session_events` separa eventos de carrinho/draft:
+  `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`,
+  `draft_updated`.
+- `agent.cart_events` usa `updated` para mudança de quantidade; `replaced`
+  fica reservado para troca real de produto futura.
 - `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
   antes de inserir nova linha — so anexa evidence ao fact existente.
-- Migrations ate `0028` aplicadas/validadas no Supabase atual.
+- Migrations ate `0029` aplicadas/validadas no Supabase atual.
 - Smoke LLM real pós-PR2 validado em 2026-05-08 via conversa fake Chatwoot
   `451`: Organizadora, Planner e Generator rodaram em shadow sem envio ao
   cliente.
 - Avaliação qualitativa do smoke: Organizadora 9/10, Planner 9/10,
   Generator 8/10, fluxo geral 8,7/10.
+- Validação determinística PR3 (2026-05-08): `npm run typecheck`, `npm test`
+  379/379, integração Atendente 8/8 e `npm run build` verdes.
 
 ## O Que Ainda Nao Esta Ligado
 
