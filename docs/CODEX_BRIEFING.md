@@ -84,6 +84,10 @@ Ultima validacao conhecida:
 - `npm test`: 371/371 verde, 51 arquivos
 - `npm run typecheck`: verde
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde
+- Smoke LLM real (2026-05-08) via Chatwoot fake `pr12-chatwoot-1778211526899`:
+  Organizadora + Planner + Generator rodaram em shadow; 15 facts salvos,
+  Planner `planner_v1.2.5`, Generator `generator_v1.3.1`, 13 mensagens no
+  contexto da conversa e 0 envio ao cliente.
 
 ## Arquivos De Estado
 

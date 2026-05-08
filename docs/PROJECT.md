@@ -68,6 +68,9 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
   antes de inserir nova linha — so anexa evidence ao fact existente.
 - Migrations ate `0028` aplicadas/validadas no Supabase atual.
+- Smoke LLM real pós-PR2 validado em 2026-05-08 via conversa fake Chatwoot
+  `451`: Organizadora, Planner e Generator rodaram em shadow sem envio ao
+  cliente.
 
 ## O Que Ainda Nao Esta Ligado
 

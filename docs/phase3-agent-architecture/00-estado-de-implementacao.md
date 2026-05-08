@@ -175,6 +175,9 @@ Ultima validacao (PR 2):
 - `npm run typecheck`: verde.
 - `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`: 13 mensagens
+  ingeridas, 15 facts da Organizadora, Planner LLM e Generator LLM em shadow,
+  sem envio ao cliente.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

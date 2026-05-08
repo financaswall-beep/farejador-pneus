@@ -148,6 +148,13 @@ Ultima validacao (2026-05-08, PR 2):
 - `npm run typecheck`: verde.
 - `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`, conversa
+  Chatwoot `451`: Organizadora salvou 15 facts (`moto-pneus-hybrid-v3-4`),
+  Planner LLM usou `planner_v1.2.5` com `buscar_e_ofertar` e tools
+  `buscarCompatibilidade`, `calcularFrete`, `buscarPoliticaComercial`;
+  Generator LLM usou `generator_v1.3.1`, gerou 5 actions e 0 bloqueios.
+  Conversa teve 13 mensagens, validando o caminho de contexto longo do PR 2
+  com default 20. `agent.turns` tem colunas de auditoria PR 1 presentes.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:

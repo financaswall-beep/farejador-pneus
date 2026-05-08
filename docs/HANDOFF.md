@@ -117,6 +117,11 @@ Nao implementado/nao ligado:
 - `npm run typecheck`: verde.
 - `npm test`: 371/371 verde, 51 arquivos.
 - `npm run test:integration -- tests/integration/atendente-state-persistence.integration.test.ts`: 7/7 verde.
+- Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`
+  (conversa `451`): Organizadora, Planner e Generator rodaram em shadow.
+  Organizadora salvou 15 facts; Planner LLM (`planner_v1.2.5`) selecionou
+  `buscar_e_ofertar`; Generator LLM (`generator_v1.3.1`) gerou 5 actions,
+  sem bloqueio. Nenhuma mensagem foi enviada ao cliente pelo Farejador.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,
