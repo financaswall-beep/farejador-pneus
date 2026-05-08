@@ -155,6 +155,10 @@ Ultima validacao (2026-05-08, PR 2):
   Generator LLM usou `generator_v1.3.1`, gerou 5 actions e 0 bloqueios.
   Conversa teve 13 mensagens, validando o caminho de contexto longo do PR 2
   com default 20. `agent.turns` tem colunas de auditoria PR 1 presentes.
+- Nota qualitativa do smoke: Organizadora **9/10**, Planner **9/10**,
+  Generator **8/10**, fluxo geral **8,7/10**. Limite: não foi cenário de
+  bloqueio forçado; falta smoke específico de desconto/marca/frete sem lastro
+  para provar `blocked_say_text` preenchido quando `status='blocked'`.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:

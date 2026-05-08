@@ -178,6 +178,9 @@ Ultima validacao (PR 2):
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`: 13 mensagens
   ingeridas, 15 facts da Organizadora, Planner LLM e Generator LLM em shadow,
   sem envio ao cliente.
+- Avaliação qualitativa: Organizadora 9/10, Planner 9/10, Generator 8/10,
+  fluxo geral 8,7/10. O teste validou correção de contexto e uso de tools;
+  ainda falta smoke específico de bloqueio para validar `blocked_say_text`.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

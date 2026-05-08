@@ -122,6 +122,10 @@ Nao implementado/nao ligado:
   Organizadora salvou 15 facts; Planner LLM (`planner_v1.2.5`) selecionou
   `buscar_e_ofertar`; Generator LLM (`generator_v1.3.1`) gerou 5 actions,
   sem bloqueio. Nenhuma mensagem foi enviada ao cliente pelo Farejador.
+- Avaliação do smoke: Organizadora 9/10, Planner 9/10, Generator 8/10,
+  fluxo geral 8,7/10. O principal acerto foi respeitar a correção
+  "Bros 160" -> "Biz 125 2019" e usar tools antes da resposta comercial.
+  Próximo smoke desejável: forçar bloqueio para validar `blocked_say_text`.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

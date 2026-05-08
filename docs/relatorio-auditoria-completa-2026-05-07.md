@@ -518,6 +518,16 @@ Quatro bugs de hardening do estado da Atendente. Independem de PR 1, mas faz sen
 
 **Status Codex 2026-05-08:** implementação concluída nos quatro itens. `npm run typecheck` verde, `npm test` verde (371/371, 51 arquivos) e integração de persistência da Atendente verde (7/7). Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899` validou Organizadora + Planner + Generator em shadow: 13 mensagens ingeridas, 15 facts salvos, Planner `planner_v1.2.5` com `buscar_e_ofertar`, Generator `generator_v1.3.1` com 5 actions e 0 bloqueios. Sem envio ao cliente.
 
+**Avaliação qualitativa do smoke LLM real (Codex, 2026-05-08):**
+
+| Componente | Nota no smoke | Comportamento observado |
+|---|---:|---|
+| Organizadora | **9/10** | Extraiu corretamente os principais fatos da conversa longa: `moto_modelo=Biz 125`, `moto_ano=2019`, `posicao_pneu=traseiro`, `medida_pneu=110/90-17`, `marca_pneu_preferida=Pirelli`, `bairro_mencionado=Meier`, `forma_pagamento=pix`. Capturou a correção de contexto ("Bros 160" anterior → "Biz 125 2019" atual). |
+| Planner | **9/10** | Escolheu `buscar_e_ofertar` e chamou tools antes de permitir resposta comercial: `buscarCompatibilidade(Biz 125, 2019, rear)`, `calcularFrete(Meier)` e `buscarPoliticaComercial`. Não pediu novamente dados que a Organizadora já tinha extraído. |
+| Generator | **8/10** | Usou `generator_v1.3.1`, gerou 5 actions, não foi bloqueado e não enviou mensagem ao cliente. Ficou em shadow/auditoria. A nota não é 9/10 porque este smoke não forçou um bloqueio; ainda falta um cenário proposital de desconto/marca/frete sem lastro para provar `blocked_say_text` preenchido em produção. |
+
+**Nota geral do fluxo no smoke:** **8,7/10**. O fluxo respeitou a correção "Bros 160" → "Biz 125 2019", usou 13 mensagens (acima do antigo limite 10), acionou tools antes de falar comercialmente e preservou o modo shadow sem envio ao cliente.
+
 - **Bug 8 [feito local]** — Tornar limit de mensagens do Context Builder configurável via env (`ATENDENTE_CONTEXT_MESSAGES_LIMIT`, default 20). Substitui o `LIMIT 10` hardcoded em [context-builder.ts:73](../src/atendente/planner/context-builder.ts#L73).
 - **Bug 16 [feito local]** — `loadCurrent` popula `derived_signals.stale_slots` lendo `agent.session_slots` onde `stale != 'fresh'` ([agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts#L230-L236)).
 - **Bug 1 [feito local]** — `applySetActiveItem` em [apply-action.ts:250-261](../src/atendente/state/apply-action.ts#L250-L261) invalida oferta ligada ao item antigo + marca slots do item antigo como `stale_strong`. Cenário "Bros 160 → Biz 125" passa a funcionar limpo.

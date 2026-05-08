@@ -71,6 +71,8 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - Smoke LLM real pós-PR2 validado em 2026-05-08 via conversa fake Chatwoot
   `451`: Organizadora, Planner e Generator rodaram em shadow sem envio ao
   cliente.
+- Avaliação qualitativa do smoke: Organizadora 9/10, Planner 9/10,
+  Generator 8/10, fluxo geral 8,7/10.
 
 ## O Que Ainda Nao Esta Ligado
 

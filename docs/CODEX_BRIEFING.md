@@ -88,6 +88,9 @@ Ultima validacao conhecida:
   Organizadora + Planner + Generator rodaram em shadow; 15 facts salvos,
   Planner `planner_v1.2.5`, Generator `generator_v1.3.1`, 13 mensagens no
   contexto da conversa e 0 envio ao cliente.
+- Nota qualitativa do smoke: Organizadora 9/10, Planner 9/10, Generator 8/10,
+  fluxo geral 8,7/10. Não considerar como certificação completa: ainda falta
+  smoke de bloqueio proposital para `blocked_say_text`.
 
 ## Arquivos De Estado
 
