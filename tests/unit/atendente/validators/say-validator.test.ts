@@ -323,6 +323,74 @@ describe('SayValidator inicial', () => {
     });
   });
 
+  it('bloqueia desconto sem politica comercial', () => {
+    expect(
+      validateSay('Consigo te dar 5% de desconto.', {
+        recent_tool_results: [],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_without_tool_result',
+    });
+  });
+
+  it('permite desconto dentro da politica retornada', () => {
+    expect(
+      validateSay('Consigo te dar 5% de desconto.', {
+        recent_tool_results: [discountPolicyToolResult(5)],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('bloqueia desconto acima da politica retornada', () => {
+    expect(
+      validateSay('Consigo te dar 10% de desconto.', {
+        recent_tool_results: [discountPolicyToolResult(5)],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_mismatches_tool_result',
+    });
+  });
+
+  it('bloqueia brinde sem politica promocional', () => {
+    expect(
+      validateSay('Levando 2 pneus ganha uma camara de brinde.', {
+        recent_tool_results: [discountPolicyToolResult(5)],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_without_tool_result',
+    });
+  });
+
+  it('permite brinde quando existe politica promocional', () => {
+    expect(
+      validateSay('Levando 2 pneus ganha uma camara de brinde.', {
+        recent_tool_results: [promotionPolicyToolResult()],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('bloqueia oferta custom sem politica comercial', () => {
+    expect(
+      validateSay('Se levar 2, faco por R$ 200.', {
+        recent_tool_results: [],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'policy_claim_without_tool_result',
+    });
+  });
+
+  it('permite meta-fala de desconto sem politica comercial', () => {
+    expect(
+      validateSay('Preciso confirmar desconto com a loja antes de te passar.', {
+        recent_tool_results: [],
+      }),
+    ).toEqual({ valid: true });
+  });
+
   it('nao bloqueia dado observado de pagamento do cliente', () => {
     expect(validateSay('Perfeito, anotei pagamento no pix.', { recent_tool_results: [] })).toEqual({ valid: true });
   });
@@ -388,6 +456,34 @@ function policyToolResult() {
       {
         policy_key: 'horario_funcionamento',
         policy_value: 'Atendemos de segunda a sábado, das 8h às 17h.',
+        policy_version: '1.0',
+      },
+    ],
+  };
+}
+
+function discountPolicyToolResult(pct: number) {
+  return {
+    tool: 'buscarPoliticaComercial' as const,
+    ok: true,
+    output: [
+      {
+        policy_key: 'desconto_maximo',
+        policy_value: { pct },
+        policy_version: '1.0',
+      },
+    ],
+  };
+}
+
+function promotionPolicyToolResult() {
+  return {
+    tool: 'buscarPoliticaComercial' as const,
+    ok: true,
+    output: [
+      {
+        policy_key: 'brinde_promocao',
+        policy_value: 'Levando 2 pneus, ganha uma camara de brinde enquanto durar o estoque.',
         policy_version: '1.0',
       },
     ],

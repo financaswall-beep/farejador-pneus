@@ -211,7 +211,10 @@ type PolicyClaim =
   | { category: 'payment_method'; methods: string[] }
   | { category: 'exchange_or_return' }
   | { category: 'warranty' }
-  | { category: 'business_hours' };
+  | { category: 'business_hours' }
+  | { category: 'discount'; pct?: number }
+  | { category: 'promotion_or_gift' }
+  | { category: 'custom_offer' };
 
 function detectPolicyClaim(text: string): PolicyClaim | null {
   for (const sentence of splitSentences(text)) {
@@ -223,6 +226,12 @@ function detectPolicyClaim(text: string): PolicyClaim | null {
 
     const payment = detectPaymentMethodClaim(normalized);
     if (payment) return payment;
+
+    const discount = detectDiscountClaim(normalized);
+    if (discount) return discount;
+
+    if (mentionsPromotionOrGiftClaim(normalized)) return { category: 'promotion_or_gift' };
+    if (mentionsCustomOfferClaim(normalized)) return { category: 'custom_offer' };
 
     if (mentionsExchangeOrReturnClaim(normalized)) return { category: 'exchange_or_return' };
     if (mentionsWarrantyClaim(normalized)) return { category: 'warranty' };
@@ -280,6 +289,36 @@ function detectPaymentMethodClaim(text: string): PolicyClaim | null {
   return methods.length > 0 ? { category: 'payment_method', methods } : null;
 }
 
+function detectDiscountClaim(text: string): PolicyClaim | null {
+  if (!/\b(?:desconto|off|preco\s+especial|condicao\s+especial|melhor\s+preco)\b/.test(text)) {
+    return null;
+  }
+
+  if (
+    !/\b(?:dou|damos|consigo|aplico|fazemos|faco|fa[cç]o|deixo|fecho|fica|tem|posso\s+fazer)\b/.test(text)
+  ) {
+    return null;
+  }
+
+  const pct = text.match(/\b(\d{1,2})(?:[,.]\d+)?\s*%|\b(\d{1,2})\s*por\s+cento\b/);
+  const pctValue = pct ? Number(pct[1] ?? pct[2]) : undefined;
+  return Number.isFinite(pctValue) ? { category: 'discount', pct: pctValue } : { category: 'discount' };
+}
+
+function mentionsPromotionOrGiftClaim(text: string): boolean {
+  return [
+    /\b(?:promocao|promocional|brinde)\b/,
+    /\b(?:ganha|ganhe|leva|levando)\b.{0,50}\b(?:camara|bico|brinde|desconto)\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function mentionsCustomOfferClaim(text: string): boolean {
+  return [
+    /\bse\s+(?:levar|comprar|fechar)\s+\d+\b.{0,70}\b(?:faco|fa[cç]o|deixo|fica|fecho|consigo)\b/,
+    /\b(?:faco|fa[cç]o|deixo|fecho)\s+(?:por\s+)?(?:r\$\s*)?\d{2,5}\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
 function mentionsExchangeOrReturnClaim(text: string): boolean {
   return [
     /\b(?:trocamos|troca|pode\s+trocar|aceita\s+troca)\b.{0,40}\b(?:\d+\s+dias?|produto|nota|compra|servir)\b/,
@@ -315,6 +354,11 @@ function policyClaimMismatchesToolResult(claim: PolicyClaim, policyResults: unkn
     return acceptedMethods.size > 0 && claim.methods.some((method) => !acceptedMethods.has(method));
   }
 
+  if (claim.category === 'discount' && claim.pct !== undefined) {
+    const maxDiscountPct = collectPolicyNumbers(policyResults, ['pct', 'percent', 'percentage', 'discount_pct', 'max_pct']);
+    return maxDiscountPct.size > 0 && ![...maxDiscountPct].some((max) => claim.pct! <= max);
+  }
+
   return false;
 }
 
@@ -330,6 +374,21 @@ function hasRelevantPolicyEvidence(claim: PolicyClaim, policyResults: unknown[])
   }
   if (claim.category === 'exchange_or_return') {
     return policyKeys.has('prazo_troca') || policyKeys.has('politica_devolucao');
+  }
+  if (claim.category === 'discount') return policyKeys.has('desconto_maximo');
+  if (claim.category === 'promotion_or_gift') {
+    return (
+      policyKeys.has('promocao_ativa') ||
+      policyKeys.has('politica_promocional') ||
+      policyKeys.has('brinde_promocao')
+    );
+  }
+  if (claim.category === 'custom_offer') {
+    return (
+      policyKeys.has('desconto_maximo') ||
+      policyKeys.has('promocao_ativa') ||
+      policyKeys.has('politica_promocional')
+    );
   }
   return false;
 }

@@ -66,8 +66,9 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Proximo lote recomendado apos PR 4: PR 5 Say Validator comercial ou catalogo
-commerce, depois do deploy e smoke LLM do PR 4.
+Proximo lote recomendado apos PR 5 comercial parcial: deploy + smoke LLM
+especifico de desconto/brinde/oferta custom, ou catalogo commerce se a prioridade
+for destravar venda real.
 
 Escopo:
 
@@ -139,6 +140,11 @@ Ultima validacao conhecida:
   `planner_v1.2.6`; auditoria retornou `BAD_STOCK_TOOL_CALLS []`. Generator nao
   repetiu "Tem Pirelli sim"; respondeu pedindo ano da Biz ou dizendo que precisa
   confirmar compatibilidade/valor antes de passar. Sem envio ao cliente.
+- PR5 comercial parcial local (2026-05-08): Say Validator bloqueia desconto sem
+  `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
+  politica promocional e oferta custom ("faco por R$ 200") sem politica
+  comercial. Teste focado `say-validator.test.ts`: 49/49 verde. Falta deploy +
+  smoke LLM especifico para confirmar `blocked_say_text` em prod.
 
 ## Arquivos De Estado
 

@@ -224,6 +224,11 @@ Ultima validacao (PR 4 local):
 - Smoke pos-deploy `planner_v1.2.6` (Chatwoot `460`-`465`): Organizadora 6/6
   jobs `done`; Planner sem `verificarEstoque` invalido; Generator sem claim de
   marca sem lastro. Sem envio ao cliente.
+- PR5 comercial parcial local: Say Validator tambem bloqueia desconto sem
+  `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
+  politica promocional e oferta custom ("faco por R$ 200") sem politica
+  comercial. Teste focado `say-validator.test.ts`: 49/49 verde. Falta deploy +
+  smoke LLM especifico de desconto/brinde/oferta custom.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

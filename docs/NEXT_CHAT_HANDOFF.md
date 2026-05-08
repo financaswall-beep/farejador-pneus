@@ -195,6 +195,12 @@ Ultima validacao (2026-05-08, PR 3):
   endereco; tambem gravou slots globais `nome`, `bairro`, `forma_pagamento`.
   `agent.session_events` contem `draft_updated`. Resposta ao cliente ficou
   segura: anotou dados e pediu confirmacao humana de produto/estoque.
+- PR5 comercial parcial local: Say Validator agora bloqueia desconto sem
+  `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
+  politica promocional e oferta custom ("faco por R$ 200") sem politica
+  comercial. Teste focado `say-validator.test.ts` verde com 49/49. Falta
+  deploy + smoke LLM especifico forcando desconto/brinde/oferta custom sem
+  lastro para confirmar `blocked_say_text` em prod.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:
@@ -228,18 +234,13 @@ Duas frentes (ordenadas por prioridade):
 - Apos seed: pipeline completo funcionara — Organizadora extrai moto, Planner
   chama buscarCompatibilidade, Generator oferta produto real.
 
-**PR 4 — Organizadora/ops**:
-- Bug 11: lease/reclaim em `ops.enrichment_jobs` implementado para recuperar
-  job zumbi apos `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`.
-- Bug 12: magic numbers principais movidos para env com defaults:
-  `ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` e
-  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`.
-- Bug 13: decisao documentada; mensagem editada segue como limitacao conhecida
-  ate existir historico versionado de `core.messages`.
+**PR 5 Say Validator comercial**:
+- Codigo local cobre marca, desconto, brinde/promocao e oferta custom sem
+  lastro comercial.
+- Proximo passo operacional: deploy + smoke LLM forcando esses cenarios.
 
-Depois disso, voltar para **PR 5 Say Validator comercial** ou **Sprint 7
-Supervisora/Critic shadow**, dependendo do resultado do smoke PR3 e da
-prioridade comercial.
+Depois disso, seguir para **Sprint 7 Supervisora/Critic shadow** ou catalogo
+commerce, dependendo da prioridade comercial.
 
 **Sprint 8 — Envio controlado ao Chatwoot**:
 - `ChatwootApiClient.postMessage()` com `private: false`.
@@ -253,6 +254,6 @@ das tabelas relevantes e o formato de importacao esperado (CSV ou SQL direto)."
 
 Ou, se catalogo nao estiver disponivel:
 
-"Quero abrir o PR 5: Say Validator comercial. Primeiro leia os blocks reais
-persistidos, reduza falso positivo se existir e so depois adicione bloqueios de
-desconto, promocao, marca e oferta custom sem lastro."
+"Quero fechar o PR 5: rode smoke LLM especifico de desconto, promocao/brinde e
+oferta custom sem lastro, confirme se o Generator foi bloqueado e se
+`blocked_say_text` ficou persistido."
