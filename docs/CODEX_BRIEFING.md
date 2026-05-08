@@ -134,6 +134,11 @@ Ultima validacao conhecida:
   normalizacao; Say Validator bloqueia claim positivo de marca sem `buscarProduto`
   (`brand_claim_without_buscar_produto`). Testes: `npm test` 384/384, typecheck,
   build e integracao `atendente-commerce-tools` 5/5 verdes.
+- Smoke pos-deploy `planner_v1.2.6` (2026-05-08, Chatwoot conversas `460`-`465`):
+  Organizadora 6/6 jobs `done`, tentativa 1, sem erro. Planner rodou com
+  `planner_v1.2.6`; auditoria retornou `BAD_STOCK_TOOL_CALLS []`. Generator nao
+  repetiu "Tem Pirelli sim"; respondeu pedindo ano da Biz ou dizendo que precisa
+  confirmar compatibilidade/valor antes de passar. Sem envio ao cliente.
 
 ## Arquivos De Estado
 

@@ -158,6 +158,9 @@ Nao implementado/nao ligado:
   `verificarEstoque` sem `product_id` ou `product_code`; Say Validator bloqueia
   claim de marca sem resultado de `buscarProduto`. Isso cobre diretamente os
   dois problemas vistos nas conversas `454`-`459`.
+- Smoke pos-deploy `planner_v1.2.6` (conversas `460`-`465`): Organizadora 6/6
+  jobs `done`, Planner sem `verificarEstoque` invalido (`BAD_STOCK_TOOL_CALLS []`)
+  e Generator sem claim "Tem Pirelli sim" sem lastro. Sem envio ao cliente.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

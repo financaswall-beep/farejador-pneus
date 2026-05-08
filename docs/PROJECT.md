@@ -112,6 +112,9 @@ Organizadora LLM e Atendente em shadow/controle humano.
   PR5 comercial.
 - Fix pos-smoke: `planner_v1.2.6` impede `verificarEstoque` sem produto concreto
   e o Say Validator bloqueia marca afirmada sem `buscarProduto`.
+- Smoke pos-deploy `planner_v1.2.6` (Chatwoot `460`-`465`): Organizadora 6/6
+  jobs `done`; Planner nao chamou `verificarEstoque` sem produto; Generator nao
+  afirmou "Tem Pirelli sim" sem lastro.
 
 ## O Que Ainda Nao Esta Ligado
 
