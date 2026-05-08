@@ -40,6 +40,8 @@ export function buildPlannerMessages(context: PlannerContext): OpenAIMessage[] {
         '- moto_ano deve ser numero, ex.: 2022. Nunca use string "2022".',
         '- Nao envie null em campos opcionais; omita o campo.',
         '- buscarProduto exige pelo menos um destes campos: medida_pneu, marca ou product_code.',
+        '- verificarEstoque exige product_id ou product_code de um produto concreto ja encontrado. Nunca chame verificarEstoque so com environment.',
+        '- Se ainda nao ha product_id/product_code, use buscarProduto/buscarCompatibilidade primeiro e deixe o Generator responder sem prometer estoque.',
         '- calcularFrete exige bairro. Se nao houver bairro, use pedir_dados_faltantes.',
         '- Se uma tool nao tiver input minimo valido, nao chame essa tool; escolha pedir_dados_faltantes.',
       ].join('\n'),

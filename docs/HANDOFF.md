@@ -154,6 +154,10 @@ Nao implementado/nao ligado:
   rodaram com LLM real. Achados para proximo hardening: Planner emitiu uma
   chamada invalida a `verificarEstoque` sem `product_id`, e Generator afirmou
   "Tem Pirelli sim..." antes de lastro comercial. Sem envio ao cliente.
+- Fix pos-smoke PR4 / PR5 inicial: Planner `planner_v1.2.6` remove/proibe
+  `verificarEstoque` sem `product_id` ou `product_code`; Say Validator bloqueia
+  claim de marca sem resultado de `buscarProduto`. Isso cobre diretamente os
+  dois problemas vistos nas conversas `454`-`459`.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

@@ -110,6 +110,8 @@ Organizadora LLM e Atendente em shadow/controle humano.
   Planner chamou `verificarEstoque` sem `product_id` uma vez, e Generator fez
   claim de marca ("Tem Pirelli sim...") sem lastro. Isso vira insumo direto do
   PR5 comercial.
+- Fix pos-smoke: `planner_v1.2.6` impede `verificarEstoque` sem produto concreto
+  e o Say Validator bloqueia marca afirmada sem `buscarProduto`.
 
 ## O Que Ainda Nao Esta Ligado
 

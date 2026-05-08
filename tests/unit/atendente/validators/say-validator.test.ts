@@ -82,6 +82,31 @@ describe('SayValidator inicial', () => {
     });
   });
 
+  it('bloqueia claim positivo de marca sem buscarProduto', () => {
+    expect(
+      validateSay('Tem Pirelli sim para eu verificar, mas me confirma o ano da sua Biz 125.', {
+        recent_tool_results: [],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'brand_claim_without_buscar_produto',
+    });
+  });
+
+  it('permite claim de marca quando buscarProduto retornou a marca', () => {
+    expect(
+      validateSay('Tem Pirelli sim, mas preciso confirmar o produto certinho antes de passar valor.', {
+        recent_tool_results: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', brand: 'Pirelli', product_name: 'Pneu Pirelli 110/90-17' }],
+          },
+        ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
   it('permite promessa de estoque quando verificarEstoque retornou dado', () => {
     expect(
       validateSay('Temos esse pneu em estoque.', {

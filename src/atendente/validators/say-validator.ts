@@ -40,6 +40,11 @@ export function validateSay(say: string, context: SayValidationContext): SayVali
     return block('stock_claim_without_verificar_estoque');
   }
 
+  const brandClaim = detectBrandAvailabilityClaim(normalizedSay);
+  if (brandClaim && !hasBrandEvidence(context.recent_tool_results, brandClaim)) {
+    return block('brand_claim_without_buscar_produto');
+  }
+
   if (mentionsDeliveryClaim(normalizedSay) && !hasDeliveryEvidence(context.recent_tool_results)) {
     return block('delivery_claim_without_calcular_frete');
   }
@@ -122,6 +127,59 @@ function mentionsStockClaim(text: string): boolean {
     /\bpronta\s+entrega\b/,
     /\b(?:quantidade|unidades?)\s+(?:disponivel|em\s+estoque)\b/,
   ].some((pattern) => pattern.test(text));
+}
+
+const KNOWN_TIRE_BRANDS = [
+  'pirelli',
+  'michelin',
+  'metzeler',
+  'levorin',
+  'technics',
+  'technic',
+  'maggion',
+  'rinaldi',
+  'vipal',
+  'magnum',
+  'ira',
+  'durable',
+  'dunlop',
+  'city',
+];
+
+function detectBrandAvailabilityClaim(text: string): string | null {
+  for (const brand of KNOWN_TIRE_BRANDS) {
+    const escapedBrand = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp(`\\btem(?:os)?\\s+(?:pneu\\s+)?(?:da\\s+marca\\s+)?${escapedBrand}\\b`),
+      new RegExp(`\\b${escapedBrand}\\s+sim\\b`),
+      new RegExp(`\\btrabalhamos\\s+com\\s+${escapedBrand}\\b`),
+      new RegExp(`\\b(?:marca|pneu)\\s+${escapedBrand}\\s+(?:tem|temos|disponivel|ok)\\b`),
+    ];
+    if (patterns.some((pattern) => pattern.test(text))) return brand;
+  }
+  return null;
+}
+
+function hasBrandEvidence(results: ToolResultForValidation[], brand: string): boolean {
+  return results.some(
+    (result) =>
+      result.ok &&
+      (result.tool === 'buscarProduto' || result.tool === 'buscarCompatibilidade') &&
+      valueContainsBrand(result.output, brand, 0),
+  );
+}
+
+function valueContainsBrand(value: unknown, brand: string, depth: number): boolean {
+  if (depth > 8) return false;
+  if (typeof value === 'string') return normalizeText(value).includes(brand);
+  if (Array.isArray(value)) return value.some((item) => valueContainsBrand(item, brand, depth + 1));
+  if (!value || typeof value !== 'object') return false;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ['brand', 'product_name', 'short_description', 'marca', 'name']) {
+    if (valueContainsBrand(record[key], brand, depth + 1)) return true;
+  }
+  return Object.values(record).some((nested) => valueContainsBrand(nested, brand, depth + 1));
 }
 
 function mentionsDeliveryClaim(text: string): boolean {

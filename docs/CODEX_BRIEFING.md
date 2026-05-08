@@ -129,6 +129,11 @@ Ultima validacao conhecida:
   `verificarEstoque` uma vez sem `product_id` (tool_failed seguro), e Generator
   disse "Tem Pirelli sim..." sem lastro comercial; isso confirma a prioridade do
   PR5 Say Validator comercial.
+- Fix pos-smoke PR4/PR5 inicial (2026-05-08): Planner `planner_v1.2.6`
+  proibe `verificarEstoque` sem `product_id`/`product_code` no schema, prompt e
+  normalizacao; Say Validator bloqueia claim positivo de marca sem `buscarProduto`
+  (`brand_claim_without_buscar_produto`). Testes: `npm test` 384/384, typecheck,
+  build e integracao `atendente-commerce-tools` 5/5 verdes.
 
 ## Arquivos De Estado
 

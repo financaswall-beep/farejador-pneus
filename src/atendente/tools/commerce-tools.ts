@@ -22,6 +22,8 @@ export const verificarEstoqueInputSchema = z.object({
   environment: z.enum(['prod', 'test']),
   product_id: z.string().uuid().optional(),
   product_code: z.string().trim().min(1).optional(),
+}).refine((data) => Boolean(data.product_id || data.product_code), {
+  message: 'verificarEstoque exige product_id ou product_code',
 });
 
 export const buscarCompatibilidadeInputSchema = z.object({

@@ -272,6 +272,7 @@ describe('Planner Sprint 3', () => {
     expect(systemPrompt).toContain('Não repita escalar_humano em turnos seguidos');
     expect(systemPrompt).toContain('posicao_pneu deve ser exatamente front, rear ou both');
     expect(systemPrompt).toContain('buscarProduto exige pelo menos um destes campos');
+    expect(systemPrompt).toContain('verificarEstoque exige product_id ou product_code');
   });
 
   it('normaliza input de tool antes de validar output do Planner', () => {
@@ -380,6 +381,50 @@ describe('Planner Sprint 3', () => {
       confidence: 0.65,
       prompt_version: plannerPromptVersion,
     });
+  });
+
+  it('remove verificarEstoque sem product_id ou product_code antes de executar tools', () => {
+    const normalized = plannerOutputSchema.parse(
+      normalizePlannerOutputCandidate(
+        {
+          skill: 'buscar_e_ofertar',
+          missing_slots: [],
+          tool_requests: [
+            {
+              tool: 'buscarProduto',
+              input: {
+                environment: 'test',
+                medida_pneu: '140/70-17',
+                apenas_com_estoque: true,
+              },
+            },
+            {
+              tool: 'verificarEstoque',
+              input: {
+                environment: 'test',
+              },
+            },
+          ],
+          risk_flags: ['mentions_stock'],
+          confidence: 0.9,
+          rationale: 'teste',
+          prompt_version: 'planner_v1.2.5',
+        },
+        context(),
+      ),
+    );
+
+    expect(normalized.tool_requests).toEqual([
+      {
+        tool: 'buscarProduto',
+        input: {
+          environment: 'test',
+          medida_pneu: '140/70-17',
+          apenas_com_estoque: true,
+          limit: 10,
+        },
+      },
+    ]);
   });
 
   it('garante buscarPoliticaComercial quando Planner esquece tool em pergunta de politica', () => {

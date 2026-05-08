@@ -217,6 +217,10 @@ Ultima validacao (PR 4 local):
   Generator usaram LLM real. Achados: Planner tentou `verificarEstoque` sem
   `product_id` em um turno; Generator fez claim de marca ("Tem Pirelli sim...")
   antes de lastro. Sem envio ao cliente.
+- Fix pos-smoke: Planner `planner_v1.2.6` agora filtra/proibe
+  `verificarEstoque` sem `product_id`/`product_code`; Say Validator bloqueia
+  `brand_claim_without_buscar_produto` para frases como "Tem Pirelli sim" sem
+  lastro de `buscarProduto`.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.
