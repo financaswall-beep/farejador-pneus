@@ -40,7 +40,7 @@ Nada responde cliente automaticamente.
 | Hardening fila Atendente - reconciliador de jobs | Implementado |
 | PR 1 - auditoria de turns bloqueados | Implementado |
 | PR 2 - estado/contexto | Implementado |
-| PR 3 - validators/eventos | Implementado; aguardando smoke LLM pos-deploy |
+| PR 3 - validators/eventos | Implementado, testado e com smoke LLM pos-deploy |
 | Critic (Sprint 7) | Nao existe |
 | Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
 | Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
@@ -192,6 +192,11 @@ Ultima validacao (PR 3):
 - Avaliação qualitativa: Organizadora 9/10, Planner 9/10, Generator 8/10,
   fluxo geral 8,7/10. O teste validou correção de contexto e uso de tools;
   ainda falta smoke específico de bloqueio para validar `blocked_say_text`.
+- Smoke PR3 pos-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts;
+  Planner LLM `planner_v1.2.5` usou tools comerciais; Generator rodou em shadow
+  e bloqueou 1 turno com `stock_claim_without_verificar_estoque`, preservando
+  `blocked_say_text`. Sem envio ao cliente. Limite: nao houve `update_draft`
+  nesse smoke, entao `draft_updated` ficou validado nos testes determinísticos.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

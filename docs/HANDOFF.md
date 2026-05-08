@@ -133,6 +133,12 @@ Nao implementado/nao ligado:
   fluxo geral 8,7/10. O principal acerto foi respeitar a correção
   "Bros 160" -> "Biz 125 2019" e usar tools antes da resposta comercial.
   Próximo smoke desejável: forçar bloqueio para validar `blocked_say_text`.
+- Smoke PR3 pos-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts;
+  Planner LLM `planner_v1.2.5` chamou tools comerciais; Generator rodou em
+  shadow, gerou 2 turns e bloqueou 1 com `stock_claim_without_verificar_estoque`,
+  com `blocked_say_text` preservado. Nenhuma mensagem enviada ao cliente.
+  Limite: nao houve `update_draft` nesse smoke; `draft_updated` esta coberto
+  pelos testes unitarios/integracao.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

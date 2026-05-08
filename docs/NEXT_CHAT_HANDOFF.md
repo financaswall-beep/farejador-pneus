@@ -172,6 +172,15 @@ Ultima validacao (2026-05-08, PR 3):
   Generator **8/10**, fluxo geral **8,7/10**. Limite: não foi cenário de
   bloqueio forçado; falta smoke específico de desconto/marca/frete sem lastro
   para provar `blocked_say_text` preenchido quando `status='blocked'`.
+- Smoke PR3 pos-deploy via Chatwoot conversa `452`: Organizadora salvou 12
+  facts (`moto-pneus-hybrid-v3-4`); Planner LLM `planner_v1.2.5` usou
+  `buscar_e_ofertar`/`responder_logistica` com tools (`buscarProduto`,
+  `buscarCompatibilidade`, `calcularFrete`, `verificarEstoque`,
+  `buscarPoliticaComercial`); Generator gerou 2 turns e bloqueou 1 com
+  `stock_claim_without_verificar_estoque`, preservando `blocked_say_text`.
+  Nenhuma mensagem foi enviada ao cliente. Limite: o Generator nao emitiu
+  `update_draft`; portanto `draft_updated` ficou coberto por unit/integration,
+  nao por smoke LLM.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:

@@ -96,6 +96,12 @@ Ultima validacao conhecida:
 - Nota qualitativa do smoke: Organizadora 9/10, Planner 9/10, Generator 8/10,
   fluxo geral 8,7/10. Não considerar como certificação completa: ainda falta
   smoke de bloqueio proposital para `blocked_say_text`.
+- Smoke PR3 pos-deploy (2026-05-08, Chatwoot conversa `452`): Organizadora
+  salvou 12 facts, Planner LLM `planner_v1.2.5` usou tools comerciais, Generator
+  rodou em shadow e bloqueou 1 turno com `stock_claim_without_verificar_estoque`,
+  preservando `blocked_say_text`. Nao houve envio ao cliente. O smoke nao emitiu
+  `update_draft`, entao `draft_updated` ficou validado pelos testes
+  deterministico/integracao.
 
 ## Arquivos De Estado
 

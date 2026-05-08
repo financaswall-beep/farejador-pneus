@@ -84,6 +84,11 @@ Organizadora LLM e Atendente em shadow/controle humano.
   Generator 8/10, fluxo geral 8,7/10.
 - Validação determinística PR3 (2026-05-08): `npm run typecheck`, `npm test`
   379/379, integração Atendente 8/8 e `npm run build` verdes.
+- Smoke PR3 pós-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts,
+  Planner LLM `planner_v1.2.5` usou tools comerciais, e Generator bloqueou uma
+  resposta com `stock_claim_without_verificar_estoque`, preservando
+  `blocked_say_text`. Sem envio ao cliente. `draft_updated` nao apareceu no
+  smoke porque nao houve `update_draft`; coberto pelos testes determinísticos.
 
 ## O Que Ainda Nao Esta Ligado
 
