@@ -41,7 +41,7 @@ Nada responde cliente automaticamente.
 | PR 1 - auditoria de turns bloqueados | Implementado |
 | PR 2 - estado/contexto | Implementado |
 | PR 3 - validators/eventos | Implementado, testado e com smoke LLM pos-deploy |
-| Generator v1.3.2 - fechamento seguro | Implementado; aguardando deploy/smoke |
+| Generator v1.3.2 - fechamento seguro | Implementado e validado em smoke real |
 | Critic (Sprint 7) | Nao existe |
 | Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
 | Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
@@ -179,6 +179,7 @@ Worker Shadow:
   Se o cliente informa nome/pagamento/endereco ou diz "pode fechar", o Generator
   deve emitir `update_draft` e responder que um atendente confirmara
   produto/estoque antes de fechar, sem inventar disponibilidade.
+  Validado no Chatwoot conversa `453`: `update_draft` + `draft_updated` gravados.
 - Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
   dados faltantes sem inventar preco, estoque ou frete.
 
@@ -202,6 +203,9 @@ Ultima validacao (PR 3):
   e bloqueou 1 turno com `stock_claim_without_verificar_estoque`, preservando
   `blocked_say_text`. Sem envio ao cliente. Limite: nao houve `update_draft`
   nesse smoke, entao `draft_updated` ficou validado nos testes determinísticos.
+- Smoke `generator_v1.3.2` pos-deploy (Chatwoot conversa `453`): segundo turn
+  emitiu `update_draft` com nome, pix, delivery e endereco; `session_events`
+  gravou `draft_updated`; resposta pediu confirmacao humana de produto/estoque.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

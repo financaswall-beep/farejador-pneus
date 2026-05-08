@@ -190,6 +190,11 @@ Ultima validacao (2026-05-08, PR 3):
   unitario para esse caso. Exemplo esperado: cliente diz "pode fechar no pix,
   meu nome e Joao, entrega na Rua X" -> action `update_draft` com nome, pix,
   delivery e endereco; resposta segura pede confirmacao humana de estoque.
+- Smoke real pos-deploy `generator_v1.3.2` via Chatwoot conversa `453`:
+  funcionou. Segundo turn emitiu `update_draft` com nome, pix, delivery e
+  endereco; tambem gravou slots globais `nome`, `bairro`, `forma_pagamento`.
+  `agent.session_events` contem `draft_updated`. Resposta ao cliente ficou
+  segura: anotou dados e pediu confirmacao humana de produto/estoque.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:

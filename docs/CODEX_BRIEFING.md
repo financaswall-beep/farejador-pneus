@@ -109,6 +109,11 @@ Ultima validacao conhecida:
 - Ajuste pos-smoke: `generator_v1.3.2` cobre essa lacuna. Teste unitario novo
   simula "pode fechar no pix, meu nome e Joao, entrega..." e exige
   `update_draft` completo sem claim de estoque.
+- Smoke LLM real pos-deploy `generator_v1.3.2` (Chatwoot conversa `453`):
+  Generator emitiu `update_draft` com `customer_name=Joao Teste`,
+  `payment_method=pix`, `fulfillment_mode=delivery`,
+  `delivery_address=Rua das Flores 123, Meier`; `agent.session_events` gravou
+  `draft_updated`. A resposta nao prometeu estoque; pediu confirmacao humana.
 
 ## Arquivos De Estado
 

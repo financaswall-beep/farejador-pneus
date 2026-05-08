@@ -63,6 +63,8 @@ Implementado:
   `update_draft` quando cliente informa fechamento/nome/pagamento/endereco,
   mesmo sem estoque confirmado. Resposta segura deve chamar humano para
   confirmar produto/estoque; nao pode afirmar disponibilidade sem evidencia.
+  Smoke real pos-deploy na conversa Chatwoot `453` validou o caminho:
+  `update_draft` com nome/pix/entrega/endereco e evento `draft_updated`.
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
@@ -143,6 +145,10 @@ Nao implementado/nao ligado:
   com `blocked_say_text` preservado. Nenhuma mensagem enviada ao cliente.
   Limite: nao houve `update_draft` nesse smoke; `draft_updated` esta coberto
   pelos testes unitarios/integracao.
+- Smoke `generator_v1.3.2` pos-deploy (Chatwoot conversa `453`): segundo turn
+  gerou `update_draft` com `customer_name=Joao Teste`, `payment_method=pix`,
+  `fulfillment_mode=delivery`, `delivery_address=Rua das Flores 123, Meier`;
+  `session_events` gravou `draft_updated`. Resposta nao prometeu estoque.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,

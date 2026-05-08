@@ -33,7 +33,7 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
 | PR 2 Estado/contexto - invalidações + contexto configurável | Implementado, testado e publicado |
 | PR 3 Validators/eventos - pre-condições + eventos semânticos | Implementado e testado; aguardando smoke LLM pós-deploy |
-| Generator v1.3.2 - fechamento seguro com update_draft | Implementado e testado localmente; aguardando deploy/smoke |
+| Generator v1.3.2 - fechamento seguro com update_draft | Implementado, testado e validado em smoke real |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -95,6 +95,10 @@ Organizadora LLM e Atendente em shadow/controle humano.
   resposta com `stock_claim_without_verificar_estoque`, preservando
   `blocked_say_text`. Sem envio ao cliente. `draft_updated` nao apareceu no
   smoke porque nao houve `update_draft`; coberto pelos testes determinísticos.
+- Smoke `generator_v1.3.2` pós-deploy (Chatwoot conversa `453`): Generator
+  emitiu `update_draft` com nome, pix, entrega e endereço; `session_events`
+  gravou `draft_updated`. Resposta segura: dados anotados e confirmação humana
+  de produto/estoque antes de fechar.
 
 ## O Que Ainda Nao Esta Ligado
 
