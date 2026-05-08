@@ -84,6 +84,11 @@ Atendente:
   endereco; bloqueia `escalate reason=ready_to_close` sem carrinho confirmado.
   `applyAction` emite eventos semanticos de carrinho/draft e `cart_events`
   usa `updated` para alteracao de quantidade. Migration `0029` aplicada.
+- Generator `generator_v1.3.2` (2026-05-08): apos smoke PR3, reforcado que
+  dados de fechamento (`pode fechar`, nome, pagamento, endereco, entrega)
+  devem gerar `update_draft` mesmo sem estoque confirmado. A resposta deve
+  anotar dados e chamar humano para confirmar produto/estoque, sem dizer
+  "tem disponivel" nem "nao encontrei disponivel" sem evidencia especifica.
 - Organizadora v3.4 calibrada:
   prompt `moto-pneus-hybrid-v3-4`, com valores permitidos gerados a partir
   de `FACT_KEY_SCHEMAS`; corrigiu aliases/tipos que causavam `schema_violation`.
@@ -155,7 +160,7 @@ Atendente:
 Ultima validacao (2026-05-08, PR 3):
 
 - `npm run typecheck`: verde.
-- `npm test`: 379/379 verde, 51 arquivos.
+- `npm test`: 380/380 verde, 51 arquivos.
 - `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
 - `npm run build`: verde.
 - Migration `0029_cart_action_events_hardening.sql`: aplicada/verificada no
@@ -181,6 +186,10 @@ Ultima validacao (2026-05-08, PR 3):
   Nenhuma mensagem foi enviada ao cliente. Limite: o Generator nao emitiu
   `update_draft`; portanto `draft_updated` ficou coberto por unit/integration,
   nao por smoke LLM.
+- Correcao pos-smoke: `generator_v1.3.2` adiciona regra explicita e teste
+  unitario para esse caso. Exemplo esperado: cliente diz "pode fechar no pix,
+  meu nome e Joao, entrega na Rua X" -> action `update_draft` com nome, pix,
+  delivery e endereco; resposta segura pede confirmacao humana de estoque.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:

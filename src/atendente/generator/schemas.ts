@@ -35,7 +35,7 @@ import {
 } from '../../shared/zod/agent-state.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 
-export const generatorPromptVersion = 'generator_v1.3.1';
+export const generatorPromptVersion = 'generator_v1.3.2';
 export const generatorAgentVersion = 'atendente_v1.0.0';
 
 // ------------------------------------------------------------------

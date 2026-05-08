@@ -479,6 +479,9 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     expect(systemPrompt).toContain('Para cada dado novo dito pelo cliente na mensagem atual, emita update_slot');
     expect(systemPrompt).toContain('Se o cliente citar dois pneus/produtos na mesma mensagem, crie/atualize dois itens separados');
     expect(systemPrompt).toContain('Para pagamento mencionado, use update_draft.payment_method e update_slot global forma_pagamento');
+    expect(systemPrompt).toContain('Dados de fechamento tem prioridade sobre resposta comercial');
+    expect(systemPrompt).toContain('Mesmo sem estoque/compatibilidade confirmados, ainda registre update_draft');
+    expect(systemPrompt).toContain('NAO diga "nao encontrei produto disponivel"');
   });
 
   it('prompt proibe misturar fallback seguro com resposta util', () => {
@@ -620,6 +623,67 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
       turn_index: 2,
       emitted_by: 'generator',
       payment_method: 'cartao_credito',
+    });
+    disableLlm();
+  });
+
+  it('em fechamento, registra update_draft mesmo sem afirmar estoque', async () => {
+    enableLlm();
+    const latestMessageId = '00000000-0000-4000-8000-0000000000f3';
+    queueLlm('Anotei seus dados. Vou chamar um atendente para confirmar produto e estoque antes de fechar.', [
+      {
+        type: 'update_slot',
+        scope: 'global',
+        item_id: null,
+        slot_key: 'forma_pagamento',
+        value: 'pix',
+        source: 'observed',
+        confidence: 0.99,
+        evidence_text: 'pix',
+        set_by_message_id: latestMessageId,
+      },
+      {
+        type: 'update_draft',
+        customer_name: 'Joao',
+        delivery_address: 'Rua das Flores 123, Meier',
+        fulfillment_mode: 'delivery',
+        payment_method: 'pix',
+      },
+    ]);
+
+    const context = makeContext({
+      recent_messages: [
+        {
+          id: latestMessageId,
+          role: 'customer',
+          text: 'Pode fechar no pix. Meu nome e Joao e entrega na Rua das Flores 123, Meier.',
+          sent_at: baseTime,
+        },
+      ],
+    });
+
+    const result = await generateTurn(
+      context,
+      makeDecision('buscar_e_ofertar'),
+      [
+        makeToolResult('buscarProduto', true, []),
+        makeToolResult('verificarEstoque', true, []),
+      ],
+    );
+
+    expect(result.blocked).toBe(false);
+    expect(result.say_text).toBe('Anotei seus dados. Vou chamar um atendente para confirmar produto e estoque antes de fechar.');
+    expect(result.say_text).not.toMatch(/disponivel|em estoque|nao encontrei/i);
+    expect(result.actions.map((action) => action.type)).toEqual(['update_slot', 'update_draft']);
+    expect(result.actions[1]).toMatchObject({
+      type: 'update_draft',
+      action_id: expect.any(String),
+      turn_index: 2,
+      emitted_by: 'generator',
+      customer_name: 'Joao',
+      delivery_address: 'Rua das Flores 123, Meier',
+      fulfillment_mode: 'delivery',
+      payment_method: 'pix',
     });
     disableLlm();
   });

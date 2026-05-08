@@ -42,6 +42,10 @@ Implementado:
 - PR 3 Validators/eventos: Action Validator bloqueia carrinho/draft/escalacao
     sem pre-condicao; `session_events` usa eventos semanticos de carrinho/draft;
     `update_cart_item` grava `updated` em `agent.cart_events`.
+- Generator `generator_v1.3.2`: reforca fechamento seguro. Quando cliente passa
+    nome/pagamento/endereco ou diz "pode fechar", deve emitir `update_draft`
+    mesmo sem estoque confirmado, e responder que um atendente confirmara
+    produto/estoque antes de fechar.
 
 Desligado/inexistente:
 
@@ -85,7 +89,7 @@ npm run build
 
 Ultima validacao conhecida:
 
-- `npm test`: 379/379 verde, 51 arquivos
+- `npm test`: 380/380 verde, 51 arquivos
 - `npm run typecheck`: verde
 - `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde
 - `npm run build`: verde
@@ -102,6 +106,9 @@ Ultima validacao conhecida:
   preservando `blocked_say_text`. Nao houve envio ao cliente. O smoke nao emitiu
   `update_draft`, entao `draft_updated` ficou validado pelos testes
   deterministico/integracao.
+- Ajuste pos-smoke: `generator_v1.3.2` cobre essa lacuna. Teste unitario novo
+  simula "pode fechar no pix, meu nome e Joao, entrega..." e exige
+  `update_draft` completo sem claim de estoque.
 
 ## Arquivos De Estado
 

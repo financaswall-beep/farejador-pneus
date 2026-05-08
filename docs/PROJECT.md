@@ -33,6 +33,7 @@ Organizadora LLM e Atendente em shadow/controle humano.
 | PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
 | PR 2 Estado/contexto - invalidações + contexto configurável | Implementado, testado e publicado |
 | PR 3 Validators/eventos - pre-condições + eventos semânticos | Implementado e testado; aguardando smoke LLM pós-deploy |
+| Generator v1.3.2 - fechamento seguro com update_draft | Implementado e testado localmente; aguardando deploy/smoke |
 | Critic (Sprint 7) | Proxima fase |
 | Envio Chatwoot (Sprint 8) | Proxima fase |
 | Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
@@ -62,6 +63,10 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - `update_draft` emitido pelo Generator agora carrega `action_id`,
   `turn_index`, `emitted_at` e `emitted_by`, permitindo idempotencia igual as
   demais actions de estado.
+- Generator `generator_v1.3.2` instrui a gravar rascunho de fechamento quando
+  cliente passa nome/pagamento/endereco ou diz "pode fechar", mesmo se produto
+  e estoque ainda dependerem de confirmacao. A resposta segura deve anotar os
+  dados e chamar humano para confirmar produto/estoque, sem claim comercial.
 - Context Builder usa `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20) em vez de
   10 mensagens fixas; `loadCurrent` expõe `derived_signals.stale_slots`.
 - Troca de item ativo e mudanças em slots comerciais reais invalidam ofertas
@@ -82,8 +87,9 @@ Organizadora LLM e Atendente em shadow/controle humano.
   cliente.
 - Avaliação qualitativa do smoke: Organizadora 9/10, Planner 9/10,
   Generator 8/10, fluxo geral 8,7/10.
-- Validação determinística PR3 (2026-05-08): `npm run typecheck`, `npm test`
-  379/379, integração Atendente 8/8 e `npm run build` verdes.
+- Validação determinística PR3 + generator_v1.3.2 (2026-05-08):
+  `npm run typecheck`, `npm test` 380/380, integração Atendente 8/8 e
+  `npm run build` verdes.
 - Smoke PR3 pós-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts,
   Planner LLM `planner_v1.2.5` usou tools comerciais, e Generator bloqueou uma
   resposta com `stock_claim_without_verificar_estoque`, preservando

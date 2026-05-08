@@ -41,6 +41,7 @@ Nada responde cliente automaticamente.
 | PR 1 - auditoria de turns bloqueados | Implementado |
 | PR 2 - estado/contexto | Implementado |
 | PR 3 - validators/eventos | Implementado, testado e com smoke LLM pos-deploy |
+| Generator v1.3.2 - fechamento seguro | Implementado; aguardando deploy/smoke |
 | Critic (Sprint 7) | Nao existe |
 | Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
 | Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
@@ -174,6 +175,10 @@ Worker Shadow:
   carrinho/draft/escalacao; `session_events` ganhou eventos especificos
   `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared` e
   `draft_updated`; `cart_events` agora usa `updated` para mudanca de quantidade.
+- Generator v1.3.2 (2026-05-08): dados de fechamento tem prioridade de memoria.
+  Se o cliente informa nome/pagamento/endereco ou diz "pode fechar", o Generator
+  deve emitir `update_draft` e responder que um atendente confirmara
+  produto/estoque antes de fechar, sem inventar disponibilidade.
 - Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
   dados faltantes sem inventar preco, estoque ou frete.
 
@@ -182,7 +187,7 @@ Worker Shadow:
 Ultima validacao (PR 3):
 
 - `npm run typecheck`: verde.
-- `npm test`: 379/379 verde, 51 arquivos.
+- `npm test`: 380/380 verde, 51 arquivos.
 - `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
 - `npm run build`: verde.
 - Migration `0029`: aplicada/verificada no Supabase atual antes do push.

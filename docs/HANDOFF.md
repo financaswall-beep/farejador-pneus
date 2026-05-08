@@ -59,6 +59,10 @@ Implementado:
   `cart_updated`, `cart_cleared` e `draft_updated`; `cart_events` grava
   `updated` quando `update_cart_item` muda apenas quantidade. Migration `0029`
   aplicada e verificada no Supabase atual.
+- Generator `generator_v1.3.2` (2026-05-08): reforco pos-smoke PR3 para gravar
+  `update_draft` quando cliente informa fechamento/nome/pagamento/endereco,
+  mesmo sem estoque confirmado. Resposta segura deve chamar humano para
+  confirmar produto/estoque; nao pode afirmar disponibilidade sem evidencia.
 - Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
   valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
   que geravam `schema_violation`.
@@ -121,7 +125,7 @@ Nao implementado/nao ligado:
 ## Ultimas Validacoes
 
 - `npm run typecheck`: verde.
-- `npm test`: 379/379 verde, 51 arquivos.
+- `npm test`: 380/380 verde, 51 arquivos.
 - `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
 - `npm run build`: verde.
 - Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`
