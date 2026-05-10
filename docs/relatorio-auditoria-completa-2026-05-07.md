@@ -1,6 +1,6 @@
 # Auditoria Completa — Estado e Cronograma de Hardening
 **Data inicial:** 2026-05-07
-**Última revisão:** 2026-05-08 (PR 3 implementado por Codex)
+**Última revisão:** 2026-05-10 (PR 1–5 fechados e validados por Codex)
 **Escopo:** Auditoria linha a linha de 16 arquivos TypeScript críticos, 8 migrations, 13 docs de arquitetura, AGENTS.md, env config e estrutura de testes.
 **Objetivo:** Mapear bugs reais com referência de linha, refutar suspeitas infundadas e produzir cronograma realista até Sprint 8 (envio Chatwoot).
 
@@ -18,17 +18,17 @@
 | Normalização raw → core | Em prod | Não |
 | Enrichment determinístico (Fase 2a) | Implementado | Não |
 | Organizadora LLM (v3.4) | Em prod | Não |
-| Estado reentrante Atendente | Implementado, com gaps | **Sim** |
+| Estado reentrante Atendente | Implementado e hardenado no PR 2 | Não para shadow; envio real depende do roadmap Sprint 8 |
 | Skills (7 canônicas) | Implementadas | Não |
-| Planner (v1.2.5) | Em prod shadow | Não |
+| Planner (v1.2.6) | Em prod shadow, com `verificarEstoque` protegido | Não |
 | Tool Executor | Implementado | Não |
-| Generator Shadow (v1.3.1) | Em prod shadow | Não |
-| Validators (say + action) | Implementados, com gaps | **Sim** |
+| Generator Shadow (v1.3.2) | Em prod shadow, com `update_draft` validado | Não |
+| Validators (say + action) | PR 1–5 hardening fechado; Say Validator comercial validado com LLM real | Não para shadow; envio real depende do roadmap Sprint 8 |
 | Catálogo `commerce.*` | **Subdimensionado** — 3 produtos, 3 specs, 3 estoques, 70 modelos, 25 fitments, 14 políticas, 624 bairros, 115 zonas [REVISADO POR CODEX] | **Sim — bloqueio funcional** (3 produtos não vendem 10/dia) |
-| Critic (Sprint 7) | Não existe | Decidir: substituir por Supervisora batch |
-| Envio Chatwoot (Sprint 8) | Não existe | Aguarda hardening |
+| Supervisora/Critic (Sprint 7) | Não existe | Próximo ciclo de qualidade |
+| Envio Chatwoot (Sprint 8) | Não existe | Próximo ciclo após catálogo + Supervisora |
 
-**Verdict curto:** arquitetura sólida (schema fechado, append-only enforced em DB, optimistic lock, idempotência atômica, evidência literal exigida). Código com **17 bugs cravados** (16 originais + 1 descoberto por Codex), todos de hardening — nenhum exige reescrita. **Bloqueio operacional principal não é código, é catálogo subdimensionado** — tem dado de suporte (geo, modelos, políticas) bem populado, mas só 3 produtos cadastrados.
+**Verdict curto:** arquitetura sólida (schema fechado, append-only enforced em DB, optimistic lock, idempotência atômica, evidência literal exigida). O hardening PR 1–5 foi implementado, testado e validado com LLM real em shadow. **Bloqueio operacional principal agora não é o hardening, é catálogo subdimensionado** — tem dado de suporte (geo, modelos, políticas) bem populado, mas só 3 produtos cadastrados.
 
 ---
 
@@ -265,167 +265,92 @@ Antes do PR 1, "auditar 31 textos" era palpite; agora a auditoria é possível q
 
 ---
 
-## 6. Cronograma de Hardening — 4 a 5 semanas até Sprint 8
+## 6. Hardening PR 1–5 — FECHADO
 
-Cronograma realista com base em velocidade observada (commits dos últimos 30 dias) e considerando que **catálogo é tarefa do Wallace, não de código**.
+Esta seção substitui o cronograma antigo de checkboxes. O cronograma original misturava hardening já concluído com roadmap futuro; a partir de 2026-05-10, a leitura correta é:
 
-> **Nota pós-Codex (07/05):** o cronograma original assumia "encher catálogo do zero". Como prod já tem 70 modelos, 14 políticas, 624 bairros e 115 zonas (camada de suporte populada), a tarefa se reduz a **cadastrar produtos/specs/estoques cobrindo as top medidas reais que aparecem em conversas**, não um número redondo. Codex rodou a query: as **5 primeiras medidas somam 82,61% da demanda observada — `140/70-17`, `90/90-18`, `100/80-18`, `110/70-17`, `110/90-17`**. Critério de catálogo Sprint 8 piloto: cobrir essas 5 medidas com pelo menos 2 marcas cada (10–15 produtos de pneu) + estoques + fitments para os modelos correspondentes. Isso encurta o caminho crítico do catálogo de "1-7 dias" pra "2-3 dias" do Wallace.
+- **Hardening PR 1–5:** fechado, testado localmente e validado com LLM real em shadow.
+- **Roadmap pós-hardening:** catálogo, Supervisora/Critic, telemetria de custo, checkout dedicado e envio controlado ao Chatwoot.
 
-### Semana 1 (07–13/maio) — Quick wins + começa catálogo
+### Fechado
 
-**Wallace (paralelo, segue toda semana):**
-- [ ] D0 (hoje): trocar env vars no Coolify pra configuração definida (orçamento até R$ 1.500/mês):
-  ```
-  OPENAI_MODEL=gpt-4o-mini       # Organizadora
-  PLANNER_MODEL=gpt-5.4-mini     # Planner (reasoning + família 5.4)
-  GENERATOR_MODEL=gpt-5.4        # Generator (cliente lê esse texto, não toca)
-  ```
-  → **Economia ~R$ 800/mês imediata.** Reverter é trocar var e redeploy (30s).
-- [ ] D1–D4: **cadastrar produtos cobrindo as 5 top medidas reais (82,61% da demanda):** `140/70-17`, `90/90-18`, `100/80-18`, `110/70-17`, `110/90-17`. Mínimo 2 marcas por medida em `commerce.products` + `commerce.tire_specs` + `commerce.stock_levels`. Revisar `commerce.vehicle_fitments` pra ligar essas medidas aos 70 modelos já cadastrados.
-  - **Pré-requisito:** consolidar aliases nos `commerce.vehicle_models` (`aliases TEXT[]`) — ex.: Titan/Titan 160/Titan 150, Biz/Biz 125, Bros/Bros 160, CG/CG 160. Sem isso, a busca por compatibilidade vai fragmentar.
-- [ ] **V1-V5 já foram rodadas por Codex em 07/05** (resultados na seção 4.5). Não rodar de novo.
-- [ ] D1: rodar query de auditoria de supersedência da Organizadora:
-```sql
-WITH moto_versions AS (
-  SELECT contact_id, COUNT(*) AS versoes,
-         COUNT(CASE WHEN superseded_by IS NULL THEN 1 END) AS ativos
-  FROM analytics.conversation_facts
-  WHERE fact_key = 'moto_modelo' AND environment = 'prod'
-  GROUP BY contact_id
-  HAVING COUNT(*) > 1
-)
-SELECT COUNT(*) AS contatos_com_troca,
-       SUM(CASE WHEN ativos > 1 THEN 1 ELSE 0 END) AS contatos_bug
-FROM moto_versions;
-```
-Se `contatos_bug > 0`, abrir incidente.
+| PR | Status | Validação |
+|---|---|---|
+| PR 1 — Auditoria de turns bloqueados + Bug 17 | Fechado | `blocked_say_text`/`blocked_payload` persistidos; `update_draft` com metacampos; migration `0028` aplicada/verificada |
+| PR 2 — Estado e contexto | Fechado | Context Builder configurável; stale slots carregados; troca de item invalida oferta/slots antigos; smoke LLM real validou contexto longo |
+| PR 3 — Validators de actions e eventos | Fechado | Action Validator endurecido; `session_events` com eventos semânticos; `cart_events.updated`; smoke LLM bloqueou estoque sem tool com auditoria |
+| PR 4 — Organizadora e ops | Fechado | Reclaim de job zumbi; envs operacionais; limitação de mensagem editada documentada; smoke LLM pós-redeploy sem quebra de fluxo |
+| PR 5 — Say Validator comercial | Fechado | Desconto, brinde/promoção, marca e oferta custom sem lastro protegidos; smoke LLM `470`–`473` validou 6 generated, 2 blocked e `blocked_say_text` preservado |
 
-**Dev (PR 1 primeiro; depois quick wins de estado/validator):**
-- [x] D1: **PR 1 / Bug 14a** — persistir candidato bloqueado do Generator (`blocked_say_text` / `blocked_actions` / `blocked_payload`) para permitir auditoria real do Say Validator.
-- [x] D1-D2: **PR 1 / Bug 17** — `update_draft` com `...base` em `hydrateGeneratorAction` + `updateDraftSchema` exigindo metacampos.
-- [x] D2: Bug 15 — Action Validator: pre-condição em `escalate`, `update_draft`, `clear_cart`.
-- [x] D2: Bug 8 — Context Builder limit configurável via env. Default sobe pra 20.
-- [x] D3: Bug 1 — `applySetActiveItem` invalida oferta + slots de item antigo.
-- [x] D3: Bug 16 — `loadCurrent` popula `derived_signals.stale_slots`.
-- [ ] D4: Telemetria de tokens em `agent.turns` (colunas `prompt_tokens`, `completion_tokens`, `cached_tokens`, `model`, `cost_estimated_brl`). Já vem da OpenAI, só falta persistir.
-- [x] D5: Bug 6 — Expandir INVALIDATION_RULES com slot_keys reais que faltam: `posicao_pneu`, `marca_preferida`, `marca_recusada`, `municipio` (global), `forma_pagamento` (global), `moto_cilindrada`, `quantidade`, `faixa_preco_max`. (Correção pós-Codex — versão original tinha fact_keys em vez de slot_keys.)
+**Conclusão do hardening:** o agente em shadow ficou protegido contra os principais incidentes comerciais: preço sem tool, estoque sem tool, frete sem tool, compatibilidade sem tool, política comercial sem tool, marca sem lastro, desconto inventado, brinde inventado e oferta custom inventada.
 
-**Saída da semana 1:** PR 1 concluído; Bug 14a ativo em shadow; quick wins de estado/validator concluídos; Bug 14 fechado no PR5 com smoke LLM real.
+## 6.1 Roadmap Pós-Hardening
 
-### Semana 2 (14–20/maio) — Sub-fluxo + ações atômicas
+Estes itens não bloqueiam o fechamento do hardening PR 1–5. Eles pertencem ao próximo ciclo operacional rumo à Sprint 8.
 
-**Wallace:**
-- [ ] D8–D14: continua catálogo pelo critério data-driven: 5 medidas reais cobertas, pelo menos 2 marcas por medida, preço, estoque, fitments e aliases consolidados. Não perseguir número redondo de produtos.
-- [ ] D10: refazer query de supersedência. Validar que correções de moto estão limpas.
+### Catálogo `commerce.*`
 
-**Dev:**
-- [ ] D8–D10: Sub-fluxo checkout linear nomeado. Skill `coletar_dados_pedido` interna ao `registrar_intencao_fechamento` com slot order fixo: `nome → bairro → modalidade → pagamento → confirmação`. Generator dentro dessa skill tem prompt restrito.
-- [ ] **REMOVIDO da Semana 2 (correção Codex):** Bug 3 (`replace_cart_item`) é prospectivo — fazer junto com sprint de expansão do action set do Generator, não antes. Não consome capacidade de dev nesta semana.
-- [x] D11: Bug 4 — Mapeamento correto de cart_events (`replaced` só pra mudança de produto).
-- [ ] D12: Normalizador determinístico de "interrupção de checkout": se `current_skill='registrar_intencao_fechamento'` e mensagem cita produto/medida/marca/troca, força saída pra `buscar_e_ofertar`. Em código TS, igual ao fix v1.2.5.
-- [ ] D13: Teste unitário "checkout interrompido por troca de produto" cobrindo:
-  - cart com item A
-  - cliente pede substituir por B
-  - planner sai do checkout
-  - oferta anterior invalidada
-  - dados globais (nome, bairro, pagamento) preservados
-- [ ] D14: Bugs 5, 11 — `intent_to_close_recorded` action emitida + lease em enrichment_jobs.
+- Cadastrar produtos para as 5 medidas reais que cobrem 82,61% da demanda observada: `140/70-17`, `90/90-18`, `100/80-18`, `110/70-17`, `110/90-17`.
+- Ter pelo menos 2 marcas por medida em `commerce.products` + `commerce.tire_specs` + `commerce.stock_levels`.
+- Revisar `commerce.vehicle_fitments` para ligar medidas aos modelos mais citados.
+- Consolidar aliases em `commerce.vehicle_models`: Titan/Titan 160/Titan 150, Biz/Biz 125, Bros/Bros 160, CG/CG 160 e variantes reais.
 
-**Saída da semana 2:** estado/checkout endurecidos e sem corrupção de troca de produto. Bug 14 cobre marca/desconto/brinde/oferta custom deterministicamente e foi validado com LLM real pós-deploy.
+### Qualidade e Operação
 
-### Semana 3 (21–27/maio) — Supervisora batch + bugs M
+- Implementar telemetria de tokens/custo em `agent.turns`.
+- Rodar query de supersedência da Organizadora para validar correções de moto.
+- Implementar Supervisora batch em vez de Critic em tempo real.
+- Atualizar docs 09, 11 e 14 com mapping atual.
 
-**Wallace:**
-- [ ] D15–D21: catálogo piloto completo pelo critério data-driven. Validar cobertura das 5 medidas reais, fitments dos modelos mais citados e zonas de entrega atendidas.
-- [ ] D17: definir critérios objetivos de saída do shadow (seção 7 deste doc).
+### Checkout e Fluxo Futuro
 
-**Dev:**
-- [ ] D15–D17: Supervisora batch. Worker noturno que:
-  - Lê conversas das últimas 24h
-  - Amostra: top 50 com `responder_geral`, top 20 escaladas, todas com Say Validator block, todas fechadas
-  - Chama LLM com prompt de auditoria (modelo barato, gpt-4o-mini)
-  - Grava em nova tabela `ops.quality_flags`
-  - Notifica Wallace via email/Chatwoot nota interna
-- [x] D18: Bug 2 — Diferenciar event types de carrinho em session_events (nova migration estendendo CHECK).
-- [ ] D19: Bug 9 — Tool execution paralela (Promise.all). Bug 10 — index funcional em tire_size normalizado (migration).
-- [x] D20: Bug 12 — Mover magic numbers para env (MIN_CONFIDENCE e limits de contexto; TTL de `request_confirmation` fica pendente).
-- [ ] D21: Atualizar docs 09, 11, 14.
+- Criar sub-fluxo `coletar_dados_pedido` dentro de `registrar_intencao_fechamento`.
+- Criar normalizador de interrupção de checkout: se o cliente muda produto/medida/marca durante fechamento, voltar para `buscar_e_ofertar`.
+- Adicionar teste unitário de checkout interrompido por troca de produto.
+- Implementar `intent_to_close_recorded` se a sprint de checkout dedicado exigir esse evento.
+- Manter `replace_cart_item` como prospectivo: só fazer quando o Generator passar a emitir ações de carrinho.
 
-**Saída da semana 3:** Supervisora rodando, gerando flags do dia anterior. Code freeze pra Sprint 8.
+### Sprint 8 — Envio Controlado ao Chatwoot
 
-### Semana 4 (28/maio–03/jun) — Sprint 8 envio controlado
-
-**Dev:**
-- [ ] D22–D23: Implementar `ChatwootApiClient.postMessage()` + integração no worker.
-- [ ] D24: Variável `ATENDENTE_SEND_ENABLED=false` por default. Override por conversa via tag/label do Chatwoot (ex: `agent-piloto`).
-- [ ] D25: Logging dedicado: cada mensagem enviada vira evento `agent_message_sent` em session_events com payload completo.
-- [ ] D26: Smoke test em 3 conversas internas (você manda mensagem pro número, agente responde).
-- [ ] D27: Liga `agent-piloto` em 5 conversas reais pré-selecionadas (clientes recorrentes que aceitam ser piloto).
-- [ ] D28: Wallace acompanha as 5 conversas em tempo real. Auditoria turno a turno.
-
-**Saída da semana 4:** agente respondendo cliente real em 5 conversas piloto. Métricas de Sprint 8 começam a sair.
-
-### Semana 5 (04–10/jun) — Calibração e decisão de expansão
-
-**Wallace:**
-- [ ] Audita 50 conversas piloto (5/dia × 10 dias).
-- [ ] Calcula taxa de aprovação (target ≥ 90%).
-- [ ] Lista top 10 problemas pra calibrar.
-
-**Dev:**
-- [ ] D29–D30: ajustes de prompt baseados em conversas reais.
-- [ ] D31: decisão GO/NO-GO de expansão.
-- [ ] Se GO: liga `ATENDENTE_SEND_ENABLED=true` em todas as conversas. Mantém Supervisora batch noturna.
-- [ ] Se NO-GO: lista de retrabalho específico, mantém piloto rodando, retorna em 2 semanas.
+- Implementar `ChatwootApiClient.postMessage()` e integração no worker.
+- Criar `ATENDENTE_SEND_ENABLED=false` por default.
+- Permitir piloto por tag/label do Chatwoot, por exemplo `agent-piloto`.
+- Registrar cada envio como `agent_message_sent`.
+- Rodar piloto com 5 conversas reais acompanhadas por Wallace.
+- Auditar 50 conversas piloto antes de GO/NO-GO.
 
 ---
 
-## 6.5 Cronograma específico dos 17 bugs
+## 6.5 Status dos Bugs e Pendências
 
-Matriz Bug → Severidade → Semana/PR → Esforço. Inclui os 17 bugs cravados nas seções 3 e 4.5 + o pré-requisito operacional Bug 14a.
+Esta matriz separa bug de hardening fechado, pendência prospectiva e roadmap pós-hardening.
 
-| Bug | Sev | Semana | Esforço | Onde está cravado |
-|---|---|---|---|---|
-| **Bug 14a** — Persistir candidato bloqueado para auditoria do Say Validator | pré-req A | PR 1 — feito | meio dia + migration | [generator/service.ts](../src/atendente/generator/service.ts) + `agent.turns` |
-| **Bug 14** — Say Validator: bloquear desconto/promoção/marca/oferta custom | **A** | PR 5 — feito + smoke LLM | 1 dia + smoke LLM | [say-validator.ts](../src/atendente/validators/say-validator.ts) |
-| **Bug 15** — Action Validator: pre-condição em escalate, update_draft, clear_cart | **A** | 1 (D2) | meio dia | [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts) |
-| **Bug 1** — `set_active_item` invalida oferta + slots antigo | **A** | 1 (D3) | meio dia | [apply-action.ts:250-261](../src/atendente/state/apply-action.ts) |
-| **Bug 16** — `loadCurrent` popula `derived_signals.stale_slots` | **M** | 1 (D3) | 1 hora | [agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts) |
-| **Bug 8** — Context Builder limit configurável via env | **M** | 1 (D2) | 30 min | [context-builder.ts:73](../src/atendente/planner/context-builder.ts) |
-| **Bug 17** [DESCOBERTO POR CODEX] — `hydrateGeneratorAction` espalha `base` em `update_draft` | **M** | 1 (D2) | 1h + teste | [generator/schemas.ts:178-186](../src/atendente/generator/schemas.ts#L178-L186) |
-| **Bug 6** [REVISADO POR CODEX] — INVALIDATION_RULES expandido com slots reais | **M** | 1 (D5) | 2h | [invalidation-rules.ts](../src/atendente/state/invalidation-rules.ts) — `posicao_pneu, marca_preferida, marca_recusada, municipio, forma_pagamento` |
-| Telemetria de tokens em `agent.turns` | infra | 1 (D4) | meio dia | nova migration + worker |
-| **Bug 3** [REVISADO POR CODEX] — `replace_cart_item` (PROSPECTIVO) | **M-prosp.** | Pareado com expansão do Generator | 2h | [agent-actions.ts](../src/shared/zod/agent-actions.ts). **Não fazer agora**, fazer junto com sprint que adicionar add_to_cart ao Generator |
-| **Bug 4** — `update_cart_item` deve emitir `'updated'` em cart_events | **M** | 2 | 1h + migration | [agent-state.repository.ts:566](../src/atendente/state/agent-state.repository.ts) |
-| Sub-fluxo checkout linear `coletar_dados_pedido` | infra | 2 | 2-3 dias | nova skill interna |
-| Normalizador de interrupção de checkout | infra | 2 | 1 dia | [planner/service.ts](../src/atendente/planner/service.ts) |
-| Teste unitário "checkout interrompido por troca de produto" | infra | 2 | meio dia | `tests/unit/atendente/` |
-| **Bug 5** — `intent_to_close_recorded` action emitida | **B** | 2 | meio dia | [generator/schemas.ts](../src/atendente/generator/schemas.ts) + [apply-action.ts](../src/atendente/state/apply-action.ts) |
-| **Bug 11** — Lease em enrichment_jobs | **M** | Feito PR4 | 1h | [ops-phase3.repository.ts](../src/shared/repositories/ops-phase3.repository.ts) |
-| Supervisora batch (em vez de Critic) | infra | 3 | 2-3 dias | novo worker |
-| **Bug 2** — Event types diferenciados em session_events | **M** | 3 | 2h + migration | [apply-action.ts](../src/atendente/state/apply-action.ts) + 0029 |
-| **Bug 9** — Tool execution paralela | **B** | 3 | 1h | [tool-executor.ts:22-31](../src/atendente/executor/tool-executor.ts) |
-| **Bug 10** [REVISADO POR CODEX] — Index funcional em `tire_specs` (não `products`) | **M** | 3 | 30 min + migration | `commerce.tire_specs` |
-| **Bug 12** — Magic numbers para env | **B** | Parcial PR4 | meio dia | [env.ts](../src/shared/config/env.ts) |
-| Atualizar docs 09, 11, 14 com mapping atual | drift | 3 | 30 min cada | [docs/phase3-agent-architecture/](../docs/phase3-agent-architecture/) |
-| **Bug 7** — UPSERT em `syncSessionSlots` (DELETE→reinsert) | **B** | 4-5 (pós-piloto) | meio dia | [agent-state.repository.ts:679-700](../src/atendente/state/agent-state.repository.ts) |
-| **Bug 13** — `validateFactEvidence` lida com message_updated | **B** | Documentado PR4 | 2h futuro se houver histórico de edição | [evidence.ts:11-22](../src/organizadora/evidence.ts) |
+| Item | Status | Observação |
+|---|---|---|
+| Bug 1 — `set_active_item` invalida oferta + slots antigos | Fechado PR2 | Validado em testes e smoke LLM de contexto |
+| Bug 2 — Event types diferenciados em `session_events` | Fechado PR3 | Migration `0029` aplicada/verificada |
+| Bug 3 — `replace_cart_item` ausente | Prospectivo | Só fazer quando Generator passar a emitir ações de carrinho |
+| Bug 4 — `update_cart_item` emitia `replaced` | Fechado PR3 | `updated` reservado para quantity-only |
+| Bug 5 — `intent_to_close_recorded` | Roadmap checkout | Fazer se o sub-fluxo dedicado exigir esse evento |
+| Bug 6 — `INVALIDATION_RULES` incompleto | Fechado PR2 | Slot keys reais adicionados |
+| Bug 7 — UPSERT em `syncSessionSlots` | Pós-piloto | Baixa severidade; não bloqueia shadow nem piloto inicial |
+| Bug 8 — Context Builder limit hardcoded | Fechado PR2 | Limits configuráveis via env |
+| Bug 9 — Tool execution paralela | Roadmap otimização | Ganho de latência; não bloqueia hardening PR1–5 |
+| Bug 10 — Index funcional em `tire_specs` | Roadmap catálogo | Relevante quando catálogo crescer |
+| Bug 11 — Lease/reclaim em `enrichment_jobs` | Fechado PR4 | Job zumbi recuperável |
+| Bug 12 — Magic numbers hardcoded | Fechado parcialmente PR4 | Env principais movidos; TTL de `request_confirmation` fica como polimento |
+| Bug 13 — Mensagem editada e evidence literal | Documentado PR4 | Só resolver se houver histórico versionado de mensagens editadas |
+| Bug 14 — Say Validator comercial | Fechado PR5 | Validado com LLM real em 10/05 |
+| Bug 14a — Persistir candidato bloqueado | Fechado PR1 | `blocked_say_text`, `blocked_actions`, `blocked_payload` |
+| Bug 15 — Action Validator sem preconditions | Fechado PR3 | `escalate`, `update_draft`, `clear_cart`, `remove/update_cart_item` |
+| Bug 16 — `stale_slots` não carregado | Fechado PR2 | `loadCurrent` lê slots stale do banco |
+| Bug 17 — `update_draft` sem `...base` | Fechado PR1 | Metacampos padronizados |
 
-**Resumo por semana:**
+**Verificações em prod V1–V5:** fechadas por Codex em 07/05, resultados na seção 4.5.
 
-| Semana | Bugs A | Bugs M | Bugs B | Esforço dev |
-|---|---|---|---|---|
-| 1 | 2 (15, 1) + 14a como pré-req do Bug 14 | 4 (8, 16, 17, 6) | 0 | ~3,5 dias + telemetria |
-| 2 | 0 | 3 (4, 11) + sub-fluxo + teste | 1 (5) | ~5 dias |
-| 3 | 0 | 3 (2, 10) + Supervisora | 2 (9, 12) + docs | ~5 dias |
-| 4 (Sprint 8 piloto) | — | — | — | implementação envio + monitoramento |
-| 5 (calibração) | — | — | 2 (7, 13) | conforme dado |
+**Hardening PR1–PR5:** fechado.
 
-**Caminho crítico até Sprint 8:** itens das semanas 1-3 marcados bloqueantes na seção 6 + Supervisora batch + sub-fluxo checkout + teste unitário. Total: **~13-14 dias dev** + tempo do Wallace pra catálogo.
-
-**Bug 3 (replace_cart_item) NÃO entra no caminho crítico.** Ele é prospectivo — só vira atual quando o Generator passar a emitir ações de carrinho. Pareá-lo com a sprint que fizer essa expansão.
-
-**Verificações em prod V1-V5: FECHADAS por Codex em 07/05** (resultados na seção 4.5). Bug 14a foi implementado no PR 1; PR5 comercial foi validado com smoke LLM real em 10/05.
+**Próximo caminho crítico real:** catálogo `commerce.*` + Supervisora batch + envio controlado ao Chatwoot.
 
 ---
 
@@ -505,115 +430,23 @@ A regra atual ("~5 semanas em shadow") é vaga. Cravando critérios concretos:
 | 2026-05-08 | **PR5 comercial implementação local:** Say Validator passou a tratar desconto, brinde/promoção e oferta custom como política comercial obrigatória. Bloqueia "Consigo 5% de desconto" sem `desconto_maximo`, bloqueia desconto acima do máximo cadastrado, bloqueia "levando 2 ganha brinde" sem política promocional e bloqueia "faço por R$ 200" sem política comercial. Teste focado: `say-validator.test.ts` 49/49 verde. | Codex |
 | 2026-05-10 | **Smoke LLM PR5 pós-deploy:** conversas Chatwoot `470`-`473`, run `pr5-commercial-20260510190449`. Organizadora extraiu 23 facts; Planner processou 8/8 jobs; Generator gerou 6 turns seguros e bloqueou 2 turns comerciais perigosos. Brinde foi bloqueado com `policy_claim_without_tool_result`; oferta "faz por R$ 200" foi bloqueada com `money_not_supported_by_tool_result:200`; ambos preservaram `blocked_say_text`. Desconto de 10% foi respondido de forma segura sem promessa; Pirelli caiu em fallback seguro. | Codex |
 
-## 12. Ordem de Execução das Correções
+## 12. Fechamento do Hardening
 
-Plano executável dos 17 bugs cravados em 5 PRs sequenciais + trabalho paralelo do Wallace no catálogo. Cada PR é independente e pode ser revisado/mergeado isoladamente.
+O plano original de execução dos 17 bugs em 5 PRs foi cumprido para o escopo de hardening da Atendente em shadow.
 
-### PR 1 — Auditoria de turns bloqueados + Bug 17
+| Bloco | Status final |
+|---|---|
+| PR 1 — Auditoria de bloqueios + `update_draft` | Fechado |
+| PR 2 — Estado/contexto | Fechado |
+| PR 3 — Validators/eventos | Fechado |
+| PR 4 — Organizadora/ops | Fechado |
+| PR 5 — Say Validator comercial | Fechado e validado com LLM real |
 
-**Primeira implementação recomendada.** Sem este PR, não dá pra auditar regex do Say Validator (Bug 14) e idempotência de `update_draft` continua quebrada em prod shadow.
+**O que este fechamento significa:** o agente pode continuar em shadow com auditoria forte, sem envio ao cliente, e com proteção contra as principais alucinações comerciais.
 
-**Status Codex 2026-05-07:** implementação concluída e testada. Migration `0028_generator_blocked_turn_audit.sql` aplicada e verificada no banco alvo antes do push/deploy, porque `recordGeneratorResult` passa a inserir `blocked_say_text`, `blocked_actions` e `blocked_payload` em `agent.turns`.
+**O que este fechamento não significa:** ainda não é autorização para envio automático ao cliente. Para isso, faltam catálogo real, Supervisora batch, piloto controlado e decisão GO/NO-GO.
 
-- **Bug 14a (novo, descoberto na rodada Codex):** persistir o candidato bloqueado do Generator no banco. Hoje `agent.turns.say_text` é null quando `status='blocked'` ([generator/service.ts:340](../src/atendente/generator/service.ts#L340)) — não dá pra revisar falso positivo.
-- Criar **migration 0028** adicionando campos auditáveis em `agent.turns` para `blocked_say_text` / `blocked_actions` / `blocked_payload` ou equivalente JSONB.
-- Ajustar `recordGeneratorResult` em [generator/service.ts](../src/atendente/generator/service.ts) para salvar o candidato quando `status='blocked'`.
-- **Bug 17:** corrigir `hydrateGeneratorAction` em [generator/schemas.ts:178-186](../src/atendente/generator/schemas.ts#L178-L186) — `update_draft` deve carregar `...base` igual aos outros 3 cases.
-- Atualizar `updateDraftSchema` em [agent-actions.ts](../src/shared/zod/agent-actions.ts) para exigir metacampos (`action_id, turn_index, emitted_at, emitted_by`) como required, alinhando com `update_slot`, `create_item`, `record_offer`.
-- Adicionar testes:
-  - Unit test de `hydrateGeneratorAction` cobrindo `update_draft.action_id` não-nulo.
-  - Unit test de `recordGeneratorResult` salvando `blocked_say_text` quando bloqueado.
-  - Integration test cobrindo o ciclo bloqueio → persistência auditável.
-- **Esse é o primeiro lote a implementar.**
-
-### PR 2 — Estado e contexto
-
-Quatro bugs de hardening do estado da Atendente. Independem de PR 1, mas faz sentido vir depois pra evitar conflito de migração.
-
-**Status Codex 2026-05-08:** implementação concluída nos quatro itens. Na validação do PR 2: `npm run typecheck` verde, `npm test` 371/371, integração de persistência da Atendente 7/7. Após o PR 3, a suíte atual subiu para 379/379 e a integração da Atendente para 8/8. Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899` validou Organizadora + Planner + Generator em shadow: 13 mensagens ingeridas, 15 facts salvos, Planner `planner_v1.2.5` com `buscar_e_ofertar`, Generator `generator_v1.3.1` com 5 actions e 0 bloqueios. Sem envio ao cliente.
-
-**Avaliação qualitativa do smoke LLM real (Codex, 2026-05-08):**
-
-| Componente | Nota no smoke | Comportamento observado |
-|---|---:|---|
-| Organizadora | **9/10** | Extraiu corretamente os principais fatos da conversa longa: `moto_modelo=Biz 125`, `moto_ano=2019`, `posicao_pneu=traseiro`, `medida_pneu=110/90-17`, `marca_pneu_preferida=Pirelli`, `bairro_mencionado=Meier`, `forma_pagamento=pix`. Capturou a correção de contexto ("Bros 160" anterior → "Biz 125 2019" atual). |
-| Planner | **9/10** | Escolheu `buscar_e_ofertar` e chamou tools antes de permitir resposta comercial: `buscarCompatibilidade(Biz 125, 2019, rear)`, `calcularFrete(Meier)` e `buscarPoliticaComercial`. Não pediu novamente dados que a Organizadora já tinha extraído. |
-| Generator | **8/10** | Usou `generator_v1.3.1`, gerou 5 actions, não foi bloqueado e não enviou mensagem ao cliente. Ficou em shadow/auditoria. A nota não é 9/10 porque este smoke não forçou um bloqueio; ainda falta um cenário proposital de desconto/marca/frete sem lastro para provar `blocked_say_text` preenchido em produção. |
-
-**Nota geral do fluxo no smoke:** **8,7/10**. O fluxo respeitou a correção "Bros 160" → "Biz 125 2019", usou 13 mensagens (acima do antigo limite 10), acionou tools antes de falar comercialmente e preservou o modo shadow sem envio ao cliente.
-
-- **Bug 8 [feito local]** — Tornar limit de mensagens do Context Builder configurável via env (`ATENDENTE_CONTEXT_MESSAGES_LIMIT`, default 20). Substitui o `LIMIT 10` hardcoded em [context-builder.ts:73](../src/atendente/planner/context-builder.ts#L73).
-- **Bug 16 [feito local]** — `loadCurrent` popula `derived_signals.stale_slots` lendo `agent.session_slots` onde `stale != 'fresh'` ([agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts#L230-L236)).
-- **Bug 1 [feito local]** — `applySetActiveItem` em [apply-action.ts:250-261](../src/atendente/state/apply-action.ts#L250-L261) invalida oferta ligada ao item antigo + marca slots do item antigo como `stale_strong`. Cenário "Bros 160 → Biz 125" passa a funcionar limpo.
-- **Bug 6 [feito local]** — Expandir `INVALIDATION_RULES` em [invalidation-rules.ts](../src/atendente/state/invalidation-rules.ts) com slot_keys que faltam: `posicao_pneu`, `marca_preferida`, `marca_recusada` (item) + `municipio`, `forma_pagamento` (global) + `moto_cilindrada`, `quantidade`, `faixa_preco_max` (item). **Não usar fact_keys** (`moto_marca`, `municipio_mencionado`) — esses são da Organizadora.
-
-### PR 3 — Validator de actions e eventos
-
-Três bugs de pre-condition e semântica de eventos. Migration de evento types vai junto.
-
-**Status Codex 2026-05-08:** implementado e testado deterministicamente. Migration `0029_cart_action_events_hardening.sql` aplicada/verificada no Supabase atual antes dos testes. Validação: `npm run typecheck` verde, `npm test` 379/379, integração `atendente-state-persistence` 8/8 e `npm run build` verde. Smoke LLM real pós-deploy na conversa Chatwoot `452`: Organizadora salvou 12 facts, Planner `planner_v1.2.5` chamou tools comerciais, Generator gerou 2 turns e bloqueou 1 com `stock_claim_without_verificar_estoque`, preservando `blocked_say_text`. O smoke não emitiu `update_draft`; por isso `draft_updated` está comprovado pelos testes unitários/integração, não por LLM.
-
-- **Bug 15 [feito local]** — Adicionar pre-condition em [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts#L148-L154) para os 5 cases que hoje retornam `{ valid: true }` em branco:
-  - `escalate`: validar `reason='ready_to_close'` exige cart confirmado.
-  - `update_draft`: validar consistência (ex.: `fulfillment_mode='delivery'` exige `delivery_address`).
-  - `clear_cart`: bloquear se há `pending_confirmation` aberta de cart.
-  - `remove_from_cart`, `update_cart_item`: validar `cart_item_id` existe.
-- **Bug 2 [feito local]** — Diferenciar event types de carrinho em `agent.session_events`. Hoje toda mudança vira `cart_proposed`. Criar **migration 0029** estendendo CHECK constraint com `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`, `draft_updated`. Atualizar emissão em [apply-action.ts](../src/atendente/state/apply-action.ts).
-- **Bug 4 [feito local]** — Corrigir mapeamento em [agent-state.repository.ts:566](../src/atendente/state/agent-state.repository.ts#L566) — `update_cart_item` (que só muda quantity) deve emitir `'updated'` em `cart_events`, não `'replaced'`. `replaced` fica reservado para troca real de produto (que entra com Bug 3 quando o action set do Generator for expandido).
-
-### PR 4 — Organizadora e ops
-
-Três bugs de hardening operacional. Não bloqueiam Sprint 8, mas são limpeza importante antes de operação contínua.
-
-- **Bug 11 [feito PR4]** — Lease/reclaim de jobs zumbis em `ops.enrichment_jobs`. A query de pickup em [ops-phase3.repository.ts](../src/shared/repositories/ops-phase3.repository.ts) agora recupera `running` vencido:
-  ```sql
-  OR (status = 'running' AND locked_at < now() - interval '15 minutes')
-  ```
-- **Bug 12 [parcialmente feito PR4]** — Movidos para env: `ORGANIZADORA_MIN_CONFIDENCE`, `ORGANIZADORA_STALE_JOB_AFTER_SECONDS`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`, `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`. Pendente: TTL default de `request_confirmation`.
-- **Bug 13 [documentado PR4]** — `validateFactEvidence` em [evidence.ts:11-22](../src/organizadora/evidence.ts#L11-L22): aceitar gap atual como limitação conhecida. Sem histórico versionado de mensagens editadas, não há evidence antiga confiável para replay perfeito.
-
-### PR 5 — Say Validator comercial
-
-Bug 14 — adicionar bloqueios de afirmação comercial sem lastro: desconto, brinde/promoção, marca não cadastrada, oferta custom.
-
-**Status Codex 2026-05-10:** implementado, testado localmente e validado com LLM real em prod shadow.
-
-- **Marca sem lastro [feito]:** bloqueia `brand_claim_without_buscar_produto` para frases como "Tem Pirelli sim" sem `buscarProduto`/`buscarCompatibilidade` contendo a marca.
-- **Desconto sem política [feito]:** bloqueia "Consigo te dar 5% de desconto" quando não há `buscarPoliticaComercial` com `desconto_maximo`.
-- **Desconto acima da política [feito]:** bloqueia "Consigo te dar 10% de desconto" quando `desconto_maximo.pct = 5`.
-- **Brinde/promoção [feito]:** bloqueia "Levando 2 pneus ganha uma câmara de brinde" sem `brinde_promocao`, `promocao_ativa` ou `politica_promocional`.
-- **Oferta custom [feito]:** bloqueia "Se levar 2, faço por R$ 200" sem política comercial.
-- **Meta-fala segura [feito]:** permite "Preciso confirmar desconto com a loja antes de te passar" sem tool, porque não promete condição comercial.
-- **Smoke LLM [feito]:** conversas `470`-`473`. Brinde e oferta custom bloquearam com `blocked_say_text`; desconto e marca foram respondidos de forma segura sem promessa comercial.
-
-### Catálogo Wallace — paralelo
-
-Trabalho do Wallace, paralelo a PR 1-5. **Não bloqueia PR 1**, mas bloqueia o piloto Sprint 8.
-
-- **Não usar meta "50 produtos".** Critério é cobertura de demanda real.
-- **Cadastrar com base nas 5 medidas reais** que cobrem 82,61% das conversas (dado de 07/05 do Codex):
-  - `140/70-17`
-  - `90/90-18`
-  - `100/80-18`
-  - `110/70-17`
-  - `110/90-17`
-- **Pré-requisito antes de cadastrar:** consolidar aliases em `commerce.vehicle_models` (`aliases TEXT[]`) — sem isso, `buscarCompatibilidade` fragmenta:
-  - Titan / Titan 160 / Titan 150
-  - Biz / Biz 125
-  - Bros / Bros 160
-  - CG / CG 160
-  - (e demais variantes que aparecerem na top motos)
-- Pelo menos **2 marcas por medida**, com `commerce.products` + `commerce.tire_specs` + `commerce.stock_levels` + `commerce.vehicle_fitments` ligando produto a moto.
-- Estimativa: 10–15 produtos cobrindo as 5 medidas. Não 50.
-
----
-
-### Marcações finais
-
-- **PR 1 já viabilizou auditoria de bloqueios.** Bug 14 (PR 5) agora pode ser validado por smoke LLM com `blocked_say_text` persistido.
-- **Bug 3 não entra agora;** só junto com expansão futura do action set do Generator (quando emitir `add_to_cart`/`remove_from_cart`). Marcado como prospectivo na seção 3 e 6.5.
-- **Bug 14 está fechado no PR5.** Desconto/brinde/oferta custom sem lastro foram testados em ambiente real shadow com LLM.
-- **Catálogo é paralelo, não bloqueia PR 1.** Wallace pode cadastrar enquanto PRs 1-5 são implementados/revisados.
+**Próxima execução recomendada:** escolher entre começar pelo catálogo `commerce.*` ou pela Supervisora batch. Catálogo destrava venda; Supervisora destrava qualidade operacional.
 
 ---
 
