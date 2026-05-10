@@ -152,17 +152,17 @@ OR (status = 'running' AND locked_at < now() - interval '15 minutes')
 - **Severidade:** baixa. Edição no WhatsApp é raro.
 - **Decisão PR4:** aceitar como limitação conhecida enquanto não existir histórico versionado de mensagens editadas. Não criar bypass no validator, porque isso enfraqueceria a garantia de evidence literal. Se o projeto precisar suportar replay perfeito de mensagem editada, o próximo passo correto é persistir versão anterior de `core.messages` ou evento de edição auditável antes de mudar `validateFactEvidence`.
 
-### Bug 14 [A] — Say Validator comercial incompleto [parcial PR5]
+### Bug 14 [A] — Say Validator comercial [FECHADO PR5]
 - **Arquivo:** [say-validator.ts](../src/atendente/validators/say-validator.ts)
 - **Cobre agora:** preço sem tool, estoque, prazo de entrega, compatibilidade, política, valores em R$, marca específica sem lastro (`brand_claim_without_buscar_produto`), desconto fora de `buscarPoliticaComercial`, brinde/promoção sem política promocional e oferta custom sem política comercial.
-- **Exemplos bloqueados pelo PR5 parcial:**
+- **Exemplos cobertos pelo PR5:**
   - "Tem Pirelli sim" sem produto/marca retornada por `buscarProduto` ou `buscarCompatibilidade`.
   - "Consigo te dar 5% de desconto" sem `desconto_maximo`.
   - "Consigo te dar 10% de desconto" quando a política permite no máximo 5%.
   - "Levando 2 pneus ganha uma câmara de brinde" sem `brinde_promocao` / `promocao_ativa`.
   - "Se levar 2, faço por R$ 200" sem política comercial.
 - **Severidade:** alta antes de Sprint 8. Esses são exatamente os tiros que o cliente vai testar quando souber que tem bot.
-- **Pendente:** smoke LLM específico pós-deploy tentando forçar desconto/brinde/oferta custom sem lastro e confirmando `blocked_say_text` no banco.
+- **Smoke LLM pós-deploy:** fechado em 10/05/2026 nas conversas Chatwoot `470`-`473`. Resultado: 8/8 jobs processados, 23 facts da Organizadora, 6 turns `generated`, 2 turns `blocked`, com `blocked_say_text` persistido para brinde e oferta custom.
 
 ### Bug 15 [M] — Action Validator passa em branco para 5 ações
 - **Arquivo:** [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts)
@@ -249,7 +249,7 @@ Coisas que afirmei em rodadas anteriores e que a leitura linha a linha desmentiu
 Implicação prática atual: o banco já consegue guardar o texto bloqueado; então o fechamento do Bug 14 depende de smoke LLM específico e leitura de `blocked_say_text`, não mais de migration.
 
 - **Bug 14a [feito]:** `agent.turns` persiste candidato bloqueado para auditoria.
-- **Bug 14b [parcial PR5]:** marca, desconto, brinde/promoção e oferta custom já têm bloqueios determinísticos; falta smoke LLM pós-deploy.
+- **Bug 14b [feito PR5]:** marca, desconto, brinde/promoção e oferta custom têm bloqueios determinísticos e foram validados com LLM real em prod shadow.
 
 Antes do PR 1, "auditar 31 textos" era palpite; agora a auditoria é possível quando houver novos bloqueios gravados.
 
@@ -310,7 +310,7 @@ Se `contatos_bug > 0`, abrir incidente.
 - [ ] D4: Telemetria de tokens em `agent.turns` (colunas `prompt_tokens`, `completion_tokens`, `cached_tokens`, `model`, `cost_estimated_brl`). Já vem da OpenAI, só falta persistir.
 - [x] D5: Bug 6 — Expandir INVALIDATION_RULES com slot_keys reais que faltam: `posicao_pneu`, `marca_preferida`, `marca_recusada`, `municipio` (global), `forma_pagamento` (global), `moto_cilindrada`, `quantidade`, `faixa_preco_max`. (Correção pós-Codex — versão original tinha fact_keys em vez de slot_keys.)
 
-**Saída da semana 1:** PR 1 concluído; Bug 14a ativo em shadow; quick wins de estado/validator concluídos; Bug 14 parcialmente implementado no PR5 e aguardando smoke LLM específico.
+**Saída da semana 1:** PR 1 concluído; Bug 14a ativo em shadow; quick wins de estado/validator concluídos; Bug 14 fechado no PR5 com smoke LLM real.
 
 ### Semana 2 (14–20/maio) — Sub-fluxo + ações atômicas
 
@@ -331,7 +331,7 @@ Se `contatos_bug > 0`, abrir incidente.
   - dados globais (nome, bairro, pagamento) preservados
 - [ ] D14: Bugs 5, 11 — `intent_to_close_recorded` action emitida + lease em enrichment_jobs.
 
-**Saída da semana 2:** estado/checkout endurecidos e sem corrupção de troca de produto. Bug 14 já cobre marca/desconto/brinde/oferta custom deterministicamente; falta validação LLM pós-deploy.
+**Saída da semana 2:** estado/checkout endurecidos e sem corrupção de troca de produto. Bug 14 cobre marca/desconto/brinde/oferta custom deterministicamente e foi validado com LLM real pós-deploy.
 
 ### Semana 3 (21–27/maio) — Supervisora batch + bugs M
 
@@ -387,7 +387,7 @@ Matriz Bug → Severidade → Semana/PR → Esforço. Inclui os 17 bugs cravados
 | Bug | Sev | Semana | Esforço | Onde está cravado |
 |---|---|---|---|---|
 | **Bug 14a** — Persistir candidato bloqueado para auditoria do Say Validator | pré-req A | PR 1 — feito | meio dia + migration | [generator/service.ts](../src/atendente/generator/service.ts) + `agent.turns` |
-| **Bug 14** — Say Validator: bloquear desconto/promoção/marca/oferta custom | **A** | PR 5 — parcial feito | 1 dia + smoke LLM | [say-validator.ts](../src/atendente/validators/say-validator.ts) |
+| **Bug 14** — Say Validator: bloquear desconto/promoção/marca/oferta custom | **A** | PR 5 — feito + smoke LLM | 1 dia + smoke LLM | [say-validator.ts](../src/atendente/validators/say-validator.ts) |
 | **Bug 15** — Action Validator: pre-condição em escalate, update_draft, clear_cart | **A** | 1 (D2) | meio dia | [action-validator.ts:148-154](../src/atendente/validators/action-validator.ts) |
 | **Bug 1** — `set_active_item` invalida oferta + slots antigo | **A** | 1 (D3) | meio dia | [apply-action.ts:250-261](../src/atendente/state/apply-action.ts) |
 | **Bug 16** — `loadCurrent` popula `derived_signals.stale_slots` | **M** | 1 (D3) | 1 hora | [agent-state.repository.ts:230-236](../src/atendente/state/agent-state.repository.ts) |
@@ -425,7 +425,7 @@ Matriz Bug → Severidade → Semana/PR → Esforço. Inclui os 17 bugs cravados
 
 **Bug 3 (replace_cart_item) NÃO entra no caminho crítico.** Ele é prospectivo — só vira atual quando o Generator passar a emitir ações de carrinho. Pareá-lo com a sprint que fizer essa expansão.
 
-**Verificações em prod V1-V5: FECHADAS por Codex em 07/05** (resultados na seção 4.5). Bug 14a foi implementado no PR 1; a pendência atual é smoke LLM pós-deploy do PR5 comercial.
+**Verificações em prod V1-V5: FECHADAS por Codex em 07/05** (resultados na seção 4.5). Bug 14a foi implementado no PR 1; PR5 comercial foi validado com smoke LLM real em 10/05.
 
 ---
 
@@ -502,7 +502,8 @@ A regra atual ("~5 semanas em shadow") é vaga. Cravando critérios concretos:
 | 2026-05-08 | **Smoke PR4 pos-redeploy:** conversas Chatwoot `454`-`459`. Organizadora processou 6/6 `enrichment_jobs` como `done`, tentativa 1, sem erro, com facts corretos para Titan 160, Biz 125/Pirelli/par, CB 300/140-70-17, Jardim America/entrega, Mercado Livre/achou_caro e Fazer 250. Planner `planner_v1.2.5` e Generator `generator_v1.3.2` rodaram com LLM real. Achados: Planner chamou `verificarEstoque` uma vez sem `product_id` (tool_failed seguro) e Generator fez claim de marca ("Tem Pirelli sim...") sem lastro; reforca prioridade do PR5 Say Validator comercial. | Codex |
 | 2026-05-08 | **Fix pos-smoke PR4 / PR5 inicial:** Planner bumpado para `planner_v1.2.6`, com contrato de `verificarEstoque` exigindo `product_id` ou `product_code` no schema/prompt/normalizacao. Say Validator passa a bloquear claim positivo de marca sem `buscarProduto` (`brand_claim_without_buscar_produto`), cobrindo o caso "Tem Pirelli sim..." visto no smoke. Testes: `npm test` 384/384, typecheck, build e integracao `atendente-commerce-tools` 5/5 verdes. | Codex |
 | 2026-05-08 | **Smoke pos-deploy `planner_v1.2.6`:** conversas Chatwoot `460`-`465`. Organizadora processou 6/6 jobs como `done`, tentativa 1, sem erro. Planner rodou com `planner_v1.2.6` e auditoria retornou `BAD_STOCK_TOOL_CALLS []`, sem `verificarEstoque` sem produto. Generator nao repetiu "Tem Pirelli sim" sem lastro; respondeu pedindo ano da Biz ou dizendo que precisava confirmar compatibilidade/valor antes de passar. Sem envio ao cliente. | Codex |
-| 2026-05-08 | **PR5 comercial parcial:** Say Validator passou a tratar desconto, brinde/promoção e oferta custom como política comercial obrigatória. Bloqueia "Consigo 5% de desconto" sem `desconto_maximo`, bloqueia desconto acima do máximo cadastrado, bloqueia "levando 2 ganha brinde" sem política promocional e bloqueia "faço por R$ 200" sem política comercial. Teste focado: `say-validator.test.ts` 49/49 verde. | Codex |
+| 2026-05-08 | **PR5 comercial implementação local:** Say Validator passou a tratar desconto, brinde/promoção e oferta custom como política comercial obrigatória. Bloqueia "Consigo 5% de desconto" sem `desconto_maximo`, bloqueia desconto acima do máximo cadastrado, bloqueia "levando 2 ganha brinde" sem política promocional e bloqueia "faço por R$ 200" sem política comercial. Teste focado: `say-validator.test.ts` 49/49 verde. | Codex |
+| 2026-05-10 | **Smoke LLM PR5 pós-deploy:** conversas Chatwoot `470`-`473`, run `pr5-commercial-20260510190449`. Organizadora extraiu 23 facts; Planner processou 8/8 jobs; Generator gerou 6 turns seguros e bloqueou 2 turns comerciais perigosos. Brinde foi bloqueado com `policy_claim_without_tool_result`; oferta "faz por R$ 200" foi bloqueada com `money_not_supported_by_tool_result:200`; ambos preservaram `blocked_say_text`. Desconto de 10% foi respondido de forma segura sem promessa; Pirelli caiu em fallback seguro. | Codex |
 
 ## 12. Ordem de Execução das Correções
 
@@ -575,7 +576,7 @@ Três bugs de hardening operacional. Não bloqueiam Sprint 8, mas são limpeza i
 
 Bug 14 — adicionar bloqueios de afirmação comercial sem lastro: desconto, brinde/promoção, marca não cadastrada, oferta custom.
 
-**Status Codex 2026-05-08:** parcialmente implementado e testado localmente.
+**Status Codex 2026-05-10:** implementado, testado localmente e validado com LLM real em prod shadow.
 
 - **Marca sem lastro [feito]:** bloqueia `brand_claim_without_buscar_produto` para frases como "Tem Pirelli sim" sem `buscarProduto`/`buscarCompatibilidade` contendo a marca.
 - **Desconto sem política [feito]:** bloqueia "Consigo te dar 5% de desconto" quando não há `buscarPoliticaComercial` com `desconto_maximo`.
@@ -583,7 +584,7 @@ Bug 14 — adicionar bloqueios de afirmação comercial sem lastro: desconto, br
 - **Brinde/promoção [feito]:** bloqueia "Levando 2 pneus ganha uma câmara de brinde" sem `brinde_promocao`, `promocao_ativa` ou `politica_promocional`.
 - **Oferta custom [feito]:** bloqueia "Se levar 2, faço por R$ 200" sem política comercial.
 - **Meta-fala segura [feito]:** permite "Preciso confirmar desconto com a loja antes de te passar" sem tool, porque não promete condição comercial.
-- **Pendente antes de fechar PR5:** rodar smoke LLM pós-deploy forçando desconto/brinde/oferta custom sem lastro e auditar se `blocked_say_text` foi persistido.
+- **Smoke LLM [feito]:** conversas `470`-`473`. Brinde e oferta custom bloquearam com `blocked_say_text`; desconto e marca foram respondidos de forma segura sem promessa comercial.
 
 ### Catálogo Wallace — paralelo
 
@@ -611,9 +612,9 @@ Trabalho do Wallace, paralelo a PR 1-5. **Não bloqueia PR 1**, mas bloqueia o p
 
 - **PR 1 já viabilizou auditoria de bloqueios.** Bug 14 (PR 5) agora pode ser validado por smoke LLM com `blocked_say_text` persistido.
 - **Bug 3 não entra agora;** só junto com expansão futura do action set do Generator (quando emitir `add_to_cart`/`remove_from_cart`). Marcado como prospectivo na seção 3 e 6.5.
-- **Bug 14 está parcialmente implementado.** Falta deploy + smoke LLM específico para fechar desconto/brinde/oferta custom sem lastro em ambiente real.
+- **Bug 14 está fechado no PR5.** Desconto/brinde/oferta custom sem lastro foram testados em ambiente real shadow com LLM.
 - **Catálogo é paralelo, não bloqueia PR 1.** Wallace pode cadastrar enquanto PRs 1-5 são implementados/revisados.
 
 ---
 
-**Auditoria assinada com referência de linha + cruzamento com banco vivo via Codex.** Tudo nas tabelas de pontos fortes e bugs foi lido. Itens fora de escopo estão marcados explicitamente. Itens refutados estão documentados em prol de transparência. **V1-V5 fechadas em 07/05.** Bug 14a foi implementado; Bug 14/PR5 está parcialmente implementado e falta smoke LLM pós-deploy. Catálogo Sprint 8: cobrir 5 medidas que somam 82,61% (140/70-17, 90/90-18, 100/80-18, 110/70-17, 110/90-17), com aliases consolidados em `commerce.vehicle_models` (Titan/Biz/Bros/CG e variantes).
+**Auditoria assinada com referência de linha + cruzamento com banco vivo via Codex.** Tudo nas tabelas de pontos fortes e bugs foi lido. Itens fora de escopo estão marcados explicitamente. Itens refutados estão documentados em prol de transparência. **V1-V5 fechadas em 07/05.** PR1-PR5 de hardening foram implementados e validados; Bug 14/PR5 teve smoke LLM em 10/05. Catálogo Sprint 8: cobrir 5 medidas que somam 82,61% (140/70-17, 90/90-18, 100/80-18, 110/70-17, 110/90-17), com aliases consolidados em `commerce.vehicle_models` (Titan/Biz/Bros/CG e variantes).

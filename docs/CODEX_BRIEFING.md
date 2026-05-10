@@ -66,9 +66,9 @@ Flexivel no funil, rigida na verdade:
 
 ## Proxima Tarefa Sugerida
 
-Proximo lote recomendado apos PR 5 comercial parcial: deploy + smoke LLM
-especifico de desconto/brinde/oferta custom, ou catalogo commerce se a prioridade
-for destravar venda real.
+Proximo lote recomendado apos PR 5 validado: catalogo commerce se a prioridade
+for destravar venda real, ou Sprint 7 Supervisora/Critic shadow se a prioridade
+for aumentar qualidade antes do envio.
 
 Escopo:
 
@@ -140,11 +140,17 @@ Ultima validacao conhecida:
   `planner_v1.2.6`; auditoria retornou `BAD_STOCK_TOOL_CALLS []`. Generator nao
   repetiu "Tem Pirelli sim"; respondeu pedindo ano da Biz ou dizendo que precisa
   confirmar compatibilidade/valor antes de passar. Sem envio ao cliente.
-- PR5 comercial parcial local (2026-05-08): Say Validator bloqueia desconto sem
+- PR5 comercial implementacao local (2026-05-08): Say Validator bloqueia desconto sem
   `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
   politica promocional e oferta custom ("faco por R$ 200") sem politica
-  comercial. Teste focado `say-validator.test.ts`: 49/49 verde. Falta deploy +
-  smoke LLM especifico para confirmar `blocked_say_text` em prod.
+  comercial. Teste focado `say-validator.test.ts`: 49/49 verde.
+- Smoke LLM PR5 pos-deploy (2026-05-10, Chatwoot `470`-`473`, run
+  `pr5-commercial-20260510190449`): Organizadora extraiu 23 facts; Planner
+  processou 8/8 jobs; Generator teve 6 `generated` seguros e 2 `blocked`.
+  Brinde bloqueou com `policy_claim_without_tool_result`; oferta "faz por R$
+  200" bloqueou com `money_not_supported_by_tool_result:200`; ambos preservaram
+  `blocked_say_text`. Desconto de 10% virou resposta segura sem promessa; Pirelli
+  virou fallback seguro. PR5 validado com LLM real.
 
 ## Arquivos De Estado
 

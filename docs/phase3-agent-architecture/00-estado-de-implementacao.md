@@ -199,7 +199,7 @@ Ultima validacao (PR 4 local):
   sem envio ao cliente.
 - Avaliação qualitativa: Organizadora 9/10, Planner 9/10, Generator 8/10,
   fluxo geral 8,7/10. O teste validou correção de contexto e uso de tools;
-  ainda falta smoke específico de bloqueio para validar `blocked_say_text`.
+  o smoke posterior do PR5 validou bloqueio comercial e `blocked_say_text`.
 - Smoke PR3 pos-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts;
   Planner LLM `planner_v1.2.5` usou tools comerciais; Generator rodou em shadow
   e bloqueou 1 turno com `stock_claim_without_verificar_estoque`, preservando
@@ -224,11 +224,15 @@ Ultima validacao (PR 4 local):
 - Smoke pos-deploy `planner_v1.2.6` (Chatwoot `460`-`465`): Organizadora 6/6
   jobs `done`; Planner sem `verificarEstoque` invalido; Generator sem claim de
   marca sem lastro. Sem envio ao cliente.
-- PR5 comercial parcial local: Say Validator tambem bloqueia desconto sem
+- PR5 comercial implementacao local: Say Validator tambem bloqueia desconto sem
   `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
   politica promocional e oferta custom ("faco por R$ 200") sem politica
-  comercial. Teste focado `say-validator.test.ts`: 49/49 verde. Falta deploy +
-  smoke LLM especifico de desconto/brinde/oferta custom.
+  comercial. Teste focado `say-validator.test.ts`: 49/49 verde.
+- Smoke LLM PR5 pos-deploy (Chatwoot `470`-`473`, run
+  `pr5-commercial-20260510190449`): Organizadora 23 facts; Planner 8/8 jobs;
+  Generator 6 `generated` seguros e 2 `blocked`. Brinde bloqueado por
+  `policy_claim_without_tool_result`; oferta "faz por R$ 200" bloqueada por
+  `money_not_supported_by_tool_result:200`; `blocked_say_text` preservado.
 - Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
   job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
   LLM real gpt-5.4, sem alucinacao comercial.

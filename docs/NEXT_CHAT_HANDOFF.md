@@ -174,9 +174,8 @@ Ultima validacao (2026-05-08, PR 3):
   Conversa teve 13 mensagens, validando o caminho de contexto longo do PR 2
   com default 20. `agent.turns` tem colunas de auditoria PR 1 presentes.
 - Nota qualitativa do smoke: Organizadora **9/10**, Planner **9/10**,
-  Generator **8/10**, fluxo geral **8,7/10**. Limite: não foi cenário de
-  bloqueio forçado; falta smoke específico de desconto/marca/frete sem lastro
-  para provar `blocked_say_text` preenchido quando `status='blocked'`.
+  Generator **8/10**, fluxo geral **8,7/10**. O smoke posterior do PR5
+  (`470`-`473`) cobriu bloqueio comercial forçado e provou `blocked_say_text`.
 - Smoke PR3 pos-deploy via Chatwoot conversa `452`: Organizadora salvou 12
   facts (`moto-pneus-hybrid-v3-4`); Planner LLM `planner_v1.2.5` usou
   `buscar_e_ofertar`/`responder_logistica` com tools (`buscarProduto`,
@@ -195,12 +194,17 @@ Ultima validacao (2026-05-08, PR 3):
   endereco; tambem gravou slots globais `nome`, `bairro`, `forma_pagamento`.
   `agent.session_events` contem `draft_updated`. Resposta ao cliente ficou
   segura: anotou dados e pediu confirmacao humana de produto/estoque.
-- PR5 comercial parcial local: Say Validator agora bloqueia desconto sem
+- PR5 comercial implementacao local: Say Validator agora bloqueia desconto sem
   `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
   politica promocional e oferta custom ("faco por R$ 200") sem politica
-  comercial. Teste focado `say-validator.test.ts` verde com 49/49. Falta
-  deploy + smoke LLM especifico forcando desconto/brinde/oferta custom sem
-  lastro para confirmar `blocked_say_text` em prod.
+  comercial. Teste focado `say-validator.test.ts` verde com 49/49.
+- Smoke LLM PR5 pos-deploy (2026-05-10, Chatwoot `470`-`473`, run
+  `pr5-commercial-20260510190449`): Organizadora extraiu 23 facts; Planner
+  processou 8/8 jobs; Generator teve 6 `generated` seguros e 2 `blocked`.
+  Brinde bloqueou com `policy_claim_without_tool_result`; oferta "faz por R$
+  200" bloqueou com `money_not_supported_by_tool_result:200`; ambos preservaram
+  `blocked_say_text`. Desconto de 10% foi respondido sem promessa comercial;
+  Pirelli virou fallback seguro.
 - Deploy anterior: commit `cb5a7f8` -> `pneus/main` -> Coolify -> prod em ~50s.
 - Probe prod: planner_v1.2.5 ativo confirmado via `agent.session_events`.
 - Validacao end-to-end conv 441:
@@ -237,7 +241,7 @@ Duas frentes (ordenadas por prioridade):
 **PR 5 Say Validator comercial**:
 - Codigo local cobre marca, desconto, brinde/promocao e oferta custom sem
   lastro comercial.
-- Proximo passo operacional: deploy + smoke LLM forcando esses cenarios.
+- Validado com LLM real em prod shadow no smoke `470`-`473`.
 
 Depois disso, seguir para **Sprint 7 Supervisora/Critic shadow** ou catalogo
 commerce, dependendo da prioridade comercial.
@@ -254,6 +258,5 @@ das tabelas relevantes e o formato de importacao esperado (CSV ou SQL direto)."
 
 Ou, se catalogo nao estiver disponivel:
 
-"Quero fechar o PR 5: rode smoke LLM especifico de desconto, promocao/brinde e
-oferta custom sem lastro, confirme se o Generator foi bloqueado e se
-`blocked_say_text` ficou persistido."
+"Quero iniciar o proximo bloco: catalogo commerce real ou Sprint 7
+Supervisora/Critic shadow, mantendo envio Chatwoot desligado."

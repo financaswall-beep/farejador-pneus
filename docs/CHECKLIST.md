@@ -34,6 +34,11 @@ Atualizado: 2026-05-08
 - [x] PR 3 Validators/eventos: Action Validator com pre-condicoes de
   carrinho/draft/escalacao; eventos semanticos em `session_events` e
   `cart_events.updated`.
+- [x] PR 4 Organizadora/ops: reclaim de job zumbi, envs operacionais e decisao
+  documentada para mensagem editada.
+- [x] PR 5 Say Validator comercial: marca, desconto, brinde/promocao e oferta
+  custom sem lastro bloqueados; smoke LLM real `470`-`473` validou
+  `blocked_say_text`.
 - [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
 - [ ] Critic (Sprint 7).
 - [ ] Envio Chatwoot pela Atendente (Sprint 8).
@@ -330,6 +335,8 @@ Pendente da F1.5:
   `agent.turns`, sem envio Chatwoot
 - [x] Turns bloqueados mantem auditoria do candidato em `blocked_say_text` e
   `blocked_payload`, sem enviar a frase ao cliente
+- [x] Say Validator comercial bloqueia brinde/oferta custom sem lastro e evita
+  promessa de desconto/marca sem evidencia comercial
 - [ ] Critic shadow
 - [ ] Sugestao assistida para humano
 - [ ] Atendente liga envio Chatwoot somente apos autorizacao explicita

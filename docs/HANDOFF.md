@@ -161,6 +161,13 @@ Nao implementado/nao ligado:
 - Smoke pos-deploy `planner_v1.2.6` (conversas `460`-`465`): Organizadora 6/6
   jobs `done`, Planner sem `verificarEstoque` invalido (`BAD_STOCK_TOOL_CALLS []`)
   e Generator sem claim "Tem Pirelli sim" sem lastro. Sem envio ao cliente.
+- PR5 comercial validado (2026-05-10, Chatwoot `470`-`473`, run
+  `pr5-commercial-20260510190449`): Organizadora extraiu 23 facts; Planner
+  processou 8/8 jobs; Generator teve 6 turns seguros e 2 bloqueios. Brinde
+  bloqueou com `policy_claim_without_tool_result`; oferta "faz por R$ 200"
+  bloqueou com `money_not_supported_by_tool_result:200`; ambos preservaram
+  `blocked_say_text`. Desconto de 10% nao foi prometido; Pirelli caiu em
+  fallback seguro.
 - Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
   Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
 - Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,
@@ -186,17 +193,9 @@ Remotes sincronizados:
 
 ## Proxima Fase Recomendada
 
-PR 4: Organizadora/ops concluido localmente.
-- `ops.enrichment_jobs` agora recupera job `running` zumbi apos
-  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` (default 900s).
-- `ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT` e
-  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT` removem magic numbers do codigo.
-- Bug 13 documentado: mensagem editada segue como limitacao conhecida ate
-  existir historico versionado de `core.messages`; nao foi criado bypass no
-  validator de evidence.
-
-Depois do PR 4, escolher entre PR 5 (Say Validator comercial, depende de
-amostra real de `blocked_say_text`) e Sprint 7/Supervisora shadow.
+PR1-PR5 de hardening concluídos e validados em shadow. Proximo passo é escolher
+entre catalogo `commerce.*` real (para vender de verdade) e Sprint 7/Supervisora
+shadow (para avaliar qualidade antes do envio).
 
 Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
 - `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios; `buscar_e_ofertar` retorna lista vazia.
