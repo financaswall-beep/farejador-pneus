@@ -77,13 +77,103 @@ export const plannerOutputJsonSchema = {
       type: 'array',
       maxItems: 5,
       items: {
-        type: 'object',
-        additionalProperties: true,
-        required: ['tool', 'input'],
-        properties: {
-          tool: { type: 'string', enum: toolNameSchema.options },
-          input: { type: 'object', additionalProperties: true },
-        },
+        anyOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tool', 'input'],
+            properties: {
+              tool: { type: 'string', enum: ['buscarProduto'] },
+              input: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  environment: { type: 'string' },
+                  medida_pneu: { type: 'string' },
+                  marca: { type: 'string' },
+                  product_code: { type: 'string' },
+                  posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'] },
+                  apenas_com_estoque: { type: 'boolean' },
+                  limit: { type: 'number' },
+                },
+                required: ['environment'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tool', 'input'],
+            properties: {
+              tool: { type: 'string', enum: ['verificarEstoque'] },
+              input: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  environment: { type: 'string' },
+                  product_id: { type: 'string' },
+                  product_code: { type: 'string' },
+                },
+                required: ['environment'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tool', 'input'],
+            properties: {
+              tool: { type: 'string', enum: ['buscarCompatibilidade'] },
+              input: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  environment: { type: 'string' },
+                  moto_modelo: { type: 'string' },
+                  moto_ano: { type: 'number' },
+                  posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'] },
+                  limit: { type: 'number' },
+                },
+                required: ['environment'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tool', 'input'],
+            properties: {
+              tool: { type: 'string', enum: ['calcularFrete'] },
+              input: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  environment: { type: 'string' },
+                  bairro: { type: 'string' },
+                  municipio: { type: 'string' },
+                },
+                required: ['environment', 'bairro'],
+              },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tool', 'input'],
+            properties: {
+              tool: { type: 'string', enum: ['buscarPoliticaComercial'] },
+              input: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  environment: { type: 'string' },
+                  policy_keys: { type: 'array', items: { type: 'string' } },
+                },
+                required: ['environment'],
+              },
+            },
+          },
+        ],
       },
     },
     risk_flags: {

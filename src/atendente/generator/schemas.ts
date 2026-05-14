@@ -111,15 +111,76 @@ export const generatorOutputJsonSchema = {
       type: 'array',
       maxItems: 10,
       items: {
-        type: 'object',
-        additionalProperties: true,
-        required: ['type'],
-        properties: {
-          type: {
-            type: 'string',
-            enum: ['update_slot', 'create_item', 'record_offer', 'update_draft'],
+        anyOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'scope', 'item_id', 'slot_key', 'value', 'source', 'confidence', 'evidence_text', 'set_by_message_id'],
+            properties: {
+              type: { type: 'string', enum: ['update_slot'] },
+              scope: { type: 'string', enum: ['global', 'item'] },
+              item_id: { type: ['string', 'null'] },
+              slot_key: { type: 'string' },
+              value: {},
+              source: {
+                type: 'string',
+                enum: [
+                  'observed',
+                  'inferred',
+                  'confirmed',
+                  'offered_to_client',
+                  'inferred_from_history',
+                  'inferred_from_organizadora',
+                ],
+              },
+              confidence: { type: 'number', minimum: 0, maximum: 1 },
+              evidence_text: { type: ['string', 'null'] },
+              set_by_message_id: { type: ['string', 'null'] },
+            },
           },
-        },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'item_id', 'make_active'],
+            properties: {
+              type: { type: 'string', enum: ['create_item'] },
+              item_id: { type: 'string' },
+              make_active: { type: 'boolean' },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'offer_id', 'item_id', 'products', 'expires_at'],
+            properties: {
+              type: { type: 'string', enum: ['record_offer'] },
+              offer_id: { type: 'string' },
+              item_id: { type: 'string' },
+              products: {
+                type: 'array',
+                minItems: 1,
+                maxItems: 10,
+                items: { type: 'object', additionalProperties: true },
+              },
+              expires_at: { type: 'string' },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type'],
+            properties: {
+              type: { type: 'string', enum: ['update_draft'] },
+              customer_name: { type: 'string' },
+              delivery_address: { type: 'string' },
+              fulfillment_mode: { type: 'string', enum: ['delivery', 'pickup'] },
+              payment_method: {
+                type: 'string',
+                enum: ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto'],
+              },
+            },
+          },
+        ],
       },
     },
     rationale: { type: 'string', minLength: 1, maxLength: 500 },
