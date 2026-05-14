@@ -121,7 +121,25 @@ export const generatorOutputJsonSchema = {
               scope: { type: 'string', enum: ['global', 'item'] },
               item_id: { type: ['string', 'null'] },
               slot_key: { type: 'string' },
-              value: {},
+              value: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'number' },
+                  { type: 'boolean' },
+                  { type: 'null' },
+                  {
+                    type: 'array',
+                    items: {
+                      anyOf: [
+                        { type: 'string' },
+                        { type: 'number' },
+                        { type: 'boolean' },
+                        { type: 'null' },
+                      ],
+                    },
+                  },
+                ],
+              },
               source: {
                 type: 'string',
                 enum: [
