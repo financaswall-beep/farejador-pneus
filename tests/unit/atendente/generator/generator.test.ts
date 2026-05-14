@@ -570,6 +570,44 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     expect(payload.context.organizer_facts[0].fact_value).toBe('140/70-17');
   });
 
+  it('entrega commercial_summary pronto para o Generator nao garimpar tool JSON bruto', () => {
+    const messages = buildGeneratorMessages(
+      makeContext(),
+      makeDecision('buscar_e_ofertar'),
+      [
+        makeToolResult('buscarProduto', true, [
+          {
+            product_id: 'prod-90',
+            product_code: 'TECH-90-90-18-REAR-BIAS',
+            tire_size: '90/90-18',
+            tire_position: 'rear',
+            price_amount: 79,
+            total_stock_available: 10,
+          },
+        ]),
+      ],
+    );
+    const payload = JSON.parse(messages[1]!.content);
+
+    expect(payload.commercial_summary).toMatchObject({
+      has_usable_evidence: true,
+      products_found: 1,
+      can_quote_price: true,
+      stock_checked: false,
+      can_claim_stock: false,
+      stock_status: 'not_checked',
+    });
+    expect(payload.commercial_summary.primary_product).toMatchObject({
+      product_code: 'TECH-90-90-18-REAR-BIAS',
+      tire_size: '90/90-18',
+      price_amount: 79,
+    });
+    expect(payload.commercial_summary.missing_evidence).toContain('stock_not_checked');
+    expect(payload.commercial_summary.response_guidance).toContain(
+      'Nao prometa estoque nem pronta entrega; diga que estoque precisa ser confirmado.',
+    );
+  });
+
   it('hidrata e preserva slots de dois pneus e dados globais emitidos no mesmo turno', async () => {
     enableLlm();
     const latestMessageId = '00000000-0000-4000-8000-0000000000f2';

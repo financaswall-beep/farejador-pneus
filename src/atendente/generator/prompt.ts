@@ -34,8 +34,10 @@ export function buildGeneratorMessages(
         '2. NAO invente estoque. Para afirmar estoque/disponibilidade/"tem em estoque"/"X unidades"/"pronta entrega", exija que verificarEstoque tenha sido chamado neste turno e tenha retornado evidencia especifica. O campo total_stock_available que aparece dentro de buscarProduto.output NAO autoriza afirmacao de estoque ao cliente — ele e apenas referencial para o Planner. Se so houver buscarProduto sem verificarEstoque, voce pode falar do produto e do preco, mas nao pode prometer disponibilidade nem citar quantidade em estoque.',
         '3. NAO invente frete. Use apenas dados de current_turn_tool_results.',
         '4. NAO invente compatibilidade. Use apenas dados de current_turn_tool_results.',
-        '4a. Prefira o bloco confirmed_evidence: ele resume, de forma deterministica, produtos/precos, estoque, compatibilidade, politicas e frete das tools deste turno.',
-        `5. Se faltar dado operacional, responda exatamente: "${SAFE_FALLBACK_SAY}"`,
+        '4a. Prefira o bloco commercial_summary. Ele e montado pelo codigo a partir das tools deste turno e diz o que voce pode afirmar, o que nao pode afirmar e o que deve pedir.',
+        '4b. Se commercial_summary.response_guidance existir, siga essa orientacao como trilho principal da resposta. Voce ainda deve escrever de forma natural, mas nao ignore os fatos e limites dali.',
+        `5. Use o fallback seguro exatamente "${SAFE_FALLBACK_SAY}" somente quando commercial_summary.has_usable_evidence=false e a skill nao for pedir_dados_faltantes.`,
+        '5c. Se commercial_summary.has_usable_evidence=true, PROIBIDO usar fallback generico. Responda com os dados confirmados e diga objetivamente qual ponto ficou sem confirmacao.',
         '5a. EXCECAO ABSOLUTA: se planner_decision.skill == "pedir_dados_faltantes", PROIBIDO usar a frase de fallback seguro.',
         '    Em vez disso, faca uma pergunta concreta sobre o slot ausente (medida do pneu, bairro, posicao, marca).',
         '    Se planner_decision.missing_slots tiver itens, mencione o primeiro de forma natural; se vazio, peca a medida do pneu (ex.: "110/90-17").',
@@ -49,7 +51,7 @@ export function buildGeneratorMessages(
         '10. Se a skill for escalar_humano, ainda assim registre dados observados em actions; nao invente motivo nem disponibilidade.',
         '11. Dados de fechamento tem prioridade sobre resposta comercial: se o cliente disser "pode fechar", "fechar pedido", "vou levar", "pago no pix/cartao/dinheiro" ou informar nome/endereco, emita update_draft com os campos observados.',
         '12. Mesmo sem estoque/compatibilidade confirmados, ainda registre update_draft para nome, pagamento, modalidade e endereco. Depois responda sem afirmar disponibilidade: diga que anotou os dados e que um atendente vai confirmar produto/estoque antes de fechar.',
-        '13. NAO diga "nao encontrei produto disponivel", "tem disponivel" ou "tem em estoque" a menos que verificarEstoque tenha retornado evidencia especifica do produto. Se a busca de produto/compatibilidade veio vazia, fale apenas que precisa confirmar com atendente.',
+        '13. NAO diga "nao encontrei produto disponivel", "tem disponivel" ou "tem em estoque" a menos que verificarEstoque tenha retornado evidencia especifica do produto. Se buscarProduto trouxe produto/preco mas verificarEstoque nao rodou, cite produto/preco e diga que estoque precisa ser confirmado.',
         '14. Se planner_decision.skill for "responder_logistica", "responder_geral" ou "escalar_humano", voce esta PROIBIDO de emitir actions do tipo "record_offer" e "create_item". Nesses turnos, ofertas comerciais nao sao escopo: apenas update_slot (memoria operacional), update_draft (dados de fechamento ja confirmados) e a resposta say sao permitidos. Se ja houver oferta ativa de turno anterior, NAO repita os dados comerciais na resposta sem confirmacao explicita de buscarProduto/verificarEstoque no turno atual.',
         '',
         'FORMATO DE SAIDA — JSON estrito:',
@@ -164,6 +166,7 @@ export function buildGeneratorMessages(
           error_message: result.error_message,
         })),
         confirmed_evidence: buildConfirmedEvidence(toolResults),
+        commercial_summary: buildCommercialSummary(toolResults),
         output_contract: {
           say: 'resposta para o cliente, max 2000 chars',
           actions: 'array de RawAction (pode ser [])',
@@ -239,4 +242,141 @@ function buildConfirmedEvidence(toolResults: ToolExecutionResult[]): Record<stri
   }
 
   return { products, stock, fitments, policies, freight };
+}
+
+interface CommercialProductSummary {
+  product_id?: unknown;
+  product_code?: unknown;
+  tire_size?: unknown;
+  position?: unknown;
+  price_amount?: unknown;
+}
+
+interface CommercialSummary {
+  has_usable_evidence: boolean;
+  products_found: number;
+  primary_product: CommercialProductSummary | null;
+  can_quote_price: boolean;
+  stock_checked: boolean;
+  can_claim_stock: boolean;
+  stock_status: 'confirmed_available' | 'confirmed_unavailable' | 'not_checked';
+  compatibility_checked: boolean;
+  can_claim_fitment: boolean;
+  fitment_status: 'confirmed' | 'not_confirmed' | 'not_checked';
+  freight_checked: boolean;
+  can_claim_freight: boolean;
+  missing_evidence: string[];
+  response_guidance: string[];
+}
+
+function buildCommercialSummary(toolResults: ToolExecutionResult[]): CommercialSummary {
+  const products = collectProducts(toolResults);
+  const stockOutputs = collectToolObjects(toolResults, 'verificarEstoque');
+  const fitmentOutputs = collectFitments(toolResults);
+  const freightOutputs = collectToolOutputs(toolResults, 'calcularFrete');
+
+  const primaryProduct = products[0] ?? null;
+  const canQuotePrice = products.some((product) => product.price_amount !== undefined && product.price_amount !== null);
+  const stockChecked = stockOutputs.length > 0;
+  const canClaimStock = stockOutputs.some((item) => item.disponivel === true || Number(item.quantidade_total) > 0);
+  const compatibilityChecked = toolResults.some((result) => result.ok && result.tool === 'buscarCompatibilidade');
+  const canClaimFitment = fitmentOutputs.length > 0;
+  const freightChecked = freightOutputs.length > 0;
+  const canClaimFreight = freightOutputs.length > 0;
+
+  const missingEvidence: string[] = [];
+  const responseGuidance: string[] = [];
+
+  if (products.length > 0) {
+    responseGuidance.push('Pode citar produto/medida encontrados neste turno.');
+    if (canQuotePrice) responseGuidance.push('Pode citar preco retornado por buscarProduto neste turno.');
+    if (!stockChecked) {
+      missingEvidence.push('stock_not_checked');
+      responseGuidance.push('Nao prometa estoque nem pronta entrega; diga que estoque precisa ser confirmado.');
+    } else if (canClaimStock) {
+      responseGuidance.push('Pode afirmar disponibilidade apenas do item coberto por verificarEstoque.');
+    } else {
+      responseGuidance.push('Estoque foi verificado, mas nao ha disponibilidade confirmada.');
+    }
+  }
+
+  if (compatibilityChecked) {
+    if (canClaimFitment) {
+      responseGuidance.push('Pode afirmar compatibilidade somente para os modelos/produtos retornados por buscarCompatibilidade.');
+    } else {
+      missingEvidence.push('fitment_not_confirmed');
+      responseGuidance.push('Compatibilidade foi consultada, mas nao confirmada; nao use "serve". Peca ano/versao/foto da medida ou chame atendente.');
+    }
+  } else {
+    missingEvidence.push('fitment_not_checked');
+    responseGuidance.push('Nao afirme compatibilidade porque buscarCompatibilidade nao rodou neste turno.');
+  }
+
+  if (freightChecked) {
+    responseGuidance.push('Pode falar de frete/entrega apenas conforme retorno de calcularFrete.');
+  }
+
+  if (products.length === 0 && !compatibilityChecked && !freightChecked) {
+    missingEvidence.push('no_current_tool_evidence');
+    responseGuidance.push('Sem evidencia comercial util neste turno; se nao for pedir dado faltante, use fallback seguro.');
+  }
+
+  return {
+    has_usable_evidence: products.length > 0 || compatibilityChecked || freightChecked,
+    products_found: products.length,
+    primary_product: primaryProduct,
+    can_quote_price: canQuotePrice,
+    stock_checked: stockChecked,
+    can_claim_stock: canClaimStock,
+    stock_status: stockChecked ? (canClaimStock ? 'confirmed_available' : 'confirmed_unavailable') : 'not_checked',
+    compatibility_checked: compatibilityChecked,
+    can_claim_fitment: canClaimFitment,
+    fitment_status: compatibilityChecked ? (canClaimFitment ? 'confirmed' : 'not_confirmed') : 'not_checked',
+    freight_checked: freightChecked,
+    can_claim_freight: canClaimFreight,
+    missing_evidence: [...new Set(missingEvidence)],
+    response_guidance: responseGuidance,
+  };
+}
+
+function collectProducts(toolResults: ToolExecutionResult[]): CommercialProductSummary[] {
+  const products: CommercialProductSummary[] = [];
+  for (const result of toolResults) {
+    if (!result.ok || result.tool !== 'buscarProduto' || !Array.isArray(result.output)) continue;
+    for (const product of result.output.slice(0, 6)) {
+      if (!product || typeof product !== 'object') continue;
+      const item = product as Record<string, unknown>;
+      products.push({
+        product_id: item.product_id,
+        product_code: item.product_code,
+        tire_size: item.tire_size,
+        position: item.tire_position,
+        price_amount: item.price_amount,
+      });
+    }
+  }
+  return products;
+}
+
+function collectToolObjects(toolResults: ToolExecutionResult[], tool: string): Record<string, unknown>[] {
+  return collectToolOutputs(toolResults, tool).filter(
+    (output): output is Record<string, unknown> => Boolean(output) && typeof output === 'object' && !Array.isArray(output),
+  );
+}
+
+function collectToolOutputs(toolResults: ToolExecutionResult[], tool: string): unknown[] {
+  return toolResults.filter((result) => result.ok && result.tool === tool).map((result) => result.output);
+}
+
+function collectFitments(toolResults: ToolExecutionResult[]): Record<string, unknown>[] {
+  const fitments: Record<string, unknown>[] = [];
+  for (const result of toolResults) {
+    if (!result.ok || result.tool !== 'buscarCompatibilidade' || !Array.isArray(result.output)) continue;
+    for (const fitment of result.output.slice(0, 8)) {
+      if (!fitment || typeof fitment !== 'object') continue;
+      const produtos = (fitment as Record<string, unknown>).produtos;
+      if (Array.isArray(produtos) && produtos.length > 0) fitments.push(fitment as Record<string, unknown>);
+    }
+  }
+  return fitments;
 }
