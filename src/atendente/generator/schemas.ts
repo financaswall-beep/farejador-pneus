@@ -76,10 +76,10 @@ const recordOfferRawSchema = z.object({
 
 const updateDraftRawSchema = z.object({
   type: z.literal('update_draft'),
-  customer_name: z.string().min(1).max(120).optional(),
-  delivery_address: z.string().min(1).max(500).optional(),
-  fulfillment_mode: z.enum(['delivery', 'pickup']).optional(),
-  payment_method: z.enum(['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto']).optional(),
+  customer_name: z.string().min(1).max(120).nullable().optional(),
+  delivery_address: z.string().min(1).max(500).nullable().optional(),
+  fulfillment_mode: z.enum(['delivery', 'pickup']).nullable().optional(),
+  payment_method: z.enum(['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto']).nullable().optional(),
 });
 
 export const generatorRawActionSchema = z.discriminatedUnion('type', [
@@ -205,15 +205,15 @@ export const generatorOutputJsonSchema = {
           {
             type: 'object',
             additionalProperties: false,
-            required: ['type'],
+            required: ['type', 'customer_name', 'delivery_address', 'fulfillment_mode', 'payment_method'],
             properties: {
               type: { type: 'string', enum: ['update_draft'] },
-              customer_name: { type: 'string' },
-              delivery_address: { type: 'string' },
-              fulfillment_mode: { type: 'string', enum: ['delivery', 'pickup'] },
+              customer_name: { type: ['string', 'null'] },
+              delivery_address: { type: ['string', 'null'] },
+              fulfillment_mode: { type: ['string', 'null'], enum: ['delivery', 'pickup', null] },
               payment_method: {
-                type: 'string',
-                enum: ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto'],
+                type: ['string', 'null'],
+                enum: ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto', null],
               },
             },
           },
@@ -303,10 +303,10 @@ export function hydrateGeneratorAction(
       candidate = {
         ...base,
         type: 'update_draft',
-        customer_name: raw.customer_name,
-        delivery_address: raw.delivery_address,
-        fulfillment_mode: raw.fulfillment_mode,
-        payment_method: raw.payment_method,
+        ...(raw.customer_name ? { customer_name: raw.customer_name } : {}),
+        ...(raw.delivery_address ? { delivery_address: raw.delivery_address } : {}),
+        ...(raw.fulfillment_mode ? { fulfillment_mode: raw.fulfillment_mode } : {}),
+        ...(raw.payment_method ? { payment_method: raw.payment_method } : {}),
       };
       break;
   }
