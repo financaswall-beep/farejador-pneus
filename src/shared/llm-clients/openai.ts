@@ -20,7 +20,7 @@ export interface OpenAICallOptions {
   timeoutMs: number;
   /** Max output tokens. Default 2000. */
   maxTokens?: number;
-  /** Temperature. Default 0.0 for deterministic extraction. */
+  /** Temperature. When omitted, the provider/model default is used. */
   temperature?: number;
 }
 
@@ -39,15 +39,17 @@ const MAX_RETRIES = 1;
  * Throws on non-retryable errors or if both attempts fail.
  */
 export async function callOpenAI(options: OpenAICallOptions): Promise<OpenAICallResult> {
-  const { apiKey, model, messages, timeoutMs, maxTokens = 2000, temperature = 0.0 } = options;
+  const { apiKey, model, messages, timeoutMs, maxTokens = 2000, temperature } = options;
 
-  const body = JSON.stringify({
+  const requestBody: Record<string, unknown> = {
     model,
     response_format: { type: 'json_object' },
     messages,
     max_completion_tokens: maxTokens,
-    temperature,
-  });
+  };
+  if (temperature !== undefined) requestBody.temperature = temperature;
+
+  const body = JSON.stringify(requestBody);
 
   let lastError: Error | null = null;
 

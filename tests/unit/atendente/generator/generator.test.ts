@@ -169,12 +169,14 @@ function llmResponse(say: string, actions: unknown[] = []): string {
 function enableLlm(): void {
   mockEnv.GENERATOR_LLM_ENABLED = true;
   mockEnv.GENERATOR_OPENAI_API_KEY = 'fake-key';
+  mockEnv.GENERATOR_MODEL = 'gpt-4o-mini';
   callOpenAIMock.mockReset();
 }
 
 function disableLlm(): void {
   mockEnv.GENERATOR_LLM_ENABLED = false;
   mockEnv.GENERATOR_OPENAI_API_KEY = undefined;
+  mockEnv.GENERATOR_MODEL = 'gpt-4o-mini';
   callOpenAIMock.mockReset();
 }
 
@@ -397,6 +399,43 @@ describe('Generator Shadow — fallback seguro quando falta dado', () => {
     expect(result.block_reason).toContain('generator_schema_failed');
     expect(result.fallback_used).toBe(true);
     expect(result.used_llm).toBe(true);
+    disableLlm();
+  });
+
+  it('usa temperature 0.2 em modelos que aceitam temperatura customizada', async () => {
+    enableLlm();
+    callOpenAIMock.mockResolvedValueOnce({
+      content: llmResponse('Posso ajudar com isso.'),
+      inputTokens: 5,
+      outputTokens: 5,
+      durationMs: 20,
+    });
+
+    await generateTurn(makeContext(), makeDecision('responder_geral'), []);
+
+    expect(callOpenAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+    }));
+    disableLlm();
+  });
+
+  it('omite temperature para gpt-5.5, permitindo o default do modelo', async () => {
+    enableLlm();
+    mockEnv.GENERATOR_MODEL = 'gpt-5.5';
+    callOpenAIMock.mockResolvedValueOnce({
+      content: llmResponse('Posso ajudar com isso.'),
+      inputTokens: 5,
+      outputTokens: 5,
+      durationMs: 20,
+    });
+
+    await generateTurn(makeContext(), makeDecision('responder_geral'), []);
+
+    expect(callOpenAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-5.5',
+      temperature: undefined,
+    }));
     disableLlm();
   });
 

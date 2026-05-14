@@ -228,7 +228,7 @@ export async function generateTurn(
       messages,
       timeoutMs: env.OPENAI_TIMEOUT_MS,
       maxTokens: 1500,
-      temperature: 0.2,
+      temperature: supportsCustomTemperature(env.GENERATOR_MODEL) ? 0.2 : undefined,
     });
 
     const parsed = generatorOutputRawSchema.safeParse(JSON.parse(llmResult.content));
@@ -312,6 +312,10 @@ export async function generateTurn(
       used_llm: true,
     };
   }
+}
+
+function supportsCustomTemperature(model: string): boolean {
+  return !/^gpt-5\.5(?:$|[-_])/.test(model);
 }
 
 // ------------------------------------------------------------------
