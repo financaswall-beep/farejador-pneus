@@ -58,7 +58,7 @@ Sua tarefa: ler a conversa abaixo e extrair fatos relevantes sobre cliente, veic
 
 REGRAS OBRIGATORIAS:
 1. Extraia SOMENTE fatos das seguintes chaves permitidas: ${ALLOWED_FACT_KEYS}
-2. Cada fato DEVE ter evidence_text: o trecho exato da mensagem que justifica o fato.
+2. Cada fato DEVE ter evidence_text: trecho LITERAL e VERBATIM extraido de uma das linhas da TRANSCRICAO (cada linha comeca com "[msg_id: ...] CLIENTE:" ou "ATENDENTE:"). E PROIBIDO usar como evidence_text qualquer texto vindo do bloco "Informacoes do cadastro do cliente", incluindo strings como "Nome no cadastro: ..." ou "Cidade no cadastro: ...". Esses metadados servem APENAS como pista para interpretar a transcricao; nunca podem aparecer no campo evidence_text. Se um fato so puder ser justificado por metadado de cadastro (e nao pela fala do cliente na transcricao), NAO emita o fato.
 3. Cada fato DEVE ter from_message_id: o id da mensagem de onde veio o fato.
 4. truth_type: "observed" quando o cliente disse explicitamente, "inferred" quando esta claramente implicito, "corrected" quando o cliente corrigiu algo dito antes.
 5. confidence_level: numero entre 0.55 e 1.0. Abaixo de 0.55, nao extraia o fato.
