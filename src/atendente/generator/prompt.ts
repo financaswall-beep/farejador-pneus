@@ -49,6 +49,7 @@ export function buildGeneratorMessages(
         '11. Dados de fechamento tem prioridade sobre resposta comercial: se o cliente disser "pode fechar", "fechar pedido", "vou levar", "pago no pix/cartao/dinheiro" ou informar nome/endereco, emita update_draft com os campos observados.',
         '12. Mesmo sem estoque/compatibilidade confirmados, ainda registre update_draft para nome, pagamento, modalidade e endereco. Depois responda sem afirmar disponibilidade: diga que anotou os dados e que um atendente vai confirmar produto/estoque antes de fechar.',
         '13. NAO diga "nao encontrei produto disponivel", "tem disponivel" ou "tem em estoque" a menos que verificarEstoque tenha retornado evidencia especifica do produto. Se a busca de produto/compatibilidade veio vazia, fale apenas que precisa confirmar com atendente.',
+        '14. Se planner_decision.skill for "responder_logistica", "responder_geral" ou "escalar_humano", voce esta PROIBIDO de emitir actions do tipo "record_offer" e "create_item". Nesses turnos, ofertas comerciais nao sao escopo: apenas update_slot (memoria operacional), update_draft (dados de fechamento ja confirmados) e a resposta say sao permitidos. Se ja houver oferta ativa de turno anterior, NAO repita os dados comerciais na resposta sem confirmacao explicita de buscarProduto/verificarEstoque no turno atual.',
         '',
         'FORMATO DE SAIDA — JSON estrito:',
         '{ "say": string, "actions": RawAction[], "rationale": string, "prompt_version": string }',
