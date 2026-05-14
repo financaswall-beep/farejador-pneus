@@ -16,8 +16,13 @@ function block(reason: string): ActionValidationResult {
   return { valid: false, reason, severity: 'block' };
 }
 
-function itemExists(state: ConversationState, itemId: string): boolean {
-  return state.items.some((item) => item.id === itemId);
+function itemExists(
+  state: ConversationState,
+  itemId: string,
+  context: ActionValidationContext = {},
+): boolean {
+  if (state.items.some((item) => item.id === itemId)) return true;
+  return context.incoming_item_ids?.has(itemId) === true;
 }
 
 function liveCartItemExists(state: ConversationState, cartItemId: string): boolean {
@@ -34,6 +39,15 @@ function hasOpenPendingConfirmation(state: ConversationState): boolean {
 
 export interface ActionValidationContext {
   recent_tool_results?: ToolResultForValidation[];
+  /**
+   * Item IDs created earlier in the same turn (via `create_item` actions
+   * present in the current array). The action validator checks each
+   * action against `state` only — `state` is not mutated between
+   * validations in a turn — so without this hint, a `record_offer`
+   * (or `set_active_item` / `update_item_status`) referencing an item
+   * the same array just created would be rejected as `item_not_found`.
+   */
+  incoming_item_ids?: Set<string>;
 }
 
 function validateSlotScope(action: Extract<AgentAction, { type: 'update_slot' | 'mark_slot_stale' }>) {
@@ -100,6 +114,11 @@ export function validateAction(
     case 'set_active_item': {
       const item = state.items.find((candidate) => candidate.id === action.item_id);
       if (!item) {
+        // Item may have been created earlier in the same turn's action array.
+        // A freshly-created item is never 'descartado', so the status check is satisfied.
+        if (context.incoming_item_ids?.has(action.item_id)) {
+          return { valid: true };
+        }
         return block('item_not_found');
       }
       if (item.status === 'descartado') {
@@ -108,15 +127,18 @@ export function validateAction(
       return { valid: true };
     }
     case 'update_item_status':
-      return itemExists(state, action.item_id) ? { valid: true } : block('item_not_found');
+      return itemExists(state, action.item_id, context) ? { valid: true } : block('item_not_found');
     case 'record_offer': {
       const item = state.items.find((candidate) => candidate.id === action.item_id);
-      if (!item) {
+      const fromIncoming = !item && context.incoming_item_ids?.has(action.item_id) === true;
+      if (!item && !fromIncoming) {
         return block('item_not_found');
       }
-      if (!['aberto', 'ofertado'].includes(item.status)) {
+      if (item && !['aberto', 'ofertado'].includes(item.status)) {
         return block('offer_requires_open_or_offered_item');
       }
+      // Freshly-created items are born with status='aberto' (see apply-action.ts
+      // applyCreateItem), so the status gate above is satisfied for fromIncoming.
       if (context.recent_tool_results && context.recent_tool_results.length > 0) {
         const toolProductIds = collectToolProductIds(context.recent_tool_results);
         for (const product of action.products) {

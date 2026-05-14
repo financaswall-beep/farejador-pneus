@@ -193,6 +193,119 @@ describe('ActionValidator com contexto de tools', () => {
   });
 });
 
+describe('ActionValidator com incoming_item_ids (item criado no mesmo turno)', () => {
+  const freshItemId = '00000000-0000-4000-8000-000000000777';
+
+  it('permite record_offer quando item foi criado no mesmo array (mesma turno)', () => {
+    const result = validateAction(
+      stateWithoutItems(),
+      {
+        type: 'record_offer',
+        action_id: '00000000-0000-4000-8000-000000000301',
+        turn_index: 1,
+        emitted_at: baseTime,
+        emitted_by: 'generator',
+        offer_id: '00000000-0000-4000-8000-000000000302',
+        item_id: freshItemId,
+        products: [{ product_id: productId }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+      },
+      {
+        recent_tool_results: [
+          { tool: 'buscarProduto', ok: true, output: [{ product_id: productId }] },
+        ],
+        incoming_item_ids: new Set([freshItemId]),
+      },
+    );
+
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('mantem bloqueio quando item_id nao esta nem em state.items nem em incoming_item_ids', () => {
+    const result = validateAction(
+      stateWithoutItems(),
+      {
+        type: 'record_offer',
+        action_id: '00000000-0000-4000-8000-000000000303',
+        turn_index: 1,
+        emitted_at: baseTime,
+        emitted_by: 'generator',
+        offer_id: '00000000-0000-4000-8000-000000000304',
+        item_id: freshItemId,
+        products: [{ product_id: productId }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+      },
+      {
+        recent_tool_results: [
+          { tool: 'buscarProduto', ok: true, output: [{ product_id: productId }] },
+        ],
+        incoming_item_ids: new Set(['00000000-0000-4000-8000-000000000999']),
+      },
+    );
+
+    expect(result).toMatchObject({ valid: false, reason: 'item_not_found' });
+  });
+
+  it('permite set_active_item para item recem-criado no mesmo turno', () => {
+    const result = validateAction(
+      stateWithoutItems(),
+      {
+        type: 'set_active_item',
+        item_id: freshItemId,
+      },
+      { incoming_item_ids: new Set([freshItemId]) },
+    );
+
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('permite update_item_status para item recem-criado no mesmo turno', () => {
+    const result = validateAction(
+      stateWithoutItems(),
+      {
+        type: 'update_item_status',
+        item_id: freshItemId,
+        status: 'descartado',
+      },
+      { incoming_item_ids: new Set([freshItemId]) },
+    );
+
+    expect(result).toEqual({ valid: true });
+  });
+
+  it('ainda checa offer_product_not_supported_by_tool_result mesmo para item recem-criado', () => {
+    const result = validateAction(
+      stateWithoutItems(),
+      {
+        type: 'record_offer',
+        action_id: '00000000-0000-4000-8000-000000000305',
+        turn_index: 1,
+        emitted_at: baseTime,
+        emitted_by: 'generator',
+        offer_id: '00000000-0000-4000-8000-000000000306',
+        item_id: freshItemId,
+        products: [{ product_id: otherProductId }],
+        expires_at: '2026-04-29T13:00:00.000Z',
+      },
+      {
+        recent_tool_results: [
+          { tool: 'buscarProduto', ok: true, output: [{ product_id: productId }] },
+        ],
+        incoming_item_ids: new Set([freshItemId]),
+      },
+    );
+
+    expect(result).toMatchObject({
+      valid: false,
+      reason: 'offer_product_not_supported_by_tool_result',
+    });
+  });
+});
+
+function stateWithoutItems(): ConversationState {
+  return { ...state(), items: [] };
+}
+
 function state(overrides: Partial<ConversationState> = {}): ConversationState {
   return {
     schema_version: 'atendente_v1.0',

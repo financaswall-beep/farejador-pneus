@@ -63,15 +63,28 @@ function runValidators(
   context: PlannerContext,
   selectedSkill?: SkillName,
 ): { blocked: boolean; block_reason: string | null } {
-  const validationCtx = toValidationCtx(toolResults, selectedSkill);
+  const sayCtx = toValidationCtx(toolResults, selectedSkill);
 
-  const sayResult = validateSay(say, validationCtx);
+  const sayResult = validateSay(say, sayCtx);
   if (!sayResult.valid) {
     return { blocked: true, block_reason: sayResult.reason };
   }
 
+  // The action validator checks each action against `context.state` without
+  // mutating between iterations. To avoid `item_not_found` on a `record_offer`
+  // (or `set_active_item` / `update_item_status`) that references an item
+  // freshly created in the same array, we collect every `create_item.item_id`
+  // up front and let the validator treat those as if they already existed.
+  const incomingItemIds = new Set(
+    actions
+      .filter((action): action is Extract<AgentAction, { type: 'create_item' }> => action.type === 'create_item')
+      .map((action) => action.item_id),
+  );
+
+  const actionCtx = { ...sayCtx, incoming_item_ids: incomingItemIds };
+
   for (const action of actions) {
-    const actionResult = validateAction(context.state, action, validationCtx);
+    const actionResult = validateAction(context.state, action, actionCtx);
     if (!actionResult.valid) {
       return { blocked: true, block_reason: `action_blocked:${actionResult.reason}` };
     }
