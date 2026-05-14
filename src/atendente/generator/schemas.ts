@@ -50,7 +50,7 @@ export const generatorAgentVersion = 'atendente_v1.0.0';
 const updateSlotRawSchema = z.object({
   type: z.literal('update_slot'),
   scope: slotScopeSchema,
-  item_id: z.string().uuid().nullable(),
+  item_id: z.string().min(1).nullable(),
   slot_key: sessionSlotKeySchema,
   value: z.unknown(),
   source: slotSourceSchema,
@@ -62,14 +62,14 @@ const updateSlotRawSchema = z.object({
 
 const createItemRawSchema = z.object({
   type: z.literal('create_item'),
-  item_id: z.string().uuid(),
+  item_id: z.string().min(1),
   make_active: z.boolean().default(true),
 });
 
 const recordOfferRawSchema = z.object({
   type: z.literal('record_offer'),
-  offer_id: z.string().uuid(),
-  item_id: z.string().uuid(),
+  offer_id: z.string().min(1),
+  item_id: z.string().min(1),
   products: z.array(z.record(z.unknown())).min(1).max(10),
   expires_at: z.string().datetime(),
 });
@@ -236,6 +236,14 @@ export interface HydrationContext {
   selected_skill?: string | null;
 }
 
+const uuidLikeRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeGeneratedId(namespace: string, ctx: HydrationContext, rawId: string): string {
+  return uuidLikeRegex.test(rawId)
+    ? rawId
+    : deterministicUuid([namespace, ctx.conversation_id, ctx.turn_index, rawId]);
+}
+
 /**
  * Hidrata uma raw action adicionando os meta-campos de forma determinística.
  * O action_id é determinístico (sha256 do payload + conversa + turn) — assim
@@ -248,6 +256,7 @@ export interface HydrationContext {
 export function hydrateGeneratorAction(
   raw: GeneratorRawAction,
   ctx: HydrationContext,
+  itemIdMap: Map<string, string> = new Map(),
 ): AgentAction | null {
   const actionId = deterministicUuid([
     'generator_action',
@@ -271,7 +280,7 @@ export function hydrateGeneratorAction(
         ...base,
         type: 'update_slot',
         scope: raw.scope,
-        item_id: raw.item_id,
+        item_id: raw.item_id ? itemIdMap.get(raw.item_id) ?? normalizeGeneratedId('generator_item', ctx, raw.item_id) : null,
         slot_key: raw.slot_key,
         value: raw.value,
         source: raw.source,
@@ -285,7 +294,7 @@ export function hydrateGeneratorAction(
       candidate = {
         ...base,
         type: 'create_item',
-        item_id: raw.item_id,
+        item_id: itemIdMap.get(raw.item_id) ?? normalizeGeneratedId('generator_item', ctx, raw.item_id),
         make_active: raw.make_active,
       };
       break;
@@ -293,8 +302,8 @@ export function hydrateGeneratorAction(
       candidate = {
         ...base,
         type: 'record_offer',
-        offer_id: raw.offer_id,
-        item_id: raw.item_id,
+        offer_id: normalizeGeneratedId('generator_offer', ctx, raw.offer_id),
+        item_id: itemIdMap.get(raw.item_id) ?? normalizeGeneratedId('generator_item', ctx, raw.item_id),
         products: raw.products,
         expires_at: raw.expires_at,
       };
@@ -328,10 +337,17 @@ export function hydrateGeneratorActions(
 ): { actions: AgentAction[]; invalid_indexes: number[] } {
   const actions: AgentAction[] = [];
   const invalid_indexes: number[] = [];
+  const itemIdMap = new Map<string, string>();
+
+  for (const raw of raws) {
+    if (raw.type === 'create_item') {
+      itemIdMap.set(raw.item_id, normalizeGeneratedId('generator_item', ctx, raw.item_id));
+    }
+  }
 
   for (let index = 0; index < raws.length; index += 1) {
     const raw = raws[index]!;
-    const hydrated = hydrateGeneratorAction(raw, ctx);
+    const hydrated = hydrateGeneratorAction(raw, ctx, itemIdMap);
     if (hydrated) {
       actions.push(hydrated);
     } else {

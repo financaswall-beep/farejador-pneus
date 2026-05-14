@@ -667,6 +667,47 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     disableLlm();
   });
 
+  it('hidrata ids simbolicos de item para UUIDs deterministicos e consistentes', async () => {
+    enableLlm();
+    const latestMessageId = '00000000-0000-4000-8000-0000000000f7';
+    queueLlm('Achei a medida e vou conferir as opcoes para voce.', [
+      { type: 'create_item', item_id: 'item_90_90_18', make_active: true },
+      {
+        type: 'update_slot',
+        scope: 'item',
+        item_id: 'item_90_90_18',
+        slot_key: 'medida_pneu',
+        value: '90/90-18',
+        source: 'observed',
+        confidence: 0.99,
+        evidence_text: '90/90-18',
+        set_by_message_id: latestMessageId,
+      },
+    ]);
+
+    const context = makeContext({
+      recent_messages: [
+        {
+          id: latestMessageId,
+          role: 'customer',
+          text: 'tem 90/90-18?',
+          sent_at: baseTime,
+        },
+      ],
+    });
+
+    const result = await generateTurn(context, makeDecision('buscar_e_ofertar'), []);
+
+    expect(result.blocked).toBe(false);
+    expect(result.actions).toHaveLength(2);
+    expect(result.actions[0]).toMatchObject({ type: 'create_item', item_id: expect.any(String) });
+    expect(result.actions[1]).toMatchObject({ type: 'update_slot', item_id: result.actions[0]!.item_id });
+    expect(result.actions[0]!.item_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    disableLlm();
+  });
+
   it('em fechamento, registra update_draft mesmo sem afirmar estoque', async () => {
     enableLlm();
     const latestMessageId = '00000000-0000-4000-8000-0000000000f3';
