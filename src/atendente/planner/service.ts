@@ -1,12 +1,13 @@
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
-import { callOpenAI } from '../../shared/llm-clients/openai.js';
+import { callOpenAIResponse } from '../../shared/llm-clients/openai.js';
 import { sessionSlotKeySchema } from '../../shared/zod/agent-state.js';
 import type { PlannerContext } from './context-builder.js';
 import { buildPlannerMessages } from './prompt.js';
 import {
   fallbackPlannerOutput,
+  plannerOutputJsonSchema,
   plannerOutputSchema,
   plannerPromptVersion,
   riskFlagSchema,
@@ -277,13 +278,18 @@ async function callPlannerModel(
     });
   }
 
-  const result = await callOpenAI({
+  const result = await callOpenAIResponse({
     apiKey: env.PLANNER_OPENAI_API_KEY!,
     model: env.PLANNER_MODEL,
     messages,
     timeoutMs: env.OPENAI_TIMEOUT_MS,
     maxTokens: 800,
     temperature: 0,
+    jsonSchema: {
+      name: 'planner_output',
+      schema: plannerOutputJsonSchema,
+      strict: true,
+    },
   });
   return {
     output: plannerOutputSchema.parse(normalizePlannerOutputCandidate(JSON.parse(result.content), context)),

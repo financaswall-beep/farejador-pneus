@@ -34,6 +34,7 @@ export function buildGeneratorMessages(
         '2. NAO invente estoque. Para afirmar estoque/disponibilidade/"tem em estoque"/"X unidades"/"pronta entrega", exija que verificarEstoque tenha sido chamado neste turno e tenha retornado evidencia especifica. O campo total_stock_available que aparece dentro de buscarProduto.output NAO autoriza afirmacao de estoque ao cliente — ele e apenas referencial para o Planner. Se so houver buscarProduto sem verificarEstoque, voce pode falar do produto e do preco, mas nao pode prometer disponibilidade nem citar quantidade em estoque.',
         '3. NAO invente frete. Use apenas dados de current_turn_tool_results.',
         '4. NAO invente compatibilidade. Use apenas dados de current_turn_tool_results.',
+        '4a. Prefira o bloco confirmed_evidence: ele resume, de forma deterministica, produtos/precos, estoque, compatibilidade, politicas e frete das tools deste turno.',
         `5. Se faltar dado operacional, responda exatamente: "${SAFE_FALLBACK_SAY}"`,
         '5a. EXCECAO ABSOLUTA: se planner_decision.skill == "pedir_dados_faltantes", PROIBIDO usar a frase de fallback seguro.',
         '    Em vez disso, faca uma pergunta concreta sobre o slot ausente (medida do pneu, bairro, posicao, marca).',
@@ -162,6 +163,7 @@ export function buildGeneratorMessages(
           output: result.output,
           error_message: result.error_message,
         })),
+        confirmed_evidence: buildConfirmedEvidence(toolResults),
         output_contract: {
           say: 'resposta para o cliente, max 2000 chars',
           actions: 'array de RawAction (pode ser [])',
@@ -171,4 +173,70 @@ export function buildGeneratorMessages(
       }),
     },
   ];
+}
+
+function buildConfirmedEvidence(toolResults: ToolExecutionResult[]): Record<string, unknown> {
+  const products: unknown[] = [];
+  const stock: unknown[] = [];
+  const fitments: unknown[] = [];
+  const policies: unknown[] = [];
+  const freight: unknown[] = [];
+
+  for (const result of toolResults) {
+    if (!result.ok) continue;
+
+    if (result.tool === 'buscarProduto' && Array.isArray(result.output)) {
+      for (const product of result.output.slice(0, 6)) {
+        if (!product || typeof product !== 'object') continue;
+        const item = product as Record<string, unknown>;
+        products.push({
+          product_id: item.product_id,
+          product_code: item.product_code,
+          tire_size: item.tire_size,
+          position: item.tire_position,
+          price_amount: item.price_amount,
+          total_stock_available: item.total_stock_available,
+        });
+      }
+    }
+
+    if (result.tool === 'verificarEstoque' && result.output && typeof result.output === 'object') {
+      const item = result.output as Record<string, unknown>;
+      stock.push({
+        product_id: item.product_id,
+        product_code: item.product_code,
+        disponivel: item.disponivel,
+        quantidade_total: item.quantidade_total,
+      });
+    }
+
+    if (result.tool === 'buscarCompatibilidade' && Array.isArray(result.output)) {
+      for (const vehicle of result.output.slice(0, 5)) {
+        if (!vehicle || typeof vehicle !== 'object') continue;
+        const item = vehicle as Record<string, unknown>;
+        fitments.push({
+          make: item.make,
+          model: item.model,
+          variant: item.variant,
+          year_start: item.year_start,
+          year_end: item.year_end,
+          produtos: item.produtos,
+        });
+      }
+    }
+
+    if (result.tool === 'buscarPoliticaComercial' && Array.isArray(result.output)) {
+      for (const policy of result.output.slice(0, 8)) {
+        if (!policy || typeof policy !== 'object') continue;
+        const item = policy as Record<string, unknown>;
+        policies.push({ policy_key: item.policy_key, value_json: item.value_json });
+      }
+    }
+
+    if (result.tool === 'calcularFrete' && result.output) {
+      freight.push(result.output);
+    }
+  }
+
+  return { products, stock, fitments, policies, freight };
 }

@@ -101,6 +101,32 @@ export const generatorOutputRawSchema = z.object({
 });
 export type GeneratorOutputRaw = z.infer<typeof generatorOutputRawSchema>;
 
+export const generatorOutputJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['say', 'actions', 'rationale', 'prompt_version'],
+  properties: {
+    say: { type: 'string', minLength: 1, maxLength: 2000 },
+    actions: {
+      type: 'array',
+      maxItems: 10,
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        required: ['type'],
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['update_slot', 'create_item', 'record_offer', 'update_draft'],
+          },
+        },
+      },
+    },
+    rationale: { type: 'string', minLength: 1, maxLength: 500 },
+    prompt_version: { type: 'string', enum: [generatorPromptVersion] },
+  },
+} as const;
+
 // ------------------------------------------------------------------
 // Hidratação: cru → AgentAction validado.
 // ------------------------------------------------------------------

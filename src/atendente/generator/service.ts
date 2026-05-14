@@ -17,7 +17,7 @@
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
-import { callOpenAI, type OpenAICallResult } from '../../shared/llm-clients/openai.js';
+import { callOpenAIResponse, type OpenAICallResult } from '../../shared/llm-clients/openai.js';
 import { logger } from '../../shared/logger.js';
 import type { AgentAction } from '../../shared/zod/agent-actions.js';
 import type { PlannerContext } from '../planner/context-builder.js';
@@ -29,6 +29,7 @@ import { validateAction } from '../validators/action-validator.js';
 import type { ToolResultForValidation } from '../validators/tool-results.js';
 import { buildGeneratorMessages } from './prompt.js';
 import {
+  generatorOutputJsonSchema,
   generatorOutputRawSchema,
   generatorPromptVersion,
   generatorAgentVersion,
@@ -222,13 +223,18 @@ export async function generateTurn(
 
   try {
     const messages = buildGeneratorMessages(context, decision, toolResults);
-    llmResult = await callOpenAI({
+    llmResult = await callOpenAIResponse({
       apiKey: env.GENERATOR_OPENAI_API_KEY,
       model: env.GENERATOR_MODEL,
       messages,
       timeoutMs: env.OPENAI_TIMEOUT_MS,
       maxTokens: 1500,
       temperature: supportsCustomTemperature(env.GENERATOR_MODEL) ? 0.2 : undefined,
+      jsonSchema: {
+        name: 'generator_output',
+        schema: generatorOutputJsonSchema,
+        strict: true,
+      },
     });
 
     const parsed = generatorOutputRawSchema.safeParse(JSON.parse(llmResult.content));

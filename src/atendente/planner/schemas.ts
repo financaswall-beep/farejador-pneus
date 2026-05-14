@@ -63,6 +63,39 @@ export const plannerOutputSchema = z.object({
 });
 export type PlannerOutput = z.infer<typeof plannerOutputSchema>;
 
+export const plannerOutputJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['skill', 'missing_slots', 'tool_requests', 'risk_flags', 'confidence', 'rationale', 'prompt_version'],
+  properties: {
+    skill: { type: 'string', enum: skillNameSchema.options },
+    missing_slots: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    tool_requests: {
+      type: 'array',
+      maxItems: 5,
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        required: ['tool', 'input'],
+        properties: {
+          tool: { type: 'string', enum: toolNameSchema.options },
+          input: { type: 'object', additionalProperties: true },
+        },
+      },
+    },
+    risk_flags: {
+      type: 'array',
+      items: { type: 'string', enum: riskFlagSchema.options },
+    },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    rationale: { type: 'string', minLength: 1, maxLength: 500 },
+    prompt_version: { type: 'string', enum: [plannerPromptVersion] },
+  },
+} as const;
+
 export function fallbackPlannerOutput(reason: string): PlannerOutput {
   return {
     skill: 'escalar_humano',

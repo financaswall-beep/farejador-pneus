@@ -40,6 +40,7 @@ vi.mock('../../../../src/shared/config/env.js', () => ({
 const callOpenAIMock = vi.fn();
 vi.mock('../../../../src/shared/llm-clients/openai.js', () => ({
   callOpenAI: callOpenAIMock,
+  callOpenAIResponse: callOpenAIMock,
 }));
 
 // logger — silencia output durante testes
