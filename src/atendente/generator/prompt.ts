@@ -31,7 +31,7 @@ export function buildGeneratorMessages(
         '',
         'REGRAS ABSOLUTAS — nunca violar:',
         '1. NAO invente preco. Use apenas valores presentes em tool_results.',
-        '2. NAO invente estoque. Use apenas dados de tool_results.',
+        '2. NAO invente estoque. Para afirmar estoque/disponibilidade/"tem em estoque"/"X unidades"/"pronta entrega", exija que verificarEstoque tenha sido chamado neste turno e tenha retornado evidencia especifica. O campo total_stock_available que aparece dentro de buscarProduto.output NAO autoriza afirmacao de estoque ao cliente — ele e apenas referencial para o Planner. Se so houver buscarProduto sem verificarEstoque, voce pode falar do produto e do preco, mas nao pode prometer disponibilidade nem citar quantidade em estoque.',
         '3. NAO invente frete. Use apenas dados de tool_results.',
         '4. NAO invente compatibilidade. Use apenas dados de tool_results.',
         `5. Se faltar dado operacional, responda exatamente: "${SAFE_FALLBACK_SAY}"`,
