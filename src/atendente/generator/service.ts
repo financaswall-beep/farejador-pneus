@@ -17,7 +17,7 @@
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
-import { callOpenAI } from '../../shared/llm-clients/openai.js';
+import { callOpenAI, type OpenAICallResult } from '../../shared/llm-clients/openai.js';
 import { logger } from '../../shared/logger.js';
 import type { AgentAction } from '../../shared/zod/agent-actions.js';
 import type { PlannerContext } from '../planner/context-builder.js';
@@ -205,15 +205,16 @@ export async function generateTurn(
   }
 
   const startedAt = Date.now();
+  let llmResult: OpenAICallResult | undefined;
 
   try {
     const messages = buildGeneratorMessages(context, decision, toolResults);
-    const llmResult = await callOpenAI({
+    llmResult = await callOpenAI({
       apiKey: env.GENERATOR_OPENAI_API_KEY,
       model: env.GENERATOR_MODEL,
       messages,
       timeoutMs: env.OPENAI_TIMEOUT_MS,
-      maxTokens: 1000,
+      maxTokens: 1500,
       temperature: 0.2,
     });
 
@@ -282,12 +283,19 @@ export async function generateTurn(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.warn(
-      { conversation_id: context.conversation_id, error: errorMsg },
+      {
+        conversation_id: context.conversation_id,
+        error: errorMsg,
+        had_llm_result: llmResult !== undefined,
+        output_tokens: llmResult?.outputTokens,
+      },
       'generator: LLM call failed — usando fallback',
     );
     return {
       ...fallbackResult(`generator_llm_failed:${errorMsg}`),
-      duration_ms: Date.now() - startedAt,
+      input_tokens: llmResult?.inputTokens ?? 0,
+      output_tokens: llmResult?.outputTokens ?? 0,
+      duration_ms: llmResult?.durationMs ?? (Date.now() - startedAt),
       used_llm: true,
     };
   }
