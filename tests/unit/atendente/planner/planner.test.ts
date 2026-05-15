@@ -261,18 +261,27 @@ describe('Planner Sprint 3', () => {
     });
   });
 
-  it('prompt orienta skill especializada antes de escalar humano', () => {
+  it('prompt v1.2.8 contem regras de roteamento explicitas (sem patch regex no codigo)', () => {
     const messages = buildPlannerMessages(context());
     const systemPrompt = messages[0]!.content;
 
-    expect(systemPrompt).toContain('Use escalar_humano somente se o cliente pedir humano/atendente');
-    expect(systemPrompt).toContain('Objeções de preço, caro, concorrente, desconto ou condição comercial usam tratar_objecao');
-    expect(systemPrompt).toContain('Perguntas sobre cartão, pix, boleto, parcelamento, troca, devolucao, garantia, horario de funcionamento');
-    expect(systemPrompt).toContain('Perguntas sobre cartão, pix, pagamento, desconto ou condição comercial nao sao responder_logistica');
-    expect(systemPrompt).toContain('Não repita escalar_humano em turnos seguidos');
+    // Regras de roteamento por skill — Planner LLM eh o unico cerebro
+    expect(systemPrompt).toContain('buscar_e_ofertar');
+    expect(systemPrompt).toContain('pedir_dados_faltantes');
+    expect(systemPrompt).toContain('responder_geral');
+    expect(systemPrompt).toContain('tratar_objecao');
+    expect(systemPrompt).toContain('responder_logistica');
+    expect(systemPrompt).toContain('escalar_humano');
+    // Regra de ouro sobre interpretacao de fala informal
+    expect(systemPrompt).toContain('REGRA DE OURO');
+    expect(systemPrompt).toContain('ta salgado');
+    // Contrato das tools
     expect(systemPrompt).toContain('posicao_pneu deve ser exatamente front, rear ou both');
     expect(systemPrompt).toContain('buscarProduto exige pelo menos um destes campos');
     expect(systemPrompt).toContain('verificarEstoque exige product_id ou product_code');
+    // Regras de marca/product_code do v1.2.7 continuam
+    expect(systemPrompt).toContain('NUNCA coloque marca de moto');
+    expect(systemPrompt).toContain('NUNCA coloque medida_pneu no campo marca');
   });
 
   it('normaliza input de tool antes de validar output do Planner', () => {
@@ -427,71 +436,16 @@ describe('Planner Sprint 3', () => {
     ]);
   });
 
-  it('garante buscarPoliticaComercial quando Planner esquece tool em pergunta de politica', () => {
-    const normalized = plannerOutputSchema.parse(
-      normalizePlannerOutputCandidate(
-        {
-          skill: 'pedir_dados_faltantes',
-          missing_slots: ['medida_pneu'],
-          tool_requests: [],
-          risk_flags: [],
-          confidence: 0.7,
-          rationale: 'teste',
-          prompt_version: 'planner_v1.2.1',
-        },
-        context({
-          recent_messages: [
-            {
-              id: '00000000-0000-4000-8000-000000000013',
-              role: 'customer',
-              text: 'Se o pneu nao servir eu posso trocar?',
-              sent_at: baseTime,
-            },
-          ],
-        }),
-      ),
-    );
-
-    expect(normalized).toMatchObject({
-      skill: 'tratar_objecao',
-      missing_slots: [],
-      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
-      prompt_version: plannerPromptVersion,
-    });
-  });
-
-  it('garante responder_geral + politica quando Planner usa pedir_dados_faltantes para pergunta de endereco', () => {
-    const normalized = plannerOutputSchema.parse(
-      normalizePlannerOutputCandidate(
-        {
-          skill: 'pedir_dados_faltantes',
-          missing_slots: ['moto_modelo', 'medida_pneu'],
-          tool_requests: [],
-          risk_flags: [],
-          confidence: 0.6,
-          rationale: 'teste',
-          prompt_version: 'planner_v1.2.1',
-        },
-        context({
-          recent_messages: [
-            {
-              id: '00000000-0000-4000-8000-000000000016',
-              role: 'customer',
-              text: 'Voces abrem domingo?',
-              sent_at: baseTime,
-            },
-          ],
-        }),
-      ),
-    );
-
-    expect(normalized).toMatchObject({
-      skill: 'responder_geral',
-      missing_slots: [],
-      tool_requests: [{ tool: 'buscarPoliticaComercial', input: { environment: 'test' } }],
-      prompt_version: plannerPromptVersion,
-    });
-  });
+  // REMOVIDOS em Etapa 3 (2026-05-15):
+  // - 'garante buscarPoliticaComercial quando Planner esquece tool em pergunta de politica'
+  // - 'garante responder_geral + politica quando Planner usa pedir_dados_faltantes para pergunta de endereco'
+  // Esses testes validavam o patch regex que detectava "domingo"/"trocar" no
+  // customer text e corrigia decisao do Planner LLM. Codex e o usuario
+  // identificaram corretamente que regex sobre fala humana eh frágil — cliente
+  // fala "ta salgado", "vc traz aqui", "pega na minha" em infinitas variacoes.
+  // Agora o Planner LLM eh o unico responsavel pela decisao (prompt v1.2.8
+  // tem regras explicitas com exemplos). Se regredir em prod, melhorar prompt,
+  // nao reintroduzir regex.
 
   it('recordPlannerDecision grava evento planner_decided auditavel', async () => {
     const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] });
@@ -581,47 +535,13 @@ describe('Planner Sprint 3', () => {
     });
   });
 
-  it('v1.2.5: promove pedir_dados_faltantes para buscar_e_ofertar quando organizer_facts ja tem moto e cliente pergunta qual pneu serve', () => {
-    const normalized = plannerOutputSchema.parse(
-      normalizePlannerOutputCandidate(
-        {
-          skill: 'pedir_dados_faltantes',
-          missing_slots: ['medida_pneu'],
-          tool_requests: [],
-          risk_flags: [],
-          confidence: 0.6,
-          rationale: 'falta medida',
-          prompt_version: 'planner_v1.2.5',
-        },
-        context({
-          recent_messages: [
-            {
-              id: '00000000-0000-4000-8000-000000000099',
-              role: 'customer',
-              text: 'Qual pneu serve pra ela?',
-              sent_at: baseTime,
-            },
-          ],
-          organizer_facts: [
-            organizerFact('moto_modelo', 'CG'),
-            organizerFact('moto_ano', 2023),
-            organizerFact('moto_cilindrada', 160),
-          ],
-        }),
-      ),
-    );
-
-    expect(normalized.skill).toBe('buscar_e_ofertar');
-    expect(normalized.missing_slots).toEqual([]);
-    expect(normalized.tool_requests).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          tool: 'buscarCompatibilidade',
-          input: expect.objectContaining({ moto_modelo: 'CG', moto_ano: 2023 }),
-        }),
-      ]),
-    );
-  });
+  // REMOVIDO em Etapa 3 (2026-05-15):
+  // - 'v1.2.5: promove pedir_dados_faltantes para buscar_e_ofertar...'
+  // Esse teste validava o patch regex `mentionsProductCompatibilityQuestion`
+  // que detectava "qual pneu serve" no customer text e promovia skill no
+  // codigo. Removido junto com a funcao — Planner LLM agora decide direto
+  // pelo prompt v1.2.8. Em prod, medir se Planner mantem essa decisao
+  // correta sem o patch.
 });
 
 function organizerFact(factKey: string, factValue: unknown): PlannerContext['organizer_facts'][number] {

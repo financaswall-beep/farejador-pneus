@@ -317,28 +317,18 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
     prompt_version: plannerPromptVersion,
   };
 
-  if (shouldEnsurePolicyTool(context, normalizedToolRequests)) {
-    normalizedToolRequests = [
-      ...normalizedToolRequests,
-      { tool: 'buscarPoliticaComercial', input: { environment: context.environment } },
-    ].slice(0, 5);
-    normalized.tool_requests = normalizedToolRequests;
-    const latestText = latestCustomerText(context);
-    if (mentionsStoreInfoQuestion(latestText)) {
-      // info geral da loja: endereco, horario, montagem — nao precisa de produto
-      if (['pedir_dados_faltantes', 'escalar_humano'].includes(String(normalized.skill))) {
-        normalized.skill = 'responder_geral';
-        normalized.missing_slots = [];
-        normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.75), 0.8);
-      }
-    } else if (['pedir_dados_faltantes', 'escalar_humano'].includes(String(normalized.skill))) {
-      normalized.skill = 'tratar_objecao';
-      normalized.missing_slots = [];
-      normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.7), 0.75);
-    }
-    normalized.rationale = appendRationale(candidate.rationale, 'Pergunta de politica/info da loja com tool garantida.');
-  }
+  // Etapa 3: removidos os blocos de "patch" que liam customer text via regex
+  // (mentionsProductCompatibilityQuestion, mentionsPolicyQuestion,
+  // mentionsStoreInfoQuestion). Esses patches existiam porque o Planner LLM
+  // as vezes errava roteamento, e o codigo tentava adivinhar a intencao do
+  // cliente por palavras-chave — algo que Codex e o usuario corretamente
+  // identificaram como cerebro de regex que nao escala (cliente fala "ta
+  // salgado", "vc traz aqui", "pega na minha" — infinitas variacoes).
+  // Agora o roteamento e responsabilidade exclusiva do Planner LLM, com
+  // regras mais explicitas no prompt v1.2.8. Se regredir, melhorar prompt.
 
+  // Trava nao-regex que continua valida: buscar_e_ofertar sem tool nao faz
+  // sentido (LLM provavelmente alucinou skill). Forca pedir_dados_faltantes.
   if (candidate.skill === 'buscar_e_ofertar' && normalizedToolRequests.length === 0) {
     normalized.skill = 'pedir_dados_faltantes';
     normalized.missing_slots = missingSlots.length > 0 ? missingSlots : ['medida_pneu'];
@@ -346,81 +336,22 @@ export function normalizePlannerOutputCandidate(raw: unknown, context: PlannerCo
     normalized.rationale = appendRationale(candidate.rationale, 'buscar_e_ofertar sem tool valida; pedindo dados faltantes.');
   }
 
-  // v1.2.5: se Planner escolheu pedir_dados_faltantes mas organizer_facts ja tem moto_modelo
-  // e o cliente perguntou sobre produto/compatibilidade, promove para buscar_e_ofertar+buscarCompatibilidade.
-  if (
-    String(normalized.skill) === 'pedir_dados_faltantes' &&
-    !(normalized.tool_requests as unknown[]).some((r) => isToolRequest(r, 'buscarCompatibilidade')) &&
-    mentionsProductCompatibilityQuestion(latestCustomerText(context)) &&
-    context.available_tools.includes('buscarCompatibilidade')
-  ) {
-    const moto = findOrganizerStringFact(context, ['moto_modelo']);
-    if (typeof moto === 'string' && moto.trim() !== '') {
-      const ano = findOrganizerNumberFact(context, ['moto_ano']);
-      const posicao = findOrganizerStringFact(context, ['posicao_pneu']);
-      const compatInput: Record<string, unknown> = { environment: context.environment, moto_modelo: moto, limit: 10 };
-      if (typeof ano === 'number') compatInput.moto_ano = ano;
-      const normalizedPos = typeof posicao === 'string' ? normalizeTirePosition(posicao) : undefined;
-      if (normalizedPos) compatInput.posicao_pneu = normalizedPos;
-
-      const compatRequest = toolRequestSchema.safeParse({ tool: 'buscarCompatibilidade', input: compatInput });
-      if (compatRequest.success) {
-        normalized.skill = 'buscar_e_ofertar';
-        normalized.missing_slots = [];
-        normalized.tool_requests = [...(normalized.tool_requests as unknown[]), compatRequest.data].slice(0, 5);
-        normalized.confidence = Math.max(numberOrDefault(candidate.confidence, 0.7), 0.78);
-        normalized.rationale = appendRationale(
-          candidate.rationale,
-          'organizer_facts ja tem moto; promovendo para buscar_e_ofertar+buscarCompatibilidade.',
-        );
-      }
-    }
-  }
-
   return normalized;
 }
 
-function isToolRequest(value: unknown, expectedTool: string): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return (value as Record<string, unknown>).tool === expectedTool;
-}
+// Etapa 3: removidas as funcoes regex de detecao de intencao do cliente
+// (mentionsProductCompatibilityQuestion, shouldEnsurePolicyTool,
+// latestCustomerText, findOrganizerNumberFact, isToolRequest) que existiam
+// para "patchar" decisoes do Planner LLM com base em palavras-chave do
+// customer text. Codex e usuario chamaram corretamente de regex burro:
+// cliente fala "ta salgado", "vc traz aqui", "pega na minha" e infinitas
+// variacoes que regex jamais cobre.
+//
+// mentionsPolicyQuestion e mentionsStoreInfoQuestion abaixo ficam, mas
+// SO sao usadas pelo mockPlanTurn (dev-only, quando PLANNER_LLM_ENABLED=
+// false). Em prod, quem decide skill+tools eh o Planner LLM diretamente.
 
-function mentionsProductCompatibilityQuestion(text: string): boolean {
-  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  if (/\b(qual|que)\b.{0,30}\b(pneu|medida|modelo)\b.{0,30}\b(serve|cabe|encaixa|combina|recomenda|indica)\b/.test(normalized)) return true;
-  if (/\b(qual|que)\b.{0,30}\b(pneu|medida)\b.{0,40}\b(pra|para)\s+(ela|ele|minha|meu|essa|esse)\b/.test(normalized)) return true;
-  if (/\b(qual|que)\b.{0,5}(pneu|medida)\s+(serve|combina|cabe)\b/.test(normalized)) return true;
-  if (/\b(serve|cabe|combina|encaixa|recomenda|indica)\b.{0,30}\b(pra|para)\b.{0,15}\b(minha|meu|essa|esse|ela|ele)\b/.test(normalized)) return true;
-  if (/\b(o\s+que|que\s+pneu)\b.{0,30}\b(usar|colocar|trocar)\b/.test(normalized)) return true;
-  return false;
-}
-
-function findOrganizerNumberFact(context: PlannerContext, factKeys: string[]): number | undefined {
-  const fact = context.organizer_facts.find(
-    (candidate) => factKeys.includes(candidate.fact_key) && isUsableOrganizerFact(candidate),
-  );
-  if (!fact) return undefined;
-  const value = fact.fact_value;
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return Number(value.trim());
-  return undefined;
-}
-
-function shouldEnsurePolicyTool(context: PlannerContext, normalizedToolRequests: unknown[]): boolean {
-  if (!context.available_tools.includes('buscarPoliticaComercial')) return false;
-  const text = latestCustomerText(context);
-  if (!mentionsPolicyQuestion(text) && !mentionsStoreInfoQuestion(text)) return false;
-  return !normalizedToolRequests.some((request) => {
-    if (!request || typeof request !== 'object' || Array.isArray(request)) return false;
-    return (request as Record<string, unknown>).tool === 'buscarPoliticaComercial';
-  });
-}
-
-function latestCustomerText(context: PlannerContext): string {
-  const last = [...context.recent_messages].reverse().find((message) => message.role === 'customer');
-  return last?.text ?? '';
-}
-
+/** @internal MOCK-ONLY \u2014 usado apenas em mockPlanTurn. Nao usar em codigo de producao. */
 function mentionsPolicyQuestion(text: string): boolean {
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/\b(parcel|parcela|parcelam|vezes|\d+\s*x)\b/.test(normalized)) return true;
@@ -431,6 +362,7 @@ function mentionsPolicyQuestion(text: string): boolean {
   return false;
 }
 
+/** @internal MOCK-ONLY — usado apenas em mockPlanTurn. Nao usar em codigo de producao. */
 function mentionsStoreInfoQuestion(text: string): boolean {
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // perguntas sobre localizacao/endereco
