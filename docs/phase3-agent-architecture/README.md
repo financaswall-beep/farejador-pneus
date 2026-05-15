@@ -17,6 +17,8 @@ registro arquitetural; o estado vivo fica em `00-estado-de-implementacao.md`.
 - Atendente Sprint 6: Generator Shadow implementado, ainda sem envio Chatwoot.
 - PR 1 de hardening do Generator: turns bloqueados auditaveis e `update_draft`
   com metacampos/idempotencia.
+- Catalogo tecnico de pneus `commerce.*`: populado no ambiente `test` auditado
+  em 2026-05-14. Ver `docs/COMMERCE_CATALOG_STATUS.md`.
 
 ## Indice Principal
 

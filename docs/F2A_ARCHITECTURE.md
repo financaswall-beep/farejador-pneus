@@ -1,6 +1,6 @@
 # Arquitetura F2a - Enrichment deterministico
 
-Atualizado: 25/04/2026
+Atualizado: 2026-05-10. Fase 2a permanece valida e implementada; Fase 2b (Organizadora LLM) ja roda em producao desde 2026-04-29 escrevendo em `analytics.conversation_facts` + `fact_evidence`.
 
 ## Leitura rapida
 

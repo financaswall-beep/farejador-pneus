@@ -1,12 +1,11 @@
 # Avaliacao da Organizadora
 
-Estado atual em 2026-05-03:
+Estado atual em 2026-05-10:
 
-- Prompt ativo: `moto-pneus-hybrid-v3-3`.
-- Arquivo do prompt: `src/organizadora/prompt.ts`.
-- Matriz sintetica expandida: 46/48 aprovados.
-- Decisao atual: encerrar ajustes em teste sintetico e observar conversas reais
-  antes de novo aumento de prompt.
+- Prompt ativo: `moto-pneus-hybrid-v3-4` (atualizado em 2026-05-04, validado em prod 2026-05-06).
+- Arquivo do prompt: `src/organizadora/prompt.ts` (secao de valores permitidos gerada a partir de `FACT_KEY_SCHEMAS`).
+- Matriz sintetica expandida v3.3: 46/48 aprovados em 2026-05-03; v3.4 cobre especificamente o gap de `schema_violation` observado em producao (aliases de pagamento/entrega, tipos de `moto_cilindrada` e `concorrente_citado`).
+- Decisao atual: continuar observando conversas reais durante a Fase D estendida (ADR-008) antes de novo ajuste de prompt.
 
 Este documento define como medir a qualidade da Organizadora antes de alterar o prompt.
 

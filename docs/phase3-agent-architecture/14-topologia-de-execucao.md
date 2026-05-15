@@ -276,10 +276,11 @@ Organizadora Worker
   le:     core.messages, agent.pending_confirmations resolvidas
   escreve: analytics.*
 
-Supervisora Worker (futuro)
+Supervisora Worker (Fase G futura, ADR-006 adiada para depois de Sprint 8)
   le:     core.*, analytics.*, agent.*, ops.*
-  escreve: ops.quality_flags ou ops.improvement_suggestions (a definir)
+  escreve: ops.supervisor_reviews + ops.supervisor_reason_codes (vocabulario fechado)
   nao escreve: raw.*, core.*, commerce.orders
+  NOTA: NAO e proximo passo. Calibracao depende de dataset humano (Fase D estendida) + envio em producao.
 
 Action handlers (compartilhados em src/shared)
   escrevem: agent.*, opcionalmente analytics.* (correct_fact, confirm_pending)

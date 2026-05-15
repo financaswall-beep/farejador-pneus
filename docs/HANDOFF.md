@@ -1,209 +1,132 @@
 # Handoff - Farejador
 
-Atualizado: 2026-05-08.
+**Atualizado: 2026-05-15.**
 
-Este arquivo e o handoff operacional curto. Para contexto completo da proxima
-conversa, use tambem `docs/NEXT_CHAT_HANDOFF.md`.
+Este arquivo é o handoff operacional curto. Para contexto completo da próxima
+conversa, use também `docs/NEXT_CHAT_HANDOFF.md`.
 
-## Estado Atual
+## Estado Atual (2026-05-15)
 
-O sistema esta em Fase 3, com a Organizadora em producao/calibrada e a
-Atendente construida em camadas. A Atendente ainda nao responde clientes
-automaticamente.
+O sistema está em **Fase 3 / Fase D estendida (shadow assistido)**.
+Organizadora em produção e calibrada. Atendente em shadow capaz de:
+- Decidir skill via Planner LLM (v1.2.8, sem regex de customer text)
+- Rodar tools determinísticas (`buscarProduto`, `verificarEstoque`, `buscarCompatibilidade`, `calcularFrete`, `buscarPoliticaComercial`)
+- Auto-chain de `verificarEstoque` pós-`buscarProduto` (determinístico, sem regex)
+- Gerar resposta via Generator LLM (v1.4.0 default ou v1.5.0 few-shot atrás de flag)
+- Emitir claims estruturados (`price`, `stock_availability`, `fitment`, `delivery_fee`) validados contra tool results pelo `ClaimValidator`
+- Emitir action `escalate` sintética quando Planner escolhe `escalar_humano` → grava em `agent.escalations` + nota interna Chatwoot
+- Persistir tudo em `agent.*` e `ops.*` com idempotência por `action_id`
 
-Implementado:
+**Nada é enviado ao cliente automaticamente.** Sprint 8 (envio Chatwoot) continua adiado.
 
-- Fase 1: webhook, raw, core, admin replay/reconcile.
-- Fase 1.5: imutabilidade, constraints e guards.
-- Fase 2a: enrichment deterministico.
-- Fase 3 Organizadora: worker LLM, facts, evidence, incidentes.
-- Analytics marts v1.
-- Atendente Sprint 1: estado reentrante (`session_items`, `session_slots`,
-  `action_id`, versionamento).
-- Atendente Sprint 2: tools deterministicas de commerce.
-- Atendente Sprint 3: Context Builder, Planner schema/service, policy schemas.
-- Atendente Sprint 4: Tool Executor, eventos `tool_executed/tool_failed`,
-  `SayValidator` inicial e `ActionValidator` reforcado.
-- Atendente Sprint 5: Worker Shadow minimalista (`src/atendente/worker.ts`),
-  log-only, desligado por default via `ATENDENTE_SHADOW_ENABLED=false`.
-- Normalizacao enfileira `ops.atendente_jobs` em `message_created` quando
-  `ATENDENTE_SHADOW_ENABLED=true`, usando `ops.enqueue_atendente_job`
-  idempotente por mensagem. Antes do enqueue, garante `agent.session_current`
-  para a conversa.
-- Hardening de fila da Atendente: `src/atendente/reconcile-jobs.ts` busca
-  mensagens publicas de cliente em `core.messages` sem job em
-  `ops.atendente_jobs` e cria os jobs faltantes com o mesmo caminho idempotente
-  (`ensureAtendenteSession` + `ops.enqueue_atendente_job`). O worker shadow roda
-  essa reconciliacao a cada minuto para as ultimas 24h; admin pode chamar
-  `POST /admin/reconcile/atendente-jobs` para uma janela controlada.
-- Atendente Sprint 6: Generator Shadow (`src/atendente/generator/service.ts`).
-  Gera resposta candidata auditavel, valida com SayValidator/ActionValidator,
-  grava em `agent.turns` (status='generated'|'blocked') e auditoria em
-  `agent.session_events` (event_type='generator_produced'). Nunca envia ao Chatwoot.
-  Controlado por `GENERATOR_LLM_ENABLED` (default false). Em producao atual,
-  o Generator LLM real foi habilitado em shadow com `GENERATOR_OPENAI_API_KEY`
-  e `GENERATOR_MODEL` configurados.
-- PR 1 de hardening do Generator (2026-05-07): `agent.turns` ganhou
-  `blocked_say_text`, `blocked_actions` e `blocked_payload` para preservar
-  candidatos bloqueados sem enviar nada ao cliente. `update_draft` agora e
-  hidratado com `action_id`, `turn_index`, `emitted_at` e `emitted_by`, e o
-  schema exige esses metacampos.
-- PR 2 de estado/contexto (2026-05-08): Context Builder usa
-  `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20), `loadCurrent` popula
-  `derived_signals.stale_slots`, `set_active_item` invalida oferta do item
-  antigo e marca slots antigos como `stale_strong`, e `INVALIDATION_RULES`
-  cobre slots comerciais reais que faltavam.
-- PR 3 de validators/eventos (2026-05-08): `ActionValidator` ganhou
-  pre-condicoes para carrinho, draft de delivery e escalacao `ready_to_close`;
-  `session_events` agora diferencia `cart_added`, `cart_removed`,
-  `cart_updated`, `cart_cleared` e `draft_updated`; `cart_events` grava
-  `updated` quando `update_cart_item` muda apenas quantidade. Migration `0029`
-  aplicada e verificada no Supabase atual.
-- Generator `generator_v1.3.2` (2026-05-08): reforco pos-smoke PR3 para gravar
-  `update_draft` quando cliente informa fechamento/nome/pagamento/endereco,
-  mesmo sem estoque confirmado. Resposta segura deve chamar humano para
-  confirmar produto/estoque; nao pode afirmar disponibilidade sem evidencia.
-  Smoke real pos-deploy na conversa Chatwoot `453` validou o caminho:
-  `update_draft` com nome/pix/entrega/endereco e evento `draft_updated`.
-- Organizadora v3.4: prompt `moto-pneus-hybrid-v3-4`, gerando a secao de
-  valores permitidos a partir de `FACT_KEY_SCHEMAS`; corrige aliases e tipos
-  que geravam `schema_violation`.
-- Sprint 6.5: loop de estado — worker itera actions e aplica via
-  `applyActionAndPersistInTx`. Persiste `session_items`, `session_slots`,
-  `cart_current`, `cart_events`, `order_drafts`, `pending_confirmations`,
-  `escalations`. Commit `63e40e8`.
-- Sprint 6.6: bridge Organizadora -> Context Builder — lê
-  `analytics.conversation_facts` e entrega `organizer_facts` ao Planner.
-  Commit `63e40e8`.
-- Sprint 6.7: Say Validator endurecido — bloqueia afirmacoes comerciais sem
-  evidencia (estoque/prazo/compatibilidade exigem tool correspondente).
-  6 novos testes. Commit `79c0d19`.
-- Sprint 6.8: filtro sender_type no dispatcher — so enfileira job para
-  `sender_type='contact'`; bots/agentes/sistema descartados com log info.
-  2 novos testes. Commit `193b4ef`.
-- Sprint 6.9: nota interna Chatwoot ao escalar — `ChatwootApiClient.createNote()`
-  posta nota `private: true` quando `escalate` é emitido, fora da transacao.
-  No-op se variaveis Chatwoot ausentes. 5 novos testes. Commit `e35ca31`.
-  Deploy 2026-05-05.
-- Ajuste pre-Critic: Generator calibrado para memoria operacional em tempo real.
-  Emite `create_item`, `update_slot` e `update_draft` para dados novos do cliente
-  na propria mensagem; contexto inclui `state.items`, `organizer_facts` e
-  `derived_signals`. 3 novos testes.
-- Sprint 6.9 calibracao de prompts: SayValidator endurecido com 3 novos padroes
-  (`mixed_safe_fallback_with_other_content`, variante de stock Michelin, variantes
-  de prazo/entrega). Planner bumped para `planner_v1.2.0` com secao ROTEAMENTO
-  CONVERSACIONAL (7 regras). Generator bumped para `generator_v1.3.0` com regras
-  9 e 10 sobre fallback. 8 novos testes. 328/328 verde. Build verde.
-- Fix planner_v1.2.5 + generator_v1.3.1 (2026-05-06):
-  Tres bugs diagnosticados via auditoria de producao e corrigidos:
-  (1) Planner ignorava `organizer_facts` com alta confianca e pedia dados ja
-  conhecidos (`pedir_dados_faltantes` em vez de `buscar_e_ofertar`). Corrigido
-  via regra de prompt + normalizer deterministico pos-LLM que promove a skill
-  quando `moto_modelo` conf>=0.85 e cliente pergunta compatibilidade.
-  Versao: `planner_v1.2.5`. 1 novo teste.
-  (2) Generator usava SAFE_FALLBACK quando skill era `pedir_dados_faltantes`,
-  em vez de perguntar o slot ausente. Corrigido via regra de prompt (regras 5a/5b)
-  e novo bloco no SayValidator (`safe_fallback_not_allowed_for_pedir_dados_faltantes`).
-  Versao: `generator_v1.3.1`. 2 novos testes.
-  (3) Facts identicos eram inseridos como nova linha e depois supersedidos,
-  poluindo o ledger. Corrigido com deep-equal check em `writeFactWithEvidence`
-  antes do INSERT — se ativo e identical, apenas annexa evidence ao fact existente.
-  1 novo teste. Commit `cb5a7f8`. Deploy 2026-05-06. Suite verde naquele ciclo.
-- Validacao end-to-end prod 2026-05-06:
-  Conv 441 — "Qual pneu traseiro serve pra ela?" (moto Biz 125 2019 ja em
-  organizer_facts) -> Planner v1.2.5 escolheu `buscar_e_ofertar +
-  buscarCompatibilidade({moto_modelo:'Biz', moto_ano:2019, posicao:'rear'})`
-  com confidence 0.96. Antes (v1.2.4) retornava `pedir_dados_faltantes`.
-  buscarCompatibilidade retornou [] (catálogo vazio — comportamento correto).
-  Generator nao aluciou; usou SAFE_FALLBACK por ausencia de resultado de tool.
+## Versões Ativas
 
-Nao implementado/nao ligado:
+| Componente | Versão atual | Notas |
+|---|---|---|
+| Planner prompt | `planner_v1.2.8` | sem patches regex sobre customer text; regras explícitas por skill |
+| Generator prompt (default) | `generator_v1.4.0` | declarativo com regras + structured claims |
+| Generator prompt (flag) | `generator_v1.5.0` | few-shot ~2660 tokens, 10 exemplos canônicos; ativar via `GENERATOR_PROMPT_FEW_SHOT_ENABLED=true` |
+| Organizadora prompt | `moto-pneus-hybrid-v3-4` | estável |
+| Migrations DB | `0001`-`0030` | todas aplicadas em prod |
 
-- Critic (Sprint 7).
-- Envio Chatwoot pela Atendente (Sprint 8).
-- Seed do catalogo commerce.* (Sprint 6.10).
-- Qualquer atendimento automatico ao cliente.
+## Recursos Implementados
 
-## Ultimas Validacoes
+**Captura:**
+- Fase 1: webhook, raw, core, admin replay/reconcile
+- Fase 1.5: imutabilidade, constraints, guards
 
-- `npm run typecheck`: verde.
-- `npm test`: 380/380 verde, 51 arquivos.
-- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
-- `npm run build`: verde.
-- Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`
-  (conversa `451`): Organizadora, Planner e Generator rodaram em shadow.
-  Organizadora salvou 15 facts; Planner LLM (`planner_v1.2.5`) selecionou
-  `buscar_e_ofertar`; Generator LLM (`generator_v1.3.1`) gerou 5 actions,
-  sem bloqueio. Nenhuma mensagem foi enviada ao cliente pelo Farejador.
-- Avaliação do smoke: Organizadora 9/10, Planner 9/10, Generator 8/10,
-  fluxo geral 8,7/10. O principal acerto foi respeitar a correção
-  "Bros 160" -> "Biz 125 2019" e usar tools antes da resposta comercial.
-  Próximo smoke desejável: forçar bloqueio para validar `blocked_say_text`.
-- Smoke PR3 pos-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts;
-  Planner LLM `planner_v1.2.5` chamou tools comerciais; Generator rodou em
-  shadow, gerou 2 turns e bloqueou 1 com `stock_claim_without_verificar_estoque`,
-  com `blocked_say_text` preservado. Nenhuma mensagem enviada ao cliente.
-  Limite: nao houve `update_draft` nesse smoke; `draft_updated` esta coberto
-  pelos testes unitarios/integracao.
-- Smoke `generator_v1.3.2` pos-deploy (Chatwoot conversa `453`): segundo turn
-  gerou `update_draft` com `customer_name=Joao Teste`, `payment_method=pix`,
-  `fulfillment_mode=delivery`, `delivery_address=Rua das Flores 123, Meier`;
-  `session_events` gravou `draft_updated`. Resposta nao prometeu estoque.
-- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora
-  processou 6/6 jobs como `done`, tentativa 1, sem erro. Planner e Generator
-  rodaram com LLM real. Achados para proximo hardening: Planner emitiu uma
-  chamada invalida a `verificarEstoque` sem `product_id`, e Generator afirmou
-  "Tem Pirelli sim..." antes de lastro comercial. Sem envio ao cliente.
-- Fix pos-smoke PR4 / PR5 inicial: Planner `planner_v1.2.6` remove/proibe
-  `verificarEstoque` sem `product_id` ou `product_code`; Say Validator bloqueia
-  claim de marca sem resultado de `buscarProduto`. Isso cobre diretamente os
-  dois problemas vistos nas conversas `454`-`459`.
-- Smoke pos-deploy `planner_v1.2.6` (conversas `460`-`465`): Organizadora 6/6
-  jobs `done`, Planner sem `verificarEstoque` invalido (`BAD_STOCK_TOOL_CALLS []`)
-  e Generator sem claim "Tem Pirelli sim" sem lastro. Sem envio ao cliente.
-- PR5 comercial validado (2026-05-10, Chatwoot `470`-`473`, run
-  `pr5-commercial-20260510190449`): Organizadora extraiu 23 facts; Planner
-  processou 8/8 jobs; Generator teve 6 turns seguros e 2 bloqueios. Brinde
-  bloqueou com `policy_claim_without_tool_result`; oferta "faz por R$ 200"
-  bloqueou com `money_not_supported_by_tool_result:200`; ambos preservaram
-  `blocked_say_text`. Desconto de 10% nao foi prometido; Pirelli caiu em
-  fallback seguro.
-- Commit `cb5a7f8` — fix planner_v1.2.5 + generator_v1.3.1 + phase3 dedup.
-  Deploy 2026-05-06 via `pneus/main`. Ativo em prod em ~50s (probe).
-- Validacao prod conv 441: Planner v1.2.5 usou organizer_facts corretamente,
-  buscarCompatibilidade chamado com {Biz, 2019, rear}, confidence 0.96.
-- Qualidade Organizadora confirmada: todos os facts das convs 441/442/445
-  extraidos corretamente, confianca 0.84-0.99. Autocorrecao de truth_type
-  (corrected) funcionando quando cliente corrigiu moto no mesmo dialogo.
-- Catalogo commerce.* ainda vazio — proximo desbloqueio operacional.
+**Enrichment:**
+- Fase 2a: enrichment determinístico
+- Fase 3 Organizadora: worker LLM, facts, evidence, incidentes
+- Analytics marts v1
 
-## Ultimos Commits Relevantes
+**Atendente — Sprints 1–6.9** (estado reentrante, tools, Planner foundation,
+Executor, validators iniciais, worker shadow, Generator shadow, loop de estado,
+bridge Organizadora→Context, SayValidator endurecido, filtro sender_type,
+nota Chatwoot ao escalar).
 
-- `e35ca31 feat(atendente): Sprint 6.9 restante — nota interna Chatwoot ao escalar`
-- `193b4ef feat(dispatcher): Sprint 6.8 — filtrar sender_type`
-- `79c0d19 feat(atendente): Sprint 6.7 — Say Validator endurecido`
-- `63e40e8 feat(atendente): Sprints 6.5 + 6.6 — loop de estado e bridge Organizadora`
-- `56dfc0e feat: tune organizadora prompt v3.4`
-- `866bae6 feat: add atendente generator shadow (sprint 6)`
+**Atendente — Pós-Maio/2026** (esta janela):
+- **Planner-input fix** (commit `4963701`): prompt v1.2.7 com regras
+  de marca/product_code; sanitize defensivo no executor. Resolveu 97% de
+  `buscarProduto.output = []` por inputs alucinados.
+- **Fase 3 residual** (commit `0a40e0d`): fitment hedge no SayValidator,
+  anti-soma no prompt do Generator, regra `update_draft` exige endereço,
+  auto-chain inicial.
+- **Refactor A2** (commit `0ba7988`): remove regex de intent do auto-chain;
+  regra puramente determinística "achou produto → confirma estoque".
+- **B1+B2+B3 housekeeping** (commit `ce16830`): `safeRollback` com log,
+  remove dead branch em `action-validator:99`, `deterministicId` 32-bit →
+  `deterministicUuid` sha256.
+- **B4 action_id** (commit `d0c5da3`): adiciona `stateActionBaseSchema.extend`
+  em `addToCart`, `removeFromCart`, `updateCartItem`, `clearCart`,
+  `requestConfirmation`, `escalate`, `selectSkill`.
+- **B5 escalação real** (commit `9888bd7`): worker emite action `escalate`
+  quando `Planner.skill === 'escalar_humano'`. `agent.escalations` agora
+  recebe linhas (5 confirmadas em DB), `postEscalateNote` chamado.
+- **Etapa 3 Planner cleanup** (commit `b6bc9d9`): remove
+  `mentionsProductCompatibilityQuestion`, `shouldEnsurePolicyTool`,
+  `mentionsStoreInfoQuestion` (mantidas como `@internal MOCK-ONLY` para
+  mockPlanTurn). Planner v1.2.8 com regras explícitas e exemplos de fala
+  informal.
+- **Etapa 2 structured claims** (commit `408f058`): Generator emite
+  `claims[]` junto com `say`. `ClaimValidator` checa cada claim contra
+  tool results. `SayValidator` regex continua como rede de segurança.
+- **Limpeza dead code** (commit `654c521`): remove `llmAtendenteResponseSchema`
+  legado (não importado em lugar nenhum).
+- **Audit claims** (commit `1edd3a2`): `event_payload.claims` +
+  `claims_count` + `claim_types` + `blocked_payload.claims`.
+- **v1.5.0 few-shot** (commit `cc93a05`): novo prompt-v1_5.ts com 10
+  exemplos canônicos derivados de catalog15 + bugs do Codex.
+  `GENERATOR_PROMPT_FEW_SHOT_ENABLED` controla A/B.
+- **Audit prompt_version fix** (commit `6f7e7c5`): DB grava versão REAL
+  do prompt (v1.4 ou v1.5) em vez da constante.
 
-Remotes sincronizados:
+## Resultados das Baterias Recentes
 
-- `origin/main`
-- `pneus/main`
+**catalog15-rerun com v1.5.0 ligada (2026-05-15):**
+- 45/45 generated, 0 blocked
+- 2 fallbacks exatos (eram 6 com v1.4.0)
+- 64,4% turns com claims, média 1,4 claims/turn
+- 0 `claim_invalid:*` blocks
+- Tipos: price 32, stock_availability 24, fitment 4, delivery_fee 1
+- Notas: Planner 9/10, Generator 9/10 provisório, Organizadora 8.5/10 provisório
 
-## Proxima Fase Recomendada
+**Bateria custom 8 casos coloquiais (2026-05-15):**
+- 8/8 generated, 0 blocked
+- Casos cobertos: "tem aí pra Fan?", "vc traz em Belford Roxo?",
+  "pega na minha Bros?", "tá salgado?", "dois pneus, quanto cada e tem?",
+  "ia querer X, mas é Y", "pode separar, pago pix, busco hoje"
+- 1 caso ("tá salgado") caiu em SAFE_FALLBACK — Planner falhou em rotear
+  pra `tratar_objecao`; não é bug do Generator
 
-PR1-PR5 de hardening concluídos e validados em shadow. Proximo passo é escolher
-entre catalogo `commerce.*` real (para vender de verdade) e Sprint 7/Supervisora
-shadow (para avaliar qualidade antes do envio).
+## Últimas Validações Técnicas
 
-Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
-- `commerce.products`, `tire_specs`, `vehicle_fitments` estao vazios; `buscar_e_ofertar` retorna lista vazia.
-- Desbloqueio: trazer CSV/dump real da loja.
+- `npm run typecheck`: verde
+- `npm test`: 463/463 verde, 55 arquivos
+- `npm run build`: verde
+- Migrations 0001-0030 aplicadas em prod
 
-Sprint 8: envio controlado ao Chatwoot.
-- `ChatwootApiClient.postMessage()` + worker envia turn `generated` aprovado.
-- Controlado por `ATENDENTE_SEND_ENABLED=false` (default off).
+## Últimos Commits Relevantes (pneus/main)
+
+Ver `docs/NEXT_CHAT_HANDOFF.md` para a lista completa desta janela
+(12 commits desde `4963701`).
+
+## Próxima Fase
+
+**Fase D estendida (ADR-008)** — em andamento.
+
+Frentes paralelas:
+1. Coleta humana 2-4 semanas, comparação humano vs bot
+2. Catálogo comercial (preço, marca, foto, estoque real — 78 produtos técnicos
+   prontos, comercial escasso — ver `docs/COMMERCE_CATALOG_STATUS.md`)
+3. 6 blocos de infra: particões, LGPD, runbook, rate limit, auditoria RLS,
+   reconciliação CLI
+
+**Não fazer agora:**
+- Tunar mais prompts (sistema entrou em diminishing returns)
+- Critic (descartado, ADR-005)
+- Supervisora (adiada para Fase G, ADR-006)
+- Sprint 8 envio (depois da Fase D + catálogo)
 
 ## Cuidados
 
@@ -211,5 +134,18 @@ Sprint 8: envio controlado ao Chatwoot.
 - Nao recriar scripts com token, connection string, endpoint real ou dados
   operacionais sensiveis hardcoded. Use `.env` local.
 - `.env` e `.env.codex` nunca devem ser commitados.
-- `ATENDENTE_SHADOW_ENABLED` pode rodar em log-only; envio Chatwoot continua
-  inexistente/desligado ate Wallace mandar ativar explicitamente.
+- `ATENDENTE_SHADOW_ENABLED=true` em prod hoje, mas envio Chatwoot continua
+  inexistente/desligado.
+- `GENERATOR_PROMPT_FEW_SHOT_ENABLED=true` ativa v1.5.0; rollback = `false` + redeploy.
+
+---
+
+## HISTÓRICO (preservado para auditoria)
+
+O HANDOFF anterior listava Sprints 6.5-6.9 + PRs 1-5 + ajustes
+`planner_v1.2.5`/`generator_v1.3.1`/`generator_v1.3.2` em detalhe. Todos
+continuam válidos como histórico; este arquivo foi reescrito em 2026-05-15
+para refletir o estado pós-migração para Responses API + structured claims +
+few-shot.
+
+Versões anteriores estão no git.

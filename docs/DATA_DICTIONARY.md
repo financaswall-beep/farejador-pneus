@@ -1,6 +1,22 @@
 # Guia das Tabelas do Farejador
 
-Atualizado: 25/04/2026
+Atualizado: 2026-05-15. Tabelas novas ou colunas adicionadas desde 25/04: `analytics.fact_evidence` (migration 0018), `agent.session_items`/`session_slots` (0024 estado reentrante), `agent.turns.blocked_say_text`/`blocked_actions`/`blocked_payload` (0028 PR1), `agent.cart_events.event_type='updated'` (0029 PR3), `analytics_marts.*` schema completo (0023). Migrations 0022-0030 estao aplicadas no banco mas o historico Supabase CLI registra ate 0021 — divida operacional a reconciliar (ver ADR-008).
+
+**Adicoes 2026-05-15 (sem migration, mudancas no payload JSON):**
+- `agent.session_events.event_payload` (event_type=`generator_produced`) agora carrega:
+  - `claims` (array de objetos, Etapa 2 do ADR-009): cada item tem `type`
+    (`price` | `stock_availability` | `fitment` | `delivery_fee`) + campos
+    especificos (amount, product_id, vehicle_hint conforme o tipo).
+  - `claims_count` (int, denormalizado pra query rapida).
+  - `claim_types` (array de strings, ex.: `[price, stock_availability]`).
+  - `prompt_version` agora vem do `parsed.data.prompt_version` real
+    (`generator_v1.4.0` ou `generator_v1.5.0` quando flag ligada), nao mais da
+    constante fixa (fix commit `6f7e7c5`).
+- `agent.turns.blocked_payload` carrega `claims` no mesmo formato para
+  auditar o que o Generator tentou afirmar mesmo quando o turno foi bloqueado.
+- `agent.escalations` passou a receber linhas reais quando `Planner.skill=escalar_humano`
+  (B5, commit `9888bd7`). Antes ficava sempre vazia (audit 1.1); em 2026-05-15
+  ja tem 5 linhas em prod com `reason` derivado de `risk_flags`/confidence.
 
 Este documento foi escrito para estudar o sistema sem precisar entender SQL.
 
@@ -1154,6 +1170,13 @@ Quando o humano confirma e fecha, o draft e promovido: `draft_status` vira `prom
 Quando o agente passa pra humano. Status: aguardando, em_atendimento, resolvida, devolvida_bot.
 
 ## Tabelas novas em `commerce.*`
+
+Status operacional do catalogo em 2026-05-14: o ambiente `FAREJADOR_ENV=test`
+auditado tem 50 pneus em `commerce.products`/`commerce.tire_specs`, 138
+modelos/variacoes em `commerce.vehicle_models`, 96 compatibilidades oficiais em
+`commerce.vehicle_fitments` e 84 pendencias em `commerce.fitment_discoveries`.
+Preco e estoque real ainda nao foram carregados nesse ambiente. Ver
+`docs/COMMERCE_CATALOG_STATUS.md`.
 
 ### `commerce.products`
 

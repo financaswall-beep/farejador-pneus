@@ -44,6 +44,7 @@ com validacao Zod, exceto overrides explicitamente documentados como
 | `GENERATOR_LLM_ENABLED` | nao | Liga o Generator Shadow com LLM real. Default `false`. Quando `false`, usa respostas mock/fallback seguras (sem custo, sem rede). | `false` |
 | `GENERATOR_OPENAI_API_KEY` | se Generator LLM ligado | Chave OpenAI especifica do Generator. Obrigatoria quando `GENERATOR_LLM_ENABLED=true`. | `sk-...` |
 | `GENERATOR_MODEL` | nao | Modelo do Generator. Default `gpt-4o-mini`. | `gpt-4o-mini` |
+| `GENERATOR_PROMPT_FEW_SHOT_ENABLED` | nao | **Etapa 5 (v1.5.0):** liga o prompt few-shot (10 exemplos canônicos, ~2660 tokens) em vez do prompt declarativo v1.4.0 (~3690 tokens). Default `false` (usa v1.4.0). Feature flag para rodar A/B em catalog15-rerun. Rollback: setar `false` e redeploy. | `false` |
 | `SEGMENTS_DIR` | nao | Override do diretorio `segments/`. Lido direto de `process.env` pelo loader de regras. | `/opt/farejador/segments` |
 
 ## Variaveis Removidas
@@ -53,6 +54,11 @@ com validacao Zod, exceto overrides explicitamente documentados como
   `rejectUnauthorized:false`.
 - `ATENDENTE_ENABLED`: nao existe no runtime atual. O controle disponivel hoje
   e `ATENDENTE_SHADOW_ENABLED`, que roda log-only e nao envia Chatwoot.
+
+## Variaveis Planejadas Mas Ainda Inexistentes
+
+- `ATENDENTE_SEND_ENABLED`: aparece em handoffs/checklists como controle de Sprint 8 (envio Chatwoot), mas NAO existe em `src/shared/config/env.ts`. Sera criada quando Sprint 8 iniciar. Hoje (2026-05-10) Sprint 8 esta adiado ate Fase D estendida + catalogo (ver ADR-008).
+- `SUPERVISORA_ENABLED`: aparecia em docs antigos como flag futura. Foi removida da lista oficial em 2026-05-10 — Supervisora batch esta adiada para Fase G (ver ADR-006); a flag sera criada quando/se Supervisora for implementada.
 
 ## Regras
 

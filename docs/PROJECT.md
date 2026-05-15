@@ -1,140 +1,105 @@
-# Farejador - Visao Atual do Projeto
+# Farejador - Visão Atual do Projeto
 
-Atualizado: 2026-05-08.
+**Atualizado: 2026-05-15.**
 
-Farejador e o backend que captura conversas do Chatwoot, normaliza dados em
-Postgres/Supabase e prepara uma fundacao auditavel para analytics,
+Farejador é o backend que captura conversas do Chatwoot, normaliza dados em
+Postgres/Supabase e prepara uma fundação auditável para analytics,
 Organizadora LLM e Atendente em shadow/controle humano.
 
 ## Status Executivo
 
-| Area | Status |
+| Área | Status |
 | --- | --- |
-| Fase 1 - webhook, raw, core, admin | Concluida e em prod |
-| Fase 1.5 - hardening DB/runtime | Concluida |
-| Fase 2a - enrichment deterministico | Concluida |
-| Fase 3 - Organizadora LLM | Implementada e em prod |
-| Fase 3 - analytics marts | Implementadas |
-| Atendente Sprint 1 - estado reentrante | Implementado |
-| Atendente Sprint 2 - tools deterministicas | Implementado |
-| Atendente Sprint 3 - Planner foundation | Implementado |
-| Atendente Sprint 4 - Executor/guardrails | Implementado |
-| Atendente Sprint 5 - worker shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator shadow | Implementado; LLM real em shadow |
-| Atendente Sprint 6.5 - loop de estado | Implementado |
-| Atendente Sprint 6.6 - bridge Organizadora | Implementado |
-| Atendente Sprint 6.7 - Say Validator endurecido | Implementado |
-| Atendente Sprint 6.8 - filtro sender_type | Implementado |
-| Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod |
-| Ajuste pre-Critic - memoria operacional do Generator | Implementado |
-| Fix planner_v1.2.5 - Planner usa organizer_facts | Implementado em prod |
-| Fix generator_v1.3.1 - Generator proibe SAFE_FALLBACK em pedir_dados_faltantes | Implementado em prod |
-| Fix phase3 repo - dedup de facts identicos por valor | Implementado em prod |
-| PR 1 Generator audit - blocked payload + update_draft idempotente | Implementado, testado; migration 0028 aplicada |
-| PR 2 Estado/contexto - invalidações + contexto configurável | Implementado, testado e publicado |
-| PR 3 Validators/eventos - pre-condições + eventos semânticos | Implementado e testado; aguardando smoke LLM pós-deploy |
-| Generator v1.3.2 - fechamento seguro com update_draft | Implementado, testado e validado em smoke real |
-| Critic (Sprint 7) | Proxima fase |
-| Envio Chatwoot (Sprint 8) | Proxima fase |
-| Seed catalogo commerce.* (Sprint 6.10) | Bloqueado por dados |
+| Fase 1 — webhook, raw, core, admin | Concluída e em prod |
+| Fase 1.5 — hardening DB/runtime | Concluída |
+| Fase 2a — enrichment determinístico | Concluída |
+| Fase 3 — Organizadora LLM | Em produção, `moto-pneus-hybrid-v3-4` |
+| Fase 3 — analytics marts | Implementadas |
+| Atendente Sprints 1–6.9 | Todos concluídos (estado reentrante, tools, Planner, Executor, validators, worker shadow, Generator shadow, loop de estado, bridge Organizadora, SayValidator endurecido, filtro sender_type, nota Chatwoot ao escalar) |
+| Atendente — Planner-input fix | Concluído (`4963701`) — Planner v1.2.7 com regras marca/product_code + sanitize defensivo |
+| Atendente — Fase 3 residual (A1+A3+A4) | Concluído (`0a40e0d`) — fitment hedge, anti-soma, delivery sem endereço, auto-chain inicial |
+| Atendente — Refactor A2 (auto-chain) | Concluído (`0ba7988`) — auto-chain determinístico sem regex de intent |
+| Atendente — B1+B2+B3 housekeeping | Concluído (`ce16830`) — safeRollback, dead branch, sha256 UUID |
+| Atendente — B4 action_id | Concluído (`d0c5da3`) — metadados em todas as actions |
+| Atendente — B5 escalação real | Concluído (`9888bd7`) — worker emite `escalate` quando Planner=`escalar_humano` |
+| Atendente — Etapa 3 Planner cleanup | Concluído (`b6bc9d9`) — Planner v1.2.8 sem regex de customer text |
+| Atendente — Etapa 2 structured claims | Concluído (`408f058`) — Generator v1.4.0 + ClaimValidator |
+| Atendente — Audit claims | Concluído (`1edd3a2`) — claims em `event_payload` |
+| Atendente — Generator v1.5.0 few-shot | Concluído (`cc93a05`) — atrás de feature flag `GENERATOR_PROMPT_FEW_SHOT_ENABLED` |
+| Atendente — Audit prompt_version fix | Concluído (`6f7e7c5`) — DB grava versão real (v1.4 ou v1.5) |
+| Critic (Sprint 7 original) | DESCARTADO (ADR-005). SayValidator + ActionValidator + ClaimValidator são o gate. |
+| Supervisora batch | ADIADA para Fase G (ADR-006). |
+| **Fase D estendida (coleta humana 2-4 semanas)** | **EM ANDAMENTO (ADR-008)** |
+| Envio Chatwoot (Sprint 8) | Adiado até Fase D + catálogo. `ATENDENTE_SEND_ENABLED` não existe. |
+| Seed catálogo commerce.* | Técnico populado (78 produtos, 308 vehicle_models, 166 fitments). Preço/marca/foto/estoque comercial escasso. |
 
-## O Que Esta Ligado
+## O Que Está Ligado em Prod (2026-05-15)
 
-- Webhook Chatwoot -> `raw.*`.
-- Normalizacao deterministica -> `core.*`.
-- Enrichment deterministico -> `analytics.*`.
-- Organizadora LLM -> `analytics.conversation_facts` e
-  `analytics.fact_evidence`.
-- Atendente Shadow Worker -> `agent.*`/`ops.*` quando
-  `ATENDENTE_SHADOW_ENABLED=true`; Generator LLM real ativo em shadow.
-- Generator recebe `state.items`, `organizer_facts` e `derived_signals` e emite
-  actions de memoria operacional em tempo real (`create_item`, `update_slot`,
-  `update_draft`).
-- Nota interna Chatwoot (`private: true`) ao emitir `escalate`.
-- Planner `planner_v1.2.5` promove `pedir_dados_faltantes` para
-  `buscar_e_ofertar+buscarCompatibilidade` quando `organizer_facts` ja contem
-  `moto_modelo` com conf >= 0.85 e cliente pergunta compatibilidade.
-- Generator `generator_v1.3.1` proibe resposta SAFE_FALLBACK quando skill e
-  `pedir_dados_faltantes`; SayValidator bloqueia com razao
-  `safe_fallback_not_allowed_for_pedir_dados_faltantes`.
-- `agent.turns` preserva candidato bloqueado em `blocked_say_text`,
-  `blocked_actions` e `blocked_payload`; `say_text` continua `NULL` quando
-  `status='blocked'`.
-- `update_draft` emitido pelo Generator agora carrega `action_id`,
-  `turn_index`, `emitted_at` e `emitted_by`, permitindo idempotencia igual as
-  demais actions de estado.
-- Generator `generator_v1.3.2` instrui a gravar rascunho de fechamento quando
-  cliente passa nome/pagamento/endereco ou diz "pode fechar", mesmo se produto
-  e estoque ainda dependerem de confirmacao. A resposta segura deve anotar os
-  dados e chamar humano para confirmar produto/estoque, sem claim comercial.
-- Context Builder usa `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20) em vez de
-  10 mensagens fixas; `loadCurrent` expõe `derived_signals.stale_slots`.
-- PR4 Organizadora/ops: `ops.enrichment_jobs` recupera job zumbi apos
-  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` (default 900s), e limites principais
-  agora sao configuraveis por env (`ORGANIZADORA_MIN_CONFIDENCE`,
-  `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`,
-  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`).
-- Troca de item ativo e mudanças em slots comerciais reais invalidam ofertas
-  antigas para evitar vender com moto/posição/pagamento antigo.
-- Action Validator bloqueia actions sem pre-condição: item inexistente em
-  `remove_from_cart`/`update_cart_item`, `clear_cart` com confirmação aberta,
-  draft de delivery sem endereço e `ready_to_close` sem carrinho confirmado.
-- `agent.session_events` separa eventos de carrinho/draft:
-  `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared`,
-  `draft_updated`.
-- `agent.cart_events` usa `updated` para mudança de quantidade; `replaced`
-  fica reservado para troca real de produto futura.
-- `analytics-phase3.repository`: dedup de facts identicos por valor deep-equal
-  antes de inserir nova linha — so anexa evidence ao fact existente.
-- Migrations ate `0029` aplicadas/validadas no Supabase atual.
-- Smoke LLM real pós-PR2 validado em 2026-05-08 via conversa fake Chatwoot
-  `451`: Organizadora, Planner e Generator rodaram em shadow sem envio ao
-  cliente.
-- Avaliação qualitativa do smoke: Organizadora 9/10, Planner 9/10,
-  Generator 8/10, fluxo geral 8,7/10.
-- Validação determinística PR3 + generator_v1.3.2 (2026-05-08):
-  `npm run typecheck`, `npm test` 380/380, integração Atendente 8/8 e
-  `npm run build` verdes.
-- Smoke PR3 pós-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts,
-  Planner LLM `planner_v1.2.5` usou tools comerciais, e Generator bloqueou uma
-  resposta com `stock_claim_without_verificar_estoque`, preservando
-  `blocked_say_text`. Sem envio ao cliente. `draft_updated` nao apareceu no
-  smoke porque nao houve `update_draft`; coberto pelos testes determinísticos.
-- Smoke `generator_v1.3.2` pós-deploy (Chatwoot conversa `453`): Generator
-  emitiu `update_draft` com nome, pix, entrega e endereço; `session_events`
-  gravou `draft_updated`. Resposta segura: dados anotados e confirmação humana
-  de produto/estoque antes de fechar.
+- Webhook Chatwoot → `raw.*` → `core.*`
+- Enrichment determinístico → `analytics.*`
+- Organizadora LLM → `analytics.conversation_facts` + `analytics.fact_evidence`
+- Atendente Shadow Worker:
+  - `ATENDENTE_SHADOW_ENABLED=true`
+  - `GENERATOR_LLM_ENABLED=true`
+  - Planner LLM v1.2.8 decide skill + tools
+  - Tools determinísticas: `buscarProduto`, `verificarEstoque`,
+    `buscarCompatibilidade`, `calcularFrete`, `buscarPoliticaComercial`
+  - Sanitize defensivo em `tool-executor` dropa `marca`/`product_code`
+    alucinados (medida-no-campo-marca, marca-de-moto)
+  - Auto-chain `verificarEstoque` quando `buscarProduto` retorna produto
+  - Generator LLM v1.4.0 (ou v1.5.0 atrás de flag)
+  - Generator emite claims estruturados (price/stock/fitment/delivery_fee)
+  - ClaimValidator + SayValidator (rede regex) + ActionValidator
+  - Worker emite `escalate` sintética em skill=`escalar_humano`
+  - `agent.turns`, `agent.session_events`, `agent.escalations` populados
+- **Nenhuma mensagem é enviada ao cliente.** Sprint 8 continua adiado.
 
-- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora 6/6
-  jobs `done` sem erro; Planner e Generator rodaram com LLM real. Achados:
-  Planner chamou `verificarEstoque` sem `product_id` uma vez, e Generator fez
-  claim de marca ("Tem Pirelli sim...") sem lastro. Isso vira insumo direto do
-  PR5 comercial.
-- Fix pos-smoke: `planner_v1.2.6` impede `verificarEstoque` sem produto concreto
-  e o Say Validator bloqueia marca afirmada sem `buscarProduto`.
-- Smoke pos-deploy `planner_v1.2.6` (Chatwoot `460`-`465`): Organizadora 6/6
-  jobs `done`; Planner nao chamou `verificarEstoque` sem produto; Generator nao
-  afirmou "Tem Pirelli sim" sem lastro.
+## Estado Real do Banco (2026-05-15)
 
-## O Que Ainda Nao Esta Ligado
+```
+agent.session_events:        5909 linhas / 6.4 MB
+agent.turns:                 1396 linhas
+agent.escalations:              5 linhas  (B5 funcionando — era 0 antes)
+agent.order_drafts:            41 linhas
+analytics.conversation_facts: 2976 linhas
+commerce.products:             78 linhas
+core.messages_2026_05:       1675 linhas
+ops.atendente_jobs:          1396 linhas
+ops.agent_incidents:           57 linhas (14 dias)
+```
 
-- Nenhum bot responde cliente.
-- Nao existe envio Chatwoot pela Atendente.
-- Planner LLM fica desligado por default (`PLANNER_LLM_ENABLED=false`).
-- Critic e Reflection Loop ainda nao existem.
-- Nenhum envio de mensagem ao cliente (Sprint 8 pendente).
-- Catalogo `commerce.*` vazio (seed pendente — Sprint 6.10).
+Migrations aplicadas: `0001` até `0030_vehicle_resolver_variant_precision.sql`.
 
-## Invariantes
+## O Que Ainda Não Está Ligado
 
-- `raw.*` e `core.*` sao deterministicas e nao recebem escrita de LLM.
-- Organizadora escreve somente em `analytics.*` e incidentes em `ops.*`.
-- Atendente, quando existir, deve consumir `core.*`, `analytics.*` e
-  `commerce.*`; nunca deve alterar `raw.*`, `core.*` ou `commerce.*`.
-- Atendente Shadow pode gravar auditoria/estado em `agent.*` e incidentes em
-  `ops.*`; nunca envia mensagem ao cliente.
-- Tudo respeita `environment` (`prod`/`test`).
-- Dados sensiveis nunca entram em scripts temporarios versionados.
+- Nenhum bot responde cliente automaticamente
+- Não existe envio Chatwoot pela Atendente (`ATENDENTE_SEND_ENABLED` não existe em código)
+- Critic e Reflection Loop não serão implementados (descartados)
+- Catálogo comercial completo (preço, marca, foto, estoque): pendente
+- Particões julho/agosto 2026 (pg_partman não instalado, urgente antes de 30/jun)
+- Endpoint LGPD operacional de erasure
+- Rate limit / circuit breaker OpenAI
+
+## Princípio de Arquitetura
+
+**Flexível no funil, rígida na verdade. LLM interpreta linguagem natural;
+código valida estrutura.**
+
+- Funil não é escada linear; é slot-filling reentrante
+- Planner LLM escolhe skill + tool_requests (sem patches regex de customer text)
+- Dados factuais vêm de tools determinísticas
+- Validators bloqueiam fala/ação sem lastro
+- Generator emite claims estruturados; validator checa contra tool results
+- Tudo grava ledger auditável
+
+## Invariantes (não-negociáveis)
+
+- `raw.*` e `core.*` são determinísticas e não recebem escrita de LLM
+- Organizadora escreve somente em `analytics.*` e incidentes em `ops.*`
+- Atendente consome `core.*`, `analytics.*` e `commerce.*`; nunca altera `raw.*`, `core.*` ou `commerce.*`
+- Atendente Shadow grava auditoria/estado em `agent.*` e incidentes em `ops.*`; nunca envia mensagem ao cliente
+- Tudo respeita `environment` (`prod`/`test`)
+- Dados sensíveis nunca entram em scripts temporários versionados
 
 ## Stack
 
@@ -145,12 +110,14 @@ Organizadora LLM e Atendente em shadow/controle humano.
 - Pino
 - Vitest
 
-## Referencias De Estado
+## Referências de Estado
 
-- `docs/NEXT_CHAT_HANDOFF.md` - resumo curto para continuar em outro chat.
-- `docs/phase3-agent-architecture/00-estado-de-implementacao.md` - log
-  detalhado da Fase 3.
-- `docs/phase3-agent-architecture/21-atendente-v1-state-design.md` - desenho
-  consolidado da Atendente reentrante.
-- `db/migrations/README.md` - ordem das migrations.
-- `docs/DATA_DICTIONARY.md` - dicionario do banco.
+- `docs/NEXT_CHAT_HANDOFF.md` — resumo curto para continuar em outro chat
+- `docs/HANDOFF.md` — operacional médio
+- `docs/CHECKLIST.md` — status por item
+- `docs/CODEX_BRIEFING.md` — briefing para Codex
+- `docs/CONFIG.md` — variáveis de ambiente
+- `docs/phase3-agent-architecture/00-estado-de-implementacao.md` — log Fase 3
+- `docs/DATA_DICTIONARY.md` — dicionário do banco
+- `docs/adr/ADR-005`/`006`/`007`/`008`/`009` — decisões arquiteturais
+- `db/migrations/README.md` — ordem das migrations

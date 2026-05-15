@@ -99,12 +99,27 @@ Depois de semanas de validacao:
 - criar pedido automaticamente;
 - rollback seguro se estoque acabar.
 
-## Fase G - Supervisora opcional
+## Fase D estendida - Coleta humana 2-4 semanas (PROXIMO PASSO REAL, ADR-008)
 
-Possivel evolucao futura:
+Decisao 2026-05-10: a Fase D original previa 5 semanas; foi estendida com mecanismo de comparacao humano vs bot.
+
+- Wallace atende clientes manualmente no Chatwoot por 2-4 semanas adicionais;
+- Agente continua em shadow gerando candidato em `agent.turns`, sem envio;
+- Rotina simples deterministica de comparacao humano vs bot (cliente perguntou X, bot teria respondido Y, Wallace respondeu Z);
+- Conversas atendidas pelo Wallace marcadas como golden em `core.conversations`;
+- Material vira dataset para calibrar prompt do Generator (few-shot ou ajuste manual);
+- Em paralelo: popular catalogo `commerce.*` + 6 blocos pequenos de infra (particoes, LGPD, runbook, rate limit, RLS, migration history).
+
+## Fase G - Supervisora batch (futura, depois de Sprint 8 maduro, ADR-006)
+
+**Decisao 2026-05-10:** adiada. NAO e proximo passo. Calibracao depende de dataset humano (Fase D estendida) + envio em producao.
+
+Quando entrar:
 
 - LLM Supervisora roda em batch;
-- audita conversas;
+- audita conversas pos-fato em `ops.supervisor_reviews`;
 - sugere melhorias;
 - revisa perdas;
-- nao participa do tempo real no inicio.
+- nao participa do tempo real.
+
+NOTA: Critic em tempo real (Sprint 7 original) foi DESCARTADO em 2026-05-10 (ADR-005). SayValidator + ActionValidator sao o gate sincrono pre-envio (ADR-007).

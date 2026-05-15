@@ -1,17 +1,20 @@
 # 00 - Estado de Implementacao da Fase 3
 
-Atualizado: 2026-05-08.
+**Atualizado: 2026-05-15.**
 
 Este e o estado vivo da Fase 3. Historico detalhado anterior permanece no git;
 este arquivo deve ficar curto, direto e util para decidir a proxima tarefa.
 
 ## Resumo Executivo
 
-Organizadora esta em producao e calibrada no prompt v3.4. A Atendente ja tem
-fundacao de estado, tools, Planner, Executor/guardrails, Worker Shadow e
-Generator Shadow (gera resposta candidata auditavel, nao envia ao Chatwoot).
+Organizadora esta em producao e calibrada no prompt v3.4. A Atendente passou
+pela migração para Responses API + structured outputs, ganhou structured
+claims (Etapa 2), perdeu regex de customer text no Planner (Etapa 3), e tem
+agora prompt few-shot v1.5.0 atrás de feature flag (Etapa 5). Worker emite
+escalate sintética quando Planner=`escalar_humano`.
 
-Nada responde cliente automaticamente.
+**Nada responde cliente automaticamente.** Sistema está em Fase D estendida
+(shadow assistido, ADR-008).
 
 ## Status Por Bloco
 
@@ -20,257 +23,204 @@ Nada responde cliente automaticamente.
 | Fase 1 - webhook/raw/core/admin | Concluida e em prod |
 | Fase 1.5 - hardening | Concluida |
 | Fase 2a - enrichment deterministico | Concluida |
-| Organizadora LLM | Em producao, v3.4 |
+| Organizadora LLM | Em producao, `moto-pneus-hybrid-v3-4` |
 | `analytics.fact_evidence` | Implementado |
 | Analytics marts v1 | Implementadas |
 | Commerce schema/views/helpers | Implementado |
 | Agent schema base | Implementado |
-| Atendente Sprint 1 - estado reentrante | Implementado |
-| Atendente Sprint 2 - tools deterministicas | Implementado |
-| Atendente Sprint 3 - Planner foundation | Implementado |
-| Atendente Sprint 4 - Executor/guardrails | Implementado |
-| Atendente Sprint 5 - Worker Shadow | Implementado, desligado por default |
-| Atendente Sprint 6 - Generator Shadow | Implementado; LLM real em shadow |
-| Atendente Sprint 6.5 - loop de estado | Implementado |
-| Atendente Sprint 6.6 - bridge Organizadora | Implementado |
-| Atendente Sprint 6.7 - Say Validator endurecido | Implementado |
-| Atendente Sprint 6.8 - filtro sender_type | Implementado |
-| Atendente Sprint 6.9 - nota Chatwoot ao escalar | Implementado em prod (e35ca31) |
-| Ajuste pre-Critic - memoria operacional Generator | Implementado |
-| Hardening fila Atendente - reconciliador de jobs | Implementado |
-| PR 1 - auditoria de turns bloqueados | Implementado |
-| PR 2 - estado/contexto | Implementado |
-| PR 3 - validators/eventos | Implementado, testado e com smoke LLM pos-deploy |
-| Generator v1.3.2 - fechamento seguro | Implementado e validado em smoke real |
-| Critic (Sprint 7) | Nao existe |
-| Envio Chatwoot pela Atendente (Sprint 8) | Nao existe |
-| Seed catalogo commerce.* (Sprint 6.10) | Pendente dados da loja |
+| Atendente Sprints 1-6.9 | Todos concluidos |
+| PRs 1-5 (audit, contexto, validators, ops, Say Validator comercial) | Todos concluidos |
+| **Planner-input fix** (commit `4963701`) | Concluído — Planner v1.2.7 + sanitize defensivo |
+| **Fase 3 residual** (commit `0a40e0d`) | A1 fitment hedge, A3 anti-soma, A4 delivery sem endereço |
+| **Refactor A2 auto-chain** (commit `0ba7988`) | Auto-chain determinístico sem regex |
+| **B1+B2+B3 housekeeping** (commit `ce16830`) | safeRollback, dead branch, sha256 UUID |
+| **B4 action_id** (commit `d0c5da3`) | Metadados em cart/escalate/confirmation/selectSkill |
+| **B5 escalação real** (commit `9888bd7`) | Worker emite `escalate` quando Planner=escalar_humano |
+| **Etapa 3 Planner cleanup** (commit `b6bc9d9`) | Planner v1.2.8 sem regex de customer text |
+| **Etapa 2 structured claims** (commit `408f058`) | Generator v1.4.0 + ClaimValidator |
+| **Audit claims** (commit `1edd3a2`) | Claims em event_payload + claims_count + claim_types |
+| **v1.5.0 few-shot** (commit `cc93a05`) | 10 exemplos canônicos atrás de flag |
+| **Audit prompt_version fix** (commit `6f7e7c5`) | DB grava versão real (v1.4 ou v1.5) |
+| Critic (Sprint 7 original) | DESCARTADO (ADR-005). SayValidator+ActionValidator+ClaimValidator são o gate. |
+| Supervisora batch | ADIADA para Fase G (ADR-006). |
+| Envio Chatwoot (Sprint 8) | Adiado. `ATENDENTE_SEND_ENABLED` não existe. |
+| Catálogo commerce.* técnico | 78 produtos, 308 vehicle_models, 166 fitments populados. Comercial (preço/marca/foto) escasso. |
+| **Fase D estendida (coleta humana)** | EM ANDAMENTO (ADR-008) |
 
-## Migrations Relevantes Da Fase 3
+## Migrations Aplicadas
 
-- `0013_commerce_layer.sql`
-- `0014_commerce_indexes.sql`
-- `0015_commerce_views.sql`
-- `0016_agent_layer.sql`
-- `0017_agent_triggers.sql`
-- `0018_analytics_evidence.sql`
-- `0019_ops_phase3_additions.sql`
-- `0020_vehicle_fitment_validation.sql`
-- `0021_environment_match_guards.sql`
-- `0022_conversation_facts_append_ledger.sql`
-- `0023_analytics_marts_v1.sql`
-- `0024_atendente_v1_state_extensions.sql`
-- `0025_planner_foundation.sql`
-- `0026_tool_executor_events.sql`
-- `0027_generator_shadow_events.sql` (aplicada/verificada no Supabase atual em 2026-05-03)
-- `0028_generator_blocked_turn_audit.sql` (aplicada/verificada em 2026-05-07)
-- `0029_cart_action_events_hardening.sql` (aplicada/verificada em 2026-05-08)
+`0001` até **`0030_vehicle_resolver_variant_precision.sql`** (todas em prod).
+
+Lista chave da Fase 3:
+- `0013-0015`: commerce layer (products, fitments, views)
+- `0016-0017`: agent schema + triggers
+- `0018`: fact_evidence (Organizadora)
+- `0019`: ops Phase 3 (atendente_jobs, agent_incidents, etc)
+- `0020-0021`: validações cross-table + env_match guards
+- `0022`: append-only ledger em conversation_facts
+- `0023`: analytics marts v1
+- `0024-0028`: state extensions Atendente + Planner + Tool Executor + Generator
+- `0029`: cart action events hardening
+- `0030`: vehicle resolver variant precision
+
+## Versões Ativas (2026-05-15)
+
+| Componente | Versão | Onde |
+|---|---|---|
+| Organizadora prompt | `moto-pneus-hybrid-v3-4` | `src/organizadora/prompt.ts` |
+| Planner prompt | `planner_v1.2.8` | `src/atendente/planner/prompt.ts` |
+| Generator prompt (default) | `generator_v1.4.0` | `src/atendente/generator/prompt.ts` |
+| Generator prompt (flag) | `generator_v1.5.0` | `src/atendente/generator/prompt-v1_5.ts` |
+| Generator agent version | `atendente_v1.0.0` | (constante em `schemas.ts`) |
 
 ## Codigo Da Organizadora
 
 Arquivos principais:
-
 - `src/organizadora/worker.ts`
 - `src/organizadora/prompt.ts`
-- `src/shared/llm-clients/openai.ts`
+- `src/shared/llm-clients/openai.ts` (função `callOpenAI` — chat completions)
 - `src/shared/zod/llm-organizadora.ts`
 - `src/shared/zod/fact-keys.ts`
 - `src/shared/repositories/analytics-phase3.repository.ts`
 - `src/shared/repositories/ops-phase3.repository.ts`
 - `src/shared/repositories/core-reader.repository.ts`
 
-Escreve:
+Escreve: `analytics.conversation_facts`, `analytics.fact_evidence`,
+`ops.agent_incidents`. Nao escreve: `raw.*`, `core.*`, `commerce.*`, `agent.*`.
 
-- `analytics.conversation_facts`
-- `analytics.fact_evidence`
-- `ops.agent_incidents`
+## Codigo Da Atendente (estado 2026-05-15)
 
-Nao escreve:
-
-- `raw.*`
-- `core.*`
-- `commerce.*`
-
-## Codigo Da Atendente Ja Implementado
-
-Estado:
-
-- `src/atendente/state/apply-action.ts`
+**Estado:**
+- `src/atendente/state/apply-action.ts` (com `deterministicUuid` agora)
+- `src/atendente/state/agent-state.repository.ts`
+- `src/atendente/state/invalidation-rules.ts`
 - `src/shared/zod/agent-state.ts`
-- `agent.session_items`
-- `agent.session_slots`
+- `src/shared/zod/agent-actions.ts` (com `stateActionBaseSchema.extend` em
+  todas as actions, incluindo cart/escalate/confirmation/selectSkill após B4)
 
-Tools:
-
+**Tools (commerce):**
 - `src/atendente/tools/commerce-tools.ts`
-- `buscarProduto`
-- `verificarEstoque`
-- `buscarCompatibilidade`
-- `calcularFrete`
-- `buscarPoliticaComercial`
+- `buscarProduto`, `verificarEstoque`, `buscarCompatibilidade`,
+  `calcularFrete`, `buscarPoliticaComercial`
 
-Planner:
-
+**Planner:**
 - `src/atendente/planner/context-builder.ts`
-- `src/atendente/planner/schemas.ts`
-- `src/atendente/planner/service.ts`
-- `src/atendente/planner/prompt.ts`
+- `src/atendente/planner/schemas.ts` (versão `planner_v1.2.8`)
+- `src/atendente/planner/service.ts` (sem regex de customer text após Etapa 3;
+  funcões `mentionsPolicyQuestion` / `mentionsStoreInfoQuestion` mantidas como
+  `@internal MOCK-ONLY`)
+- `src/atendente/planner/prompt.ts` (regras explícitas por skill + REGRA DE OURO)
 
-Executor/Guardrails:
-
+**Executor:**
 - `src/atendente/executor/tool-executor.ts`
-- `src/atendente/validators/say-validator.ts`
-- `src/atendente/validators/action-validator.ts`
-- `src/atendente/validators/tool-results.ts`
-- `src/shared/deterministic-id.ts`
+  - `sanitizeBuscarProdutoInput` — drop defensivo de marca/product_code alucinados
+  - `maybeAutoChainVerificarEstoque` — auto-chain determinístico pós-buscarProduto
 
-Worker Shadow:
+**Validators:**
+- `src/atendente/validators/say-validator.ts` — regex sobre output do bot (rede)
+- `src/atendente/validators/action-validator.ts` — pré-condições de actions
+- `src/atendente/validators/claim-validator.ts` — **NOVO Etapa 2** — checa
+  `price`/`stock_availability`/`fitment`/`delivery_fee` contra tool results
+- `src/atendente/validators/tool-results.ts` — helpers compartilhados
 
+**Generator:**
+- `src/atendente/generator/schemas.ts`
+  - `generatorPromptVersionV14 = 'generator_v1.4.0'`
+  - `generatorPromptVersionV15 = 'generator_v1.5.0'`
+  - `SUPPORTED_GENERATOR_PROMPT_VERSIONS` enum para schema strict
+  - `generatorClaimSchema` (discriminated union)
+  - `GeneratorResult.claims` + `GeneratorResult.prompt_version` (novos campos)
+- `src/atendente/generator/prompt.ts` — v1.4.0 declarativo (14 regras numeradas + claims section)
+- `src/atendente/generator/prompt-v1_5.ts` — **NOVO** v1.5.0 few-shot (10 exemplos)
+- `src/atendente/generator/service.ts`
+  - Roteia entre v1.4.0 e v1.5.0 via `env.GENERATOR_PROMPT_FEW_SHOT_ENABLED`
+  - `runValidators` agora chama `validateClaims` antes do say-validator
+  - `recordGeneratorResult` grava `prompt_version` real do LLM em vez de constante
+  - Persiste `claims` + `claims_count` + `claim_types` em `event_payload` e `blocked_payload`
+
+**Worker:**
 - `src/atendente/worker.ts`
-- `src/shared/repositories/ops-atendente.repository.ts`
-- `src/atendente/reconcile-jobs.ts`
-- `ATENDENTE_SHADOW_ENABLED=false` por default
-- `src/normalization/dispatcher.ts` enfileira `ops.atendente_jobs` em
-  `message_created` quando `ATENDENTE_SHADOW_ENABLED=true` e garante
-  `agent.session_current` para a conversa antes do enqueue
-- `src/atendente/reconcile-jobs.ts` corrige lacunas: busca mensagens `contact`
-  publicas em `core.messages` sem job correspondente e chama o mesmo
-  `ensureAtendenteSession` + `ops.enqueue_atendente_job` idempotente. O worker
-  shadow roda essa varredura leve a cada minuto para as ultimas 24h.
-- endpoint admin `POST /admin/reconcile/atendente-jobs` permite reconciliar uma
-  janela controlada, com limite maximo de 500 mensagens por chamada
-- log-only: gera candidato shadow, sem envio Chatwoot
-
-## Organizadora v3.4
-
-- `extractor_version`: `moto-pneus-hybrid-v3-4`
-- Prompt atual: `src/organizadora/prompt.ts`, com secao de valores permitidos
-  gerada a partir de `FACT_KEY_SCHEMAS`.
-- Fix validado em prod: `concorrente_citado` saiu como string,
-  `moto_cilindrada` saiu como number e aliases de entrega/pagamento deixaram
-  de gerar novos `schema_violation` nas conversas testadas.
-- Matriz sintetica expandida v3.3: 46/48 aprovados em 2026-05-03; v3.4 cobre
-  especificamente o gap de schema violations observado em producao.
-- Proxima acao da Organizadora: observar conversas reais antes de novo ajuste.
+  - `safeRollback` helper (log explícito em rollback failed)
+  - `maybeSynthesizeEscalate` — emite action `escalate` sintética quando
+    Planner decide `escalar_humano`. Reason inferido de `risk_flags` + confidence.
+  - Roteia tool execution → auto-chain → generator → record → loop apply actions
+- `src/atendente/reconcile-jobs.ts` — varredura periódica
+- `src/atendente/handlers/escalate.ts` — `postEscalateNote` (nota Chatwoot)
+- `ATENDENTE_SHADOW_ENABLED=true` em prod
 
 ## Atendente Generator Shadow Em Producao
 
-- `ATENDENTE_SHADOW_ENABLED=true` no ambiente atual.
-- `GENERATOR_LLM_ENABLED=true` no ambiente atual, com chave e modelo do
-  Generator configurados.
-- Teste com 6 conversas Chatwoot criou jobs, turns e eventos
-  `generator_produced` em shadow.
-- Respostas candidatas foram gravadas em `agent.turns`; nenhuma mensagem foi
-  enviada ao cliente.
-- Hardening PR 1 (2026-05-07): turns bloqueados passam a preservar candidato
-  em `blocked_say_text`/`blocked_actions`/`blocked_payload`, e `update_draft`
-  agora recebe metacampos (`action_id`, `turn_index`, `emitted_at`,
-  `emitted_by`) como as demais actions emitidas pelo Generator.
-- Hardening PR 2 (2026-05-08): contexto recente deixou de ser fixo em
-  10 mensagens e passa a usar `ATENDENTE_CONTEXT_MESSAGES_LIMIT` (default 20);
-  `derived_signals.stale_slots` reflete slots persistidos com `stale != 'fresh'`;
-  trocar item ativo invalida a oferta do item antigo e marca seus slots como
-  `stale_strong`.
-- Hardening PR 3 (2026-05-08): `ActionValidator` valida pre-condicoes de
-  carrinho/draft/escalacao; `session_events` ganhou eventos especificos
-  `cart_added`, `cart_removed`, `cart_updated`, `cart_cleared` e
-  `draft_updated`; `cart_events` agora usa `updated` para mudanca de quantidade.
-- Generator v1.3.2 (2026-05-08): dados de fechamento tem prioridade de memoria.
-  Se o cliente informa nome/pagamento/endereco ou diz "pode fechar", o Generator
-  deve emitir `update_draft` e responder que um atendente confirmara
-  produto/estoque antes de fechar, sem inventar disponibilidade.
-  Validado no Chatwoot conversa `453`: `update_draft` + `draft_updated` gravados.
-- Exemplo validado: para pedido de par Pirelli/Biz 125, o Generator pediu
-  dados faltantes sem inventar preco, estoque ou frete.
+- `ATENDENTE_SHADOW_ENABLED=true` em prod
+- `GENERATOR_LLM_ENABLED=true` em prod
+- `GENERATOR_PROMPT_FEW_SHOT_ENABLED` controla v1.4/v1.5 (default false)
+- Auto-chain `verificarEstoque` ativo
+- Worker emite escalate quando Planner=`escalar_humano`
+- `agent.escalations` recebe linhas reais (5 confirmadas em DB em 2026-05-15)
+- Nenhuma mensagem enviada ao cliente
+
+## Resultados das Baterias Recentes (2026-05-15)
+
+**catalog15-rerun com v1.5.0:**
+- 45/45 generated, 0 blocked
+- 2 fallbacks exatos (eram 6 com v1.4.0)
+- 64.4% turns com claims, média 1.4 claims/turn
+- Tipos: price 32, stock_availability 24, fitment 4, delivery_fee 1
+- 0 `claim_invalid:*` blocks
+- Notas: Planner 9/10, Generator 9/10 provisório, Organizadora 8.5/10 provisório
+- Input médio Generator: 7068 tokens (era 6890 com v1.4 pós-claims)
+- Output médio: 347 tokens
+
+**Bateria custom 8 casos coloquiais:**
+- 8/8 generated, 0 blocked
+- Cobre: "tem aí?", "vc traz em Belford Roxo?", "pega na minha Bros?",
+  "tá salgado?", "dois pneus, quanto cada e tem?", "ia querer X, mas é Y",
+  "pode separar, pago pix, busco hoje"
+- 1 caso ("tá salgado") caiu em fallback — Planner falhou em rotear pra
+  `tratar_objecao`; não é bug do Generator
 
 ## Validacao Atual
 
-Ultima validacao (PR 4 local):
+- `npm run typecheck`: verde
+- `npm test`: 463/463 verde, 55 arquivos
+- `npm run build`: verde
+- 10 commits push em `pneus/main` desde `4963701`
 
-- `npm run typecheck`: verde.
-- `npm test`: 381/381 verde, 52 arquivos.
-- `npm run build`: verde.
-- `npm run test:integration`: 13 testes passaram em 2 arquivos; 3 suites nao
-  rodaram por falta de runtime Testcontainers/Docker no ambiente local.
-- `npx vitest run --config vitest.integration.config.ts tests/integration/atendente-state-persistence.integration.test.ts`: 8/8 verde.
-- Migration `0029`: aplicada/verificada no Supabase atual antes do push.
-- Smoke LLM real via Chatwoot fake `pr12-chatwoot-1778211526899`: 13 mensagens
-  ingeridas, 15 facts da Organizadora, Planner LLM e Generator LLM em shadow,
-  sem envio ao cliente.
-- Avaliação qualitativa: Organizadora 9/10, Planner 9/10, Generator 8/10,
-  fluxo geral 8,7/10. O teste validou correção de contexto e uso de tools;
-  o smoke posterior do PR5 validou bloqueio comercial e `blocked_say_text`.
-- Smoke PR3 pos-deploy (Chatwoot conversa `452`): Organizadora salvou 12 facts;
-  Planner LLM `planner_v1.2.5` usou tools comerciais; Generator rodou em shadow
-  e bloqueou 1 turno com `stock_claim_without_verificar_estoque`, preservando
-  `blocked_say_text`. Sem envio ao cliente. Limite: nao houve `update_draft`
-  nesse smoke, entao `draft_updated` ficou validado nos testes determinísticos.
-- Smoke `generator_v1.3.2` pos-deploy (Chatwoot conversa `453`): segundo turn
-  emitiu `update_draft` com nome, pix, delivery e endereco; `session_events`
-  gravou `draft_updated`; resposta pediu confirmacao humana de produto/estoque.
-- PR4 Organizadora/ops local: `ops.enrichment_jobs` recupera job zumbi por
-  `ORGANIZADORA_STALE_JOB_AFTER_SECONDS` e os limites principais passaram para
-  env (`ORGANIZADORA_MIN_CONFIDENCE`, `ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT`,
-  `ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT`).
-- Smoke PR4 pos-redeploy (Chatwoot conversas `454`-`459`): Organizadora
-  processou 6/6 jobs como `done`, tentativa 1, sem `last_error`; Planner e
-  Generator usaram LLM real. Achados: Planner tentou `verificarEstoque` sem
-  `product_id` em um turno; Generator fez claim de marca ("Tem Pirelli sim...")
-  antes de lastro. Sem envio ao cliente.
-- Fix pos-smoke: Planner `planner_v1.2.6` agora filtra/proibe
-  `verificarEstoque` sem `product_id`/`product_code`; Say Validator bloqueia
-  `brand_claim_without_buscar_produto` para frases como "Tem Pirelli sim" sem
-  lastro de `buscarProduto`.
-- Smoke pos-deploy `planner_v1.2.6` (Chatwoot `460`-`465`): Organizadora 6/6
-  jobs `done`; Planner sem `verificarEstoque` invalido; Generator sem claim de
-  marca sem lastro. Sem envio ao cliente.
-- PR5 comercial implementacao local: Say Validator tambem bloqueia desconto sem
-  `desconto_maximo`, desconto acima do maximo cadastrado, brinde/promocao sem
-  politica promocional e oferta custom ("faco por R$ 200") sem politica
-  comercial. Teste focado `say-validator.test.ts`: 49/49 verde.
-- Smoke LLM PR5 pos-deploy (Chatwoot `470`-`473`, run
-  `pr5-commercial-20260510190449`): Organizadora 23 facts; Planner 8/8 jobs;
-  Generator 6 `generated` seguros e 2 `blocked`. Brinde bloqueado por
-  `policy_claim_without_tool_result`; oferta "faz por R$ 200" bloqueada por
-  `money_not_supported_by_tool_result:200`; `blocked_say_text` preservado.
-- Smoke test prod 2026-05-05: mensagem 'oi, tem pneu 140/70-17 para Titan?',
-  job processado < 7s, turn `skill=pedir_dados_faltantes, status=generated`,
-  LLM real gpt-5.4, sem alucinacao comercial.
-- Teste real 12 conversas Chatwoot em 2026-05-05 revelou lacuna operacional:
-  12 mensagens `message_created/contact` foram normalizadas, mas 6 jobs nasceram
-  so apos enfileiramento manual. O hardening de fila adiciona reconciliador
-  automatico + endpoint admin para impedir mensagem de cliente sem job.
-- Validacao pos-redeploy do hardening (`cc42bfa`), run
-  `multiturn-20260505124936`: 6 conversas com 3 mensagens cada no Chatwoot real;
-  18/18 mensagens normalizadas em `prod`, 18/18 jobs e 18/18 turns. Zero job
-  faltante. Dois jobs tiveram atraso >30s, mas foram recuperados/processados.
-  Auditoria de qualidade: 12/18 ok, 6/18 review por frase generica de escalacao,
-  uma alegacao de politica/logistica e uma alegacao de disponibilidade de marca.
-- Organizadora: 120 enrichment_jobs done, 4 facts corretos, confianca > 0.95.
-- Deploy Coolify commit e35ca31: 2026-05-05 10:07, rolling update completed.
+## Próxima Fase
 
-## Proxima Fase
+**Fase D estendida (ADR-008)** — EM ANDAMENTO, não mais "próximo passo".
 
-Sprint 7: Critic Shadow da Atendente.
-- Segundo passe LLM avalia candidato do Generator; bloqueia ou aprova.
-- Sem envio Chatwoot no Critic.
-- Memoria operacional do Generator ja calibrada antes desta sprint.
-- Antes de envio real, Critic/SayValidator devem bloquear alegacoes comerciais
-  sem lastro, especialmente `temos <marca> disponivel`, prazo/politica de
-  entrega e frases genericas de escalacao em respostas que poderiam pedir dado
-  faltante de forma mais natural.
+Frentes paralelas:
+1. **Coleta humana 2-4 semanas:** Wallace atende manual, agente em shadow,
+   dataset humano vs bot.
+2. **Catálogo comercial:** preço, marca, foto, estoque (78 produtos técnicos
+   prontos). Ver `docs/COMMERCE_CATALOG_STATUS.md`.
+3. **6 blocos de infra paralela:**
+   - Particões julho/agosto 2026 (urgente, pg_partman não instalado)
+   - Reconciliar migration history (banco em 0030, CLI registra 0021)
+   - LGPD: endpoint erasure + base legal
+   - Runbook de desligamento de emergência
+   - Rate limit / circuit breaker OpenAI
+   - Auditoria RLS: confirmar service_role-only
 
-Sprint 6.10 (bloqueado por dados): seed catalogo `commerce.*`.
-- Tabelas `products`, `tire_specs`, `vehicle_fitments` vazias; `buscar_e_ofertar` retorna lista vazia.
+**NÃO fazer agora:**
+- Tunar mais prompts (sistema em diminishing returns)
+- Critic (descartado, ADR-005)
+- Supervisora (adiada, ADR-006)
+- Sprint 8 envio (adiado até Fase D + catálogo)
 
-Sprint 8: envio controlado ao Chatwoot.
-- `ChatwootApiClient.postMessage()` + worker envia turn `generated` aprovado.
-- Controlado por `ATENDENTE_SEND_ENABLED=false` (default off).
+**Fase G (futura, após Sprint 8):** Supervisora batch.
 
 ## Documentos De Apoio
 
-- `docs/NEXT_CHAT_HANDOFF.md`
-- `docs/HANDOFF.md`
-- `docs/CODEX_BRIEFING.md`
-- `docs/phase3-agent-architecture/21-atendente-v1-state-design.md`
+- `docs/NEXT_CHAT_HANDOFF.md` — resumo curto
+- `docs/HANDOFF.md` — operacional médio
+- `docs/CODEX_BRIEFING.md` — briefing técnico
+- `docs/PROJECT.md` — visão executiva
+- `docs/CONFIG.md` — env vars (inclui `GENERATOR_PROMPT_FEW_SHOT_ENABLED`)
 - `docs/adr/ADR-004-fase-3-arquitetura-agente.md`
+- `docs/adr/ADR-005-critic-descartado.md`
+- `docs/adr/ADR-006-supervisora-batch-adiada.md`
+- `docs/adr/ADR-007-validators-como-gate-sincrono.md`
+- `docs/adr/ADR-008-fase-d-estendida-coleta-humana.md`
+- `docs/adr/ADR-009-claims-and-few-shot.md` — **NOVO**, decisão Etapa 2 + v1.5.0
+- `docs/phase3-agent-architecture/21-atendente-v1-state-design.md`

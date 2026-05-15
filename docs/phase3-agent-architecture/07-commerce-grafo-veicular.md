@@ -171,3 +171,23 @@ agente nao vende como certeza se a compatibilidade depender de discovery nao pro
 
 `ops.stock_snapshots` e observabilidade/historico. Nao e fonte para o agente vender.
 
+## Status Do Catalogo Tecnico
+
+Atualizado em 2026-05-14: o ambiente `FAREJADOR_ENV=test` auditado tem
+catalogo tecnico de pneus populado em `commerce.*`.
+
+Resumo:
+
+- 50 pneus em `commerce.products`/`commerce.tire_specs`.
+- 138 modelos/variacoes em `commerce.vehicle_models`.
+- 96 compatibilidades oficiais em `commerce.vehicle_fitments`.
+- 84 pendencias em `commerce.fitment_discoveries`.
+- Aros cobertos: 10, 12, 13, 14, 15, 16, 17, 18, 19 e 21.
+- Preco ativo: 0 produtos no ambiente auditado.
+- Estoque positivo: 0 produtos no ambiente auditado.
+
+Documento operacional completo: `docs/COMMERCE_CATALOG_STATUS.md`.
+
+Teste inicial para shadow em `prod` tambem foi registrado em
+`docs/ATENDENTE_CATALOG_SHADOW_TESTS.md`: bateria 5/5 verde, com correcao do
+resolvedor para respeitar versao do modelo antes de cair em match generico.

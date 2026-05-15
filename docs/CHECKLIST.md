@@ -1,48 +1,60 @@
 # Checklist Master - Farejador
 
-Atualizado: 2026-05-08
+Atualizado: 2026-05-15
 
 > Nota: este checklist preserva historico das Fases 1/2a. Para o estado vivo
 > da Fase 3 e proximo passo, use `docs/NEXT_CHAT_HANDOFF.md` e
 > `docs/phase3-agent-architecture/00-estado-de-implementacao.md`.
 
-## 0. Estado Atual Resumido
+## 0. Estado Atual Resumido (2026-05-15)
 
 - [x] Fase 1 em prod.
 - [x] Fase 2a concluida.
 - [x] Organizadora LLM em prod.
-- [x] Atendente Sprint 1: estado reentrante.
-- [x] Atendente Sprint 2: tools deterministicas.
-- [x] Atendente Sprint 3: Planner foundation.
-- [x] Atendente Sprint 4: Executor/guardrails.
-- [x] Atendente Sprint 5: Worker Shadow minimalista.
-- [x] Atendente Sprint 6: Generator shadow.
+- [x] Atendente Sprints 1-6.9 todos concluidos.
 - [x] Generator LLM real validado em shadow, sem envio Chatwoot.
-- [x] Atendente Sprint 6.5: loop de estado (applyActionAndPersistInTx).
-- [x] Atendente Sprint 6.6: bridge Organizadora → Context Builder.
-- [x] Atendente Sprint 6.7: Say Validator endurecido.
-- [x] Atendente Sprint 6.8: filtro sender_type no dispatcher.
-- [x] Atendente Sprint 6.9: nota interna Chatwoot ao escalar.
-- [x] Ajuste pre-Critic: memoria operacional do Generator (create_item, update_slot em tempo real).
-- [x] Fix planner_v1.2.5: Planner usa organizer_facts para buscarCompatibilidade.
-- [x] Fix generator_v1.3.1: Generator proibe SAFE_FALLBACK em pedir_dados_faltantes.
-- [x] Fix phase3 dedup: facts identicos nao geram nova linha no ledger.
-- [x] PR 1 Generator audit: turns bloqueados preservam candidato em
-  `blocked_say_text`/`blocked_payload`; `update_draft` tem metacampos.
-- [x] PR 2 Estado/contexto: Context Builder com limite configuravel,
-  `stale_slots` carregado do banco e invalidações ampliadas de oferta/slots.
-- [x] PR 3 Validators/eventos: Action Validator com pre-condicoes de
-  carrinho/draft/escalacao; eventos semanticos em `session_events` e
-  `cart_events.updated`.
-- [x] PR 4 Organizadora/ops: reclaim de job zumbi, envs operacionais e decisao
-  documentada para mensagem editada.
-- [x] PR 5 Say Validator comercial: marca, desconto, brinde/promocao e oferta
-  custom sem lastro bloqueados; smoke LLM real `470`-`473` validou
-  `blocked_say_text`.
-- [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod (2026-05-06).
-- [ ] Critic (Sprint 7).
-- [ ] Envio Chatwoot pela Atendente (Sprint 8).
-- [ ] Seed catalogo commerce.* (Sprint 6.10).
+- [x] PRs 1-5 fechados (auditoria, contexto, validators, ops, Say Validator comercial).
+- [x] Validacao qualidade end-to-end Organizadora+Planner+Generator em prod.
+- [~] Critic (Sprint 7 original): DESCARTADO (ADR-005). SayValidator+ActionValidator+ClaimValidator sao o gate.
+- [~] Supervisora batch: ADIADA para Fase G original (ADR-006).
+- [x] **Planner-input fix (commit `4963701`):** prompt v1.2.7 com regras
+  marca/product_code + sanitize defensivo no executor. Resolveu 97% de
+  `buscarProduto.output=[]` por inputs alucinados.
+- [x] **Fase 3 residual (commit `0a40e0d`):** A1 fitment hedge, A3 anti-soma,
+  A4 delivery sem endereço, auto-chain inicial.
+- [x] **Refactor A2 (commit `0ba7988`):** auto-chain determinístico de
+  `verificarEstoque` sem regex de intent.
+- [x] **B1+B2+B3 housekeeping (commit `ce16830`):** safeRollback,
+  dead branch removido, `deterministicId` sha256.
+- [x] **B4 action_id (commit `d0c5da3`):** metadados em cart/escalate/confirmation/selectSkill.
+- [x] **B5 escalação real (commit `9888bd7`):** worker emite `escalate`
+  quando `Planner.skill=escalar_humano`. `agent.escalations` agora recebe linhas
+  (5 confirmadas em DB).
+- [x] **Etapa 3 Planner cleanup (commit `b6bc9d9`):** Planner v1.2.8 sem
+  regex de customer text; regras explícitas por skill.
+- [x] **Etapa 2 structured claims (commit `408f058`):** Generator v1.4.0 com
+  `claims[]` + `ClaimValidator` (price/stock_availability/fitment/delivery_fee).
+- [x] **Limpeza dead code (commit `654c521`):** `llmAtendenteResponseSchema` morto removido.
+- [x] **Audit claims (commit `1edd3a2`):** claims em `event_payload` + `claims_count` + `claim_types`.
+- [x] **v1.5.0 few-shot (commit `cc93a05`):** novo prompt com 10 exemplos canônicos atrás de
+  `GENERATOR_PROMPT_FEW_SHOT_ENABLED`. ~28% menor que v1.4.0.
+- [x] **Audit prompt_version fix (commit `6f7e7c5`):** DB grava versão REAL
+  (v1.4 ou v1.5), não constante fixa.
+- [ ] **Fase D estendida (EM ANDAMENTO):** Wallace atende manual 2-4 semanas +
+  comparacao humano vs bot (ADR-008).
+- [x] Seed catalogo tecnico commerce.* (2026-05-14): 78 pneus em
+  `commerce.products`/`commerce.tire_specs`, 166 `vehicle_fitments` no banco.
+- [x] catalog15-rerun com v1.5.0 ligada (2026-05-15): 45/45 generated, 0 blocked,
+  2 fallbacks, 64.4% turns com claims. Notas: Planner 9/10, Generator 9/10
+  provisório, Organizadora 8.5/10 provisório.
+- [x] Bateria custom 8 casos coloquiais (2026-05-15): 8/8 generated, 0 blocked.
+- [ ] Preco/marca/fotos do catalogo: completar conforme a operação exigir.
+- [ ] Envio Chatwoot pela Atendente (Sprint 8): adiado ate Fase D + catalogo.
+- [ ] Particoes julho/agosto 2026 (urgente — antes de 30/jun).
+- [ ] Reconciliar migration history Supabase (banco em 0030, CLI registra 0021) ou abandonar CLI.
+- [ ] LGPD minimo: endpoint de erasure + base legal documentada.
+- [ ] Runbook de desligamento de emergencia.
+- [ ] Rate limit / circuit breaker de custo OpenAI.
 
 Legenda: feito, em andamento, proximo, futuro.
 
@@ -337,9 +349,9 @@ Pendente da F1.5:
   `blocked_payload`, sem enviar a frase ao cliente
 - [x] Say Validator comercial bloqueia brinde/oferta custom sem lastro e evita
   promessa de desconto/marca sem evidencia comercial
-- [ ] Critic shadow
-- [ ] Sugestao assistida para humano
-- [ ] Atendente liga envio Chatwoot somente apos autorizacao explicita
+- [~] Critic shadow: DESCARTADO (ADR-005). SayValidator+ActionValidator cobrem.
+- [ ] Comparacao humano vs bot durante Fase D estendida (ADR-008)
+- [ ] Atendente liga envio Chatwoot somente apos Fase D + catalogo + autorizacao explicita
 - [ ] Pedido NAO criado automaticamente; humano fecha via escalacao
 - [ ] Monitoramento: taxa de validator_blocked, llm_timeout, fallback_responder_geral
 - [ ] Auditoria semanal de `agent.turns` e `ops.agent_incidents`

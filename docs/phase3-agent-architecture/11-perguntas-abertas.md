@@ -4,15 +4,9 @@ Estas decisoes nao bloqueiam o desenho do banco, mas precisam ser fechadas antes
 
 ## LLM usada
 
-Ainda nao definido.
+**Decidido em 2026-04-29:** OpenAI gpt-5.4 / gpt-5.4-mini, em producao via Organizadora e Generator (shadow).
 
-Arquitetura deve funcionar com qualquer provider que entregue:
-
-- chamada de texto;
-- JSON estruturado;
-- timeout;
-- logs de custo;
-- versionamento de prompt.
+Arquitetura permanece agnostica para troca futura, mas variaveis de ambiente atuais (`OPENAI_API_KEY`, `GENERATOR_OPENAI_API_KEY`, `OPENAI_MODEL`, `GENERATOR_MODEL`) assumem provider OpenAI.
 
 ## Modo Shadow Assistido
 
@@ -66,27 +60,15 @@ retry curto -> fallback educado -> registrar incidente
 
 ## Deployment
 
-Decidir depois:
+**Decidido em 2026-04-29:** servico unico no Coolify. Atendente, Organizadora e Farejador rodam no mesmo container/processo, controlados por feature flags (`ATENDENTE_SHADOW_ENABLED`, `ORGANIZADORA_ENABLED`).
 
-- Atendente em container separado;
-- endpoints separados;
-- ou orquestracao por fila.
-
-Preferencia arquitetural:
-
-```text
-servico separado, lendo core/analytics/commerce e escrevendo agent
-```
+Separacao em multiplos containers fica como possibilidade futura, nao prioridade.
 
 ## analytics marts
 
-Ainda nao entram no primeiro schema operacional.
+**Implementado em 2026-04-29:** schema `analytics_marts` ativo em prod via migration `0023_analytics_marts_v1.sql`. Views disponiveis: `organizadora_quality_daily`, `daily_demand_by_tire`, `daily_demand_by_neighborhood`, `daily_customer_intent`, etc.
 
-Precisam de sessao propria com Wallace:
-
-```text
-quais perguntas de negocio voce quer responder todo dia?
-```
+Materializacao das views mais usadas e dashboard (Metabase ou similar) ainda pendentes.
 
 ## Pedido automatico
 
@@ -96,17 +78,13 @@ Execucao automatica fica desligada no v1.
 
 ## LLM Supervisora
 
-Possibilidade futura, nao obrigatoria.
+**Decisao 2026-05-10 (ADR-006):** adiada para Fase G original (depois de Sprint 8 maduro). NAO e proximo passo.
 
-Perguntas em aberto:
+Respostas as 4 perguntas:
 
-- vale criar LLM Supervisora em batch?
-- ela revisa todas as conversas ou apenas perdas/fallbacks?
-- quais tabelas receberiam flags de qualidade?
-- qual modelo barato seria suficiente?
+- vale criar? Sim, mas calibracao depende de dataset humano (Fase D estendida) + envio em producao.
+- todas as conversas ou apenas perdas/fallbacks? Comecar por todos os turnos `status='generated'` nao bloqueados.
+- quais tabelas? `ops.supervisor_reviews` + `ops.supervisor_reason_codes` (vocabulario evolutivo).
+- modelo? `gpt-5.4-mini` configuravel via env.
 
-Recomendacao atual:
-
-```text
-nao entra antes da LLM Atendente estar validada
-```
+NOTA: Critic em tempo real (Sprint 7 original) foi DESCARTADO em 2026-05-10 (ADR-005). NAO sera implementado. SayValidator + ActionValidator sao o gate sincrono pre-envio (ADR-007).

@@ -48,8 +48,10 @@ Esse volume e suficiente para observar dados reais antes de automatizar o atendi
 ORGANIZADORA_ENABLED=true
 ATENDENTE_SHADOW_ENABLED=false
 PLANNER_LLM_ENABLED=false
-SUPERVISORA_ENABLED=false
+GENERATOR_LLM_ENABLED=false
 ```
+
+NOTA: `SUPERVISORA_ENABLED` foi removida desta lista em 2026-05-10. Supervisora foi adiada para Fase G (ADR-006); a feature flag sera criada quando Supervisora for implementada, nao antes. `ATENDENTE_SEND_ENABLED` tambem nao existe ainda — sera criada quando Sprint 8 iniciar.
 
 Quando chegar a hora de testar a Atendente em log-only:
 
