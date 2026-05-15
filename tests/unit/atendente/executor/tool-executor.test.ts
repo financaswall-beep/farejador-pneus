@@ -70,6 +70,73 @@ describe('Tool Executor Sprint 4', () => {
     expect(result[0]?.error_message).toContain('buscarProduto exige');
   });
 
+  it('sanitiza marca/product_code quando LLM Planner envia medida ou marca de moto', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+
+    // Caso 1: marca = medida_pneu (LLM copiou medida para marca)
+    await executeToolRequests({ query } as never, [
+      {
+        tool: 'buscarProduto',
+        input: {
+          environment: 'test',
+          medida_pneu: '110/70-17',
+          marca: '110/70-17',
+          product_code: '110/70-17',
+          posicao_pneu: 'front',
+          apenas_com_estoque: true,
+          limit: 10,
+        } as never,
+      },
+    ]);
+    expect(query).toHaveBeenCalledTimes(1);
+    const sql1 = String(query.mock.calls[0]?.[0]);
+    const params1 = query.mock.calls[0]?.[1] ?? [];
+    expect(sql1).toContain('FROM commerce.product_full');
+    // marca dropped → filtro de marca nao aparece no SQL
+    expect(sql1).not.toContain('brand ILIKE');
+    // product_code dropped → filtro tambem nao aparece
+    expect(sql1).not.toContain('product_code = ');
+    // medida_pneu mantido
+    expect(params1).toEqual(expect.arrayContaining(['110/70-17']));
+
+    query.mockClear();
+
+    // Caso 2: marca de moto (Zontes) — drop
+    await executeToolRequests({ query } as never, [
+      {
+        tool: 'buscarProduto',
+        input: {
+          environment: 'test',
+          medida_pneu: '160/60-17',
+          marca: 'Zontes',
+          posicao_pneu: 'rear',
+          apenas_com_estoque: true,
+          limit: 5,
+        } as never,
+      },
+    ]);
+    const sql2 = String(query.mock.calls[0]?.[0]);
+    expect(sql2).not.toContain('brand ILIKE');
+
+    query.mockClear();
+
+    // Caso 3: marca valida (Pirelli) — mantida
+    await executeToolRequests({ query } as never, [
+      {
+        tool: 'buscarProduto',
+        input: {
+          environment: 'test',
+          medida_pneu: '160/60-17',
+          marca: 'Pirelli',
+          apenas_com_estoque: true,
+          limit: 5,
+        } as never,
+      },
+    ]);
+    const sql3 = String(query.mock.calls[0]?.[0]);
+    expect(sql3).toContain('brand ILIKE');
+  });
+
   it('grava tool_executed e tool_failed no ledger', async () => {
     const query = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] });
     const context = plannerContext();
