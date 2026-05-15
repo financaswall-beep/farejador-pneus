@@ -165,6 +165,7 @@ function mockGenerateTurn(
   return {
     say_text: validation.blocked ? null : say,
     actions: validation.blocked ? [] : actions,
+    claims: [],
     blocked: validation.blocked,
     block_reason: validation.block_reason,
     candidate_say_text: validation.blocked ? say : null,
@@ -192,6 +193,7 @@ function fallbackResult(reason: string): GeneratorResult {
   return {
     say_text: null,
     actions: [],
+    claims: [],
     blocked: true,
     block_reason: reason,
     candidate_say_text: null,
@@ -288,6 +290,7 @@ export async function generateTurn(
         ...fallbackResult(
           `generator_action_hydration_failed:indexes=${invalid_indexes.join(',')}`,
         ),
+        claims, // audit: preserva claims que o Generator emitiu mesmo com action invalida
         candidate_say_text: say,
         candidate_actions: actions,
         candidate_raw_actions: rawActions,
@@ -303,6 +306,7 @@ export async function generateTurn(
     return {
       say_text: validation.blocked ? null : say,
       actions: validation.blocked ? [] : actions,
+      claims, // audit: SEMPRE preserva claims emitidos (mesmo se blocked pelo claim-validator)
       blocked: validation.blocked,
       block_reason: validation.block_reason,
       candidate_say_text: validation.blocked ? say : null,
@@ -391,10 +395,17 @@ export async function recordGeneratorResult(
   // Não preenche delivered_message_id (envio não existe ainda).
   const blockedSayText = result.blocked ? result.candidate_say_text : null;
   const blockedActions = result.blocked ? result.candidate_actions : [];
+  // Audit Etapa 2: claims emitidos pelo Generator ficam no payload pra
+  // separar "Generator afirmou e validator passou" de "Generator nao afirmou
+  // nada comercial". Sem isso nao da pra medir adocao de claims.
+  // Defensivo contra fixtures/mocks legados que nao incluem claims.
+  const claimsForAudit = result.claims ?? [];
+  const claimTypes = claimsForAudit.map((c) => c.type);
   const blockedPayload = result.blocked
     ? {
         say_text: blockedSayText,
         actions: blockedActions,
+        claims: claimsForAudit,
         raw_actions: result.candidate_raw_actions ?? null,
         block_reason: result.block_reason,
         used_llm: result.used_llm,
@@ -457,6 +468,11 @@ export async function recordGeneratorResult(
         blocked_say_text: blockedSayText,
         blocked_actions_count: blockedActions.length,
         actions_count: result.actions.length,
+        // Audit Etapa 2: claims emitidos pelo Generator (sempre, mesmo se blocked).
+        // claims_count + claim_types permitem query rapida em SQL sem unnest.
+        claims: claimsForAudit,
+        claims_count: claimsForAudit.length,
+        claim_types: claimTypes,
         used_llm: result.used_llm,
         fallback_used: result.fallback_used,
         prompt_version: generatorPromptVersion,

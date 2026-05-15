@@ -924,4 +924,90 @@ describe('Generator Shadow — auditoria de bloqueios', () => {
       block_reason: 'delivery_claim_without_calcular_frete',
     });
   });
+
+  it('recordGeneratorResult inclui claims no blocked_payload e event_payload (audit Etapa 2)', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    const claims = [
+      { type: 'price' as const, amount: 79, product_id: '11111111-2222-4333-8444-555555555555' },
+      { type: 'stock_availability' as const, product_id: '11111111-2222-4333-8444-555555555555' },
+    ];
+
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'buscar_e_ofertar',
+      {
+        say_text: 'Tem por R$ 79 em estoque.',
+        actions: [],
+        claims,
+        blocked: false,
+        block_reason: null,
+        candidate_say_text: null,
+        candidate_actions: [],
+        used_llm: true,
+        fallback_used: false,
+        input_tokens: 100,
+        output_tokens: 50,
+        duration_ms: 500,
+      },
+      '00000000-0000-4000-8000-0000000000ff',
+    );
+
+    // event_payload deve conter claims, claims_count, claim_types
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    expect(eventPayload.claims).toEqual(claims);
+    expect(eventPayload.claims_count).toBe(2);
+    expect(eventPayload.claim_types).toEqual(['price', 'stock_availability']);
+  });
+
+  it('recordGeneratorResult preserva claims emitidos mesmo quando turn eh bloqueado por claim invalido', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    const claims = [{ type: 'price' as const, amount: 158 }]; // invalido — soma proibida
+
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'buscar_e_ofertar',
+      {
+        say_text: null,
+        actions: [],
+        claims,
+        blocked: true,
+        block_reason: 'claim_invalid:price:amount_158_not_in_results',
+        candidate_say_text: 'Os dois pneus saem por R$ 158.',
+        candidate_actions: [],
+        candidate_raw_actions: [],
+        used_llm: true,
+        fallback_used: false,
+        input_tokens: 100,
+        output_tokens: 50,
+        duration_ms: 500,
+      },
+      '00000000-0000-4000-8000-0000000000aa',
+    );
+
+    // blocked_payload tambem deve carregar claims pra auditoria
+    const blockedPayload = JSON.parse(queries[0]!.params[16] as string);
+    expect(blockedPayload.claims).toEqual(claims);
+    expect(blockedPayload.block_reason).toBe('claim_invalid:price:amount_158_not_in_results');
+
+    // event_payload espelha claims
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    expect(eventPayload.claims).toEqual(claims);
+    expect(eventPayload.claim_types).toEqual(['price']);
+  });
 });

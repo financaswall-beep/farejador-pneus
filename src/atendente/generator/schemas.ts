@@ -488,6 +488,13 @@ export interface GeneratorResult {
   say_text: string | null;
   /** Actions hidratadas e validadas (vazio quando blocked). */
   actions: AgentAction[];
+  /**
+   * Claims estruturados emitidos pelo Generator junto com `say` (Etapa 2).
+   * Mesmo array tanto no caminho de sucesso quanto no bloqueado — necessario
+   * para auditar se Generator esta emitindo claims direito ou se turn passa
+   * apenas pela rede regex antiga.
+   */
+  claims: GeneratorClaim[];
   /** true = resposta bloqueada pelos validators ou falta de lastro. */
   blocked: boolean;
   /** Motivo do bloqueio, preenchido quando blocked=true. */
