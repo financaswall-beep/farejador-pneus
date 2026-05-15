@@ -25,6 +25,7 @@ import {
 } from '../shared/repositories/ops-atendente.repository.js';
 import {
   executeToolRequests,
+  maybeAutoChainVerificarEstoque,
   recordToolExecutionResults,
   type ToolExecutionResult,
 } from './executor/tool-executor.js';
@@ -87,6 +88,21 @@ export async function processAtendenteJob(
   if (decision.output.tool_requests.length > 0) {
     toolResults = await executeToolRequests(client, decision.output.tool_requests);
     await recordToolExecutionResults(client, context, toolResults);
+  }
+
+  // Auto-chain: se o cliente perguntou estoque/disponibilidade e buscarProduto
+  // retornou produto, dispara verificarEstoque automaticamente (Planner nao
+  // tem product_id antes da busca, entao nao consegue pedir sozinho).
+  const customerText = latestCustomerTextForJob(context, job.trigger_message_id);
+  const autoStock = await maybeAutoChainVerificarEstoque(
+    client,
+    job.environment,
+    customerText,
+    toolResults,
+  );
+  if (autoStock) {
+    toolResults = [...toolResults, autoStock];
+    await recordToolExecutionResults(client, context, [autoStock]);
   }
 
   const generatorResult = await generateTurn(context, decision, toolResults);
@@ -321,6 +337,22 @@ async function reconcileAtendenteJobsIfDue(now = new Date()): Promise<void> {
   } catch (err) {
     logger.error({ worker_id: WORKER_ID, err }, 'atendente shadow: job reconciliation failed');
   }
+}
+
+function latestCustomerTextForJob(
+  context: Awaited<ReturnType<typeof buildPlannerContext>>,
+  triggerMessageId: string,
+): string | null {
+  // Prefere a mensagem do trigger (a mais nova que disparou o job).
+  // Fallback: ultima mensagem com role=customer em recent_messages.
+  const trigger = context.recent_messages.find((m) => m.id === triggerMessageId);
+  if (trigger && trigger.role === 'customer') return trigger.text;
+
+  for (let index = context.recent_messages.length - 1; index >= 0; index -= 1) {
+    const message = context.recent_messages[index]!;
+    if (message.role === 'customer') return message.text;
+  }
+  return null;
 }
 
 async function lockSessionForJob(client: PoolClient, job: AtendenteJobRow): Promise<void> {

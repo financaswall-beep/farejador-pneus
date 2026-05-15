@@ -212,6 +212,38 @@ describe('SayValidator inicial', () => {
     ).toEqual({ valid: true });
   });
 
+  // Fitment hedge: frases negativas/cautelosas sobre compatibilidade NAO devem
+  // disparar fitment_claim_without_buscar_compatibilidade (falsos positivos
+  // observados em catalog15-rerun-20260515033950: 6/45 turns bloqueados).
+  it.each([
+    'Nao consigo confirmar se serve na sua Suzuki sem o ano.',
+    'Ainda nao consigo confirmar a compatibilidade com seguranca.',
+    'Nao tenho como garantir que serve nessa moto.',
+    'Vou verificar se serve antes de afirmar.',
+    'Preciso confirmar se serve para a sua moto.',
+    'Talvez sirva, mas precisa confirmar.',
+    'Me manda o ano da sua moto para eu confirmar se serve.',
+    'Antes de garantir que serve, preciso de mais informacoes.',
+  ])('permite frase com hedge de compatibilidade sem buscarCompatibilidade: %s', (sentence) => {
+    expect(
+      validateSay(sentence, { recent_tool_results: [] }),
+    ).toEqual({ valid: true });
+  });
+
+  it('bloqueia mesmo com hedge se houver frase afirmativa separada sem evidencia', () => {
+    // Duas frases: a primeira tem hedge, a segunda afirma sem evidencia.
+    // O validator deve bloquear pela segunda frase.
+    expect(
+      validateSay(
+        'Nao tenho certeza se serve. Mas esse pneu serve para sua Honda.',
+        { recent_tool_results: [] },
+      ),
+    ).toMatchObject({
+      valid: false,
+      reason: 'fitment_claim_without_buscar_compatibilidade',
+    });
+  });
+
   it('bloqueia fallback seguro misturado com resposta util', () => {
     expect(
       validateSay(

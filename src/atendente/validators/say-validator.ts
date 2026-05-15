@@ -197,13 +197,55 @@ function mentionsDeliveryClaim(text: string): boolean {
   ].some((pattern) => pattern.test(text));
 }
 
-function mentionsCompatibilityClaim(text: string): boolean {
+const COMPATIBILITY_CLAIM_PATTERNS = [
+  /\b(?:serve|servem)\s+(?:na|no|para|pra)\b/,
+  /\bcompativel\s+(?:com|para|pra)\b/,
+  /\b(?:pneu|medida|modelo)\s+(?:certo|correto|ideal)\s+(?:para|pra)\b/,
+  /\bencaixa\s+(?:na|no)\b/,
+];
+
+/**
+ * Marca uma frase como hedge/negacao sobre compatibilidade.
+ * Quando a frase contem qualquer um destes padroes, "serve"/"compativel"
+ * NAO devem ser tratados como afirmacao de compatibilidade.
+ *
+ * Exemplos cobertos:
+ *  - "nao consigo confirmar se serve"
+ *  - "nao tenho certeza se serve"
+ *  - "ainda nao sei se serve"
+ *  - "preciso confirmar se serve"
+ *  - "vou verificar se serve"
+ *  - "nao posso garantir que serve"
+ *  - "talvez sirva" / "talvez serve"
+ */
+function mentionsCompatibilityHedge(text: string): boolean {
   return [
-    /\b(?:serve|servem)\s+(?:na|no|para|pra)\b/,
-    /\bcompativel\s+(?:com|para|pra)\b/,
-    /\b(?:pneu|medida|modelo)\s+(?:certo|correto|ideal)\s+(?:para|pra)\b/,
-    /\bencaixa\s+(?:na|no)\b/,
+    // Negacoes diretas de confirmacao
+    /\bnao\s+(?:consigo|posso|tenho\s+como|vou\s+conseguir)\s+(?:confirmar|garantir|afirmar|prometer|dizer)\b/,
+    /\bnao\s+(?:tenho|temos)\s+(?:como\s+)?(?:certeza|confirmacao|garantia)\b/,
+    /\bnao\s+(?:sei|saberia|sabia)\s+(?:dizer|afirmar|confirmar|se)\b/,
+    /\bnao\s+(?:da|deu|daria)\s+(?:pra|para)\s+(?:confirmar|garantir|afirmar)\b/,
+    // Hedges de incerteza/futuro
+    /\b(?:ainda\s+)?(?:preciso|precisamos|vou|vamos|posso|podemos)\s+(?:verificar|confirmar|checar|consultar|olhar)\b/,
+    /\bdeixa\s+eu\s+(?:verificar|confirmar|checar|consultar|olhar)\b/,
+    /\bantes\s+de\s+(?:confirmar|garantir|afirmar|prometer)\b/,
+    // Modais de incerteza
+    /\b(?:talvez|provavelmente|possivelmente|pode\s+ser\s+que)\b/,
+    // Pedidos para o cliente ajudar a confirmar
+    /\b(?:me\s+(?:manda|envia|passa)|voce\s+(?:tem|poderia|pode))\b.{0,40}\b(?:foto|ano|versao|medida)\b/,
   ].some((pattern) => pattern.test(text));
+}
+
+function mentionsCompatibilityClaim(text: string): boolean {
+  // Quebra em frases para nao misturar hedge de uma frase com claim de outra.
+  for (const sentence of splitSentences(text)) {
+    const normalized = normalizeText(sentence);
+    if (mentionsCompatibilityHedge(normalized)) continue;
+    if (COMPATIBILITY_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 type PolicyClaim =

@@ -13,6 +13,7 @@ const planTurnMock = vi.fn();
 const recordPlannerDecisionMock = vi.fn();
 const executeToolRequestsMock = vi.fn();
 const recordToolExecutionResultsMock = vi.fn();
+const maybeAutoChainVerificarEstoqueMock = vi.fn().mockResolvedValue(null);
 const generateTurnMock = vi.fn();
 const recordGeneratorResultMock = vi.fn();
 
@@ -28,6 +29,7 @@ vi.mock('../../../src/atendente/planner/service.js', () => ({
 vi.mock('../../../src/atendente/executor/tool-executor.js', () => ({
   executeToolRequests: executeToolRequestsMock,
   recordToolExecutionResults: recordToolExecutionResultsMock,
+  maybeAutoChainVerificarEstoque: maybeAutoChainVerificarEstoqueMock,
 }));
 
 vi.mock('../../../src/atendente/generator/service.js', () => ({

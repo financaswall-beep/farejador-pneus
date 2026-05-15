@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { executeToolRequests, recordToolExecutionResults } from '../../../../src/atendente/executor/tool-executor.js';
+import {
+  customerAsksForStock,
+  executeToolRequests,
+  maybeAutoChainVerificarEstoque,
+  recordToolExecutionResults,
+  type ToolExecutionResult,
+} from '../../../../src/atendente/executor/tool-executor.js';
 import type { PlannerContext } from '../../../../src/atendente/planner/context-builder.js';
 import type { ConversationState } from '../../../../src/shared/zod/agent-state.js';
 
@@ -135,6 +141,152 @@ describe('Tool Executor Sprint 4', () => {
     ]);
     const sql3 = String(query.mock.calls[0]?.[0]);
     expect(sql3).toContain('brand ILIKE');
+  });
+
+  describe('auto-chain verificarEstoque pos-buscarProduto', () => {
+    it.each([
+      'Tem?',
+      'Tem ai?',
+      'Voces tem em estoque?',
+      'Pronta entrega?',
+      'Ainda tem esse pneu?',
+      'Tem disponivel?',
+      'Vcs tem 90/90-18?',
+    ])('detecta intencao de estoque na mensagem: %s', (text) => {
+      expect(customerAsksForStock(text)).toBe(true);
+    });
+
+    it.each([
+      'Qual a medida do meu pneu?',
+      'Minha moto e Honda CG 160.',
+      'Quero saber o preco.',
+      null,
+      undefined,
+      '',
+    ])('NAO detecta intencao de estoque: %s', (text) => {
+      expect(customerAsksForStock(text)).toBe(false);
+    });
+
+    it('dispara verificarEstoque quando cliente pediu estoque e buscarProduto retornou produto', async () => {
+      // Mock para verificarEstoque
+      const client = {
+        query: vi.fn().mockResolvedValueOnce({
+          rows: [
+            {
+              product_id: '11111111-2222-4333-8444-555555555555',
+              product_code: 'SKU001',
+              product_name: 'Pneu 90/90-18',
+              location: 'loja',
+              quantity_available: 5,
+              quantity_reserved: 0,
+            },
+          ],
+        }),
+      };
+
+      const existing: ToolExecutionResult[] = [
+        {
+          tool: 'buscarProduto',
+          input: { environment: 'prod', medida_pneu: '90/90-18' },
+          output: [{ product_id: '11111111-2222-4333-8444-555555555555', product_code: 'SKU001', price_amount: '79.00' }],
+          ok: true,
+          duration_ms: 5,
+          error_message: null,
+        },
+      ];
+
+      const result = await maybeAutoChainVerificarEstoque(
+        client as never,
+        'prod',
+        'Tem em estoque?',
+        existing,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.tool).toBe('verificarEstoque');
+      expect(result?.ok).toBe(true);
+      expect((result?.input as Record<string, unknown>)?.product_id).toBe('11111111-2222-4333-8444-555555555555');
+    });
+
+    it('NAO dispara quando verificarEstoque ja rodou no turn', async () => {
+      const client = { query: vi.fn() };
+      const existing: ToolExecutionResult[] = [
+        {
+          tool: 'buscarProduto',
+          input: { environment: 'prod' },
+          output: [{ product_id: 'p1' }],
+          ok: true,
+          duration_ms: 5,
+          error_message: null,
+        },
+        {
+          tool: 'verificarEstoque',
+          input: { environment: 'prod', product_id: 'p1' },
+          output: { disponivel: true, quantidade_total: 3 },
+          ok: true,
+          duration_ms: 5,
+          error_message: null,
+        },
+      ];
+
+      const result = await maybeAutoChainVerificarEstoque(
+        client as never,
+        'prod',
+        'Tem em estoque?',
+        existing,
+      );
+
+      expect(result).toBeNull();
+      expect(client.query).not.toHaveBeenCalled();
+    });
+
+    it('NAO dispara quando buscarProduto retornou vazio', async () => {
+      const client = { query: vi.fn() };
+      const existing: ToolExecutionResult[] = [
+        {
+          tool: 'buscarProduto',
+          input: { environment: 'prod' },
+          output: [],
+          ok: true,
+          duration_ms: 5,
+          error_message: null,
+        },
+      ];
+
+      const result = await maybeAutoChainVerificarEstoque(
+        client as never,
+        'prod',
+        'Tem em estoque?',
+        existing,
+      );
+
+      expect(result).toBeNull();
+      expect(client.query).not.toHaveBeenCalled();
+    });
+
+    it('NAO dispara quando cliente nao perguntou sobre estoque', async () => {
+      const client = { query: vi.fn() };
+      const existing: ToolExecutionResult[] = [
+        {
+          tool: 'buscarProduto',
+          input: { environment: 'prod' },
+          output: [{ product_id: 'p1' }],
+          ok: true,
+          duration_ms: 5,
+          error_message: null,
+        },
+      ];
+
+      const result = await maybeAutoChainVerificarEstoque(
+        client as never,
+        'prod',
+        'Quero saber o preco.',
+        existing,
+      );
+
+      expect(result).toBeNull();
+      expect(client.query).not.toHaveBeenCalled();
+    });
   });
 
   it('grava tool_executed e tool_failed no ledger', async () => {
