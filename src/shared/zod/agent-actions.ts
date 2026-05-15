@@ -247,23 +247,9 @@ export type InvalidateOfferAction = z.infer<typeof invalidateOfferSchema>;
 export type AddObjectionAction = z.infer<typeof addObjectionSchema>;
 export type UnsupportedObservationAction = z.infer<typeof unsupportedObservationSchema>;
 
-// ------------------------------------------------------------------
-// Full LLM Atendente response envelope
-// ------------------------------------------------------------------
-
-/**
- * The complete JSON object that the LLM Atendente must return.
- * The Say Validator checks `say` before it goes to Chatwoot.
- * The Action Validator parses `actions` through agentActionSchema for each element.
- */
-export const llmAtendenteResponseSchema = z.object({
-  /**
-   * The text to send to the customer via Chatwoot.
-   * Say Validator must block: internal_notes leaks, PII exposure, empty string.
-   */
-  say: z.string().min(1).max(4000),
-  /** May be empty array when the turn only sends a message with no state change. */
-  actions: z.array(agentActionSchema).max(10),
-});
-
-export type LLMAtendenteResponse = z.infer<typeof llmAtendenteResponseSchema>;
+// NOTE (limpeza 2026-05-15): removidos llmAtendenteResponseSchema e
+// LLMAtendenteResponse — eram do esqueleto antigo do Atendente (Sprint
+// pre-6) que tinha say.max(4000) e actions diretas. O fluxo atual usa
+// generatorOutputRawSchema (max 2000) em src/atendente/generator/schemas.ts
+// e o Generator emite raw actions hidratadas pelo codigo. Sem callers em
+// nenhum lugar (grep -r confirmou).
