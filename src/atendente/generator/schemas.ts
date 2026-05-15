@@ -35,7 +35,19 @@ import {
 } from '../../shared/zod/agent-state.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 
-export const generatorPromptVersion = 'generator_v1.4.0';
+export const generatorPromptVersionV14 = 'generator_v1.4.0';
+export const generatorPromptVersionV15 = 'generator_v1.5.0';
+
+/**
+ * Versao "ativa" — preservada por compatibilidade. Quem instancia a chamada
+ * (service.ts) decide qual versao colocar no prompt; o schema abaixo aceita
+ * AMBAS via enum.
+ */
+export const generatorPromptVersion = generatorPromptVersionV14;
+export const SUPPORTED_GENERATOR_PROMPT_VERSIONS = [
+  generatorPromptVersionV14,
+  generatorPromptVersionV15,
+] as const;
 export const generatorAgentVersion = 'atendente_v1.0.0';
 
 // ------------------------------------------------------------------
@@ -150,7 +162,7 @@ export const generatorOutputRawSchema = z.object({
    */
   claims: z.array(generatorClaimSchema).max(20).default([]),
   rationale: z.string().min(1).max(500),
-  prompt_version: z.literal(generatorPromptVersion),
+  prompt_version: z.enum(SUPPORTED_GENERATOR_PROMPT_VERSIONS),
 });
 export type GeneratorOutputRaw = z.infer<typeof generatorOutputRawSchema>;
 
@@ -320,7 +332,7 @@ export const generatorOutputJsonSchema = {
       },
     },
     rationale: { type: 'string', minLength: 1, maxLength: 500 },
-    prompt_version: { type: 'string', enum: [generatorPromptVersion] },
+    prompt_version: { type: 'string', enum: [...SUPPORTED_GENERATOR_PROMPT_VERSIONS] },
   },
 } as const;
 

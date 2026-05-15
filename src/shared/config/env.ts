@@ -39,6 +39,13 @@ const envSchema = z.object({
   GENERATOR_LLM_ENABLED: booleanStringSchema,
   GENERATOR_OPENAI_API_KEY: z.string().min(1).optional(),
   GENERATOR_MODEL: z.string().min(1).default('gpt-4o-mini'),
+  /**
+   * Etapa 5 (v1.5.0): quando true, o Generator usa o prompt few-shot
+   * (10 exemplos canonicos, ~1700 tokens) em vez do prompt declarativo
+   * v1.4.0 (~3700 tokens com regras + claims). Feature flag pra rodar
+   * A/B em catalog15-rerun sem comitar a troca.
+   */
+  GENERATOR_PROMPT_FEW_SHOT_ENABLED: booleanStringSchema,
   SKIP_EVENT_TYPES: z
     .string()
     .default('')

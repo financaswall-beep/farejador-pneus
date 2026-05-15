@@ -180,50 +180,64 @@ export function buildGeneratorMessages(
     },
     {
       role: 'user',
-      content: JSON.stringify({
-        context: {
-          environment: context.environment,
-          conversation_id: context.conversation_id,
-          state_summary: {
-            status: context.state.status,
-            current_skill: context.state.current_skill,
-            turn_index: context.state.turn_index,
-            global_slots: context.state.global_slots,
-            order_draft: context.state.order_draft ?? null,
-            cart: context.state.cart,
-            items: context.state.items,
-            active_item: context.state.items.find((item) => item.is_active) ?? null,
-            items_count: context.state.items.length,
-          },
-          recent_messages: context.recent_messages,
-          tool_results_history: context.recent_tool_results,
-          organizer_facts: context.organizer_facts,
-          derived_signals: context.derived_signals,
-        },
-        planner_decision: {
-          skill: decision.output.skill,
-          missing_slots: decision.output.missing_slots,
-          risk_flags: decision.output.risk_flags,
-          confidence: decision.output.confidence,
-          rationale: decision.output.rationale,
-        },
-        current_turn_tool_results: toolResults.map((result) => ({
-          tool: result.tool,
-          ok: result.ok,
-          output: result.output,
-          error_message: result.error_message,
-        })),
-        confirmed_evidence: buildConfirmedEvidence(toolResults),
-        commercial_summary: buildCommercialSummary(toolResults),
-        output_contract: {
-          say: 'resposta para o cliente, max 2000 chars',
-          actions: 'array de RawAction (pode ser [])',
-          rationale: 'justificativa interna, max 500 chars',
-          prompt_version: generatorPromptVersion,
-        },
-      }),
+      content: JSON.stringify(buildGeneratorContextPayload(context, decision, toolResults, generatorPromptVersion)),
     },
   ];
+}
+
+/**
+ * Constroi o payload do user message — mesma estrutura para ambas as versoes
+ * de prompt (v1.4.0 declarativo e v1.5.0 few-shot). Exportado pra ser
+ * reutilizado por `prompt-v1_5.ts`.
+ */
+export function buildGeneratorContextPayload(
+  context: PlannerContext,
+  decision: PlannerDecisionResult,
+  toolResults: ToolExecutionResult[],
+  promptVersion: string,
+): Record<string, unknown> {
+  return {
+    context: {
+      environment: context.environment,
+      conversation_id: context.conversation_id,
+      state_summary: {
+        status: context.state.status,
+        current_skill: context.state.current_skill,
+        turn_index: context.state.turn_index,
+        global_slots: context.state.global_slots,
+        order_draft: context.state.order_draft ?? null,
+        cart: context.state.cart,
+        items: context.state.items,
+        active_item: context.state.items.find((item) => item.is_active) ?? null,
+        items_count: context.state.items.length,
+      },
+      recent_messages: context.recent_messages,
+      tool_results_history: context.recent_tool_results,
+      organizer_facts: context.organizer_facts,
+      derived_signals: context.derived_signals,
+    },
+    planner_decision: {
+      skill: decision.output.skill,
+      missing_slots: decision.output.missing_slots,
+      risk_flags: decision.output.risk_flags,
+      confidence: decision.output.confidence,
+      rationale: decision.output.rationale,
+    },
+    current_turn_tool_results: toolResults.map((result) => ({
+      tool: result.tool,
+      ok: result.ok,
+      output: result.output,
+      error_message: result.error_message,
+    })),
+    confirmed_evidence: buildConfirmedEvidence(toolResults),
+    commercial_summary: buildCommercialSummary(toolResults),
+    output_contract: {
+      say: 'resposta para o cliente, max 2000 chars',
+      actions: 'array de RawAction (pode ser [])',
+      rationale: 'justificativa interna, max 500 chars',
+      prompt_version: promptVersion,
+    },
+  };
 }
 
 function buildConfirmedEvidence(toolResults: ToolExecutionResult[]): Record<string, unknown> {

@@ -29,6 +29,7 @@ import { validateAction } from '../validators/action-validator.js';
 import { validateClaims } from '../validators/claim-validator.js';
 import type { ToolResultForValidation } from '../validators/tool-results.js';
 import { buildGeneratorMessages } from './prompt.js';
+import { buildGeneratorMessagesFewShot } from './prompt-v1_5.js';
 import {
   generatorOutputJsonSchema,
   generatorOutputRawSchema,
@@ -238,7 +239,12 @@ export async function generateTurn(
   let llmResult: OpenAICallResult | undefined;
 
   try {
-    const messages = buildGeneratorMessages(context, decision, toolResults);
+    // Etapa 5 (v1.5.0): feature flag escolhe entre prompt declarativo
+    // (v1.4.0, ~3700 tokens) e prompt few-shot (v1.5.0, ~1700 tokens, 10
+    // exemplos). Rodada A/B em catalog15-rerun antes de retirar v1.4.0.
+    const messages = env.GENERATOR_PROMPT_FEW_SHOT_ENABLED
+      ? buildGeneratorMessagesFewShot(context, decision, toolResults)
+      : buildGeneratorMessages(context, decision, toolResults);
     llmResult = await callOpenAIResponse({
       apiKey: env.GENERATOR_OPENAI_API_KEY,
       model: env.GENERATOR_MODEL,
