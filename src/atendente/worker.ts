@@ -14,6 +14,7 @@ import type { PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
+import { deterministicUuid } from '../shared/deterministic-id.js';
 import { logIncident } from '../shared/repositories/ops-phase3.repository.js';
 import type { IncidentSeverity, IncidentType } from '../shared/types/ops-phase3.js';
 import {
@@ -30,13 +31,14 @@ import {
   type ToolExecutionResult,
 } from './executor/tool-executor.js';
 import { buildPlannerContext } from './planner/context-builder.js';
-import { planTurn, recordPlannerDecision } from './planner/service.js';
+import { planTurn, recordPlannerDecision, type PlannerDecisionResult } from './planner/service.js';
 import { generateTurn, recordGeneratorResult } from './generator/service.js';
+import type { GeneratorResult } from './generator/schemas.js';
 import {
   AgentStateVersionConflictError,
   applyActionAndPersistInTx,
 } from './state/agent-state.repository.js';
-import type { EscalateAction } from '../shared/zod/agent-actions.js';
+import type { AgentAction, EscalateAction } from '../shared/zod/agent-actions.js';
 import { postEscalateNote } from './handlers/escalate.js';
 import {
   createDefaultAtendenteJobReconcileInput,
@@ -112,15 +114,33 @@ export async function processAtendenteJob(
     job.trigger_message_id,
   );
 
+  // B5: se o Planner decidiu escalar_humano, o worker emite a action `escalate`
+  // diretamente (o Generator nao tem permissao de emitir escalate no raw schema).
+  // Isso garante que escalation chega no DB e a nota Chatwoot eh disparada,
+  // mesmo se o Generator bloquear ou falhar.
+  const actionsToApply: AgentAction[] = [];
+  const syntheticEscalate = maybeSynthesizeEscalate(
+    decision,
+    generatorResult,
+    context.conversation_id,
+    turnIndex,
+  );
+  if (syntheticEscalate) {
+    actionsToApply.push(syntheticEscalate);
+  }
+  if (!generatorResult.blocked && generatorResult.actions.length > 0) {
+    actionsToApply.push(...generatorResult.actions);
+  }
+
   // Sprint 6.5: fechar loop de mutação de estado.
   // Aplica cada action válida, isoladamente via SAVEPOINT — uma falha
   // não derruba auditoria do turno nem outras actions independentes.
   let actionsPersisted = 0;
   let actionsFailed = 0;
   const escalatedActions: EscalateAction[] = [];
-  if (!generatorResult.blocked && generatorResult.actions.length > 0) {
+  if (actionsToApply.length > 0) {
     let currentState = context.state;
-    for (const action of generatorResult.actions) {
+    for (const action of actionsToApply) {
       const savepoint = `apply_${actionsPersisted + actionsFailed}`;
       await client.query(`SAVEPOINT ${savepoint}`);
       try {
@@ -335,6 +355,64 @@ async function reconcileAtendenteJobsIfDue(now = new Date()): Promise<void> {
   } catch (err) {
     logger.error({ worker_id: WORKER_ID, err }, 'atendente shadow: job reconciliation failed');
   }
+}
+
+/**
+ * B5: gera action `escalate` sintetica quando Planner decidiu escalar_humano.
+ *
+ * O Generator nao pode emitir `escalate` porque seu raw schema so aceita 4 tipos
+ * (update_slot, create_item, record_offer, update_draft). Sem essa funcao, a
+ * decisao do Planner virava apenas turn com selected_skill='escalar_humano',
+ * sem persistir em agent.escalations nem disparar nota Chatwoot — atendente
+ * humano nao era avisado (auditoria achado 1.1, 0 linhas em agent.escalations
+ * em prod apos 180 turns com skill='escalar_humano').
+ *
+ * Reason inferido de sinais disponiveis (planner risk_flags + confidence).
+ * Summary preferencialmente a fala que o Generator escreveu; fallback simples
+ * quando Generator bloqueou.
+ *
+ * action_id eh deterministico — retry da mesma decisao nao duplica escalation
+ * (ON CONFLICT em session_events.action_id ja garante; syncEscalation tambem
+ * tem WHERE NOT EXISTS por motivo+status).
+ */
+export function maybeSynthesizeEscalate(
+  decision: PlannerDecisionResult,
+  generatorResult: GeneratorResult,
+  conversationId: string,
+  turnIndex: number,
+): EscalateAction | null {
+  if (decision.output.skill !== 'escalar_humano') return null;
+
+  const reason: EscalateAction['reason'] = decision.output.risk_flags.includes('human_requested')
+    ? 'customer_requested'
+    : decision.output.confidence < 0.3
+      ? 'confidence_low'
+      : 'other';
+
+  const summary = (() => {
+    const sayCandidate = generatorResult.blocked
+      ? generatorResult.candidate_say_text
+      : generatorResult.say_text;
+    if (sayCandidate && sayCandidate.trim().length > 0) return sayCandidate;
+    return `Sistema escalou conversa para atendimento humano (skill=escalar_humano, motivo=${reason}).`;
+  })();
+
+  const actionId = deterministicUuid([
+    'synthetic_escalate',
+    conversationId,
+    turnIndex,
+    reason,
+  ]);
+
+  return {
+    action_id: actionId,
+    turn_index: turnIndex,
+    emitted_at: new Date().toISOString(),
+    emitted_by: 'system',
+    type: 'escalate',
+    reason,
+    summary_text: summary.slice(0, 2000),
+  };
 }
 
 /**

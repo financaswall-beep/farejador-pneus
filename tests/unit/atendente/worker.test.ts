@@ -40,6 +40,7 @@ vi.mock('../../../src/atendente/generator/service.js', () => ({
 let processAtendenteJob: typeof import('../../../src/atendente/worker.js').processAtendenteJob;
 let classifyJobFailure: typeof import('../../../src/atendente/worker.js').classifyJobFailure;
 let startAtendenteShadow: typeof import('../../../src/atendente/worker.js').startAtendenteShadow;
+let maybeSynthesizeEscalate: typeof import('../../../src/atendente/worker.js').maybeSynthesizeEscalate;
 
 beforeAll(async () => {
   process.env.FAREJADOR_ENV = 'test';
@@ -53,6 +54,7 @@ beforeAll(async () => {
   processAtendenteJob = worker.processAtendenteJob;
   classifyJobFailure = worker.classifyJobFailure;
   startAtendenteShadow = worker.startAtendenteShadow;
+  maybeSynthesizeEscalate = worker.maybeSynthesizeEscalate;
 });
 
 describe('Atendente Shadow Worker - Sprint 5', () => {
@@ -214,6 +216,166 @@ describe('Atendente Shadow Worker - Sprint 5', () => {
     expect(planTurnMock).not.toHaveBeenCalled();
     expect(typeof stop).toBe('function');
     stop();
+  });
+});
+
+describe('maybeSynthesizeEscalate (B5)', () => {
+  const turnIndex = 3;
+  const conversationIdLocal = '00000000-0000-4000-8000-000000000099';
+
+  function makeDecision(overrides: Partial<{
+    skill: string;
+    risk_flags: string[];
+    confidence: number;
+  }> = {}) {
+    return {
+      output: {
+        skill: overrides.skill ?? 'escalar_humano',
+        missing_slots: [],
+        tool_requests: [],
+        risk_flags: overrides.risk_flags ?? [],
+        confidence: overrides.confidence ?? 0.5,
+        rationale: 'mock',
+        prompt_version: 'planner-v1',
+      },
+      used_llm: false,
+      fallback_used: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      duration_ms: 0,
+    } as never;
+  }
+
+  function makeGeneratorResult(overrides: Partial<{
+    say_text: string | null;
+    blocked: boolean;
+    candidate_say_text: string | null;
+  }> = {}) {
+    return {
+      say_text: overrides.say_text ?? 'Vou transferir você para um atendente.',
+      actions: [],
+      blocked: overrides.blocked ?? false,
+      block_reason: null,
+      candidate_say_text: overrides.candidate_say_text ?? null,
+      candidate_actions: [],
+      used_llm: false,
+      fallback_used: false,
+      input_tokens: 0,
+      output_tokens: 0,
+      duration_ms: 0,
+    } as never;
+  }
+
+  it('retorna null quando skill nao eh escalar_humano', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision({ skill: 'buscar_e_ofertar' }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result).toBeNull();
+  });
+
+  it('emite escalate com reason=customer_requested quando risk_flags inclui human_requested', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision({ risk_flags: ['human_requested'] }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('escalate');
+    expect(result?.reason).toBe('customer_requested');
+    expect(result?.emitted_by).toBe('system');
+    expect(result?.turn_index).toBe(turnIndex);
+    expect(result?.action_id).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it('emite escalate com reason=confidence_low quando confidence < 0.3', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision({ confidence: 0.1 }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.reason).toBe('confidence_low');
+  });
+
+  it('emite escalate com reason=other quando confidence ok e sem human_requested', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision({ confidence: 0.8 }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.reason).toBe('other');
+  });
+
+  it('usa say_text do Generator como summary quando disponivel', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision(),
+      makeGeneratorResult({ say_text: 'Já transferi sua conversa para um atendente.' }),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.summary_text).toBe('Já transferi sua conversa para um atendente.');
+  });
+
+  it('usa candidate_say_text quando Generator bloqueou', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision(),
+      makeGeneratorResult({
+        say_text: null,
+        blocked: true,
+        candidate_say_text: 'Fala bloqueada por validator.',
+      }),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.summary_text).toBe('Fala bloqueada por validator.');
+  });
+
+  it('cai para fallback summary quando Generator nao produziu nenhum texto', () => {
+    const result = maybeSynthesizeEscalate(
+      makeDecision({ risk_flags: ['human_requested'] }),
+      makeGeneratorResult({ say_text: null, blocked: true, candidate_say_text: null }),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.summary_text).toMatch(/Sistema escalou conversa.*motivo=customer_requested/);
+  });
+
+  it('action_id eh deterministico (retry produz mesmo id)', () => {
+    const a = maybeSynthesizeEscalate(makeDecision(), makeGeneratorResult(), conversationIdLocal, turnIndex);
+    const b = maybeSynthesizeEscalate(makeDecision(), makeGeneratorResult(), conversationIdLocal, turnIndex);
+    expect(a?.action_id).toBe(b?.action_id);
+  });
+
+  it('action_id muda quando reason muda', () => {
+    const a = maybeSynthesizeEscalate(
+      makeDecision({ risk_flags: ['human_requested'] }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    const b = maybeSynthesizeEscalate(
+      makeDecision({ confidence: 0.1 }),
+      makeGeneratorResult(),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(a?.action_id).not.toBe(b?.action_id);
+  });
+
+  it('summary_text eh truncado em 2000 chars', () => {
+    const huge = 'a'.repeat(2500);
+    const result = maybeSynthesizeEscalate(
+      makeDecision(),
+      makeGeneratorResult({ say_text: huge }),
+      conversationIdLocal,
+      turnIndex,
+    );
+    expect(result?.summary_text.length).toBe(2000);
   });
 });
 
