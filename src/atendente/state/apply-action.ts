@@ -24,6 +24,7 @@ import type {
   SessionItem,
   SlotValue,
 } from '../../shared/zod/agent-state.js';
+import { deterministicUuid } from '../../shared/deterministic-id.js';
 import { INVALIDATION_RULES, staleLevelForAction } from './invalidation-rules.js';
 
 export interface SessionEventInsert {
@@ -55,15 +56,12 @@ function deterministicId(state: ConversationState, action: AgentAction, suffix: 
     return action.action_id;
   }
 
-  // Deterministic UUID-ish value for legacy actions. It is not cryptographic;
-  // it only preserves applyAction purity until legacy actions gain action_id.
-  const input = `${state.conversation_id}:${suffix}:${JSON.stringify(action)}`;
-  let hash = 0;
-  for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 31 + input.charCodeAt(index)) >>> 0;
-  }
-  const hex = hash.toString(16).padStart(8, '0');
-  return `${hex}-0000-4000-8000-000000000000`;
+  // B3: trocado o hash djb2 de 32-bit (que gerava colisao em ~65k IDs e produzia
+  // suffix fixo "-0000-4000-8000-000000000000") por deterministicUuid sha256 do
+  // shared/deterministic-id, que ja eh padrao no resto do sistema (Generator,
+  // Planner, tool events, escalations). Mesmo input -> mesmo UUID; colisao
+  // praticamente impossivel.
+  return deterministicUuid(['legacy_action_id', state.conversation_id, suffix, action]);
 }
 
 function addSeconds(isoTimestamp: string, seconds: number): string {

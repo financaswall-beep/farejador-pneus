@@ -1,7 +1,6 @@
 import type { AgentAction } from '../../shared/zod/agent-actions.js';
 import {
   globalSlotKeySchema,
-  isCriticalSlot,
   itemSlotKeySchema,
   type ConversationState,
   type SessionSlotKey,
@@ -96,9 +95,11 @@ export function validateAction(
       if (action.source === 'confirmed' && !action.set_by_message_id) {
         return block('confirmed_slot_requires_message_id');
       }
-      if (isCriticalSlot(action.slot_key) && action.source.startsWith('inferred')) {
-        return { valid: true };
-      }
+      // Removido em B2: branch sem-efeito (`isCriticalSlot && source.startsWith('inferred')
+      // → { valid: true }`) que retornava o mesmo que o caminho default. Era codigo
+      // morto que parecia regra. Quem voltar e quiser regra real para slots criticos
+      // inferidos: usar `requires_confirmation: true` no setSlot — ja eh aplicado em
+      // apply-action.ts:118-121 quando source comeca com 'inferred'.
       return { valid: true };
     }
     case 'mark_slot_stale':

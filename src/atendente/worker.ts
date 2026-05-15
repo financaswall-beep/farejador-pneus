@@ -229,7 +229,7 @@ export async function pollAndAttend(): Promise<void> {
         // Sem envio Chatwoot — log-only.
       );
     } catch (err) {
-      await client.query('ROLLBACK').catch(() => {});
+      await safeRollback(client, 'after_process_job_failed', { job_id: job.id });
 
       const failure = classifyJobFailure(err);
       try {
@@ -250,7 +250,7 @@ export async function pollAndAttend(): Promise<void> {
         await markAtendenteJobFailed(client, job.id, failure.message);
         await client.query('COMMIT');
       } catch (auditErr) {
-        await client.query('ROLLBACK').catch(() => {});
+        await safeRollback(client, 'after_incident_log_failed', { job_id: job.id });
         logger.error(
           { worker_id: WORKER_ID, job_id: job.id, err: auditErr },
           'atendente shadow: failed to record incident/mark failed',
@@ -271,7 +271,7 @@ export async function pollAndAttend(): Promise<void> {
     }
   } catch (err) {
     if (client) {
-      await client.query('ROLLBACK').catch(() => {});
+      await safeRollback(client, 'after_poll_failed', {});
     }
     logger.error({ err }, 'atendente shadow: poll failed');
   } finally {
@@ -334,6 +334,26 @@ async function reconcileAtendenteJobsIfDue(now = new Date()): Promise<void> {
     }
   } catch (err) {
     logger.error({ worker_id: WORKER_ID, err }, 'atendente shadow: job reconciliation failed');
+  }
+}
+
+/**
+ * Executa ROLLBACK e loga explicitamente se falhar (em vez de engolir o erro).
+ * Substitui o antigo `.catch(() => {})` mudo: rollback que falha agora aparece
+ * no log com contexto, em vez de virar inconsistencia silenciosa.
+ */
+async function safeRollback(
+  client: PoolClient,
+  reason: string,
+  context: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await client.query('ROLLBACK');
+  } catch (rollbackErr) {
+    logger.error(
+      { worker_id: WORKER_ID, rollback_reason: reason, ...context, err: rollbackErr },
+      'atendente shadow: ROLLBACK failed (transaction state inconsistent)',
+    );
   }
 }
 
