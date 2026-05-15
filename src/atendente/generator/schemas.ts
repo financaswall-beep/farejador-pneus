@@ -56,7 +56,7 @@ const updateSlotRawSchema = z.object({
   source: slotSourceSchema,
   confidence: z.number().min(0).max(1),
   evidence_text: z.string().nullable().optional(),
-  set_by_message_id: z.string().uuid().nullable().optional(),
+  set_by_message_id: z.string().min(1).nullable().optional(),
   set_by_skill: z.string().nullable().optional(),
 });
 
@@ -234,6 +234,7 @@ export interface HydrationContext {
   turn_index: number;
   emitted_at: string;
   selected_skill?: string | null;
+  latest_customer_message_id?: string | null;
 }
 
 const uuidLikeRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -242,6 +243,14 @@ function normalizeGeneratedId(namespace: string, ctx: HydrationContext, rawId: s
   return uuidLikeRegex.test(rawId)
     ? rawId
     : deterministicUuid([namespace, ctx.conversation_id, ctx.turn_index, rawId]);
+}
+
+function normalizeOptionalMessageId(rawId: string | null | undefined, ctx: HydrationContext): string | null {
+  if (rawId && uuidLikeRegex.test(rawId)) return rawId;
+  if (ctx.latest_customer_message_id && uuidLikeRegex.test(ctx.latest_customer_message_id)) {
+    return ctx.latest_customer_message_id;
+  }
+  return null;
 }
 
 /**
@@ -286,7 +295,7 @@ export function hydrateGeneratorAction(
         source: raw.source,
         confidence: raw.confidence,
         evidence_text: raw.evidence_text ?? null,
-        set_by_message_id: raw.set_by_message_id ?? null,
+        set_by_message_id: normalizeOptionalMessageId(raw.set_by_message_id, ctx),
         set_by_skill: raw.set_by_skill ?? ctx.selected_skill ?? null,
       };
       break;

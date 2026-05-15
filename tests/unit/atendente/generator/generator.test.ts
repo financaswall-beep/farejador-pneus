@@ -60,6 +60,7 @@ let generateTurn: typeof import('../../../../src/atendente/generator/service.js'
 let recordGeneratorResult: typeof import('../../../../src/atendente/generator/service.js').recordGeneratorResult;
 let buildGeneratorMessages: typeof import('../../../../src/atendente/generator/prompt.js').buildGeneratorMessages;
 let SAFE_FALLBACK_SAY: string;
+let generatorOutputJsonSchema: unknown;
 
 beforeAll(async () => {
   const module = await import('../../../../src/atendente/generator/service.js');
@@ -72,6 +73,7 @@ beforeAll(async () => {
   const schemas = await import('../../../../src/atendente/generator/schemas.js');
   SAFE_FALLBACK_SAY = schemas.SAFE_FALLBACK_SAY;
   generatorPromptVersion = schemas.generatorPromptVersion;
+  generatorOutputJsonSchema = schemas.generatorOutputJsonSchema;
 });
 
 // ---------------------------------------------------------------------------
@@ -188,6 +190,41 @@ function queueLlm(say: string, actions: unknown[] = []): void {
     outputTokens: 20,
     durationMs: 50,
   });
+}
+
+function assertStrictObjects(schema: unknown, path = 'root'): void {
+  if (!schema || typeof schema !== 'object') return;
+  const record = schema as Record<string, unknown>;
+
+  if (record.type === 'object') {
+    expect(record.additionalProperties, `${path}.additionalProperties`).toBe(false);
+    const properties = record.properties as Record<string, unknown> | undefined;
+    if (properties) {
+      const required = record.required as string[] | undefined;
+      expect(required, `${path}.required`).toEqual(expect.arrayContaining(Object.keys(properties)));
+      expect(required, `${path}.required exact`).toHaveLength(Object.keys(properties).length);
+    }
+  }
+
+  for (const key of ['properties', 'items']) {
+    const child = record[key];
+    if (child && typeof child === 'object') {
+      if (key === 'properties') {
+        for (const [propertyName, propertySchema] of Object.entries(child as Record<string, unknown>)) {
+          assertStrictObjects(propertySchema, `${path}.properties.${propertyName}`);
+        }
+      } else {
+        assertStrictObjects(child, `${path}.items`);
+      }
+    }
+  }
+
+  for (const key of ['anyOf', 'oneOf', 'allOf']) {
+    const variants = record[key];
+    if (Array.isArray(variants)) {
+      variants.forEach((variant, index) => assertStrictObjects(variant, `${path}.${key}[${index}]`));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +475,29 @@ describe('Generator Shadow — fallback seguro quando falta dado', () => {
       temperature: undefined,
     }));
     disableLlm();
+  });
+
+  it('omite temperature para modelos novos que nao estao na allowlist', async () => {
+    enableLlm();
+    mockEnv.GENERATOR_MODEL = 'gpt-5.4';
+    callOpenAIMock.mockResolvedValueOnce({
+      content: llmResponse('Posso ajudar com isso.'),
+      inputTokens: 5,
+      outputTokens: 5,
+      durationMs: 20,
+    });
+
+    await generateTurn(makeContext(), makeDecision('responder_geral'), []);
+
+    expect(callOpenAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      model: 'gpt-5.4',
+      temperature: undefined,
+    }));
+    disableLlm();
+  });
+
+  it('mantem o JSON schema do Generator compativel com strict mode', () => {
+    assertStrictObjects(generatorOutputJsonSchema);
   });
 
   it('bloqueia quando LLM lança exceção de rede', async () => {
@@ -719,7 +779,7 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
         source: 'observed',
         confidence: 0.99,
         evidence_text: '90/90-18',
-        set_by_message_id: latestMessageId,
+        set_by_message_id: 'mensagem-atual',
       },
     ]);
 
@@ -739,7 +799,11 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     expect(result.blocked).toBe(false);
     expect(result.actions).toHaveLength(2);
     expect(result.actions[0]).toMatchObject({ type: 'create_item', item_id: expect.any(String) });
-    expect(result.actions[1]).toMatchObject({ type: 'update_slot', item_id: result.actions[0]!.item_id });
+    expect(result.actions[1]).toMatchObject({
+      type: 'update_slot',
+      item_id: result.actions[0]!.item_id,
+      set_by_message_id: latestMessageId,
+    });
     expect(result.actions[0]!.item_id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );

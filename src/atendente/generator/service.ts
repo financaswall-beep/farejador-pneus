@@ -229,7 +229,7 @@ export async function generateTurn(
       messages,
       timeoutMs: env.OPENAI_TIMEOUT_MS,
       maxTokens: 1500,
-      temperature: supportsCustomTemperature(env.GENERATOR_MODEL) ? 0.2 : undefined,
+      temperature: temperatureForModel(env.GENERATOR_MODEL),
       jsonSchema: {
         name: 'generator_output',
         schema: generatorOutputJsonSchema,
@@ -262,6 +262,7 @@ export async function generateTurn(
       turn_index: turnIndex,
       emitted_at: emittedAt,
       selected_skill: decision.output.skill,
+      latest_customer_message_id: latestCustomerMessageId(context),
     });
 
     if (invalid_indexes.length > 0) {
@@ -320,8 +321,21 @@ export async function generateTurn(
   }
 }
 
+function temperatureForModel(model: string): number | undefined {
+  return supportsCustomTemperature(model) ? 0.2 : undefined;
+}
+
 function supportsCustomTemperature(model: string): boolean {
-  return !/^gpt-5\.5(?:$|[-_])/.test(model);
+  const normalized = model.trim().toLowerCase();
+  return /^(gpt-4o|gpt-4\.1)(?:$|[-_])/.test(normalized);
+}
+
+function latestCustomerMessageId(context: PlannerContext): string | null {
+  for (let index = context.recent_messages.length - 1; index >= 0; index -= 1) {
+    const message = context.recent_messages[index]!;
+    if (message.role === 'customer') return message.id;
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------
