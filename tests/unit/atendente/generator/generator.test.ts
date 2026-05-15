@@ -1010,4 +1010,115 @@ describe('Generator Shadow — auditoria de bloqueios', () => {
     expect(eventPayload.claims).toEqual(claims);
     expect(eventPayload.claim_types).toEqual(['price']);
   });
+
+  it('recordGeneratorResult grava prompt_version real do resultado (v1.4.0 ou v1.5.0)', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    // Simula resultado que veio do prompt v1.5.0 (LLM emitiu essa versao)
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'buscar_e_ofertar',
+      {
+        say_text: 'Tem por R$ 79 em estoque.',
+        actions: [],
+        claims: [],
+        prompt_version: 'generator_v1.5.0',
+        blocked: false,
+        block_reason: null,
+        candidate_say_text: null,
+        candidate_actions: [],
+        used_llm: true,
+        fallback_used: false,
+        input_tokens: 100,
+        output_tokens: 50,
+        duration_ms: 500,
+      },
+      '00000000-0000-4000-8000-00000000beef',
+    );
+
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    expect(eventPayload.prompt_version).toBe('generator_v1.5.0');
+  });
+
+  it('recordGeneratorResult preserva prompt_version no blocked_payload tambem', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'buscar_e_ofertar',
+      {
+        say_text: null,
+        actions: [],
+        claims: [],
+        prompt_version: 'generator_v1.5.0',
+        blocked: true,
+        block_reason: 'some_reason',
+        candidate_say_text: 'algum texto bloqueado',
+        candidate_actions: [],
+        used_llm: true,
+        fallback_used: false,
+        input_tokens: 100,
+        output_tokens: 50,
+        duration_ms: 500,
+      },
+      '00000000-0000-4000-8000-0000000bcafe',
+    );
+
+    const blockedPayload = JSON.parse(queries[0]!.params[16] as string);
+    expect(blockedPayload.prompt_version).toBe('generator_v1.5.0');
+
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    expect(eventPayload.prompt_version).toBe('generator_v1.5.0');
+  });
+
+  it('recordGeneratorResult cai pra generatorPromptVersion legado quando result nao traz prompt_version (fixture antigo)', async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: unknown[]) => {
+        queries.push({ sql, params });
+        return { rowCount: 1, rows: [] };
+      }),
+    };
+
+    // Fixture legado sem prompt_version — deve usar a constante (defensivo)
+    await recordGeneratorResult(
+      client as never,
+      makeContext(),
+      'buscar_e_ofertar',
+      {
+        say_text: 'oi',
+        actions: [],
+        claims: [],
+        blocked: false,
+        block_reason: null,
+        candidate_say_text: null,
+        candidate_actions: [],
+        used_llm: false,
+        fallback_used: false,
+        input_tokens: 0,
+        output_tokens: 0,
+        duration_ms: 0,
+      } as never,
+      '00000000-0000-4000-8000-0000000ddead',
+    );
+
+    const eventPayload = JSON.parse(queries[1]!.params[4] as string);
+    // Cai pra constante quando undefined — nao explode
+    expect(eventPayload.prompt_version).toBeTruthy();
+    expect(typeof eventPayload.prompt_version).toBe('string');
+  });
 });

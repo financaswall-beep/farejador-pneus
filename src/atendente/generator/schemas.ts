@@ -507,6 +507,14 @@ export interface GeneratorResult {
    * apenas pela rede regex antiga.
    */
   claims: GeneratorClaim[];
+  /**
+   * Versao real do prompt usada neste turn (v1.4.0 declarativo ou v1.5.0
+   * few-shot, conforme env.GENERATOR_PROMPT_FEW_SHOT_ENABLED). Quando
+   * caminho LLM teve sucesso, vem do output parseado do LLM. Caso contrario,
+   * derivado do env (mock/fallback). Substitui o uso da constante
+   * generatorPromptVersion na auditoria (fix v1.5.0-audit).
+   */
+  prompt_version: string;
   /** true = resposta bloqueada pelos validators ou falta de lastro. */
   blocked: boolean;
   /** Motivo do bloqueio, preenchido quando blocked=true. */

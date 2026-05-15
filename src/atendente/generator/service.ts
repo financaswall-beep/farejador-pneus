@@ -34,6 +34,8 @@ import {
   generatorOutputJsonSchema,
   generatorOutputRawSchema,
   generatorPromptVersion,
+  generatorPromptVersionV14,
+  generatorPromptVersionV15,
   generatorAgentVersion,
   hydrateGeneratorActions,
   SAFE_FALLBACK_SAY,
@@ -41,6 +43,18 @@ import {
   type GeneratorRawAction,
   type GeneratorResult,
 } from './schemas.js';
+
+/**
+ * Versao do prompt que ESTA ativa neste processo (gated por env flag).
+ * Usada como fallback quando o caminho LLM nao chegou a parsear output
+ * (mock, fallback de erro). No caminho LLM bem-sucedido, a versao real
+ * que o modelo emitiu eh preferida — vinda de parsed.data.prompt_version.
+ */
+function activeGeneratorPromptVersion(): string {
+  return env.GENERATOR_PROMPT_FEW_SHOT_ENABLED
+    ? generatorPromptVersionV15
+    : generatorPromptVersionV14;
+}
 
 // ------------------------------------------------------------------
 // Validação
@@ -167,6 +181,7 @@ function mockGenerateTurn(
     say_text: validation.blocked ? null : say,
     actions: validation.blocked ? [] : actions,
     claims: [],
+    prompt_version: activeGeneratorPromptVersion(),
     blocked: validation.blocked,
     block_reason: validation.block_reason,
     candidate_say_text: validation.blocked ? say : null,
@@ -195,6 +210,7 @@ function fallbackResult(reason: string): GeneratorResult {
     say_text: null,
     actions: [],
     claims: [],
+    prompt_version: activeGeneratorPromptVersion(),
     blocked: true,
     block_reason: reason,
     candidate_say_text: null,
@@ -297,6 +313,7 @@ export async function generateTurn(
           `generator_action_hydration_failed:indexes=${invalid_indexes.join(',')}`,
         ),
         claims, // audit: preserva claims que o Generator emitiu mesmo com action invalida
+        prompt_version: parsed.data.prompt_version, // versao REAL emitida pelo LLM
         candidate_say_text: say,
         candidate_actions: actions,
         candidate_raw_actions: rawActions,
@@ -313,6 +330,7 @@ export async function generateTurn(
       say_text: validation.blocked ? null : say,
       actions: validation.blocked ? [] : actions,
       claims, // audit: SEMPRE preserva claims emitidos (mesmo se blocked pelo claim-validator)
+      prompt_version: parsed.data.prompt_version, // versao REAL emitida pelo LLM (v1.4.0 ou v1.5.0)
       blocked: validation.blocked,
       block_reason: validation.block_reason,
       candidate_say_text: validation.blocked ? say : null,
@@ -407,6 +425,10 @@ export async function recordGeneratorResult(
   // Defensivo contra fixtures/mocks legados que nao incluem claims.
   const claimsForAudit = result.claims ?? [];
   const claimTypes = claimsForAudit.map((c) => c.type);
+  // Audit v1.5.0-fix: usa a versao REAL do prompt (v1.4.0 ou v1.5.0), nao a
+  // constante fixa. Sem isso, baterias A/B com a feature flag confundiriam
+  // analise futura porque DB diria que tudo eh v1.4.0.
+  const auditPromptVersion = result.prompt_version ?? generatorPromptVersion;
   const blockedPayload = result.blocked
     ? {
         say_text: blockedSayText,
@@ -416,7 +438,7 @@ export async function recordGeneratorResult(
         block_reason: result.block_reason,
         used_llm: result.used_llm,
         fallback_used: result.fallback_used,
-        prompt_version: generatorPromptVersion,
+        prompt_version: auditPromptVersion,
         agent_version: generatorAgentVersion,
         input_tokens: result.input_tokens,
         output_tokens: result.output_tokens,
@@ -481,7 +503,7 @@ export async function recordGeneratorResult(
         claim_types: claimTypes,
         used_llm: result.used_llm,
         fallback_used: result.fallback_used,
-        prompt_version: generatorPromptVersion,
+        prompt_version: auditPromptVersion, // versao real (v1.4 ou v1.5)
         agent_version: generatorAgentVersion,
         input_tokens: result.input_tokens,
         output_tokens: result.output_tokens,
