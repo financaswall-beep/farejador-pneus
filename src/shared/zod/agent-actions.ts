@@ -35,7 +35,7 @@ const stateActionBaseSchema = z.object({
 // ------------------------------------------------------------------
 
 /** Add an item to agent.cart_current_items. */
-export const addToCartSchema = z.object({
+export const addToCartSchema = stateActionBaseSchema.extend({
   type: z.literal('add_to_cart'),
   product_id: z.string().uuid({ message: 'product_id must be a valid UUID' }),
   quantity: z.number().int().min(1).max(20),
@@ -44,20 +44,20 @@ export const addToCartSchema = z.object({
 });
 
 /** Remove an item from agent.cart_current_items. */
-export const removeFromCartSchema = z.object({
+export const removeFromCartSchema = stateActionBaseSchema.extend({
   type: z.literal('remove_from_cart'),
   cart_item_id: z.string().uuid(),
 });
 
 /** Change quantity of an existing cart item. */
-export const updateCartItemSchema = z.object({
+export const updateCartItemSchema = stateActionBaseSchema.extend({
   type: z.literal('update_cart_item'),
   cart_item_id: z.string().uuid(),
   quantity: z.number().int().min(1).max(20),
 });
 
 /** Clear all items — resets cart_current to empty. */
-export const clearCartSchema = z.object({
+export const clearCartSchema = stateActionBaseSchema.extend({
   type: z.literal('clear_cart'),
 });
 
@@ -84,7 +84,7 @@ export const updateDraftSchema = stateActionBaseSchema.extend({
  * Ask the customer to confirm something. Creates agent.pending_confirmations.
  * A confirmation is pending until the customer answers or it expires (24 h).
  */
-export const requestConfirmationSchema = z.object({
+export const requestConfirmationSchema = stateActionBaseSchema.extend({
   type: z.literal('request_confirmation'),
   confirmation_type: z.enum([
     'fact_confirmation',
@@ -106,7 +106,7 @@ export const requestConfirmationSchema = z.object({
  * Escalate conversation to human. Creates agent.escalations.
  * The summary_text is shown as a Chatwoot internal note.
  */
-export const escalateSchema = z.object({
+export const escalateSchema = stateActionBaseSchema.extend({
   type: z.literal('escalate'),
   reason: z.enum([
     'ready_to_close',
@@ -128,7 +128,7 @@ export const escalateSchema = z.object({
 // ------------------------------------------------------------------
 
 /** Switch the active skill. Updates agent.session_current.current_skill. */
-export const selectSkillSchema = z.object({
+export const selectSkillSchema = stateActionBaseSchema.extend({
   type: z.literal('select_skill'),
   skill_name: z.string().min(1).max(80),
 });
