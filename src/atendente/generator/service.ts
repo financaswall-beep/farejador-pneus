@@ -26,6 +26,7 @@ import type { PlannerDecisionResult } from '../planner/service.js';
 import type { ToolExecutionResult } from '../executor/tool-executor.js';
 import { validateSay } from '../validators/say-validator.js';
 import { validateAction } from '../validators/action-validator.js';
+import { validateClaims } from '../validators/claim-validator.js';
 import type { ToolResultForValidation } from '../validators/tool-results.js';
 import { buildGeneratorMessages } from './prompt.js';
 import {
@@ -35,6 +36,7 @@ import {
   generatorAgentVersion,
   hydrateGeneratorActions,
   SAFE_FALLBACK_SAY,
+  type GeneratorClaim,
   type GeneratorRawAction,
   type GeneratorResult,
 } from './schemas.js';
@@ -60,12 +62,23 @@ function toValidationCtx(toolResults: ToolExecutionResult[], selectedSkill?: Ski
 function runValidators(
   say: string,
   actions: AgentAction[],
+  claims: GeneratorClaim[],
   toolResults: ToolExecutionResult[],
   context: PlannerContext,
   selectedSkill?: SkillName,
 ): { blocked: boolean; block_reason: string | null } {
   const sayCtx = toValidationCtx(toolResults, selectedSkill);
 
+  // Etapa 2: claims-first validation. Se Generator emitiu claims sem evidencia,
+  // bloqueia antes do say-validator (mais especifico, melhor reason). Quando
+  // claims=[] (legado/turn sem afirmacao comercial), passa direto.
+  const claimResult = validateClaims(claims, sayCtx.recent_tool_results);
+  if (!claimResult.valid) {
+    return { blocked: true, block_reason: claimResult.reason };
+  }
+
+  // Say-validator regex permanece como rede de seguranca durante migracao
+  // dos claims. Quando claim catalog cobrir todos os casos, considera retirar.
   const sayResult = validateSay(say, sayCtx);
   if (!sayResult.valid) {
     return { blocked: true, block_reason: sayResult.reason };
@@ -145,7 +158,8 @@ function mockGenerateTurn(
       say = 'Como posso te ajudar?';
   }
 
-  const validation = runValidators(say, actions, toolResults, context, skill);
+  // Mock generator nao emite claims — passa [] (sem afirmacoes a validar).
+  const validation = runValidators(say, actions, [], toolResults, context, skill);
   const usedSafeFallback = say === SAFE_FALLBACK_SAY;
 
   return {
@@ -252,7 +266,7 @@ export async function generateTurn(
       };
     }
 
-    const { say, actions: rawActions } = parsed.data;
+    const { say, actions: rawActions, claims } = parsed.data;
 
     // Sprint 6.5 — Caminho B: hidrata cada action com meta determinístico.
     const turnIndex = context.state.turn_index + 1;
@@ -284,7 +298,7 @@ export async function generateTurn(
       };
     }
 
-    const validation = runValidators(say, actions, toolResults, context, decision.output.skill);
+    const validation = runValidators(say, actions, claims, toolResults, context, decision.output.skill);
 
     return {
       say_text: validation.blocked ? null : say,

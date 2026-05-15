@@ -35,7 +35,7 @@ import {
 } from '../../shared/zod/agent-state.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
 
-export const generatorPromptVersion = 'generator_v1.3.3';
+export const generatorPromptVersion = 'generator_v1.4.0';
 export const generatorAgentVersion = 'atendente_v1.0.0';
 
 // ------------------------------------------------------------------
@@ -90,12 +90,65 @@ export const generatorRawActionSchema = z.discriminatedUnion('type', [
 ]);
 export type GeneratorRawAction = z.infer<typeof generatorRawActionSchema>;
 
+// ------------------------------------------------------------------
+// Structured commercial claims (Etapa 2 — 2026-05-15)
+//
+// Quando o Generator afirma algo comercial na resposta (preco, estoque,
+// compatibilidade, frete), tambem emite um claim estruturado apontando
+// a tool que confirma. O ClaimValidator checa cada claim contra os
+// tool_results do turn — sem regex sobre a fala humana do bot.
+//
+// Migracao gradual: claims default=[]. LLM pode nao emitir nada (legado).
+// Quando emite, validator bloqueia se claim nao tem evidencia.
+// ------------------------------------------------------------------
+
+const priceClaimSchema = z.object({
+  type: z.literal('price'),
+  /** Valor afirmado (R$). Validator compara com price_amount do buscarProduto (±R$0,01). */
+  amount: z.number().positive(),
+  /** Optional — quando informado, refina a checagem para esse produto especifico. */
+  product_id: z.string().min(1).nullable().optional(),
+});
+
+const stockClaimSchema = z.object({
+  type: z.literal('stock_availability'),
+  /** Optional — quando informado, validator exige verificarEstoque deste product_id. */
+  product_id: z.string().min(1).nullable().optional(),
+});
+
+const fitmentClaimSchema = z.object({
+  type: z.literal('fitment'),
+  /** Optional — produto sendo afirmado como compativel. */
+  product_id: z.string().min(1).nullable().optional(),
+  /** Optional — texto descritivo da moto/veiculo (apenas hint, nao usado em validacao estrita). */
+  vehicle_hint: z.string().max(120).nullable().optional(),
+});
+
+const deliveryFeeClaimSchema = z.object({
+  type: z.literal('delivery_fee'),
+  /** Optional — valor de frete afirmado. Validator compara com valor de calcularFrete (±R$0,01). */
+  amount: z.number().nonnegative().nullable().optional(),
+});
+
+export const generatorClaimSchema = z.discriminatedUnion('type', [
+  priceClaimSchema,
+  stockClaimSchema,
+  fitmentClaimSchema,
+  deliveryFeeClaimSchema,
+]);
+export type GeneratorClaim = z.infer<typeof generatorClaimSchema>;
+
 /**
  * Schema da resposta crua da LLM Generator (sem meta nas actions).
  */
 export const generatorOutputRawSchema = z.object({
   say: z.string().min(1).max(2000),
   actions: z.array(generatorRawActionSchema).max(10).default([]),
+  /**
+   * Etapa 2: claims estruturados sobre afirmacoes comerciais em `say`.
+   * Default `[]` — turns que nao afirmam nada comercial.
+   */
+  claims: z.array(generatorClaimSchema).max(20).default([]),
   rationale: z.string().min(1).max(500),
   prompt_version: z.literal(generatorPromptVersion),
 });
@@ -104,7 +157,7 @@ export type GeneratorOutputRaw = z.infer<typeof generatorOutputRawSchema>;
 export const generatorOutputJsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['say', 'actions', 'rationale', 'prompt_version'],
+  required: ['say', 'actions', 'claims', 'rationale', 'prompt_version'],
   properties: {
     say: { type: 'string', minLength: 1, maxLength: 2000 },
     actions: {
@@ -215,6 +268,52 @@ export const generatorOutputJsonSchema = {
                 type: ['string', 'null'],
                 enum: ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto', null],
               },
+            },
+          },
+        ],
+      },
+    },
+    claims: {
+      type: 'array',
+      maxItems: 20,
+      items: {
+        anyOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'amount', 'product_id'],
+            properties: {
+              type: { type: 'string', enum: ['price'] },
+              amount: { type: 'number' },
+              product_id: { type: ['string', 'null'] },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'product_id'],
+            properties: {
+              type: { type: 'string', enum: ['stock_availability'] },
+              product_id: { type: ['string', 'null'] },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'product_id', 'vehicle_hint'],
+            properties: {
+              type: { type: 'string', enum: ['fitment'] },
+              product_id: { type: ['string', 'null'] },
+              vehicle_hint: { type: ['string', 'null'] },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'amount'],
+            properties: {
+              type: { type: 'string', enum: ['delivery_fee'] },
+              amount: { type: ['number', 'null'] },
             },
           },
         ],
