@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  customerAsksForStock,
   executeToolRequests,
   maybeAutoChainVerificarEstoque,
   recordToolExecutionResults,
@@ -144,31 +143,11 @@ describe('Tool Executor Sprint 4', () => {
   });
 
   describe('auto-chain verificarEstoque pos-buscarProduto', () => {
-    it.each([
-      'Tem?',
-      'Tem ai?',
-      'Voces tem em estoque?',
-      'Pronta entrega?',
-      'Ainda tem esse pneu?',
-      'Tem disponivel?',
-      'Vcs tem 90/90-18?',
-    ])('detecta intencao de estoque na mensagem: %s', (text) => {
-      expect(customerAsksForStock(text)).toBe(true);
-    });
+    // Regra deterministica: achou produto -> confirma estoque. Sem regex de
+    // intencao sobre a mensagem do cliente. Etapa 2 (structured claims) vai
+    // remover regex tambem do say-validator.
 
-    it.each([
-      'Qual a medida do meu pneu?',
-      'Minha moto e Honda CG 160.',
-      'Quero saber o preco.',
-      null,
-      undefined,
-      '',
-    ])('NAO detecta intencao de estoque: %s', (text) => {
-      expect(customerAsksForStock(text)).toBe(false);
-    });
-
-    it('dispara verificarEstoque quando cliente pediu estoque e buscarProduto retornou produto', async () => {
-      // Mock para verificarEstoque
+    it('dispara verificarEstoque sempre que buscarProduto retornou produto', async () => {
       const client = {
         query: vi.fn().mockResolvedValueOnce({
           rows: [
@@ -188,24 +167,23 @@ describe('Tool Executor Sprint 4', () => {
         {
           tool: 'buscarProduto',
           input: { environment: 'prod', medida_pneu: '90/90-18' },
-          output: [{ product_id: '11111111-2222-4333-8444-555555555555', product_code: 'SKU001', price_amount: '79.00' }],
+          output: [
+            { product_id: '11111111-2222-4333-8444-555555555555', product_code: 'SKU001', price_amount: '79.00' },
+          ],
           ok: true,
           duration_ms: 5,
           error_message: null,
         },
       ];
 
-      const result = await maybeAutoChainVerificarEstoque(
-        client as never,
-        'prod',
-        'Tem em estoque?',
-        existing,
-      );
+      const result = await maybeAutoChainVerificarEstoque(client as never, 'prod', existing);
 
       expect(result).not.toBeNull();
       expect(result?.tool).toBe('verificarEstoque');
       expect(result?.ok).toBe(true);
-      expect((result?.input as Record<string, unknown>)?.product_id).toBe('11111111-2222-4333-8444-555555555555');
+      expect((result?.input as Record<string, unknown>)?.product_id).toBe(
+        '11111111-2222-4333-8444-555555555555',
+      );
     });
 
     it('NAO dispara quando verificarEstoque ja rodou no turn', async () => {
@@ -229,12 +207,7 @@ describe('Tool Executor Sprint 4', () => {
         },
       ];
 
-      const result = await maybeAutoChainVerificarEstoque(
-        client as never,
-        'prod',
-        'Tem em estoque?',
-        existing,
-      );
+      const result = await maybeAutoChainVerificarEstoque(client as never, 'prod', existing);
 
       expect(result).toBeNull();
       expect(client.query).not.toHaveBeenCalled();
@@ -253,36 +226,26 @@ describe('Tool Executor Sprint 4', () => {
         },
       ];
 
-      const result = await maybeAutoChainVerificarEstoque(
-        client as never,
-        'prod',
-        'Tem em estoque?',
-        existing,
-      );
+      const result = await maybeAutoChainVerificarEstoque(client as never, 'prod', existing);
 
       expect(result).toBeNull();
       expect(client.query).not.toHaveBeenCalled();
     });
 
-    it('NAO dispara quando cliente nao perguntou sobre estoque', async () => {
+    it('NAO dispara quando nao ha buscarProduto no turn', async () => {
       const client = { query: vi.fn() };
       const existing: ToolExecutionResult[] = [
         {
-          tool: 'buscarProduto',
+          tool: 'buscarPoliticaComercial',
           input: { environment: 'prod' },
-          output: [{ product_id: 'p1' }],
+          output: [{ policy_key: 'pix', policy_value: { aceitos: ['pix'] } }],
           ok: true,
           duration_ms: 5,
           error_message: null,
         },
       ];
 
-      const result = await maybeAutoChainVerificarEstoque(
-        client as never,
-        'prod',
-        'Quero saber o preco.',
-        existing,
-      );
+      const result = await maybeAutoChainVerificarEstoque(client as never, 'prod', existing);
 
       expect(result).toBeNull();
       expect(client.query).not.toHaveBeenCalled();

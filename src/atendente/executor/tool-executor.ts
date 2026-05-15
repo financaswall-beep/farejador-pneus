@@ -86,28 +86,18 @@ type BuscarProdutoRequest = Extract<ToolRequest, { tool: 'buscarProduto' }>;
 // ------------------------------------------------------------------
 // Auto-chain de verificarEstoque pos-buscarProduto.
 //
-// Quando o cliente pergunta "tem?", "estoque?", "pronta entrega?" etc,
-// o Planner nao tem product_id antes de buscar — entao nao consegue
-// pedir verificarEstoque no mesmo turn. Aqui, APOS executar os tools
-// do Planner, se a intencao de estoque esta presente E buscarProduto
-// retornou produto concreto E verificarEstoque ainda nao foi chamado,
-// injetamos automaticamente verificarEstoque(product_id=primeiro).
+// Regra deterministica: sempre que buscarProduto retornar produto concreto
+// (product_id) e verificarEstoque ainda NAO tiver rodado neste turn,
+// disparamos verificarEstoque(product_id=primeiro) automaticamente.
 //
-// Garante que o Generator receba evidencia de estoque sem depender do
-// LLM Planner perceber a intencao.
+// Sem regex sobre a mensagem do cliente. Sem "adivinhar intencao". Achou
+// produto -> confirma estoque. Custo: 1 query extra por turn comercial.
+// Ganho: Generator recebe evidencia de estoque sempre que ha produto, sem
+// depender do LLM Planner perceber intencao.
+//
+// Etapa futura (structured claims): substituir o resto dos validators
+// regex por claims tipados emitidos pelo Generator (ver plan file).
 // ------------------------------------------------------------------
-
-const STOCK_INTENT_PATTERN =
-  /\b(?:tem(?:os)?(?:\s+(?:ai|aqui|em\s+estoque|disponivel|disponivel))?|temos|em\s+estoque|estoque|disponivel|disponibilidade|pronta\s+entrega|chega\s+(?:hoje|amanha)|ainda\s+tem|voce(?:s)?\s+tem|vc(?:s)?\s+tem)\b/;
-
-function normalizeTextLite(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
-export function customerAsksForStock(customerText: string | null | undefined): boolean {
-  if (!customerText) return false;
-  return STOCK_INTENT_PATTERN.test(normalizeTextLite(customerText));
-}
 
 function pickFirstProductIdFromResults(results: ToolExecutionResult[]): string | null {
   for (const result of results) {
@@ -127,18 +117,17 @@ function verificarEstoqueAlreadyRan(results: ToolExecutionResult[]): boolean {
 }
 
 /**
- * Se a intencao do cliente menciona estoque e buscarProduto retornou produto,
- * roda verificarEstoque automaticamente. Retorna null quando nada foi feito.
+ * Se buscarProduto retornou produto e verificarEstoque ainda nao rodou,
+ * dispara verificarEstoque(product_id=primeiro) automaticamente.
+ * Retorna null quando nao ha o que fazer (noop seguro).
  *
- * Eh seguro chamar sempre apos executeToolRequests: noop quando nao se aplica.
+ * Sem heuristica sobre a mensagem do cliente — regra puramente deterministica.
  */
 export async function maybeAutoChainVerificarEstoque(
   client: PoolClient,
   environment: 'prod' | 'test',
-  customerText: string | null | undefined,
   toolResults: ToolExecutionResult[],
 ): Promise<ToolExecutionResult | null> {
-  if (!customerAsksForStock(customerText)) return null;
   if (verificarEstoqueAlreadyRan(toolResults)) return null;
 
   const productId = pickFirstProductIdFromResults(toolResults);

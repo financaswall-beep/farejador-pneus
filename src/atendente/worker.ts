@@ -90,14 +90,12 @@ export async function processAtendenteJob(
     await recordToolExecutionResults(client, context, toolResults);
   }
 
-  // Auto-chain: se o cliente perguntou estoque/disponibilidade e buscarProduto
-  // retornou produto, dispara verificarEstoque automaticamente (Planner nao
-  // tem product_id antes da busca, entao nao consegue pedir sozinho).
-  const customerText = latestCustomerTextForJob(context, job.trigger_message_id);
+  // Auto-chain deterministico: se buscarProduto retornou produto e
+  // verificarEstoque ainda nao rodou, dispara verificarEstoque automaticamente.
+  // Sem regex sobre a mensagem do cliente — achou produto, confirma estoque.
   const autoStock = await maybeAutoChainVerificarEstoque(
     client,
     job.environment,
-    customerText,
     toolResults,
   );
   if (autoStock) {
@@ -337,22 +335,6 @@ async function reconcileAtendenteJobsIfDue(now = new Date()): Promise<void> {
   } catch (err) {
     logger.error({ worker_id: WORKER_ID, err }, 'atendente shadow: job reconciliation failed');
   }
-}
-
-function latestCustomerTextForJob(
-  context: Awaited<ReturnType<typeof buildPlannerContext>>,
-  triggerMessageId: string,
-): string | null {
-  // Prefere a mensagem do trigger (a mais nova que disparou o job).
-  // Fallback: ultima mensagem com role=customer em recent_messages.
-  const trigger = context.recent_messages.find((m) => m.id === triggerMessageId);
-  if (trigger && trigger.role === 'customer') return trigger.text;
-
-  for (let index = context.recent_messages.length - 1; index >= 0; index -= 1) {
-    const message = context.recent_messages[index]!;
-    if (message.role === 'customer') return message.text;
-  }
-  return null;
 }
 
 async function lockSessionForJob(client: PoolClient, job: AtendenteJobRow): Promise<void> {
