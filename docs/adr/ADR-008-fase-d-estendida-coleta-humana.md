@@ -57,7 +57,7 @@ Componentes da Fase D estendida:
 
 4. **6 blocos pequenos de infra paralela (~5-7 dias espalhados)**
    - **Particoes julho/agosto 2026** (urgente — antes de 30/jun). pg_partman NAO esta instalado; sera SQL manual ou cron proprio.
-   - **Reconciliar migration history Supabase** (banco em 0029, CLI registra 0021) ou abandonar formalmente o CLI Supabase.
+   - **Reconciliar migration history Supabase** (banco em 0030, CLI registra 0021) ou abandonar formalmente o CLI Supabase.
    - **LGPD minimo**: endpoint de erasure operacional + base legal documentada (`ops.erasure_log` ja existe como tabela).
    - **Runbook de desligamento de emergencia** (kill switch documentado).
    - **Rate limit / circuit breaker** de custo OpenAI (sem isso, cliente pode enfileirar 1000 mensagens em 10s e estourar conta).

@@ -63,11 +63,16 @@ nota Chatwoot ao escalar).
 - **B5 escalação real** (commit `9888bd7`): worker emite action `escalate`
   quando `Planner.skill === 'escalar_humano'`. `agent.escalations` agora
   recebe linhas (5 confirmadas em DB), `postEscalateNote` chamado.
-- **Etapa 3 Planner cleanup** (commit `b6bc9d9`): remove
-  `mentionsProductCompatibilityQuestion`, `shouldEnsurePolicyTool`,
-  `mentionsStoreInfoQuestion` (mantidas como `@internal MOCK-ONLY` para
-  mockPlanTurn). Planner v1.2.8 com regras explícitas e exemplos de fala
-  informal.
+- **Etapa 3 Planner cleanup** (commit `b6bc9d9`): removeu do
+  `normalizePlannerOutputCandidate` os patches regex que liam customer text
+  para "consertar" decisões do Planner LLM. Especificamente:
+  - **Removidas do código (deletadas):** `mentionsProductCompatibilityQuestion`,
+    `shouldEnsurePolicyTool`, `findOrganizerNumberFact`, `latestCustomerText`.
+  - **Mantidas como `@internal MOCK-ONLY`:** `mentionsPolicyQuestion` e
+    `mentionsStoreInfoQuestion` (usadas APENAS por `mockPlanTurn` quando
+    `PLANNER_LLM_ENABLED=false` em dev — nunca em prod).
+  Planner v1.2.8 com regras explícitas por skill e exemplos de fala informal
+  (REGRA DE OURO). Em produção, LLM é o único intérprete de fala humana.
 - **Etapa 2 structured claims** (commit `408f058`): Generator emite
   `claims[]` junto com `say`. `ClaimValidator` checa cada claim contra
   tool results. `SayValidator` regex continua como rede de segurança.

@@ -111,12 +111,14 @@ Agora:
 criar estrutura -> ligar Organizadora -> Shadow Assistido por 5 semanas -> ligar Atendente
 ```
 
-Portanto:
+Portanto (atualizado 2026-05-15):
 
-- `agent.*` continua projetado e a fundacao reentrante do Sprint 1 ja existe localmente;
-- Planner constrained, skills e validadores completos continuam projetados;
-- Atendente Worker continua nao implementado;
-- qualquer runtime da Atendente permanece desligado no primeiro periodo.
+- `agent.*` IMPLEMENTADO e em uso em prod: `session_current`, `session_items`, `session_slots`, `turns`, `escalations`, `order_drafts`, `session_events` todos populados;
+- Planner LLM v1.2.8 IMPLEMENTADO (sem regex de customer text — Etapa 3 ADR-009);
+- Validadores IMPLEMENTADOS: `SayValidator`, `ActionValidator`, `ClaimValidator` (Etapa 2 ADR-009 — cobre `price`, `stock_availability`, `fitment`, `delivery_fee`);
+- **Atendente Worker IMPLEMENTADO em shadow** (commits `4963701` a `6f7e7c5`): Worker, Planner, Executor, Generator, claims, auto-chain de `verificarEstoque`, escalação real quando Planner=`escalar_humano`. NUNCA envia ao cliente;
+- Generator v1.4.0 default ou v1.5.0 few-shot atrás de `GENERATOR_PROMPT_FEW_SHOT_ENABLED`;
+- Envio Chatwoot pela Atendente (Sprint 8) continua adiado — `ATENDENTE_SEND_ENABLED` não existe em código ainda.
 
 ## Como Wallace trabalha nesse periodo
 

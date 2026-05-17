@@ -100,7 +100,7 @@ The project evolves in three phases. Do not mix responsibilities across phase bo
 - **Phase 1 — Deterministic Farejador (MVP).** Webhook ingestion, HMAC validation, dedup, raw persistence, structural normalization into `core.*`. No LLM calls. No interpretation.
 - **Phase 2a — Deterministic enrichment.** Background workers using regex, heuristics, and SQL aggregation. Populate `analytics.conversation_signals`, `analytics.linguistic_hints`, basic `analytics.customer_journey`. Baseline for measuring LLM value in 2b.
 - **Phase 2b — LLM enrichment.** Background workers that read conversations and extract structured facts, classifications, and transcriptions using an LLM. Writes only to `analytics.*`.
-- **Phase 3 — Conversational agent.** A separate service (separate container, possibly separate repo) that consumes `core.*` and `analytics.*` as a read-only client and talks to customers. Not part of the Farejador runtime.
+- **Phase 3 — Conversational agent.** Implemented in `src/atendente/` and `src/agent/` within the same Farejador process/container in production today (decision 2026-04-29). Controlled via feature flags (`ATENDENTE_SHADOW_ENABLED`, `GENERATOR_LLM_ENABLED`). Consumes `core.*` and `analytics.*` as read-only client; writes only to `agent.*` and `ops.*` via validated action handlers. Decisions 2026-05-10: Critic descartado (ADR-005), Supervisora adiada para Fase G (ADR-006), Fase D estendida e proximo passo (ADR-008).
 
 A legacy Phase 4 (training a proprietary LLM from the captured dataset) is **out of the active plan**. It remains as a distant roadmap possibility only.
 

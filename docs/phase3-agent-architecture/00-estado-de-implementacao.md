@@ -61,7 +61,7 @@ Lista chave da Fase 3:
 - `0023`: analytics marts v1
 - `0024-0028`: state extensions Atendente + Planner + Tool Executor + Generator
 - `0029`: cart action events hardening
-- `0030`: vehicle resolver variant precision
+- `0030`: vehicle resolver variant precision (prioriza match por modelo+versao em `commerce.resolve_vehicle_model`)
 
 ## Versões Ativas (2026-05-15)
 

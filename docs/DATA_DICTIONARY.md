@@ -1135,9 +1135,9 @@ mas novas actions de carrinho usam os tipos especificos acima.
 
 ### `agent.turns`
 
-Cada resposta da LLM Atendente. Guarda mensagem que disparou, skill escolhida, output `{ say, actions }` e, no futuro, mensagem enviada no Chatwoot.
+Cada resposta da LLM Atendente. Guarda mensagem que disparou, skill escolhida, output `{ say, actions, claims, rationale, prompt_version }` (claims adicionados em 2026-05-15 via Etapa 2 ADR-009) e, no futuro, mensagem enviada no Chatwoot.
 
-Quando `status='blocked'`, `say_text` fica `NULL` por seguranca, mas o candidato bloqueado fica auditavel em `blocked_say_text`, `blocked_actions` e `blocked_payload`. Isso permite ver o que o Generator tentou dizer sem expor a frase ao cliente.
+Quando `status='blocked'`, `say_text` fica `NULL` por seguranca, mas o candidato bloqueado fica auditavel em `blocked_say_text`, `blocked_actions` e `blocked_payload` (este ultimo agora tambem carrega `claims` para auditoria de Etapa 2). Isso permite ver o que o Generator tentou dizer sem expor a frase ao cliente.
 
 Idempotente: mesmo `trigger_message_id` + `agent_version` nao gera dois turnos.
 

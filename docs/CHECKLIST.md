@@ -273,8 +273,9 @@ Pendente da F1.5:
 - [x] `0027_generator_shadow_events.sql` (evento `generator_produced`)
 - [x] `0028_generator_blocked_turn_audit.sql` (candidato bloqueado em `agent.turns`)
 - [x] `0029_cart_action_events_hardening.sql` (eventos semanticos de carrinho/draft)
+- [x] `0030_vehicle_resolver_variant_precision.sql` (prioriza match por modelo+versao em `commerce.resolve_vehicle_model`)
 - [x] Cada migration idempotente (CREATE/ALTER IF NOT EXISTS)
-- [x] Migration `0029` aplicada/validada no Supabase atual para este deploy/push
+- [x] Migration `0030` aplicada/validada no Supabase atual
 - [ ] Testes de integracao por migration (Kimi escreve depois)
 
 ### 7.3 Etapa C - Codigo TypeScript

@@ -404,8 +404,8 @@ rodada do catalog15 mostrou recuperacao significativa.
 | Blocked | 2/45 | 0/45 |
 | Safe fallback exato | 6 | 2 |
 | buscarProduto -> produto | 100% (25/25) | 100% (25/25) |
-| verificarEstoque chamadas | 34 | 38 |
-| buscarCompatibilidade | 20 | 18 |
+| verificarEstoque chamadas | 34 | 39 |
+| buscarCompatibilidade | 20 | 21 |
 | Adocao de claims | 64.4% | 64.4% |
 | Media claims/turn | 1.36 | 1.40 |
 | Input medio Generator (tokens) | 7187 | 7068 |
@@ -427,4 +427,8 @@ Notas pos-deploy:
 
 Sistema continua nao pronto para envio automatico. Proxima fase: coleta humana
 (ADR-008).
+
+> Nota: numeros de verificarEstoque/buscarCompatibilidade corrigidos em
+> 2026-05-15 apos revisao final do Codex. Versao anterior do append tinha
+> 38/18 (medicao intermediaria); medicao final consolidada eh 39/21.
 

@@ -35,6 +35,7 @@ Ordem de execução:
 27. `0027_generator_shadow_events.sql` - base do Sprint 6 Generator Shadow: adiciona `generator_produced` ao ledger `agent.session_events` para auditoria da resposta candidata, sem envio Chatwoot.
 28. `0028_generator_blocked_turn_audit.sql` - PR 1 de hardening: adiciona `blocked_say_text`, `blocked_actions` e `blocked_payload` em `agent.turns` para auditar o texto/actions candidatos quando o Generator e bloqueado pelo Say/Action Validator.
 29. `0029_cart_action_events_hardening.sql` - PR 3 de hardening: adiciona eventos semânticos de carrinho/draft em `agent.session_events` e `updated` em `agent.cart_events`.
+30. `0030_vehicle_resolver_variant_precision.sql` - prioriza match por modelo + versao em `commerce.resolve_vehicle_model`.
 
 ## Convenções
 
