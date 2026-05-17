@@ -116,7 +116,9 @@ Negativas:
 
 A implementacao concreta sera detalhada em handoff/plano separado quando iniciada. Esta ADR registra apenas a decisao arquitetural de prioridade.
 
-Ideia preliminar para mecanismo de comparacao:
-- Adicionar coluna `is_golden_reference boolean` em `core.conversations`, default false; trigger marca true quando ha mensagem com `sender_type='agent'` (humano via Chatwoot, nao bot).
-- View `ops.human_vs_bot_comparison`: para cada `agent.turns` em conversa golden, junta com a mensagem humana mais proxima e mostra lado a lado.
-- Endpoint admin ou query simples para Wallace marcar concordancia.
+Implementado em 2026-05-16:
+- Migration `0031_human_vs_bot_comparison_view.sql` cria a view `ops.human_vs_bot_comparison`.
+- A view pareia cada mensagem publica do cliente em `core.messages` com a primeira resposta humana publica antes da proxima mensagem do cliente e com o turno shadow da Atendente via `agent.turns.trigger_message_id`.
+- Status possiveis: `paired`, `bot_blocked`, `bot_empty`, `missing_human_reply`, `missing_bot_shadow`.
+- No banco auditado em 2026-05-16 ainda nao havia respostas humanas publicas suficientes para parear; o resultado inicial aparece como `missing_human_reply`. Isso e esperado ate Wallace atender conversas reais pelo Chatwoot com mensagens publicas.
+- Ainda falta uma camada de revisao humana (`agree` / `disagree` / `partial`) se quisermos transformar a comparacao em dataset rotulado. A view resolve o lado "mostrar X/Y/Z"; o julgamento humano fica para passo posterior.

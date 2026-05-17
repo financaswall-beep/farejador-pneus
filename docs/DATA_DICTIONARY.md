@@ -1,6 +1,6 @@
 # Guia das Tabelas do Farejador
 
-Atualizado: 2026-05-15. Tabelas novas ou colunas adicionadas desde 25/04: `analytics.fact_evidence` (migration 0018), `agent.session_items`/`session_slots` (0024 estado reentrante), `agent.turns.blocked_say_text`/`blocked_actions`/`blocked_payload` (0028 PR1), `agent.cart_events.event_type='updated'` (0029 PR3), `analytics_marts.*` schema completo (0023). Migrations 0022-0030 estao aplicadas no banco mas o historico Supabase CLI registra ate 0021 — divida operacional a reconciliar (ver ADR-008).
+Atualizado: 2026-05-16. Tabelas novas ou colunas adicionadas desde 25/04: `analytics.fact_evidence` (migration 0018), `agent.session_items`/`session_slots` (0024 estado reentrante), `agent.turns.blocked_say_text`/`blocked_actions`/`blocked_payload` (0028 PR1), `agent.cart_events.event_type='updated'` (0029 PR3), `analytics_marts.*` schema completo (0023), `ops.human_vs_bot_comparison` (0031 Fase D). Migrations 0022-0031 estao aplicadas no banco mas o historico Supabase CLI registra ate 0021 — divida operacional a reconciliar (ver ADR-008).
 
 **Adicoes 2026-05-15 (sem migration, mudancas no payload JSON):**
 - `agent.session_events.event_payload` (event_type=`generator_produced`) agora carrega:
@@ -1286,6 +1286,28 @@ Bloqueios e falhas do agente. Tipos:
 - router_no_skill_matched: nenhuma skill bateu
 - evidence_not_literal: LLM extraiu fato sem evidence valida
 - schema_violation: LLM tentou usar fact_key fora do extraction-schema
+
+### `ops.human_vs_bot_comparison`
+
+View de leitura da Fase D estendida. Ela responde a pergunta:
+
+> cliente perguntou X, Wallace respondeu Y, a Atendente em shadow teria respondido Z.
+
+Ela junta:
+
+- mensagem publica do cliente em `core.messages`
+- primeira resposta humana publica antes da proxima mensagem do cliente
+- turno shadow da Atendente em `agent.turns`, ligado por `trigger_message_id`
+
+Campos mais importantes:
+
+- `customer_text` - o que o cliente perguntou.
+- `human_text` - resposta humana real no Chatwoot.
+- `bot_text` - resposta shadow da Atendente; se foi bloqueada, usa `blocked_say_text`.
+- `comparison_status` - `paired`, `bot_blocked`, `bot_empty`, `missing_human_reply` ou `missing_bot_shadow`.
+- `human_reply_seconds` e `bot_shadow_seconds` - tempo ate cada resposta.
+
+Observacao operacional: no banco auditado em 2026-05-16 havia mensagens de cliente e turns shadow, mas quase nenhuma resposta humana publica. Enquanto Wallace nao responder clientes reais pelo Chatwoot em modo publico, a view vai mostrar muitos `missing_human_reply`.
 
 ### `ops.enrichment_jobs` (atualizada)
 

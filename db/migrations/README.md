@@ -36,6 +36,7 @@ Ordem de execução:
 28. `0028_generator_blocked_turn_audit.sql` - PR 1 de hardening: adiciona `blocked_say_text`, `blocked_actions` e `blocked_payload` em `agent.turns` para auditar o texto/actions candidatos quando o Generator e bloqueado pelo Say/Action Validator.
 29. `0029_cart_action_events_hardening.sql` - PR 3 de hardening: adiciona eventos semânticos de carrinho/draft em `agent.session_events` e `updated` em `agent.cart_events`.
 30. `0030_vehicle_resolver_variant_precision.sql` - prioriza match por modelo + versao em `commerce.resolve_vehicle_model`.
+31. `0031_human_vs_bot_comparison_view.sql` - cria `ops.human_vs_bot_comparison` para comparar mensagem do cliente, resposta humana real e resposta shadow da Atendente na Fase D.
 
 ## Convenções
 
