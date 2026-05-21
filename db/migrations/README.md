@@ -37,6 +37,18 @@ Ordem de execução:
 29. `0029_cart_action_events_hardening.sql` - PR 3 de hardening: adiciona eventos semânticos de carrinho/draft em `agent.session_events` e `updated` em `agent.cart_events`.
 30. `0030_vehicle_resolver_variant_precision.sql` - prioriza match por modelo + versao em `commerce.resolve_vehicle_model`.
 31. `0031_human_vs_bot_comparison_view.sql` - cria `ops.human_vs_bot_comparison` para comparar mensagem do cliente, resposta humana real e resposta shadow da Atendente na Fase D.
+32. `0032_order_manual_capture.sql` - cria `core.units`, `audit.events`, extensoes controladas em `commerce.orders` e functions `commerce.register_manual_order`/`commerce.cancel_manual_order` para o Painel MVP.
+33. `0033_painel_views_and_audit.sql` - cria schema `dashboard.*` com views read-only do Painel MVP e `ops.human_bot_reviews` para rotular pares humano vs bot.
+34. `0034_painel_walkin_and_source.sql` - expande origem de venda em `commerce.orders.source`, cria `commerce.customers`, adiciona `commerce.orders.customer_id`, adiciona venda sem conversa Chatwoot (`commerce.register_walkin_order`) e recria `commerce.register_manual_order` com `source_tag`.
+35. `0035_partner_portal_foundation.sql` - cria fundacao do Portal Parceiro: `network.partners`, `network.partner_units`, tokens hash por unidade, estoque local, compras, despesas e view segura por `unit_id`.
+36. `0036_partner_expense_soft_delete.sql` - adiciona exclusao logica de despesas do Portal Parceiro e ajusta `network.partner_unit_summary` para ignorar despesas removidas.
+37. `0037_partner_operations_management.sql` - adiciona exclusao logica de compras do Portal Parceiro e ajusta o resumo para ignorar compras canceladas.
+38. `0038_partner_stock_tire_dimensions.sql` - adiciona colunas dimensionais (`tire_width_mm`, `tire_aspect_ratio`, `tire_rim_diameter`) em `commerce.partner_stock_levels`, indice composto e backfill regex-based a partir de `tire_size` canonico.
+39. `0039_commerce_network_stock_unified.sql` - cria view `commerce.network_stock_unified` que padroniza estoque da matriz + parceiros credenciados (read-only, mutacoes continuam nas tabelas originais).
+40. `0040_partner_orders_local.sql` - decisao do silo isolado: cria `commerce.partner_orders`, `commerce.partner_order_items` (snapshot item_name/tire_size/brand), functions `commerce.register_partner_local_order` e `commerce.cancel_partner_local_order` (atomicas, `FOR UPDATE`, audit) e views `partner_orders_full` + `network_orders_unified`.
+41. `0041_partner_summary_reads_partner_orders.sql` - corrige `network.partner_unit_summary` que ainda somava `commerce.orders`; agora soma `commerce.partner_orders` (alinhado com a decisao do silo da 0040).
+42. `0042_partner_sale_consistency.sql` - recria `commerce.register_partner_local_order` com BUG #2 (`RAISE EXCEPTION 'Estoque insuficiente'` ERRCODE 23514 quando saldo < pedido) e BUG #5 (emite 2 eventos audit separados: `partner_order_created` + `stock_decrement_sale`). Reconstrucao em arquivo a partir de `pg_get_functiondef` em prod (auditoria 2026-05-21).
+43. `0043_partner_hardening.sql` - segunda rodada de hardening do silo do parceiro: trigger `partner_orders_set_updated_at`, 2 triggers `env_match_*` em `partner_orders`/`partner_order_items`, 3 FKs com `ON DELETE SET NULL` (partner_order_items.partner_stock_id, partner_purchase_items.product_id, partner_stock_levels.product_id), UNIQUE natural-key do estoque (`item_name + tire_size + brand + supplier_name`) e comentarios em `partner_orders.status/deleted_at` esclarecendo convencao cancelled vs LGPD. Reconstrucao em arquivo a partir do estado real de prod (auditoria 2026-05-21).
 
 ## Convenções
 

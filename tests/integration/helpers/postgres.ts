@@ -14,13 +14,18 @@ export interface IntegrationDb {
 }
 
 export async function startPostgres(): Promise<IntegrationDb> {
-  const container = await new PostgreSqlContainer('postgres:16-alpine')
+  // Imagem alinhada com prod (Supabase usa Postgres 17.x).
+  const container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('farejador_test')
     .withUsername('test')
     .withPassword('test')
     .start();
 
-  const connectionString = container.getConnectionUri();
+  // Workaround Docker Desktop + WSL2 no Windows: getConnectionUri() retorna
+  // "postgres://...@localhost:PORT/..." mas o forwarding so funciona em IPv4.
+  // Como Node.js resolve "localhost" pra IPv6 (::1), conexao falha com
+  // ECONNRESET. Substituindo por 127.0.0.1 forca IPv4.
+  const connectionString = container.getConnectionUri().replace('@localhost:', '@127.0.0.1:');
   const pool = new Pool({ connectionString, max: 5 });
 
   await applyMigrations(pool);
@@ -41,10 +46,36 @@ async function applyMigrations(pool: Pool): Promise<void> {
   const client = await pool.connect();
   try {
     for (const file of files) {
-      const sql = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
+      const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
+      const sql = patchKnownIssues(file, raw);
       await client.query(sql);
     }
   } finally {
     client.release();
   }
+}
+
+/**
+ * Patches in-memory de migrations existentes que nao compilam em Postgres 17
+ * fresh. Nao toca em arquivo fonte — apenas adapta no carregamento dos testes.
+ *
+ * Item conhecido: 0020 declara `position TEXT` dentro de `RETURNS TABLE` na
+ * function `commerce.find_compatible_tires`. `position` e palavra-chave em
+ * contexto de declaracao de TABLE em Postgres 16+ — exige aspas duplas.
+ * A 0025 ja recria essa function com `fitment_position`, entao em prod tudo
+ * funciona. Mas pra subir banco fresh em CI/dev a 0020 precisa parsear.
+ *
+ * Correcao adequada seria editar a 0020 ou criar migration nova. Como esta
+ * fora do escopo Portal Parceiro (auditoria 2026-05-21), patcheamos so aqui.
+ */
+function patchKnownIssues(file: string, sql: string): string {
+  if (file === '0020_vehicle_fitment_validation.sql') {
+    return sql
+      .replace(/^(\s*)position(\s+)TEXT,$/m, '$1"position"$2TEXT,')
+      .replace(/^(\s*)f\.position,$/gm, '$1f."position",')
+      .replace(/f\.position\s*=\s*p_position/g, 'f."position" = p_position')
+      .replace(/f\.position\s*=\s*'both'/g, 'f."position" = \'both\'')
+      .replace(/(GROUP BY[^;]*?)f\.position,/g, '$1f."position",');
+  }
+  return sql;
 }
