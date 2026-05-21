@@ -60,6 +60,20 @@ process.on('SIGINT', () => {
   void shutdown('SIGINT');
 });
 
+process.on('uncaughtException', (err) => {
+  if (err.message.includes('Connection terminated unexpectedly')) {
+    logger.error({ err }, 'postgres connection terminated unexpectedly; keeping local server alive');
+    return;
+  }
+
+  logger.error({ err }, 'uncaught exception');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ reason }, 'unhandled rejection');
+});
+
 start().catch((err) => {
   logger.error({ err }, 'failed to start server');
   process.exit(1);

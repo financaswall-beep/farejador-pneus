@@ -1,0 +1,251 @@
+/* ────────────────────────────────────────────
+   Farejador-Painel — CSS customizado (light mode)
+   A maior parte do estilo vem do Tailwind (CDN).
+   Este arquivo guarda só o que o Tailwind não cobre.
+   ──────────────────────────────────────────── */
+
+/* Scrollbar discreto no tema light */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 5px;
+  border: 2px solid #f9fafb;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+/* Esconde elementos enquanto Alpine inicializa */
+[x-cloak] {
+  display: none !important;
+}
+
+/* Renderização suave de fonte */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+/* Fallback local quando CDNs externos (Alpine/Tailwind) nao carregam no admin. */
+.fallback-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: #f9fafb;
+  color: #111827;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.fallback-sidebar {
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+  padding: 22px 18px;
+}
+
+.fallback-logo {
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 28px;
+}
+
+.fallback-nav {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.fallback-nav.active {
+  background: #111827;
+  color: #fff;
+}
+
+.fallback-note {
+  margin-top: 24px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fallback-main {
+  padding: 28px;
+  overflow: auto;
+}
+
+.fallback-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.fallback-header h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.fallback-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.fallback-pill,
+.fallback-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.fallback-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.fallback-card,
+.fallback-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.fallback-card {
+  padding: 16px;
+}
+
+.fallback-label,
+.fallback-detail {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.fallback-value {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 8px 0 4px;
+}
+
+.fallback-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, 0.8fr);
+  gap: 18px;
+}
+
+.fallback-panel {
+  padding: 18px;
+}
+
+.fallback-panel h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.fallback-panel h3 {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.fallback-panel table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.fallback-panel th {
+  text-align: left;
+  color: #6b7280;
+  font-weight: 600;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fallback-panel td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+}
+
+.fallback-panel small {
+  display: block;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.fallback-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fallback-detail-grid div {
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.fallback-detail-grid span {
+  display: block;
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.fallback-detail-grid strong {
+  font-size: 16px;
+}
+
+.fallback-panel ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #374151;
+  font-size: 13px;
+}
+
+.fallback-panel li {
+  margin: 6px 0;
+}
+
+.pos {
+  color: #047857;
+}
+
+.neg {
+  color: #be123c;
+}
+
+.fallback-error {
+  padding: 40px;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+@media (max-width: 900px) {
+  .fallback-shell {
+    grid-template-columns: 1fr;
+  }
+  .fallback-sidebar {
+    display: none;
+  }
+  .fallback-kpis,
+  .fallback-grid {
+    grid-template-columns: 1fr;
+  }
+}
