@@ -162,6 +162,24 @@ const concorrenteCitadoSchema = z.string().min(1).max(100);
 const precoConcorrenteSchema = z.number().min(0);
 
 // ------------------------------------------------------------------
+// Category: quote (loja afirmou valor — NAO confundir com faixa_preco_desejada do cliente)
+// ------------------------------------------------------------------
+
+/**
+ * Preco que o ATENDENTE/BOT cotou explicitamente na conversa.
+ * Ex: "fica 99 reais", "sai a 89", "ta saindo a 120".
+ * NAO confundir com faixa_preco_desejada (orcamento expresso pelo cliente)
+ * nem com preco_concorrente (valor citado de outra loja).
+ */
+const precoCotadoSchema = z.number().positive();
+
+/**
+ * Taxa de frete que o ATENDENTE/BOT cotou explicitamente na conversa.
+ * Ex: "frete sai 9,90", "entrega 19 reais", "frete gratis" -> 0.
+ */
+const taxaFreteCotadaSchema = z.number().nonnegative();
+
+// ------------------------------------------------------------------
 // Category: outcome
 // ------------------------------------------------------------------
 
@@ -244,6 +262,10 @@ export const FACT_KEY_SCHEMAS = {
   // competition
   concorrente_citado:          concorrenteCitadoSchema,
   preco_concorrente:           precoConcorrenteSchema,
+
+  // quote (loja afirmou valor)
+  preco_cotado:                precoCotadoSchema,
+  taxa_frete_cotada:           taxaFreteCotadaSchema,
 
   // outcome
   produto_oferecido:           produtoOferecidoSchema,

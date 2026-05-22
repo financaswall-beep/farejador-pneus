@@ -161,7 +161,7 @@ export const generatorOutputRawSchema = z.object({
    * Default `[]` — turns que nao afirmam nada comercial.
    */
   claims: z.array(generatorClaimSchema).max(20).default([]),
-  rationale: z.string().min(1).max(500),
+  rationale: z.string().min(1).max(800),
   prompt_version: z.enum(SUPPORTED_GENERATOR_PROMPT_VERSIONS),
 });
 export type GeneratorOutputRaw = z.infer<typeof generatorOutputRawSchema>;
@@ -331,7 +331,7 @@ export const generatorOutputJsonSchema = {
         ],
       },
     },
-    rationale: { type: 'string', minLength: 1, maxLength: 500 },
+    rationale: { type: 'string', minLength: 1, maxLength: 800 },
     prompt_version: { type: 'string', enum: [...SUPPORTED_GENERATOR_PROMPT_VERSIONS] },
   },
 } as const;

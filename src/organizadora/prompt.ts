@@ -96,6 +96,27 @@ GARANTIA, RECLAMACAO E DESFECHO:
 - "ficou caro", "achei caro", "mais barato em outro lugar" tambem indicam achou_caro = true.
 - "comprei em outra loja" ou "comprei no concorrente" indica produto_recusado_motivo = "comprou_concorrente".
 
+QUEM DISSE O PRECO (CRITICO — afeta 3 fact_keys diferentes):
+Cada linha da TRANSCRICAO comeca com "CLIENTE:" ou "ATENDENTE:". Use ISSO pra decidir o fact_key, nao palavras-chave.
+
+- CLIENTE expressando orcamento, limite, budget -> faixa_preco_desejada (texto livre)
+  Ex: CLIENTE: "tenho 200 reais", "no maximo 250", "ate 190", "meu limite eh X"
+
+- ATENDENTE/loja afirmando preco do produto -> preco_cotado (numero, sem "R$" nem "reais")
+  Ex: ATENDENTE: "ta saindo a 99", "fica 89 reais", "esse aqui sai por R$ 120", "o seu eh 99 reais"
+  Extraia o numero limpo: "fica 89 reais" -> preco_cotado = 89
+
+- ATENDENTE/loja afirmando taxa de frete -> taxa_frete_cotada (numero, sem "R$" nem "reais")
+  Ex: ATENDENTE: "frete sai 9,90", "entrega 19", "cobramos 15 reais pra Bangu", "frete gratis" -> 0
+  Extraia o numero limpo: "frete sai 9,90" -> taxa_frete_cotada = 9.90
+
+- CLIENTE citando preco de OUTRO lugar -> preco_concorrente
+  Ex: CLIENTE: "no concorrente sai por 80", "vi por 75 em outra loja"
+
+NUNCA confunda esses 4. O sinal eh QUEM falou (CLIENTE vs ATENDENTE) e o CONTEXTO (orcamento vs cotacao da loja vs preco fora da loja). Se houver duvida real (ex.: mensagem ambigua sem CLIENTE/ATENDENTE claro), use confidence_level menor (0.55-0.70) ou nao extraia.
+
+Em uma mesma conversa pode haver MULTIPLOS preco_cotado (produtos diferentes) e MULTIPLOS taxa_frete_cotada (bairros diferentes). Extraia cada um com from_message_id correto. O sistema gerencia versoes via superseded_by.
+
 PRECO, URGENCIA E USO:
 - "ate 220", "ate 190", "no maximo 250", "tenho 200 reais" indicam faixa_preco_desejada.
 - "furou agora", "preciso resolver hoje", "pegar ainda hoje" indicam urgencia = "alta".

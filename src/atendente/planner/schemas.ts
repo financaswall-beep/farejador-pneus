@@ -58,7 +58,7 @@ export const plannerOutputSchema = z.object({
   tool_requests: z.array(toolRequestSchema).max(5).default([]),
   risk_flags: z.array(riskFlagSchema).default([]),
   confidence: z.number().min(0).max(1),
-  rationale: z.string().min(1).max(500),
+  rationale: z.string().min(1).max(800),
   prompt_version: z.literal(plannerPromptVersion),
 });
 export type PlannerOutput = z.infer<typeof plannerOutputSchema>;
@@ -194,7 +194,7 @@ export const plannerOutputJsonSchema = {
       items: { type: 'string', enum: riskFlagSchema.options },
     },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
-    rationale: { type: 'string', minLength: 1, maxLength: 500 },
+    rationale: { type: 'string', minLength: 1, maxLength: 800 },
     prompt_version: { type: 'string', enum: [plannerPromptVersion] },
   },
 } as const;
@@ -206,7 +206,7 @@ export function fallbackPlannerOutput(reason: string): PlannerOutput {
     tool_requests: [],
     risk_flags: ['low_confidence'],
     confidence: 0,
-    rationale: reason.slice(0, 500) || 'planner fallback',
+    rationale: reason.slice(0, 800) || 'planner fallback',
     prompt_version: plannerPromptVersion,
   };
 }
