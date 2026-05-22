@@ -30,6 +30,7 @@ function parceiroApp() {
     lastUpdatedAt: null,
     currentSection: 'resumo',
     currentTab: 'sale',
+    financePurchaseMode: 'tires',
 
     resumo: null,
     vendas: [],
@@ -37,11 +38,15 @@ function parceiroApp() {
     compras: [],
     despesas: [],
     produtos: [],
+    payables: [],
+    receivables: [],
 
     saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
+    payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' },
+    receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' },
 
     menu: [
       { id: 'resumo',     label: 'Resumo',        icon: 'layout-dashboard' },
@@ -105,6 +110,8 @@ function parceiroApp() {
       this.compras = [];
       this.despesas = [];
       this.produtos = [];
+      this.payables = [];
+      this.receivables = [];
     },
 
     // â”€â”€â”€ API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -131,13 +138,15 @@ function parceiroApp() {
       if (!this.apiToken) return;
       this.loading = true;
       try {
-        const [resumo, vendas, estoque, compras, despesas, produtos] = await Promise.all([
+        const [resumo, vendas, estoque, compras, despesas, produtos, payables, receivables] = await Promise.all([
           this.api('resumo'),
           this.api('vendas'),
           this.api('estoque'),
           this.api('compras'),
           this.api('despesas'),
           this.api('produtos'),
+          this.api('contas-a-pagar'),
+          this.api('contas-a-receber'),
         ]);
         this.resumo = (resumo.rows && resumo.rows[0]) || null;
         this.vendas = vendas.rows || [];
@@ -145,6 +154,8 @@ function parceiroApp() {
         this.compras = compras.rows || [];
         this.despesas = despesas.rows || [];
         this.produtos = produtos.rows || [];
+        this.payables = payables.rows || [];
+        this.receivables = receivables.rows || [];
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {
           lucide.createIcons();
@@ -164,6 +175,135 @@ function parceiroApp() {
 
     get totalCusts() {
       return this.num(this.resumo?.purchases_month) + this.num(this.resumo?.expenses_month);
+    },
+
+    get estimatedMargin() {
+      const sales = this.num(this.resumo?.sales_month);
+      if (sales <= 0) return 0;
+      return (this.num(this.resumo?.estimated_result_month) / sales) * 100;
+    },
+
+    get stockValue() {
+      return this.estoque.reduce((sum, item) => {
+        const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+        const value = this.num(item.sale_price || item.average_cost);
+        return sum + (qty * value);
+      }, 0);
+    },
+
+    get purchasedUnitsMonth() {
+      return this.compras.reduce((sum, purchase) => {
+        if (purchase.status === 'cancelled') return sum;
+        const items = Array.isArray(purchase.items) ? purchase.items : [];
+        return sum + items.reduce((itemSum, item) => itemSum + this.num(item.quantity), 0);
+      }, 0);
+    },
+
+    get soldUnitsMonth() {
+      return this.salesUnitsFor(this.activeSales);
+    },
+
+    get financeOriginSplit() {
+      const partnerUnits = this.salesUnitsFor(this.partnerSales);
+      const doorUnits = this.salesUnitsFor(this.doorSales);
+      const totalUnits = partnerUnits + doorUnits;
+      const safeTotal = totalUnits || 1;
+      return [
+        { label: '2W', value: this.partnerSalesTotal, count: partnerUnits, percent: Math.round((partnerUnits / safeTotal) * 100), color: '#047857' },
+        { label: 'Porta', value: this.doorSalesTotal, count: doorUnits, percent: Math.round((doorUnits / safeTotal) * 100), color: '#9ca3af' },
+      ];
+    },
+
+    salesUnitsFor(sales) {
+      return sales.reduce((sum, sale) => {
+        const items = Array.isArray(sale.items) ? sale.items : [];
+        const itemQty = items.reduce((itemSum, item) => itemSum + this.num(item.quantity), 0);
+        return sum + (itemQty || 1);
+      }, 0);
+    },
+
+    get financeUnitsSeries30d() {
+      const days = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i -= 1) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        days.push({
+          key: d.toISOString().slice(0, 10),
+          label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''),
+          value: 0,
+        });
+      }
+      for (const sale of this.activeSales) {
+        const key = String(sale.created_at || '').slice(0, 10);
+        const day = days.find((d) => d.key === key);
+        if (!day) continue;
+        const items = Array.isArray(sale.items) ? sale.items : [];
+        const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0);
+        day.value += qty || 1;
+      }
+      return days;
+    },
+
+    get financeRevenueSeries30d() {
+      const days = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i -= 1) {
+        const d = new Date(now);
+        days.push({
+          key: d.toISOString().slice(0, 10),
+          label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''),
+          value: 0,
+        });
+      }
+      for (const sale of this.activeSales) {
+        const key = String(sale.created_at || '').slice(0, 10);
+        const day = days.find((d) => d.key === key);
+        if (day) day.value += this.num(sale.total_amount);
+      }
+      return days;
+    },
+
+    get payablesDetail() {
+      return this.payables
+        .filter((payable) => payable.status === 'open')
+        .map((payable) => ({
+          id: `payable-${payable.id}`,
+          type: 'Conta a pagar',
+          title: payable.counterparty_name || payable.description,
+          subtitle: this.payableCategoryLabel(payable.category),
+          date: payable.due_date,
+          amount: this.num(payable.amount),
+        }))
+        .filter((item) => item.amount > 0)
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    },
+
+    get receivablesDetail() {
+      return this.receivables
+        .filter((receivable) => receivable.status === 'open')
+        .map((receivable) => ({
+          id: `receivable-${receivable.id}`,
+          type: this.sourceLabel(receivable.source_tag),
+          title: receivable.customer_name || receivable.description,
+          subtitle: receivable.description,
+          date: receivable.due_date,
+          amount: this.num(receivable.amount),
+        }))
+        .filter((item) => item.amount > 0)
+        .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    },
+
+    get payablesOpenTotal() {
+      return this.payables
+        .filter((payable) => payable.status === 'open')
+        .reduce((sum, payable) => sum + this.num(payable.amount), 0);
+    },
+
+    get receivablesOpenTotal() {
+      return this.receivables
+        .filter((receivable) => receivable.status === 'open')
+        .reduce((sum, receivable) => sum + this.num(receivable.amount), 0);
     },
 
     get salesTodayCount() {
@@ -267,8 +407,8 @@ function parceiroApp() {
 
     get financeCostSplit() {
       return [
-        { label: 'Compras', value: this.num(this.resumo?.purchases_month), color: '#f59e0b' },
-        { label: 'Despesas', value: this.num(this.resumo?.expenses_month), color: '#ef4444' },
+        { label: 'Compras', value: this.num(this.resumo?.purchases_month), color: '#7f8f83' },
+        { label: 'Despesas', value: this.num(this.resumo?.expenses_month), color: '#dc3f4d' },
       ];
     },
 
@@ -546,6 +686,37 @@ function parceiroApp() {
       }
     },
 
+    async saveMaterialPayable() {
+      if (!this.expenseForm.description.trim()) { this.flash('Descreva o material comprado.'); return; }
+      if (this.num(this.expenseForm.amount) <= 0) { this.flash('Informe o valor do material.'); return; }
+      this.saving = true;
+      this.savingAction = 'payable';
+      try {
+        await this.api('contas-a-pagar', {
+          method: 'POST',
+          body: JSON.stringify({
+            counterparty_name: 'Compra de material',
+            description: this.expenseForm.description.trim(),
+            category: 'maintenance',
+            amount: this.num(this.expenseForm.amount),
+            due_date: null,
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+            payment_method: 'Pix',
+            idempotency_key: this.uuid(),
+          }),
+        });
+        this.expenseForm = { category: 'maintenance', description: '', amount: 0 };
+        await this.loadData();
+        this.flash('Material lançado em contas a pagar.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
     // â”€â”€â”€ FORMS: EXPENSE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async saveExpense() {
       if (!this.expenseForm.description.trim()) { this.flash('Descreva a despesa.'); return; }
@@ -588,6 +759,78 @@ function parceiroApp() {
       }
     },
 
+    async savePayable() {
+      if (!this.payableForm.description.trim()) { this.flash('Descreva a conta a pagar.'); return; }
+      if (this.num(this.payableForm.amount) <= 0) { this.flash('Informe o valor da conta a pagar.'); return; }
+      if (this.payableForm.status === 'open' && !this.payableForm.due_date) { this.flash('Informe o vencimento da conta em aberto.'); return; }
+      this.saving = true;
+      this.savingAction = 'payable';
+      try {
+        const wasPaid = this.payableForm.status === 'paid';
+        const paidAt = this.payableForm.status === 'paid'
+          ? (this.payableForm.paid_at ? new Date(`${this.payableForm.paid_at}T12:00:00`).toISOString() : new Date().toISOString())
+          : null;
+        await this.api('contas-a-pagar', {
+          method: 'POST',
+          body: JSON.stringify({
+            counterparty_name: this.payableForm.counterparty_name.trim() || null,
+            description: this.payableForm.description.trim(),
+            category: this.payableForm.category || 'other',
+            amount: this.num(this.payableForm.amount),
+            due_date: this.payableForm.status === 'open' ? this.payableForm.due_date || null : null,
+            status: this.payableForm.status || 'open',
+            paid_at: paidAt,
+            payment_method: this.payableForm.status === 'paid' ? this.payableForm.payment_method || 'Pix' : null,
+            idempotency_key: this.uuid(),
+          }),
+        });
+        this.payableForm = { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' };
+        await this.loadData();
+        this.flash(wasPaid ? 'Pagamento registrado no custo do mês.' : 'Conta a pagar cadastrada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async saveReceivable() {
+      if (!this.receivableForm.description.trim()) { this.flash('Descreva a conta a receber.'); return; }
+      if (this.num(this.receivableForm.amount) <= 0) { this.flash('Informe o valor da conta a receber.'); return; }
+      if (this.receivableForm.status === 'open' && !this.receivableForm.due_date) { this.flash('Informe o vencimento da conta em aberto.'); return; }
+      this.saving = true;
+      this.savingAction = 'receivable';
+      try {
+        const wasReceived = this.receivableForm.status === 'received';
+        const receivedAt = this.receivableForm.status === 'received'
+          ? (this.receivableForm.received_at ? new Date(`${this.receivableForm.received_at}T12:00:00`).toISOString() : new Date().toISOString())
+          : null;
+        await this.api('contas-a-receber', {
+          method: 'POST',
+          body: JSON.stringify({
+            customer_name: this.receivableForm.customer_name.trim() || null,
+            description: this.receivableForm.description.trim(),
+            source_tag: this.receivableForm.source_tag || 'porta',
+            amount: this.num(this.receivableForm.amount),
+            due_date: this.receivableForm.status === 'open' ? this.receivableForm.due_date || null : null,
+            status: this.receivableForm.status || 'open',
+            received_at: receivedAt,
+            payment_method: this.receivableForm.status === 'received' ? this.receivableForm.payment_method || 'Pix' : null,
+            idempotency_key: this.uuid(),
+          }),
+        });
+        this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' };
+        await this.loadData();
+        this.flash(wasReceived ? 'Recebimento registrado.' : 'Conta a receber cadastrada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
     // â”€â”€â”€ CHARTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     renderAllCharts() {
       this.renderSalesTrendChart();
@@ -595,6 +838,8 @@ function parceiroApp() {
       this.renderStockChart();
       this.renderFinanceBarChart();
       this.renderFinanceSplitChart();
+      this.renderFinanceOriginChart();
+      this.renderFinanceUnitsChart();
     },
 
     renderSalesTrendChart() {
@@ -729,19 +974,24 @@ function parceiroApp() {
           labels: ['Vendas', 'Compras', 'Despesas', 'Resultado'],
           datasets: [{
             data: [this.num(r.sales_month), this.num(r.purchases_month), this.num(r.expenses_month), result],
-            backgroundColor: ['#2563eb', '#f59e0b', '#ef4444', result >= 0 ? '#10b981' : '#e11d48'],
-            borderRadius: 6,
+            backgroundColor: ['#047857', '#6b7280', '#dc3f4d', result >= 0 ? '#047857' : '#be123c'],
+            borderRadius: 5,
+            barThickness: 46,
           }],
         },
         options: {
           maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => this.money(ctx.parsed.y) } },
+            tooltip: {
+              backgroundColor: '#111827',
+              padding: 10,
+              callbacks: { label: (ctx) => this.money(ctx.parsed.y) },
+            },
           },
           scales: {
-            x: { grid: { display: false } },
-            y: { grid: { color: '#f3f4f6' }, ticks: { callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') } },
+            x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 11 } }, border: { display: false } },
+            y: { grid: { color: '#e5e7eb' }, ticks: { color: '#475569', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') }, border: { display: false } },
           },
         },
       });
@@ -753,6 +1003,7 @@ function parceiroApp() {
       if (window._financeSplitChart) window._financeSplitChart.destroy();
 
       const split = this.financeCostSplit;
+      const totalCostsLabel = this.money(this.totalCusts);
       window._financeSplitChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -760,15 +1011,127 @@ function parceiroApp() {
           datasets: [{
             data: split.map((item) => item.value),
             backgroundColor: split.map((item) => item.color),
-            borderWidth: 0,
+            borderColor: '#ffffff',
+            borderWidth: 4,
+            hoverBorderColor: '#ffffff',
+            radius: '98%',
           }],
         },
         options: {
           maintainAspectRatio: false,
-          cutout: '62%',
+          cutout: '54%',
+          layout: { padding: 0 },
           plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } },
+            legend: { display: false },
             tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${this.money(ctx.parsed)}` } },
+          },
+        },
+        plugins: [{
+          id: 'financeCostCenterLabel',
+          afterDraw(chart) {
+            const { ctx: canvasCtx, chartArea } = chart;
+            if (!chartArea) return;
+            const arc = chart.getDatasetMeta(0).data[0];
+            const x = arc?.x ?? (chartArea.left + chartArea.right) / 2;
+            const y = arc?.y ?? (chartArea.top + chartArea.bottom) / 2;
+            canvasCtx.save();
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillStyle = '#111827';
+            canvasCtx.font = '600 20px Inter, system-ui, sans-serif';
+            canvasCtx.fillText(totalCostsLabel, x, y - 8);
+            canvasCtx.fillStyle = '#64748b';
+            canvasCtx.font = '400 12px Inter, system-ui, sans-serif';
+            canvasCtx.fillText('Total de custos', x, y + 16);
+            canvasCtx.restore();
+          },
+        }],
+      });
+    },
+
+    renderFinanceOriginChart() {
+      const ctx = document.getElementById('chartFinanceOrigin');
+      if (!ctx) return;
+      if (window._financeOriginChart) window._financeOriginChart.destroy();
+
+      const split = this.financeOriginSplit;
+      const totalUnits = split.reduce((sum, item) => sum + this.num(item.count), 0);
+      window._financeOriginChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: split.map((item) => item.label),
+          datasets: [{
+            data: split.map((item) => item.count),
+            backgroundColor: split.map((item) => item.color),
+            borderColor: '#ffffff',
+            borderWidth: 4,
+            hoverBorderColor: '#ffffff',
+            radius: '98%',
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          cutout: '54%',
+          layout: { padding: 0 },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed} pneus` } },
+          },
+        },
+        plugins: [{
+          id: 'financeOriginCenterLabel',
+          afterDraw(chart) {
+            const { ctx: canvasCtx, chartArea } = chart;
+            if (!chartArea) return;
+            const arc = chart.getDatasetMeta(0).data[0];
+            const x = arc?.x ?? (chartArea.left + chartArea.right) / 2;
+            const y = arc?.y ?? (chartArea.top + chartArea.bottom) / 2;
+            canvasCtx.save();
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillStyle = '#111827';
+            canvasCtx.font = '600 22px Inter, system-ui, sans-serif';
+            canvasCtx.fillText(String(totalUnits), x, y - 8);
+            canvasCtx.fillStyle = '#64748b';
+            canvasCtx.font = '400 12px Inter, system-ui, sans-serif';
+            canvasCtx.fillText('Pneus', x, y + 16);
+            canvasCtx.restore();
+          },
+        }],
+      });
+    },
+
+    renderFinanceUnitsChart() {
+      const ctx = document.getElementById('chartFinanceUnits');
+      if (!ctx) return;
+      if (window._financeUnitsChart) window._financeUnitsChart.destroy();
+
+      const series = this.financeRevenueSeries30d;
+      window._financeUnitsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: series.map((d) => d.label),
+          datasets: [{
+            data: series.map((d) => d.value),
+            borderColor: '#047857',
+            backgroundColor: 'rgba(4, 120, 87, 0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2.5,
+            pointHoverRadius: 4,
+            pointBackgroundColor: '#047857',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => this.money(ctx.parsed.y) } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#475569', maxTicksLimit: 8, font: { size: 11 } }, border: { display: false } },
+            y: { beginAtZero: true, grid: { color: '#e5e7eb' }, ticks: { color: '#475569', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') }, border: { display: false } },
           },
         },
       });
@@ -884,6 +1247,19 @@ function parceiroApp() {
       return map[category] || category || 'Despesa';
     },
 
+    payableCategoryLabel(category) {
+      const map = {
+        supplier: 'Fornecedor',
+        employee: 'Funcionário',
+        rent: 'Aluguel',
+        utilities: 'Contas',
+        tax: 'Taxa/imposto',
+        maintenance: 'Manutenção',
+        other: 'Outra',
+      };
+      return map[category] || category || 'Conta';
+    },
+
     normalizeSource(source) {
       const value = String(source || '').trim().toLowerCase();
       if (value === '2w') return '2w';
@@ -954,4 +1330,3 @@ function parceiroApp() {
     },
   };
 }
-

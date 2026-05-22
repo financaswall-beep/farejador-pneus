@@ -11,11 +11,15 @@ import {
   getPartnerCompras,
   getPartnerDespesas,
   getPartnerEstoque,
+  getPartnerPayables,
   getPartnerProdutos,
+  getPartnerReceivables,
   getPartnerResumo,
   getPartnerVendas,
   registerPartnerExpense,
+  registerPartnerPayable,
   registerPartnerPurchase,
+  registerPartnerReceivable,
   registerPartnerSale,
   upsertPartnerStock,
 } from './queries.js';
@@ -118,6 +122,32 @@ const expenseSchema = z.object({
   idempotency_key: z.string().min(8).nullable().optional(),
 });
 
+const payableSchema = z.object({
+  counterparty_name: z.string().max(200).nullable().optional(),
+  description: z.string().min(1).max(300),
+  category: z.enum(['supplier', 'employee', 'rent', 'utilities', 'tax', 'maintenance', 'other']).nullable().optional(),
+  amount: z.number().nonnegative(),
+  due_date: z.string().date().nullable().optional(),
+  status: z.enum(['open', 'paid']).nullable().optional(),
+  paid_at: z.string().datetime().nullable().optional(),
+  payment_method: z.string().max(80).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  idempotency_key: z.string().min(8).nullable().optional(),
+});
+
+const receivableSchema = z.object({
+  customer_name: z.string().max(200).nullable().optional(),
+  description: z.string().min(1).max(300),
+  source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).nullable().optional(),
+  amount: z.number().nonnegative(),
+  due_date: z.string().date().nullable().optional(),
+  status: z.enum(['open', 'received']).nullable().optional(),
+  received_at: z.string().datetime().nullable().optional(),
+  payment_method: z.string().max(80).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  idempotency_key: z.string().min(8).nullable().optional(),
+});
+
 async function sendStatic(reply: FastifyReply, file: string, type: string) {
   const content = await readFile(path.join(publicDir, file));
   return reply
@@ -175,6 +205,14 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.get('/parceiro/:slug/api/compras', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerCompras(getPartnerContext(request)) });
+  });
+
+  fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await getPartnerPayables(getPartnerContext(request)) });
+  });
+
+  fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await getPartnerReceivables(getPartnerContext(request)) });
   });
 
   fastify.post('/parceiro/:slug/api/vendas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
@@ -265,5 +303,25 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const result = await deletePartnerExpense(getPartnerContext(request), parsed.data.expenseId);
     if (!result.deleted) return reply.status(404).send({ error: 'expense_not_found' });
     return reply.status(200).send(result);
+  });
+
+  fastify.post('/parceiro/:slug/api/contas-a-pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = payableSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+    return reply.status(200).send(await registerPartnerPayable(getPartnerContext(request), parsed.data));
+  });
+
+  fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = receivableSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+    return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
   });
 }

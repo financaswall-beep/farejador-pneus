@@ -50,6 +50,10 @@ Ordem de execução:
 42. `0042_partner_sale_consistency.sql` - recria `commerce.register_partner_local_order` com BUG #2 (`RAISE EXCEPTION 'Estoque insuficiente'` ERRCODE 23514 quando saldo < pedido) e BUG #5 (emite 2 eventos audit separados: `partner_order_created` + `stock_decrement_sale`). Reconstrucao em arquivo a partir de `pg_get_functiondef` em prod (auditoria 2026-05-21).
 43. `0043_partner_hardening.sql` - segunda rodada de hardening do silo do parceiro: trigger `partner_orders_set_updated_at`, 2 triggers `env_match_*` em `partner_orders`/`partner_order_items`, 3 FKs com `ON DELETE SET NULL` (partner_order_items.partner_stock_id, partner_purchase_items.product_id, partner_stock_levels.product_id), UNIQUE natural-key do estoque (`item_name + tire_size + brand + supplier_name`) e comentarios em `partner_orders.status/deleted_at` esclarecendo convencao cancelled vs LGPD. Reconstrucao em arquivo a partir do estado real de prod (auditoria 2026-05-21).
 
+44. `0044_partner_rls_policies.sql` - Etapa 5: RLS efetivo no Portal Parceiro, role `farejador_partner_app`, policies estritas nas tabelas do parceiro, views `security_invoker` e function `network.validate_partner_token`.
+45. `0045_partner_finance_accounts.sql` - cria `finance.partner_payables` e `finance.partner_receivables` para contas a pagar/receber da unidade parceira, com RLS por unidade, triggers de ambiente e GRANTs para o pool restrito do portal.
+46. `0046_partner_summary_sao_paulo_month.sql` - ajusta `network.partner_unit_summary` para calcular o mes atual usando `America/Sao_Paulo`, preservando `security_invoker` para o RLS do portal.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

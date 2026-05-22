@@ -93,6 +93,32 @@ export interface RegisterPartnerExpenseInput {
   idempotency_key?: string | null;
 }
 
+export interface RegisterPartnerPayableInput {
+  counterparty_name?: string | null;
+  description: string;
+  category?: 'supplier' | 'employee' | 'rent' | 'utilities' | 'tax' | 'maintenance' | 'other' | null;
+  amount: number;
+  due_date?: string | null;
+  status?: 'open' | 'paid' | null;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  notes?: string | null;
+  idempotency_key?: string | null;
+}
+
+export interface RegisterPartnerReceivableInput {
+  customer_name?: string | null;
+  description: string;
+  source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
+  amount: number;
+  due_date?: string | null;
+  status?: 'open' | 'received' | null;
+  received_at?: string | null;
+  payment_method?: string | null;
+  notes?: string | null;
+  idempotency_key?: string | null;
+}
+
 // ----------------------------------------------------------------------------
 // Leituras
 // ----------------------------------------------------------------------------
@@ -212,6 +238,42 @@ export async function getPartnerCompras(ctx: PartnerContext): Promise<unknown[]>
   });
 }
 
+export async function getPartnerPayables(ctx: PartnerContext): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT id, counterparty_name, description, category, amount, due_date,
+              status, paid_at, payment_method, notes, created_at
+       FROM finance.partner_payables
+       WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+       ORDER BY
+         CASE status WHEN 'open' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END,
+         due_date ASC NULLS LAST,
+         created_at DESC
+       LIMIT 100`,
+      [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
+export async function getPartnerReceivables(ctx: PartnerContext): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT id, customer_name, description, source_tag, amount, due_date,
+              status, received_at, payment_method, notes, created_at
+       FROM finance.partner_receivables
+       WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+       ORDER BY
+         CASE status WHEN 'open' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
+         due_date ASC NULLS LAST,
+         created_at DESC
+       LIMIT 100`,
+      [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
 // ----------------------------------------------------------------------------
 // Vendas — via function SQL atomica
 // ----------------------------------------------------------------------------
@@ -297,6 +359,21 @@ function stockStatus(input: UpsertPartnerStockInput): string {
 function normalizeText(value: string | null | undefined): string | null {
   const text = value?.trim();
   return text ? text : null;
+}
+
+function payableCategoryToExpenseCategory(
+  category: RegisterPartnerPayableInput['category'],
+): RegisterPartnerExpenseInput['category'] {
+  const map: Record<string, RegisterPartnerExpenseInput['category']> = {
+    supplier: 'maintenance',
+    employee: 'employee_payment',
+    rent: 'rent',
+    utilities: 'utilities',
+    tax: 'tax',
+    maintenance: 'maintenance',
+    other: 'other',
+  };
+  return map[category ?? 'other'] ?? 'other';
 }
 
 export async function upsertPartnerStock(
@@ -780,5 +857,156 @@ export async function deletePartnerExpense(
     }
 
     return { expense_id: expenseId, deleted: result.rowCount === 1 };
+  });
+}
+
+// ----------------------------------------------------------------------------
+// Contas a pagar / receber
+// ----------------------------------------------------------------------------
+
+export async function registerPartnerPayable(
+  ctx: PartnerContext,
+  input: RegisterPartnerPayableInput,
+): Promise<{ payable_id: string }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const status = input.status ?? 'open';
+    const result = await client.query<{ id: string }>(
+      `INSERT INTO finance.partner_payables (
+         environment, unit_id, counterparty_name, description, category, amount,
+         due_date, status, paid_at, payment_method, notes, created_by, idempotency_key
+       ) VALUES ($1, $2, $3, $4, COALESCE($5, 'other'), $6,
+                 $7::date, $8, $9::timestamptz, $10, $11, $12, $13)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+       RETURNING id`,
+      [
+        ctx.environment,
+        ctx.unitId,
+        normalizeText(input.counterparty_name),
+        input.description,
+        input.category ?? 'other',
+        input.amount,
+        input.due_date ?? null,
+        status,
+        status === 'paid' ? input.paid_at ?? null : null,
+        input.payment_method ?? null,
+        normalizeText(input.notes),
+        `partner:${ctx.slug}`,
+        input.idempotency_key ?? null,
+      ],
+    );
+
+    const payableId = result.rows[0]!.id;
+
+    if (status === 'paid') {
+      await client.query(
+        `INSERT INTO finance.partner_expenses (
+           environment, unit_id, expense_date, category, description, amount,
+           payment_method, created_by, idempotency_key
+         ) VALUES (
+           $1, $2, COALESCE($3::date, CURRENT_DATE), $4, $5, $6, $7, $8, $9
+         )
+         ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+         DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
+        [
+          ctx.environment,
+          ctx.unitId,
+          input.paid_at ? input.paid_at.slice(0, 10) : null,
+          payableCategoryToExpenseCategory(input.category),
+          input.description,
+          input.amount,
+          input.payment_method ?? null,
+          `partner:${ctx.slug}`,
+          input.idempotency_key ? `${input.idempotency_key}:expense` : null,
+        ],
+      );
+    }
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, idempotency_key, payload_after
+       ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                 'partner_payable_created', $3, $4, $5::jsonb)`,
+      [
+        ctx.environment,
+        payableId,
+        `partner:${ctx.slug}`,
+        input.idempotency_key ?? null,
+        JSON.stringify({
+          unit_id: ctx.unitId,
+          counterparty_name: input.counterparty_name,
+          description: input.description,
+          category: input.category ?? 'other',
+          amount: input.amount,
+          due_date: input.due_date,
+          status,
+          paid_at: status === 'paid' ? input.paid_at : null,
+        }),
+      ],
+    );
+
+    return { payable_id: payableId };
+  });
+}
+
+export async function registerPartnerReceivable(
+  ctx: PartnerContext,
+  input: RegisterPartnerReceivableInput,
+): Promise<{ receivable_id: string }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const status = input.status ?? 'open';
+    const result = await client.query<{ id: string }>(
+      `INSERT INTO finance.partner_receivables (
+         environment, unit_id, customer_name, description, source_tag, amount,
+         due_date, status, received_at, payment_method, notes, created_by, idempotency_key
+       ) VALUES ($1, $2, $3, $4, COALESCE($5, 'porta'), $6,
+                 $7::date, $8, $9::timestamptz, $10, $11, $12, $13)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+       RETURNING id`,
+      [
+        ctx.environment,
+        ctx.unitId,
+        normalizeText(input.customer_name),
+        input.description,
+        input.source_tag ?? 'porta',
+        input.amount,
+        status === 'open' ? input.due_date ?? null : null,
+        status,
+        status === 'received' ? input.received_at ?? null : null,
+        input.payment_method ?? null,
+        normalizeText(input.notes),
+        `partner:${ctx.slug}`,
+        input.idempotency_key ?? null,
+      ],
+    );
+
+    const receivableId = result.rows[0]!.id;
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, idempotency_key, payload_after
+       ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
+                 'partner_receivable_created', $3, $4, $5::jsonb)`,
+      [
+        ctx.environment,
+        receivableId,
+        `partner:${ctx.slug}`,
+        input.idempotency_key ?? null,
+        JSON.stringify({
+          unit_id: ctx.unitId,
+          customer_name: input.customer_name,
+          description: input.description,
+          source_tag: input.source_tag ?? 'porta',
+          amount: input.amount,
+          due_date: input.due_date,
+          status,
+          received_at: status === 'received' ? input.received_at : null,
+        }),
+      ],
+    );
+
+    return { receivable_id: receivableId };
   });
 }

@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260520-portal-22" />
+  <link rel="stylesheet" href="./style.css?v=20260522-financeiro-1" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()" x-cloak>
@@ -78,44 +78,52 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- SIDEBAR -->
-  <aside class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
-    <div class="px-5 py-5 border-b border-gray-100">
+  <aside class="w-64 bg-[#071426] text-white flex flex-col flex-shrink-0">
+    <div class="px-5 py-6">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-bold shadow-sm">F</div>
+        <div class="w-11 h-11 rounded-xl bg-white/10 ring-1 ring-white/15 text-white flex items-center justify-center font-bold shadow-sm">BR</div>
         <div class="min-w-0">
-          <div class="font-semibold text-sm truncate" x-text="resumo?.display_name || 'Portal parceiro'"></div>
-          <div class="text-[11px] text-gray-500">Portal parceiro</div>
+          <div class="font-semibold text-sm uppercase leading-tight" x-text="resumo?.display_name || 'Borracharia Rio do Ouro'"></div>
+          <div class="text-[11px] text-slate-300">Portal parceiro</div>
         </div>
       </div>
+      <div class="mt-5 inline-flex px-3 py-1.5 rounded-full bg-white/10 text-xs text-slate-100">Portal parceiro</div>
     </div>
 
-    <nav class="flex-1 px-3 py-4 space-y-0.5">
+    <nav class="flex-1 px-3 py-4 space-y-1">
       <template x-for="item in menu" :key="item.id">
         <a href="#"
            @click.prevent="goToSection(item.id)"
            :class="currentSection === item.id
-             ? 'bg-gray-900 text-white'
-             : 'text-gray-700 hover:bg-gray-50'"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors">
+             ? 'bg-white/12 text-white border-l-2 border-emerald-400'
+             : 'text-slate-300 hover:bg-white/8 hover:text-white border-l-2 border-transparent'"
+           class="flex items-center gap-3 px-3 py-3 rounded-md text-sm transition-colors focus:outline-none focus:ring-0">
           <i :data-lucide="item.icon" class="w-4 h-4"></i>
           <span x-text="item.label"></span>
         </a>
       </template>
     </nav>
 
-    <div class="px-3 py-4 border-t border-gray-100">
+    <div class="px-3 py-4">
+      <div class="bg-white/10 border border-white/10 rounded-lg p-3 mb-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="help-circle" class="w-4 h-4 text-slate-100"></i>
+          <div class="text-[11px] font-semibold">Precisa de ajuda?</div>
+        </div>
+        <div class="text-[11px] text-slate-300 mt-1">Fale com nosso suporte</div>
+      </div>
       <div class="flex items-center gap-2 px-3 py-2 mb-2">
         <span class="relative flex h-2 w-2">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
         <div class="text-xs">
-          <div class="font-medium text-gray-900">Unidade conectada</div>
-          <div class="text-gray-500">Dados isolados por token</div>
+          <div class="font-medium text-white">Unidade conectada</div>
+          <div class="text-slate-400">Dados isolados por token</div>
         </div>
       </div>
       <button @click="logout()"
-              class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-700 rounded-lg text-xs font-medium transition-colors text-gray-700">
+              class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-lg text-xs font-medium transition-colors text-slate-200">
         <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         Sair
       </button>
@@ -148,6 +156,7 @@
           <i data-lucide="refresh-cw" class="w-4 h-4 text-gray-600" :class="loading && 'animate-spin'"></i>
           Atualizar
         </button>
+        <div class="hidden md:flex w-9 h-9 rounded-full bg-emerald-700 text-white items-center justify-center text-xs font-bold">BR</div>
       </div>
     </div>
 
@@ -273,44 +282,366 @@
 
       <!-- â•â•â• SEÃ‡ÃƒO: LANÃ‡AMENTOS (tabs) â•â•â• -->
       <section id="section-forms" x-show="['vendas', 'estoque', 'financeiro'].includes(currentSection)" class="space-y-4">
-        <div x-show="currentSection === 'financeiro'" class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl">
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="text-xs text-gray-500">Vendas do mês</div>
-            <div class="text-xl font-bold mt-2" x-text="money(resumo?.sales_month)"></div>
+        <div x-show="currentSection === 'financeiro'" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
+              <span class="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-emerald-600"></span>
+              <div class="text-sm font-medium text-slate-600">Vendas do mês</div>
+              <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(resumo?.sales_month)"></div>
+              <div class="flex items-center gap-1.5 text-xs text-emerald-700 mt-2">
+                <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
+                <span>dados reais do mês atual</span>
+              </div>
+            </div>
+            <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
+              <span class="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-emerald-600"></span>
+              <div class="text-sm font-medium text-slate-600">Ticket médio</div>
+              <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(avgTicket)"></div>
+              <div class="flex items-center gap-1.5 text-xs text-emerald-700 mt-2">
+                <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+                <span x-text="(resumo?.orders_month || 0) + ' vendas no mês'"></span>
+              </div>
+            </div>
+            <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
+              <span class="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-emerald-600"></span>
+              <div class="text-sm font-medium text-slate-600">Ponto de equilíbrio</div>
+              <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(totalCusts)"></div>
+              <div class="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
+                <i data-lucide="scale" class="w-3.5 h-3.5"></i>
+                <span>vendas necessárias para empatar</span>
+              </div>
+            </div>
+            <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
+              <span class="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-emerald-600"></span>
+              <div class="text-sm font-medium text-slate-600">Resultado estimado</div>
+              <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(resumo?.estimated_result_month)"></div>
+              <div class="flex items-center gap-1.5 text-xs mt-2"
+                   :class="Number(resumo?.estimated_result_month || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'">
+                <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                <span>vendas menos custos</span>
+              </div>
+            </div>
+            <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
+              <span class="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-emerald-600"></span>
+              <div class="text-sm font-medium text-slate-600">Margem estimada</div>
+              <div class="text-xl font-semibold mt-2 tracking-tight" x-text="estimatedMargin.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'"></div>
+              <div class="flex items-center gap-1.5 text-xs text-emerald-700 mt-2">
+                <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                <span>resultado sobre vendas</span>
+              </div>
+            </div>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="text-xs text-gray-500">Custos do mês</div>
-            <div class="text-xl font-bold mt-2 text-amber-700" x-text="money(totalCusts)"></div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="text-xs text-gray-500">Resultado estimado</div>
-            <div class="text-xl font-bold mt-2"
-                 :class="Number(resumo?.estimated_result_month || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'"
-                 x-text="money(resumo?.estimated_result_month)"></div>
-          </div>
-        </div>
 
-        <div x-show="currentSection === 'financeiro'" class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 max-w-5xl">
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-sm">Resultado financeiro</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Vendas, compras, despesas e saldo do mês</p>
+          <div class="grid grid-cols-1 2xl:grid-cols-[1.35fr_1fr_1fr] gap-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+              <div class="mb-4">
+                <h3 class="font-semibold text-base">Resultado financeiro</h3>
+                <p class="text-sm text-slate-500">Vendas, compras, despesas e resultado do mês</p>
+              </div>
+              <div class="h-72">
+                <canvas id="chartFinanceBar"></canvas>
               </div>
             </div>
-            <div class="h-64">
-              <canvas id="chartFinanceBar"></canvas>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+              <div class="mb-4">
+                <h3 class="font-semibold text-base">Composição dos custos</h3>
+                <p class="text-sm text-slate-500">Compras de pneus x despesas</p>
+              </div>
+              <div class="h-64 flex items-center justify-center">
+                <canvas id="chartFinanceSplit"></canvas>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mt-4 text-sm text-center">
+                <div>
+                  <div class="flex items-center justify-center gap-2 text-slate-500">
+                    <span class="w-2.5 h-2.5 rounded-full bg-[#7f8f83]"></span>
+                    <span>Compras</span>
+                  </div>
+                  <div class="font-semibold" x-text="money(resumo?.purchases_month)"></div>
+                </div>
+                <div>
+                  <div class="flex items-center justify-center gap-2 text-slate-500">
+                    <span class="w-2.5 h-2.5 rounded-full bg-[#dc3f4d]"></span>
+                    <span>Despesas</span>
+                  </div>
+                  <div class="font-semibold" x-text="money(resumo?.expenses_month)"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+              <div class="mb-4">
+                <h3 class="font-semibold text-base">Origem dos pneus</h3>
+                <p class="text-sm text-slate-500">Distribuição por origem</p>
+              </div>
+              <div class="h-64 flex items-center justify-center">
+                <canvas id="chartFinanceOrigin"></canvas>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mt-4 text-sm text-center">
+                <template x-for="item in financeOriginSplit" :key="item.label">
+                  <div>
+                    <div class="flex items-center justify-center gap-2 text-slate-500">
+                      <span class="w-2.5 h-2.5 rounded-full" :style="`background:${item.color}`"></span>
+                      <span x-text="item.label"></span>
+                    </div>
+                    <div class="font-semibold mt-1" x-text="item.percent + '% (' + item.count + ' un.)'"></div>
+                    <div class="text-xs text-slate-500" x-text="money(item.value)"></div>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-sm">Composição dos custos</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Compras de pneus x despesas</p>
+
+          <div class="grid grid-cols-1 2xl:grid-cols-[1.35fr_0.8fr_0.9fr] gap-4">
+            <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+              <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 class="font-semibold text-base">Evolução financeira</h3>
+                  <p class="text-sm text-slate-500">Faturamento diário dos últimos 30 dias</p>
+                </div>
+                <div class="hidden md:flex rounded-lg bg-slate-50 p-1 text-xs">
+                  <span class="px-3 py-1 rounded-md text-slate-500">7 dias</span>
+                  <span class="px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 font-semibold">30 dias</span>
+                  <span class="px-3 py-1 rounded-md text-slate-500">Mês</span>
+                </div>
+              </div>
+              <div class="h-56">
+                <canvas id="chartFinanceUnits"></canvas>
               </div>
             </div>
-            <div class="h-64">
-              <canvas id="chartFinanceSplit"></canvas>
+
+            <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-base">Pneus comprados x vendidos</h3>
+                <span class="text-xs border border-gray-200 rounded-md px-2 py-1 text-slate-600">Mês atual</span>
+              </div>
+              <div class="space-y-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                    <i data-lucide="circle-dot" class="w-5 h-5"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-slate-500">Pneus comprados</div>
+                    <div class="text-2xl font-semibold" x-text="purchasedUnitsMonth"></div>
+                  </div>
+                  <div class="text-xs text-slate-500">unidades</div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white">
+                    <i data-lucide="circle-dot" class="w-5 h-5"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-slate-500">Pneus vendidos</div>
+                    <div class="text-2xl font-semibold" x-text="soldUnitsMonth"></div>
+                  </div>
+                  <div class="text-xs text-slate-500">unidades</div>
+                </div>
+                <div class="bg-emerald-50 text-emerald-800 rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-4 h-4"></i>
+                  <span x-text="(purchasedUnitsMonth >= soldUnitsMonth ? 'Comprados acima dos vendidos' : 'Vendidos acima dos comprados') + ' - diferença: ' + Math.abs(purchasedUnitsMonth - soldUnitsMonth) + ' unidades'"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <i data-lucide="package" class="w-6 h-6"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="text-sm text-slate-500">Valor parado em estoque</div>
+                  <div class="text-xl font-semibold" x-text="money(stockValue)"></div>
+                  <div class="text-xs text-slate-500">Valor total em estoque</div>
+                </div>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <i data-lucide="file-clock" class="w-6 h-6"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-slate-500">Contas a pagar</div>
+                    <div class="text-xl font-semibold" x-text="money(payablesOpenTotal)"></div>
+                    <div class="text-xs text-slate-500">Total em aberto</div>
+                  </div>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <i data-lucide="badge-dollar-sign" class="w-6 h-6"></i>
+                  </div>
+                  <div class="flex-1">
+                    <div class="text-sm text-slate-500">Contas a receber</div>
+                    <div class="text-xl font-semibold" x-text="money(receivablesOpenTotal)"></div>
+                    <div class="text-xs text-slate-500">Total a receber</div>
+                  </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-1">
+            <div class="flex items-end justify-between mb-3">
+              <div>
+                <h2 class="text-base font-semibold text-slate-900">Contas futuras</h2>
+                <p class="text-sm text-slate-500">Cadastre compromissos que ainda vão entrar ou sair do caixa.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+            <div class="bg-white border border-gray-200 border-l-4 border-l-rose-400 rounded-lg p-5 shadow-sm h-full">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <i data-lucide="file-clock" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-base leading-tight">Cadastrar conta a pagar</h3>
+                    <p class="text-xs text-slate-500">Despesa futura da unidade</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] px-3 py-1 rounded-md bg-rose-50 text-rose-700 font-medium">Saída</span>
+                  <div class="text-xs text-slate-500 mt-1" x-text="money(payableForm.amount)"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Fornecedor / favorecido</label>
+                  <input x-model="payableForm.counterparty_name" placeholder="Ex: Fornecedor, aluguel, funcionário" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Categoria</label>
+                  <select x-model="payableForm.category" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option value="supplier">Fornecedor</option>
+                    <option value="employee">Funcionário</option>
+                    <option value="rent">Aluguel</option>
+                    <option value="utilities">Contas</option>
+                    <option value="tax">Imposto</option>
+                    <option value="maintenance">Manutenção</option>
+                    <option value="other">Outra</option>
+                  </select>
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Situação</label>
+                  <select x-model="payableForm.status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option value="open">Em aberto</option>
+                    <option value="paid">Pago agora</option>
+                  </select>
+                </div>
+                <div class="col-span-12 md:col-span-8">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Descrição</label>
+                  <input x-model="payableForm.description" placeholder="Ex: Compra a prazo, conta de energia, salário" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Valor</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
+                    <input type="text" inputmode="decimal" :value="formatBRLDisplay(payableForm.amount)" @input="payableForm.amount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(payableForm.amount)" class="w-full border border-gray-200 rounded-lg pl-10 pr-3 py-2 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                  </div>
+                </div>
+                <div x-show="payableForm.status === 'open'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Vencimento</label>
+                  <input type="date" x-model="payableForm.due_date" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div x-show="payableForm.status === 'paid'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Data do pagamento</label>
+                  <input type="date" x-model="payableForm.paid_at" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div x-show="payableForm.status === 'paid'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Forma de pagamento</label>
+                  <select x-model="payableForm.payment_method" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option>Pix</option>
+                    <option>Dinheiro</option>
+                    <option>Cartão</option>
+                    <option>Boleto</option>
+                    <option>Transferência</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+                <span class="text-xs text-slate-500" x-text="payableForm.status === 'paid' ? 'Valor pago agora' : 'Valor que vai sair'"></span>
+                <span class="text-sm font-semibold text-rose-700" x-text="money(payableForm.amount)"></span>
+              </div>
+              <button @click="savePayable()" :disabled="saving" class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-800 hover:bg-rose-900 active:bg-rose-950 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm transition-all">
+                <i data-lucide="file-plus-2" class="w-4 h-4"></i>
+                <span x-text="isSaving('payable') ? 'Salvando...' : (payableForm.status === 'paid' ? 'Salvar como pago' : 'Salvar conta a pagar')"></span>
+              </button>
+            </div>
+
+            <div class="bg-white border border-gray-200 border-l-4 border-l-emerald-500 rounded-lg p-5 shadow-sm h-full">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <i data-lucide="badge-dollar-sign" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-base leading-tight">Cadastrar conta a receber</h3>
+                    <p class="text-xs text-slate-500">Recebimento futuro da unidade</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 font-medium">Entrada</span>
+                  <div class="text-xs text-slate-500 mt-1" x-text="money(receivableForm.amount)"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Cliente</label>
+                  <input x-model="receivableForm.customer_name" placeholder="Nome do cliente" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Origem</label>
+                  <select x-model="receivableForm.source_tag" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option value="porta">Porta</option>
+                    <option value="2w">2W</option>
+                    <option value="walkin_telefone">Telefone</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Situação</label>
+                  <select x-model="receivableForm.status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option value="open">Em aberto</option>
+                    <option value="received">Recebido agora</option>
+                  </select>
+                </div>
+                <div class="col-span-12 md:col-span-8">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Descrição</label>
+                  <input x-model="receivableForm.description" placeholder="Ex: Venda fiado, serviço pendente, parcelamento" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Valor</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">R$</span>
+                    <input type="text" inputmode="decimal" :value="formatBRLDisplay(receivableForm.amount)" @input="receivableForm.amount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(receivableForm.amount)" class="w-full border border-gray-200 rounded-lg pl-10 pr-3 py-2 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                  </div>
+                </div>
+                <div x-show="receivableForm.status === 'open'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Vencimento</label>
+                  <input type="date" x-model="receivableForm.due_date" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div x-show="receivableForm.status === 'received'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Data do recebimento</label>
+                  <input type="date" x-model="receivableForm.received_at" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10" />
+                </div>
+                <div x-show="receivableForm.status === 'received'" class="col-span-12 md:col-span-6">
+                  <label class="text-[11px] text-slate-500 mb-1 block">Forma de recebimento</label>
+                  <select x-model="receivableForm.payment_method" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/10">
+                    <option>Pix</option>
+                    <option>Dinheiro</option>
+                    <option>Cartão</option>
+                    <option>Boleto</option>
+                    <option>Transferência</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+                <span class="text-xs text-slate-500" x-text="receivableForm.status === 'received' ? 'Valor recebido agora' : 'Valor que vai entrar'"></span>
+                <span class="text-sm font-semibold text-emerald-700" x-text="money(receivableForm.amount)"></span>
+              </div>
+              <button @click="saveReceivable()" :disabled="saving" class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm transition-all">
+                <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
+                <span x-text="isSaving('receivable') ? 'Salvando...' : (receivableForm.status === 'received' ? 'Salvar como recebido' : 'Salvar conta a receber')"></span>
+              </button>
             </div>
           </div>
         </div>
@@ -333,7 +664,7 @@
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden max-w-5xl">
+        <div x-show="currentSection !== 'financeiro'" class="bg-white border border-gray-200 rounded-xl overflow-hidden max-w-5xl">
           <!-- tabs -->
           <div class="hidden border-b border-gray-100 px-5 pt-4 pb-0 items-center gap-1 overflow-x-auto">
             <template x-for="tab in tabs" :key="tab.id">
@@ -616,52 +947,11 @@
             </button>
           </div>
 
-          <!-- DESPESA -->
-          <div x-show="currentSection === 'financeiro'" class="p-5 space-y-4 border-t border-gray-100">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold">Registrar despesa</h3>
-              <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">operação</span>
-            </div>
-            <div class="grid grid-cols-12 gap-3">
-              <div class="col-span-12 md:col-span-7">
-                <label class="text-[11px] text-gray-500 mb-1 block">Categoria</label>
-                <select x-model="expenseForm.category" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10">
-                  <option value="employee_payment">Funcionário</option>
-                  <option value="rent">Aluguel</option>
-                  <option value="utilities">Contas</option>
-                  <option value="maintenance">Manutenção</option>
-                  <option value="delivery">Entrega</option>
-                  <option value="tax">Taxa/imposto</option>
-                  <option value="other">Outra</option>
-                </select>
-              </div>
-              <div class="col-span-12 md:col-span-5">
-                <label class="text-[11px] text-gray-500 mb-1 block">Valor</label>
-                <div class="relative">
-                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">R$</span>
-                  <input type="text" inputmode="decimal"
-                         :value="formatBRLDisplay(expenseForm.amount)"
-                         @input="expenseForm.amount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(expenseForm.amount)"
-                         class="w-full border border-gray-200 rounded-lg pl-10 pr-3 py-2 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                </div>
-              </div>
-              <div class="col-span-12">
-                <label class="text-[11px] text-gray-500 mb-1 block">Descrição</label>
-                <input x-model="expenseForm.description" placeholder="Descreva a despesa" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-              </div>
-            </div>
-            <button @click="saveExpense()"
-                    :disabled="saving"
-                    class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm hover:shadow transition-all">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              <span x-text="isSaving('expense') ? 'Salvando...' : 'Salvar despesa'"></span>
-            </button>
-          </div>
         </div>
       </section>
 
       <!-- â•â•â• SEÃ‡ÃƒO: REGISTROS â•â•â• -->
-      <section id="section-registros" x-show="['vendas', 'estoque', 'financeiro'].includes(currentSection)" class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <section id="section-registros" x-show="['vendas', 'estoque', 'financeiro'].includes(currentSection)" class="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
 
         <!-- Vendas -->
         <div x-show="currentSection === 'vendas'" class="bg-white border border-gray-200 rounded-xl overflow-hidden xl:col-span-2">
@@ -738,58 +1028,58 @@
           </div>
         </div>
 
-        <!-- Compras -->
-        <div x-show="currentSection === 'financeiro'" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Contas a receber -->
+        <div x-show="currentSection === 'financeiro'" class="bg-white border border-gray-200 rounded-xl overflow-hidden h-full">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="font-semibold">Compras recentes</h3>
+            <h3 class="font-semibold">Contas a receber recentes</h3>
             <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700"
-                  x-text="compras.length + ' registros'"></span>
+                  x-text="receivables.length + ' registros'"></span>
           </div>
-          <div x-show="!compras.length" class="p-8 text-center text-sm text-gray-500">
-            Nenhuma compra registrada.
+          <div x-show="!receivables.length" class="p-8 text-center text-sm text-gray-500">
+            Nenhuma conta a receber cadastrada.
           </div>
           <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-            <template x-for="purchase in compras.slice(0, 30)" :key="purchase.id">
+            <template x-for="receivable in receivables.slice(0, 30)" :key="receivable.id">
               <div class="px-5 py-3 flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="font-medium text-sm truncate" x-text="purchase.supplier_name || 'Fornecedor'"></div>
-                  <div class="text-xs text-gray-500 truncate" x-text="purchaseItemsLabel(purchase) + ' - ' + formatDate(purchase.purchased_at)"></div>
+                  <div class="font-medium text-sm truncate" x-text="receivable.customer_name || receivable.description"></div>
+                  <div class="text-xs text-gray-500 truncate"
+                       x-text="sourceLabel(receivable.source_tag) + ' - ' + (receivable.status === 'received' ? ('recebido em ' + formatDate(receivable.received_at)) : ('vence ' + formatDate(receivable.due_date)))"></div>
                 </div>
                 <div class="flex items-center gap-3 flex-shrink-0">
-                  <span class="text-sm font-semibold" x-text="money(purchase.total_amount)"></span>
-                  <button @click="deletePurchase(purchase.id)"
-                          class="px-2 py-1 bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-700 rounded text-[11px] font-medium text-gray-700">
-                    Cancelar
-                  </button>
+                  <span class="text-[11px] px-2 py-0.5 rounded-full"
+                        :class="receivable.status === 'open' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'"
+                        x-text="receivable.status === 'open' ? 'em aberto' : receivable.status"></span>
+                  <span class="text-sm font-semibold text-emerald-700" x-text="money(receivable.amount)"></span>
                 </div>
               </div>
             </template>
           </div>
         </div>
 
-        <!-- Despesas -->
-        <div x-show="currentSection === 'financeiro'" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Contas a pagar -->
+        <div x-show="currentSection === 'financeiro'" class="bg-white border border-gray-200 rounded-xl overflow-hidden h-full">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="font-semibold">Despesas recentes</h3>
+            <h3 class="font-semibold">Contas a pagar recentes</h3>
             <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700"
-                  x-text="despesas.length + ' registros'"></span>
+                  x-text="payables.length + ' registros'"></span>
           </div>
-          <div x-show="!despesas.length" class="p-8 text-center text-sm text-gray-500">
-            Nenhuma despesa registrada.
+          <div x-show="!payables.length" class="p-8 text-center text-sm text-gray-500">
+            Nenhuma conta a pagar cadastrada.
           </div>
           <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-            <template x-for="expense in despesas.slice(0, 30)" :key="expense.id">
+            <template x-for="payable in payables.slice(0, 30)" :key="payable.id">
               <div class="px-5 py-3 flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="font-medium text-sm truncate" x-text="expense.description"></div>
-                  <div class="text-xs text-gray-500" x-text="categoryLabel(expense.category) + ' - ' + formatDate(expense.expense_date)"></div>
+                  <div class="font-medium text-sm truncate" x-text="payable.counterparty_name || payable.description"></div>
+                  <div class="text-xs text-gray-500"
+                       x-text="payableCategoryLabel(payable.category) + ' - ' + (payable.status === 'paid' ? ('pago em ' + formatDate(payable.paid_at)) : ('vence ' + formatDate(payable.due_date)))"></div>
                 </div>
                 <div class="flex items-center gap-3 flex-shrink-0">
-                  <span class="text-sm font-semibold text-rose-700" x-text="money(expense.amount)"></span>
-                  <button @click="deleteExpense(expense.id)"
-                          class="px-2 py-1 bg-white border border-gray-200 hover:border-rose-300 hover:text-rose-700 rounded text-[11px] font-medium text-gray-700">
-                    Excluir
-                  </button>
+                  <span class="text-[11px] px-2 py-0.5 rounded-full"
+                        :class="payable.status === 'open' ? 'bg-rose-50 text-rose-700' : 'bg-gray-100 text-gray-600'"
+                        x-text="payable.status === 'open' ? 'em aberto' : payable.status"></span>
+                  <span class="text-sm font-semibold text-rose-700" x-text="money(payable.amount)"></span>
                 </div>
               </div>
             </template>
@@ -817,7 +1107,6 @@
   </main>
 </div>
 
-<script src="./app.js?v=20260520-portal-22"></script>
+<script src="./app.js?v=20260522-financeiro-contas-7"></script>
 </body>
 </html>
-

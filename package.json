@@ -9,7 +9,7 @@
     "node": ">=20.10.0"
   },
   "scripts": {
-    "dev": "tsx --env-file=.env watch src/app/server.ts",
+    "dev": "tsx watch --env-file=.env src/app/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/app/server.js",
     "typecheck": "tsc --noEmit",
