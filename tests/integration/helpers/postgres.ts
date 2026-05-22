@@ -45,6 +45,19 @@ async function applyMigrations(pool: Pool): Promise<void> {
 
   const client = await pool.connect();
   try {
+    // Etapa 5 V2: cria a role 'farejador_partner_app' antes das migrations.
+    // A 0044 supoe que a role ja existe (criacao real e via runbook em prod).
+    // Em testes, criamos com senha 'test' (sem implicacao de seguranca — o
+    // container e efemero e nao expoe rede externa).
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'farejador_partner_app') THEN
+          CREATE ROLE farejador_partner_app LOGIN PASSWORD 'test' NOSUPERUSER NOBYPASSRLS NOINHERIT;
+        END IF;
+      END $$;
+    `);
+
     for (const file of files) {
       const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
       const sql = patchKnownIssues(file, raw);
@@ -53,6 +66,14 @@ async function applyMigrations(pool: Pool): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/**
+ * Constroi connection string usando a role farejador_partner_app.
+ * Substitui o usuario default (test) na connectionString do container.
+ */
+export function buildRestrictedConnectionString(connectionString: string): string {
+  return connectionString.replace(/\/\/test:test@/, '//farejador_partner_app:test@');
 }
 
 /**

@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+# Arquivo NUL (criado por engano quando rodam `cmd > NUL` no Git Bash em Windows
+# — NUL eh dispositivo nulo no CMD, mas vira arquivo literal no Git Bash)
+NUL
 
 # OS
 .DS_Store

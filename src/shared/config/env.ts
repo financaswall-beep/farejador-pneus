@@ -7,6 +7,10 @@ const envSchema = z.object({
   FAREJADOR_ENV: z.enum(['prod', 'test']),
   PORT: z.string().transform(Number).pipe(z.number().int().min(1).max(65535)).default('3000'),
   DATABASE_URL: z.string().min(1),
+  // Etapa 5 da auditoria 2026-05-21: pool separado pro Portal Parceiro com
+  // role sem BYPASSRLS. Opcional pra nao quebrar ambientes que ainda nao
+  // configuraram (dev/test/staging). Em prod, deve estar setado.
+  PARTNER_DATABASE_URL: z.string().min(1).optional(),
   DATABASE_POOL_MAX: z.string().transform(Number).pipe(z.number().int().min(1)).default('10'),
   DATABASE_SSL: booleanStringSchema,
   CHATWOOT_HMAC_SECRET: z.string().min(1),
