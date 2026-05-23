@@ -42,6 +42,7 @@ import {
   type GeneratorClaim,
   type GeneratorRawAction,
   type GeneratorResult,
+  type GeneratorRetryContext,
 } from './schemas.js';
 
 /**
@@ -238,6 +239,7 @@ export async function generateTurn(
   context: PlannerContext,
   decision: PlannerDecisionResult,
   toolResults: ToolExecutionResult[],
+  retryContext?: GeneratorRetryContext,
 ): Promise<GeneratorResult> {
   if (!env.GENERATOR_LLM_ENABLED) {
     return mockGenerateTurn(context, decision, toolResults);
@@ -259,8 +261,8 @@ export async function generateTurn(
     // (v1.4.0, ~3700 tokens) e prompt few-shot (v1.5.0, ~1700 tokens, 10
     // exemplos). Rodada A/B em catalog15-rerun antes de retirar v1.4.0.
     const messages = env.GENERATOR_PROMPT_FEW_SHOT_ENABLED
-      ? buildGeneratorMessagesFewShot(context, decision, toolResults)
-      : buildGeneratorMessages(context, decision, toolResults);
+      ? buildGeneratorMessagesFewShot(context, decision, toolResults, retryContext)
+      : buildGeneratorMessages(context, decision, toolResults, retryContext);
     llmResult = await callOpenAIResponse({
       apiKey: env.GENERATOR_OPENAI_API_KEY,
       model: env.GENERATOR_MODEL,
@@ -508,6 +510,9 @@ export async function recordGeneratorResult(
         input_tokens: result.input_tokens,
         output_tokens: result.output_tokens,
         duration_ms: result.duration_ms,
+        // Self-correction: presente apenas quando o worker repetiu o turn.
+        self_correction_round: result.self_correction_round ?? 1,
+        self_correction_previous_reason: result.self_correction_previous_reason ?? null,
       }),
       deterministicUuid([
         'generator_produced',

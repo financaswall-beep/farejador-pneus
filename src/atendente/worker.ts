@@ -33,7 +33,7 @@ import {
 import { buildPlannerContext } from './planner/context-builder.js';
 import { planTurn, recordPlannerDecision, type PlannerDecisionResult } from './planner/service.js';
 import { generateTurn, recordGeneratorResult } from './generator/service.js';
-import type { GeneratorResult } from './generator/schemas.js';
+import { SAFE_FALLBACK_SAY, type GeneratorResult, type GeneratorRetryContext } from './generator/schemas.js';
 import {
   AgentStateVersionConflictError,
   applyActionAndPersistInTx,
@@ -105,7 +105,7 @@ export async function processAtendenteJob(
     await recordToolExecutionResults(client, context, [autoStock]);
   }
 
-  const generatorResult = await generateTurn(context, decision, toolResults);
+  const generatorResult = await generateTurnWithSelfCorrection(context, decision, toolResults);
   const turnId = await recordGeneratorResult(
     client,
     context,
@@ -433,6 +433,69 @@ async function safeRollback(
       'atendente shadow: ROLLBACK failed (transaction state inconsistent)',
     );
   }
+}
+
+/**
+ * Self-correction: chama generateTurn uma vez; se vier blocked ou cair em
+ * SAFE_FALLBACK_SAY, chama de novo passando retryContext com o motivo.
+ * Cap em 1 retry — sem loop infinito.
+ *
+ * O resultado final (1o atempt se bom, 2o atempt caso contrario) carrega
+ * self_correction_round e self_correction_previous_reason pra auditoria.
+ */
+async function generateTurnWithSelfCorrection(
+  context: import('./planner/context-builder.js').PlannerContext,
+  decision: PlannerDecisionResult,
+  toolResults: ToolExecutionResult[],
+): Promise<GeneratorResult> {
+  const first = await generateTurn(context, decision, toolResults);
+
+  if (!shouldSelfCorrect(first)) {
+    return first;
+  }
+
+  const retryContext: GeneratorRetryContext = first.blocked
+    ? {
+        reason: 'previous_blocked',
+        previous_block_reason: first.block_reason,
+        previous_candidate_say: first.candidate_say_text,
+      }
+    : {
+        reason: 'previous_fallback',
+        previous_say: first.say_text,
+      };
+
+  logger.info(
+    {
+      worker_id: WORKER_ID,
+      shadow: true,
+      conversation_id: context.conversation_id,
+      reason: retryContext.reason,
+      first_block_reason: first.block_reason,
+      first_say: first.say_text,
+    },
+    'atendente shadow: self-correction triggered',
+  );
+
+  const second = await generateTurn(context, decision, toolResults, retryContext);
+
+  return {
+    ...second,
+    self_correction_round: 2,
+    self_correction_previous_reason:
+      retryContext.reason === 'previous_blocked'
+        ? first.block_reason
+        : 'previous_fallback',
+  };
+}
+
+function shouldSelfCorrect(result: GeneratorResult): boolean {
+  // Path A: validator bloqueou o turn.
+  if (result.blocked) return true;
+  // Path B: Generator emitiu o texto literal de fallback (sem que validator tenha bloqueado).
+  // Usamos igualdade de constante exportada — atualiza junto se SAFE_FALLBACK_SAY mudar.
+  if (result.say_text === SAFE_FALLBACK_SAY) return true;
+  return false;
 }
 
 async function lockSessionForJob(client: PoolClient, job: AtendenteJobRow): Promise<void> {

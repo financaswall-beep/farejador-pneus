@@ -115,14 +115,18 @@ describe('Generator prompt v1.5.0 (few-shot)', () => {
     expect(prompt).toContain('"type": "delivery_fee"');
   });
 
-  it('system prompt nao infla acima do v1.4.0', () => {
+  it('system prompt nao infla descontrolado', () => {
     const messages = buildGeneratorMessagesFewShot(context(), decision(), []);
     const size = messages[0].content.length;
-    // v1.4.0 = ~14748 chars. v1.5.0 inicial era ~12500 (Sprint 6.5).
-    // 2026-05-22: adicionados exemplos 11 (fechamento sem tools), 12 (despedida),
-    // 13 (nome+endereco separados) — sobe pra ~14650, ainda abaixo do v1.4.0.
-    // Filosofia: agente mais pensativo pode pagar bytes em few-shots criticos.
-    expect(size).toBeLessThan(15000);
+    // Historico de tamanho:
+    //  v1.4.0           = ~14748 chars
+    //  v1.5.0 Sprint6.5 = ~12500
+    //  + ex 11/12/13    = ~14650
+    //  + ex 14 + reforco safety (2026-05-22 turno self-correction) = ~16000
+    // Filosofia: agente mais pensativo paga bytes em few-shots criticos. Limite
+    // bruto em 17k pra detectar inflacao acidental, mas reconhecendo que prompt
+    // few-shot eh mais robusto que prompt declarativo enxuto.
+    expect(size).toBeLessThan(17000);
     expect(size).toBeGreaterThan(4000); // sanity: nao esta vazio
   });
 

@@ -530,6 +530,30 @@ export interface GeneratorResult {
   input_tokens: number;
   output_tokens: number;
   duration_ms: number;
+  /**
+   * Self-correction: quando o worker pede um 2o atempt ao Generator depois de
+   * blocked/fallback no 1o, o resultado final carrega:
+   *   - self_correction_round = 2
+   *   - self_correction_previous_reason = motivo do bloqueio ou 'previous_fallback'
+   * Quando ausente/undefined, esse turn nao passou por retry (atempt unico = 1).
+   */
+  self_correction_round?: number;
+  self_correction_previous_reason?: string | null;
+}
+
+/**
+ * Contexto opcional passado ao Generator quando ele eh chamado pela 2a vez
+ * (self-correction). O prompt v1.5 le isso e injeta uma mensagem `system`
+ * adicional pedindo pra reescrever, sem repetir o erro anterior.
+ */
+export interface GeneratorRetryContext {
+  reason: 'previous_blocked' | 'previous_fallback';
+  /** Quando reason='previous_blocked': motivo do validator (claim_invalid:..., action_blocked:...). */
+  previous_block_reason?: string | null;
+  /** Quando reason='previous_blocked': texto candidato que foi bloqueado. */
+  previous_candidate_say?: string | null;
+  /** Quando reason='previous_fallback': texto que foi a frase de safety (geralmente SAFE_FALLBACK_SAY). */
+  previous_say?: string | null;
 }
 
 /**

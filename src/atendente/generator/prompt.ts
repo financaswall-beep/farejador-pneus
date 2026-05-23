@@ -14,12 +14,17 @@ import type { OpenAIMessage } from '../../shared/llm-clients/openai.js';
 import type { PlannerContext } from '../planner/context-builder.js';
 import type { PlannerDecisionResult } from '../planner/service.js';
 import type { ToolExecutionResult } from '../executor/tool-executor.js';
-import { generatorPromptVersion, SAFE_FALLBACK_SAY } from './schemas.js';
+import { generatorPromptVersion, SAFE_FALLBACK_SAY, type GeneratorRetryContext } from './schemas.js';
 
 export function buildGeneratorMessages(
   context: PlannerContext,
   decision: PlannerDecisionResult,
   toolResults: ToolExecutionResult[],
+  // retryContext atualmente nao injetado em v1.4 (prompt declarativo). Quando
+  // env.GENERATOR_PROMPT_FEW_SHOT_ENABLED=false, self-correction roda mas o LLM
+  // nao ve a instrucao de retry. Aceitar o param mantem o tipo unificado com v1.5.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  retryContext?: GeneratorRetryContext,
 ): OpenAIMessage[] {
   return [
     {

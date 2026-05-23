@@ -24,15 +24,16 @@ import type { OpenAIMessage } from '../../shared/llm-clients/openai.js';
 import type { PlannerContext } from '../planner/context-builder.js';
 import type { PlannerDecisionResult } from '../planner/service.js';
 import type { ToolExecutionResult } from '../executor/tool-executor.js';
-import { generatorPromptVersionV15, SAFE_FALLBACK_SAY } from './schemas.js';
+import { generatorPromptVersionV15, SAFE_FALLBACK_SAY, type GeneratorRetryContext } from './schemas.js';
 import { buildGeneratorContextPayload } from './prompt.js';
 
 export function buildGeneratorMessagesFewShot(
   context: PlannerContext,
   decision: PlannerDecisionResult,
   toolResults: ToolExecutionResult[],
+  retryContext?: GeneratorRetryContext,
 ): OpenAIMessage[] {
-  return [
+  const messages: OpenAIMessage[] = [
     {
       role: 'system',
       content: SYSTEM_PROMPT_V1_5,
@@ -42,6 +43,54 @@ export function buildGeneratorMessagesFewShot(
       content: JSON.stringify(buildGeneratorContextPayload(context, decision, toolResults, generatorPromptVersionV15)),
     },
   ];
+
+  if (retryContext) {
+    messages.push({
+      role: 'system',
+      content: buildRetryInstruction(retryContext, decision.output.skill),
+    });
+  }
+
+  return messages;
+}
+
+function buildRetryInstruction(retry: GeneratorRetryContext, skill: string): string {
+  if (retry.reason === 'previous_blocked') {
+    return [
+      '# RETRY — sua resposta anterior foi BLOQUEADA pelo validator.',
+      '',
+      `motivo: ${retry.previous_block_reason ?? 'unknown'}`,
+      retry.previous_candidate_say ? `say bloqueado: "${retry.previous_candidate_say}"` : '',
+      '',
+      'COMO REESCREVER:',
+      '- claim_invalid:price → voce tentou afirmar preço sem evidência de buscarProduto. Não cite valor.',
+      '- claim_invalid:delivery_fee → voce tentou afirmar frete sem evidência de calcularFrete. Pergunte bairro/CEP ao cliente.',
+      '- claim_invalid:fitment → voce afirmou compatibilidade sem evidência de buscarCompatibilidade. Pergunte ano/medida.',
+      '- claim_invalid:stock → voce afirmou estoque sem verificarEstoque. Não diga "em estoque".',
+      '- action_blocked → ajuste a action conforme o motivo. Hidratação inválida geralmente eh referência a item_id que nao existe.',
+      '',
+      `Mantenha skill=${skill}, mantenha slots já registrados, mude apenas o que causou o bloqueio.`,
+      'NAO use a frase de SAFE_FALLBACK_SAY a menos que realmente nao haja saida.',
+    ].filter(Boolean).join('\n');
+  }
+
+  // previous_fallback
+  return [
+    '# RETRY — sua resposta anterior foi a FRASE DE FALLBACK ("Desculpe...").',
+    '',
+    retry.previous_say ? `say anterior: "${retry.previous_say}"` : '',
+    '',
+    'Fallback eh ULTIMA opcao. Reveja com calma:',
+    `- Skill recebida = ${skill}.`,
+    '- Voce TEM organizer_facts e state com slots ja preenchidos de turnos anteriores.',
+    '- Casos onde fallback eh ERRADO:',
+    '  * Cliente confirmando aritmetica sobre valores ja cotados ("198 + 9,90, ok?") → confirma a soma.',
+    '  * Cliente sinalizou fechamento ("vou querer", "fecha", "pode mandar") → peça nome/endereco/pagamento.',
+    '  * Cliente despedindo ("valeu", "obrigado", "blz amigo") → responda com cordialidade.',
+    '  * Cliente fazendo pergunta sobre algo que esta em organizer_facts → responda do estado.',
+    '',
+    'REESCREVA uma resposta que AVANCE a conversa. Use o contexto que voce tem.',
+  ].filter(Boolean).join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +114,12 @@ const SYSTEM_PROMPT_V1_5 = [
   'NÃO afirme um valor comercial (preço, estoque, compatibilidade, frete)',
   'sem evidência em current_turn_tool_results deste turno.',
   'Afirmou → emita claim apontando a tool. Não afirmou → claim vazia.',
+  '',
+  'IMPORTANTE — anti-drible: frases SOFT também são afirmação comercial.',
+  '"Tem sim opções", "temos pra essa moto", "consigo achar", "vou ver pra você", "vou conferir",',
+  '"deve servir", "geralmente serve", "acho que tem" — tudo isso insinua disponibilidade',
+  'mesmo sem claim estruturado. Se a tool veio vazia (`[]` ou erro), NÃO USE essas frases.',
+  'Tool vazia = você NÃO tem essa info. Seja honesto e pergunte o que precisa pra refinar a busca.',
   '',
   '# Tipos de Action (RawAction)',
   '',
@@ -285,6 +340,20 @@ const SYSTEM_PROMPT_V1_5 = [
   '  "actions": [],',
   '  "claims": [],',
   '  "rationale": "Cliente se despedindo apos fechamento. Encerro com cordialidade. Sem actions porque nao tem dado novo pra registrar. Sem fallback — fallback eh pra falta de dado, nao pra despedida."',
+  '}',
+  '',
+  '## Exemplo 14 — Tool retornou vazio: seja honesto, NAO insinue ter',
+  'CRITICO: quando buscarCompatibilidade ou buscarProduto retornam `[]`, voce NAO TEM no catalogo.',
+  'NUNCA escreva "tem sim", "temos pra essa moto", "consigo achar opcoes", "vou ver" — isso eh',
+  'mentira branca que cria expectativa falsa no cliente. Diga honestamente que nao acha,',
+  'e peca o dado que poderia destravar a busca (medida no pneu velho, ano da moto, marca).',
+  'Customer: "Tem pneu pra minha Triumph Daytona 675?"',
+  'tool_results: buscarCompatibilidade (Daytona, NMAX, etc) → []',
+  '{',
+  '  "say": "Pra Daytona 675 eu nao acho aqui no catalogo direto. Me passa a medida que ta escrita no pneu atual (dianteiro e traseiro) que eu busco por medida e te confirmo.",',
+  '  "actions": [ update_slot item <new> moto_modelo="Daytona 675" ],',
+  '  "claims": [],',
+  '  "rationale": "Tool retornou []. NAO afirmo ter. Peço medida pra destravar busca por medida em vez de modelo. Sem claim — nao tenho evidencia."',
   '}',
   '',
   '## Exemplo 13 — Cliente passa nome E endereco grudados na mesma frase',

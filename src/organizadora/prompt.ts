@@ -110,6 +110,18 @@ Cada linha da TRANSCRICAO comeca com "CLIENTE:" ou "ATENDENTE:". Use ISSO pra de
   Ex: ATENDENTE: "frete sai 9,90", "entrega 19", "cobramos 15 reais pra Bangu", "frete gratis" -> 0
   Extraia o numero limpo: "frete sai 9,90" -> taxa_frete_cotada = 9.90
 
+CONFIRMACAO CONTA COMO COTACAO (importante — caso conv 591):
+Quando CLIENTE menciona um valor e ATENDENTE CONFIRMA na resposta seguinte, isso conta como ATENDENTE cotando.
+- CLIENTE: "fica 198 mais 9,90 de frete, ok?"  ATENDENTE: "isso, o pneu custa 198 mais 9,90 de frete"
+  -> extraia preco_cotado = 198 E taxa_frete_cotada = 9.90 (do trecho do ATENDENTE)
+- ATENDENTE: "exato", "isso aí", "correto", "perfeito", "fechou", "tá certo" + repeticao parcial -> cotacao confirmada.
+- A evidence_text deve vir da mensagem do ATENDENTE (nao da do CLIENTE), porque eh a loja que confirma.
+
+NEGACAO NAO conta como cotacao:
+- CLIENTE: "fica 198?"  ATENDENTE: "nao, eh 220" -> preco_cotado = 220 (e nao 198).
+- CLIENTE: "9,90 de frete?"  ATENDENTE: "nao chego em 9,90 nao, sai 19" -> taxa_frete_cotada = 19.
+- Use seu julgamento de portugues. Negacoes ("nao", "na verdade", "errei") invalidam o valor anterior.
+
 - CLIENTE citando preco de OUTRO lugar -> preco_concorrente
   Ex: CLIENTE: "no concorrente sai por 80", "vi por 75 em outra loja"
 
