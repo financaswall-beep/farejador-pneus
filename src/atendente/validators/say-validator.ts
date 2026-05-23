@@ -14,7 +14,20 @@ export type SayValidationResult =
   | { valid: false; reason: string; severity: 'block' | 'warn' };
 
 export interface SayValidationContext {
+  /** Tool results do TURN ATUAL — fonte primaria de evidencia. */
   recent_tool_results: ToolResultForValidation[];
+  /**
+   * Tool results de TURNS PASSADOS na mesma conversa. Permite que o
+   * Generator cite valores que ja foram cotados antes (ex.: cliente
+   * pergunta "quanto deu tudo?" e bot soma o preco do produto e o frete
+   * que foram cotados turns atras). Sem isso, validator bloqueava
+   * aritmetica legitima.
+   *
+   * Risco: valor "velho" (cotacao desatualizada) pode ser permitido. O
+   * trade-off vale porque (a) skills validas mantem o contexto e (b) o
+   * prompt do retry/CoT instrui o LLM a usar so valores atuais.
+   */
+  tool_results_history?: ToolResultForValidation[];
   /** Skill selecionada pelo Planner; quando 'pedir_dados_faltantes' o fallback seguro fica proibido. */
   selected_skill?: string;
 }
@@ -67,20 +80,82 @@ export function validateSay(say: string, context: SayValidationContext): SayVali
   const mentionedMoney = extractMoneyValues(say);
   if (mentionedMoney.length === 0) return { valid: true };
 
-  const knownPrices = collectToolPrices(context.recent_tool_results);
-  const knownFees = collectDeliveryFees(context.recent_tool_results);
-  const knownPolicyMoney = collectPolicyMoney(context.recent_tool_results);
+  // Valores conhecidos vem do TURN ATUAL primeiro (fonte autorizada),
+  // mais HISTORY (turns anteriores). Isso destrava "quanto deu tudo?" depois
+  // de cotacao em turns passados, sem precisar rodar tool nova so pra repetir.
+  const currentResults = context.recent_tool_results;
+  const historyResults = context.tool_results_history ?? [];
+  const allResults = [...currentResults, ...historyResults];
+
+  const knownPrices = collectToolPrices(allResults);
+  const knownFees = collectDeliveryFees(allResults);
+  const knownPolicyMoney = collectPolicyMoney(allResults);
   const knownAmounts = new Set([...knownPrices, ...knownFees, ...knownPolicyMoney]);
   if (knownAmounts.size === 0) {
     return block('money_mentioned_without_tool_result');
   }
 
   for (const amount of mentionedMoney) {
-    if (!hasApproxAmount(knownAmounts, amount)) {
-      return block(`money_not_supported_by_tool_result:${amount}`);
-    }
+    // (1) valor exato cotado
+    if (hasApproxAmount(knownAmounts, amount)) continue;
+    // (2) soma/multiplo de ate 3 valores conhecidos (ex.: 2x99 = 198, 99+9,9 = 108,9).
+    //     Trata aritmetica legitima feita sobre cotacoes que ja existem.
+    if (isSimpleCombination(amount, knownAmounts)) continue;
+    return block(`money_not_supported_by_tool_result:${amount}`);
   }
   return { valid: true };
+}
+
+/**
+ * Checa se `target` pode ser obtido por:
+ *  (a) multiplicação de 1 valor conhecido por inteiro 1-10 (ex.: 2 pneus iguais)
+ *  (b) soma de 2 valores conhecidos (ex.: pneu + frete)
+ *  (c) soma de 3 valores conhecidos (ex.: 2 pneus + frete)
+ *  (d) k pneus iguais + frete (ex.: 2*99 + 9.90)
+ *
+ * Mantem o validator anti-mentira (valor inventado do nada continua bloqueado),
+ * mas libera aritmetica legitima sobre valores ja cotados.
+ *
+ * Complexidade: O(n²) em pior caso pra somas; n eh pequeno (handful de tools).
+ */
+function isSimpleCombination(target: number, values: Set<number>): boolean {
+  const arr = [...values];
+  const eq = (a: number, b: number): boolean => Math.abs(a - b) < 0.01;
+
+  // (a) multiplo inteiro 1..10
+  for (const v of arr) {
+    for (let k = 1; k <= 10; k++) {
+      if (eq(v * k, target)) return true;
+    }
+  }
+
+  // (b) soma de 2
+  for (let i = 0; i < arr.length; i++) {
+    for (let j = i; j < arr.length; j++) {
+      if (eq(arr[i]! + arr[j]!, target)) return true;
+    }
+  }
+
+  // (c) soma de 3
+  for (let i = 0; i < arr.length; i++) {
+    for (let j = i; j < arr.length; j++) {
+      for (let l = j; l < arr.length; l++) {
+        if (eq(arr[i]! + arr[j]! + arr[l]!, target)) return true;
+      }
+    }
+  }
+
+  // (d) k * v1 + v2 (ex.: 2 pneus de 99 + 9.90 = 207.90)
+  for (const v1 of arr) {
+    for (let k = 2; k <= 10; k++) {
+      const base = v1 * k;
+      for (const v2 of arr) {
+        if (eq(base + v2, target)) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function block(reason: string): SayValidationResult {

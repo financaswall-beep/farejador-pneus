@@ -54,6 +54,104 @@ describe('SayValidator inicial', () => {
     });
   });
 
+  // ============================================================
+  // Bug 1 da conv 592 turn 8 (2026-05-22): cliente pergunta "quanto deu
+  // tudo?" depois de cotacao em turns anteriores. Bot soma valores ja
+  // cotados (preco + frete). Validator antes bloqueava porque so olhava
+  // recent_tool_results do turn atual.
+  // ============================================================
+
+  it('libera preco que esta em tool_results_history (turn anterior cotou)', () => {
+    expect(
+      validateSay('Esse pneu sai por R$ 99,00, conforme cotamos antes', {
+        recent_tool_results: [], // nenhuma tool no turn atual
+        tool_results_history: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', price_amount: '99.00' }],
+          },
+        ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('libera soma de preco e frete que estao em history (caso conv 592)', () => {
+    expect(
+      validateSay('Ficou R$ 108,90 no total: R$ 99,00 do pneu + R$ 9,90 da entrega', {
+        recent_tool_results: [],
+        tool_results_history: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', price_amount: '99.00' }],
+          },
+          {
+            tool: 'calcularFrete',
+            ok: true,
+            output: { valor: 9.9, disponivel: true },
+          },
+        ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('libera 2 pneus iguais somando ao total (2x99 = 198)', () => {
+    expect(
+      validateSay('Dois pneus iguais fica R$ 198,00', {
+        recent_tool_results: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', price_amount: '99.00' }],
+          },
+        ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('libera 2 pneus + frete (2x99 + 9,90 = 207,90)', () => {
+    expect(
+      validateSay('Total: R$ 207,90 (R$ 99,00 x 2 pneus + R$ 9,90 de frete)', {
+        recent_tool_results: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', price_amount: '99.00' }],
+          },
+          {
+            tool: 'calcularFrete',
+            ok: true,
+            output: { valor: 9.9 },
+          },
+        ],
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it('AINDA bloqueia valor que nao e cotado nem soma de cotados', () => {
+    expect(
+      validateSay('Fica R$ 250,00 no total', {
+        recent_tool_results: [],
+        tool_results_history: [
+          {
+            tool: 'buscarProduto',
+            ok: true,
+            output: [{ product_id: 'p1', price_amount: '99.00' }],
+          },
+          {
+            tool: 'calcularFrete',
+            ok: true,
+            output: { valor: 9.9 },
+          },
+        ],
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: 'money_not_supported_by_tool_result:250',
+    });
+  });
+
   it('bloqueia promessa de estoque sem verificarEstoque', () => {
     expect(
       validateSay('Temos esse pneu em estoque para pronta entrega.', {

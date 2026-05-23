@@ -15,8 +15,15 @@ export interface PlannerMessage {
 export interface ToolResultSummary {
   tool: ToolName;
   ok: boolean;
+  /** Texto truncado pra usar no prompt do LLM (até ~500 chars). */
   summary: string;
   occurred_at: string;
+  /**
+   * Output cru da tool (objeto/array). Não vai no prompt — usado pelo
+   * say-validator pra autorizar money mentions quando o LLM cita valor
+   * que foi cotado em turn anterior (history). Opcional pra retro-compat.
+   */
+  output_raw?: unknown;
 }
 
 export interface OrganizerFactSummary {
@@ -146,6 +153,9 @@ export async function buildPlannerContext(
           ok: row.event_type === 'tool_executed',
           summary: JSON.stringify(row.event_payload).slice(0, 500),
           occurred_at: row.occurred_at.toISOString(),
+          // Output cru pra say-validator olhar money de turns anteriores.
+          // Nao vai no prompt; eh usado em runtime na validacao.
+          output_raw: (row.event_payload as Record<string, unknown>).output,
         },
       ];
     }),

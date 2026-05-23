@@ -61,8 +61,13 @@ function activeGeneratorPromptVersion(): string {
 // Validação
 // ------------------------------------------------------------------
 
-function toValidationCtx(toolResults: ToolExecutionResult[], selectedSkill?: SkillName): {
+function toValidationCtx(
+  toolResults: ToolExecutionResult[],
+  context: PlannerContext,
+  selectedSkill?: SkillName,
+): {
   recent_tool_results: ToolResultForValidation[];
+  tool_results_history: ToolResultForValidation[];
   selected_skill?: string;
 } {
   return {
@@ -71,6 +76,17 @@ function toValidationCtx(toolResults: ToolExecutionResult[], selectedSkill?: Ski
       ok: result.ok,
       output: result.output,
     })),
+    // History de turns passados, com output cru pra o validator olhar
+    // money/preco/frete ja cotados. Sem isso, perguntas do tipo "quanto deu
+    // tudo?" depois de cotacao em turnos anteriores caem em
+    // money_mentioned_without_tool_result.
+    tool_results_history: context.recent_tool_results
+      .filter((r): r is typeof r & { output_raw: unknown } => r.output_raw !== undefined)
+      .map((r) => ({
+        tool: r.tool,
+        ok: r.ok,
+        output: r.output_raw,
+      })),
     selected_skill: selectedSkill,
   };
 }
@@ -83,7 +99,7 @@ function runValidators(
   context: PlannerContext,
   selectedSkill?: SkillName,
 ): { blocked: boolean; block_reason: string | null } {
-  const sayCtx = toValidationCtx(toolResults, selectedSkill);
+  const sayCtx = toValidationCtx(toolResults, context, selectedSkill);
 
   // Etapa 2: claims-first validation. Se Generator emitiu claims sem evidencia,
   // bloqueia antes do say-validator (mais especifico, melhor reason). Quando
