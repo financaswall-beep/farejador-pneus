@@ -592,7 +592,10 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     expect(systemPrompt).toContain('so pode aparecer sozinha, exatamente igual, nunca misturada com outro texto');
   });
 
-  it('inclui items completos e organizer_facts no contexto entregue ao LLM', () => {
+  it('inclui items completos mas NAO injeta organizer_facts no payload (Fase 1 isolamento 2026-05-22)', () => {
+    // Mesmo que o contexto contenha facts (que poderia vir do banco), o
+    // payload entregue ao LLM nao mais carrega organizer_facts. O bot le
+    // state.items + state.global_slots + recent_messages.
     const context = makeContext({
       state: makeState({
         items: [
@@ -626,8 +629,8 @@ describe('Generator Shadow — memória operacional em tempo real', () => {
     const payload = JSON.parse(messages[1]!.content);
 
     expect(payload.context.state_summary.items).toHaveLength(1);
-    expect(payload.context.organizer_facts).toHaveLength(1);
-    expect(payload.context.organizer_facts[0].fact_value).toBe('140/70-17');
+    // organizer_facts foi removido do payload entregue ao LLM
+    expect(payload.context.organizer_facts).toBeUndefined();
   });
 
   it('entrega commercial_summary pronto para o Generator nao garimpar tool JSON bruto', () => {

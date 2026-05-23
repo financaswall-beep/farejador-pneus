@@ -47,7 +47,7 @@ export function buildGeneratorMessages(
         '5a. EXCECAO ABSOLUTA: se planner_decision.skill == "pedir_dados_faltantes", PROIBIDO usar a frase de fallback seguro.',
         '    Em vez disso, faca uma pergunta concreta sobre o slot ausente (medida do pneu, bairro, posicao, marca).',
         '    Se planner_decision.missing_slots tiver itens, mencione o primeiro de forma natural; se vazio, peca a medida do pneu (ex.: "110/90-17").',
-        '5b. Se a skill for "pedir_dados_faltantes" e organizer_facts ja contem moto_modelo + moto_ano, voce pode confirmar a moto na pergunta',
+        '5b. Se a skill for "pedir_dados_faltantes" e state.items ja contem moto_modelo + moto_ano no item ativo, voce pode confirmar a moto na pergunta',
         '    (ex.: "Sua moto e Bros 160 2022, certo? Me passa a medida do pneu traseiro, ex.: 110/90-17.").',
         '6. NAO crie pedido. NAO envie mensagem ao Chatwoot.',
         '7. Voce so pode emitir quatro tipos de action: update_slot, create_item, record_offer, update_draft.',
@@ -218,7 +218,9 @@ export function buildGeneratorContextPayload(
       },
       recent_messages: context.recent_messages,
       tool_results_history: context.recent_tool_results,
-      organizer_facts: context.organizer_facts,
+      // FASE 1 (2026-05-22): organizer_facts isolado — bot nao consome mais
+      // facts da Organizadora em tempo real. Memoria entre turns vem de
+      // state.global_slots + state.items + recent_messages + recent_tool_results.
       derived_signals: context.derived_signals,
     },
     planner_decision: {

@@ -90,7 +90,13 @@ describe('buildPlannerContext', () => {
     ]);
   });
 
-  it('le fatos atuais da Organizadora como organizer_facts', async () => {
+  it('NAO consome organizer_facts em tempo real (Fase 1 isolamento 2026-05-22)', async () => {
+    // Mesmo que a Organizadora tenha gravado facts em analytics.conversation_facts,
+    // o PlannerContext NAO carrega esses facts pro bot consumir. organizer_facts
+    // fica sempre [] no contexto entregue ao Planner/Generator.
+    // Motivo: facts mal-ancorados contaminavam o atendimento (conv 593 PCX 2020).
+    // A Organizadora segue gravando pra analytics/dashboard, mas o bot le state
+    // proprio (global_slots, items) + recent_messages + tool_results.
     const { buildPlannerContext } = await import('../../../../src/atendente/planner/context-builder.js');
     const query = vi
       .fn()
@@ -116,21 +122,8 @@ describe('buildPlannerContext', () => {
 
     const context = await buildPlannerContext({ query } as never, 'test', conversationId);
 
-    expect(context.organizer_facts).toEqual([
-      {
-        fact_key: 'medida_pneu',
-        fact_value: '120/80-18',
-        observed_at: baseTime,
-        message_id: '00000000-0000-4000-8000-000000000010',
-        truth_type: 'observed',
-        source: 'organizadora_llm',
-        confidence_level: 0.91,
-        extractor_version: 'organizadora_v3.4',
-        latest_evidence_text: 'preciso 120/80-18',
-        latest_evidence_message_id: '00000000-0000-4000-8000-000000000010',
-        latest_evidence_type: 'literal',
-      },
-    ]);
+    // Apesar do banco ter 1 fact, o contexto vem com organizer_facts vazio.
+    expect(context.organizer_facts).toEqual([]);
   });
 });
 

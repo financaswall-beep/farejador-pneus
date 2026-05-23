@@ -159,19 +159,14 @@ export async function buildPlannerContext(
         },
       ];
     }),
-    organizer_facts: organizerFacts.rows.map((fact) => ({
-      fact_key: fact.fact_key,
-      fact_value: fact.fact_value,
-      observed_at: fact.observed_at?.toISOString() ?? null,
-      message_id: fact.message_id,
-      truth_type: fact.truth_type,
-      source: fact.source,
-      confidence_level: fact.confidence_level,
-      extractor_version: fact.extractor_version,
-      latest_evidence_text: fact.latest_evidence_text,
-      latest_evidence_message_id: fact.latest_evidence_message_id,
-      latest_evidence_type: fact.latest_evidence_type,
-    })),
+    // FASE 1 (2026-05-22 turno isolamento): organizer_facts FORA do contexto.
+    // A Organizadora segue extraindo facts pra analytics.conversation_facts,
+    // mas o bot (Planner + Generator) NAO consome mais em tempo real.
+    // Fonte de memoria entre turns passa a ser state.global_slots + state.items
+    // + recent_messages + tool_results (autorizados via tools).
+    // Motivo: conv 593 mostrou que facts mal-ancorados (ex.: produto_oferecido
+    // sem amarrar à variante da moto) viravam mentira no atendimento.
+    organizer_facts: [],
     derived_signals: state.derived_signals,
   };
 }
