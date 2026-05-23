@@ -1,11 +1,37 @@
 # Handoff - Farejador
 
-**Atualizado: 2026-05-15.**
+**Atualizado: 2026-05-22 (sessão Claude Sonnet 4.5).**
+
+> Para o estado MAIS RECENTE (sessão 2026-05-22), ver:
+> [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)
+> Cobre prompts pensativos, self-correction loop, migration 0047,
+> bug crítico aberto de inferência de compatibilidade.
 
 Este arquivo é o handoff operacional curto. Para contexto completo da próxima
-conversa, use também `docs/NEXT_CHAT_HANDOFF.md`.
+conversa, use também `docs/NEXT_CHAT_HANDOFF.md` e o doc da sessão de 2026-05-22.
 
-## Estado Atual (2026-05-15)
+## Estado Atual (2026-05-22)
+
+**Mudanças desde 2026-05-15** (resumo — detalhes em [`SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)):
+
+| frente | resumo |
+|---|---|
+| Catálogo | merge `test → prod`, 20 motos populares novas (CG/Factor/Fazer/MT/CB/Hornet/Twister), 56 produtos a R$ 99, 624 zones de entrega a R$ 9,90, migration 0047 resolve modelo preferindo candidatos úteis |
+| Prompts | CoT estruturado obrigatório (a/b/c/d), exemplos 11/12/13/14 no Generator v1.5, anti-drible "tem sim opções", rationale 500→800 chars |
+| Self-correction | worker.ts re-executa generator 1× quando blocked ou SAFE_FALLBACK, com retryContext específico |
+| Validator | say-validator aceita aritmética simples sobre tool_results_history (somas 2-3 valores, múltiplos 1..10x) |
+| Organizadora | nova seção "QUEM DISSE O PRECO" + 2 fact_keys novos (`preco_cotado`, `taxa_frete_cotada`) |
+| Bug aberto 🔴 | bot afirma compatibilidade implícita ("achei o pneu pra X") sem buscarCompatibilidade ter retornado o product_id (conv 593) |
+
+**Commits da sessão 2026-05-22**:
+- `a615832` — prompts pensativos + fact_keys cotação
+- `ecc9220` — self-correction + anti-mentira + extracao frete confirmado
+- `bae915a` — say-validator aceita aritmética sobre history
+- `8f2bafd` — migration 0047 resolve_vehicle_model
+
+---
+
+## Estado Atual (linha base 2026-05-15)
 
 O sistema está em **Fase 3 / Fase D estendida (shadow assistido)**.
 Organizadora em produção e calibrada. Atendente em shadow capaz de:

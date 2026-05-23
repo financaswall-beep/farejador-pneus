@@ -1,5 +1,15 @@
 # Next Chat Handoff - Farejador
 
+> **🚨 Sessão mais recente: 2026-05-22**
+> Para continuar em outro chat **agora**, leia primeiro:
+> [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)
+>
+> Esse novo doc cobre: catálogo merged test→prod, 20 motos populares cadastradas,
+> prompts pensativos (CoT estruturado, exemplos 11-14), self-correction loop,
+> say-validator com aritmética, migration 0047 (resolve_vehicle_model prefere
+> candidatos úteis). E aponta o **bug crítico aberto** de inferência de
+> compatibilidade implícita na conv 593.
+
 **Atualizado: 2026-05-15.** Esta sessão entregou um conjunto grande de mudanças
 ao Atendente: limpeza de regex no Planner, escalação real, structured claims,
 prompt few-shot v1.5.0 atrás de feature flag, e audit fix de `prompt_version`.
