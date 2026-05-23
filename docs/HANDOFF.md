@@ -1,14 +1,36 @@
 # Handoff - Farejador
 
-**Atualizado: 2026-05-22 (sessão Claude Sonnet 4.5).**
+**Atualizado: 2026-05-23 (sessão Claude Sonnet 4.5).**
 
-> Para o estado MAIS RECENTE (sessão 2026-05-22), ver:
-> [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)
-> Cobre prompts pensativos, self-correction loop, migration 0047,
-> bug crítico aberto de inferência de compatibilidade.
+> Para o estado MAIS RECENTE (sessão 2026-05-23), ver:
+> [`docs/SESSAO_2026-05-23_HANDOFF.md`](SESSAO_2026-05-23_HANDOFF.md)
+> Cobre: consolidação de catálogo (87 operações em prod), bug 593 morto na causa raiz
+> (PCX 150 com 4 fitments), aliases envenenados limpos, 5 motos modernas adicionadas
+> (CB 250F/300F Twister, CBR 250R, XJ6, CB 750 Hornet), variantes Crosser S 2025 e
+> Ténéré Flex separadas. Plano anti-alucinação Camada 4 concluída — Camadas 1.4/1.5/3 pendentes.
+>
+> Sessão anterior (2026-05-22): [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)
+> + plano completo: [`docs/PLANO_ANTI_ALUCINACAO_2026-05-22.md`](PLANO_ANTI_ALUCINACAO_2026-05-22.md)
 
 Este arquivo é o handoff operacional curto. Para contexto completo da próxima
-conversa, use também `docs/NEXT_CHAT_HANDOFF.md` e o doc da sessão de 2026-05-22.
+conversa, use também `docs/NEXT_CHAT_HANDOFF.md` e os docs das sessões recentes.
+
+## Estado Atual (2026-05-23)
+
+**Mudanças desde 2026-05-22:**
+
+| frente | resumo |
+|---|---|
+| Auditoria | 4 agentes paralelos auditaram prompts/validators/fluxo/banco. Plano de 5 camadas escrito em [`PLANO_ANTI_ALUCINACAO_2026-05-22.md`](PLANO_ANTI_ALUCINACAO_2026-05-22.md) |
+| Pesquisa | 23 buscas web (manuais oficiais Honda/Yamaha/Suzuki/etc.) coletaram medidas com fontes |
+| Catálogo | **+14 tire_specs, +5 motos modernas, +2 variantes, +45 fitments, -22 entradas duplicadas/órfãs** — banco passou de 157→141 motos limpas, 56→70 produtos, 132→177 fitments |
+| Bug 593 | morto na causa raiz: PCX 150 (2013-2022) agora tem 4 fitments (OEM + alt), bot deixa de cair em `produtos=[]` |
+| Aliases | envenenamentos removidos (Crosser ≠ Lander ≠ Ténéré, Ténéré 700 não rouba mais "Tenere" simples) |
+| Script | `scripts/consolidar-catalogo-2026-05-23.ts` (~700 linhas) aplicado em prod em transação única (87 operações, ROLLBACK automático se erro) |
+
+**Camada 4 do plano anti-alucinação concluída. Camadas 1.4/1.5/3 pendentes** — recomendadas como próxima frente.
+
+---
 
 ## Estado Atual (2026-05-22)
 

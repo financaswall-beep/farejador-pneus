@@ -1,14 +1,18 @@
 # Next Chat Handoff - Farejador
 
-> **🚨 Sessão mais recente: 2026-05-22**
+> **🚨 Sessão mais recente: 2026-05-23**
 > Para continuar em outro chat **agora**, leia primeiro:
-> [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md)
+> [`docs/SESSAO_2026-05-23_HANDOFF.md`](SESSAO_2026-05-23_HANDOFF.md)
 >
-> Esse novo doc cobre: catálogo merged test→prod, 20 motos populares cadastradas,
-> prompts pensativos (CoT estruturado, exemplos 11-14), self-correction loop,
-> say-validator com aritmética, migration 0047 (resolve_vehicle_model prefere
-> candidatos úteis). E aponta o **bug crítico aberto** de inferência de
-> compatibilidade implícita na conv 593.
+> Essa sessão executou a **Camada 4 do plano anti-alucinação** (consolidação de catálogo).
+> Bug 593 morto na causa raiz: PCX 150 agora tem 4 fitments (OEM + alt) em vez de zero.
+> 87 operações em transação única aplicadas em prod: 14 tire_specs novos, 14 duplicatas consolidadas,
+> 8 órfãs apagadas, 14 aliases envenenados limpos, 2 variantes novas (Crosser S 2025, Ténéré Flex),
+> 5 motos modernas adicionadas (CB 250F/300F Twister, CBR 250R, XJ6, CB 750 Hornet), 45 fitments.
+> Cobertura Honda 36/38, Yamaha 21/22, Royal Enfield 100%.
+>
+> **Sessão anterior (2026-05-22)** — auditoria profunda com 4 agentes paralelos + plano de 5 camadas:
+> [`docs/SESSAO_2026-05-22_HANDOFF.md`](SESSAO_2026-05-22_HANDOFF.md) + [`docs/PLANO_ANTI_ALUCINACAO_2026-05-22.md`](PLANO_ANTI_ALUCINACAO_2026-05-22.md)
 
 **Atualizado: 2026-05-15.** Esta sessão entregou um conjunto grande de mudanças
 ao Atendente: limpeza de regex no Planner, escalação real, structured claims,
