@@ -180,7 +180,7 @@ function parceiroApp() {
     },
 
     get totalCusts() {
-      return this.num(this.resumo?.purchases_month) + this.num(this.resumo?.expenses_month);
+      return this.num(this.resumo?.purchases_month) + this.costExpensesCommitted;
     },
 
     get estimatedMargin() {
@@ -304,6 +304,16 @@ function parceiroApp() {
       return this.payables
         .filter((payable) => payable.status === 'open')
         .reduce((sum, payable) => sum + this.num(payable.amount), 0);
+    },
+
+    get manualOpenPayablesTotal() {
+      return this.payables
+        .filter((payable) => payable.status === 'open' && !payable.source_purchase_id)
+        .reduce((sum, payable) => sum + this.num(payable.amount), 0);
+    },
+
+    get costExpensesCommitted() {
+      return this.num(this.resumo?.expenses_month) + this.manualOpenPayablesTotal;
     },
 
     get receivablesOpenTotal() {
@@ -567,7 +577,7 @@ function parceiroApp() {
     get financeCostSplit() {
       return [
         { label: 'Compras', value: this.num(this.resumo?.purchases_month), color: '#7f8f83' },
-        { label: 'Despesas', value: this.num(this.resumo?.expenses_month), color: '#dc3f4d' },
+        { label: 'Despesas/contas', value: this.costExpensesCommitted, color: '#dc3f4d' },
       ];
     },
 

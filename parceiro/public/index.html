@@ -360,7 +360,7 @@
               <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(totalCusts)"></div>
               <div class="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
                 <i data-lucide="scale" class="w-3.5 h-3.5"></i>
-                <span>compras + despesas pagas</span>
+                <span>compras + despesas/contas</span>
               </div>
             </div>
             <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
@@ -397,7 +397,7 @@
               <div class="text-xs text-slate-500 mt-2 space-y-0.5">
                 <div>Vendas: <span class="font-medium text-slate-700" x-text="money(resumo?.sales_month)"></span></div>
                 <div>Compras: <span class="font-medium text-slate-700" x-text="money(resumo?.purchases_month)"></span></div>
-                <div>Despesas: <span class="font-medium text-slate-700" x-text="money(resumo?.expenses_month)"></span></div>
+                <div>Despesas/contas: <span class="font-medium text-slate-700" x-text="money(costExpensesCommitted)"></span></div>
               </div>
             </div>
 
@@ -444,7 +444,7 @@
             <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
               <div class="mb-4">
                 <h3 class="font-semibold text-base">Composição dos custos</h3>
-                <p class="text-sm text-slate-500">Compras de pneus x despesas</p>
+                <p class="text-sm text-slate-500">Compras de pneus x despesas/contas</p>
               </div>
               <div class="h-64 flex items-center justify-center">
                 <canvas id="chartFinanceSplit"></canvas>
@@ -460,9 +460,9 @@
                 <div>
                   <div class="flex items-center justify-center gap-2 text-slate-500">
                     <span class="w-2.5 h-2.5 rounded-full bg-[#dc3f4d]"></span>
-                    <span>Despesas</span>
+                    <span>Despesas/contas</span>
                   </div>
-                  <div class="font-semibold" x-text="money(resumo?.expenses_month)"></div>
+                  <div class="font-semibold" x-text="money(costExpensesCommitted)"></div>
                 </div>
               </div>
             </div>

@@ -317,7 +317,7 @@ export async function getPartnerPayables(ctx: PartnerContext): Promise<unknown[]
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT id, counterparty_name, description, category, amount, due_date,
-              status, paid_at, payment_method, notes, created_at
+              status, paid_at, payment_method, notes, created_at, source_purchase_id
        FROM finance.partner_payables
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
        ORDER BY
