@@ -382,11 +382,35 @@ Se padrão de erros mostrar Atendente errando interpretação consistentemente. 
 
 ## Sprints futuras planejadas (continuação)
 
-| sprint | esforço | resolve |
-|---|---|---|
-| **B** — `remove_from_cart` + `update_cart_item` | 2-3h | "tira um", "quero 2 desse" |
-| **C** — Cancelamento (`clear_cart` + `draft_status='abandoned'`) | 3-4h | "esquece, deixa pra outro dia" |
-| **D** — Múltiplos drafts por conversa | ADIADO | cenário raro, Sprint A já resolve 95% |
+| sprint | esforço | resolve | status |
+|---|---|---|---|
+| **B** — `remove_from_cart` + `update_cart_item` | 2-3h | "tira um", "quero 2 desse" | ✅ **CONCLUÍDA 2026-05-23** |
+| **C** — Cancelamento (`clear_cart`) | 3-4h | "esquece, deixa pra outro dia" | ✅ **CONCLUÍDA 2026-05-23** (sem `draft_status='abandoned'`, ficou pra depois) |
+| **D** — Múltiplos drafts por conversa | ADIADO | cenário raro, Sprint A já resolve 95% | ⏳ adiada |
+
+### Sprint B+C — entrega de 2026-05-23 (final do dia)
+
+**O que foi feito:**
+- `schemas.ts`: 3 raw schemas novos (`removeFromCartRawSchema`, `updateCartItemRawSchema`, `clearCartRawSchema`) + entradas no `discriminatedUnion` + 3 blocks no JSON schema strict.
+- `schemas.ts`: hidratação dos 3 tipos (passa `cart_item_id` direto — validator zod do `agentActionSchema` exige UUID, então id simbólico = blocked, igual `add_to_cart`).
+- `prompt-v1_5.ts`: 3 novas action descriptions na seção "Tipos de Action" + 3 exemplos novos (Ex 17 remove, Ex 18 update qty, Ex 19 clear).
+- `prompt-v1_5.ts`: Ex 1 condensado pela metade (era duplicação de Ex 4) pra compensar crescimento.
+- Atualizado CoT do `rationale` pra mencionar "19 exemplos".
+
+**Impacto no prompt do Atendente:**
+| métrica | pré-Sprint B+C | pós-Sprint B+C | delta |
+|---|---:|---:|---:|
+| linhas | 311 | 345 | +34 |
+| chars | 17.497 | 19.610 | +2.113 |
+| tokens (~) | 4.375 | **4.903** | **+528** |
+
+Zona: 🟡 amarela meio-alto (limite vermelho = 5.500). **Restam 597 tokens de folga** antes do refator obrigatório. Estimativa pré-implementação era +400-700 tokens — bateu.
+
+**Testes:** 485/485 verdes, typecheck limpo.
+
+**Observabilidade pra próxima sessão:**
+- Quando bot ganhar volume real de remove/update/clear em prod, monitorar se LLM acerta o `cart_item_id`. Se errar, hidratação retorna `null` → turn fica blocked (fail-fast) → audit no `auditar-conversa.ts`.
+- `clear_cart` é destrutivo. Validator já bloqueia se há `pending_confirmation` aberto, mas pode haver caso onde cliente diz "esquece" no meio de coleta de dados sem confirmação aberta — o Ex 19 ensina o LLM a pedir confirmação quando ambíguo, mas isso é comportamento (não invariante estrutural).
 
 ## Scripts dessa janela (complementares aos da outra)
 
@@ -518,9 +542,10 @@ Indicadores objetivos:
 | + Exs 11/12/13 (sessão 22/05) | ~240 | ~14.650 | ~3.660 |
 | + Ex 14 + reforço anti-mentira (22/05) | 302 | 16.053 | 4.014 |
 | + Sprint A + Exs 15/16 (2026-05-23) | 335 | 18.558 | 4.640 |
-| **+ Enxugamento (commit `edc6de4`)** | **311** | **17.497** | **4.375** |
+| + Enxugamento (commit `edc6de4`) | 311 | 17.497 | 4.375 |
+| **+ Sprint B+C + Exs 17/18/19 (2026-05-23, noite)** | **345** | **19.610** | **4.903** |
 
-Crescimento de **+34% em 2 sessões + recuo de -5.7% no enxugamento.** Pico foi 4.640 tokens, hoje em 4.375. Cada exemplo cobre um caso real de bug observado, não bloat.
+Crescimento total: +47% em 2 sessões. Hoje em 4.903 tokens — zona amarela meio-alto. Cada exemplo cobre um caso real de bug observado ou capacidade ausente, não bloat.
 
 ### Enxugamento aplicado nesta sessão (commit `edc6de4`)
 
@@ -544,3 +569,84 @@ Crescimento de **+34% em 2 sessões + recuo de -5.7% no enxugamento.** Pico foi 
 > **Se o sistema está em 8-10/10, faça mudanças cirúrgicas (1 problema = 1 fix). Não refatore arquitetura porque "seria mais bonito". Refatore quando padrão de erros justificar.**
 
 A sessão respeitou isso. As 3 mudanças (Fase 1, 0048, Sprint A) foram cirúrgicas. O caminho do Planner ganhar tudo ficou DOCUMENTADO como opção futura, sem ser executado.
+
+---
+
+# Janela 3 do mesmo dia (2026-05-23, final da noite)
+
+> **Adendo 2:** terceira janela do dia. Foco: **fechar Sprints B e C** (edição/cancelamento de carrinho). Antes desta janela, o Atendente só sabia **adicionar** item no carrinho — não conseguia tirar, mudar quantidade nem cancelar. Bug latente: cliente dizia "esquece o traseiro" e bot fingia entender mas não executava.
+
+## TL;DR janela 3
+
+| frente | resumo |
+|---|---|
+| **Sprint B** (`remove_from_cart` + `update_cart_item`) | LLM agora consegue tirar item específico e mudar quantidade. cart_item_id vem de state.cart[].id (UUID), validator rejeita se inventar. |
+| **Sprint C** (`clear_cart`) | LLM agora cancela carrinho inteiro. Ex 19 ensina pedir confirmação quando cliente é ambíguo ("hmm, não sei"). Sem regex — só few-shot. |
+| **Mitigação de tamanho** | Ex 1 (cotação mono CG Fan) condensado pela metade — era duplicação de Ex 4 (multi). Crescimento líquido: +528 tokens. |
+| **Cobertura total do carrinho** | add ✅ + remove ✅ + update ✅ + clear ✅ — bot fecha o ciclo de vida completo. |
+
+## Arquivos tocados
+
+| arquivo | mudança |
+|---|---|
+| `src/atendente/generator/schemas.ts` | +3 raw schemas (remove/update/clear) no `discriminatedUnion` + 3 blocks no JSON schema strict + 3 cases na hidratação |
+| `src/atendente/generator/prompt-v1_5.ts` | +3 entradas em "Tipos de Action" + bloco "IMPORTANTE carrinho" + Exs 17/18/19 + Ex 1 condensado + CoT "19 exemplos" |
+| `docs/SESSAO_2026-05-23_HANDOFF.md` | Janela 3 documentada + status Sprints B+C atualizado + tabela de crescimento do prompt |
+
+**Nada mexido em:** `apply-action.ts`, `action-validator.ts`, `agent-state.repository.ts` — todas as 3 ações já existiam no backend desde Sprint 6. Sprint B+C foi puramente **exposição** ao LLM.
+
+## Decisões da janela 3
+
+1. **`cart_item_id` como UUID estrito (sem normalização determinística como `item_id`).** Razão: o cart já existe quando o LLM vai remover/atualizar — o id vem de `state.cart[].id` que o LLM lê do contexto. Se inventar id simbólico, `agentActionSchema.safeParse` rejeita → hidratação retorna null → turn fica blocked. Mesmo padrão de `add_to_cart.product_id`. Fail-fast > silenciar.
+
+2. **`clear_cart` sem mexer no `order_draft`.** Hoje cancelar carrinho **não** marca draft como `abandoned`. Razão: separar mudanças. Se aparecer ruído na auditoria (cliente cancela mas draft fica em `collecting` sem item), abre-se Sprint C.1 com `draft_status` enum novo. Não otimizar prematuramente.
+
+3. **Confirmação ambígua via prompt, não código.** Ex 19 ensina o LLM a pedir "confirma que cancelo?" quando cliente não é explícito. Wallace já recusou regex antes — manteve a filosofia: decisão semântica fica no LLM, validator estrutural fica no código.
+
+4. **Ex 1 condensado em vez de removido.** Tentei remover mas ele é o "happy path" — primeiro exemplo do prompt costuma ser muito imitado (recency-of-first-example). Condensei pela metade preservando assinatura (CG Fan + 90/90-18 + R$ 79 + 3 claims).
+
+## Impacto medido (script `medir-prompts.cjs`)
+
+| prompt | antes | depois | delta |
+|---|---:|---:|---:|
+| Atendente v1.5 (system) | 4.375 tok | 4.903 tok | **+528 tok** |
+| Planner | 2.083 tok | 2.083 tok | 0 |
+| Organizadora | 2.864 tok | 2.864 tok | 0 |
+
+Zona do Atendente: 🟡 amarela meio-alto (limite vermelho = 5.500). **Restam 597 tokens de folga.**
+
+Próximo exemplo que entrar precisa ou (a) fundir com existente ou (b) refator do tipo "prompt modular por skill" — não dá pra ficar empilhando.
+
+## Bugs que esta janela mata
+
+| bug | causa | fix |
+|---|---|---|
+| Cliente diz "tira o traseiro" → bot ignora (cart fica com 2 mesmo) | `remove_from_cart` nunca foi exposto no Generator | Sprint B |
+| Cliente diz "quero 2 desse" → bot abre 2o slot novo em vez de subir qty | `update_cart_item` nunca foi exposto | Sprint B |
+| Cliente diz "esquece, deixa pra depois" → bot tenta continuar fechamento | `clear_cart` nunca foi exposto | Sprint C |
+| Cliente ambíguo ("hmm, não sei mais") → risco de cancelar sem querer | Ex 19 ensina pedir confirmação | Prompt (sem regex) |
+
+## Frente NÃO atacada na janela 3 (intencional)
+
+- **`draft_status='abandoned'` ao limpar carrinho** — fica pra Sprint C.1 se houver evidência de problema.
+- **Sprint D (múltiplos drafts por conversa)** — adiado. Sprint A resolve 95% dos casos de multi-item.
+- **Camadas 1.4 + 1.5 + 3 do plano anti-alucinação** — pendentes, prioridade alta pra próxima sessão (estavam recomendadas como "próximas" antes do Sprint B/C entrar na frente).
+- **Eval suite anti-regresso** (conv 593 sintética) — pendente. Sem teste, qualquer mudança futura pode reintroduzir o bug.
+
+## Assinatura — janela 3
+
+**Autor:** Claude (Anthropic, modelo Opus 4.7) — terceira janela do dia
+**Data:** 2026-05-23 — final da noite
+**Commits:** ainda não comitado (esperando OK do Wallace pra commit + conv-teste)
+**Migrations aplicadas:** nenhuma
+**Testes:** 485/485 verdes, typecheck limpo
+**Cobertura do carrinho:** ciclo de vida completo (add/remove/update/clear)
+**Princípio respeitado:** zero regex, decisão semântica no LLM, fix cirúrgico (1 problema = 1 fix por sprint).
+
+## Próximo agente — punch list em ordem de impacto
+
+1. **Conv-teste manual** das 3 novas capacidades (remove/update/clear) antes de commitar.
+2. **Commitar Sprint B+C** (1 commit só — schemas + prompt + handoff).
+3. **Camadas 1.4 + 1.5** do plano anti-alucinação (~1h) — adicionar `fitment_status` enum em `CompatibilidadeResultado` e `compatible_vehicle_models[]` em `ProdutoOferta`. Backward-compatible.
+4. **Camada 3** (~2h) — exemplos pensativos (pivot moto, compat vazia) já estão parcialmente em Exs 9/15/16. Revisar se ainda falta cobertura.
+5. **Eval suite anti-regresso** (conv 593 + conv 595 multi-item + casos B/C) — protege os 4 bugs deste dia de voltarem.

@@ -23,8 +23,11 @@ import {
   agentActionSchema,
   type AgentAction,
   type AddToCartAction,
+  type ClearCartAction,
   type CreateItemAction,
   type RecordOfferAction,
+  type RemoveFromCartAction,
+  type UpdateCartItemAction,
   type UpdateDraftAction,
   type UpdateSlotAction,
 } from '../../shared/zod/agent-actions.js';
@@ -109,12 +112,35 @@ const addToCartRawSchema = z.object({
   unit_price: z.number().nonnegative().optional(),
 });
 
+/**
+ * Sprint B (2026-05-23): remove_from_cart / update_cart_item / clear_cart
+ * liberados pro Generator. cart_item_id vem de state.cart[].id (UUID).
+ * clear_cart é destrutivo: o validator bloqueia se há pending_confirmation aberto.
+ */
+const removeFromCartRawSchema = z.object({
+  type: z.literal('remove_from_cart'),
+  cart_item_id: z.string().min(1),
+});
+
+const updateCartItemRawSchema = z.object({
+  type: z.literal('update_cart_item'),
+  cart_item_id: z.string().min(1),
+  quantity: z.number().int().min(1).max(20),
+});
+
+const clearCartRawSchema = z.object({
+  type: z.literal('clear_cart'),
+});
+
 export const generatorRawActionSchema = z.discriminatedUnion('type', [
   updateSlotRawSchema,
   createItemRawSchema,
   recordOfferRawSchema,
   updateDraftRawSchema,
   addToCartRawSchema,
+  removeFromCartRawSchema,
+  updateCartItemRawSchema,
+  clearCartRawSchema,
 ]);
 export type GeneratorRawAction = z.infer<typeof generatorRawActionSchema>;
 
@@ -310,6 +336,36 @@ export const generatorOutputJsonSchema = {
               unit_price: { type: ['number', 'null'], minimum: 0 },
             },
           },
+          {
+            // Sprint B (2026-05-23): remove_from_cart
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'cart_item_id'],
+            properties: {
+              type: { type: 'string', enum: ['remove_from_cart'] },
+              cart_item_id: { type: 'string' },
+            },
+          },
+          {
+            // Sprint B (2026-05-23): update_cart_item
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'cart_item_id', 'quantity'],
+            properties: {
+              type: { type: 'string', enum: ['update_cart_item'] },
+              cart_item_id: { type: 'string' },
+              quantity: { type: 'number', minimum: 1, maximum: 20 },
+            },
+          },
+          {
+            // Sprint C (2026-05-23): clear_cart
+            type: 'object',
+            additionalProperties: false,
+            required: ['type'],
+            properties: {
+              type: { type: 'string', enum: ['clear_cart'] },
+            },
+          },
         ],
       },
     },
@@ -420,7 +476,15 @@ export function hydrateGeneratorAction(
     emitted_by: 'generator' as const,
   };
 
-  let candidate: UpdateSlotAction | CreateItemAction | RecordOfferAction | UpdateDraftAction | AddToCartAction;
+  let candidate:
+    | UpdateSlotAction
+    | CreateItemAction
+    | RecordOfferAction
+    | UpdateDraftAction
+    | AddToCartAction
+    | RemoveFromCartAction
+    | UpdateCartItemAction
+    | ClearCartAction;
 
   switch (raw.type) {
     case 'update_slot':
@@ -476,6 +540,30 @@ export function hydrateGeneratorAction(
         product_id: raw.product_id,
         quantity: raw.quantity,
         ...(raw.unit_price !== undefined ? { unit_price: raw.unit_price } : {}),
+      };
+      break;
+    case 'remove_from_cart':
+      // Sprint B (2026-05-23): cart_item_id eh UUID vindo de state.cart[].id.
+      // Validator (action-validator) bloqueia se item nao existe ou ja esta removed.
+      candidate = {
+        ...base,
+        type: 'remove_from_cart',
+        cart_item_id: raw.cart_item_id,
+      };
+      break;
+    case 'update_cart_item':
+      candidate = {
+        ...base,
+        type: 'update_cart_item',
+        cart_item_id: raw.cart_item_id,
+        quantity: raw.quantity,
+      };
+      break;
+    case 'clear_cart':
+      // Sprint C (2026-05-23): destrutivo. Validator bloqueia se ha pending_confirmation aberto.
+      candidate = {
+        ...base,
+        type: 'clear_cart',
       };
       break;
   }
