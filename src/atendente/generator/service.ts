@@ -30,6 +30,7 @@ import { validateClaims } from '../validators/claim-validator.js';
 import type { ToolResultForValidation } from '../validators/tool-results.js';
 import { buildGeneratorMessages } from './prompt.js';
 import { buildGeneratorMessagesFewShot } from './prompt-v1_5.js';
+import { buildGeneratorMessagesModular } from './prompt-v1_6.js';
 import {
   generatorOutputJsonSchema,
   generatorOutputRawSchema,
@@ -275,12 +276,17 @@ export async function generateTurn(
   let llmResult: OpenAICallResult | undefined;
 
   try {
-    // Etapa 5 (v1.5.0): feature flag escolhe entre prompt declarativo
-    // (v1.4.0, ~3700 tokens) e prompt few-shot (v1.5.0, ~1700 tokens, 10
-    // exemplos). Rodada A/B em catalog15-rerun antes de retirar v1.4.0.
-    const messages = env.GENERATOR_PROMPT_FEW_SHOT_ENABLED
-      ? buildGeneratorMessagesFewShot(context, decision, toolResults, retryContext)
-      : buildGeneratorMessages(context, decision, toolResults, retryContext);
+    // v1.6.0 Modular (2026-05-24): se MODULAR_ENABLED, usa builder por skill
+    // (~2.426 tokens media). Senao cai na flag antiga: FEW_SHOT_ENABLED escolhe
+    // entre v1.5 monolitico (~5.144 tokens) ou v1.4 declarativo (~3.700 tokens).
+    let messages;
+    if (env.GENERATOR_PROMPT_MODULAR_ENABLED) {
+      messages = buildGeneratorMessagesModular(context, decision, toolResults, retryContext);
+    } else if (env.GENERATOR_PROMPT_FEW_SHOT_ENABLED) {
+      messages = buildGeneratorMessagesFewShot(context, decision, toolResults, retryContext);
+    } else {
+      messages = buildGeneratorMessages(context, decision, toolResults, retryContext);
+    }
     llmResult = await callOpenAIResponse({
       apiKey: env.GENERATOR_OPENAI_API_KEY,
       model: env.GENERATOR_MODEL,

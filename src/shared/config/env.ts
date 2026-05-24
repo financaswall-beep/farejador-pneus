@@ -50,6 +50,14 @@ const envSchema = z.object({
    * A/B em catalog15-rerun sem comitar a troca.
    */
   GENERATOR_PROMPT_FEW_SHOT_ENABLED: booleanStringSchema,
+  /**
+   * v1.6.0 (Modular, 2026-05-24): quando true, o Generator usa prompt
+   * modular (common + skill especializada via router). Tokens cai de
+   * ~5.144 (v1.5) pra ~2.426 (media v1.6, -53%). Feature flag pra
+   * desativar rapido sem revert de codigo se houver regressao.
+   * Precedencia: MODULAR_ENABLED=true bypassa FEW_SHOT_ENABLED.
+   */
+  GENERATOR_PROMPT_MODULAR_ENABLED: booleanStringSchema,
   SKIP_EVENT_TYPES: z
     .string()
     .default('')
