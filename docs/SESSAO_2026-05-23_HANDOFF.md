@@ -409,6 +409,106 @@ Se padrão de erros mostrar Atendente errando interpretação consistentemente. 
 
 ---
 
+## Saúde dos prompts — diagnóstico e linha vermelha
+
+Análise feita ao final desta janela, lendo os 3 prompts vivos no código.
+
+### Estado atual (após Fase 1 + Sprint A)
+
+| LLM | linhas | chars | tokens (~) | estado |
+|---|---:|---:|---:|---|
+| **Planner** | 87 | 8.331 | 2.083 | 🟢 saudável |
+| **Organizadora** | 147 | 11.453 | 2.864 | 🟢 saudável |
+| **Atendente v1.5** | 335 | 18.558 | 4.640 | 🟡 zona amarela |
+
+**Atendente é 48% do custo de prompt do sistema. Cresceu 42% nas últimas 2 sessões (16 exemplos hoje, vs 10 originais).**
+
+### Linha vermelha NÃO é número — é sintoma
+
+Saúde de prompt mede-se por comportamento do LLM, não por byte count:
+
+| sintoma | gravidade |
+|---|---|
+| Bot consistente, segue todos os exemplos | 🟢 verde |
+| Bot ignora 1-2 exemplos do meio do prompt | 🟡 amarelo |
+| Latência > 5s por turn só de LLM call | 🟡 amarelo |
+| Custo por turn começa a doer no caixa | 🟡 amarelo |
+| Bot esquece regra explícita ("não invente preço") | 🔴 vermelho |
+| Decisões inconsistentes em inputs parecidos | 🔴 vermelho |
+| Validator bloqueia turns que deveriam passar | 🔴 vermelho |
+| Lost-in-the-middle visível — exemplo do meio nunca é imitado | 🔴 vermelho |
+| Equipe humana se perde mantendo o prompt | 🔴 vermelho |
+
+### Zonas numéricas concretas pro Atendente
+
+| zona | tokens | chars | linhas |
+|---|---:|---:|---:|
+| 🟢 verde | < 3.500 | < 14k | < 250 |
+| 🟡 amarelo (**HOJE**) | 3.500 – 5.500 | 14k – 22k | 250 – 400 |
+| 🔴 vermelho | > 5.500 | > 22k | > 400 |
+
+### Sintomas observados nesta sessão
+
+| sintoma | onde apareceu | classificação |
+|---|---|---|
+| Bot ignorou pergunta de total 3 vezes | conv 595 multi-item, turns 10/11/12/13 | 🟡 possível atenção diluída — OU falta de capacidade (cart vazio). Sprint A vai testar qual era o problema real. |
+| Bot somou só item ativo, ignorou outros | conv 595 turn 14 | 🟡 mesma análise — pode ser cart vazio |
+| Exemplos 11/12/13/14 sendo imitados | últimas 3 conv-testes | 🟢 |
+| Sem mentira / fallback indevido | últimas 3 conv-testes | 🟢 |
+
+**Diagnóstico:** Atendente está na **zona amarela**. Não é crise. Mas é hora de **parar de adicionar exemplo sem refatorar antes**.
+
+### Caminhos quando passar pra 🔴
+
+3 opções (em ordem de esforço):
+
+1. **Refatorar exemplos (fundir similares)** — ~30min
+   - Fundir Ex 9 + 14 (ambos "tool vazia")
+   - Fundir Ex 1 + 4 (ambos cotação completa)
+   - Encurtar `rationale` interno de cada exemplo
+   - **Corta ~2-3k chars sem perder cobertura**
+
+2. **Prompt modular por skill** — ~3-4h
+   - 1 prompt por skill em vez de mega-prompt único
+   - Planner escolhe → manda só os exemplos relevantes
+   - Mais código, mas cada chamada fica lean
+   - **Corta ~50% por chamada**
+
+3. **Mover gravação pro Planner (Caminho A das Etapas 1-4)** — ~8-11h
+   - Atendente perde 5 tipos de action → fica enxuto
+   - Prompt cai pra ~3-3.5k tokens
+   - **Corta ~25%** mas refator profundo
+
+### Regra prática pro próximo agente
+
+1. **Antes de adicionar exemplo novo:** verifica se algum dos 16 atuais já cobre.
+2. **Roda conv-testes após cada mudança:** se exemplo novo não é imitado em nenhum turno relevante, é candidato a remoção.
+3. **Quando chegar em ~20k chars / 5k tokens:** refatora obrigatoriamente.
+4. **Quando LLM começar a ignorar regra explícita:** refator não pode esperar — é zona vermelha.
+
+### Linha vermelha conceitual
+
+> **Quando o LLM começa a se comportar como se NÃO tivesse parte do prompt.**
+
+Indicadores objetivos:
+- **Coverage de exemplos** — se tem 16 exemplos e LLM só imita 5-6 em conv típica, os outros 10 estão sendo desperdiçados.
+- **Recall test** — perguntar ao LLM "qual é o Exemplo 9?" — se inventar, perdeu recall.
+- **Consistência** — input idêntico → output similar. Variação > ~10% = atenção diluída.
+
+### Histórico de crescimento do Atendente v1.5
+
+| momento | linhas | chars | tokens (~) |
+|---|---:|---:|---:|
+| v1.4.0 (legado declarativo) | 151 | 13.085 | 3.272 |
+| v1.5.0 Sprint 6.5 (10 exemplos) | ~200 | ~12.500 | ~3.100 |
+| + Exs 11/12/13 (sessão 22/05) | ~240 | ~14.650 | ~3.660 |
+| + Ex 14 + reforço anti-mentira (22/05) | 302 | 16.053 | 4.014 |
+| **+ Sprint A + Exs 15/16 (HOJE)** | **335** | **18.558** | **4.640** |
+
+Crescimento de **42% em 2 sessões.** Cada exemplo cobre um caso real de bug observado, não bloat. Mas o ritmo precisa diminuir.
+
+---
+
 ## Princípio que ficou ao final
 
 > **Se o sistema está em 8-10/10, faça mudanças cirúrgicas (1 problema = 1 fix). Não refatore arquitetura porque "seria mais bonito". Refatore quando padrão de erros justificar.**
