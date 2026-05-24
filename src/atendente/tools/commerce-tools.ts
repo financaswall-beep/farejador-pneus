@@ -309,11 +309,18 @@ export async function buscarCompatibilidade(
   for (const vehicle of vehicleResult.rows) {
     const vehicleId = vehicle.vehicle_model_id ?? vehicle.id;
     if (!vehicleId) throw new Error('resolve_vehicle_model returned no vehicle id');
+    // Fix (2026-05-23): a funcao SQL find_compatible_tires aceita apenas
+    // 'front', 'rear' ou NULL. O schema da tool aceita 'both' (alias semantico
+    // de "todos os pneus"), entao traduzimos 'both' -> NULL antes da query.
+    // Sem isso, posicao_pneu='both' virava WHERE position='both' e zero matches.
+    const positionFilter = parsed.posicao_pneu && parsed.posicao_pneu !== 'both'
+      ? parsed.posicao_pneu
+      : null;
     const tires = await client.query<CompatibleTireRow>(
       `SELECT *
        FROM commerce.find_compatible_tires($1, $2, $3)
        LIMIT $4`,
-      [parsed.environment, vehicleId, parsed.posicao_pneu ?? null, parsed.limit],
+      [parsed.environment, vehicleId, positionFilter, parsed.limit],
     );
     out.push({
       vehicle_model_id: vehicleId,
