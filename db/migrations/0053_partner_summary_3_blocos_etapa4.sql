@@ -29,7 +29,11 @@
 -- Assinatura: Claude (Opus 4.7), 2026-05-24
 -- ============================================================
 
-CREATE OR REPLACE VIEW network.partner_unit_summary
+-- DROP + CREATE: CREATE OR REPLACE nao permite reordenar colunas existentes.
+-- Confirmado zero views/funcoes dependentes antes do DROP (pg_depend).
+DROP VIEW IF EXISTS network.partner_unit_summary CASCADE;
+
+CREATE VIEW network.partner_unit_summary
 WITH (security_invoker = true) AS
 WITH month_bounds AS (
   SELECT
