@@ -41,7 +41,7 @@ function parceiroApp() {
     payables: [],
     receivables: [],
 
-    saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', fulfillment_mode: 'pickup', delivery_address: '' },
+    saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
@@ -479,6 +479,10 @@ function parceiroApp() {
         this.flash('Informe o endereço de entrega ou mude para retirada.');
         return;
       }
+      if (this.saleForm.payment_status === 'receivable' && !this.saleForm.receivable_due_date) {
+        this.flash('Informe a data para receber esta venda.');
+        return;
+      }
       this.saving = true;
       this.savingAction = 'sale';
       try {
@@ -492,7 +496,11 @@ function parceiroApp() {
             quantity: this.num(this.saleForm.quantity) || 1,
             unit_price: this.num(this.saleForm.unit_price) || 0,
           }],
-          payment_method: this.saleForm.payment_method,
+          payment_method: this.saleForm.payment_status === 'receivable' ? 'A receber' : this.saleForm.payment_method,
+          payment_status: this.saleForm.payment_status || 'received',
+          receivable_due_date: this.saleForm.payment_status === 'receivable'
+            ? this.saleForm.receivable_due_date || null
+            : null,
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: this.saleForm.fulfillment_mode === 'delivery'
             ? this.saleForm.delivery_address.trim()
@@ -511,6 +519,8 @@ function parceiroApp() {
           source_tag: this.saleForm.source_tag || 'porta',
           quantity: 1, unit_price: 0,
           payment_method: this.saleForm.payment_method,
+          payment_status: this.saleForm.payment_status || 'received',
+          receivable_due_date: '',
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: '',
         };
@@ -823,6 +833,82 @@ function parceiroApp() {
         this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' };
         await this.loadData();
         this.flash(wasReceived ? 'Recebimento registrado.' : 'Conta a receber cadastrada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async settlePayable(payableId) {
+      if (!confirm('Marcar esta conta como paga agora?')) return;
+      this.saving = true;
+      this.savingAction = `payable-pay-${payableId}`;
+      try {
+        await this.api(`contas-a-pagar/${payableId}/pagar`, {
+          method: 'POST',
+          body: JSON.stringify({
+            paid_at: new Date().toISOString(),
+            payment_method: 'Pix',
+          }),
+        });
+        await this.loadData();
+        this.flash('Conta marcada como paga.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async cancelPayable(payableId) {
+      if (!confirm('Cancelar esta conta a pagar?')) return;
+      this.saving = true;
+      this.savingAction = `payable-cancel-${payableId}`;
+      try {
+        await this.api(`contas-a-pagar/${payableId}`, { method: 'DELETE' });
+        await this.loadData();
+        this.flash('Conta a pagar cancelada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async settleReceivable(receivableId) {
+      if (!confirm('Marcar esta conta como recebida agora?')) return;
+      this.saving = true;
+      this.savingAction = `receivable-receive-${receivableId}`;
+      try {
+        await this.api(`contas-a-receber/${receivableId}/receber`, {
+          method: 'POST',
+          body: JSON.stringify({
+            received_at: new Date().toISOString(),
+            payment_method: 'Pix',
+          }),
+        });
+        await this.loadData();
+        this.flash('Conta marcada como recebida.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async cancelReceivable(receivableId) {
+      if (!confirm('Cancelar esta conta a receber?')) return;
+      this.saving = true;
+      this.savingAction = `receivable-cancel-${receivableId}`;
+      try {
+        await this.api(`contas-a-receber/${receivableId}`, { method: 'DELETE' });
+        await this.loadData();
+        this.flash('Conta a receber cancelada.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {

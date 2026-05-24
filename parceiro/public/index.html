@@ -738,13 +738,24 @@
                 </div>
               </div>
               <div class="col-span-6 md:col-span-3">
-                <label class="text-[11px] text-gray-500 mb-1 block">Pagamento</label>
+                <label class="text-[11px] text-gray-500 mb-1 block">Recebimento</label>
+                <select x-model="saleForm.payment_status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10">
+                  <option value="received">Recebeu agora</option>
+                  <option value="receivable">Ficou a receber</option>
+                </select>
+              </div>
+              <div class="col-span-6 md:col-span-3" x-show="saleForm.payment_status !== 'receivable'" x-transition.opacity>
+                <label class="text-[11px] text-gray-500 mb-1 block">Forma</label>
                 <select x-model="saleForm.payment_method" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10">
                   <option value="Pix">Pix</option>
                   <option value="Cartão crédito">Cartão crédito</option>
                   <option value="Cartão débito">Cartão débito</option>
                   <option value="Dinheiro">Dinheiro</option>
                 </select>
+              </div>
+              <div class="col-span-6 md:col-span-3" x-show="saleForm.payment_status === 'receivable'" x-transition.opacity>
+                <label class="text-[11px] text-gray-500 mb-1 block">Receber em</label>
+                <input type="date" x-model="saleForm.receivable_due_date" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
               </div>
               <div class="col-span-6 md:col-span-2">
                 <label class="text-[11px] text-gray-500 mb-1 block">Entrega</label>
@@ -1046,11 +1057,25 @@
                   <div class="text-xs text-gray-500 truncate"
                        x-text="sourceLabel(receivable.source_tag) + ' - ' + (receivable.status === 'received' ? ('recebido em ' + formatDate(receivable.received_at)) : ('vence ' + formatDate(receivable.due_date)))"></div>
                 </div>
-                <div class="flex items-center gap-3 flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <span class="text-[11px] px-2 py-0.5 rounded-full"
                         :class="receivable.status === 'open' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'"
                         x-text="receivable.status === 'open' ? 'em aberto' : receivable.status"></span>
                   <span class="text-sm font-semibold text-emerald-700" x-text="money(receivable.amount)"></span>
+                  <button x-show="receivable.status === 'open'"
+                          @click="settleReceivable(receivable.id)"
+                          :disabled="saving"
+                          title="Marcar como recebida"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-emerald-100 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                  </button>
+                  <button x-show="receivable.status === 'open'"
+                          @click="cancelReceivable(receivable.id)"
+                          :disabled="saving"
+                          title="Cancelar conta"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
                 </div>
               </div>
             </template>
@@ -1075,11 +1100,25 @@
                   <div class="text-xs text-gray-500"
                        x-text="payableCategoryLabel(payable.category) + ' - ' + (payable.status === 'paid' ? ('pago em ' + formatDate(payable.paid_at)) : ('vence ' + formatDate(payable.due_date)))"></div>
                 </div>
-                <div class="flex items-center gap-3 flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <span class="text-[11px] px-2 py-0.5 rounded-full"
                         :class="payable.status === 'open' ? 'bg-rose-50 text-rose-700' : 'bg-gray-100 text-gray-600'"
                         x-text="payable.status === 'open' ? 'em aberto' : payable.status"></span>
                   <span class="text-sm font-semibold text-rose-700" x-text="money(payable.amount)"></span>
+                  <button x-show="payable.status === 'open'"
+                          @click="settlePayable(payable.id)"
+                          :disabled="saving"
+                          title="Marcar como paga"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-emerald-100 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                  </button>
+                  <button x-show="payable.status === 'open'"
+                          @click="cancelPayable(payable.id)"
+                          :disabled="saving"
+                          title="Cancelar conta"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
                 </div>
               </div>
             </template>
@@ -1107,6 +1146,6 @@
   </main>
 </div>
 
-<script src="./app.js?v=20260522-financeiro-contas-7"></script>
+<script src="./app.js?v=20260524-financeiro-parceiro-1"></script>
 </body>
 </html>

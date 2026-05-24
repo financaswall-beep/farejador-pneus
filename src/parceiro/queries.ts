@@ -40,6 +40,8 @@ export interface RegisterPartnerSaleInput {
   customer_phone?: string | null;
   items: PartnerOrderItemInput[];
   payment_method: string | null;
+  payment_status?: 'received' | 'receivable' | null;
+  receivable_due_date?: string | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
@@ -117,6 +119,16 @@ export interface RegisterPartnerReceivableInput {
   payment_method?: string | null;
   notes?: string | null;
   idempotency_key?: string | null;
+}
+
+export interface SettlePartnerPayableInput {
+  paid_at?: string | null;
+  payment_method?: string | null;
+}
+
+export interface SettlePartnerReceivableInput {
+  received_at?: string | null;
+  payment_method?: string | null;
 }
 
 // ----------------------------------------------------------------------------
@@ -295,7 +307,7 @@ export async function registerPartnerSale(
           input.customer_name ?? null,
           normalizedPhone,
           JSON.stringify(input.items),
-          input.payment_method,
+          input.payment_status === 'receivable' ? 'A receber' : input.payment_method,
           input.fulfillment_mode,
           input.delivery_address ?? null,
           `partner:${ctx.slug}`,
@@ -303,7 +315,52 @@ export async function registerPartnerSale(
           input.source_tag ?? 'porta',
         ],
       );
-      return { order_id: result.rows[0]!.order_id };
+      const orderId = result.rows[0]!.order_id;
+
+      if (input.payment_status === 'receivable') {
+        const order = await client.query<{
+          total_amount: string;
+          customer_name: string | null;
+        }>(
+          `SELECT total_amount, customer_name
+           FROM commerce.partner_orders
+           WHERE id = $1
+             AND environment = $2
+             AND unit_id = $3
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          [orderId, ctx.environment, ctx.unitId],
+        );
+
+        const row = order.rows[0];
+        if (row) {
+          await client.query(
+            `INSERT INTO finance.partner_receivables (
+               environment, unit_id, customer_name, description, source_tag, amount,
+               due_date, status, received_at, payment_method, notes, created_by, idempotency_key
+             ) VALUES (
+               $1, $2, $3, $4, COALESCE($5, 'porta'), $6,
+               $7::date, 'open', NULL, NULL, $8, $9, $10
+             )
+             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+             DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
+            [
+              ctx.environment,
+              ctx.unitId,
+              input.customer_name ?? row.customer_name ?? null,
+              `Venda a receber ${orderId.slice(0, 8)}`,
+              input.source_tag ?? 'porta',
+              row.total_amount,
+              input.receivable_due_date ?? null,
+              `Gerada automaticamente pela venda ${orderId}`,
+              `partner:${ctx.slug}`,
+              `${input.idempotency_key}:receivable`,
+            ],
+          );
+        }
+      }
+
+      return { order_id: orderId };
     } catch (err) {
       if (err instanceof Error && err.message.includes('Estoque insuficiente')) {
         throw new Error(err.message);
@@ -950,6 +1007,120 @@ export async function registerPartnerPayable(
   });
 }
 
+export async function settlePartnerPayable(
+  ctx: PartnerContext,
+  payableId: string,
+  input: SettlePartnerPayableInput,
+): Promise<{ payable_id: string; paid: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const paidAt = input.paid_at ?? new Date().toISOString();
+    const result = await client.query<{
+      id: string;
+      description: string;
+      category: RegisterPartnerPayableInput['category'];
+      amount: string;
+      payment_method: string | null;
+    }>(
+      `UPDATE finance.partner_payables
+       SET status = 'paid',
+           paid_at = $4::timestamptz,
+           payment_method = COALESCE($5, payment_method)
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id, description, category, amount, payment_method`,
+      [payableId, ctx.environment, ctx.unitId, paidAt, input.payment_method ?? null],
+    );
+
+    if (result.rowCount !== 1) return { payable_id: payableId, paid: false };
+
+    const row = result.rows[0]!;
+    await client.query(
+      `INSERT INTO finance.partner_expenses (
+         environment, unit_id, expense_date, category, description, amount,
+         payment_method, created_by, idempotency_key
+       ) VALUES (
+         $1, $2, ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date,
+         $4, $5, $6, $7, $8, $9
+       )
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
+      [
+        ctx.environment,
+        ctx.unitId,
+        paidAt,
+        payableCategoryToExpenseCategory(row.category),
+        row.description,
+        row.amount,
+        row.payment_method,
+        `partner:${ctx.slug}`,
+        `payable:${payableId}:expense`,
+      ],
+    );
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, payload_after
+       ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                 'partner_payable_paid', $3, $4::jsonb)`,
+      [
+        ctx.environment,
+        payableId,
+        `partner:${ctx.slug}`,
+        JSON.stringify({ unit_id: ctx.unitId, paid_at: paidAt, amount: row.amount }),
+      ],
+    );
+
+    return { payable_id: payableId, paid: true };
+  });
+}
+
+export async function cancelPartnerPayable(
+  ctx: PartnerContext,
+  payableId: string,
+): Promise<{ payable_id: string; cancelled: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string; description: string; amount: string }>(
+      `UPDATE finance.partner_payables
+       SET status = 'cancelled',
+           deleted_at = now(),
+           deleted_by = $4
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id, description, amount`,
+      [payableId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+    );
+
+    if (result.rowCount === 1) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                   'partner_payable_cancelled', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          payableId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({
+            unit_id: ctx.unitId,
+            description: result.rows[0]!.description,
+            amount: result.rows[0]!.amount,
+          }),
+        ],
+      );
+    }
+
+    return { payable_id: payableId, cancelled: result.rowCount === 1 };
+  });
+}
+
 export async function registerPartnerReceivable(
   ctx: PartnerContext,
   input: RegisterPartnerReceivableInput,
@@ -1008,5 +1179,93 @@ export async function registerPartnerReceivable(
     );
 
     return { receivable_id: receivableId };
+  });
+}
+
+export async function settlePartnerReceivable(
+  ctx: PartnerContext,
+  receivableId: string,
+  input: SettlePartnerReceivableInput,
+): Promise<{ receivable_id: string; received: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const receivedAt = input.received_at ?? new Date().toISOString();
+    const result = await client.query<{ id: string; description: string; amount: string }>(
+      `UPDATE finance.partner_receivables
+       SET status = 'received',
+           received_at = $4::timestamptz,
+           payment_method = COALESCE($5, payment_method)
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id, description, amount`,
+      [receivableId, ctx.environment, ctx.unitId, receivedAt, input.payment_method ?? null],
+    );
+
+    if (result.rowCount !== 1) return { receivable_id: receivableId, received: false };
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, payload_after
+       ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
+                 'partner_receivable_received', $3, $4::jsonb)`,
+      [
+        ctx.environment,
+        receivableId,
+        `partner:${ctx.slug}`,
+        JSON.stringify({
+          unit_id: ctx.unitId,
+          received_at: receivedAt,
+          amount: result.rows[0]!.amount,
+        }),
+      ],
+    );
+
+    return { receivable_id: receivableId, received: true };
+  });
+}
+
+export async function cancelPartnerReceivable(
+  ctx: PartnerContext,
+  receivableId: string,
+): Promise<{ receivable_id: string; cancelled: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string; description: string; amount: string }>(
+      `UPDATE finance.partner_receivables
+       SET status = 'cancelled',
+           deleted_at = now(),
+           deleted_by = $4
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id, description, amount`,
+      [receivableId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+    );
+
+    if (result.rowCount === 1) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
+                   'partner_receivable_cancelled', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          receivableId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({
+            unit_id: ctx.unitId,
+            description: result.rows[0]!.description,
+            amount: result.rows[0]!.amount,
+          }),
+        ],
+      );
+    }
+
+    return { receivable_id: receivableId, cancelled: result.rowCount === 1 };
   });
 }

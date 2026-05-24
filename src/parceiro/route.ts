@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { requirePartnerAuth, getPartnerContext, type PartnerAuthedRequest } from './auth.js';
 import {
   cancelPartnerSale,
+  cancelPartnerPayable,
+  cancelPartnerReceivable,
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
@@ -21,6 +23,8 @@ import {
   registerPartnerPurchase,
   registerPartnerReceivable,
   registerPartnerSale,
+  settlePartnerPayable,
+  settlePartnerReceivable,
   upsertPartnerStock,
 } from './queries.js';
 
@@ -46,6 +50,14 @@ const purchaseParamsSchema = paramsSchema.extend({
   purchaseId: z.string().uuid(),
 });
 
+const payableParamsSchema = paramsSchema.extend({
+  payableId: z.string().uuid(),
+});
+
+const receivableParamsSchema = paramsSchema.extend({
+  receivableId: z.string().uuid(),
+});
+
 // Venda local do parceiro: cada item aponta direto pro estoque local do parceiro
 // (partner_stock_levels.id), não pra commerce.products. Decisão "silo isolado" 2026-05-19.
 const orderItemSchema = z.object({
@@ -60,6 +72,8 @@ const saleSchema = z.object({
   customer_phone: z.string().min(1).max(40).nullable().optional(),
   items: z.array(orderItemSchema).min(1),
   payment_method: z.string().min(1).nullable(),
+  payment_status: z.enum(['received', 'receivable']).nullable().optional(),
+  receivable_due_date: z.string().date().nullable().optional(),
   fulfillment_mode: z.enum(['delivery', 'pickup']),
   delivery_address: z.string().min(1).nullable().optional(),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).optional(),
@@ -70,6 +84,12 @@ const saleSchema = z.object({
   {
     message: 'delivery_address obrigatorio quando fulfillment_mode=delivery',
     path: ['delivery_address'],
+  },
+).refine(
+  (data) => data.payment_status !== 'receivable' || (data.receivable_due_date && data.receivable_due_date.trim().length > 0),
+  {
+    message: 'receivable_due_date obrigatorio quando payment_status=receivable',
+    path: ['receivable_due_date'],
   },
 );
 
@@ -146,6 +166,16 @@ const receivableSchema = z.object({
   payment_method: z.string().max(80).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
+});
+
+const settlePayableSchema = z.object({
+  paid_at: z.string().datetime().nullable().optional(),
+  payment_method: z.string().max(80).nullable().optional(),
+});
+
+const settleReceivableSchema = z.object({
+  received_at: z.string().datetime().nullable().optional(),
+  payment_method: z.string().max(80).nullable().optional(),
 });
 
 async function sendStatic(reply: FastifyReply, file: string, type: string) {
@@ -315,6 +345,31 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerPayable(getPartnerContext(request), parsed.data));
   });
 
+  fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = payableParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
+
+    const parsed = settlePayableSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await settlePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
+    if (!result.paid) return reply.status(404).send({ error: 'payable_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = payableParamsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'payable_not_found' });
+
+    const result = await cancelPartnerPayable(getPartnerContext(request), parsed.data.payableId);
+    if (!result.cancelled) return reply.status(404).send({ error: 'payable_not_found' });
+    return reply.status(200).send(result);
+  });
+
   fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -323,5 +378,30 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
     return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
+  });
+
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = receivableParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
+
+    const parsed = settleReceivableSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await settlePartnerReceivable(getPartnerContext(request), params.data.receivableId, parsed.data);
+    if (!result.received) return reply.status(404).send({ error: 'receivable_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = receivableParamsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'receivable_not_found' });
+
+    const result = await cancelPartnerReceivable(getPartnerContext(request), parsed.data.receivableId);
+    if (!result.cancelled) return reply.status(404).send({ error: 'receivable_not_found' });
+    return reply.status(200).send(result);
   });
 }
