@@ -375,6 +375,11 @@ Se padrão de erros mostrar Atendente errando interpretação consistentemente. 
 - **Causa:** `cart_current_items` vazio porque `add_to_cart` não exposto.
 - **Fix (Sprint A):** liberar `add_to_cart` no schema + prompt + 2 exemplos.
 
+### 🐛 Bug Planner output_contract (descoberto durante análise de saúde dos prompts)
+- **Antes:** `src/atendente/planner/prompt.ts` linha 109 do user payload dizia `rationale: 'max 500 chars'`, mas o system prompt já tinha sido atualizado pra `rationale tem ate 800 chars`. **Inconsistência interna** que podia confundir o LLM.
+- **Fix:** alinhar pra 800 em ambos os lugares.
+- **Commit:** `edc6de4`.
+
 ## Sprints futuras planejadas (continuação)
 
 | sprint | esforço | resolve |
@@ -400,11 +405,20 @@ Se padrão de erros mostrar Atendente errando interpretação consistentemente. 
 
 **Autor:** Claude (Anthropic, modelo Sonnet 4.5) — segunda janela do dia
 **Data:** 2026-05-23 — continuação noturna
-**Commits:** `05a324e`, `e5f02d8`, `fe78290` (3 commits, ~250 linhas mudadas)
-**Migrations:** 0048 aplicada
-**Testes:** 485 verdes, typecheck limpo, build OK
+**Commits:**
+- `05a324e` Fase 1: isola Organizadora do contexto
+- `e5f02d8` Migration 0048: resolve_neighborhood ignora acentos
+- `fe78290` Sprint A: expõe `add_to_cart` no Generator v1.5
+- `0482bcf` docs: adiciona seção complementar no handoff
+- `85835af` docs: adiciona seção "Saúde dos prompts — linha vermelha"
+- `edc6de4` refactor(prompts): enxuga Generator v1.5 e corrige bug do Planner
+
+**Migrations aplicadas:** 0048 (banco prod)
+**Testes:** 485 verdes em toda a janela
 **Bug 593:** mata pela CAUSA RAIZ — organizer_facts isolado (não consome mais em tempo real) + cobertura PCX 150 da outra janela
 **Bug 595:** mata 2 partes — acentos (migration 0048) e multi-item (Sprint A)
+**Bug do Planner output_contract:** rationale 500/800 inconsistente — corrigido
+**Enxugamento:** Atendente -5.7% tokens sem perder cobertura
 **Caminho do Planner mapeado** como decisão futura baseada em evidência, não em teoria.
 
 ---
@@ -413,15 +427,15 @@ Se padrão de erros mostrar Atendente errando interpretação consistentemente. 
 
 Análise feita ao final desta janela, lendo os 3 prompts vivos no código.
 
-### Estado atual (após Fase 1 + Sprint A)
+### Estado atual (após Fase 1 + Sprint A + enxugamento)
 
 | LLM | linhas | chars | tokens (~) | estado |
 |---|---:|---:|---:|---|
 | **Planner** | 87 | 8.331 | 2.083 | 🟢 saudável |
 | **Organizadora** | 147 | 11.453 | 2.864 | 🟢 saudável |
-| **Atendente v1.5** | 335 | 18.558 | 4.640 | 🟡 zona amarela |
+| **Atendente v1.5** | **311** | **17.497** | **4.375** | 🟡 zona amarela (mais perto da fronteira verde) |
 
-**Atendente é 48% do custo de prompt do sistema. Cresceu 42% nas últimas 2 sessões (16 exemplos hoje, vs 10 originais).**
+**Após enxugamento (commit `edc6de4`):** Atendente caiu de 4.640 → 4.375 tokens (-5.7%). Cobertura mantida (Ex 9 + Ex 14 fundidos em 1 só sobre "tool vazia").
 
 ### Linha vermelha NÃO é número — é sintoma
 
@@ -503,9 +517,25 @@ Indicadores objetivos:
 | v1.5.0 Sprint 6.5 (10 exemplos) | ~200 | ~12.500 | ~3.100 |
 | + Exs 11/12/13 (sessão 22/05) | ~240 | ~14.650 | ~3.660 |
 | + Ex 14 + reforço anti-mentira (22/05) | 302 | 16.053 | 4.014 |
-| **+ Sprint A + Exs 15/16 (HOJE)** | **335** | **18.558** | **4.640** |
+| + Sprint A + Exs 15/16 (2026-05-23) | 335 | 18.558 | 4.640 |
+| **+ Enxugamento (commit `edc6de4`)** | **311** | **17.497** | **4.375** |
 
-Crescimento de **42% em 2 sessões.** Cada exemplo cobre um caso real de bug observado, não bloat. Mas o ritmo precisa diminuir.
+Crescimento de **+34% em 2 sessões + recuo de -5.7% no enxugamento.** Pico foi 4.640 tokens, hoje em 4.375. Cada exemplo cobre um caso real de bug observado, não bloat.
+
+### Enxugamento aplicado nesta sessão (commit `edc6de4`)
+
+| ação | impacto |
+|---|---|
+| Fundir **Ex 9 (Intruder)** + **Ex 14 (Daytona)** → 1 só Ex 9 "tool vazia" | -12 linhas / -300 chars |
+| Encurtar seção **"Fallback seguro"** (14 → 5 linhas) | -8 linhas / -250 chars |
+| Encurtar **"Nota sobre update_slot"** (6 → 2 linhas) | -4 linhas / -150 chars |
+| Corrigir referência **"1-13"** → **"15 exemplos"** no CoT do rationale | correção |
+| Corrigir bug do Planner: **rationale 500 → 800 chars** no output_contract (estava inconsistente com system prompt) | correção de bug |
+| **Total Atendente** | **-24 linhas / -1.061 chars / -265 tokens (-5.7%)** |
+
+**O que NÃO foi mexido:** Organizadora (já estava enxuta), Princípio de safety, Tipos de Action/Claim, Slot keys, Exemplos 1-8 e 11-13/15-16 (cada um cobre caso real).
+
+**Resultado:** Atendente saiu do meio da zona amarela pra mais perto da fronteira verde. Cobertura mantida (15 exemplos cobrem todos os casos antes representados por 16). 485 testes verdes.
 
 ---
 
