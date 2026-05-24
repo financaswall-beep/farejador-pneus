@@ -124,10 +124,13 @@ describe('Generator prompt v1.5.0 (few-shot)', () => {
     //  + ex 11/12/13    = ~14650
     //  + ex 14 + reforco safety (2026-05-22 self-correction) = ~16000
     //  + ex 15/16 + add_to_cart (2026-05-23 Sprint A cart) = ~18500
+    //  + ex 17/18/19 + Sprint B+C (2026-05-23 noite) = ~19610
+    //  + ex 2 a/b/c reescrito + safety anti-cautela (2026-05-24) = ~20575
     // Filosofia: agente mais pensativo paga bytes em few-shots criticos. Limite
-    // bruto em 20k pra detectar inflacao acidental, mas reconhecendo que prompt
-    // few-shot com 16 exemplos canonicos eh inerentemente maior.
-    expect(size).toBeLessThan(20000);
+    // bruto em 21k pra detectar inflacao acidental, mas reconhecendo que prompt
+    // few-shot com 20 exemplos canonicos eh inerentemente maior. Se passar de
+    // 22k, refator obrigatorio (modularizar por skill).
+    expect(size).toBeLessThan(21000);
     expect(size).toBeGreaterThan(4000); // sanity: nao esta vazio
   });
 
