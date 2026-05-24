@@ -40,10 +40,11 @@ function parceiroApp() {
     produtos: [],
     payables: [],
     receivables: [],
+    fluxoCaixa: null,
 
-    saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', fulfillment_mode: 'pickup', delivery_address: '' },
+    saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
-    purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null },
+    purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' },
     receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' },
@@ -129,7 +130,10 @@ function parceiroApp() {
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || `api_${response.status}`);
+        const err = new Error(payload.error || `api_${response.status}`);
+        err.status = response.status;
+        err.payload = payload;
+        throw err;
       }
       return response.json();
     },
@@ -138,7 +142,7 @@ function parceiroApp() {
       if (!this.apiToken) return;
       this.loading = true;
       try {
-        const [resumo, vendas, estoque, compras, despesas, produtos, payables, receivables] = await Promise.all([
+        const [resumo, vendas, estoque, compras, despesas, produtos, payables, receivables, fluxo] = await Promise.all([
           this.api('resumo'),
           this.api('vendas'),
           this.api('estoque'),
@@ -147,6 +151,7 @@ function parceiroApp() {
           this.api('produtos'),
           this.api('contas-a-pagar'),
           this.api('contas-a-receber'),
+          this.api('fluxo-caixa'),
         ]);
         this.resumo = (resumo.rows && resumo.rows[0]) || null;
         this.vendas = vendas.rows || [];
@@ -156,6 +161,7 @@ function parceiroApp() {
         this.produtos = produtos.rows || [];
         this.payables = payables.rows || [];
         this.receivables = receivables.rows || [];
+        this.fluxoCaixa = (fluxo.rows && fluxo.rows[0]) || null;
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {
           lucide.createIcons();
@@ -521,6 +527,9 @@ function parceiroApp() {
           receivable_due_date: this.saleForm.payment_status === 'receivable'
             ? this.saleForm.receivable_due_date || null
             : null,
+          receivable_installments: this.saleForm.payment_status === 'receivable'
+            ? Math.max(1, Math.min(36, Number(this.saleForm.receivable_installments) || 1))
+            : null,
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: this.saleForm.fulfillment_mode === 'delivery'
             ? this.saleForm.delivery_address.trim()
@@ -541,6 +550,7 @@ function parceiroApp() {
           payment_method: this.saleForm.payment_method,
           payment_status: this.saleForm.payment_status || 'received',
           receivable_due_date: '',
+          receivable_installments: 1,
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: '',
         };
@@ -668,6 +678,10 @@ function parceiroApp() {
         return;
       }
       const tireSize = filledCount === 3 ? this.composeTireSize(this.purchaseForm.tire_width, this.purchaseForm.tire_aspect, this.purchaseForm.tire_rim) : null;
+      if (this.purchaseForm.payment_status === 'payable' && !this.purchaseForm.payable_due_date) {
+        this.flash('Informe a data de vencimento da compra a prazo.');
+        return;
+      }
       this.saving = true;
       this.savingAction = 'purchase';
       try {
@@ -675,6 +689,8 @@ function parceiroApp() {
           method: 'POST',
           body: JSON.stringify({
             supplier_name: this.purchaseForm.supplier_name.trim() || null,
+            payment_status: this.purchaseForm.payment_status || 'paid_now',
+            payable_due_date: this.purchaseForm.payment_status === 'payable' ? (this.purchaseForm.payable_due_date || null) : null,
             idempotency_key: this.uuid(),
             items: [{
               item_name: this.purchaseForm.item_name.trim(),
@@ -689,9 +705,12 @@ function parceiroApp() {
             }],
           }),
         });
-        this.purchaseForm = { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null };
+        const wasPayable = this.purchaseForm.payment_status === 'payable';
+        this.purchaseForm = { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' };
         await this.loadData();
-        this.flash('Compra registrada e estoque atualizado.');
+        this.flash(wasPayable
+          ? 'Compra registrada (a prazo) — conta a pagar criada.'
+          : 'Compra registrada e estoque atualizado.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -709,6 +728,20 @@ function parceiroApp() {
         await this.loadData();
         this.flash('Compra cancelada.');
       } catch (err) {
+        // Fix pos-Codex: tratamentos especificos para 409
+        if (err.status === 409 && err.payload) {
+          if (err.payload.error === 'cannot_delete_paid_purchase') {
+            this.flash(err.payload.message || 'Esta compra ja foi paga e nao pode ser apagada.');
+            return;
+          }
+          if (err.payload.error === 'stock_reversal_incomplete') {
+            const items = (err.payload.failed_items || [])
+              .map((it) => `- ${it.item_name} (qtd ${it.quantity})`)
+              .join('\n');
+            this.flash(`${err.payload.message}\n\nItens sem estorno:\n${items}`);
+            return;
+          }
+        }
         this.flash(this.errMessage(err));
       } finally {
         this.saving = false;
@@ -721,21 +754,42 @@ function parceiroApp() {
       if (this.num(this.expenseForm.amount) <= 0) { this.flash('Informe o valor do material.'); return; }
       this.saving = true;
       this.savingAction = 'payable';
+      const idem = this.uuid();
+      const payload = {
+        counterparty_name: 'Compra de material',
+        description: this.expenseForm.description.trim(),
+        category: 'maintenance',
+        amount: this.num(this.expenseForm.amount),
+        due_date: null,
+        status: 'paid',
+        paid_at: new Date().toISOString(),
+        payment_method: 'Pix',
+        idempotency_key: idem,
+      };
+      const attempt = async (force) => this.api('contas-a-pagar', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, force_duplicate: force }),
+      });
       try {
-        await this.api('contas-a-pagar', {
-          method: 'POST',
-          body: JSON.stringify({
-            counterparty_name: 'Compra de material',
-            description: this.expenseForm.description.trim(),
-            category: 'maintenance',
-            amount: this.num(this.expenseForm.amount),
-            due_date: null,
-            status: 'paid',
-            paid_at: new Date().toISOString(),
-            payment_method: 'Pix',
-            idempotency_key: this.uuid(),
-          }),
-        });
+        try {
+          await attempt(false);
+        } catch (err) {
+          // Fix pos-Codex: status='paid' agora roda dedupe via helper interno.
+          // 409 duplicate_expense → pergunta e retenta com force.
+          if (err.status === 409 && err.payload && err.payload.error === 'duplicate_expense') {
+            const dups = (err.payload.duplicates || [])
+              .map((d) => `- ${d.expense_date}: ${d.description} (R$ ${d.amount})`)
+              .join('\n');
+            const ok = confirm(`Ja existem despesas parecidas nos ultimos 7 dias:\n\n${dups}\n\nLancar mesmo assim?`);
+            if (!ok) {
+              this.flash('Cancelado. Confira despesas antes de lancar.');
+              return;
+            }
+            await attempt(true);
+          } else {
+            throw err;
+          }
+        }
         this.expenseForm = { category: 'maintenance', description: '', amount: 0 };
         await this.loadData();
         this.flash('Material lançado em contas a pagar.');
@@ -869,14 +923,31 @@ function parceiroApp() {
       if (!confirm('Marcar esta conta como paga agora?')) return;
       this.saving = true;
       this.savingAction = `payable-pay-${payableId}`;
+      const paidAt = new Date().toISOString();
+      const attempt = async (force) => this.api(`contas-a-pagar/${payableId}/pagar`, {
+        method: 'POST',
+        body: JSON.stringify({ paid_at: paidAt, payment_method: 'Pix', force_duplicate: force }),
+      });
       try {
-        await this.api(`contas-a-pagar/${payableId}/pagar`, {
-          method: 'POST',
-          body: JSON.stringify({
-            paid_at: new Date().toISOString(),
-            payment_method: 'Pix',
-          }),
-        });
+        try {
+          await attempt(false);
+        } catch (err) {
+          if (err.status === 409 && err.payload && err.payload.error === 'duplicate_expense') {
+            const dups = (err.payload.duplicates || [])
+              .map((d) => `- ${d.expense_date}: ${d.description} (R$ ${d.amount})`)
+              .join('\n');
+            const ok = confirm(
+              `Ja existem despesas parecidas nos ultimos 7 dias:\n\n${dups}\n\nPagar mesmo assim? (vai criar uma despesa nova alem das ja existentes)`,
+            );
+            if (!ok) {
+              this.flash('Pagamento cancelado. Confira despesas antes de marcar como paga.');
+              return;
+            }
+            await attempt(true);
+          } else {
+            throw err;
+          }
+        }
         await this.loadData();
         this.flash('Conta marcada como paga.');
       } catch (err) {
@@ -895,6 +966,25 @@ function parceiroApp() {
         await this.api(`contas-a-pagar/${payableId}`, { method: 'DELETE' });
         await this.loadData();
         this.flash('Conta a pagar cancelada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async settleInstallment(receivableId, installmentId) {
+      if (!confirm('Marcar esta parcela como recebida?')) return;
+      this.saving = true;
+      this.savingAction = `installment-receive-${installmentId}`;
+      try {
+        await this.api(`contas-a-receber/${receivableId}/parcelas/${installmentId}/receber`, {
+          method: 'POST',
+          body: JSON.stringify({ received_at: new Date().toISOString(), payment_method: 'Pix' }),
+        });
+        await this.loadData();
+        this.flash('Parcela recebida.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -1352,6 +1442,7 @@ function parceiroApp() {
         maintenance: 'Manutenção',
         delivery: 'Entrega',
         tax: 'Taxa/imposto',
+        supplier_payment: 'Fornecedor',
         other: 'Outra',
       };
       return map[category] || category || 'Despesa';

@@ -42,10 +42,16 @@ export interface RegisterPartnerSaleInput {
   payment_method: string | null;
   payment_status?: 'received' | 'receivable' | null;
   receivable_due_date?: string | null;
+  receivable_installments?: number | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
   idempotency_key: string;
+}
+
+export interface SettlePartnerReceivableInstallmentInput {
+  received_at?: string | null;
+  payment_method?: string | null;
 }
 
 export interface UpsertPartnerStockInput {
@@ -70,6 +76,8 @@ export interface RegisterPartnerPurchaseInput {
   supplier_name?: string | null;
   purchased_at?: string | null;
   payment_method?: string | null;
+  payment_status?: 'paid_now' | 'payable' | null;
+  payable_due_date?: string | null;
   notes?: string | null;
   idempotency_key?: string | null;
   items: Array<{
@@ -88,7 +96,7 @@ export interface RegisterPartnerPurchaseInput {
 
 export interface RegisterPartnerExpenseInput {
   expense_date?: string | null;
-  category: 'employee_payment' | 'rent' | 'utilities' | 'maintenance' | 'delivery' | 'tax' | 'other';
+  category: 'employee_payment' | 'rent' | 'utilities' | 'maintenance' | 'delivery' | 'tax' | 'supplier_payment' | 'other';
   description: string;
   amount: number;
   payment_method?: string | null;
@@ -106,6 +114,7 @@ export interface RegisterPartnerPayableInput {
   payment_method?: string | null;
   notes?: string | null;
   idempotency_key?: string | null;
+  force_duplicate?: boolean;
 }
 
 export interface RegisterPartnerReceivableInput {
@@ -124,6 +133,47 @@ export interface RegisterPartnerReceivableInput {
 export interface SettlePartnerPayableInput {
   paid_at?: string | null;
   payment_method?: string | null;
+  force_duplicate?: boolean;
+}
+
+export class DuplicateExpenseError extends Error {
+  readonly code = 'duplicate_expense';
+  readonly duplicates: Array<{ id: string; expense_date: string; amount: string; description: string }>;
+  constructor(duplicates: DuplicateExpenseError['duplicates']) {
+    super('duplicate_expense');
+    this.duplicates = duplicates;
+  }
+}
+
+export class InstallmentsTooSmallError extends Error {
+  readonly code = 'installments_below_minimum';
+  readonly total_cents: number;
+  readonly installments: number;
+  constructor(totalCents: number, installments: number) {
+    super(`installments_below_minimum: total R$ ${(totalCents / 100).toFixed(2)} insuficiente para ${installments} parcelas (cada parcela ficaria menor que R$ 0,01)`);
+    this.total_cents = totalCents;
+    this.installments = installments;
+  }
+}
+
+export class PaidPurchaseLockedError extends Error {
+  readonly code = 'cannot_delete_paid_purchase';
+  readonly purchase_id: string;
+  readonly paid_payable_id: string;
+  constructor(purchaseId: string, paidPayableId: string) {
+    super('cannot_delete_paid_purchase');
+    this.purchase_id = purchaseId;
+    this.paid_payable_id = paidPayableId;
+  }
+}
+
+export class PartialStockReversalError extends Error {
+  readonly code = 'stock_reversal_incomplete';
+  readonly failed_items: Array<{ item_name: string; quantity: number }>;
+  constructor(failedItems: PartialStockReversalError['failed_items']) {
+    super('stock_reversal_incomplete');
+    this.failed_items = failedItems;
+  }
 }
 
 export interface SettlePartnerReceivableInput {
@@ -140,6 +190,18 @@ export async function getPartnerResumo(ctx: PartnerContext): Promise<unknown> {
     const result = await client.query(
       `SELECT *
        FROM network.partner_unit_summary
+       WHERE environment = $1 AND unit_id = $2`,
+      [ctx.environment, ctx.unitId],
+    );
+    return result.rows[0] ?? null;
+  });
+}
+
+export async function getPartnerFluxoCaixa(ctx: PartnerContext): Promise<unknown> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT *
+       FROM network.partner_cash_flow_projection
        WHERE environment = $1 AND unit_id = $2`,
       [ctx.environment, ctx.unitId],
     );
@@ -231,6 +293,7 @@ export async function getPartnerCompras(ctx: PartnerContext): Promise<unknown[]>
     const result = await client.query(
       `SELECT pp.id, pp.supplier_name, pp.purchased_at, pp.total_amount,
               pp.payment_method, pp.notes, pp.created_at,
+              pp.payment_status, pp.payable_due_date,
               COALESCE(jsonb_agg(jsonb_build_object(
                 'item_name', ppi.item_name,
                 'quantity', ppi.quantity,
@@ -271,18 +334,71 @@ export async function getPartnerPayables(ctx: PartnerContext): Promise<unknown[]
 export async function getPartnerReceivables(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, customer_name, description, source_tag, amount, due_date,
-              status, received_at, payment_method, notes, created_at
-       FROM finance.partner_receivables
-       WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+      `SELECT pr.id, pr.customer_name, pr.description, pr.source_tag, pr.amount, pr.due_date,
+              pr.status, pr.received_at, pr.payment_method, pr.notes, pr.created_at,
+              COALESCE(jsonb_agg(jsonb_build_object(
+                'id', pri.id,
+                'sequence', pri.sequence,
+                'amount', pri.amount,
+                'due_date', pri.due_date,
+                'status', pri.status,
+                'received_at', pri.received_at,
+                'payment_method', pri.payment_method
+              ) ORDER BY pri.sequence) FILTER (WHERE pri.id IS NOT NULL AND pri.deleted_at IS NULL), '[]'::jsonb) AS installments
+       FROM finance.partner_receivables pr
+       LEFT JOIN finance.partner_receivable_installments pri
+         ON pri.receivable_id = pr.id AND pri.deleted_at IS NULL
+       WHERE pr.environment = $1 AND pr.unit_id = $2 AND pr.deleted_at IS NULL
+       GROUP BY pr.id
        ORDER BY
-         CASE status WHEN 'open' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
-         due_date ASC NULLS LAST,
-         created_at DESC
+         CASE pr.status WHEN 'open' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
+         pr.due_date ASC NULLS LAST,
+         pr.created_at DESC
        LIMIT 100`,
       [ctx.environment, ctx.unitId],
     );
     return result.rows;
+  });
+}
+
+export async function settlePartnerReceivableInstallment(
+  ctx: PartnerContext,
+  receivableId: string,
+  installmentId: string,
+  input: SettlePartnerReceivableInstallmentInput,
+): Promise<{ installment_id: string; received: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const receivedAt = input.received_at ?? new Date().toISOString();
+    const result = await client.query<{ id: string }>(
+      `UPDATE finance.partner_receivable_installments
+       SET status = 'received',
+           received_at = $4::timestamptz,
+           payment_method = COALESCE($5, payment_method)
+       WHERE id = $1
+         AND receivable_id = $2
+         AND environment = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [installmentId, receivableId, ctx.environment, receivedAt, input.payment_method ?? null],
+    );
+
+    if (result.rowCount !== 1) return { installment_id: installmentId, received: false };
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, payload_after
+       ) VALUES ($1, 'partner_finance', 'finance.partner_receivable_installments', $2,
+                 'partner_receivable_installment_received', $3, $4::jsonb)`,
+      [
+        ctx.environment,
+        installmentId,
+        `partner:${ctx.slug}`,
+        JSON.stringify({ unit_id: ctx.unitId, receivable_id: receivableId, received_at: receivedAt }),
+      ],
+    );
+    return { installment_id: installmentId, received: true };
   });
 }
 
@@ -333,30 +449,86 @@ export async function registerPartnerSale(
         );
 
         const row = order.rows[0];
-        if (row) {
+        if (!row) {
+          throw new Error(
+            `partner_sale_receivable_missing_order: venda ${orderId} criada mas nao encontrada para gerar conta a receber`,
+          );
+        }
+
+        const receivableResult = await client.query<{ id: string }>(
+          `INSERT INTO finance.partner_receivables (
+             environment, unit_id, customer_name, description, source_tag, amount,
+             due_date, status, received_at, payment_method, notes, created_by,
+             idempotency_key, source_order_id
+           ) VALUES (
+             $1, $2, $3, $4, COALESCE($5, 'porta'), $6,
+             $7::date, 'open', NULL, NULL, $8, $9, $10, $11
+           )
+           ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+           DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+           RETURNING id`,
+          [
+            ctx.environment,
+            ctx.unitId,
+            input.customer_name ?? row.customer_name ?? null,
+            `Venda a receber ${orderId.slice(0, 8)}`,
+            input.source_tag ?? 'porta',
+            row.total_amount,
+            input.receivable_due_date ?? null,
+            `Gerada automaticamente pela venda ${orderId}`,
+            `partner:${ctx.slug}`,
+            `order:${orderId}:receivable`,
+            orderId,
+          ],
+        );
+
+        const receivableId = receivableResult.rows[0]?.id;
+        if (receivableId) {
           await client.query(
-            `INSERT INTO finance.partner_receivables (
-               environment, unit_id, customer_name, description, source_tag, amount,
-               due_date, status, received_at, payment_method, notes, created_by, idempotency_key
-             ) VALUES (
-               $1, $2, $3, $4, COALESCE($5, 'porta'), $6,
-               $7::date, 'open', NULL, NULL, $8, $9, $10
-             )
-             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-             DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
+            `INSERT INTO audit.events (
+               environment, domain, entity_table, entity_id, event_type,
+               actor_label, payload_after
+             ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
+                       'partner_receivable_auto_created', $3, $4::jsonb)`,
             [
               ctx.environment,
-              ctx.unitId,
-              input.customer_name ?? row.customer_name ?? null,
-              `Venda a receber ${orderId.slice(0, 8)}`,
-              input.source_tag ?? 'porta',
-              row.total_amount,
-              input.receivable_due_date ?? null,
-              `Gerada automaticamente pela venda ${orderId}`,
+              receivableId,
               `partner:${ctx.slug}`,
-              `${input.idempotency_key}:receivable`,
+              JSON.stringify({
+                unit_id: ctx.unitId,
+                source_order_id: orderId,
+                amount: row.total_amount,
+                due_date: input.receivable_due_date ?? null,
+                installments: input.receivable_installments ?? 1,
+              }),
             ],
           );
+
+          // Etapa 6: se installments > 1, cria parcelas (intervalo fixo 30d)
+          const installments = Math.max(1, Math.floor(input.receivable_installments ?? 1));
+          if (installments > 1 && input.receivable_due_date) {
+            const totalCents = Math.round(Number(row.total_amount) * 100);
+            // Fix pos-Codex: valor minimo - cada parcela precisa de pelo menos
+            // 1 centavo. Sem isso, viola CHECK (amount > 0) na tabela.
+            if (totalCents < installments) {
+              throw new InstallmentsTooSmallError(totalCents, installments);
+            }
+            const baseCents = Math.floor(totalCents / installments);
+            for (let i = 1; i <= installments; i++) {
+              // Ultima parcela leva o resto de arredondamento
+              const cents = i === installments ? totalCents - baseCents * (installments - 1) : baseCents;
+              // Fix pos-Codex: ON CONFLICT garante idempotencia em retry HTTP.
+              // partner_orders e partner_receivables ja deduplicam via idempotency_key;
+              // sem este DO NOTHING, retry estourava UNIQUE (receivable_id, sequence).
+              await client.query(
+                `INSERT INTO finance.partner_receivable_installments (
+                   environment, receivable_id, sequence, amount, due_date, status
+                 ) VALUES ($1, $2, $3, $4::numeric / 100, ($5::date + (($3 - 1) * 30) * INTERVAL '1 day')::date, 'open')
+                 ON CONFLICT (receivable_id, sequence) DO NOTHING`,
+                [ctx.environment, receivableId, i, cents, input.receivable_due_date],
+              );
+            }
+          }
         }
       }
 
@@ -422,7 +594,7 @@ function payableCategoryToExpenseCategory(
   category: RegisterPartnerPayableInput['category'],
 ): RegisterPartnerExpenseInput['category'] {
   const map: Record<string, RegisterPartnerExpenseInput['category']> = {
-    supplier: 'maintenance',
+    supplier: 'supplier_payment',
     employee: 'employee_payment',
     rent: 'rent',
     utilities: 'utilities',
@@ -574,11 +746,16 @@ export async function registerPartnerPurchase(
 ): Promise<{ purchase_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const total = input.items.reduce((sum, item) => sum + item.quantity * item.unit_cost, 0);
+    const paymentStatus = input.payment_status === 'payable' ? 'payable' : 'paid_now';
+    if (paymentStatus === 'payable' && !input.payable_due_date) {
+      throw new Error('payable_due_date_required_when_payment_status_payable');
+    }
     const purchase = await client.query<{ id: string }>(
       `INSERT INTO commerce.partner_purchases (
          environment, unit_id, supplier_name, purchased_at, total_amount,
-         payment_method, notes, created_by, idempotency_key
-       ) VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, $6, $7, $8, $9)
+         payment_method, notes, created_by, idempotency_key,
+         payment_status, payable_due_date
+       ) VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, $6, $7, $8, $9, $10, $11::date)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
@@ -588,10 +765,12 @@ export async function registerPartnerPurchase(
         input.supplier_name ?? null,
         input.purchased_at ?? null,
         total,
-        input.payment_method ?? null,
+        paymentStatus === 'payable' ? 'A pagar' : input.payment_method ?? null,
         input.notes ?? null,
         `partner:${ctx.slug}`,
         input.idempotency_key ?? null,
+        paymentStatus,
+        paymentStatus === 'payable' ? input.payable_due_date : null,
       ],
     );
 
@@ -728,6 +907,58 @@ export async function registerPartnerPurchase(
       );
     }
 
+    // Etapa 3: compra a prazo gera partner_payable vinculado.
+    // UNIQUE parcial em source_purchase_id (Etapa 2) garante 1 payable por compra.
+    if (paymentStatus === 'payable') {
+      const supplierLabel = input.supplier_name?.trim() || 'fornecedor';
+      const payableResult = await client.query<{ id: string }>(
+        `INSERT INTO finance.partner_payables (
+           environment, unit_id, counterparty_name, description, category, amount,
+           due_date, status, notes, created_by, idempotency_key, source_purchase_id
+         ) VALUES (
+           $1, $2, $3, $4, 'supplier', $5,
+           $6::date, 'open', $7, $8, $9, $10
+         )
+         ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+         DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+         RETURNING id`,
+        [
+          ctx.environment,
+          ctx.unitId,
+          input.supplier_name?.trim() || null,
+          `Compra a pagar ${purchaseId.slice(0, 8)} (${supplierLabel})`,
+          total,
+          input.payable_due_date,
+          `Gerado automaticamente pela compra ${purchaseId}`,
+          `partner:${ctx.slug}`,
+          `purchase:${purchaseId}:payable`,
+          purchaseId,
+        ],
+      );
+      const payableId = payableResult.rows[0]?.id;
+      if (payableId) {
+        await client.query(
+          `INSERT INTO audit.events (
+             environment, domain, entity_table, entity_id, event_type,
+             actor_label, payload_after
+           ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                     'partner_payable_auto_created', $3, $4::jsonb)`,
+          [
+            ctx.environment,
+            payableId,
+            `partner:${ctx.slug}`,
+            JSON.stringify({
+              unit_id: ctx.unitId,
+              source_purchase_id: purchaseId,
+              amount: total,
+              due_date: input.payable_due_date,
+              supplier_name: input.supplier_name ?? null,
+            }),
+          ],
+        );
+      }
+    }
+
     return { purchase_id: purchaseId };
   });
 }
@@ -749,6 +980,23 @@ export async function deletePartnerPurchase(
       return { purchase_id: purchaseId, deleted: false, stock_moves: [] };
     }
 
+    // Fix pos-Codex (#3): bloqueia delete se houver payable vinculado JA PAGO.
+    // Apagar a compra deixaria o pagamento orfao no caixa - trail contabil quebrado.
+    // Estorno automatico fica para Etapa futura.
+    const paidPayable = await client.query<{ id: string }>(
+      `SELECT id FROM finance.partner_payables
+       WHERE source_purchase_id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'paid'
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [purchaseId, ctx.environment, ctx.unitId],
+    );
+    if (paidPayable.rowCount && paidPayable.rowCount > 0) {
+      throw new PaidPurchaseLockedError(purchaseId, paidPayable.rows[0]!.id);
+    }
+
     const supplierName = normalizeText(purchaseRow.rows[0]!.supplier_name);
     const items = await client.query<{ product_id: string | null; item_name: string; quantity: number }>(
       `SELECT product_id, item_name, quantity
@@ -758,6 +1006,7 @@ export async function deletePartnerPurchase(
     );
 
     const moves: Array<{ stock_id: string; new_qty: number; new_status: string }> = [];
+    const failedReversals: Array<{ item_name: string; quantity: number }> = [];
     for (const item of items.rows) {
       const moved = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
         `WITH target AS (
@@ -791,7 +1040,17 @@ export async function deletePartnerPurchase(
       );
       if (moved.rowCount && moved.rowCount > 0) {
         moves.push(moved.rows[0]!);
+      } else {
+        // Fix pos-Codex (#4 mini-trava): se nao achou stock pra estornar este item,
+        // registra. Se sobrar item sem estorno, ABORTA o delete inteiro abaixo
+        // (rollback automatico via throw). Etapa 7 vai resolver com FK direta
+        // partner_purchase_items -> partner_stock_levels.
+        failedReversals.push({ item_name: item.item_name, quantity: Number(item.quantity) });
       }
+    }
+
+    if (failedReversals.length > 0) {
+      throw new PartialStockReversalError(failedReversals);
     }
 
     await client.query(
@@ -801,6 +1060,37 @@ export async function deletePartnerPurchase(
        WHERE id = $1 AND environment = $2 AND unit_id = $3`,
       [purchaseId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
     );
+
+    // Etapa 3: cancela payable vinculado em cascata (mesma logica que
+    // cancel_partner_local_order faz para receivable de venda).
+    const cancelledPayable = await client.query<{ id: string }>(
+      `UPDATE finance.partner_payables
+       SET status = 'cancelled',
+           deleted_at = now(),
+           deleted_by = $4
+       WHERE source_purchase_id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [purchaseId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+    );
+    if (cancelledPayable.rowCount && cancelledPayable.rowCount > 0) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                   'partner_payable_cancelled_by_purchase_delete', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          cancelledPayable.rows[0]!.id,
+          `partner:${ctx.slug}`,
+          JSON.stringify({ source_purchase_id: purchaseId, unit_id: ctx.unitId }),
+        ],
+      );
+    }
 
     if (moves.length > 0) {
       await client.query(
@@ -926,13 +1216,16 @@ export async function registerPartnerPayable(
   input: RegisterPartnerPayableInput,
 ): Promise<{ payable_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const status = input.status ?? 'open';
+    const wantedStatus = input.status ?? 'open';
+    // SEMPRE insere em 'open'. Se input.status='paid', o pagamento eh feito
+    // logo abaixo via _settlePartnerPayableWithClient (caminho unico para
+    // criar expense com source_payable_id e rodar dedupe).
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_payables (
          environment, unit_id, counterparty_name, description, category, amount,
          due_date, status, paid_at, payment_method, notes, created_by, idempotency_key
        ) VALUES ($1, $2, $3, $4, COALESCE($5, 'other'), $6,
-                 $7::date, $8, $9::timestamptz, $10, $11, $12, $13)
+                 $7::date, 'open', NULL, $8, $9, $10, $11)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
@@ -944,8 +1237,6 @@ export async function registerPartnerPayable(
         input.category ?? 'other',
         input.amount,
         input.due_date ?? null,
-        status,
-        status === 'paid' ? input.paid_at ?? null : null,
         input.payment_method ?? null,
         normalizeText(input.notes),
         `partner:${ctx.slug}`,
@@ -954,30 +1245,6 @@ export async function registerPartnerPayable(
     );
 
     const payableId = result.rows[0]!.id;
-
-    if (status === 'paid') {
-      await client.query(
-        `INSERT INTO finance.partner_expenses (
-           environment, unit_id, expense_date, category, description, amount,
-           payment_method, created_by, idempotency_key
-         ) VALUES (
-           $1, $2, COALESCE($3::date, CURRENT_DATE), $4, $5, $6, $7, $8, $9
-         )
-         ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-         DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
-        [
-          ctx.environment,
-          ctx.unitId,
-          input.paid_at ? input.paid_at.slice(0, 10) : null,
-          payableCategoryToExpenseCategory(input.category),
-          input.description,
-          input.amount,
-          input.payment_method ?? null,
-          `partner:${ctx.slug}`,
-          input.idempotency_key ? `${input.idempotency_key}:expense` : null,
-        ],
-      );
-    }
 
     await client.query(
       `INSERT INTO audit.events (
@@ -997,22 +1264,37 @@ export async function registerPartnerPayable(
           category: input.category ?? 'other',
           amount: input.amount,
           due_date: input.due_date,
-          status,
-          paid_at: status === 'paid' ? input.paid_at : null,
+          status: 'open',
+          requested_paid: wantedStatus === 'paid',
         }),
       ],
     );
+
+    // Se foi pedido criar ja como pago, usa o helper interno (mesma transacao).
+    // Helper preenche source_payable_id no expense e roda dedupe.
+    if (wantedStatus === 'paid') {
+      await _settlePartnerPayableWithClient(client, ctx, payableId, {
+        paid_at: input.paid_at ?? null,
+        payment_method: input.payment_method ?? null,
+        force_duplicate: input.force_duplicate,
+      });
+    }
 
     return { payable_id: payableId };
   });
 }
 
-export async function settlePartnerPayable(
+// Helper interno: executa o settle dentro de um client/transacao ja aberto.
+// Usado tanto pelo endpoint publico settlePartnerPayable quanto pelo
+// registerPartnerPayable quando o payable ja vem com status='paid'
+// (evita abrir nova transacao - a conta recem-criada poderia nao estar
+// visivel ainda em outra connection).
+async function _settlePartnerPayableWithClient(
+  client: PoolClient,
   ctx: PartnerContext,
   payableId: string,
   input: SettlePartnerPayableInput,
 ): Promise<{ payable_id: string; paid: boolean }> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const paidAt = input.paid_at ?? new Date().toISOString();
     const result = await client.query<{
       id: string;
@@ -1020,6 +1302,7 @@ export async function settlePartnerPayable(
       category: RegisterPartnerPayableInput['category'];
       amount: string;
       payment_method: string | null;
+      source_purchase_id: string | null;
     }>(
       `UPDATE finance.partner_payables
        SET status = 'paid',
@@ -1030,20 +1313,79 @@ export async function settlePartnerPayable(
          AND unit_id = $3
          AND status = 'open'
          AND deleted_at IS NULL
-       RETURNING id, description, category, amount, payment_method`,
+       RETURNING id, description, category, amount, payment_method, source_purchase_id`,
       [payableId, ctx.environment, ctx.unitId, paidAt, input.payment_method ?? null],
     );
 
     if (result.rowCount !== 1) return { payable_id: payableId, paid: false };
 
     const row = result.rows[0]!;
+    const idempotencyKey = `payable:${payableId}:expense`;
+
+    // Etapa 3: se o payable veio de uma compra (source_purchase_id preenchido),
+    // NAO cria expense. A compra ja foi contabilizada como saida no momento
+    // da entrada de estoque - criar expense aqui contaria a saida duas vezes.
+    // (Etapa 4 vai reescrever o resumo separando competencia vs caixa de fato.)
+    if (row.source_purchase_id) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                   'partner_payable_paid', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          payableId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({
+            unit_id: ctx.unitId,
+            paid_at: paidAt,
+            amount: row.amount,
+            source_purchase_id: row.source_purchase_id,
+            expense_skipped: 'origin_is_purchase',
+          }),
+        ],
+      );
+      return { payable_id: payableId, paid: true };
+    }
+
+    // Trava de duplicidade (BUG #3): se ja existe despesa com mesma descricao
+    // e mesmo valor nos ultimos 7 dias E ela nao foi gerada por este mesmo payable
+    // (via FK source_payable_id, introduzida na Etapa 2), bloqueia e pede
+    // confirmacao do usuario (force_duplicate=true).
+    if (!input.force_duplicate) {
+      const dup = await client.query<{
+        id: string;
+        expense_date: string;
+        amount: string;
+        description: string;
+      }>(
+        `SELECT id, expense_date::text, amount::text, description
+         FROM finance.partner_expenses
+         WHERE environment = $1
+           AND unit_id = $2
+           AND deleted_at IS NULL
+           AND lower(trim(description)) = lower(trim($3))
+           AND amount = $4::numeric
+           AND expense_date >= (($5::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '7 days')
+           AND expense_date <= (($5::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '7 days')
+           AND (source_payable_id IS NULL OR source_payable_id <> $6::uuid)
+         ORDER BY expense_date DESC, created_at DESC
+         LIMIT 5`,
+        [ctx.environment, ctx.unitId, row.description, row.amount, paidAt, payableId],
+      );
+      if (dup.rowCount && dup.rowCount > 0) {
+        throw new DuplicateExpenseError(dup.rows);
+      }
+    }
+
     await client.query(
       `INSERT INTO finance.partner_expenses (
          environment, unit_id, expense_date, category, description, amount,
-         payment_method, created_by, idempotency_key
+         payment_method, created_by, idempotency_key, source_payable_id
        ) VALUES (
          $1, $2, ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date,
-         $4, $5, $6, $7, $8, $9
+         $4, $5, $6, $7, $8, $9, $10
        )
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
@@ -1056,7 +1398,8 @@ export async function settlePartnerPayable(
         row.amount,
         row.payment_method,
         `partner:${ctx.slug}`,
-        `payable:${payableId}:expense`,
+        idempotencyKey,
+        payableId,
       ],
     );
 
@@ -1075,6 +1418,15 @@ export async function settlePartnerPayable(
     );
 
     return { payable_id: payableId, paid: true };
+}
+
+export async function settlePartnerPayable(
+  ctx: PartnerContext,
+  payableId: string,
+  input: SettlePartnerPayableInput,
+): Promise<{ payable_id: string; paid: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    return _settlePartnerPayableWithClient(client, ctx, payableId, input);
   });
 }
 

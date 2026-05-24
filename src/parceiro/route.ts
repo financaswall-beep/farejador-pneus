@@ -10,12 +10,17 @@ import {
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
+  DuplicateExpenseError,
+  InstallmentsTooSmallError,
+  PaidPurchaseLockedError,
+  PartialStockReversalError,
   getPartnerCompras,
   getPartnerDespesas,
   getPartnerEstoque,
   getPartnerPayables,
   getPartnerProdutos,
   getPartnerReceivables,
+  getPartnerFluxoCaixa,
   getPartnerResumo,
   getPartnerVendas,
   registerPartnerExpense,
@@ -25,6 +30,7 @@ import {
   registerPartnerSale,
   settlePartnerPayable,
   settlePartnerReceivable,
+  settlePartnerReceivableInstallment,
   upsertPartnerStock,
 } from './queries.js';
 
@@ -58,6 +64,11 @@ const receivableParamsSchema = paramsSchema.extend({
   receivableId: z.string().uuid(),
 });
 
+const receivableInstallmentParamsSchema = paramsSchema.extend({
+  receivableId: z.string().uuid(),
+  installmentId: z.string().uuid(),
+});
+
 // Venda local do parceiro: cada item aponta direto pro estoque local do parceiro
 // (partner_stock_levels.id), não pra commerce.products. Decisão "silo isolado" 2026-05-19.
 const orderItemSchema = z.object({
@@ -74,6 +85,7 @@ const saleSchema = z.object({
   payment_method: z.string().min(1).nullable(),
   payment_status: z.enum(['received', 'receivable']).nullable().optional(),
   receivable_due_date: z.string().date().nullable().optional(),
+  receivable_installments: z.number().int().min(1).max(36).nullable().optional(),
   fulfillment_mode: z.enum(['delivery', 'pickup']),
   delivery_address: z.string().min(1).nullable().optional(),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).optional(),
@@ -117,6 +129,8 @@ const purchaseSchema = z.object({
   supplier_name: z.string().max(160).nullable().optional(),
   purchased_at: z.string().datetime().nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
+  payment_status: z.enum(['paid_now', 'payable']).nullable().optional(),
+  payable_due_date: z.string().date().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
   items: z.array(z.object({
@@ -131,11 +145,17 @@ const purchaseSchema = z.object({
     unit_cost: z.number().nonnegative(),
     sale_price: z.number().nonnegative().nullable().optional(),
   })).min(1),
-});
+}).refine(
+  (data) => data.payment_status !== 'payable' || (data.payable_due_date && data.payable_due_date.trim().length > 0),
+  {
+    message: 'payable_due_date obrigatorio quando payment_status=payable',
+    path: ['payable_due_date'],
+  },
+);
 
 const expenseSchema = z.object({
   expense_date: z.string().date().nullable().optional(),
-  category: z.enum(['employee_payment', 'rent', 'utilities', 'maintenance', 'delivery', 'tax', 'other']),
+  category: z.enum(['employee_payment', 'rent', 'utilities', 'maintenance', 'delivery', 'tax', 'supplier_payment', 'other']),
   description: z.string().min(1).max(300),
   amount: z.number().nonnegative(),
   payment_method: z.string().max(80).nullable().optional(),
@@ -153,6 +173,7 @@ const payableSchema = z.object({
   payment_method: z.string().max(80).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
+  force_duplicate: z.boolean().optional(),
 });
 
 const receivableSchema = z.object({
@@ -171,6 +192,7 @@ const receivableSchema = z.object({
 const settlePayableSchema = z.object({
   paid_at: z.string().datetime().nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
+  force_duplicate: z.boolean().optional(),
 });
 
 const settleReceivableSchema = z.object({
@@ -214,6 +236,10 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });
   });
 
+  fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: [await getPartnerFluxoCaixa(getPartnerContext(request))].filter(Boolean) });
+  });
+
   fastify.get('/parceiro/:slug/api/vendas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerVendas(getPartnerContext(request)) });
   });
@@ -255,6 +281,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     try {
       return reply.status(200).send(await registerPartnerSale(getPartnerContext(request), parsed.data));
     } catch (err) {
+      // Fix pos-Codex (#2): valor insuficiente para o numero de parcelas pedido
+      // vira 400 com mensagem clara, nao 500.
+      if (err instanceof InstallmentsTooSmallError) {
+        return reply.status(400).send({
+          error: err.code,
+          message: err.message,
+          total_cents: err.total_cents,
+          installments: err.installments,
+        });
+      }
       // BUG #2: erros de regra de negocio (estoque insuficiente, item inativado) viram
       // 422 com mensagem clara em vez de 500 internal_server_error.
       if (err instanceof Error && (
@@ -311,9 +347,30 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const parsed = purchaseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'purchase_not_found' });
 
-    const result = await deletePartnerPurchase(getPartnerContext(request), parsed.data.purchaseId);
-    if (!result.deleted) return reply.status(404).send({ error: 'purchase_not_found' });
-    return reply.status(200).send(result);
+    try {
+      const result = await deletePartnerPurchase(getPartnerContext(request), parsed.data.purchaseId);
+      if (!result.deleted) return reply.status(404).send({ error: 'purchase_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      // Fix pos-Codex (#3): compra com payable pago vinculado nao pode ser apagada
+      if (err instanceof PaidPurchaseLockedError) {
+        return reply.status(409).send({
+          error: err.code,
+          message: 'Esta compra ja foi paga. Para manter o financeiro correto, ela nao pode ser apagada. Faca ajuste manual/estorno em etapa futura.',
+          purchase_id: err.purchase_id,
+          paid_payable_id: err.paid_payable_id,
+        });
+      }
+      // Fix pos-Codex (#4 mini-trava): se nao conseguiu estornar todos os itens, aborta
+      if (err instanceof PartialStockReversalError) {
+        return reply.status(409).send({
+          error: err.code,
+          message: 'Nao foi possivel localizar no estoque todos os itens desta compra para estornar. A compra nao foi apagada. Ajuste o estoque manualmente antes de tentar de novo.',
+          failed_items: err.failed_items,
+        });
+      }
+      throw err;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/despesas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
@@ -342,7 +399,15 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       const path = issue?.path?.join('.') || 'body';
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
-    return reply.status(200).send(await registerPartnerPayable(getPartnerContext(request), parsed.data));
+    try {
+      return reply.status(200).send(await registerPartnerPayable(getPartnerContext(request), parsed.data));
+    } catch (err) {
+      // status='paid' + force_duplicate=false pode disparar DuplicateExpenseError pelo helper interno
+      if (err instanceof DuplicateExpenseError) {
+        return reply.status(409).send({ error: err.code, duplicates: err.duplicates });
+      }
+      throw err;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
@@ -356,9 +421,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
 
-    const result = await settlePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
-    if (!result.paid) return reply.status(404).send({ error: 'payable_not_found' });
-    return reply.status(200).send(result);
+    try {
+      const result = await settlePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
+      if (!result.paid) return reply.status(404).send({ error: 'payable_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      if (err instanceof DuplicateExpenseError) {
+        return reply.status(409).send({ error: err.code, duplicates: err.duplicates });
+      }
+      throw err;
+    }
   });
 
   fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
@@ -402,6 +474,27 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
     const result = await cancelPartnerReceivable(getPartnerContext(request), parsed.data.receivableId);
     if (!result.cancelled) return reply.status(404).send({ error: 'receivable_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = receivableInstallmentParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'installment_not_found' });
+
+    const parsed = settleReceivableSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await settlePartnerReceivableInstallment(
+      getPartnerContext(request),
+      params.data.receivableId,
+      params.data.installmentId,
+      parsed.data,
+    );
+    if (!result.received) return reply.status(404).send({ error: 'installment_not_found' });
     return reply.status(200).send(result);
   });
 }

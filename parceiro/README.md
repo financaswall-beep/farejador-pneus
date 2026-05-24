@@ -4,6 +4,117 @@ Portal operacional da unidade parceira (borracheiro credenciado). Roda dentro do
 
 > **Status:** Reescrito visualmente em 2026-05-19. **Refatorado pra silo isolado da matriz no mesmo dia** — parceiro não enxerga mais `commerce.products` nem `commerce.orders`; opera sobre tabelas próprias (`partner_stock_levels`, `partner_orders`, `partner_purchases`, `partner_expenses`). Migrations 0038-0040 pendentes de aplicação em prod.
 
+---
+
+## 🩹 Fix 2026-05-24 — venda "a receber" (pós-review do commit 522bf86)
+
+Três correções aplicadas em `src/parceiro/queries.ts` (função `registerPartnerSale`):
+
+1. `idempotency_key` da receivable agora deriva do `order_id` (era `"undefined:receivable"` quando o frontend omitia a chave — colidia entre vendas).
+2. Se o SELECT do pedido recém-criado vier vazio, lança erro e faz rollback da venda inteira (antes ficava venda sem receivable, em silêncio).
+3. Receivable criada automaticamente agora emite `audit.events` com tipo `partner_receivable_auto_created` (antes só os fluxos manuais auditavam).
+
+Detalhes: `docs/FIX_PARCEIRO_VENDA_RECEBER_2026-05-24.md`.
+
+## 🧯 Etapa 1 de reconciliação 2026-05-24 — 3 bugs vermelhos do financeiro
+
+Plano de 6 etapas descrito em `docs/PLANO_RECONCILIACAO_FINANCEIRO_PARCEIRO_2026-05-24.md`. Esta Etapa 1 resolve os bugs que vazam dinheiro/quebram trilha contábil:
+
+1. **Cancelar venda agora cancela a conta a receber vinculada** (cascade) — migration `0050` recria `commerce.cancel_partner_local_order` para também marcar a receivable como `cancelled` + emitir audit event. Antes ficava órfã `'open'`, podia ser "recebida" depois.
+2. **Categoria fornecedor não vira mais "manutenção"** — nova categoria `supplier_payment` em `partner_expenses` (migration `0050`) + mapeamento corrigido em `payableCategoryToExpenseCategory`. Antes pagamento a fornecedor sumia do relatório de despesas com fornecedor.
+3. **Trava de duplicidade no `settlePartnerPayable`** — antes de criar a despesa automática, busca despesa parecida (mesma descrição, mesmo valor, ±7 dias) que não tenha sido gerada por este mesmo payable. Se achar, devolve `409 duplicate_expense` com a lista. Frontend mostra `confirm()` com as duplicatas e pede pra confirmar; usuário pode forçar com `force_duplicate: true`.
+
+Detalhes técnicos: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA1_2026-05-24.md`.
+
+## 🔗 Etapa 2 de reconciliação 2026-05-24 — FKs reais
+
+Migration `0051` substitui a "ligação por string `idempotency_key`" por foreign keys formais:
+
+- `partner_receivables.source_order_id → partner_orders(id)`
+- `partner_payables.source_purchase_id → partner_purchases(id)` (preparada pra Etapa 3)
+- `partner_expenses.source_payable_id → partner_payables(id)`
+
+Inclui backfill via regex no `idempotency_key`, UNIQUE parcial (uma venda → 1 receivable auto), `env_match` nas novas FKs, e `cancel_partner_local_order` reescrita pra cancelar receivable via FK em vez de match por string. `idempotency_key` ainda existe pra idempotência HTTP — FK é a fonte da verdade pra reconciliação.
+
+Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA2_2026-05-24.md`.
+
+## 💳 Etapa 3 de reconciliação 2026-05-24 — Compra a prazo
+
+Migration `0052` adiciona `payment_status` (`'paid_now'` | `'payable'`) e `payable_due_date` em `commerce.partner_purchases`. Quando o parceiro escolhe "A prazo" no form de compra:
+
+- A compra é registrada (estoque sobe igual antes)
+- Um `partner_payable` é criado automaticamente com `source_purchase_id` preenchido (UNIQUE garante 1 payable por compra)
+- Quando o payable for marcado como pago, **não** cria expense duplicada (a compra já foi contabilizada)
+- Cancelar a compra cancela o payable em cascade
+
+Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA3_2026-05-24.md`.
+
+## 📊 Etapa 4 de reconciliação 2026-05-24 — Resumo em 3 blocos
+
+Migration `0053` reescreve `network.partner_unit_summary` separando 3 perguntas que antes vinham misturadas: **competência** (sales/purchases/expenses/result), **caixa realizado** (cash_in/cash_out/cash_net com regras anti-dupla-contagem), **posição futura** (open_receivables/open_payables/net_future). Campos antigos preservados. UI: fileira de 3 cards na aba financeiro.
+
+Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA4_2026-05-24.md`.
+
+## 📅 Etapa 5 de reconciliação 2026-05-24 — Fluxo de caixa projetado
+
+Migration `0054` cria `network.partner_cash_flow_projection` agregando payables/receivables em aberto em 5 buckets de vencimento (vencido / hoje / 7d / 30d / depois). Endpoint `GET /api/fluxo-caixa`. UI: 4 cards no topo do financeiro com net + breakdown + contagem por bucket.
+
+Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA5_2026-05-24.md`.
+
+## 🔢 Etapa 6 de reconciliação 2026-05-24 — Parcelas
+
+Migration `0055` adiciona `finance.partner_receivable_installments` (1-36 parcelas, +30d entre cada). Trigger fecha receivable mãe quando todas parcelas resolvem. View auxiliar `partner_receivables_effective` permite agregadores tratarem parcelas como linhas individuais. Endpoint `POST /api/contas-a-receber/:id/parcelas/:installmentId/receber`. UI: input "Parcelas" no form de venda + lista expandida de parcelas em cada receivable.
+
+Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_ETAPA6_2026-05-24.md`.
+
+---
+
+## 🔧 Fixes pós-revisão Codex 2026-05-24
+
+Codex revisou o pacote 1-6 e apontou 4 problemas. 3 confirmados como bugs (deixavam número errado em prod), 1 reconhecido como dívida pré-existente (vira Etapa 7):
+
+1. `registerPartnerPayable` com `status='paid'` criava expense sem `source_payable_id` → dupla contagem em `cash_out_month`. Helper interno `_settlePartnerPayableWithClient` agora é compartilhado entre `register` e `settle`, na mesma transação.
+2. Parcelas com valor menor que N centavos quebravam (`CHECK amount > 0`) e retry HTTP estourava `UNIQUE`. Validação `InstallmentsTooSmallError` (→ 400) + `ON CONFLICT DO NOTHING`.
+3. `deletePartnerPurchase` apagava compra com payable já pago → pagamento órfão. `PaidPurchaseLockedError` (→ 409) bloqueia.
+4. (mini-trava) Estorno de estoque incompleto agora aborta o delete (`PartialStockReversalError` → 409) em vez de apagar a compra deixando estoque inconsistente. Fix estrutural em Etapa 7.
+
+Zero migration nova — só app-layer. Cache-bust → `v=20260524-financeiro-parceiro-6`. Detalhes: `docs/FIX_PARCEIRO_RECONCILIACAO_POS_CODEX_2026-05-24.md`.
+
+---
+
+**Status do plano de reconciliação:** ✅ 100% implementado (etapas 1-6 + fixes pós-Codex). 6 migrations pendentes pra aplicar em prod: `0050`, `0051`, `0052`, `0053`, `0054`, `0055` (nessa ordem). Etapa 7 (FK direta em `partner_purchase_items`) no backlog. Plano-mãe: `docs/PLANO_RECONCILIACAO_FINANCEIRO_PARCEIRO_2026-05-24.md`.
+
+---
+
+## 🔒 Auditoria de segurança 2026-05-21 — RLS efetivo (Etapa 5)
+
+A partir desta data, o Portal Parceiro opera com **RLS (Row Level Security) efetivo no Postgres** — não só app-layer.
+
+### Mudanças aplicadas
+- **Pool de conexão separado** (`src/parceiro/db.ts`) usando role `farejador_partner_app` (sem `BYPASSRLS`)
+- **9 policies estritas** no Postgres (`IS NOT NULL AND unit_id = current_partner_core_unit()`) — sem `IS NULL OR`
+- **Function `validate_partner_token`** com `SECURITY DEFINER` faz login sem expor `partner_access_tokens` à role restrita
+- **2 views com `security_invoker = true`** (`partner_unit_summary`, `partner_orders_full`)
+- **`SET LOCAL app.partner_unit_id`** em toda transação do portal (`withPartnerContext`)
+- **Defesa em profundidade:** se TypeScript esquecer filtro `unit_id`, RLS no banco bloqueia
+
+### Trilha auditável
+- `docs/AUDITORIA_PAINEL_PARCEIRO_2026-05-21.md` — auditoria original (21 problemas)
+- `docs/EXECUCAO_AUDITORIA_2026-05-21.md` — execução das 5 etapas
+- `docs/PLANO_ETAPA5_RLS_2026-05-21_V2.md` — plano técnico V2 aprovado por Codex
+- `docs/REVISAO_CODEX_PLANO_ETAPA5_RLS_2026-05-21.md` — revisão Codex
+- `docs/RUNBOOK_ETAPA5_RLS_2026-05-21.md` — runbook operacional
+- `db/migrations/0044_partner_rls_policies.sql` — migration aplicada
+- `tests/integration/partner-rls-enforcement.integration.test.ts` — 10 testes de isolamento real
+
+### Nota geral pós-auditoria
+**6,4/10 → 8,8/10**. Os 3 problemas críticos (RLS inerte, `partner_access_tokens` sem RLS, `partners` sem RLS) foram resolvidos.
+
+### Trade-offs aceitos
+A role restrita ganhou `SELECT` em `core.units` e `commerce.products` (necessário pelos triggers `env_match`). Significa: parceiro pode descobrir slug/nome/endereço/telefone de outras unidades da rede, mas **não vê** vendas/estoque/despesas (RLS estrita protege). Documentado em `docs/RUNBOOK_ETAPA5_RLS_2026-05-21.md` seção 4.5.
+
+---
+
 ## Arquitetura: silo isolado
 
 Decisão tomada por Wallace em 2026-05-19: **"matriz vê tudo do parceiro, parceiro não vê nada da matriz"**.
@@ -89,6 +200,8 @@ GET  /parceiro/:slug/api/estoque
 GET  /parceiro/:slug/api/produtos
 GET  /parceiro/:slug/api/despesas
 GET  /parceiro/:slug/api/compras
+GET  /parceiro/:slug/api/contas-a-pagar
+GET  /parceiro/:slug/api/contas-a-receber
 POST /parceiro/:slug/api/vendas
 DELETE /parceiro/:slug/api/vendas/:orderId
 POST /parceiro/:slug/api/estoque
@@ -97,6 +210,12 @@ POST /parceiro/:slug/api/compras
 DELETE /parceiro/:slug/api/compras/:purchaseId
 POST /parceiro/:slug/api/despesas
 DELETE /parceiro/:slug/api/despesas/:expenseId
+POST /parceiro/:slug/api/contas-a-pagar
+POST /parceiro/:slug/api/contas-a-pagar/:payableId/pagar
+DELETE /parceiro/:slug/api/contas-a-pagar/:payableId
+POST /parceiro/:slug/api/contas-a-receber
+POST /parceiro/:slug/api/contas-a-receber/:receivableId/receber
+DELETE /parceiro/:slug/api/contas-a-receber/:receivableId
 ```
 
 Todos os `/api/*` passam por `requirePartnerAuth` ([src/parceiro/auth.ts](../src/parceiro/auth.ts)).
