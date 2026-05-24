@@ -41,16 +41,21 @@ import { deterministicUuid } from '../../shared/deterministic-id.js';
 
 export const generatorPromptVersionV14 = 'generator_v1.4.0';
 export const generatorPromptVersionV15 = 'generator_v1.5.0';
+export const generatorPromptVersionV16 = 'generator_v1.6.0';
 
 /**
  * Versao "ativa" — preservada por compatibilidade. Quem instancia a chamada
  * (service.ts) decide qual versao colocar no prompt; o schema abaixo aceita
  * AMBAS via enum.
+ *
+ * v1.6.0 (Modular, 2026-05-24): preparado em branch separado, NAO ativado por
+ * default. Caller continua usando v1.5 ate validacao em shadow mode.
  */
 export const generatorPromptVersion = generatorPromptVersionV14;
 export const SUPPORTED_GENERATOR_PROMPT_VERSIONS = [
   generatorPromptVersionV14,
   generatorPromptVersionV15,
+  generatorPromptVersionV16,
 ] as const;
 export const generatorAgentVersion = 'atendente_v1.0.0';
 
