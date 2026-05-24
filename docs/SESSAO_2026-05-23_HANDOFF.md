@@ -266,3 +266,151 @@ A regra é: **toda decisão de conteúdo (intent, separação semântica, ambigu
 Esta sessão respeitou isso. Solução pro bug 593 foi puramente dado/catálogo, sem código novo no bot.
 
 Quando estiver em dúvida: **pergunte antes de fazer**. Especialmente em operações destrutivas no banco ou commits.
+
+---
+
+# Sessão paralela do mesmo dia (2026-05-23, continuação noturna)
+
+> **Adendo:** este documento foi originalmente escrito por um agente que rodou em paralelo nesta data e atacou a Camada 4 do plano anti-alucinação (cobertura de catálogo). A seção abaixo descreve o que **outro agente** fez no mesmo dia, em janela posterior, com foco diferente: **isolar Organizadora**, **corrigir bug de acentos no resolver de bairro**, e **expor `add_to_cart` no Atendente**. Os dois trabalhos são complementares — um cuidou do catálogo, o outro da arquitetura do bot.
+
+## TL;DR do trabalho complementar
+
+| frente | resumo |
+|---|---|
+| **Fase 1 — Isolar Organizadora** | `organizer_facts` deixa de entrar no contexto do Planner+Atendente. Bot passa a depender só de `state.global_slots` + `state.items` + `recent_messages` + `tool_results`. Organizadora continua extraindo facts pra `analytics.conversation_facts` mas isolada do atendimento. Mata a categoria de bugs onde fact contaminado virava mentira. |
+| **Migration 0048 — Acentos** | Bug observado: `calcularFrete(Fonseca, Niteroi)` retornou `bairro_nao_encontrado` mesmo com Fonseca cadastrada. Causa: `lower('Niterói') = 'niterói' != 'niteroi'`. Fix: `CREATE EXTENSION unaccent` + reescrever `resolve_neighborhood` usando `lower(unaccent(...))`. Cobre todas as 15 cidades + 624 bairros. |
+| **Sprint A — `add_to_cart` no Atendente** | Bug 595 (multi-item): cliente comprou pra ele + amigo (2 pneus), bot somou só R$ 108,90 (1 pneu + frete) em vez de R$ 207,90. Causa: `cart_current_items` vazio porque `add_to_cart` não estava exposto no schema do Generator. Fix: adicionar `add_to_cart` no `generatorRawActionSchema` + JSON strict + hidratação + 2 exemplos novos no prompt v1.5 (Exs 15+16). |
+| **Caminho futuro mapeado** | Documentado plano de migração gradual pro Planner (Etapas 1-4) caso futuro padrão de erros justifique. |
+
+## Commits desta janela
+
+```
+05a324e feat(atendente): isola Organizadora do contexto do Planner+Atendente (Fase 1)
+e5f02d8 fix(commerce): resolve_neighborhood normaliza acentos via unaccent (migration 0048)
+fe78290 feat(atendente): expoe add_to_cart no Generator v1.5 (Sprint A)
+```
+
+Migration 0048 já aplicada em prod via `aplicar-0048.cjs --commit` (2026-05-23 ~17:30Z).
+
+## Estado da arquitetura — quem faz o quê (após esta janela)
+
+```
+🎯 Planner (LLM)
+   decide:   skill + tool_requests
+   grava:    NADA
+   tamanho:  87 linhas, ~2k tokens
+
+💬 Atendente / Generator (LLM)
+   interpreta dados + escreve resposta + grava
+   actions hoje (5 tipos):
+      - update_slot
+      - create_item
+      - record_offer
+      - update_draft
+      - add_to_cart    ← NOVO (Sprint A)
+   tamanho:  ~320 linhas, ~4.6k tokens
+
+📊 Organizadora (LLM, isolada)
+   só extrai facts pra analytics.*
+   NÃO interfere no atendimento em tempo real
+   tamanho:  147 linhas, ~2.9k tokens
+```
+
+## Caminho FUTURO: "migrar tudo pro Planner"
+
+Durante esta janela da sessão, o Wallace levantou questão arquitetural:
+
+> *"Eu pensava que o Planner fazia tudo isso e o Atendente só falava com o cliente."*
+
+Hoje **não está assim** — o Atendente faz interpretação + gravação + fala. O Planner só decide skill+tools.
+
+### Por que está assim hoje
+- Escolha de otimização: 1 LLM call por turn em vez de 2 (custo+latência menores).
+
+### Quando vale migrar
+Se padrão de erros mostrar Atendente errando interpretação consistentemente. Hoje (após Sprint A), Atendente está estável. Sem evidência recorrente, refator não tem urgência.
+
+### Plano de migração gradual (se algum dia for fazer)
+
+| etapa | esforço | risco | ganho |
+|---|---|---|---|
+| 1 — Planner ganha `update_slot` | 2-3h | baixo | Planner começa a justificar nome |
+| 2 — Planner ganha `create_item` + `update_draft` | 2-3h | baixo | Separação semântica vira do cérebro |
+| 3 — Planner ganha carrinho (add/remove/update/clear) | 3h | médio | Bug 595 fica difícil reincidir |
+| 4 — Atendente vira só boca (`say, claims, rationale`) | 1-2h | baixo | Coerência arquitetural total |
+| **Total** | **8-11h** | distribuído | quem decide, grava |
+
+### Trade-offs honestos
+
+**A favor:**
+- Coerência arquitetural — quem decide deveria gravar
+- Atendente "burro" não pode inventar dado
+- Planner FINALMENTE justifica o nome (hoje é "selector de tools" disfarçado)
+- Resolve categoria inteira de bugs ("Atendente inventando dado")
+
+**Contra (agora):**
+- Sistema atual está **8-10/10**. Não está em crise.
+- Refator de 8-11h pode introduzir bugs novos
+- 485 testes vão precisar adaptação grande
+- Custo de tokens por turn fica ~10% maior
+- Latência por turn fica ~1-2s maior (Planner ganha mais trabalho)
+
+### Recomendação no fim desta janela
+
+> **Não migra agora. Faz Sprint B e C primeiro. Roda 5-10 conv-testes. Se Atendente errar interpretação semântica em padrão recorrente, aí migra com base em evidência. Se não, mantém status quo — sistema funciona bem.**
+
+## Bugs corrigidos na janela complementar
+
+### 🐛 Bug 593 — PCX 2020 com `produto_oferecido` contaminado da Organizadora
+- **Antes:** Organizadora gravava `produto_oferecido="130/70-13"` sem amarrar à variante PCX 160. Planner consumia → Atendente afirmava compat pra PCX 2020 → mentira.
+- **Fix:** Fase 1 cortou `organizer_facts` do contexto. **Causa raiz fechada.**
+- **Complementar:** a outra janela cadastrou os fitments da PCX 150 (4 produtos), então AGORA o bot sabe a medida certa pela tool e não precisa "chutar".
+
+### 🐛 Bug 595 (acentos)
+- **Antes:** `calcularFrete("Fonseca", "Niteroi")` → 0 resultados, porque `lower('Niterói') != lower('Niteroi')`.
+- **Fix (Migration 0048):** `unaccent` + reescrever resolver. 15/15 cidades batem agora independente de acento.
+
+### 🐛 Bug 595 (multi-item)
+- **Antes:** Cliente comprou pra ele + amigo (2 pneus), bot somou R$ 108,90 (só 1 pneu + frete).
+- **Causa:** `cart_current_items` vazio porque `add_to_cart` não exposto.
+- **Fix (Sprint A):** liberar `add_to_cart` no schema + prompt + 2 exemplos.
+
+## Sprints futuras planejadas (continuação)
+
+| sprint | esforço | resolve |
+|---|---|---|
+| **B** — `remove_from_cart` + `update_cart_item` | 2-3h | "tira um", "quero 2 desse" |
+| **C** — Cancelamento (`clear_cart` + `draft_status='abandoned'`) | 3-4h | "esquece, deixa pra outro dia" |
+| **D** — Múltiplos drafts por conversa | ADIADO | cenário raro, Sprint A já resolve 95% |
+
+## Scripts dessa janela (complementares aos da outra)
+
+| script | uso |
+|---|---|
+| `scripts/aplicar-0048.cjs` | aplica migration 0048 com smoke tests |
+| `scripts/checar-geo-frete.cjs`, `debug-fonseca.cjs` | debug do calcularFrete |
+| `scripts/testar-todas-cidades.cjs` | confirmar 15/15 cidades batem após unaccent |
+| `scripts/checar-itens-conv.cjs` | inspecionar session_items/cart/draft de uma conv |
+| `scripts/checar-uso-analytics.cjs` | uso real das tabelas analytics (confirmou que 4 das 6 estão vazias) |
+| `scripts/descrever-analytics.cjs` | listar colunas das analytics |
+| `scripts/checar-self-correction.cjs` | query nos events de self-correction |
+| `scripts/medir-prompts.cjs` | tamanho atual dos 3 prompts |
+
+## Assinatura — janela complementar
+
+**Autor:** Claude (Anthropic, modelo Sonnet 4.5) — segunda janela do dia
+**Data:** 2026-05-23 — continuação noturna
+**Commits:** `05a324e`, `e5f02d8`, `fe78290` (3 commits, ~250 linhas mudadas)
+**Migrations:** 0048 aplicada
+**Testes:** 485 verdes, typecheck limpo, build OK
+**Bug 593:** mata pela CAUSA RAIZ — organizer_facts isolado (não consome mais em tempo real) + cobertura PCX 150 da outra janela
+**Bug 595:** mata 2 partes — acentos (migration 0048) e multi-item (Sprint A)
+**Caminho do Planner mapeado** como decisão futura baseada em evidência, não em teoria.
+
+---
+
+## Princípio que ficou ao final
+
+> **Se o sistema está em 8-10/10, faça mudanças cirúrgicas (1 problema = 1 fix). Não refatore arquitetura porque "seria mais bonito". Refatore quando padrão de erros justificar.**
+
+A sessão respeitou isso. As 3 mudanças (Fase 1, 0048, Sprint A) foram cirúrgicas. O caminho do Planner ganhar tudo ficou DOCUMENTADO como opção futura, sem ser executado.
