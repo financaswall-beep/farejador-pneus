@@ -122,11 +122,12 @@ describe('Generator prompt v1.5.0 (few-shot)', () => {
     //  v1.4.0           = ~14748 chars
     //  v1.5.0 Sprint6.5 = ~12500
     //  + ex 11/12/13    = ~14650
-    //  + ex 14 + reforco safety (2026-05-22 turno self-correction) = ~16000
+    //  + ex 14 + reforco safety (2026-05-22 self-correction) = ~16000
+    //  + ex 15/16 + add_to_cart (2026-05-23 Sprint A cart) = ~18500
     // Filosofia: agente mais pensativo paga bytes em few-shots criticos. Limite
-    // bruto em 17k pra detectar inflacao acidental, mas reconhecendo que prompt
-    // few-shot eh mais robusto que prompt declarativo enxuto.
-    expect(size).toBeLessThan(17000);
+    // bruto em 20k pra detectar inflacao acidental, mas reconhecendo que prompt
+    // few-shot com 16 exemplos canonicos eh inerentemente maior.
+    expect(size).toBeLessThan(20000);
     expect(size).toBeGreaterThan(4000); // sanity: nao esta vazio
   });
 

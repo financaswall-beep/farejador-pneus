@@ -272,21 +272,27 @@ describe('Generator Shadow — não inventa preço sem tool', () => {
     disableLlm();
   });
 
-  it('bloqueia action fora do escopo shadow, como add_to_cart', async () => {
+  it('aceita add_to_cart (Sprint A 2026-05-23: liberado pro Generator)', async () => {
+    // Antes (Sprint anterior) add_to_cart estava fora do escopo do Generator.
+    // Agora foi liberado pra que o Atendente possa popular cart_current_items
+    // quando cliente confirma compra. O cart vira fonte de verdade pra somar
+    // total. Resolve bug 595 do calculo errado.
     enableLlm();
-    queueLlm('Separei esse produto para você.', [
+    queueLlm('Separei esse produto para você. Posso fechar?', [
       {
         type: 'add_to_cart',
         product_id: '00000000-0000-4000-8000-0000000000aa',
         quantity: 1,
+        unit_price: 99,
       },
     ]);
 
-    const result = await generateTurn(makeContext(), makeDecision('buscar_e_ofertar'), []);
+    const result = await generateTurn(makeContext(), makeDecision('registrar_intencao_fechamento'), []);
 
-    expect(result.blocked).toBe(true);
-    expect(result.say_text).toBeNull();
-    expect(result.block_reason).toContain('generator_schema_failed');
+    expect(result.blocked).toBe(false);
+    expect(result.say_text).toContain('Separei');
+    expect(result.actions).toHaveLength(1);
+    expect(result.actions[0]!.type).toBe('add_to_cart');
     disableLlm();
   });
 

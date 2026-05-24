@@ -22,6 +22,7 @@ import { z } from 'zod';
 import {
   agentActionSchema,
   type AgentAction,
+  type AddToCartAction,
   type CreateItemAction,
   type RecordOfferAction,
   type UpdateDraftAction,
@@ -94,11 +95,26 @@ const updateDraftRawSchema = z.object({
   payment_method: z.enum(['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'boleto']).nullable().optional(),
 });
 
+/**
+ * Sprint A (2026-05-23): add_to_cart liberado pro Generator.
+ * Quando cliente confirma compra ("blz pode fechar", "vou querer"), o
+ * Generator emite uma action add_to_cart por item aceito. Vai pra
+ * agent.cart_current_items, criando fonte de verdade pra somar total.
+ * Resolve bug 595 (Generator somava só item ativo, não todos os cotados).
+ */
+const addToCartRawSchema = z.object({
+  type: z.literal('add_to_cart'),
+  product_id: z.string().min(1),
+  quantity: z.number().int().min(1).max(20),
+  unit_price: z.number().nonnegative().optional(),
+});
+
 export const generatorRawActionSchema = z.discriminatedUnion('type', [
   updateSlotRawSchema,
   createItemRawSchema,
   recordOfferRawSchema,
   updateDraftRawSchema,
+  addToCartRawSchema,
 ]);
 export type GeneratorRawAction = z.infer<typeof generatorRawActionSchema>;
 
@@ -282,6 +298,18 @@ export const generatorOutputJsonSchema = {
               },
             },
           },
+          {
+            // Sprint A (2026-05-23): add_to_cart
+            type: 'object',
+            additionalProperties: false,
+            required: ['type', 'product_id', 'quantity', 'unit_price'],
+            properties: {
+              type: { type: 'string', enum: ['add_to_cart'] },
+              product_id: { type: 'string' },
+              quantity: { type: 'number', minimum: 1, maximum: 20 },
+              unit_price: { type: ['number', 'null'], minimum: 0 },
+            },
+          },
         ],
       },
     },
@@ -392,7 +420,7 @@ export function hydrateGeneratorAction(
     emitted_by: 'generator' as const,
   };
 
-  let candidate: UpdateSlotAction | CreateItemAction | RecordOfferAction | UpdateDraftAction;
+  let candidate: UpdateSlotAction | CreateItemAction | RecordOfferAction | UpdateDraftAction | AddToCartAction;
 
   switch (raw.type) {
     case 'update_slot':
@@ -436,6 +464,18 @@ export function hydrateGeneratorAction(
         ...(raw.delivery_address ? { delivery_address: raw.delivery_address } : {}),
         ...(raw.fulfillment_mode ? { fulfillment_mode: raw.fulfillment_mode } : {}),
         ...(raw.payment_method ? { payment_method: raw.payment_method } : {}),
+      };
+      break;
+    case 'add_to_cart':
+      // Sprint A (2026-05-23): product_id deve ser UUID valido vindo de tool_result.
+      // Se LLM emitir um id simbolico, hidratacao falha (retorna null) e turn fica blocked.
+      // Quantity 1-20. unit_price opcional (handler valida contra DB).
+      candidate = {
+        ...base,
+        type: 'add_to_cart',
+        product_id: raw.product_id,
+        quantity: raw.quantity,
+        ...(raw.unit_price !== undefined ? { unit_price: raw.unit_price } : {}),
       };
       break;
   }
