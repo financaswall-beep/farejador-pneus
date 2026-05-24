@@ -179,7 +179,8 @@ async function main() {
   const turns = await client.query(
     `SELECT id, selected_skill, agent_version, status, say_text, actions,
             llm_duration_ms, llm_input_tokens, llm_output_tokens, error_message,
-            trigger_message_id, delivered_message_id, created_at
+            trigger_message_id, delivered_message_id, created_at,
+            rationale_text
      FROM agent.turns
      WHERE conversation_id = $1
      ORDER BY created_at ASC;`,
@@ -192,6 +193,7 @@ async function main() {
     console.log(`    trigger_msg=${t.trigger_message_id}`);
     console.log(`    duracao=${t.llm_duration_ms}ms | tokens in/out=${t.llm_input_tokens}/${t.llm_output_tokens}`);
     if (t.say_text) console.log(`    SAY: ${truncate(t.say_text, 280)}`);
+    if (t.rationale_text) console.log(`    RATIONALE: ${truncate(t.rationale_text, 800)}`);
     if (t.actions && Array.isArray(t.actions) && t.actions.length > 0) {
       console.log(`    ACOES: ${truncate(JSON.stringify(t.actions), 320)}`);
     }

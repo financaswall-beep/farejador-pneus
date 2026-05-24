@@ -198,6 +198,7 @@ function mockGenerateTurn(
     say_text: validation.blocked ? null : say,
     actions: validation.blocked ? [] : actions,
     claims: [],
+    rationale_text: null, // mock generator nao emite rationale
     prompt_version: activeGeneratorPromptVersion(),
     blocked: validation.blocked,
     block_reason: validation.block_reason,
@@ -227,6 +228,7 @@ function fallbackResult(reason: string): GeneratorResult {
     say_text: null,
     actions: [],
     claims: [],
+    rationale_text: null,
     prompt_version: activeGeneratorPromptVersion(),
     blocked: true,
     block_reason: reason,
@@ -308,7 +310,7 @@ export async function generateTurn(
       };
     }
 
-    const { say, actions: rawActions, claims } = parsed.data;
+    const { say, actions: rawActions, claims, rationale } = parsed.data;
 
     // Sprint 6.5 — Caminho B: hidrata cada action com meta determinístico.
     const turnIndex = context.state.turn_index + 1;
@@ -331,6 +333,7 @@ export async function generateTurn(
           `generator_action_hydration_failed:indexes=${invalid_indexes.join(',')}`,
         ),
         claims, // audit: preserva claims que o Generator emitiu mesmo com action invalida
+        rationale_text: rationale, // audit: preserva rationale mesmo bloqueado
         prompt_version: parsed.data.prompt_version, // versao REAL emitida pelo LLM
         candidate_say_text: say,
         candidate_actions: actions,
@@ -348,6 +351,7 @@ export async function generateTurn(
       say_text: validation.blocked ? null : say,
       actions: validation.blocked ? [] : actions,
       claims, // audit: SEMPRE preserva claims emitidos (mesmo se blocked pelo claim-validator)
+      rationale_text: rationale, // audit: SEMPRE preserva rationale do LLM
       prompt_version: parsed.data.prompt_version, // versao REAL emitida pelo LLM (v1.4.0 ou v1.5.0)
       blocked: validation.blocked,
       block_reason: validation.block_reason,
@@ -470,8 +474,9 @@ export async function recordGeneratorResult(
         selected_skill, agent_version, context_hash,
         say_text, actions, status,
         llm_duration_ms, llm_input_tokens, llm_output_tokens,
-        error_message, blocked_say_text, blocked_actions, blocked_payload)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        error_message, blocked_say_text, blocked_actions, blocked_payload,
+        rationale_text)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      ON CONFLICT (environment, trigger_message_id, agent_version) DO NOTHING`,
     [
       turnId,
@@ -491,6 +496,7 @@ export async function recordGeneratorResult(
       blockedSayText,
       JSON.stringify(blockedActions),
       blockedPayload ? JSON.stringify(blockedPayload) : null,
+      result.rationale_text, // Migration 0049
     ],
   );
 
@@ -529,6 +535,9 @@ export async function recordGeneratorResult(
         // Self-correction: presente apenas quando o worker repetiu o turn.
         self_correction_round: result.self_correction_round ?? 1,
         self_correction_previous_reason: result.self_correction_previous_reason ?? null,
+        // Migration 0049 — rationale tambem no payload do evento (auditoria
+        // independente da migration ja ter rodado, util pra debug).
+        rationale_text: result.rationale_text,
       }),
       deterministicUuid([
         'generator_produced',

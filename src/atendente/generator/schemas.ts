@@ -653,6 +653,13 @@ export interface GeneratorResult {
   candidate_actions: AgentAction[];
   /** Actions cruas recebidas da LLM, quando disponiveis para auditoria. */
   candidate_raw_actions?: unknown[];
+  /**
+   * Justificativa textual emitida pelo LLM no campo `rationale` do output
+   * (max 800 chars). Persistida em agent.turns.rationale_text via migration
+   * 0049 — permite auditoria pos-fato do "por que o LLM decidiu X".
+   * NULL quando fallback_used=true (sem chamada LLM) ou quando parsing falhou.
+   */
+  rationale_text: string | null;
   used_llm: boolean;
   fallback_used: boolean;
   input_tokens: number;
