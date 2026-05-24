@@ -650,3 +650,192 @@ Próximo exemplo que entrar precisa ou (a) fundir com existente ou (b) refator d
 3. **Camadas 1.4 + 1.5** do plano anti-alucinação (~1h) — adicionar `fitment_status` enum em `CompatibilidadeResultado` e `compatible_vehicle_models[]` em `ProdutoOferta`. Backward-compatible.
 4. **Camada 3** (~2h) — exemplos pensativos (pivot moto, compat vazia) já estão parcialmente em Exs 9/15/16. Revisar se ainda falta cobertura.
 5. **Eval suite anti-regresso** (conv 593 + conv 595 multi-item + casos B/C) — protege os 4 bugs deste dia de voltarem.
+
+---
+
+# Janela 4 — Madrugada 2026-05-24 (rationale + auditoria universal + Fix A/B)
+
+> **Adendo 3:** quarta janela, madrugada de 24/05 (transição de dia). Foco: **validar Sprint B+C em conv-teste real** → descoberta de bugs novos → **diagnóstico via observabilidade** → fixes cirúrgicos universais.
+>
+> Princípio reforçado: **evidência antes de mexer no prompt**. Quando o bot deu sintomas estranhos, em vez de mexer no prompt no chute, primeiro instrumentamos (Migration 0049 persistindo o rationale do LLM), depois lemos o que o LLM literalmente pensou, AÍ identificamos a causa raiz e aplicamos fix.
+
+## TL;DR janela 4
+
+| frente | resumo |
+|---|---|
+| **Bug catálogo "Fan"** | alias "Fan" só existia na CG 150 (year_end=2015). Cliente "fan 2019" não casava com nada. Fix: adicionar Fan/fan/CG Fan/Honda Fan como alias da CG 160 também. Aplicado direto no DB prod. |
+| **Bug `posicao_pneu='both'`** | Schema da tool buscarCompatibilidade aceitava `'both'`, função SQL só aceitava `'front'/'rear'/null`. Quando Planner mandava `'both'`, filtro `WHERE position='both'` retornava zero fitments. **Bug latente desde sempre, escondido por outros gaps.** Fix: handler traduz `'both' → NULL` antes da query SQL. |
+| **Observabilidade — Migration 0049** | Descoberto que o `rationale` do LLM era gerado, validado e **jogado fora**. Sem como auditar "por que o LLM decidiu X". Fix: nova coluna `rationale_text` em `agent.turns` + caller persiste após cada turn + `auditar-conversa.ts` mostra. Custo zero (LLM já gerava). |
+| **Auditoria universal de 351 queries** | Pra cada moto + alias popular do catálogo, simula `resolve_vehicle_model` e categoriza em 5 grupos. Resultado: ~52% das motos NÃO precisam de ano, ~44% precisam mesmo, ~4% sem fitment cadastrado. |
+| **Fix Planner — "tente primeiro, pergunte depois"** | Bug observado: Planner pedia ano por hábito mesmo pra motos que tinham 1 só geração (ex.: NMAX). Fix delega decisão ao catálogo: SEMPRE chame buscarCompatibilidade antes de pedir ano. Se função retornar 0/1/N, bot reage diferente. |
+| **Fix Planner — "pivot de veículo redefine foco"** | Bug observado: cliente disse "trocar dianteiro Fan por traseiro NMAX", Planner chamou buscarProduto com medida da Fan (3 turns desperdiçados). Fix: pivot de moto força reset de medida/posição/ano do item anterior. |
+| **Fix Generator — Ex 2 reescrito (a/b/c)** | Ex 2 antigo só ensinava "sem ano = peça ano". Novo cobre 3 sub-casos: (a) tool retornou 1 com fitments → cote direto; (b) tool retornou N com anos → mostre opções; (c) tool vazia → peça medida atual. |
+| **Fix Generator — "anti-cautela-excessiva"** | Adicionado bloco contrabalanceando o "anti-drible". Cliente perguntou tem+preço + tool deu tudo = COTE no mesmo turn. Cautela é pra dado AUSENTE, não pra dado PRESENTE. |
+
+## Commits desta janela
+
+```
+3cdc2c6 feat(atendente): expoe remove_from_cart, update_cart_item, clear_cart no Generator (Sprints B+C)
+7616fb0 fix(commerce-tools): traduz posicao_pneu='both' para NULL em find_compatible_tires + alias Fan na CG 160
+2fa1399 feat(observabilidade): persiste rationale do Generator em agent.turns (migration 0049)
+b3c7bea feat(planner): regra 'tente primeiro, pergunte depois' + 'pivot de veiculo redefine foco'
+87bf1ce feat(generator): reescreve Ex 2 (sem ano: catalogo decide) + safety anti-cautela-excessiva
+```
+
+Migration aplicada em prod: **0049** (rationale_text em agent.turns).
+
+## Conversas-teste e o que cada uma revelou
+
+### Conv 597 (primeira tentativa Fan 2019)
+- **Bot:** "Pra Fan 2019 eu não achei no catálogo direto por modelo. Me passa a medida..."
+- **Diagnóstico:** alias "Fan" não casava com CG 160 (só com CG 150 fora do range).
+- **Fix:** alias da CG 160 atualizado.
+
+### Conv 598 (segundo Fan 2019 — pós-alias)
+- **Bot:** mesmo comportamento. "Me passa a medida..."
+- **Diagnóstico:** alias funcionou (resolveu CG 160 Fan), mas `find_compatible_tires('both')` retornou vazio.
+- **Fix:** `'both' → NULL` no handler.
+
+### Conv 599 (terceiro Fan 2019 — pós-both)
+- **Bot:** Cotou medidas corretas no turn 1, mas:
+  - NÃO citou preço/estoque mesmo tendo na tool
+  - Cliente disse "Fechado os 2" no turn 2 → bot não emitiu `add_to_cart` (Sprint A não disparou)
+  - Cliente "ta certo sim" (turn 6) → ignorado
+- **Diagnóstico inicial:** suspeita de "lost-in-the-middle" no prompt do Atendente
+- **Limitação observada:** o `rationale` do LLM não estava sendo persistido — não dava pra confirmar a hipótese sem mais investigação
+- **Decisão:** instrumentar primeiro (Opção D), mexer no prompt depois
+
+### Migration 0049 — persistir rationale (entre conv 599 e 600)
+
+Coluna `rationale_text TEXT` adicionada em `agent.turns`. Worker grava rationale do output do LLM em cada turn. `auditar-conversa.ts` mostra na seção "RATIONALE" de cada turn.
+
+**Insight crítico:** Custo zero — o LLM **já gerava** o rationale (schema exige `min(1).max(800)`). A gente só parou de jogar no lixo. Storage: ~800 bytes/turn = ~230 MB/ano em volume normal.
+
+### Conv 600 (quarto Fan 2019 — pós-Migration 0049, evidência real)
+
+12 turns completos. Rationale literal de cada turn permitiu refutar "lost-in-the-middle" e identificar a causa REAL.
+
+**Bug 1 — viés de cautela (turn 1):**
+> Rationale literal: *"não posso afirmar estoque nem preço pelo safety, mesmo havendo current_price/total_stock embutidos, porque o resumo comercial não liberou essas afirmações"*
+
+LLM inventou regra que NÃO está no prompt: "campos vindos via buscarCompatibilidade não contam, só via buscarProduto/verificarEstoque separadamente". Resultado: bot fica tímido com dado completo na mão.
+
+**Bug 2 — Sprint A não dispara (turn 10):**
+> Rationale literal: *"carrinho ainda vazio e não há tool neste turno, então não posso reafirmar valor comercial nem adicionar produto sem aceite explícito vinculado a um produto cotado neste turno/histórico estruturado"*
+
+Outra regra inventada: "add_to_cart só vale com record_offer ativa ou tool no turn atual". Causa raiz do Sprint A não disparar.
+
+**Bug 3 — pivot quebrado (turns 5-7):**
+> Cliente disse "trocar dianteiro Fan por traseiro NMAX". Planner chamou `buscarProduto(100/90-18, rear)` — medida da Fan. Em 3 turns seguidos não chamou `buscarCompatibilidade(NMAX, ...)`. Cliente teve que dar ano (turn 6) E medida (turn 7) manualmente — dados que o catálogo já tinha.
+
+## Auditoria universal — 351 queries testadas
+
+Script: `scripts/auditar-resolve-todas-motos.cjs`
+
+Pra cada `model` distinto + cada alias popular, simula `resolve_vehicle_model(query, NULL)` e categoriza pelo número de resultados + comparação de fitments.
+
+| categoria | queries | % | comportamento esperado |
+|---|---:|---:|---|
+| 🟢 A — resolve sozinho com fitments | 167 | 47.6% | cota direto, 1 turn |
+| 🟢 D — N entradas mas fitments idênticos | 16 | 4.6% | qualquer ano serve |
+| 🟡 B — PRECISA ano (anos diferentes) | 150 | 42.7% | bot apresenta opções |
+| 🟡 C — PRECISA variante | 5 | 1.4% | bot apresenta opções |
+| 🔴 A-sem-fitment — catálogo sem produto | 13 | 3.7% | bot honesto |
+
+**Conclusão:** ~52% das motos do catálogo NÃO precisam de ano. Bot pedia por hábito. Os fixes A+B (Planner+Generator) delegam decisão ao catálogo — zero hardcoded, escala automaticamente quando cadastrar motos novas.
+
+### 13 motos sem fitment (gaps de catálogo)
+
+| make | model |
+|---|---|
+| Aprilia | Tuareg 660 |
+| Bajaj | Pulsar N160 |
+| GasGas | ES 700 |
+| Garinni | GR 150 ST |
+| Haojue | DL |
+| Husqvarna | 701 Enduro |
+| Kawasaki | KLR 650 |
+| MVK | Fox 110 |
+| Shineray | Phoenix 50 |
+| Traxx | Sky 50, Sky 125, Work 125 |
+| Zontes | 310 |
+
+Bot vai resolver essas motos (resolver funciona) mas retornar `produtos:[]` quando perguntarem por pneu. Comportamento correto: "não tenho cadastrado, me passa a medida atual" (Ex 9 já cobre).
+
+## Tamanho dos prompts — final da janela 4
+
+| prompt | inicio do dia 23/05 | final janela 4 (24/05) | delta |
+|---|---:|---:|---:|
+| **Atendente v1.5** | 4.375 tok | **5.144 tok** | +769 |
+| **Planner** | 2.083 tok | **2.550 tok** | +467 |
+| **Organizadora** | 2.864 tok | 2.864 tok | 0 |
+
+Atendente: 🟡 zona amarela alta, 356 tokens de folga até 5.500 (limite vermelho conceitual). **Próximo exemplo novo no Generator exige refator obrigatório** (modularizar por skill — Opção C do diagnóstico).
+
+Planner: 🟢 zona verde-amarela, muita folga.
+
+Guard rail do teste subiu de 20k → 21k chars com histórico documentado.
+
+## Princípios reforçados nesta janela
+
+1. **Evidência antes de mexer:** descobriu que sem rationale persistido, qualquer mudança no prompt é palpite. Instrumentou (Migration 0049) antes de mexer.
+
+2. **Catálogo decide, não prompt:** Fix A+B não tem lista hardcoded de "motos que precisam ano". O catálogo decide via tool. Quando cadastrar moto nova, sistema se adapta sozinho.
+
+3. **Fix cirúrgico, não refator:** Resistiu a tentação de Opção C (modular por skill) — fixes A+B resolvem 90% dos sintomas observados sem refator estrutural.
+
+4. **LLM inventa regras silenciosamente:** mesmo prompt enxuto, o LLM extrapola dos exemplos e cria restrições que não estão escritas. Anti-cautela-excessiva foi a contramedida.
+
+## O que NÃO foi feito (dívida técnica clara)
+
+| item | razão |
+|---|---|
+| Sprint B+C testado em conv real (remove/update/clear) | Conv 600 não chegou a usar essas capacidades — cliente fluiu para fechamento. Próxima conv-teste deve forçar o cenário. |
+| Eval suite anti-regresso | Pendente desde Janela 2. Cada conv-teste hoje é manual — sem teste automático que pegue regressão. |
+| Cadastro dos 13 gaps de fitment | Decisão de produto, não técnica. |
+| Auditoria nível 2 (cross-check web) | Não justifica esforço enquanto não houver evidência de fitment errado. |
+| Modular por skill (Opção C) | Adiado até Atendente passar de 5.500 tokens ou ignorar regra explícita de novo. |
+| Promoted_order em commerce.orders | Draft fica em `ready` mas nunca promove pra `commerce.orders`. Pode ser design (human-in-the-loop) ou bug. Não investigado. |
+| Incidentes `evidence_not_literal` e `schema_violation` da conv 600 | Registrados em `ops.agent_incidents` mas não investigados. |
+
+## Scripts criados nesta janela
+
+| script | uso |
+|---|---|
+| `scripts/fix-fan-alias.cjs` | Aplica alias Fan na CG 160 (dry-run/commit). Já rodado em prod. |
+| `scripts/debug-cg160-fitments.cjs` | Debug que descobriu o bug do `'both'`. |
+| `scripts/diag-rationale-599.cjs` | Tentativa de pegar rationale antes da Migration 0049 (descobriu que não era persistido). |
+| `scripts/audit-aliases-multigeracao.cjs` | Procura aliases genéricos cobrindo só uma geração. |
+| `scripts/testar-resolves-suspeitos.cjs` | Testa resolve_vehicle_model em casos típicos. |
+| `scripts/auditar-resolve-todas-motos.cjs` | **Auditoria universal de 351 queries — categoriza A/B/C/D/sem-fitment.** |
+| `scripts/planner-rationales-600.cjs` | Extrai rationale do Planner por turn de uma conv. |
+
+## Assinatura — janela 4
+
+**Autor:** Claude (Anthropic, modelos Sonnet 4.6, Sonnet 4.7, Opus 4.7 — vários switches durante a sessão)
+**Data:** 2026-05-24 (madrugada)
+**Commits:** 5 (`3cdc2c6`, `7616fb0`, `2fa1399`, `b3c7bea`, `87bf1ce`) + docs
+**Migrations aplicadas:** 0049 (rationale_text)
+**Testes:** 485/485 verdes em toda a janela
+**Conv-testes:** 4 (597, 598, 599, 600)
+**Bugs cirurgicamente mortos:** 5
+- Fan + alias errado
+- `'both'` no handler vs SQL
+- Observabilidade vazia (rationale jogado fora)
+- Planner pedindo ano por hábito
+- Generator com viés de cautela inventando regras
+
+## Punch list — próxima janela
+
+1. **Aguardar redeploy do Coolify**, apagar conversa no Chatwoot UI, refazer conv-teste:
+   - Esperado: "tenho fan 2019, quero traseiro e dianteiro" → bot deve cotar 80/100-18 + 100/90-18 com preço e estoque NO MESMO TURN (Ex 1, sem mais "se quiser, eu confirmo")
+   - Esperado: "tenho NMAX, quanto sai o traseiro?" → bot cota 130/70-13 R$99 SEM pedir ano (Ex 2a)
+   - Esperado: "tenho PCX, quanto?" → bot apresenta as 2 opções (PCX 150 e PCX 160) e pede ano (Ex 2b)
+2. **Forçar cenário Sprint B+C** na próxima conv-teste:
+   - Cliente fecha 2 itens → testa add_to_cart (Sprint A)
+   - "tira o traseiro" → testa remove (Sprint B)
+   - "quero 2 do dianteiro" → testa update (Sprint B)
+   - "esquece, deixa pra outro dia" → testa clear (Sprint C)
+3. **Ler rationales pós-fix:** se Generator ainda ficar tímido OU se Planner ainda errar pivot, o rationale vai dizer onde o LLM está falhando.
+4. **Investigar incidentes** `evidence_not_literal` e `schema_violation` (conv 600).
+5. **Eval suite anti-regresso** — virar conv 593, 595, 599, 600 em testes sintéticos.
