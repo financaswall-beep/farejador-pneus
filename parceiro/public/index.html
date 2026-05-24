@@ -290,7 +290,7 @@
               <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(resumo?.sales_month)"></div>
               <div class="flex items-center gap-1.5 text-xs text-emerald-700 mt-2">
                 <i data-lucide="arrow-up" class="w-3.5 h-3.5"></i>
-                <span>dados reais do mês atual</span>
+                <span>vendas registradas</span>
               </div>
             </div>
             <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
@@ -308,7 +308,7 @@
               <div class="text-xl font-semibold mt-2 tracking-tight" x-text="money(totalCusts)"></div>
               <div class="flex items-center gap-1.5 text-xs text-slate-600 mt-2">
                 <i data-lucide="scale" class="w-3.5 h-3.5"></i>
-                <span>vendas necessárias para empatar</span>
+                <span>compras + despesas pagas</span>
               </div>
             </div>
             <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
@@ -318,7 +318,7 @@
               <div class="flex items-center gap-1.5 text-xs mt-2"
                    :class="Number(resumo?.estimated_result_month || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'">
                 <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
-                <span>vendas menos custos</span>
+                <span>vendas - compras - despesas</span>
               </div>
             </div>
             <div class="relative bg-white border border-gray-200 rounded-lg p-4 pl-5 shadow-sm min-h-[116px] overflow-hidden">
@@ -461,7 +461,7 @@
                   <div class="flex-1">
                     <div class="text-sm text-slate-500">Contas a pagar</div>
                     <div class="text-xl font-semibold" x-text="money(payablesOpenTotal)"></div>
-                    <div class="text-xs text-slate-500">Total em aberto</div>
+                    <div class="text-xs text-slate-500" x-text="'Pago no mês: ' + money(payablesPaidMonthTotal)"></div>
                   </div>
               </div>
               <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-center gap-4">
@@ -471,7 +471,7 @@
                   <div class="flex-1">
                     <div class="text-sm text-slate-500">Contas a receber</div>
                     <div class="text-xl font-semibold" x-text="money(receivablesOpenTotal)"></div>
-                    <div class="text-xs text-slate-500">Total a receber</div>
+                    <div class="text-xs text-slate-500" x-text="'Recebido no mês: ' + money(receivablesReceivedMonthTotal)"></div>
                   </div>
               </div>
             </div>
@@ -495,7 +495,7 @@
                   </div>
                   <div>
                     <h3 class="font-semibold text-base leading-tight">Cadastrar conta a pagar</h3>
-                    <p class="text-xs text-slate-500">Despesa futura da unidade</p>
+                    <p class="text-xs text-slate-500">Em aberto ou pago agora</p>
                   </div>
                 </div>
                 <div class="text-right">
@@ -558,7 +558,7 @@
                 </div>
               </div>
               <div class="mt-4 flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-                <span class="text-xs text-slate-500" x-text="payableForm.status === 'paid' ? 'Valor pago agora' : 'Valor que vai sair'"></span>
+                <span class="text-xs text-slate-500" x-text="payableForm.status === 'paid' ? 'Entra no custo do mês' : 'Fica em contas a pagar'"></span>
                 <span class="text-sm font-semibold text-rose-700" x-text="money(payableForm.amount)"></span>
               </div>
               <button @click="savePayable()" :disabled="saving" class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-800 hover:bg-rose-900 active:bg-rose-950 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm transition-all">
@@ -575,7 +575,7 @@
                   </div>
                   <div>
                     <h3 class="font-semibold text-base leading-tight">Cadastrar conta a receber</h3>
-                    <p class="text-xs text-slate-500">Recebimento futuro da unidade</p>
+                    <p class="text-xs text-slate-500">Em aberto ou recebido agora</p>
                   </div>
                 </div>
                 <div class="text-right">
@@ -635,7 +635,7 @@
                 </div>
               </div>
               <div class="mt-4 flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
-                <span class="text-xs text-slate-500" x-text="receivableForm.status === 'received' ? 'Valor recebido agora' : 'Valor que vai entrar'"></span>
+                <span class="text-xs text-slate-500" x-text="receivableForm.status === 'received' ? 'Recebido no caixa' : 'Fica em contas a receber'"></span>
                 <span class="text-sm font-semibold text-emerald-700" x-text="money(receivableForm.amount)"></span>
               </div>
               <button @click="saveReceivable()" :disabled="saving" class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm transition-all">
@@ -1146,6 +1146,6 @@
   </main>
 </div>
 
-<script src="./app.js?v=20260524-financeiro-parceiro-1"></script>
+<script src="./app.js?v=20260524-financeiro-parceiro-2"></script>
 </body>
 </html>

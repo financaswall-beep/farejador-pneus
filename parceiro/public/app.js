@@ -306,6 +306,18 @@ function parceiroApp() {
         .reduce((sum, receivable) => sum + this.num(receivable.amount), 0);
     },
 
+    get payablesPaidMonthTotal() {
+      return this.payables
+        .filter((payable) => payable.status === 'paid' && this.isCurrentMonth(payable.paid_at || payable.created_at))
+        .reduce((sum, payable) => sum + this.num(payable.amount), 0);
+    },
+
+    get receivablesReceivedMonthTotal() {
+      return this.receivables
+        .filter((receivable) => receivable.status === 'received' && this.isCurrentMonth(receivable.received_at || receivable.created_at))
+        .reduce((sum, receivable) => sum + this.num(receivable.amount), 0);
+    },
+
     get salesTodayCount() {
       const today = new Date().toISOString().slice(0, 10);
       return this.vendas.filter((sale) => String(sale.created_at || '').slice(0, 10) === today && sale.status !== 'cancelled').length;
@@ -395,6 +407,14 @@ function parceiroApp() {
     get lastUpdatedLabel() {
       if (!this.lastUpdatedAt) return 'Aguardando atualização';
       return `Atualizado ${this.lastUpdatedAt.toLocaleString('pt-BR')}`;
+    },
+
+    isCurrentMonth(value) {
+      if (!value) return false;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return false;
+      const now = new Date();
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
     },
 
     get saleTotalLabel() {
@@ -796,7 +816,9 @@ function parceiroApp() {
         });
         this.payableForm = { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' };
         await this.loadData();
-        this.flash(wasPaid ? 'Pagamento registrado no custo do mês.' : 'Conta a pagar cadastrada.');
+        this.flash(wasPaid
+          ? 'Pagamento registrado no custo do mês.'
+          : 'Conta a pagar cadastrada em aberto.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -832,7 +854,9 @@ function parceiroApp() {
         });
         this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' };
         await this.loadData();
-        this.flash(wasReceived ? 'Recebimento registrado.' : 'Conta a receber cadastrada.');
+        this.flash(wasReceived
+          ? 'Recebimento registrado.'
+          : 'Conta a receber cadastrada em aberto.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
