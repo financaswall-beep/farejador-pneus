@@ -106,7 +106,7 @@ export function buildPlannerMessages(context: PlannerContext): OpenAIMessage[] {
           tool_requests: 'array de {tool,input}; input deve validar no schema da tool',
           risk_flags: 'array de flags',
           confidence: '0..1',
-          rationale: 'max 500 chars',
+          rationale: 'max 800 chars',
           prompt_version: plannerPromptVersion,
         },
       }),
