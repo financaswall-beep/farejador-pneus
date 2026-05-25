@@ -38,6 +38,7 @@ describe('buildPlannerContext', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 
     const context = await buildPlannerContext({ query } as never, 'test', conversationId);
@@ -52,13 +53,16 @@ describe('buildPlannerContext', () => {
     ]);
     expect(context.recent_tool_results).toEqual([]);
     expect(context.organizer_facts).toEqual([]);
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(context.last_skill).toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(4);
     expect(query.mock.calls[0]?.[0]).toContain('FROM core.messages');
     expect(query.mock.calls[0]?.[1]).toEqual(['test', conversationId, null, 20]);
     expect(query.mock.calls[1]?.[0]).toContain("event_type IN ('tool_executed', 'tool_failed')");
     expect(query.mock.calls[1]?.[1]).toEqual(['test', conversationId, 7]);
-    expect(query.mock.calls[2]?.[0]).toContain('FROM analytics.current_facts');
-    expect(query.mock.calls[2]?.[1]).toEqual(['test', conversationId, 31]);
+    expect(query.mock.calls[2]?.[0]).toContain("event_type = 'planner_decided'");
+    expect(query.mock.calls[2]?.[1]).toEqual(['test', conversationId]);
+    expect(query.mock.calls[3]?.[0]).toContain('FROM analytics.current_facts');
+    expect(query.mock.calls[3]?.[1]).toEqual(['test', conversationId, 31]);
   });
 
   it('le tool_executed e tool_failed reais como recent_tool_results', async () => {
@@ -80,6 +84,7 @@ describe('buildPlannerContext', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
 
     const context = await buildPlannerContext({ query } as never, 'test', conversationId);
@@ -100,6 +105,7 @@ describe('buildPlannerContext', () => {
     const { buildPlannerContext } = await import('../../../../src/atendente/planner/context-builder.js');
     const query = vi
       .fn()
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({

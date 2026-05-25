@@ -40,6 +40,36 @@ export interface OpenAIResponseCallOptions extends OpenAICallOptions {
     schema: OpenAIJsonSchema;
     strict?: boolean;
   };
+  /**
+   * Reasoning effort for gpt-5.x / o1 / o3 models. Ignored by other models.
+   * 'none' = ~0 reasoning tokens. 'low' = balanceado. 'medium' = default OpenAI.
+   * Reduz custo cortando tokens "thinking".
+   */
+  reasoning?: { effort: 'none' | 'low' | 'medium' | 'high' | 'xhigh' };
+  /**
+   * Output verbosity for gpt-5.x models. Ignored by other models.
+   * 'low' corta ~15-20% dos tokens de resposta sem alterar conteudo essencial.
+   */
+  verbosity?: 'low' | 'medium' | 'high';
+}
+
+/**
+ * Detecta se o modelo eh reasoning (gpt-5.x, o1, o3).
+ * Reasoning models aceitam reasoning.effort e text.verbosity.
+ * NAO aceitam temperature customizada — passar resulta em HTTP 400.
+ */
+export function isReasoningModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return /^(gpt-5|o1|o3)(?:$|[-_.])/.test(normalized);
+}
+
+/**
+ * Detecta se o modelo aceita o parametro `temperature`.
+ * Apenas GPT-4o e GPT-4.1.
+ */
+export function supportsCustomTemperature(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return /^(gpt-4o|gpt-4\.1)(?:$|[-_])/.test(normalized);
 }
 
 const OPENAI_CHAT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -85,7 +115,19 @@ export async function callOpenAI(options: OpenAICallOptions): Promise<OpenAICall
  * outputs. When jsonSchema is omitted, JSON object mode is still requested.
  */
 export async function callOpenAIResponse(options: OpenAIResponseCallOptions): Promise<OpenAICallResult> {
-  const { apiKey, model, messages, timeoutMs, maxTokens = 2000, temperature, jsonSchema } = options;
+  const { apiKey, model, messages, timeoutMs, maxTokens = 2000, temperature, jsonSchema, reasoning, verbosity } = options;
+
+  const textBlock: Record<string, unknown> = {
+    format: jsonSchema
+      ? {
+          type: 'json_schema',
+          name: jsonSchema.name,
+          schema: jsonSchema.schema,
+          strict: jsonSchema.strict ?? true,
+        }
+      : { type: 'json_object' },
+  };
+  if (verbosity !== undefined) textBlock.verbosity = verbosity;
 
   const requestBody: Record<string, unknown> = {
     model,
@@ -94,18 +136,10 @@ export async function callOpenAIResponse(options: OpenAIResponseCallOptions): Pr
       content: message.content,
     })),
     max_output_tokens: maxTokens,
-    text: {
-      format: jsonSchema
-        ? {
-            type: 'json_schema',
-            name: jsonSchema.name,
-            schema: jsonSchema.schema,
-            strict: jsonSchema.strict ?? true,
-          }
-        : { type: 'json_object' },
-    },
+    text: textBlock,
   };
   if (temperature !== undefined) requestBody.temperature = temperature;
+  if (reasoning !== undefined) requestBody.reasoning = reasoning;
 
   const json = await postOpenAI(OPENAI_RESPONSES_ENDPOINT, apiKey, requestBody, timeoutMs);
   const content = extractResponsesText(json);

@@ -49,6 +49,12 @@ export interface PlannerContext {
   recent_tool_results: ToolResultSummary[];
   organizer_facts: OrganizerFactSummary[];
   derived_signals: ConversationState['derived_signals'];
+  /**
+   * Skill decidida no turn anterior (do evento planner_decided mais recente).
+   * Undefined no primeiro turn da conversa. Usado pra ajustar reasoning.effort
+   * dinamicamente: triviais (responder_geral/escalar_humano) -> 'none', resto -> 'low'.
+   */
+  last_skill?: string;
 }
 
 export async function buildPlannerContext(
@@ -95,6 +101,18 @@ export async function buildPlannerContext(
      LIMIT $3`,
     [environment, conversationId, env.ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT],
   );
+  const lastPlannerDecision = await client.query<{ skill_name: string | null }>(
+    `SELECT skill_name
+     FROM agent.session_events
+     WHERE environment = $1
+       AND conversation_id = $2
+       AND event_type = 'planner_decided'
+     ORDER BY occurred_at DESC
+     LIMIT 1`,
+    [environment, conversationId],
+  );
+  const lastSkill = lastPlannerDecision.rows[0]?.skill_name ?? undefined;
+
   const organizerFacts = await client.query<{
     fact_key: string;
     fact_value: unknown;
@@ -168,6 +186,7 @@ export async function buildPlannerContext(
     // sem amarrar à variante da moto) viravam mentira no atendimento.
     organizer_facts: [],
     derived_signals: state.derived_signals,
+    last_skill: lastSkill ?? undefined,
   };
 }
 

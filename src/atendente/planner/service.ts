@@ -1,7 +1,11 @@
 import type { PoolClient } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { deterministicUuid } from '../../shared/deterministic-id.js';
-import { callOpenAIResponse } from '../../shared/llm-clients/openai.js';
+import {
+  callOpenAIResponse,
+  isReasoningModel,
+  supportsCustomTemperature,
+} from '../../shared/llm-clients/openai.js';
 import { sessionSlotKeySchema } from '../../shared/zod/agent-state.js';
 import type { PlannerContext } from './context-builder.js';
 import { buildPlannerMessages } from './prompt.js';
@@ -278,6 +282,7 @@ async function callPlannerModel(
     });
   }
 
+  const reasoningEnabled = isReasoningModel(env.PLANNER_MODEL);
   const result = await callOpenAIResponse({
     apiKey: env.PLANNER_OPENAI_API_KEY!,
     model: env.PLANNER_MODEL,
@@ -286,10 +291,17 @@ async function callPlannerModel(
     // Reasoning models (gpt-5.x) gastam tokens "pensando" antes de responder.
     // 800 tokens estourava no meio do output -> JSON truncado -> "Unterminated string".
     // 3000 da espaço pra reasoning + output completo. Modelos nao-reasoning seguem em 800.
-    maxTokens: isReasoningModel(env.PLANNER_MODEL) ? 3000 : 800,
+    maxTokens: reasoningEnabled ? 3000 : 800,
     // Reasoning models (gpt-5.x) NAO aceitam parametro temperature — HTTP 400.
     // So passa temperature pra modelos GPT-4o/4.1 que aceitam.
     temperature: supportsCustomTemperature(env.PLANNER_MODEL) ? 0 : undefined,
+    // Reasoning dinamico: 'none' apos trivial, 'low' nos demais casos.
+    // Corta ~40-50% dos reasoning tokens vs default 'medium'.
+    reasoning: reasoningEnabled
+      ? { effort: effortForContext(context.last_skill) }
+      : undefined,
+    // Verbosity baixa: resposta mais concisa, ~15-20% menos tokens de output.
+    verbosity: reasoningEnabled ? 'low' : undefined,
     jsonSchema: {
       name: 'planner_output',
       schema: plannerOutputJsonSchema,
@@ -504,22 +516,20 @@ function fallbackResult(reason: string): PlannerDecisionResult {
 }
 
 /**
- * Detecta se o modelo aceita o parametro `temperature`.
- * Reasoning models (gpt-5.x, o1, o3) NAO aceitam — HTTP 400.
- * Apenas modelos GPT-4o e GPT-4.1 aceitam temperature customizada.
+ * Escolhe reasoning.effort baseado na skill DO TURN ANTERIOR.
+ * NAO classifica mensagem do cliente — usa sinal ja existente em agent.session_events.
  *
- * Mesmo regex do generator/service.ts — manter sincronizado.
+ * - Turn anterior foi conversa trivial (responder_geral / escalar_humano) -> 'none'
+ *   (proximo turn provavelmente tambem eh simples; reasoning quase 0)
+ * - Demais casos / primeiro turn -> 'low' (default balanceado, ~40% mais barato que medium)
+ *
+ * Skills "complexas" (buscar_e_ofertar, registrar_intencao_fechamento) NAO recebem
+ * boost — Planner lida bem com confidence 0.90+ mesmo em 'low' (conv 608 confirma).
+ *
+ * Se qualidade cair, encurtar a lista de triviais ou forçar 'low' fixo.
  */
-function supportsCustomTemperature(model: string): boolean {
-  const normalized = model.trim().toLowerCase();
-  return /^(gpt-4o|gpt-4\.1)(?:$|[-_])/.test(normalized);
-}
-
-/**
- * Reasoning models (gpt-5.x, o1, o3) gastam tokens "pensando" antes do output final.
- * Precisam de budget maior pra nao truncar JSON no meio.
- */
-function isReasoningModel(model: string): boolean {
-  const normalized = model.trim().toLowerCase();
-  return /^(gpt-5|o1|o3)(?:$|[-_.])/.test(normalized);
+function effortForContext(lastSkill: string | undefined): 'none' | 'low' {
+  if (!lastSkill) return 'low';
+  const triviais = new Set(['responder_geral', 'escalar_humano']);
+  return triviais.has(lastSkill) ? 'none' : 'low';
 }

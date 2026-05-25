@@ -37,7 +37,7 @@ const envSchema = z.object({
   ATENDENTE_SHADOW_ENABLED: booleanStringSchema,
   ATENDENTE_SHADOW_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   ATENDENTE_CONTEXT_MESSAGES_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).default('20'),
-  ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(50)).default('5'),
+  ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(50)).default('3'),
   ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).default('25'),
   // Generator Shadow (Sprint 6): gera resposta candidata auditavel, sem envio Chatwoot.
   GENERATOR_LLM_ENABLED: booleanStringSchema,
