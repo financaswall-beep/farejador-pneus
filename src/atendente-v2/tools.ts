@@ -124,6 +124,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           modalidade: { type: 'string', enum: ['delivery', 'pickup'] },
           endereco_entrega: { type: 'string', description: 'Obrigatório se modalidade=delivery' },
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
+          valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
@@ -252,8 +253,19 @@ async function criarPedido(
   args: Record<string, unknown>,
 ): Promise<string> {
   const itens = args.itens as PedidoItem[];
-  const totalAmount = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+  const subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
+  const valorFrete = Number(args.valor_frete ?? 0) || 0;
+
+  // Guard: delivery sem frete é provavelmente o LLM esquecendo o campo.
+  // Retorna erro estruturado pra ele rechamar com valor_frete.
+  if (modalidade === 'delivery' && valorFrete <= 0) {
+    return JSON.stringify({
+      erro: 'valor_frete obrigatório quando modalidade=delivery. Reuse o valor do calcular_frete que você já chamou.',
+    });
+  }
+
+  const totalAmount = subtotal + valorFrete;
 
   // Busca contact_id direto da conversa
   const convResult = await client.query<{ contact_id: string | null }>(
@@ -303,6 +315,8 @@ async function criarPedido(
   return JSON.stringify({
     ok: true,
     order_number: order.order_number,
+    subtotal_itens: subtotal.toFixed(2),
+    valor_frete: valorFrete.toFixed(2),
     total: totalAmount.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
   });
