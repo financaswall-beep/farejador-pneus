@@ -152,110 +152,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 ];
 
-// ─── Helpers: enxugam retornos das tools antes de virar JSON pro LLM ─────
-// Removem campos que o LLM não usa (vehicle_model_id, is_oem, source,
-// confidence_level, displacement_cc, etc.) — esses dados ficam acumulados
-// no histórico turn a turn e somam tokens à toa.
-
-function trimVeiculo(v: {
-  vehicle_model_id: string;
-  make: string;
-  model: string;
-  variant: string | null;
-  year_start: number | null;
-  year_end: number | null;
-  displacement_cc: number | null;
-  produtos: Array<{
-    product_id: string;
-    product_name: string;
-    brand: string | null;
-    tire_size: string;
-    position: 'front' | 'rear' | 'both';
-    is_oem: boolean;
-    source: string;
-    confidence_level: string | null;
-    current_price: string | null;
-    total_stock: number;
-  }>;
-}): Record<string, unknown> {
-  const moto: Record<string, unknown> = { model: v.model };
-  if (v.variant) moto.variant = v.variant;
-  if (v.year_start && v.year_end) moto.ano = `${v.year_start}-${v.year_end}`;
-  else if (v.year_start) moto.ano = `${v.year_start}+`;
-
-  return {
-    moto,
-    produtos: v.produtos.map((p) => {
-      const item: Record<string, unknown> = {
-        id: p.product_id,
-        nome: p.product_name,
-        medida: p.tire_size,
-        pos: p.position,
-        preco: p.current_price ? Number(p.current_price) : null,
-        estoque: p.total_stock,
-      };
-      if (p.brand) item.marca = p.brand;
-      return item;
-    }),
-  };
-}
-
-function trimProduto(p: {
-  product_id: string;
-  product_code: string;
-  product_name: string;
-  brand: string | null;
-  tire_size: string | null;
-  tire_position: 'front' | 'rear' | 'both' | null;
-  price_amount: string | null;
-  total_stock_available: number;
-}): Record<string, unknown> {
-  const item: Record<string, unknown> = {
-    id: p.product_id,
-    nome: p.product_name,
-    medida: p.tire_size,
-    pos: p.tire_position,
-    preco: p.price_amount ? Number(p.price_amount) : null,
-    estoque: p.total_stock_available,
-  };
-  if (p.brand) item.marca = p.brand;
-  return item;
-}
-
-function trimEstoque(e: {
-  product_id: string;
-  product_name: string;
-  disponivel: boolean;
-  quantidade_total: number;
-}): Record<string, unknown> {
-  return {
-    id: e.product_id,
-    nome: e.product_name,
-    disponivel: e.disponivel,
-    qtd: e.quantidade_total,
-  };
-}
-
-function trimFrete(f: {
-  encontrado: boolean;
-  bairro_canonico: string | null;
-  municipio: string | null;
-  disponivel: boolean;
-  valor: string | null;
-  prazo_dias: number | null;
-  motivo?: string;
-}): Record<string, unknown> {
-  if (!f.encontrado) return { encontrado: false, motivo: f.motivo ?? 'bairro não encontrado' };
-  return {
-    encontrado: true,
-    bairro: f.bairro_canonico,
-    municipio: f.municipio,
-    disponivel: f.disponivel,
-    valor: f.valor ? Number(f.valor) : null,
-    prazo_dias: f.prazo_dias,
-  };
-}
-
 // ─── Tool executors ────────────────────────────────────────────────────────
 
 export async function executeTool(
@@ -275,8 +171,8 @@ export async function executeTool(
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
           limit: 10,
         });
-        if (result.length === 0) return JSON.stringify({ ok: false, msg: 'Nenhuma moto encontrada.' });
-        return JSON.stringify({ ok: true, veiculos: result.map(trimVeiculo) });
+        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        return JSON.stringify({ encontrado: true, veiculos: result });
       }
 
       case 'buscar_produto': {
@@ -288,8 +184,8 @@ export async function executeTool(
           apenas_com_estoque: (args.apenas_com_estoque as boolean | undefined) ?? false,
           limit: 10,
         });
-        if (result.length === 0) return JSON.stringify({ ok: false, msg: 'Nenhum produto encontrado.' });
-        return JSON.stringify({ ok: true, produtos: result.map(trimProduto) });
+        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        return JSON.stringify({ encontrado: true, produtos: result });
       }
 
       case 'calcular_frete': {
@@ -298,7 +194,7 @@ export async function executeTool(
           bairro: args.bairro as string,
           municipio: args.municipio as string | undefined,
         });
-        return JSON.stringify(trimFrete(result));
+        return JSON.stringify(result);
       }
 
       case 'verificar_estoque': {
@@ -308,7 +204,7 @@ export async function executeTool(
           product_code: args.product_code as string | undefined,
         });
         if (!result) return JSON.stringify({ encontrado: false });
-        return JSON.stringify(trimEstoque(result));
+        return JSON.stringify(result);
       }
 
       case 'buscar_politica': {
