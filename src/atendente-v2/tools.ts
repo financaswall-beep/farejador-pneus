@@ -62,7 +62,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         required: ['bairro'],
         additionalProperties: false,
       },
-      strict: true,
     },
   },
   {
@@ -130,7 +129,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
       },
-      strict: true,
     },
   },
   {
