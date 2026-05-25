@@ -39,6 +39,8 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     let inputTokens = 0;
     let outputTokens = 0;
     let finalText: string | null = null;
+    // Acumula tool calls + results pra persistir em agent.turns.actions
+    const turnActions: ChatMessage[] = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const response = await callOpenAIWithTools(messages);
@@ -51,11 +53,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
 
       // Add assistant message with tool_calls
-      messages.push({
+      const assistantToolMsg: ChatMessage = {
         role: 'assistant',
         content: null,
         tool_calls: response.tool_calls,
-      });
+      };
+      messages.push(assistantToolMsg);
+      turnActions.push(assistantToolMsg);
 
       // Execute all tool calls in parallel (reads only) or serial (writes)
       for (const toolCall of response.tool_calls) {
@@ -68,21 +72,23 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
 
         const isWrite = toolCall.function.name === 'criar_pedido';
 
+        let result: string;
         if (isWrite) {
           // Run inside a transaction for writes
           await client.query('BEGIN');
           try {
-            const result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
+            result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
             await client.query('COMMIT');
-            messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
           } catch (err) {
             await client.query('ROLLBACK');
             throw err;
           }
         } else {
-          const result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
-          messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
+          result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
         }
+        const toolMsg: ChatMessage = { role: 'tool', tool_call_id: toolCall.id, content: result };
+        messages.push(toolMsg);
+        turnActions.push(toolMsg);
       }
     }
 
@@ -95,19 +101,20 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const textToSend = finalText.replace(/^OPCOES:.*$/gm, '').trim();
     await sendMessage(chatwootConvId, textToSend);
 
-    // 5. Log turn (lightweight)
+    // 5. Log turn (com actions pra reconstruir histórico de tool calls)
     await client.query(
       `INSERT INTO agent.turns (
          environment, conversation_id, trigger_message_id,
-         agent_version, context_hash, say_text,
+         agent_version, context_hash, say_text, actions,
          llm_input_tokens, llm_output_tokens, llm_duration_ms, status
-       ) VALUES ($1, $2, $3, 'v2', '', $4, $5, $6, $7, 'delivered')
+       ) VALUES ($1, $2, $3, 'v2', '', $4, $5::jsonb, $6, $7, $8, 'delivered')
        ON CONFLICT DO NOTHING`,
       [
         environment,
         conversationId,
         job.triggerMessageId,
         textToSend.slice(0, 4000),
+        JSON.stringify(turnActions),
         inputTokens,
         outputTokens,
         Date.now() - start,
