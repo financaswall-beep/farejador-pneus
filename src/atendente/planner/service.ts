@@ -284,7 +284,9 @@ async function callPlannerModel(
     messages,
     timeoutMs: env.OPENAI_TIMEOUT_MS,
     maxTokens: 800,
-    temperature: 0,
+    // Reasoning models (gpt-5.x) NAO aceitam parametro temperature — HTTP 400.
+    // So passa temperature pra modelos GPT-4o/4.1 que aceitam.
+    temperature: supportsCustomTemperature(env.PLANNER_MODEL) ? 0 : undefined,
     jsonSchema: {
       name: 'planner_output',
       schema: plannerOutputJsonSchema,
@@ -496,4 +498,16 @@ function fallbackResult(reason: string): PlannerDecisionResult {
     output_tokens: 0,
     duration_ms: 0,
   };
+}
+
+/**
+ * Detecta se o modelo aceita o parametro `temperature`.
+ * Reasoning models (gpt-5.x, o1, o3) NAO aceitam — HTTP 400.
+ * Apenas modelos GPT-4o e GPT-4.1 aceitam temperature customizada.
+ *
+ * Mesmo regex do generator/service.ts — manter sincronizado.
+ */
+function supportsCustomTemperature(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return /^(gpt-4o|gpt-4\.1)(?:$|[-_])/.test(normalized);
 }
