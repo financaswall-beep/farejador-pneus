@@ -49,15 +49,25 @@ export async function enqueueAtendenteJob(
   );
   const jobId = result.rows[0]!.enqueue_atendente_job;
 
-  // Empurra not_before pra +debounceSeconds. Se chegarem mais mensagens
-  // do cliente nesse intervalo, novos jobs sao enfileirados — o picker
-  // depois descarta os mais antigos via hasNewerPendingJob.
+  // Coalescing window: a cada mensagem nova, RESETA o timer de todos os
+  // jobs pending da mesma conversa pra now() + debounceSeconds. Isso faz
+  // com que o worker so processe quando o cliente parar de digitar por
+  // debounceSeconds. Quando finalmente processar, o picker descarta os
+  // jobs antigos via hasNewerPendingJob e so o ultimo roda — vendo todas
+  // as mensagens da rajada de uma vez via loadHistory.
+  //
+  // Comportamento:
+  //   - 1 msg solta -> espera debounceSeconds e responde
+  //   - 3 msgs em rajada -> cada uma reseta o timer -> 1 resposta vendo as 3
+  //   - cliente pausa e volta -> reset garante que pega tudo
   if (debounceSeconds > 0) {
     await client.query(
       `UPDATE ops.atendente_jobs
-       SET not_before = now() + ($2 || ' seconds')::interval
-       WHERE id = $1 AND status = 'pending'`,
-      [jobId, String(debounceSeconds)],
+       SET not_before = now() + ($3 || ' seconds')::interval
+       WHERE environment = $1
+         AND conversation_id = $2
+         AND status = 'pending'`,
+      [environment, conversationId, String(debounceSeconds)],
     );
   }
 

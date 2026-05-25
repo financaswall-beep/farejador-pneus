@@ -38,11 +38,12 @@ const envSchema = z.object({
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
-  // Debounce: segundos pra esperar antes de processar uma mensagem.
-  // Se cliente mandar mais mensagens nesse intervalo, jobs antigos sao
-  // descartados e so o ultimo processa. Evita o bot responder 3x quando
-  // o cliente solta "oi", "bom dia", "tem pneu pra fan?" em sequencia.
-  AGENT_V2_DEBOUNCE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(0).max(60)).default('6'),
+  // Coalescing window: segundos de pausa do cliente antes do bot responder.
+  // A cada nova mensagem o timer RESETA. So responde quando o cliente para
+  // de digitar por X segundos. Cobre rajadas curtas e longas. Modelo
+  // Intercom/Zendesk. Evita o bot responder 3x quando o cliente solta
+  // "oi", "bom dia", "tem pneu pra fan?" em sequencia.
+  AGENT_V2_DEBOUNCE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(0).max(60)).default('3'),
   // Agent V2: lista de conversation_id (UUID) que usam o agente unificado.
   // Use "*" para rotear todas. Vazio = V2 desligado.
   AGENT_V2_CONVERSATION_IDS: z
