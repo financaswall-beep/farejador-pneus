@@ -20,19 +20,23 @@
  */
 
 import { z } from 'zod';
-import { VALID_FACT_KEYS } from './fact-keys.js';
-import type { FactKey } from './fact-keys.js';
 
 // ------------------------------------------------------------------
 // A single extracted fact as returned by the LLM Organizadora
 // ------------------------------------------------------------------
 
 export const extractedFactSchema = z.object({
-  /** Must be in VALID_FACT_KEYS whitelist. Validated by validateFactValue() after parsing. */
-  fact_key: z.string().min(1).refine(
-    (k): k is FactKey => VALID_FACT_KEYS.includes(k as FactKey),
-    { message: 'fact_key not in whitelist — schema_violation' },
-  ),
+  /**
+   * Aceita string livre. A validacao contra VALID_FACT_KEYS acontece DEPOIS
+   * do parse, em organizadora/worker.ts via validateFactValue() — fact-a-fact.
+   *
+   * Antes esse campo tinha refine() rejeitando keys fora da whitelist no parse,
+   * mas isso descartava o batch INTEIRO quando 1 fact_key era invalido. Agora
+   * o parse aceita qualquer string; a chave invalida vira incidente individual
+   * (schema_violation com fact_key especifico) e os outros facts validos sao
+   * salvos normalmente.
+   */
+  fact_key: z.string().min(1),
 
   /**
    * The extracted value. Type depends on the fact_key — validated in step 3.
