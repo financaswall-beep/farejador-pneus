@@ -205,6 +205,31 @@ const produtoRecusadoMotivoSchema = z.enum([
 const pediuHumanoSchema = z.boolean();
 
 // ------------------------------------------------------------------
+// Category: cancellation (capturada quando cliente desiste/cancela)
+// ------------------------------------------------------------------
+
+/** Cliente cancelou o pedido explicitamente apos cotacao/aceite. */
+const pedidoCanceladoSchema = z.boolean();
+
+/**
+ * Motivo do cancelamento, capturado do que cliente disse.
+ * - sem_grana: "to sem grana", "to liso", "nao tenho dinheiro agora"
+ * - mudou_de_ideia: "muda de ideia", "esquece", "deixa pra outro dia"
+ * - comprou_concorrente: "comprei em outra loja", "ja comprei"
+ * - preco_alto: "ficou caro", "ta acima do meu orcamento"
+ * - sem_pressa: "vou pensar", "depois vejo"
+ * - outro: motivo nao mapeado
+ */
+const motivoCancelamentoSchema = z.enum([
+  'sem_grana',
+  'mudou_de_ideia',
+  'comprou_concorrente',
+  'preco_alto',
+  'sem_pressa',
+  'outro',
+]);
+
+// ------------------------------------------------------------------
 // Category: identity (PII)
 // ------------------------------------------------------------------
 
@@ -274,6 +299,10 @@ export const FACT_KEY_SCHEMAS = {
 
   // operational
   pediu_humano:                pediuHumanoSchema,
+
+  // cancellation
+  pedido_cancelado:            pedidoCanceladoSchema,
+  motivo_cancelamento:         motivoCancelamentoSchema,
 
   // identity (PII)
   nome_cliente:                nomeClienteSchema,

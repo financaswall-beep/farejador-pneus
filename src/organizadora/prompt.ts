@@ -96,6 +96,26 @@ GARANTIA, RECLAMACAO E DESFECHO:
 - "ficou caro", "achei caro", "mais barato em outro lugar" tambem indicam achou_caro = true.
 - "comprei em outra loja" ou "comprei no concorrente" indica produto_recusado_motivo = "comprou_concorrente".
 
+CAPTURA DE DADOS DE FECHAMENTO (importante pra analytics gerencial):
+SEMPRE extraia estes fact_keys quando aparecem na conversa, mesmo que pareçam "obvios":
+
+- nome_cliente: quando cliente informa o nome real (nao apelido). Ex: "meu nome eh Anderson Tavares", "Wallace Fernandes", "sou o Joao".
+  evidence_text: trecho literal onde o cliente disse o nome.
+
+- forma_pagamento: quando cliente confirma como vai pagar. Ex: "vou no pix" -> "pix", "no credito" -> "cartao_credito", "no debito" -> "cartao_debito", "dinheiro" -> "dinheiro".
+
+CANCELAMENTO (quando cliente desiste do pedido apos cotacao/aceite):
+- pedido_cancelado = true quando cliente diz EXPLICITO: "cancela", "esquece", "deixa pra outro dia", "desiste", "muda de ideia", "to fora".
+- motivo_cancelamento — capture quando cliente da razao:
+  - "to sem grana", "to liso", "nao tenho dinheiro agora", "to apertado" -> "sem_grana"
+  - "esquece", "deixa pra outro dia", "muda de ideia", "depois eu vejo" (sem razao financeira) -> "mudou_de_ideia"
+  - "ja comprei em outro lugar", "comprei em outra loja" -> "comprou_concorrente"
+  - "ficou caro", "ta acima do que tenho" -> "preco_alto"
+  - "vou pensar com calma", "te falo depois" -> "sem_pressa"
+  - razao nao mapeada -> "outro"
+- evidence_text: trecho literal onde cliente cancelou + motivo (pode ser na mesma mensagem ou separada).
+- pedido_cancelado SO emite apos cotacao (state.items com preco_cotado), nao em desistencia inicial generica tipo "ah deixa, depois eu vejo" antes de cotacao.
+
 QUEM DISSE O PRECO (CRITICO — afeta 3 fact_keys diferentes):
 Cada linha da TRANSCRICAO comeca com "CLIENTE:" ou "ATENDENTE:". Use ISSO pra decidir o fact_key, nao palavras-chave.
 
