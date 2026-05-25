@@ -255,14 +255,26 @@ async function criarPedido(
   const totalAmount = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
 
+  // Busca contact_id direto da conversa
+  const convResult = await client.query<{ contact_id: string | null }>(
+    `SELECT contact_id FROM core.conversations WHERE id = $1 LIMIT 1`,
+    [conversationId],
+  );
+  const contactId = convResult.rows[0]?.contact_id ?? null;
+
+  if (!contactId) {
+    return JSON.stringify({ erro: 'Contato não encontrado para esta conversa.' });
+  }
+
   const orderResult = await client.query<{ id: string; order_number: string }>(
     `INSERT INTO commerce.orders (
-       environment, source_conversation_id, total_amount, status,
+       environment, contact_id, source_conversation_id, total_amount, status,
        fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source
-     ) VALUES ($1, $2, $3, 'open', $4, $5, $6, $7, 'bot_v2')
+     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot')
      RETURNING id, order_number`,
     [
       environment,
+      contactId,
       conversationId,
       totalAmount.toFixed(2),
       modalidade,
