@@ -44,6 +44,7 @@ import {
   createDefaultAtendenteJobReconcileInput,
   reconcileMissingAtendenteJobsWithPool,
 } from './reconcile-jobs.js';
+import { runAgentV2 } from '../atendente-v2/agent.js';
 
 const WORKER_ID = `atendente-shadow-${randomUUID().slice(0, 8)}`;
 const MISSING_STATE_PREFIX = 'planner_context_missing_state:';
@@ -213,6 +214,40 @@ export async function pollAndAttend(): Promise<void> {
 
     await markAtendenteJobProcessing(client, job.id, WORKER_ID);
     await client.query('COMMIT');
+
+    // Roteamento V2: se conversation está na lista AGENT_V2_CONVERSATION_IDS,
+    // usa o agente unificado (1 LLM + function calling) e pula o pipeline V1.
+    const v2Ids = env.AGENT_V2_CONVERSATION_IDS;
+    const useV2 = v2Ids.includes('*') || v2Ids.includes(job.conversation_id);
+
+    if (useV2) {
+      try {
+        await runAgentV2({
+          jobId: job.id,
+          conversationId: job.conversation_id,
+          triggerMessageId: job.trigger_message_id,
+          environment: job.environment,
+        });
+        await client.query('BEGIN');
+        await markAtendenteJobProcessed(client, job.id);
+        await client.query('COMMIT');
+        logger.info(
+          { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
+          'agent_v2: job processed',
+        );
+      } catch (err) {
+        const failure = classifyJobFailure(err);
+        try {
+          await client.query('BEGIN');
+          await markAtendenteJobFailed(client, job.id, failure.message);
+          await client.query('COMMIT');
+        } catch (markErr) {
+          logger.error({ worker_id: WORKER_ID, job_id: job.id, err: markErr }, 'agent_v2: failed to mark job failed');
+        }
+        logger.error({ worker_id: WORKER_ID, job_id: job.id, err }, 'agent_v2: job failed');
+      }
+      return;
+    }
 
     try {
       await client.query('BEGIN');

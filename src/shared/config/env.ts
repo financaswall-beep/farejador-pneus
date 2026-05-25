@@ -67,6 +67,17 @@ const envSchema = z.object({
         .map((part) => part.trim())
         .filter((part) => part.length > 0),
     ),
+  // Agent V2: lista de conversation_id (UUID) que usam o agente unificado.
+  // Use "*" para rotear todas. Vazio = V2 desligado.
+  AGENT_V2_CONVERSATION_IDS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0),
+    ),
 });
 
 export type Env = z.infer<typeof envSchema>;
