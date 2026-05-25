@@ -283,7 +283,10 @@ async function callPlannerModel(
     model: env.PLANNER_MODEL,
     messages,
     timeoutMs: env.OPENAI_TIMEOUT_MS,
-    maxTokens: 800,
+    // Reasoning models (gpt-5.x) gastam tokens "pensando" antes de responder.
+    // 800 tokens estourava no meio do output -> JSON truncado -> "Unterminated string".
+    // 3000 da espaço pra reasoning + output completo. Modelos nao-reasoning seguem em 800.
+    maxTokens: isReasoningModel(env.PLANNER_MODEL) ? 3000 : 800,
     // Reasoning models (gpt-5.x) NAO aceitam parametro temperature — HTTP 400.
     // So passa temperature pra modelos GPT-4o/4.1 que aceitam.
     temperature: supportsCustomTemperature(env.PLANNER_MODEL) ? 0 : undefined,
@@ -510,4 +513,13 @@ function fallbackResult(reason: string): PlannerDecisionResult {
 function supportsCustomTemperature(model: string): boolean {
   const normalized = model.trim().toLowerCase();
   return /^(gpt-4o|gpt-4\.1)(?:$|[-_])/.test(normalized);
+}
+
+/**
+ * Reasoning models (gpt-5.x, o1, o3) gastam tokens "pensando" antes do output final.
+ * Precisam de budget maior pra nao truncar JSON no meio.
+ */
+function isReasoningModel(model: string): boolean {
+  const normalized = model.trim().toLowerCase();
+  return /^(gpt-5|o1|o3)(?:$|[-_.])/.test(normalized);
 }
