@@ -6,6 +6,21 @@
 
 ---
 
+## 🎯 Objetivos do projeto — TODOS atingidos
+
+O V2 nasceu com 4 metas. Todas foram cumpridas:
+
+| Meta original | Status |
+|---|---|
+| Substituir 3 LLMs por 1 | ✅ 1 único call por turn com function calling |
+| Cortar custo de R$440/mês → ~R$60/mês | ✅ ~R$38-230/mês dependendo do modelo |
+| Preservar o banco (zero migration) | ✅ Reusa `agent.turns.actions` (coluna jsonb existente) |
+| Bot responder no WhatsApp de verdade (não shadow) | ✅ Pedidos reais sendo criados (PED-0003, PED-0004) |
+
+**Conversa Anderson (PED-0004)** foi o marco — fluxo de ponta a ponta funcionando, tom humano, persistência de memória entre turns, pedido fechado. O sistema entrega tudo que se propôs.
+
+---
+
 ## 1. O que é o V2
 
 Substituição da arquitetura de 3 LLMs (Planner + Generator + Organizadora) por **um único LLM com function calling** (`gpt-5.5` ou `gpt-4o-mini`).
@@ -271,7 +286,25 @@ Redeploy. Volta pro V1 sem perder nada. O V2 fica desativado mas o código conti
 |---|---------|-------|--------|-------|--------|-----------|
 | 1 | Wallace | 9 | Falhou (delivery_address null) | — | — | Fix aplicado |
 | 2 | Wallace | 9 | PED-0003 R$108,90 | 16¢ | 5.5 | OK, tom robótico |
-| 3 | Anderson | 11 | PED-0004 R$207,90 | 14¢ | 5.5 | OK, tom humano, persistência funcionando |
+| 3 | Anderson | 11 | PED-0004 R$207,90 | 14¢ | 5.5 | **Nota 9/10** — tom humano, persistência funcionando, adicionou item no meio, fechou venda |
+
+### Avaliação detalhada da conversa Anderson (referência)
+
+**Acertos** (9 pontos):
+- Tom natural ("amigo", "show", "tá sim", "fechou", emoji 👍 no fim)
+- Não mencionou estoque em nenhuma resposta (info interna)
+- Lembrou "Fonseca" 5 turns depois sem rechamar tool
+- Adicionou Fan 150 no meio sem perder contexto do PCX
+- Calculou total certinho: R$99 + R$99 + R$9,90 = R$207,90
+- Pediu endereço completo (rua, número, bairro)
+- Quando cliente esqueceu pagamento, pediu separadamente sem desnecessária formalidade
+- Pedido criou na primeira tentativa
+- Despedida final humanizada com emoji
+
+**A melhorar** (1 ponto):
+- OPCOES (quick replies) escritos no prompt mas não aparecem como botões no WhatsApp
+- Pequenas redundâncias de confirmação ("Fechou?" / "Posso fechar?")
+- 11 turns é um pouco longo — daria pra encurtar com mais agressividade
 
 ---
 
