@@ -448,6 +448,7 @@ function applyUpdateDraft(state: ConversationState, action: UpdateDraftAction): 
     payment_method: action.payment_method ?? current?.payment_method ?? null,
     draft_status: draftStatusFor(action, current),
     promoted_order_id: current?.promoted_order_id ?? null,
+    order_number: current?.order_number ?? null,
     promoted_by: current?.promoted_by ?? null,
     promoted_at: current?.promoted_at ?? null,
     created_at: current?.created_at ?? timestamp,

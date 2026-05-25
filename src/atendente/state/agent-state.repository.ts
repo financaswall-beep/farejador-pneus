@@ -157,17 +157,20 @@ export async function loadCurrent(
     payment_method: OrderDraftState['payment_method'];
     draft_status: OrderDraftState['draft_status'];
     promoted_order_id: string | null;
+    order_number: string | null;
     promoted_by: string | null;
     promoted_at: Date | null;
     created_at: Date;
     updated_at: Date;
   }>(
-    `SELECT customer_name, delivery_address, geo_resolution_id,
-            fulfillment_mode, payment_method, draft_status,
-            promoted_order_id, promoted_by, promoted_at, created_at, updated_at
-     FROM agent.order_drafts
-     WHERE environment = $1
-       AND conversation_id = $2`,
+    `SELECT od.customer_name, od.delivery_address, od.geo_resolution_id,
+            od.fulfillment_mode, od.payment_method, od.draft_status,
+            od.promoted_order_id, o.order_number,
+            od.promoted_by, od.promoted_at, od.created_at, od.updated_at
+     FROM agent.order_drafts od
+     LEFT JOIN commerce.orders o ON o.id = od.promoted_order_id
+     WHERE od.environment = $1
+       AND od.conversation_id = $2`,
     [environment, conversationId],
   );
 
@@ -211,6 +214,7 @@ export async function loadCurrent(
           payment_method: orderDraft.rows[0].payment_method,
           draft_status: orderDraft.rows[0].draft_status,
           promoted_order_id: orderDraft.rows[0].promoted_order_id,
+          order_number: orderDraft.rows[0].order_number,
           promoted_by: orderDraft.rows[0].promoted_by,
           promoted_at: orderDraft.rows[0].promoted_at?.toISOString() ?? null,
           created_at: orderDraft.rows[0].created_at.toISOString(),

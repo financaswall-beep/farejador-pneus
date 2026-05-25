@@ -126,6 +126,13 @@ export const orderDraftStateSchema = z.object({
   payment_method: paymentMethodSchema.nullable().default(null),
   draft_status: z.enum(['collecting', 'ready', 'promoted', 'abandoned']).default('collecting'),
   promoted_order_id: z.string().uuid().nullable().default(null),
+  /**
+   * Numero amigavel do pedido (ex.: "PED-0042"), carregado via LEFT JOIN
+   * com commerce.orders quando promoted_order_id existe.
+   * Null enquanto o draft ainda nao foi promovido.
+   * Usado pelo Generator no resumo final de fechamento.
+   */
+  order_number: z.string().nullable().default(null),
   promoted_by: z.string().nullable().default(null),
   promoted_at: z.string().datetime().nullable().default(null),
   created_at: z.string().datetime(),
