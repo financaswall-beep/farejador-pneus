@@ -18,7 +18,6 @@ import { insertStatusEvent } from '../persistence/status-events.repository.js';
 import { insertAssignment } from '../persistence/assignments.repository.js';
 import { insertReaction } from '../persistence/reactions.repository.js';
 import { upsertTags } from '../persistence/tags.repository.js';
-import { enqueueOrganizadoraJob } from '../persistence/enrichment-jobs.repository.js';
 import {
   enqueueAtendenteJob,
   ensureAtendenteSession,
@@ -200,37 +199,10 @@ export async function dispatch(
       const message = mapMessage(payload, environment, lastEventAt);
       const upsertedMessage = await upsertMessage(client, message);
 
-      // Enfileira job da Organizadora para a conversa (debounce configuravel via env).
-      // So para message_created; message_updated nao dispara nova extracao.
+      // Enfileira job do Agent V2 para a conversa.
+      // So para message_created; message_updated nao dispara processamento.
       if (eventType === 'message_created') {
-        if (env.ORGANIZADORA_ENABLED) {
-          const jobId = await enqueueOrganizadoraJob(
-            client,
-            environment,
-            upsertedMessage.conversationId,
-            upsertedMessage.messageId,
-          );
-          logger.info(
-            {
-              raw_event_id: rawEventId,
-              conversation_id: upsertedMessage.conversationId,
-              message_id: upsertedMessage.messageId,
-              enrichment_job_id: jobId,
-            },
-            'normalization: organizadora job enqueued',
-          );
-        } else {
-          logger.warn(
-            {
-              raw_event_id: rawEventId,
-              conversation_id: upsertedMessage.conversationId,
-              message_id: upsertedMessage.messageId,
-            },
-            'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
-          );
-        }
-
-        if (env.ATENDENTE_SHADOW_ENABLED) {
+        if (env.AGENT_V2_WORKER_ENABLED) {
           // Só processa mensagens do contato (cliente real).
           // Mensagens de bot, agente humano e sistema não disparam o Atendente
           // para evitar que o bot responda a si mesmo quando o envio Chatwoot for habilitado.
@@ -275,7 +247,7 @@ export async function dispatch(
               conversation_id: upsertedMessage.conversationId,
               message_id: upsertedMessage.messageId,
             },
-            'normalization: atendente job skipped because ATENDENTE_SHADOW_ENABLED=false',
+            'normalization: atendente job skipped because AGENT_V2_WORKER_ENABLED=false',
           );
         }
       }

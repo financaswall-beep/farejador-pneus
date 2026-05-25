@@ -7,8 +7,7 @@ const baseEnv = {
   CHATWOOT_HMAC_SECRET: 'test-secret',
   CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: '300',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
-  ORGANIZADORA_ENABLED: 'false',
-  ATENDENTE_SHADOW_ENABLED: 'false',
+  AGENT_V2_WORKER_ENABLED: 'false',
 };
 
 function createMockClient(): {
@@ -244,71 +243,8 @@ describe('dispatcher', () => {
     expect(msgUpsert).toBeDefined();
   });
 
-  it('enqueues organizadora job for message_created when enabled', async () => {
-    process.env.ORGANIZADORA_ENABLED = 'true';
-    process.env.ORGANIZADORA_DEBOUNCE_SECONDS = '10';
-    const { dispatch } = await loadDispatcher();
-    const client = createMockClient();
-    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
-
-    await dispatch(client as unknown as import('pg').PoolClient, {
-      id: 55,
-      event_type: 'message_created',
-      payload: messageCreated,
-      environment,
-      chatwoot_timestamp: lastEventAt,
-    });
-
-    const enqueueCall = client.query.mock.calls.find((call) =>
-      (call[0] as string).includes('ops.enqueue_enrichment_job'),
-    );
-    expect(enqueueCall).toBeDefined();
-    expect(enqueueCall?.[1]).toEqual([
-      environment,
-      'conversation-uuid',
-      'uuid-1',
-      10,
-    ]);
-    expect(loggerInfo).toHaveBeenCalledWith(
-      {
-        raw_event_id: 55,
-        conversation_id: 'conversation-uuid',
-        message_id: 'uuid-1',
-        enrichment_job_id: 'job-uuid-1',
-      },
-      'normalization: organizadora job enqueued',
-    );
-  });
-
-  it('logs when organizadora enqueue is skipped by config', async () => {
-    const { dispatch } = await loadDispatcher();
-    const client = createMockClient();
-    const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
-
-    await dispatch(client as unknown as import('pg').PoolClient, {
-      id: 56,
-      event_type: 'message_created',
-      payload: messageCreated,
-      environment,
-      chatwoot_timestamp: lastEventAt,
-    });
-
-    const enqueueCall = client.query.mock.calls.find((call) =>
-      (call[0] as string).includes('ops.enqueue_enrichment_job'),
-    );
-    expect(enqueueCall).toBeUndefined();
-    expect(loggerWarn).toHaveBeenCalledWith(
-      {
-        raw_event_id: 56,
-        conversation_id: 'conversation-uuid',
-        message_id: 'uuid-1',
-      },
-      'normalization: organizadora job skipped because ORGANIZADORA_ENABLED=false',
-    );
-  });
-
-  it('enqueues atendente job for message_created when shadow is enabled', async () => {
-    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+  it('enqueues atendente job for message_created when agent v2 worker is enabled', async () => {
+    process.env.AGENT_V2_WORKER_ENABLED = 'true';
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
     const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
@@ -352,7 +288,7 @@ describe('dispatcher', () => {
     );
   });
 
-  it('does not enqueue atendente job when shadow is disabled', async () => {
+  it('does not enqueue atendente job when agent v2 worker is disabled', async () => {
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
     const messageCreated = (await import('../../fixtures/chatwoot/message_created.json')).default;
@@ -379,12 +315,12 @@ describe('dispatcher', () => {
         conversation_id: 'conversation-uuid',
         message_id: 'uuid-1',
       },
-      'normalization: atendente job skipped because ATENDENTE_SHADOW_ENABLED=false',
+      'normalization: atendente job skipped because AGENT_V2_WORKER_ENABLED=false',
     );
   });
 
   it('does not enqueue atendente job for message from human agent (sender_type=user)', async () => {
-    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+    process.env.AGENT_V2_WORKER_ENABLED = 'true';
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
 
@@ -420,7 +356,7 @@ describe('dispatcher', () => {
   });
 
   it('does not enqueue atendente job for message from bot (sender_type=agent_bot)', async () => {
-    process.env.ATENDENTE_SHADOW_ENABLED = 'true';
+    process.env.AGENT_V2_WORKER_ENABLED = 'true';
     const { dispatch } = await loadDispatcher();
     const client = createMockClient();
 

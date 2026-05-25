@@ -6,8 +6,7 @@ const baseEnv = {
   DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
   CHATWOOT_HMAC_SECRET: 'test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
-  ORGANIZADORA_ENABLED: 'false',
-  ATENDENTE_SHADOW_ENABLED: 'true',
+  AGENT_V2_WORKER_ENABLED: 'true',
 };
 
 async function loadReconcileJobs() {

@@ -124,8 +124,7 @@ function dashboardPayload(rows: unknown[]) {
     environment: env.FAREJADOR_ENV,
     chatwoot_account_id: env.CHATWOOT_ACCOUNT_ID ?? null,
     chatwoot_base_url: chatwootBaseUrl,
-    atendente_shadow_enabled: env.ATENDENTE_SHADOW_ENABLED,
-    generator_llm_enabled: env.GENERATOR_LLM_ENABLED,
+    agent_v2_worker_enabled: env.AGENT_V2_WORKER_ENABLED,
     rows,
   };
 }

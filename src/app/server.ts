@@ -4,16 +4,14 @@ import { logger, loggerOptions } from '../shared/logger.js';
 import { pool } from '../persistence/db.js';
 import { registerRoutes } from './routes.js';
 import { startWorker } from '../normalization/worker.js';
-import { startOrganizadora } from '../organizadora/worker.js';
-import { startAtendenteShadow } from '../atendente/worker.js';
+import { startAgentV2Worker } from '../atendente-v2/worker.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
 });
 
 let stopWorker: (() => void) | null = null;
-let stopOrganizadora: (() => void) | null = null;
-let stopAtendenteShadow: (() => void) | null = null;
+let stopAgentV2: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -33,8 +31,7 @@ async function start(): Promise<void> {
   await registerRoutes(fastify);
 
   stopWorker = startWorker();
-  stopOrganizadora = startOrganizadora();
-  stopAtendenteShadow = startAtendenteShadow();
+  stopAgentV2 = startAgentV2Worker();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -44,8 +41,7 @@ async function start(): Promise<void> {
 async function shutdown(signal: string): Promise<void> {
   fastify.log.info({ signal }, 'shutting down gracefully');
   stopWorker?.();
-  stopOrganizadora?.();
-  stopAtendenteShadow?.();
+  stopAgentV2?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');

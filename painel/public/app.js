@@ -34,8 +34,7 @@ function painelApp() {
     serverEnvironment: null,
     chatwootBaseUrl: null,
     chatwootAccountId: null,
-    shadowWorkerEnabled: null,
-    generatorLlmEnabled: null,
+    agentV2WorkerEnabled: null,
     shadowSelectedIndex: 0,
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
@@ -1425,8 +1424,7 @@ function painelApp() {
         this.serverEnvironment = shadow.environment || this.serverEnvironment;
         this.chatwootBaseUrl = shadow.chatwoot_base_url || this.chatwootBaseUrl;
         this.chatwootAccountId = shadow.chatwoot_account_id || this.chatwootAccountId;
-        this.shadowWorkerEnabled = shadow.atendente_shadow_enabled;
-        this.generatorLlmEnabled = shadow.generator_llm_enabled;
+        this.agentV2WorkerEnabled = shadow.agent_v2_worker_enabled;
         this.applyShadow(shadow.rows);
         this.apiStatus = 'real';
         this.apiError = null;
@@ -1463,8 +1461,7 @@ function painelApp() {
         this.serverEnvironment = resumo.environment || operacao.environment || pedidos.environment || shadow.environment || produtos.environment || rede.environment || null;
         this.chatwootBaseUrl = shadow.chatwoot_base_url || operacao.chatwoot_base_url || resumo.chatwoot_base_url || pedidos.chatwoot_base_url || produtos.chatwoot_base_url || rede.chatwoot_base_url || null;
         this.chatwootAccountId = shadow.chatwoot_account_id || operacao.chatwoot_account_id || resumo.chatwoot_account_id || pedidos.chatwoot_account_id || produtos.chatwoot_account_id || rede.chatwoot_account_id || null;
-        this.shadowWorkerEnabled = shadow.atendente_shadow_enabled ?? resumo.atendente_shadow_enabled ?? null;
-        this.generatorLlmEnabled = shadow.generator_llm_enabled ?? resumo.generator_llm_enabled ?? null;
+        this.agentV2WorkerEnabled = shadow.agent_v2_worker_enabled ?? resumo.agent_v2_worker_enabled ?? null;
         this.applyResumo(resumo.rows);
         this.applyOperacao(operacao.rows);
         this.applyPedidos(pedidos.rows);
