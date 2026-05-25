@@ -178,23 +178,26 @@ function trimVeiculo(v: {
     total_stock: number;
   }>;
 }): Record<string, unknown> {
-  const out: Record<string, unknown> = { model: v.model };
-  if (v.variant) out.variant = v.variant;
-  if (v.year_start) out.year_start = v.year_start;
-  if (v.year_end) out.year_end = v.year_end;
-  out.produtos = v.produtos.map((p) => {
-    const item: Record<string, unknown> = {
-      product_id: p.product_id,
-      product_name: p.product_name,
-      tire_size: p.tire_size,
-      position: p.position,
-      current_price: p.current_price,
-      total_stock: p.total_stock,
-    };
-    if (p.brand) item.brand = p.brand;
-    return item;
-  });
-  return out;
+  const moto: Record<string, unknown> = { model: v.model };
+  if (v.variant) moto.variant = v.variant;
+  if (v.year_start && v.year_end) moto.ano = `${v.year_start}-${v.year_end}`;
+  else if (v.year_start) moto.ano = `${v.year_start}+`;
+
+  return {
+    moto,
+    produtos: v.produtos.map((p) => {
+      const item: Record<string, unknown> = {
+        id: p.product_id,
+        nome: p.product_name,
+        medida: p.tire_size,
+        pos: p.position,
+        preco: p.current_price ? Number(p.current_price) : null,
+        estoque: p.total_stock,
+      };
+      if (p.brand) item.marca = p.brand;
+      return item;
+    }),
+  };
 }
 
 function trimProduto(p: {
@@ -208,14 +211,14 @@ function trimProduto(p: {
   total_stock_available: number;
 }): Record<string, unknown> {
   const item: Record<string, unknown> = {
-    product_id: p.product_id,
-    product_name: p.product_name,
-    tire_size: p.tire_size,
-    tire_position: p.tire_position,
-    price_amount: p.price_amount,
-    total_stock_available: p.total_stock_available,
+    id: p.product_id,
+    nome: p.product_name,
+    medida: p.tire_size,
+    pos: p.tire_position,
+    preco: p.price_amount ? Number(p.price_amount) : null,
+    estoque: p.total_stock_available,
   };
-  if (p.brand) item.brand = p.brand;
+  if (p.brand) item.marca = p.brand;
   return item;
 }
 
@@ -226,10 +229,10 @@ function trimEstoque(e: {
   quantidade_total: number;
 }): Record<string, unknown> {
   return {
-    product_id: e.product_id,
-    product_name: e.product_name,
+    id: e.product_id,
+    nome: e.product_name,
     disponivel: e.disponivel,
-    quantidade_total: e.quantidade_total,
+    qtd: e.quantidade_total,
   };
 }
 
@@ -245,10 +248,10 @@ function trimFrete(f: {
   if (!f.encontrado) return { encontrado: false, motivo: f.motivo ?? 'bairro não encontrado' };
   return {
     encontrado: true,
-    bairro_canonico: f.bairro_canonico,
+    bairro: f.bairro_canonico,
     municipio: f.municipio,
     disponivel: f.disponivel,
-    valor: f.valor,
+    valor: f.valor ? Number(f.valor) : null,
     prazo_dias: f.prazo_dias,
   };
 }
@@ -272,8 +275,8 @@ export async function executeTool(
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
           limit: 10,
         });
-        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
-        return JSON.stringify({ encontrado: true, veiculos: result.map(trimVeiculo) });
+        if (result.length === 0) return JSON.stringify({ ok: false, msg: 'Nenhuma moto encontrada.' });
+        return JSON.stringify({ ok: true, veiculos: result.map(trimVeiculo) });
       }
 
       case 'buscar_produto': {
@@ -285,8 +288,8 @@ export async function executeTool(
           apenas_com_estoque: (args.apenas_com_estoque as boolean | undefined) ?? false,
           limit: 10,
         });
-        if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
-        return JSON.stringify({ encontrado: true, produtos: result.map(trimProduto) });
+        if (result.length === 0) return JSON.stringify({ ok: false, msg: 'Nenhum produto encontrado.' });
+        return JSON.stringify({ ok: true, produtos: result.map(trimProduto) });
       }
 
       case 'calcular_frete': {
