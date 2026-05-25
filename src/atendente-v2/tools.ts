@@ -68,7 +68,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'verificar_estoque',
-      description: 'Verifica estoque de um produto específico pelo product_id ou código.',
+      description: 'Reconfirma estoque de um produto. RARAMENTE NECESSÁRIA: estoque já vem em buscar_compatibilidade e buscar_produto. Use SÓ antes de criar_pedido se a busca foi há 8+ turnos. Não chame só por segurança.',
       parameters: {
         type: 'object',
         properties: {
