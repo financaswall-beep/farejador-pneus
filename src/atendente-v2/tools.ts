@@ -28,7 +28,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         required: ['moto_modelo'],
         additionalProperties: false,
       },
-      strict: true,
     },
   },
   {
@@ -151,7 +150,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         required: ['motivo', 'resumo'],
         additionalProperties: false,
       },
-      strict: true,
     },
   },
 ];
