@@ -28,7 +28,7 @@
 
 import { SAFE_FALLBACK_SAY } from '../schemas.js';
 
-export const generatorPromptVersionV16 = 'generator_v1.6.2';
+export const generatorPromptVersionV16 = 'generator_v1.6.3';
 
 export const COMMON_BLOCK = [
   `prompt_version=${generatorPromptVersionV16}`,
