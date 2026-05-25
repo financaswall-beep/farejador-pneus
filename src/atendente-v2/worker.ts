@@ -17,9 +17,11 @@ import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import {
+  hasNewerPendingJob,
   markAtendenteJobFailed,
   markAtendenteJobProcessed,
   markAtendenteJobProcessing,
+  markAtendenteJobSuperseded,
   pickAtendenteJob,
 } from '../shared/repositories/ops-atendente.repository.js';
 import {
@@ -49,6 +51,26 @@ export async function pollAndAttend(): Promise<void> {
       { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
       'agent_v2: picked job',
     );
+
+    // Debounce: descarta este job se chegou mensagem mais nova durante o
+    // intervalo not_before. Evita responder 3x quando cliente manda 3
+    // mensagens em sequencia rapida.
+    const superseded = await hasNewerPendingJob(
+      client,
+      job.environment,
+      job.conversation_id,
+      job.created_at,
+      job.id,
+    );
+    if (superseded) {
+      await markAtendenteJobSuperseded(client, job.id);
+      await client.query('COMMIT');
+      logger.info(
+        { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
+        'agent_v2: job superseded (newer message arrived)',
+      );
+      return;
+    }
 
     await markAtendenteJobProcessing(client, job.id, WORKER_ID);
     await client.query('COMMIT');

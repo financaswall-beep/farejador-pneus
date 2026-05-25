@@ -228,6 +228,7 @@ export async function dispatch(
               environment as Environment,
               upsertedMessage.conversationId,
               upsertedMessage.messageId,
+              env.AGENT_V2_DEBOUNCE_SECONDS,
             );
             logger.info(
               {

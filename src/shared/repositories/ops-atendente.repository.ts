@@ -14,6 +14,7 @@ export interface AtendenteJobRow {
   trigger_message_id: string;
   status: AtendenteJobStatus;
   attempts: number;
+  created_at: Date;
 }
 
 export async function ensureAtendenteSession(
@@ -40,12 +41,76 @@ export async function enqueueAtendenteJob(
   environment: Environment,
   conversationId: string,
   triggerMessageId: string,
+  debounceSeconds = 0,
 ): Promise<string> {
   const result = await client.query<{ enqueue_atendente_job: string }>(
     `SELECT ops.enqueue_atendente_job($1, $2, $3) AS enqueue_atendente_job`,
     [environment, conversationId, triggerMessageId],
   );
-  return result.rows[0]!.enqueue_atendente_job;
+  const jobId = result.rows[0]!.enqueue_atendente_job;
+
+  // Empurra not_before pra +debounceSeconds. Se chegarem mais mensagens
+  // do cliente nesse intervalo, novos jobs sao enfileirados — o picker
+  // depois descarta os mais antigos via hasNewerPendingJob.
+  if (debounceSeconds > 0) {
+    await client.query(
+      `UPDATE ops.atendente_jobs
+       SET not_before = now() + ($2 || ' seconds')::interval
+       WHERE id = $1 AND status = 'pending'`,
+      [jobId, String(debounceSeconds)],
+    );
+  }
+
+  return jobId;
+}
+
+/**
+ * Verifica se existe job mais recente (pending ou processing) para a mesma
+ * conversa. Usado pelo worker pra descartar jobs obsoletos quando o cliente
+ * mandou mais mensagens enquanto o job estava aguardando o debounce.
+ */
+export async function hasNewerPendingJob(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  afterCreatedAt: Date,
+  excludeJobId: string,
+): Promise<boolean> {
+  const result = await client.query<{ exists: boolean }>(
+    `SELECT EXISTS(
+       SELECT 1
+       FROM ops.atendente_jobs
+       WHERE environment = $1
+         AND conversation_id = $2
+         AND id <> $3
+         AND status IN ('pending', 'processing')
+         AND created_at > $4
+     ) AS exists`,
+    [environment, conversationId, excludeJobId, afterCreatedAt],
+  );
+  return result.rows[0]?.exists === true;
+}
+
+/**
+ * Marca job como obsoleto (uma mensagem mais nova chegou antes do debounce
+ * expirar). Reusa status='processed' porque o schema atual nao tem
+ * 'superseded' no CHECK constraint, mas registra em error_message para
+ * auditoria.
+ */
+export async function markAtendenteJobSuperseded(
+  client: PoolClient,
+  jobId: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE ops.atendente_jobs
+     SET status        = 'processed',
+         processed_at  = now(),
+         locked_at     = NULL,
+         locked_by     = NULL,
+         error_message = 'superseded:newer_message_arrived'
+     WHERE id = $1`,
+    [jobId],
+  );
 }
 
 export async function pickAtendenteJob(
@@ -53,7 +118,7 @@ export async function pickAtendenteJob(
   environment: Environment,
 ): Promise<AtendenteJobRow | null> {
   const result = await client.query<AtendenteJobRow>(
-    `SELECT id, environment, conversation_id, trigger_message_id, status, attempts
+    `SELECT id, environment, conversation_id, trigger_message_id, status, attempts, created_at
      FROM ops.atendente_jobs
      WHERE environment = $1
        AND status = 'pending'
