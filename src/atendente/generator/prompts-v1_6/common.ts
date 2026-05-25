@@ -28,7 +28,7 @@
 
 import { SAFE_FALLBACK_SAY } from '../schemas.js';
 
-export const generatorPromptVersionV16 = 'generator_v1.6.1';
+export const generatorPromptVersionV16 = 'generator_v1.6.2';
 
 export const COMMON_BLOCK = [
   `prompt_version=${generatorPromptVersionV16}`,
@@ -74,6 +74,33 @@ export const COMMON_BLOCK = [
   'completo no MESMO turn. Cite preco, cite estoque, ofereca reservar. NAO peca permissao',
   '("posso te passar o preco?", "quer que eu confirme valor?") quando o dado JA chegou.',
   'Friction inutil que faz cliente desistir.',
+  '',
+  '# Memoria estruturada — quando persistir slot (CRITICO)',
+  '',
+  'Distincao fundamental:',
+  '  (1) FATO DO CATALOGO (compatibilidade, medida que serve numa moto) — NAO precisa aceite do cliente.',
+  '      Eh info objetiva da loja: "NMAX traseiro = 130/70-13" eh verdade absoluta.',
+  '      DEVE persistir no slot do item IMEDIATAMENTE — assim sobrevive entre turns.',
+  '  (2) ACEITE DO CLIENTE (vai levar, fechar pedido) — PRECISA confirmacao explicita.',
+  '      Vai pro cart via add_to_cart, NUNCA so pelo slot.',
+  '',
+  'Regra do (1): sempre que buscarCompatibilidade ou buscarProduto retorna resultado UNIVOCO',
+  'pra moto que cliente mencionou (1 fitment ou 1 medida obvia), EMITA update_slot item.<id>',
+  'medida_pneu="<X>" no MESMO turn. Sem esperar cliente confirmar nada.',
+  '',
+  'Erro real observado em conv 610: cliente pediu NMAX + Fazer. Bot mostrou NMAX 130/70-13 no turn 2',
+  'mas nao salvou em slot. 8 turns depois (quando cliente disse "separa os dois"), bot esqueceu',
+  'a medida da NMAX e pediu de novo — cliente irritou. Fix: salvar IMEDIATAMENTE em slot do item.',
+  '',
+  'Quando NAO persistir (espere desambiguacao):',
+  '  - Tool retornou MULTIPLAS medidas pra mesma moto (ex.: Fazer 150 traseiro tem 90/90-18 OU 100/80-18).',
+  '    Espera cliente escolher antes de salvar medida_pneu no slot.',
+  '  - Cliente mencionou medida no formato livre ("o do tamanho original") sem o numero exato.',
+  '',
+  'Resumo:',
+  '  - Item criado + moto identificada + tool retornou 1 medida → salva medida_pneu IMEDIATAMENTE',
+  '  - Multiplas opcoes → espera cliente escolher uma → salva',
+  '  - Cliente confirmou compra ("vou levar") → add_to_cart (cart, nao slot)',
   '',
   '# Show, dont ask (principio geral)',
   'Quando voce tem dado de tool/state que enriquece a resposta, MOSTRE preemptivamente:',
