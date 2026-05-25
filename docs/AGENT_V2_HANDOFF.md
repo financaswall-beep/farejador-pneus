@@ -1,375 +1,331 @@
-# Agent V2 — Handoff e Desligamento do V1
+# Agent V2 — Estado de Produção
 
-**Data**: 2026-05-25
-**Status**: V2 em produção, V1 em paralelo (desativado por flag)
-**Custo real medido**: ~14¢/conversa (vs ~$1,50/conversa do V1 com 3 LLMs)
-
----
-
-## 🎯 Objetivos do projeto — TODOS atingidos
-
-O V2 nasceu com 4 metas. Todas foram cumpridas:
-
-| Meta original | Status |
-|---|---|
-| Substituir 3 LLMs por 1 | ✅ 1 único call por turn com function calling |
-| Cortar custo de R$440/mês → ~R$60/mês | ✅ ~R$38-230/mês dependendo do modelo |
-| Preservar o banco (zero migration) | ✅ Reusa `agent.turns.actions` (coluna jsonb existente) |
-| Bot responder no WhatsApp de verdade (não shadow) | ✅ Pedidos reais sendo criados (PED-0003, PED-0004) |
-
-**Conversa Anderson (PED-0004)** foi o marco — fluxo de ponta a ponta funcionando, tom humano, persistência de memória entre turns, pedido fechado. O sistema entrega tudo que se propôs.
+**Última atualização**: 2026-05-25 (sessão de polish completa)
+**Status**: V2 em produção, V1 totalmente removido do código e da fila
+**Custo real medido**: ~R$ 0,20–0,30/conversa (incluindo coalescing)
+**Última conversa validada**: 621 (Ângelo, PED-0006, nota 9.2/10)
 
 ---
 
-## 1. O que é o V2
+## 1. Visão geral
 
-Substituição da arquitetura de 3 LLMs (Planner + Generator + Organizadora) por **um único LLM com function calling** (`gpt-5.5` ou `gpt-4o-mini`).
+Agente conversacional de WhatsApp pra loja de pneus de moto, baseado em **1 LLM com function calling**. Substituiu a arquitetura antiga de 3 LLMs (Planner + Generator + Organizadora) sem migration de banco e cortando ~80% do custo.
 
-### Comparação rápida
-
-| | V1 (anterior) | V2 (atual) |
-|--|--|--|
-| LLMs por turn | 3 (Planner, Generator, Organizadora) | 1 |
-| Estado | 11 tabelas `agent.*` (slots, items, events) | 0 tabelas novas — usa `agent.turns.actions` |
-| Memória entre turns | Slots estruturados | Tool calls persistidas + replay no histórico |
-| Custo médio/conversa | ~R$8 (3 LLMs grandes) | ~70¢ (1 LLM) |
-| Custo mensal estimado | ~R$440/mês | ~R$230/mês (gpt-5.5) ou ~R$38/mês (mini) |
-| Latência por turn | 5-15s | 4-8s |
-| Migrations necessárias | dezenas | **zero** |
+```
+WhatsApp → Chatwoot → webhook → core.messages
+                                       ↓
+                                ops.atendente_jobs (fila)
+                                       ↓
+                                Agent V2 Worker (poll 5s)
+                                       ↓
+                              loadHistory + LLM call + tools
+                                       ↓
+                                  agent.turns
+                                       ↓
+                              sendMessage → Chatwoot → cliente
+```
 
 ---
 
 ## 2. Arquivos do V2
 
-Todo o código novo vive em `src/atendente-v2/`:
-
 ```
 src/atendente-v2/
-├── agent.ts        ← Loop principal do turn (chama OpenAI, gerencia tool calls)
-├── history.ts      ← Carrega histórico de core.messages + agent.turns.actions
-├── prompt.ts       ← System prompt (~1500 tokens, 1 fonte de verdade)
-├── sender.ts       ← Envia resposta pro Chatwoot
-├── tools.ts        ← Definições + executores das 7 tools
-└── types.ts        ← Interfaces ChatMessage, ToolCall, etc.
+├── worker.ts       ← Poll da fila ops.atendente_jobs, supersede, runs agent
+├── agent.ts        ← Loop do turn (chama OpenAI, executa tools, persiste)
+├── history.ts      ← Carrega core.messages + agent.turns.actions intercalados
+├── prompt.ts       ← System prompt (~2.2k tokens, fluxo de 6 passos)
+├── sender.ts       ← Envia resposta pro Chatwoot (com strip de OPCOES)
+├── tools.ts        ← 7 tools + executores
+└── types.ts        ← Interfaces TS
 ```
 
-**Pontos de integração** (1 linha em cada):
-- `src/atendente/worker.ts` — flag `AGENT_V2_CONVERSATION_IDS` roteia conversas pro V2
-- `src/shared/config/env.ts` — declara a env var nova
+**Integrações:**
+- `src/atendente/tools/commerce-tools.ts` — funções SQL das tools (mantido do V1)
+- `src/atendente/policies/policy-schemas.ts` — schemas das políticas (mantido)
+- `src/atendente/reconcile-jobs.ts` — reconcile periódico (mantido)
+- `src/shared/repositories/ops-atendente.repository.ts` — fila, debounce, supersede
 
-**Reusa do V1**:
-- `src/atendente/tools/commerce-tools.ts` — funções `buscarCompatibilidade`, `buscarProduto`, etc. (não tocou)
-- `src/persistence/db.ts` — pool de conexão
-- `src/shared/logger.ts` — logger
-- `core.messages`, `core.conversations`, `core.contacts` — tabelas inalteradas
+**V1 — totalmente removido**: `src/organizadora/`, `src/atendente/{planner,generator,executor,validators,policies/!schemas,handlers,state,worker.ts}`, `src/shared/zod/{agent-actions,agent-state,llm-organizadora,fact-keys}.ts`, `src/persistence/enrichment-jobs.repository.ts`.
 
 ---
 
-## 3. Tabelas usadas pelo V2 (TODAS já existiam)
+## 3. As 7 tools
+
+| Tool | Quando | Tipo |
+|------|--------|------|
+| `buscar_compatibilidade` | Cliente disse a **moto** | leitura |
+| `buscar_produto` | Cliente disse a **medida** ou marca | leitura |
+| `calcular_frete` | Bairro fornecido | leitura |
+| `verificar_estoque` | Raríssimo — só se busca foi há 8+ turnos | leitura |
+| `buscar_politica` | Garantia, horário, pagamento, troca | leitura |
+| `criar_pedido` | Passo 6 do fluxo. Exige `valor_frete` quando delivery | **escrita** |
+| `escalar_humano` | Cliente pediu, reclamação, fora do escopo | sinalização |
+
+**Possível ampliação futura (não implementada):**
+- 🔴 `consultar_pedido` — cliente perguntando status (será necessária quando volume crescer)
+- 🟡 `cancelar_pedido` — hoje vira escalação
+- 🟡 `confirmar_pagamento` — hoje vira escalação (não processa comprovante Pix)
+
+---
+
+## 4. Fluxo do turn
+
+```
+1. Cliente manda msg → Chatwoot webhook → core.messages → ops.atendente_jobs
+   └─ enqueueAtendenteJob faz UPDATE not_before=now()+3s em TODOS jobs pending da conv
+      (coalescing window — ver §6)
+
+2. Worker poll (a cada 5s):
+   └─ pickAtendenteJob: WHERE status='pending' AND not_before <= now()
+   └─ Se hasNewerPendingJob: marca este 'processed' com error_message='superseded:...'
+      e pula sem chamar LLM
+   └─ Senão: marca processing, chama runAgentV2
+
+3. runAgentV2:
+   a) loadHistory: core.messages + agent.turns.actions em ordem cronológica
+   b) Monta pacote [SYSTEM] + [HISTÓRICO]
+   c) Loop: chama OpenAI → executa tools → reinjeta → até finalText (max 5 rounds)
+   d) sendMessage pro Chatwoot
+   e) INSERT em agent.turns com say_text + actions + tokens
+```
+
+---
+
+## 5. Tabelas usadas
 
 ### Em runtime
 
 | Tabela | Uso | Colunas tocadas |
 |--------|-----|-----------------|
-| `core.messages` | Leitura — histórico de texto | id, conversation_id, sender_type, content, sent_at |
-| `core.conversations` | Leitura — descobre chatwoot_id e contact_id | id, chatwoot_conversation_id, contact_id |
-| `agent.turns` | Escrita por turn + leitura | environment, conversation_id, trigger_message_id, agent_version='v2', say_text, **actions** (jsonb), llm_input_tokens, llm_output_tokens, llm_duration_ms, status='delivered' |
+| `core.messages` | Leitura | id, conversation_id, sender_type, content, sent_at |
+| `core.conversations` | Leitura | id, chatwoot_conversation_id, contact_id |
+| `agent.turns` | Escrita | environment, conversation_id, trigger_message_id, agent_version='v2', say_text, **actions** (jsonb), llm_input_tokens, llm_output_tokens, llm_duration_ms, status='delivered' |
+| `ops.atendente_jobs` | Leitura/Escrita | + `not_before` agora gerenciado pelo coalescing |
 
-### Pedido (passo 6)
+### Pedido (criar_pedido)
 
-| Tabela | Uso | Colunas tocadas |
-|--------|-----|-----------------|
-| `commerce.orders` | Escrita | environment, contact_id, source_conversation_id, total_amount, status='open', fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source='chatwoot_com_bot' |
-| `commerce.order_items` | Escrita | environment, order_id, product_id, quantity, unit_price |
+| Tabela | Colunas |
+|--------|---------|
+| `commerce.orders` | environment, contact_id, source_conversation_id, **total_amount** (subtotal + frete), status='open', fulfillment_mode, payment_method, delivery_address, source='chatwoot_com_bot' |
+| `commerce.order_items` | environment, order_id, product_id, quantity, unit_price |
 
-### Catálogo (somente leitura via SQL functions)
+**Importante**: `total_amount` inclui frete. Tool `criar_pedido` exige param `valor_frete` quando modalidade=delivery.
 
-- `commerce.products`, `commerce.tire_specs`, `commerce.vehicle_models`, `commerce.vehicle_fitments`, `commerce.stock_levels`, `commerce.current_prices`, `commerce.delivery_zones`
-- Acessadas via `find_compatible_tires()`, `resolve_vehicle_model()` — não escreve em nenhuma
+### Catálogo (somente leitura)
 
----
+`commerce.products`, `tire_specs`, `vehicle_models`, `vehicle_fitments`, `stock_levels`, `current_prices`, `delivery_zones`, `store_policies` — acessadas via SQL functions das tools.
 
-## 4. Tabelas do V1 que ficaram ÓCIOSAS
-
-V2 não usa, mas estão preservadas. Decidir depois se apaga ou mantém pra histórico:
+### Tabelas órfãs (V1 desligado)
 
 ```
-agent.cart_current
-agent.cart_current_items
-agent.cart_events
-agent.session_current
-agent.session_events
-agent.session_items
-agent.session_slots
-agent.order_drafts
-agent.pending_confirmations
-agent.pending_human_closures
+agent.cart_current, cart_current_items, cart_events
+agent.session_current, session_events, session_items, session_slots
+agent.order_drafts, pending_confirmations, pending_human_closures
 agent.escalations
+ops.enrichment_jobs
 ```
-
-**Recomendação**: manter por enquanto (não custam nada vazias). Apagar daqui a 1 mês se nada quebrar.
+**Recomendação**: deixar por 30 dias. Apagar depois.
 
 ---
 
-## 5. Como funciona um turn no V2
+## 6. Coalescing window (anti-resposta-em-rajada)
 
-```
-1. Cliente manda mensagem no WhatsApp
-2. Chatwoot dispara webhook → ingere em core.messages
-3. Worker (src/atendente/worker.ts) acorda
-4. Worker confere AGENT_V2_CONVERSATION_IDS:
-   - Se conversation_id está na lista (ou "*") → vai pro V2
-   - Senão → vai pro V1 (Planner + Generator)
+**Problema resolvido**: cliente mandando 3+ mensagens em rajada fazia o bot responder 3 vezes separadas (1 por job).
 
-V2:
-5. runAgentV2() em src/atendente-v2/agent.ts
-6. loadHistory() carrega:
-   - Texto do core.messages
-   - Tool calls/results do agent.turns.actions
-   - Intercala em ordem cronológica via trigger_message_id
-7. Monta pacote: [SYSTEM] + [HISTÓRICO]
-8. Loop:
-   a) Chama OpenAI Chat Completions com tools
-   b) Se resposta tem tool_calls → executa, adiciona ao pacote, volta pra (a)
-   c) Se resposta é texto → break
-   d) Máx 5 rounds por turn
-9. Envia texto pro Chatwoot (sender.ts)
-10. Grava em agent.turns com say_text + actions + tokens
+**Solução**: a cada mensagem nova, `enqueueAtendenteJob` faz:
+
+```sql
+UPDATE ops.atendente_jobs
+SET not_before = now() + (3 seconds)::interval
+WHERE environment = $1 AND conversation_id = $2 AND status = 'pending';
 ```
+
+Toda msg nova **reseta o timer** de todos os jobs pending da conversa. Bot só "acorda" depois que o cliente para de digitar por 3s. Quando processa, `hasNewerPendingJob` descarta os jobs intermediários (status='processed', error='superseded:newer_message_arrived') e só o último roda — vendo todas as msgs no histórico de uma vez.
+
+**Comportamento por cenário:**
+
+| Cenário | Antes | Agora |
+|---|---|---|
+| 1 msg solta | 6s espera | 3s espera |
+| 3 msgs em 5s | 3 respostas atropeladas | 1 resposta vendo as 3 |
+| 5 msgs em 30s c/ pausas | 2-3 respostas atropeladas | 1 resposta com tudo |
+| Cliente corrige após 8s | Respondia a versão errada | Responde a versão certa |
+
+**Validado em produção** (conv 621, Ângelo): 5 msgs em 19s → 1 resposta única às 19:56:29.
+
+Configurável: `AGENT_V2_DEBOUNCE_SECONDS` (default 3, max 60).
 
 ---
 
-## 6. As 7 tools do V2
+## 7. Regras do prompt — destaques
 
-| Tool | Tipo | O que faz |
-|------|------|-----------|
-| `buscar_compatibilidade` | leitura | Dado modelo da moto, retorna pneus compatíveis com preço e estoque |
-| `buscar_produto` | leitura | Busca por medida (90/90-18), marca ou código |
-| `calcular_frete` | leitura | Calcula frete por bairro/cidade |
-| `verificar_estoque` | leitura | Estoque por product_id ou code (chamado silencioso no passo 2) |
-| `buscar_politica` | leitura | Garantia, horário, formas de pagamento, troca, prazo |
-| `criar_pedido` | **escrita** | Cria pedido + items (passo 6 do fluxo) |
-| `escalar_humano` | sinalização | Marca conversa pra atendente humano |
+### 2 caminhos de cotação
+- **(a) Cliente disse medida** ("90/90-18") → `buscar_produto` direto, **não pergunta a moto**
+- **(b) Cliente disse moto** ("Fan 150") → `buscar_compatibilidade`
 
-Definições completas em `src/atendente-v2/tools.ts`.
+### Estoque (limiares quantitativos)
+- `total_stock == 0` → "tá em falta agora"
+- `1 ≤ total_stock ≤ 3` → "tenho aqui, mas só X unidades"
+- `total_stock >= 4` → **não menciona** estoque
+
+### Formatação
+- **Default**: texto corrido WhatsApp, sem bullets
+- **Exceção 1**: cotação com 2+ produtos → uma linha por produto com preço
+- **Exceção 2**: resumo final do pedido → bloco com nº pedido, itens, frete, total, endereço, pagamento
+
+### Fluxo de fechamento (6 passos, obrigatório)
+1. Produto confirmado (busca rodou)
+2. Cliente confirmou interesse → perguntar entrega ou retirada
+3. Se delivery → bairro → `calcular_frete`
+4. Mostrar total (produtos + frete)
+5. Coletar nome, endereço, pagamento numa mensagem só
+6. `criar_pedido` (com `valor_frete` se delivery)
+
+### Stop rules
+- Cliente pediu humano → `escalar_humano` imediato
+- Tool erro 2x → escalar
+- Max 3 parágrafos, exceto resumo final estruturado
 
 ---
 
-## 7. Variáveis no Coolify
+## 8. Variáveis no Coolify
 
-### Manter (são compartilhadas com infraestrutura)
+### Manter (22 vars)
 
 ```bash
 NODE_ENV=production
 FAREJADOR_ENV=prod
 PORT=3000
-DATABASE_URL=...
-DATABASE_POOL_MAX=10
-DATABASE_SSL=true
-CHATWOOT_HMAC_SECRET=...
-CHATWOOT_WEBHOOK_MAX_AGE_SECONDS=300
-CHATWOOT_API_BASE_URL=...
-CHATWOOT_API_TOKEN=...
-CHATWOOT_ACCOUNT_ID=...
-ADMIN_AUTH_TOKEN=...
 LOG_LEVEL=info
 SIGNAL_TIMEZONE=America/Sao_Paulo
+SKIP_EVENT_TYPES=
+
+DATABASE_URL=...
+DATABASE_POOL_MAX=5
+DATABASE_SSL=true
 PARTNER_DATABASE_URL=...
-```
 
-### Adicionar (V2)
+CHATWOOT_HMAC_SECRET=...
+CHATWOOT_WEBHOOK_MAX_AGE_SECONDS=300
+CHATWOOT_API_BASE_URL=https://chatwoot.smarttecsolutions.com.br/api/v1
+CHATWOOT_API_TOKEN=...
+CHATWOOT_ACCOUNT_ID=2
 
-```bash
-OPENAI_API_KEY=...          # usada pelo V2
-OPENAI_MODEL=gpt-5.5        # ou gpt-4o-mini se quiser baratear
+ADMIN_AUTH_TOKEN=...
+
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.5
 OPENAI_TIMEOUT_MS=30000
-AGENT_V2_CONVERSATION_IDS=* # "*" = todas as conversas vão pro V2
+
+AGENT_V2_WORKER_ENABLED=true
+AGENT_V2_POLL_INTERVAL_MS=5000
+AGENT_V2_CONVERSATION_IDS=*
+AGENT_V2_DEBOUNCE_SECONDS=3    # opcional, default 3
 ```
 
-### Remover (V1 não usa mais)
+### Remover (já não fazem nada, zod ignora)
+
+`ORGANIZADORA_*`, `PLANNER_*`, `GENERATOR_*`, `ATENDENTE_SHADOW_*`, `ATENDENTE_CONTEXT_*`
+
+---
+
+## 9. Bugs corrigidos nesta sessão (2026-05-25)
+
+| # | Bug | Fix | Commit |
+|---|-----|-----|--------|
+| 1 | V1 ainda hospedava V2 — não dava pra desligar `ATENDENTE_SHADOW_ENABLED` sem matar o V2 | Worker V2 próprio (`src/atendente-v2/worker.ts`); `server.ts` chama `startAgentV2Worker` | `1c7718d` |
+| 2 | Frete não gravado em `commerce.orders.total_amount` (R$ 198 no banco quando cliente combinou R$ 207,90) | Tool `criar_pedido` exige `valor_frete` quando delivery. `total_amount = subtotal + frete`. Retorno separa as 3 grandezas. | `5454922` |
+| 3 | Bot chamava `verificar_estoque` redundante (~2k tokens/conversa) | Doc da tool e prompt deixam claro: estoque já vem em `buscar_compatibilidade`. Use só após 8+ turnos. | `5454922` |
+| 4 | Cotação com 2 pneus saía em texto corrido bagunçado | Regra de formatação estruturada para 2+ produtos. Exemplos atualizados. | `475347d` |
+| 5 | Resumo final do pedido vinha sem nº, endereço, items separados | Template de bloco estruturado completo. Exceção da regra "max 3 parágrafos". | `475347d` |
+| 6 | Bot respondia 3x quando cliente mandava 3 msgs em rajada | Coalescing window 3s (modelo Intercom) com supersedimento | `9e89575` + `52f1ac6` |
+| 7 | Contradições no prompt (limites subjetivos, exemplo inconsistente) | Auditoria: 8+ turnos definido, estoque com limiar quantitativo, exemplo de cotação corrigido | `7c20276` + `e782c62` |
+| 8 | Bot perguntava moto quando cliente já tinha dado medida ("tem 90/90-18?" → "qual moto?") | Regra "2 caminhos de cotação" no prompt | `44f184e` |
+
+---
+
+## 10. Métricas validadas em produção
+
+### Conv 619 (Wallace, PED-0005, nota 9.5/10)
+- 8 turns
+- 38.135 tokens input, 917 output
+- ~R$ 0,30
+- 7 tool calls
+- ✅ Pedido criado, ⚠️ frete não estava no `total_amount` (bug que originou os fixes)
+
+### Conv 621 (Ângelo, PED-0006, nota 9.2/10) — **pós-fixes**
+- 10 turns
+- 62.887 tokens input
+- ~R$ 0,40
+- Coalescing funcionou: 5 msgs em 19s → 1 resposta
+- ✅ `total_amount=108.90` (R$ 99 + R$ 9,90) corretos
+- ✅ Resumo final estruturado completo
+- ✅ Não perguntou moto quando cliente deu medida
+- ⚠️ 1 ponto fraco: bot levou 2 turnos pra entender "ele pega na fan 2015?" depois de já ter cotado por medida
+
+---
+
+## 11. Rollback
+
+Se algo der errado:
 
 ```bash
-ORGANIZADORA_ENABLED            # set false ou remova
-ORGANIZADORA_DEBOUNCE_SECONDS
-ORGANIZADORA_POLL_INTERVAL_MS
-ORGANIZADORA_MIN_CONFIDENCE
-ORGANIZADORA_STALE_JOB_AFTER_SECONDS
-PLANNER_LLM_ENABLED             # set false
-PLANNER_OPENAI_API_KEY
-PLANNER_MODEL
-ATENDENTE_SHADOW_ENABLED        # set false
-ATENDENTE_SHADOW_POLL_INTERVAL_MS
-ATENDENTE_CONTEXT_MESSAGES_LIMIT
-ATENDENTE_CONTEXT_TOOL_EVENTS_LIMIT
-ATENDENTE_CONTEXT_ORGANIZER_FACTS_LIMIT
-GENERATOR_LLM_ENABLED           # set false
-GENERATOR_OPENAI_API_KEY
-GENERATOR_MODEL
-GENERATOR_PROMPT_FEW_SHOT_ENABLED
-GENERATOR_PROMPT_MODULAR_ENABLED
+# Coolify
+AGENT_V2_WORKER_ENABLED=false
 ```
 
-**Ordem segura de remoção**:
-1. Primeiro: setar todos os `*_ENABLED=false` (Planner, Generator, Organizadora, Atendente Shadow)
-2. Confirmar com `AGENT_V2_CONVERSATION_IDS=*` que todas as conversas vão pro V2
-3. Rodar 1 semana com tudo desligado mas variáveis presentes
-4. Se nada quebrar, remove uma por uma do Coolify
+Bot para de processar. Mensagens continuam entrando em `core.messages` (sem ingestão perdida). Para voltar: `AGENT_V2_WORKER_ENABLED=true`.
+
+V1 **não tem rollback** — código foi removido. Reinstalar V1 exige `git revert 1c7718d` e redeploy.
 
 ---
 
-## 8. Como reverter pro V1 (rollback de emergência)
+## 12. Limitações conhecidas
 
-Se algo der errado no V2:
+1. **Quick replies (`OPCOES:`) não viram botão no WhatsApp.** Texto é strip pelo sender, cliente nunca vê. LLM usa como hint interna pra formular pergunta fechada.
 
-```bash
-# No Coolify:
-AGENT_V2_CONVERSATION_IDS=    # vazio
-PLANNER_LLM_ENABLED=true
-GENERATOR_LLM_ENABLED=true
-ATENDENTE_SHADOW_ENABLED=true
-```
+2. **Nome do cliente não atualiza `core.contacts`.** Fica só no histórico/pedido.
 
-Redeploy. Volta pro V1 sem perder nada. O V2 fica desativado mas o código continua no repo.
+3. **Sem `consultar_pedido`.** Cliente que volta perguntar status do pedido vai pra escalação humana. Implementar quando volume aumentar.
 
----
+4. **Sem processamento de imagem (comprovante Pix).** Tool de confirmação de pagamento não existe.
 
-## 9. Conquistas técnicas do V2
+5. **Latência base +3s.** Toda resposta agora demora ~3s a mais por causa do coalescing. Trade-off aceito.
 
-### Memória persistente entre turns
-- Tool calls e results gravados em `agent.turns.actions` (jsonb)
-- `loadHistory` intercala com `core.messages`
-- Bot lembra product_ids, estoques, preços, sem rechamar tools
-- Economia medida: ~28% por turn vs sem persistência
-
-### Prompt enxuto
-- 1 fonte de verdade (sem contradições)
-- Fluxo de 6 passos explícito
-- Tom humano (testado em produção)
-- State check obrigatório no início do turn
-- Estoque é info interna (bot não anuncia)
-- Bairro vs município bem definidos
-
-### Robustez
-- Transação BEGIN/COMMIT só pra criar_pedido
-- 5 rounds máx por turn (evita loop infinito)
-- Timeout 30s no OpenAI
-- Tratamento de erros: tool errado retorna `{erro: ...}` em vez de explodir
+6. **Bot pode falhar no "pivot por medida → confirmação por moto"** (conv 621 T1). Quando cliente já recebeu cotação por medida e depois pergunta "ele pega na X?", LLM pode repetir o preço em vez de validar com `buscar_compatibilidade`. Próximo fix se virar padrão.
 
 ---
 
-## 10. Próximos passos sugeridos
+## 13. Próximos passos sugeridos (em ordem)
 
-### Imediato
-- Validar 20-30 conversas reais pra confirmar zero regressões
-- Decidir final entre gpt-5.5 e gpt-4o pela relação custo/qualidade
-
-### Curto prazo
-- Adicionar OPCOES (quick replies) que estão no prompt mas não saem nas respostas
-- Capturar nome do cliente automaticamente em `core.contacts` no primeiro pedido
-- Dashboard simples mostrando pedidos do bot por dia
-
-### Médio prazo (depois de 1 mês estável)
-- Apagar tabelas `agent.*` órfãs do V1
-- Remover código do V1 do repo (manter em branch separada)
-- Remover env vars do Coolify
-
-### Longo prazo
-- Avaliar trocar OpenAI → Anthropic (Claude tem preços melhores e prompt caching mais agressivo)
-- Avaliar streaming pra reduzir percepção de latência
-- Multi-turn parallel tool calls (já suportado, validar)
+1. **`consultar_pedido` tool** — quando aparecer "cadê meu pedido?" pela 3ª vez no mês
+2. **Capturar nome do cliente em `core.contacts`** — pra dashboard de clientes
+3. **Dashboard de pedidos do bot** — already exists em `/admin/painel`?
+4. **Apagar tabelas `agent.*` órfãs** — depois de 30 dias sem incidentes
+5. **Avaliar Claude Sonnet 4.7** vs gpt-5.5 — Anthropic tem prompt caching mais agressivo
 
 ---
 
-## 11. Conversas de validação rodadas
-
-| # | Cliente | Turns | Pedido | Custo | Modelo | Resultado |
-|---|---------|-------|--------|-------|--------|-----------|
-| 1 | Wallace | 9 | Falhou (delivery_address null) | — | — | Fix aplicado |
-| 2 | Wallace | 9 | PED-0003 R$108,90 | 16¢ | 5.5 | OK, tom robótico |
-| 3 | Anderson | 11 | PED-0004 R$207,90 | 14¢ | 5.5 | **Nota 9/10** — tom humano, persistência funcionando, adicionou item no meio, fechou venda |
-
-### Avaliação detalhada da conversa Anderson (referência)
-
-**Acertos** (9 pontos):
-- Tom natural ("amigo", "show", "tá sim", "fechou", emoji 👍 no fim)
-- Não mencionou estoque em nenhuma resposta (info interna)
-- Lembrou "Fonseca" 5 turns depois sem rechamar tool
-- Adicionou Fan 150 no meio sem perder contexto do PCX
-- Calculou total certinho: R$99 + R$99 + R$9,90 = R$207,90
-- Pediu endereço completo (rua, número, bairro)
-- Quando cliente esqueceu pagamento, pediu separadamente sem desnecessária formalidade
-- Pedido criou na primeira tentativa
-- Despedida final humanizada com emoji
-
-**A melhorar** (1 ponto):
-- OPCOES (quick replies) escritos no prompt mas não aparecem como botões no WhatsApp
-- Pequenas redundâncias de confirmação ("Fechou?" / "Posso fechar?")
-- 11 turns é um pouco longo — daria pra encurtar com mais agressividade
-
----
-
-## 12. Commits relevantes do V2
+## 14. Commits relevantes (esta sessão)
 
 ```
-3a40449 feat(agent-v2): persiste tool calls/results em agent.turns.actions
-0e47a7d fix(agent-v2): estoque é info interna — não fala pro cliente
-e923656 fix(agent-v2): tom mais humano, menos robótico
-007f284 fix(agent-v2): move state check pro topo do prompt
-0e34bb4 fix(agent-v2): corrige 2 contradições no prompt
-cb725fd fix(agent-v2): estoque já vem no buscar_compatibilidade/buscar_produto
-b649cfc feat(agent-v2): state check obrigatório antes de cada resposta
-1ce71a1 fix(agent-v2): remove contradições no prompt — fluxo único de fechamento
-a121afa fix(agent-v2): fluxo de fechamento explícito em 6 passos no prompt
-79118d6 fix(agent-v2): clarifica bairro vs município no calcular_frete
-0d0c5a0 fix(agent-v2): exige endereço completo para delivery antes de criar_pedido
-ba9c2fb fix(agent-v2): escapa backticks no prompt
-04fba54 fix(agent-v2): contact_id e source corretos no criar_pedido
-2709807 fix(agent-v2): remove todos os strict mode dos tool schemas
-be9a0ed fix(agent-v2): remove strict mode dos tool schemas
-d0d7663 feat(agent-v2): agente unificado 1 LLM com function calling
+44f184e fix(agent-v2): nao pergunta moto quando cliente ja deu a medida
+e782c62 fix(agent-v2): resolve contradicao no exemplo de cotacao + define limiar de estoque
+7c20276 fix(agent-v2): resolve conflitos prompt/tools apos auditoria
+52f1ac6 feat(agent-v2): troca debounce fixo por coalescing window (modelo Intercom)
+9e89575 feat(agent-v2): debounce de mensagens em sequencia (anti-resposta-em-rajada)
+475347d fix(agent-v2): formata cotacao multi-produto e resumo final do pedido
+5454922 fix(agent-v2): grava frete no total_amount e remove verificar_estoque redundante
+1c7718d chore(agent-v1): desliga V1 e migra worker para src/atendente-v2/
 ```
 
 ---
 
-## 13. Decisões de design importantes
+## 15. Referências
 
-### Por que não criar tabelas novas?
-- V1 já criou 11 tabelas em `agent.*` que ficaram complexas demais
-- `agent.turns` já existia e tinha coluna `actions` jsonb perfeita pro caso
-- Zero migration = zero risco de quebrar prod
-
-### Por que function calling em vez de prompt-only?
-- Modelo controla quando chamar tool (não precisa parsing)
-- Erro estruturado (`{erro: ...}` em JSON)
-- OpenAI cuida do schema validation
-- Permite parallel tool calls naturalmente
-
-### Por que história limitada a 30 mensagens?
-- Controle de custo (input tokens crescem linearmente)
-- 30 mensagens = ~15 turns = cobertura de 99% das conversas reais
-- Conversas mais longas: o estado importante já tá nos tool calls persistidos
-
-### Por que `source = 'chatwoot_com_bot'`?
-- Constraint `orders_source_check` no banco aceita só valores conhecidos
-- Distingue pedidos do bot de pedidos manuais no dashboard
-
----
-
-## 14. Limitações conhecidas
-
-1. **Quick replies (OPCOES) não saem na resposta** — bot escreve OPCOES no texto mas não vira UI no WhatsApp. Investigar `sender.ts`.
-
-2. **Saudação dupla intermitente** — em raros casos webhook do Chatwoot disparou 2x. Bug de concorrência, não do prompt. Não reproduzido depois da última conversa.
-
-3. **Nome do cliente não atualiza `core.contacts`** — fica só no histórico/pedido. Próximo passo se quiser dashboard de clientes.
-
-4. **Tool result tokens não cacheados** — diferente do system prompt, os tool results crescem o histórico e somam tokens. Mitigação: limit 30 messages.
-
----
-
-## 15. Contato e referências
-
-- Repositório: `farejador-pneus` (remote `pneus`)
+- Repo: `farejador-pneus` (remote `pneus`)
 - Deploy: Coolify, serviço `farejador-pneus`
-- DB: Supabase project `aoqtgwzeyznycuakrdhp`
-- Arquitetura: `docs/PLANO_AGENT_V2.md` (plano original)
+- DB: Supabase `aoqtgwzeyznycuakrdhp`
+- Auditoria de conv: ver scripts em `scripts/auditar-*.cjs`
+- Limpeza de banco: `scripts/apagar-conversas-2026-05-23.cjs` (com `COMMIT=1`)
