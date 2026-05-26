@@ -159,8 +159,9 @@ interface OpenAIResponse {
   usage: {
     prompt_tokens: number;
     completion_tokens: number;
-    // Tokens reaproveitados do cache automatico da OpenAI (prompts >1024
-    // tokens, TTL ~5-10min). Custo cai 50% no que foi cacheado.
+    // Tokens reaproveitados do cache automatico da OpenAI.
+    // Modelos gpt-5.5+ usam TTL 24h por padrao; modelos antigos 5-10min.
+    // Desconto: ate 90% no token cacheado ($0.50/M vs $5/M no gpt-5.5).
     prompt_tokens_details?: { cached_tokens?: number };
   };
   durationMs: number;
@@ -183,6 +184,10 @@ async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
     tools: TOOL_DEFINITIONS,
     tool_choice: 'auto',
     max_completion_tokens: 1000,
+    // Garante TTL de 24h no prompt caching. gpt-5.5+ ja usa 24h por
+    // default, mas explicito > implicito. Pra modelos mais antigos
+    // (gpt-4o etc) isso forca 24h em vez do default 5-10min.
+    prompt_cache_retention: '24h',
   });
 
   const start = Date.now();
