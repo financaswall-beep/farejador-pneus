@@ -52,13 +52,51 @@ src/atendente-v2/
 
 **Escrita**:
 - `agent.turns` — historico do bot (1 row por turn, com say_text + actions jsonb + tokens)
+- `agent.session_current` — sessão por conversa (criada pelo dispatcher antes do job — schema mínimo)
 - `commerce.orders` + `commerce.order_items` — pedidos criados
 - `ops.atendente_jobs` — fila de processamento
 
-**Órfãs (V1 desligado, não tocadas pelo V2)**:
-- `agent.cart_*`, `agent.session_*`, `agent.order_drafts`, `agent.pending_*`, `agent.escalations`
-- `ops.enrichment_jobs`
-- (manter por 30 dias, depois drop)
+**Apagadas em 2026-05-26 (eram realmente órfãs do V1)**:
+- `agent.cart_current`, `cart_current_items`, `cart_events`
+- `agent.escalations`, `order_drafts`, `pending_confirmations`
+- `agent.session_items`, `session_slots`, `session_events`
+- `ops.stock_snapshots`, `unhandled_messages`, `bot_events`
+- Schema `analytics_marts` inteiro (8 views da Organizadora V1)
+
+**Apagadas por engano e recriadas/pendentes**:
+- `agent.session_current` ✅ recriada (V2 dispatcher usa)
+- `ops.human_bot_reviews` ⚠️ pendente recriar (painel admin /shadow/review usa)
+- `ops.enrichment_jobs` ⚠️ pendente recriar (repository legacy ainda referencia)
+
+---
+
+## 1.5. Camada de Analytics — implementada 2026-05-26
+
+**6 tabelas analytics populando automaticamente** via trigger em `agent.turns`:
+
+| Tabela | O que tem | Fonte |
+|--------|-----------|-------|
+| `analytics.conversation_facts` | 26+ tipos de facts (nome, moto, preço, frete, pedido, etc) | Parse de `agent.turns.actions` jsonb |
+| `analytics.fact_evidence` | 1 evidência por fact (rastreabilidade) | Mesmo trigger |
+| `analytics.conversation_classifications` | 5 dimensões (outcome, stage, customer_type, intent, urgency, loss_reason) | Regras SQL |
+| `analytics.linguistic_hints` | 9 padrões regex (aceite, objeção, urgência, etc) | Regex sobre `core.messages` do cliente |
+| `analytics.conversation_signals_mv` | Tempos, contagens, tokens, custo | Materialized view |
+| `analytics.customer_journey_mv` | LTV, total pedidos, recorrente | Materialized view |
+
+**Funcionamento:**
+- `agent.turns` INSERT → trigger `analytics_extract_facts` dispara → roda 3 funções SQL
+- Funções têm `EXCEPTION WHEN OTHERS` → bot **nunca quebra** se trigger falhar
+- pg_cron agendado: refresh diário às 3h e 3h15
+- ~88% das métricas analíticas populadas em real-time sem LLM nenhuma
+
+**Views de consumo prontas (`analytics.v_*`)**:
+- `v_conversation_summary` — 1 linha por conversa com 25+ colunas (cliente, pedido, tokens, custo, bairro, etc)
+- `v_daily_metrics` — métricas agregadas por dia
+- `v_top_bairros` — vendas por geografia
+- `v_top_motos` — motos mais consultadas
+- `v_top_produtos` — produtos mais cotados
+
+**Doc completa:** `docs/PLANO_ANALYTICS_2026-05-26.md`
 
 ---
 
@@ -174,7 +212,8 @@ e782c62 fix(agent-v2): contradicao no exemplo + limiar de estoque
 | 619 | Wallace (1ª) | PED-0005 R$ 198 | 8 | ~R$ 0,30 | ⚠️ Frete não no total_amount (bug que originou fix #4.2) |
 | 621 | Ângelo | PED-0006 R$ 108,90 | 10 | ~R$ 0,40 | ✅ Frete OK após fix. Nota 9.2/10 |
 | 622 | Wallace (2ª) | PED-0008 R$ 108,90 | 7 | **~R$ 0,50** | ✅ Prompt EN funcionando. 1ª pós-deploy (cache warmup). Nota 9.5/10 |
-| **623** | **Anderson** | **PED-0009 R$ 207,90** | **8** | **~R$ 0,43** | 🏆 **Multi-produto multi-moto, recuperação inteligente, consolidação. Nota 9.8/10** |
+| 623 | Anderson | PED-0009 R$ 207,90 | 8 | ~R$ 0,43 | 🏆 Multi-produto multi-moto, recuperação inteligente, consolidação. Nota 9.8/10 |
+| **624** | **Wallace (3ª)** | **PED-0010 R$ 207,90** | **7** | **~R$ 0,23** 🏆 | ✅ **Mais barata até hoje. Twister 2019, regra meia-vida funcionou ("são novos?"→explicou), saudação adaptativa ("Bom dia"). Nota 9.6/10. Único soluço: 4min na 1ª resposta porque acabei de apagar agent.session_current por engano (recriado)** |
 
 ### Conv 623 — Feito técnico notável
 

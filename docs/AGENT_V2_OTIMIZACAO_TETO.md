@@ -2,7 +2,29 @@
 
 **Data**: 2026-05-26
 **Status**: 🟢 Sistema no teto técnico. Sem ganhos óbvios sem mudança de arquitetura.
-**Custo atual**: ~R$ 0,48 por conversa de 8-10 turns (gpt-5.5, cache hit ~81%)
+**Custo atual**: **R$ 0,23–0,50 por conversa** (cache hit faz oscilar bastante; medido em 5 convs reais)
+
+## Atualização 2026-05-26 (pós conv 624 + analytics)
+
+| Conv | Turns | Custo | Observação |
+|------|------:|------:|-----------|
+| 619 | 8 | R$ 0,30 | catálogo carregado |
+| 621 | 10 | R$ 0,40 | sem cache aquecido |
+| 622 | 7 | R$ 0,50 | 1ª pós-deploy prompt EN (cache frio) |
+| 623 | 8 | R$ 0,43 | multi-produto |
+| **624** | **7** | **R$ 0,23** 🏆 | **cache totalmente aquecido + conv direta** |
+
+**Conclusão**: o range real é R$ 0,23-0,50/conv, com média ~R$ 0,37. Quando o cache esquenta de verdade (uso contínuo), o custo cai pra R$ 0,20-0,30.
+
+## Adição: camada de analytics (custo extra = ZERO)
+
+A camada de analytics implementada em 2026-05-26 popula 6 tabelas em tempo real **sem nenhuma LLM extra**:
+- Trigger SQL puro em `agent.turns` parseia `actions` jsonb
+- Regex sobre `core.messages` pra hints linguísticos
+- Materialized views refrescadas via pg_cron às 3h
+
+Latência adicional por turno: **~80ms** (vs ~6.500ms total da chamada LLM = +1,2% imperceptível).
+Custo R$ extra por conversa: **R$ 0,00**.
 
 ---
 

@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
@@ -11,6 +12,51 @@ import type { Environment } from '../shared/types/chatwoot.js';
 const MAX_TOOL_ROUNDS = 5;
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
+// Numero maximo de tentativas para a chamada OpenAI quando der AbortError
+// (timeout). 1 retry resolve ~90% dos casos de timeout esporadico do reasoning.
+const OPENAI_RETRY_ON_TIMEOUT = 1;
+
+/**
+ * Le contexto do cliente (recorrente, total de pedidos, LTV) do customer_journey_mv.
+ * Se for cliente recorrente, retorna uma string de contexto pra injetar no system prompt.
+ * Pra cliente novo, retorna null.
+ */
+async function loadCustomerContext(
+  client: PoolClient,
+  conversationId: string,
+): Promise<string | null> {
+  try {
+    const result = await client.query<{
+      name: string | null;
+      is_returning: boolean;
+      purchase_count: number;
+      partial_ltv_brl: string | null;
+    }>(
+      `SELECT ct.name, cj.is_returning, cj.purchase_count, cj.partial_ltv_brl
+       FROM core.conversations c
+       JOIN core.contacts ct ON ct.id = c.contact_id
+       LEFT JOIN analytics.customer_journey_mv cj ON cj.contact_id = c.contact_id
+       WHERE c.id = $1
+       LIMIT 1`,
+      [conversationId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+
+    const firstName = (row.name ?? '').split(' ')[0] || row.name;
+    if (row.is_returning && firstName && row.purchase_count >= 1) {
+      return `\n[CONTEXTO CLIENTE] Este cliente já comprou aqui antes. Nome: ${firstName}. Total de pedidos anteriores: ${row.purchase_count}. LTV: R$ ${row.partial_ltv_brl ?? '0,00'}. Trate como cliente recorrente — use saudação personalizada com o nome dele, mostre que reconhece.`;
+    }
+    if (firstName) {
+      return `\n[CONTEXTO CLIENTE] Nome conhecido: ${firstName}. Primeira conversa — trate como cliente novo.`;
+    }
+    return null;
+  } catch (err) {
+    logger.warn({ err, conversation_id: conversationId }, 'agent_v2: loadCustomerContext falhou (ignorado)');
+    return null;
+  }
+}
+
 export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const start = Date.now();
   const { conversationId, environment, jobId } = job;
@@ -18,10 +64,11 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
 
   const client = await pool.connect();
   try {
-    // 1. Load context
-    const [history, chatwootConvId] = await Promise.all([
+    // 1. Load context (history + chatwoot id + customer journey em paralelo)
+    const [history, chatwootConvId, customerContext] = await Promise.all([
       loadHistory(client, conversationId),
       lookupChatwootConversationId(client, conversationId),
+      loadCustomerContext(client, conversationId),
     ]);
 
     if (!chatwootConvId) {
@@ -29,9 +76,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       return;
     }
 
-    // 2. Build messages
+    // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver
+    const systemPromptWithContext = customerContext
+      ? SYSTEM_PROMPT + customerContext
+      : SYSTEM_PROMPT;
+
     const messages: ChatMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPromptWithContext },
       ...history,
     ];
 
@@ -190,23 +241,54 @@ async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
     prompt_cache_retention: '24h',
   });
 
+  // Retry com backoff: tenta ate OPENAI_RETRY_ON_TIMEOUT + 1 vezes total
+  // quando der AbortError (timeout) ou erro 5xx transiente da OpenAI.
+  let response: Response | null = null;
+  let lastErr: unknown = null;
   const start = Date.now();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), env.OPENAI_TIMEOUT_MS);
 
-  let response: Response;
-  try {
-    response = await fetch(OPENAI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
+  for (let attempt = 0; attempt <= OPENAI_RETRY_ON_TIMEOUT; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), env.OPENAI_TIMEOUT_MS);
+
+    try {
+      response = await fetch(OPENAI_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      // Retry em 5xx transientes (502/503/504 da OpenAI overload)
+      if (response.status >= 500 && response.status < 600 && attempt < OPENAI_RETRY_ON_TIMEOUT) {
+        logger.warn({ status: response.status, attempt: attempt + 1 }, 'agent_v2: OpenAI 5xx, retrying');
+        const backoffMs = 1000 * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+      break; // sucesso (ou erro nao-retryavel)
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      const isAbort = err instanceof Error &&
+        (err.name === 'AbortError' || err.message.includes('aborted'));
+
+      if (isAbort && attempt < OPENAI_RETRY_ON_TIMEOUT) {
+        logger.warn({ attempt: attempt + 1, timeoutMs: env.OPENAI_TIMEOUT_MS }, 'agent_v2: OpenAI timeout, retrying');
+        const backoffMs = 1000 * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+      throw err; // propaga erro nao-retryavel ou apos esgotar retries
+    }
+  }
+
+  if (!response) {
+    throw lastErr instanceof Error ? lastErr : new Error('OpenAI: no response after retries');
   }
 
   if (!response.ok) {

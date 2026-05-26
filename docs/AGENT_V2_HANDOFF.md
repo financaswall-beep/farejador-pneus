@@ -1,9 +1,10 @@
 # Agent V2 — Estado de Produção
 
-**Última atualização**: 2026-05-25 (sessão de polish completa)
-**Status**: V2 em produção, V1 totalmente removido do código e da fila
-**Custo real medido**: ~R$ 0,20–0,30/conversa (incluindo coalescing)
-**Última conversa validada**: 621 (Ângelo, PED-0006, nota 9.2/10)
+**Última atualização**: 2026-05-26 (sessão de analytics + limpeza V1)
+**Status**: V2 em produção, V1 totalmente removido, **camada de analytics ativa via trigger SQL** (sem LLM)
+**Custo real medido**: ~R$ 0,23–0,50/conversa (cache hit faz oscilar bastante; mais baixo medido: PED-0010 R$ 0,23)
+**Última conversa validada**: **624 (Wallace, PED-0010, nota 9.6/10) — mais barata até hoje**
+**Conversas validadas no experimento prompt EN**: **3/5** (622, 623, 624 todas com 100% pt-br no output)
 
 ---
 
@@ -116,16 +117,42 @@ src/atendente-v2/
 
 `commerce.products`, `tire_specs`, `vehicle_models`, `vehicle_fitments`, `stock_levels`, `current_prices`, `delivery_zones`, `store_policies` — acessadas via SQL functions das tools.
 
-### Tabelas órfãs (V1 desligado)
+### Tabelas órfãs do V1 (apagadas em 2026-05-26)
 
 ```
-agent.cart_current, cart_current_items, cart_events
-agent.session_current, session_events, session_items, session_slots
-agent.order_drafts, pending_confirmations, pending_human_closures
-agent.escalations
-ops.enrichment_jobs
+agent.cart_current, cart_current_items, cart_events         ← apagadas ✅
+agent.session_events, session_items, session_slots          ← apagadas ✅
+agent.order_drafts, pending_confirmations                   ← apagadas ✅
+agent.escalations                                            ← apagada ✅
+ops.stock_snapshots, unhandled_messages, bot_events         ← apagadas ✅ (nunca usadas)
+analytics_marts.* (8 views da Organizadora)                 ← apagado schema inteiro ✅
 ```
-**Recomendação**: deixar por 30 dias. Apagar depois.
+
+**Apagadas por engano e recriadas/pendentes:**
+
+```
+agent.session_current        ← V2 dispatcher USA. Recriada com schema mínimo ✅
+ops.human_bot_reviews        ← Painel admin /shadow/review usa. ⚠️ Pendente recriar
+ops.enrichment_jobs          ← Repository legacy ainda referencia. ⚠️ Pendente recriar
+```
+
+### Camada de Analytics ATIVA (implementada 2026-05-26)
+
+6 tabelas no schema `analytics.*` populando automaticamente via trigger em `agent.turns`:
+
+| Tabela | Conteúdo | Mecanismo |
+|--------|----------|-----------|
+| `analytics.conversation_facts` | 26+ tipos de facts (nome, moto, preço, frete, pedido) | Parse jsonb de `agent.turns.actions` |
+| `analytics.fact_evidence` | Rastreabilidade (1 por fact) | Mesmo trigger |
+| `analytics.conversation_classifications` | 5-6 dimensões (outcome, stage, customer_type, etc) | Regras SQL determinísticas |
+| `analytics.linguistic_hints` | 9 padrões regex (aceite, objeção, urgência, etc) | Regex sobre `core.messages` do cliente |
+| `analytics.conversation_signals_mv` | Tempos, contagens, tokens, custo | Materialized view |
+| `analytics.customer_journey_mv` | LTV, total pedidos, recorrente | Materialized view |
+
+Trigger: `analytics_extract_facts AFTER INSERT ON agent.turns` com `EXCEPTION WHEN OTHERS` (bot nunca quebra).
+pg_cron: refresh diário às 3h e 3h15 das materialized views.
+
+**Doc completa**: `docs/PLANO_ANALYTICS_2026-05-26.md`
 
 ---
 
@@ -248,21 +275,33 @@ AGENT_V2_DEBOUNCE_SECONDS=3    # opcional, default 3
 ## 10. Métricas validadas em produção
 
 ### Conv 619 (Wallace, PED-0005, nota 9.5/10)
-- 8 turns
-- 38.135 tokens input, 917 output
-- ~R$ 0,30
-- 7 tool calls
+- 8 turns | 38.135 in / 917 out | ~R$ 0,30 | 7 tool calls
 - ✅ Pedido criado, ⚠️ frete não estava no `total_amount` (bug que originou os fixes)
 
-### Conv 621 (Ângelo, PED-0006, nota 9.2/10) — **pós-fixes**
-- 10 turns
-- 62.887 tokens input
-- ~R$ 0,40
+### Conv 621 (Ângelo, PED-0006, nota 9.2/10) — pós-fixes
+- 10 turns | 62.887 in | ~R$ 0,40
 - Coalescing funcionou: 5 msgs em 19s → 1 resposta
-- ✅ `total_amount=108.90` (R$ 99 + R$ 9,90) corretos
-- ✅ Resumo final estruturado completo
-- ✅ Não perguntou moto quando cliente deu medida
-- ⚠️ 1 ponto fraco: bot levou 2 turnos pra entender "ele pega na fan 2015?" depois de já ter cotado por medida
+- ✅ `total_amount=108.90` correto após fix
+- ⚠️ Bot levou 2 turnos pra entender "ele pega na fan 2015?" depois de cotar por medida
+
+### Conv 622 (Wallace 2ª, PED-0008, nota 9.5/10) — 1ª pós-prompt EN
+- 7 turns | ~R$ 0,50 (cache warmup)
+- ✅ Idioma 100% pt-br, tom mantido
+- ✅ Cache hit 76-79% medido nos logs
+
+### Conv 623 (Anderson, PED-0009, nota 9.8/10) — 🏆 multi-produto multi-moto
+- 8 turns | ~R$ 0,43
+- 2 `buscar_compatibilidade` em paralelo (NMAX + PCX)
+- Recuperação inteligente: "tem como ser pelo ano?" → identificou PCX 160 via ano 2024
+- Consolidou 2 pneus iguais em 1 item quantity=2
+
+### Conv 624 (Wallace 3ª, PED-0010, nota 9.6/10) — 🏆 mais barata até hoje
+- 7 turns | 40.015 in / 941 out | **~R$ 0,23**
+- Twister 2019 → CB 250F resolvida (catalog match)
+- ✅ Regra meia-vida funcionou (cliente: "são novos?" → bot explicou com transparência)
+- ✅ Saudação adaptativa ("Bom dia" cliente → "Bom dia" bot, não usou template "Boa noite")
+- ⚠️ 1ª resposta demorou 4min — **culpa da sessão deletada por engano antes da conversa** (`agent.session_current` apagada, recriada depois)
+- ✅ Trigger de analytics populou 30 facts + 5 classifications + 3 hints em tempo real
 
 ---
 

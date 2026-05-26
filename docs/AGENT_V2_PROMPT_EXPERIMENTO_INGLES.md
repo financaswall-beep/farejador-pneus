@@ -1,8 +1,21 @@
 # Experimento: prompt híbrido inglês + exemplos pt-br
 
 **Data início**: 2026-05-26
-**Status**: 🟡 EM TESTE
+**Status**: 🟡 EM TESTE — **3/5 convs validadas, 0 regressão**
 **Objetivo**: economizar ~37-40% de tokens do system prompt sem perder qualidade
+
+## Status acumulado (atualização 2026-05-26)
+
+| # | Conv | Cliente | Pedido | Idioma | Tom mantido | Nota |
+|---|------|---------|--------|:-----:|:-----:|:----:|
+| 1 | 622 | Wallace | PED-0008 R$ 108,90 | ✅ 100% pt-br | ✅ | 9.5/10 |
+| 2 | 623 | Anderson | PED-0009 R$ 207,90 | ✅ 100% pt-br | ✅ | 9.8/10 |
+| 3 | **624** | **Wallace** | **PED-0010 R$ 207,90** | **✅ 100% pt-br** | **✅** | **9.6/10** |
+| 4 | — | (pendente) | — | — | — | — |
+| 5 | — | (pendente) | — | — | — | — |
+
+**Critério pra declarar estável**: 5 convs consecutivas sem regressão (1 falta = volta a 0).
+**Faltam: 2 convs.**
 
 ---
 
