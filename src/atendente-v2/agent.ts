@@ -17,10 +17,25 @@ const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_RETRY_ON_TIMEOUT = 1;
 
 /**
- * Le contexto do cliente (recorrente, total de pedidos, LTV) do customer_journey_mv.
- * Se for cliente recorrente, retorna uma string de contexto pra injetar no system prompt.
- * Pra cliente novo, retorna null.
+ * Le contexto do cliente (nome do Chatwoot, recorrente, total de pedidos, LTV).
+ * Retorna string pra injetar no system prompt OU null se nao tiver info util.
+ *
+ * Filtra nomes invalidos do Chatwoot (numeros de telefone, placeholders,
+ * strings vazias) pra evitar bot chamar cliente de "+5521..." ou "Cliente".
  */
+function isValidChatwootName(name: string | null): boolean {
+  if (!name) return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return false;
+  // Rejeita strings que parecem numero de telefone
+  if (/^\+?\d[\d\s\-()]*$/.test(trimmed)) return false;
+  // Rejeita placeholders comuns
+  const lower = trimmed.toLowerCase();
+  const placeholders = ['cliente', 'lead', 'unknown', 'desconhecido', 'visitante', 'no name', 'sem nome', 'whatsapp', 'user'];
+  if (placeholders.some((p) => lower === p || lower.startsWith(p + ' '))) return false;
+  return true;
+}
+
 async function loadCustomerContext(
   client: PoolClient,
   conversationId: string,
@@ -43,14 +58,16 @@ async function loadCustomerContext(
     const row = result.rows[0];
     if (!row) return null;
 
-    const firstName = (row.name ?? '').split(' ')[0] || row.name;
+    const hasValidName = isValidChatwootName(row.name);
+    const firstName = hasValidName ? (row.name as string).trim().split(/\s+/)[0] : null;
+
     if (row.is_returning && firstName && row.purchase_count >= 1) {
-      return `\n[CONTEXTO CLIENTE] Este cliente já comprou aqui antes. Nome: ${firstName}. Total de pedidos anteriores: ${row.purchase_count}. LTV: R$ ${row.partial_ltv_brl ?? '0,00'}. Trate como cliente recorrente — use saudação personalizada com o nome dele, mostre que reconhece.`;
+      return `\n[CONTEXTO CLIENTE] Este cliente já comprou aqui antes. Nome (do Chatwoot): ${firstName}. Total de pedidos anteriores: ${row.purchase_count}. LTV: R$ ${row.partial_ltv_brl ?? '0,00'}. Trate como cliente recorrente — use saudação personalizada com o nome dele, mostre que reconhece. NÃO pergunte o nome dele.`;
     }
     if (firstName) {
-      return `\n[CONTEXTO CLIENTE] Nome conhecido: ${firstName}. Primeira conversa — trate como cliente novo.`;
+      return `\n[CONTEXTO CLIENTE] Nome conhecido do Chatwoot: ${firstName}. Primeira conversa. USE esse nome desde o turno 1 (ex: "Bom dia, ${firstName}!") e NÃO pergunte o nome dele de novo. Se ele se identificar com nome diferente na conversa, prefira o nome novo.`;
     }
-    return null;
+    return `\n[CONTEXTO CLIENTE] Nome do cliente NÃO veio do Chatwoot. Pergunte o nome dele em algum momento durante a conversa (ex: turno 2 após cotar).`;
   } catch (err) {
     logger.warn({ err, conversation_id: conversationId }, 'agent_v2: loadCustomerContext falhou (ignorado)');
     return null;
