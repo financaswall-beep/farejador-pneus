@@ -367,8 +367,8 @@ async function criarPedido(
   const orderResult = await client.query<{ id: string; order_number: string }>(
     `INSERT INTO commerce.orders (
        environment, contact_id, source_conversation_id, total_amount, status,
-       fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source
-     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot')
+       fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source, customer_name
+     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9)
      RETURNING id, order_number`,
     [
       environment,
@@ -379,6 +379,9 @@ async function criarPedido(
       args.forma_pagamento ?? null,
       modalidade === 'delivery' ? (args.endereco_entrega ?? null) : null,
       args.geo_resolution_id ?? null,
+      // customer_name: nome dado NA conversa (pode diferir de core.contacts.name
+      // quando o WhatsApp e compartilhado). Mantemos core.contacts.name intocado.
+      (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null,
     ],
   );
 
@@ -418,6 +421,7 @@ interface OrderRow {
   fulfillment_mode: string;
   payment_method: string | null;
   delivery_address: string | null;
+  customer_name: string | null;
   created_at: Date;
   closed_at: Date | null;
 }
@@ -452,7 +456,7 @@ async function consultarPedido(
     // perguntando de pedido de outra conta dele).
     const result = await client.query<OrderRow>(
       `SELECT id, order_number, status, total_amount, fulfillment_mode,
-              payment_method, delivery_address, created_at, closed_at
+              payment_method, delivery_address, customer_name, created_at, closed_at
        FROM commerce.orders
        WHERE environment = $1
          AND order_number = $2
@@ -477,7 +481,7 @@ async function consultarPedido(
     }
     const result = await client.query<OrderRow>(
       `SELECT id, order_number, status, total_amount, fulfillment_mode,
-              payment_method, delivery_address, created_at, closed_at
+              payment_method, delivery_address, customer_name, created_at, closed_at
        FROM commerce.orders
        WHERE environment = $1
          AND contact_id = $2
@@ -514,6 +518,7 @@ async function consultarPedido(
         modalidade: o.fulfillment_mode,
         pagamento: o.payment_method,
         endereco_entrega: o.delivery_address,
+        cliente_nome: o.customer_name,
         criado_em: o.created_at.toISOString(),
         fechado_em: o.closed_at?.toISOString() ?? null,
         itens: itensResult.rows.map((i) => ({
