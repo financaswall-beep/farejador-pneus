@@ -135,6 +135,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'consultar_pedido',
+      description: 'Consulta pedido(s) que o cliente JÁ FEZ. Use quando o cliente perguntar "cadê meu pedido?", "qual o status do PED-XXXX?", "já saiu?", etc. Se ele passar o número, busca por número. Se não, lista os últimos pedidos dele.',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0006"). Opcional — se omitido, lista os últimos pedidos do contato da conversa atual.' },
+          limit: { type: 'integer', description: 'Quantos pedidos retornar quando lista (default 5)', minimum: 1, maximum: 10 },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'escalar_humano',
       description: 'Escalada para atendente humano. Use quando o cliente pedir humano, após 2 falhas consecutivas, ou em reclamação grave.',
       parameters: {
@@ -218,6 +234,10 @@ export async function executeTool(
 
       case 'criar_pedido': {
         return await criarPedido(client, environment, conversationId, args);
+      }
+
+      case 'consultar_pedido': {
+        return await consultarPedido(client, environment, conversationId, args);
       }
 
       case 'escalar_humano': {
@@ -319,5 +339,130 @@ async function criarPedido(
     valor_frete: valorFrete.toFixed(2),
     total: totalAmount.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
+  });
+}
+
+// ─── consultar_pedido ──────────────────────────────────────────────────────
+
+interface OrderRow {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: string;
+  fulfillment_mode: string;
+  payment_method: string | null;
+  delivery_address: string | null;
+  created_at: Date;
+  closed_at: Date | null;
+}
+
+interface OrderItemRow {
+  product_name: string;
+  product_code: string;
+  quantity: number;
+  unit_price: string;
+}
+
+async function consultarPedido(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const orderNumber = args.order_number as string | undefined;
+  const limit = Math.min(Math.max(Number(args.limit ?? 5), 1), 10);
+
+  // Busca contact_id da conversa atual.
+  const convResult = await client.query<{ contact_id: string | null }>(
+    `SELECT contact_id FROM core.conversations WHERE id = $1 LIMIT 1`,
+    [conversationId],
+  );
+  const contactId = convResult.rows[0]?.contact_id ?? null;
+
+  let orders: OrderRow[];
+
+  if (orderNumber) {
+    // Busca por numero — pode ser de qualquer contato (cliente pode estar
+    // perguntando de pedido de outra conta dele).
+    const result = await client.query<OrderRow>(
+      `SELECT id, order_number, status, total_amount, fulfillment_mode,
+              payment_method, delivery_address, created_at, closed_at
+       FROM commerce.orders
+       WHERE environment = $1
+         AND order_number = $2
+       LIMIT 1`,
+      [environment, orderNumber.toUpperCase().trim()],
+    );
+    orders = result.rows;
+
+    if (orders.length === 0) {
+      return JSON.stringify({
+        encontrado: false,
+        mensagem: `Não encontrei pedido ${orderNumber}. Confere o número?`,
+      });
+    }
+  } else {
+    // Sem numero — lista os ultimos pedidos do contato da conversa atual.
+    if (!contactId) {
+      return JSON.stringify({
+        encontrado: false,
+        mensagem: 'Não consegui identificar o contato. Me passa o número do pedido (ex: PED-0042).',
+      });
+    }
+    const result = await client.query<OrderRow>(
+      `SELECT id, order_number, status, total_amount, fulfillment_mode,
+              payment_method, delivery_address, created_at, closed_at
+       FROM commerce.orders
+       WHERE environment = $1
+         AND contact_id = $2
+       ORDER BY created_at DESC
+       LIMIT $3`,
+      [environment, contactId, limit],
+    );
+    orders = result.rows;
+
+    if (orders.length === 0) {
+      return JSON.stringify({
+        encontrado: false,
+        mensagem: 'Você ainda não tem pedidos comigo. Quer fazer um?',
+      });
+    }
+  }
+
+  // Pra cada pedido, busca os itens.
+  const pedidos = await Promise.all(
+    orders.map(async (o) => {
+      const itensResult = await client.query<OrderItemRow>(
+        `SELECT p.product_name, p.product_code,
+                oi.quantity, oi.unit_price
+         FROM commerce.order_items oi
+         JOIN commerce.products p ON p.id = oi.product_id
+         WHERE oi.order_id = $1
+         ORDER BY p.product_name`,
+        [o.id],
+      );
+      return {
+        order_number: o.order_number,
+        status: o.status,
+        total: o.total_amount,
+        modalidade: o.fulfillment_mode,
+        pagamento: o.payment_method,
+        endereco_entrega: o.delivery_address,
+        criado_em: o.created_at.toISOString(),
+        fechado_em: o.closed_at?.toISOString() ?? null,
+        itens: itensResult.rows.map((i) => ({
+          produto: i.product_name,
+          codigo: i.product_code,
+          quantidade: i.quantity,
+          preco_unitario: i.unit_price,
+        })),
+      };
+    }),
+  );
+
+  return JSON.stringify({
+    encontrado: true,
+    pedidos,
+    total_pedidos: pedidos.length,
   });
 }
