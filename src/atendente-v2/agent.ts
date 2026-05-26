@@ -145,14 +145,26 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
     }
 
-    if (!finalText) {
-      logger.warn({ ...logCtx, rounds: MAX_TOOL_ROUNDS }, 'agent_v2: max rounds reached without text response');
+    if (!finalText || finalText.trim().length === 0) {
+      logger.warn({ ...logCtx, rounds: MAX_TOOL_ROUNDS, finalText }, 'agent_v2: LLM retornou vazio, nao envia ao Chatwoot');
       return;
     }
 
     // 4. Send to Chatwoot (strip quick-reply markers from sent text, keep them for reference)
     const textToSend = finalText.replace(/^OPCOES:.*$/gm, '').trim();
-    await sendMessage(chatwootConvId, textToSend);
+
+    // Salvaguarda: se LLM gerou SO uma linha OPCOES (sem texto principal),
+    // o regex deixa o body vazio e o Chatwoot recusa com 'text.body is required'.
+    // Fallback humano em vez de quebrar a conversa.
+    const finalBody = textToSend.length > 0
+      ? textToSend
+      : 'Me passa mais um detalhe pra eu te ajudar?';
+
+    if (textToSend.length === 0) {
+      logger.warn({ ...logCtx, rawFinalText: finalText }, 'agent_v2: textToSend vazio apos strip OPCOES, usando fallback');
+    }
+
+    await sendMessage(chatwootConvId, finalBody);
 
     // 5. Log turn (com actions pra reconstruir histórico de tool calls)
     await client.query(
@@ -166,7 +178,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         environment,
         conversationId,
         job.triggerMessageId,
-        textToSend.slice(0, 4000),
+        finalBody.slice(0, 4000),
         JSON.stringify(turnActions),
         inputTokens,
         outputTokens,

@@ -105,6 +105,8 @@ When asking delivery or pickup, end with: OPCOES: Entrega | Retirada
 When asking payment, end with: OPCOES: Pix | Cartão | Dinheiro
 When motorcycle is ambiguous, end with the possible models: OPCOES: opção1 | opção2 | opção3
 
+CRITICAL: the OPCOES line is a hint that gets stripped from the final WhatsApp message — your reply must ALWAYS contain a real human-readable question or statement BEFORE the OPCOES line. NEVER reply with ONLY an "OPCOES:" line and nothing else — that would result in an empty message after stripping.
+
 PORTUGUESE RESPONSE PATTERNS
 
 Greeting (TURN 1 — always ask tire + neighborhood together with "pra agilizar"):
