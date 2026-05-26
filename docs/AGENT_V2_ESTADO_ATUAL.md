@@ -173,24 +173,38 @@ e782c62 fix(agent-v2): contradicao no exemplo + limiar de estoque
 |---|---|---|---|---|---|
 | 619 | Wallace (1ª) | PED-0005 R$ 198 | 8 | ~R$ 0,30 | ⚠️ Frete não no total_amount (bug que originou fix #4.2) |
 | 621 | Ângelo | PED-0006 R$ 108,90 | 10 | ~R$ 0,40 | ✅ Frete OK após fix. Nota 9.2/10 |
-| 622 | Wallace (2ª) | PED-0008 R$ 108,90 | 7 | **~R$ 0,32** | ✅ Prompt EN funcionando. Nota 9.5/10 |
+| 622 | Wallace (2ª) | PED-0008 R$ 108,90 | 7 | **~R$ 0,50** | ✅ Prompt EN funcionando. 1ª pós-deploy (cache warmup). Nota 9.5/10 |
+| **623** | **Anderson** | **PED-0009 R$ 207,90** | **8** | **~R$ 0,43** | 🏆 **Multi-produto multi-moto, recuperação inteligente, consolidação. Nota 9.8/10** |
+
+### Conv 623 — Feito técnico notável
+
+Cliente Anderson pediu pneu da **NMAX + PCX juntos** sem saber o modelo da PCX. Bot:
+1. Disparou 2 `buscar_compatibilidade` em paralelo (NMAX + PCX)
+2. Listou 3 modelos de PCX quando ambíguo
+3. Quando cliente disse "não sei o modelo", deu dica prática de mecânico ("na lateral do pneu velho tem a medida")
+4. Cliente sugeriu "tem como ser pelo ano?" → bot adaptou e identificou PCX 160 via ano 2024
+5. Percebeu que os 2 pneus eram fisicamente iguais (mesmo product_id) e gravou como 1 item quantity=2 no banco
+6. Fechou PED-0009 R$ 207,90 com endereço/typos parseados
+
+Tempo total: 10 minutos. Custo: R$ 0,43. Cenário que humano demoraria 15+ min e custaria R$ 5-10 do tempo do dono.
 
 ---
 
 ## 6. Status do experimento prompt EN
 
-**Estado**: 🟡 EM TESTE (1 conv validada, esperando 5+ pra declarar estável)
+**Estado**: 🟡 EM TESTE (2/5 convs validadas, faltam 3)
 
-**Resultados conv 622** (única conv pós-deploy do prompt EN):
-- ✅ Idioma 100% pt-br
-- ✅ Tom mantido ("meu camarada", "Show", "Tá fechado, Wallace 👍")
-- ✅ Tools funcionando normal (5 calls)
-- ✅ Banco gravando correto
-- ✅ Economia confirmada (~20% vs anterior)
-- 🟡 1 drift menor: faltou OPCOES em "Qual modelo da Fan?" (cliente respondeu OK mesmo assim)
+**Resultados acumulados (conv 622 + 623)**:
+- ✅ Idioma 100% pt-br nas 2 convs (15 turns combinados, zero vazamento)
+- ✅ Tom brasileiro mantido em todas respostas
+- ✅ Tools funcionando normal (9 calls combinadas, incluindo paralelo)
+- ✅ Banco gravando correto (PED-0008 e PED-0009 com `total_amount` certo)
+- ✅ Economia confirmada (cache hit 76-79% medido em logs)
+- ✅ Cenários novos cobertos: multi-produto, multi-moto, recuperação quando cliente trava
+- 🟡 1 drift menor (conv 622): faltou OPCOES em "Qual modelo da Fan?" (cliente respondeu OK)
 - 🟡 Cosmético: nome de produto verboso no resumo final
 
-**Critério pra declarar estável**: 5 convs consecutivas sem regressão. Faltam 4.
+**Critério pra declarar estável**: 5 convs consecutivas sem regressão. Faltam 3.
 
 **Como reverter se der ruim**:
 ```bash
