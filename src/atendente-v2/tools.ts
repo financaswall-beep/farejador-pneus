@@ -151,6 +151,64 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: 'function',
     function: {
+      name: 'cancelar_pedido',
+      description: 'Cancela um pedido com status=open (recém criado, ainda não confirmado/pago/entregue). Use quando cliente desistir, achar caro, mudar de planos, ou pedir cancelamento. SEMPRE confirme com o cliente antes de chamar. Não cancela pedido pago/entregue (escalar humano nesses casos).',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
+          motivo: {
+            type: 'string',
+            enum: ['sem_grana', 'achou_outro_lugar', 'frete_caro', 'mudou_planos', 'atraso_entrega', 'erro_pedido', 'outro'],
+            description: 'Categoria do motivo. Use o que mais se aproxima do que o cliente disse.',
+          },
+          detalhes: { type: 'string', description: 'Detalhes em texto livre do que o cliente disse (opcional, max 300 chars)' },
+        },
+        required: ['order_number', 'motivo'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'editar_pedido',
+      description: 'Edita um pedido com status=open (recém criado). Use quando cliente quiser mudar endereço, forma de pagamento, OU remover/adicionar item. SEMPRE confirme com o cliente antes de chamar. Cliente DEVE explicitamente pedir a mudança. Não edita pedido pago/entregue.',
+      parameters: {
+        type: 'object',
+        properties: {
+          order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
+          novo_endereco: { type: 'string', description: 'Novo endereço completo (rua, número, bairro). Opcional.' },
+          nova_forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'], description: 'Nova forma de pagamento. Opcional.' },
+          remover_itens: {
+            type: 'array',
+            items: { type: 'string', description: 'product_id (UUID) do item a remover' },
+            description: 'product_ids dos itens a remover do pedido. Opcional.',
+          },
+          adicionar_itens: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                product_id: { type: 'string' },
+                quantidade: { type: 'integer', minimum: 1 },
+                preco_unitario: { type: 'number' },
+              },
+              required: ['product_id', 'quantidade', 'preco_unitario'],
+              additionalProperties: false,
+            },
+            description: 'Novos itens a adicionar. Opcional.',
+          },
+          motivo: { type: 'string', description: 'Motivo livre da edição (ex: "cliente trocou bairro de entrega")' },
+        },
+        required: ['order_number'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'escalar_humano',
       description: 'Escalada para atendente humano. Use quando o cliente pedir humano, após 2 falhas consecutivas, ou em reclamação grave.',
       parameters: {
@@ -238,6 +296,14 @@ export async function executeTool(
 
       case 'consultar_pedido': {
         return await consultarPedido(client, environment, conversationId, args);
+      }
+
+      case 'cancelar_pedido': {
+        return await cancelarPedido(client, environment, conversationId, args);
+      }
+
+      case 'editar_pedido': {
+        return await editarPedido(client, environment, conversationId, args);
       }
 
       case 'escalar_humano': {
@@ -465,4 +531,237 @@ async function consultarPedido(
     pedidos,
     total_pedidos: pedidos.length,
   });
+}
+
+// ─── cancelar_pedido ───────────────────────────────────────────────────────
+
+async function cancelarPedido(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const orderNumber = (args.order_number as string)?.toUpperCase().trim();
+  const motivo = args.motivo as string;
+  const detalhes = (args.detalhes as string | undefined)?.slice(0, 300);
+
+  if (!orderNumber || !motivo) {
+    return JSON.stringify({ erro: 'order_number e motivo sao obrigatorios' });
+  }
+
+  // Busca pedido + valida que pertence ao contato da conversa atual
+  const orderResult = await client.query<{
+    id: string;
+    status: string;
+    total_amount: string;
+    contact_id: string | null;
+    conv_contact_id: string | null;
+  }>(
+    `SELECT o.id, o.status, o.total_amount, o.contact_id,
+            (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
+     FROM commerce.orders o
+     WHERE o.environment = $1 AND o.order_number = $3
+     LIMIT 1`,
+    [environment, conversationId, orderNumber],
+  );
+
+  const order = orderResult.rows[0];
+  if (!order) {
+    return JSON.stringify({ erro: `Pedido ${orderNumber} nao encontrado.` });
+  }
+
+  // Bot so cancela pedido do PROPRIO cliente
+  if (order.contact_id && order.conv_contact_id && order.contact_id !== order.conv_contact_id) {
+    return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
+  }
+
+  if (order.status !== 'open') {
+    return JSON.stringify({
+      erro: `Pedido esta com status '${order.status}', nao pode ser cancelado automaticamente.`,
+      sugestao: 'Encaminhe pra humano se cliente insistir.',
+    });
+  }
+
+  // Reaproveita function ja existente do admin (commerce.cancel_manual_order)
+  try {
+    const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
+    await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
+      order.id,
+      'agent_v2_bot',
+      reason,
+    ]);
+
+    logger.info(
+      { environment, conversation_id: conversationId, order_number: orderNumber, motivo, detalhes },
+      'agent_v2: pedido cancelado via bot',
+    );
+
+    return JSON.stringify({
+      ok: true,
+      order_number: orderNumber,
+      motivo,
+      mensagem: `Pedido ${orderNumber} cancelado.`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ environment, order_number: orderNumber, err: message }, 'agent_v2: erro ao cancelar pedido');
+    return JSON.stringify({ erro: `Nao foi possivel cancelar: ${message}` });
+  }
+}
+
+// ─── editar_pedido ─────────────────────────────────────────────────────────
+
+interface ItemAdicionar {
+  product_id: string;
+  quantidade: number;
+  preco_unitario: number;
+}
+
+async function editarPedido(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const orderNumber = (args.order_number as string)?.toUpperCase().trim();
+  if (!orderNumber) {
+    return JSON.stringify({ erro: 'order_number obrigatorio' });
+  }
+
+  const novoEndereco = args.novo_endereco as string | undefined;
+  const novaFormaPagamento = args.nova_forma_pagamento as string | undefined;
+  const removerItens = (args.remover_itens as string[] | undefined) ?? [];
+  const adicionarItens = (args.adicionar_itens as ItemAdicionar[] | undefined) ?? [];
+  const motivo = (args.motivo as string | undefined) ?? 'cliente_solicitou';
+
+  if (!novoEndereco && !novaFormaPagamento && removerItens.length === 0 && adicionarItens.length === 0) {
+    return JSON.stringify({ erro: 'Nenhuma mudanca informada. Passe ao menos um campo.' });
+  }
+
+  // Busca pedido + valida ownership
+  const orderResult = await client.query<{
+    id: string;
+    status: string;
+    contact_id: string | null;
+    conv_contact_id: string | null;
+    fulfillment_mode: string;
+  }>(
+    `SELECT o.id, o.status, o.contact_id, o.fulfillment_mode,
+            (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
+     FROM commerce.orders o
+     WHERE o.environment = $1 AND o.order_number = $3
+     LIMIT 1`,
+    [environment, conversationId, orderNumber],
+  );
+
+  const order = orderResult.rows[0];
+  if (!order) return JSON.stringify({ erro: `Pedido ${orderNumber} nao encontrado.` });
+
+  if (order.contact_id && order.conv_contact_id && order.contact_id !== order.conv_contact_id) {
+    return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
+  }
+
+  if (order.status !== 'open') {
+    return JSON.stringify({
+      erro: `Pedido com status '${order.status}' nao pode ser editado automaticamente.`,
+      sugestao: 'Escalando pra humano.',
+    });
+  }
+
+  // Tudo dentro de uma transacao
+  try {
+    await client.query('BEGIN');
+
+    if (novoEndereco) {
+      await client.query(
+        `UPDATE commerce.orders SET delivery_address = $1, updated_at = now() WHERE id = $2`,
+        [novoEndereco, order.id],
+      );
+    }
+
+    if (novaFormaPagamento) {
+      await client.query(
+        `UPDATE commerce.orders SET payment_method = $1, updated_at = now() WHERE id = $2`,
+        [novaFormaPagamento, order.id],
+      );
+    }
+
+    if (removerItens.length > 0) {
+      await client.query(
+        `DELETE FROM commerce.order_items WHERE order_id = $1 AND product_id = ANY($2::uuid[])`,
+        [order.id, removerItens],
+      );
+    }
+
+    for (const item of adicionarItens) {
+      await client.query(
+        `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [environment, order.id, item.product_id, item.quantidade, item.preco_unitario.toFixed(2)],
+      );
+    }
+
+    // Recalcula total: soma itens (NAO inclui frete pra evitar perder o valor original)
+    // O frete ja esta embutido em total_amount; vamos manter a diferenca
+    const totalsResult = await client.query<{ subtotal: string; total_amount: string }>(
+      `SELECT
+         COALESCE(SUM(oi.quantity * oi.unit_price), 0)::text AS subtotal,
+         o.total_amount
+       FROM commerce.orders o
+       LEFT JOIN commerce.order_items oi ON oi.order_id = o.id
+       WHERE o.id = $1
+       GROUP BY o.total_amount`,
+      [order.id],
+    );
+
+    const newSubtotal = parseFloat(totalsResult.rows[0]?.subtotal ?? '0');
+    const oldTotal = parseFloat(totalsResult.rows[0]?.total_amount ?? '0');
+    // Estima o frete antigo subtraindo (heuristica)
+    const subtotalAntigoResult = await client.query<{ s: string }>(
+      `SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)::text AS s
+       FROM commerce.order_items oi WHERE oi.order_id = $1`,
+      [order.id],
+    );
+    // Recupera o frete original via diferenca historica nao da (ja recalculamos os itens)
+    // Solucao: pegamos o frete via JOIN delivery_zones se houver geo_resolution_id, senao 0
+    const freteResult = await client.query<{ frete: string }>(
+      `SELECT COALESCE(dz.delivery_fee, 0)::text AS frete
+       FROM commerce.orders o
+       LEFT JOIN commerce.delivery_zones dz ON dz.geo_resolution_id = o.geo_resolution_id
+       WHERE o.id = $1`,
+      [order.id],
+    );
+    const freteAtual = parseFloat(freteResult.rows[0]?.frete ?? '0');
+    const newTotal = newSubtotal + (order.fulfillment_mode === 'delivery' ? freteAtual : 0);
+
+    await client.query(
+      `UPDATE commerce.orders SET total_amount = $1, updated_at = now() WHERE id = $2`,
+      [newTotal.toFixed(2), order.id],
+    );
+
+    await client.query('COMMIT');
+
+    logger.info(
+      {
+        environment, conversation_id: conversationId, order_number: orderNumber,
+        novoEndereco: !!novoEndereco, novaFormaPagamento, removidos: removerItens.length, adicionados: adicionarItens.length,
+        motivo, novo_total: newTotal,
+      },
+      'agent_v2: pedido editado via bot',
+    );
+
+    return JSON.stringify({
+      ok: true,
+      order_number: orderNumber,
+      novo_subtotal: newSubtotal.toFixed(2),
+      valor_frete: freteAtual.toFixed(2),
+      novo_total: newTotal.toFixed(2),
+      mensagem: `Pedido ${orderNumber} atualizado.`,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ environment, order_number: orderNumber, err: message }, 'agent_v2: erro ao editar pedido');
+    return JSON.stringify({ erro: `Nao foi possivel editar: ${message}` });
+  }
 }
