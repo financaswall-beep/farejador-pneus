@@ -38,6 +38,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // 3. LLM loop with function calling
     let inputTokens = 0;
     let outputTokens = 0;
+    let cachedTokens = 0;
     let finalText: string | null = null;
     // Acumula tool calls + results pra persistir em agent.turns.actions
     const turnActions: ChatMessage[] = [];
@@ -46,6 +47,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       const response = await callOpenAIWithTools(messages);
       inputTokens += response.inputTokens;
       outputTokens += response.outputTokens;
+      cachedTokens += response.cachedTokens;
 
       if (response.type === 'text' || !response.tool_calls?.length) {
         finalText = response.content ?? null;
@@ -121,11 +123,14 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       ],
     );
 
+    const cacheHitRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
     logger.info(
       {
         ...logCtx,
         duration_ms: Date.now() - start,
         input_tokens: inputTokens,
+        cached_tokens: cachedTokens,
+        cache_hit_pct: cacheHitRate,
         output_tokens: outputTokens,
         text_length: textToSend.length,
       },
@@ -151,7 +156,13 @@ interface OpenAIChoice {
 
 interface OpenAIResponse {
   choices: OpenAIChoice[];
-  usage: { prompt_tokens: number; completion_tokens: number };
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    // Tokens reaproveitados do cache automatico da OpenAI (prompts >1024
+    // tokens, TTL ~5-10min). Custo cai 50% no que foi cacheado.
+    prompt_tokens_details?: { cached_tokens?: number };
+  };
   durationMs: number;
 }
 
@@ -161,6 +172,7 @@ async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
   tool_calls?: ToolCall[];
   inputTokens: number;
   outputTokens: number;
+  cachedTokens: number;
 }> {
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');
@@ -205,10 +217,11 @@ async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
 
   const inputTokens = json.usage?.prompt_tokens ?? 0;
   const outputTokens = json.usage?.completion_tokens ?? 0;
+  const cachedTokens = json.usage?.prompt_tokens_details?.cached_tokens ?? 0;
 
   if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls?.length) {
-    return { type: 'tool_calls', tool_calls: choice.message.tool_calls, inputTokens, outputTokens };
+    return { type: 'tool_calls', tool_calls: choice.message.tool_calls, inputTokens, outputTokens, cachedTokens };
   }
 
-  return { type: 'text', content: choice.message.content ?? '', inputTokens, outputTokens };
+  return { type: 'text', content: choice.message.content ?? '', inputTokens, outputTokens, cachedTokens };
 }
