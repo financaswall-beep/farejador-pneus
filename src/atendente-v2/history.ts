@@ -29,6 +29,10 @@ export async function loadHistory(
 ): Promise<ChatMessage[]> {
   const [msgResult, turnsResult] = await Promise.all([
     client.query<MessageRow>(
+      // ORDER BY sent_at DESC, id DESC: o id como tiebreaker garante ordem
+      // deterministica quando 2+ msgs do cliente vem com o mesmo timestamp
+      // (acontece em rajada coalesced). Sem isso, o prefix do prompt pode
+      // mudar entre turns e quebrar o prompt caching da OpenAI.
       `SELECT id, sender_type, content, sent_at
        FROM core.messages
        WHERE conversation_id = $1
@@ -36,7 +40,7 @@ export async function loadHistory(
          AND deleted_at IS NULL
          AND content IS NOT NULL
          AND content <> ''
-       ORDER BY sent_at DESC
+       ORDER BY sent_at DESC, id DESC
        LIMIT $2`,
       [conversationId, HISTORY_LIMIT],
     ),
