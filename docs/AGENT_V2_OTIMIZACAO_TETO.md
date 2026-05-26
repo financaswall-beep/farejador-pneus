@@ -235,3 +235,68 @@ Pra contextualizar: vendendo pneu de R$ 200-300 via bot, o custo OpenAI de R$ 0,
 1. Validar 20-30 conversas reais (estabilidade)
 2. Implementar `cancelar_pedido` e capturar nome (ops)
 3. Observar 1 semana antes de qualquer mudança nova
+
+---
+
+## 9. ADDENDUM 2026-05-26 — TETO REVISITADO: prompt em inglês
+
+Após declarar "teto atingido" no commit `b7fd8f1`, o dono insistiu em revisitar a opção de prompt em inglês com a justificativa: **"mexo agora pra ter margem no crescimento"**.
+
+A análise inicial subestimou o ganho (estimei ~R$ 20/mês a 1k convs). Após medir tokens reais:
+
+### Mudança aplicada (commit `b229f57`)
+
+| Versão | Tokens | Custo/conv (cache 81%) |
+|---|---|---|
+| Prompt pt-br | 2.852 | R$ 0,042 |
+| **Prompt híbrido EN+exemplos PT** | **1.700-1.790** | **R$ 0,026** |
+| Economia | -1.060 (-37%) | -R$ 0,016/turn = **-R$ 0,16/conv** |
+
+### Arquitetura da versão híbrida
+
+- **Regras em inglês** (mais eficiente em tokens)
+- **Exemplos de resposta em pt-br** (ancoram vocabulário brasileiro: "Fechou?", "Show", "Tá fechado")
+- **Trava de idioma** no item 8 do FINAL CHECK: "Is my final customer answer in Brazilian Portuguese?"
+- **Tolerância a typos** explícita: "customer may write with typos, abbreviations and incomplete phrases. Understand intent, do not correct spelling."
+
+### Backup do prompt anterior
+
+`src/atendente-v2/prompt.legacy-ptbr.ts` — exporta `LEGACY_SYSTEM_PROMPT_PTBR`. Não importado, só referência. Rollback em 1 linha.
+
+### Validação em produção (conv 622 / PED-0008)
+
+Cliente Wallace, 7 turns, fechou pedido R$ 108,90:
+
+✅ **Idioma 100% pt-br** — zero vazamento de inglês
+✅ **Tom mantido**: "meu camarada", "Show", "fica tranquilo", "Fechou?", "Tá fechado, Wallace 👍"
+✅ **Banco gravou correto**: total R$ 108,90 (frete incluído), endereço completo, source
+✅ **Inteligência social funcionou**: entendeu gíria "tá filezinho?", parseou endereço com typos
+✅ **Custo real**: ~R$ 0,32 (vs R$ 0,40 antes do prompt em inglês — economia de 20% confirmada)
+🟡 **Drift menor**: 1× faltou OPCOES em "Qual modelo da Fan?" (cliente respondeu OK mesmo assim)
+🟡 **Cosmético**: nome do produto cru no resumo final ("Pneu Moto 80/100-18 Dianteiro Diagonal")
+
+### Cache compartilhado entre clientes — esclarecimento importante
+
+Descoberta paralela: cache da OpenAI é **por organização**, não por cliente. Significa que conforme volume cresce, MAIS conversas se beneficiam do cache "esquentado" por outras. Estimativa de cache hit por volume:
+
+| Convs/dia | Cache hit estimado | Custo médio/conv (prompt EN) |
+|---|---|---|
+| 1 | 60-70% | R$ 0,30 |
+| 5 | 80% | R$ 0,26 |
+| 20 | 85% | R$ 0,22 |
+| 100 | 90% | R$ 0,19 |
+| 500 | 92% | R$ 0,17 |
+
+**Bot fica proporcionalmente mais barato conforme escala.**
+
+### Novo teto
+
+O teto técnico real considerando o prompt em inglês:
+
+- Cache compartilhado entre conversas
+- Prompt 40% menor
+- Modelo gpt-5.5 mantido (qualidade preservada)
+
+Custo médio esperado em produção: **R$ 0,20-0,35 por conversa** dependendo do volume.
+
+Para um ticket médio de R$ 200-300 (pneu de moto), o LLM representa **0,1% do faturamento**. **Esse é o novo teto realista.**
