@@ -57,6 +57,8 @@ export interface PartnerCustomerInput {
   name: string;
   phone?: string | null;
   cpf?: string | null;
+  address?: string | null;
+  is_vip?: boolean | null;
   idempotency_key?: string | null;
 }
 
@@ -260,7 +262,7 @@ export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]>
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
               brand, supplier_name,
               quantity_on_hand, minimum_quantity, average_cost, sale_price,
-              is_tracked, stock_status, updated_at
+              is_tracked, stock_status, created_at, updated_at
        FROM commerce.partner_stock_levels
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
        ORDER BY stock_status DESC, item_name ASC
@@ -301,7 +303,7 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
 export async function getPartnerCustomers(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, name, phone, cpf, created_at, updated_at
+      `SELECT id, name, phone, cpf, address, is_vip, created_at, updated_at
        FROM commerce.partner_customers
        WHERE environment = $1
          AND unit_id = $2
@@ -320,7 +322,7 @@ export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Pr
   const digits = search.replace(/\D/g, '');
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, name, phone, cpf, created_at, updated_at
+      `SELECT id, name, phone, cpf, address, is_vip, created_at, updated_at
        FROM commerce.partner_customers
        WHERE environment = $1
          AND unit_id = $2
@@ -329,6 +331,7 @@ export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Pr
            lower(name) LIKE lower($3)
            OR ($4 <> '' AND phone LIKE $5)
            OR ($4 <> '' AND cpf LIKE $5)
+           OR lower(COALESCE(address, '')) LIKE lower($3)
          )
        ORDER BY updated_at DESC
        LIMIT 30`,
@@ -713,6 +716,8 @@ async function upsertPartnerCustomerWithClient(
 
   const phone = normalizeBrazilianPhone(input.phone);
   const cpf = normalizeCpf(input.cpf);
+  const address = normalizeText(input.address);
+  const isVip = input.is_vip === true;
   const existing = await client.query<{ id: string }>(
     `SELECT id
      FROM commerce.partner_customers
@@ -734,23 +739,30 @@ async function upsertPartnerCustomerWithClient(
       `UPDATE commerce.partner_customers
        SET name = $4,
            phone = COALESCE($5, phone),
-           cpf = COALESCE($6, cpf)
+           cpf = COALESCE($6, cpf),
+           address = COALESCE($7, address),
+           is_vip = $8
        WHERE id = $1
          AND environment = $2
          AND unit_id = $3`,
-      [customerId, ctx.environment, ctx.unitId, name, phone, cpf],
+      [customerId, ctx.environment, ctx.unitId, name, phone, cpf, address, isVip],
     );
     return customerId;
   }
 
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO commerce.partner_customers (
-       environment, unit_id, name, phone, cpf, idempotency_key
-     ) VALUES ($1, $2, $3, $4, $5, $6)
+       environment, unit_id, name, phone, cpf, address, is_vip, idempotency_key
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-     DO UPDATE SET name = EXCLUDED.name
+     DO UPDATE SET
+       name = EXCLUDED.name,
+       phone = COALESCE(EXCLUDED.phone, commerce.partner_customers.phone),
+       cpf = COALESCE(EXCLUDED.cpf, commerce.partner_customers.cpf),
+       address = COALESCE(EXCLUDED.address, commerce.partner_customers.address),
+       is_vip = EXCLUDED.is_vip
      RETURNING id`,
-    [ctx.environment, ctx.unitId, name, phone, cpf, input.idempotency_key ?? null],
+    [ctx.environment, ctx.unitId, name, phone, cpf, address, isVip, input.idempotency_key ?? null],
   );
   return inserted.rows[0]?.id ?? null;
 }
@@ -762,6 +774,28 @@ export async function createPartnerCustomer(
   return withPartnerContext(ctx.partnerUnitId, async (client) => ({
     customer_id: await upsertPartnerCustomerWithClient(client, ctx, input),
   }));
+}
+
+export async function updatePartnerCustomerVip(
+  ctx: PartnerContext,
+  customerId: string,
+  isVip: boolean,
+): Promise<{ customer_id: string; is_vip: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string; is_vip: boolean }>(
+      `UPDATE commerce.partner_customers
+       SET is_vip = $4
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND deleted_at IS NULL
+       RETURNING id, is_vip`,
+      [customerId, ctx.environment, ctx.unitId, isVip],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('customer_not_found');
+    return { customer_id: row.id, is_vip: row.is_vip };
+  });
 }
 
 function payableCategoryToExpenseCategory(

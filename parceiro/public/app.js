@@ -61,6 +61,8 @@ function parceiroApp() {
     payables: [],
     receivables: [],
     fluxoCaixa: null,
+    clientes: [],
+    customerListSearch: '',
 
     saleForm: { customer_id: null, customer_name: '', customer_phone: '', customer_cpf: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
@@ -68,13 +70,14 @@ function parceiroApp() {
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
     receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null },
-    customerForm: { name: '', phone: '', cpf: '' },
+    customerForm: { name: '', phone: '', cpf: '', address: '', is_vip: false },
     editingPayableId: null,
     editingReceivableId: null,
 
     menu: [
       { id: 'resumo',     label: 'Resumo',        icon: 'layout-dashboard' },
       { id: 'vendas',     label: 'Frente de caixa', icon: 'shopping-cart' },
+      { id: 'clientes',   label: 'Clientes',      icon: 'user' },
       { id: 'estoque',    label: 'Estoque',        icon: 'package' },
       { id: 'financeiro', label: 'Financeiro',     icon: 'wallet' },
     ],
@@ -222,6 +225,13 @@ function parceiroApp() {
         this.payables = payables.rows || [];
         this.receivables = receivables.rows || [];
         this.fluxoCaixa = (fluxo.rows && fluxo.rows[0]) || null;
+        try {
+          const clientes = await this.api('clientes');
+          this.clientes = clientes.rows || [];
+        } catch (err) {
+          console.warn('clientes_unavailable', err);
+          this.clientes = [];
+        }
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {
           lucide.createIcons();
@@ -237,6 +247,33 @@ function parceiroApp() {
       const orders = this.num(this.resumo?.orders_month);
       const sales = this.num(this.resumo?.sales_month);
       return orders > 0 ? sales / orders : 0;
+    },
+
+    get filteredCustomers() {
+      const query = String(this.customerListSearch || '').trim().toLowerCase();
+      const digits = query.replace(/\D/g, '');
+      const list = Array.isArray(this.clientes) ? this.clientes : [];
+      if (!query) return list;
+      return list.filter((customer) => {
+        const name = String(customer?.name || '').toLowerCase();
+        const phone = String(customer?.phone || '').replace(/\D/g, '');
+        const cpf = String(customer?.cpf || '').replace(/\D/g, '');
+        return name.includes(query)
+          || (!!digits && phone.includes(digits))
+          || (!!digits && cpf.includes(digits));
+      });
+    },
+
+    get customersWithPhoneCount() {
+      return (this.clientes || []).filter((customer) => String(customer?.phone || '').trim()).length;
+    },
+
+    get customersWithCpfCount() {
+      return (this.clientes || []).filter((customer) => String(customer?.cpf || '').trim()).length;
+    },
+
+    get identifiedSalesCount() {
+      return (this.vendas || []).filter((sale) => sale.customer_id || sale.customer_name || sale.customer_phone || sale.customer_cpf).length;
     },
 
     // Total de custos do mes (regime de competencia).
@@ -339,6 +376,12 @@ function parceiroApp() {
         const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0);
         addToWeek(purchase.purchased_at || purchase.created_at, 'entradas', qty);
       }
+      if (!this.compras.length) {
+        for (const item of this.estoque) {
+          const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+          addToWeek(item.created_at, 'entradas', qty);
+        }
+      }
       for (const sale of this.activeSales) {
         const items = Array.isArray(sale.items) ? sale.items : [];
         const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0) || 1;
@@ -353,6 +396,31 @@ function parceiroApp() {
         const items = Array.isArray(purchase.items) ? purchase.items : [];
         return sum + items.reduce((itemSum, item) => itemSum + this.num(item.quantity), 0);
       }, 0);
+    },
+
+    get stockCreatedUnitsMonth() {
+      const now = new Date();
+      const month = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+      }).format(now);
+      return this.estoque.reduce((sum, item) => {
+        if (!item.is_tracked || !item.created_at) return sum;
+        const createdMonth = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit',
+        }).format(new Date(item.created_at));
+        if (createdMonth !== month) return sum;
+        return sum + this.num(item.quantity_on_hand);
+      }, 0);
+    },
+
+    get inventoryEntriesMonth() {
+      // Enquanto nao existe ledger de movimentacao, evita contar duas vezes
+      // compra que tambem criou item novo no estoque.
+      return Math.max(this.purchasedUnitsMonth, this.stockCreatedUnitsMonth);
     },
 
     get soldUnitsMonth() {
@@ -859,6 +927,10 @@ function parceiroApp() {
           title: 'Frente de caixa',
           subtitle: 'Venda rápida, baixa de estoque e financeiro automático',
         },
+        clientes: {
+          title: 'Clientes',
+          subtitle: 'Cadastro simples vinculado às vendas do parceiro',
+        },
         estoque: {
           title: 'Estoque',
           subtitle: 'Cadastrar pneus e controlar saldo local',
@@ -1036,24 +1108,57 @@ function parceiroApp() {
           name: this.customerForm.name.trim(),
           phone: this.toE164Phone(this.customerForm.phone),
           cpf: this.cpfDigits(this.customerForm.cpf) || null,
+          address: this.customerForm.address?.trim() || null,
+          is_vip: this.customerForm.is_vip === true,
           idempotency_key: this.uuid(),
         };
         const result = await this.api('clientes', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        this.selectPartnerCustomer({
+        const customer = {
           id: result.customer_id,
           name: payload.name,
           phone: payload.phone,
           cpf: payload.cpf,
-        });
-        this.customerForm = { name: '', phone: '', cpf: '' };
+          address: payload.address,
+          is_vip: payload.is_vip,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        };
+        if (this.currentSection === 'clientes') {
+          this.clientes = [customer, ...this.clientes.filter((item) => item.id !== customer.id)];
+        } else {
+          this.selectPartnerCustomer(customer);
+        }
+        this.customerForm = { name: '', phone: '', cpf: '', address: '', is_vip: false };
         this.flash('Cliente cadastrado.');
+        if (this.currentSection === 'clientes') {
+          await this.loadData();
+        }
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
         this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async toggleCustomerVip(customer) {
+      if (!customer?.id) return;
+      const previous = customer.is_vip === true;
+      const next = !previous;
+      customer.is_vip = next;
+      this.savingAction = `customer-vip-${customer.id}`;
+      try {
+        await this.api(`clientes/${customer.id}/vip`, {
+          method: 'PATCH',
+          body: JSON.stringify({ is_vip: next }),
+        });
+      } catch (err) {
+        customer.is_vip = previous;
+        this.flash(this.errMessage(err));
+      } finally {
         this.savingAction = '';
       }
     },
@@ -1294,7 +1399,7 @@ function parceiroApp() {
             tire_aspect_ratio: tireSize ? this.num(this.stockForm.tire_aspect) : null,
             tire_rim_diameter: tireSize ? this.num(this.stockForm.tire_rim) : null,
             brand: this.stockForm.brand?.trim() || null,
-            supplier_name: this.stockForm.supplier_name?.trim() || null,
+            supplier_name: this.stockPositionValue(this.stockForm.supplier_name) || null,
             quantity_on_hand: this.stockForm.is_tracked ? this.num(this.stockForm.quantity_on_hand) : null,
             minimum_quantity: this.stockForm.minimum_quantity !== null && this.stockForm.minimum_quantity !== '' ? this.num(this.stockForm.minimum_quantity) : null,
             average_cost: this.stockForm.average_cost !== null && this.stockForm.average_cost !== '' ? this.num(this.stockForm.average_cost) : null,
@@ -2267,7 +2372,10 @@ function parceiroApp() {
     },
 
     formatPhoneDisplay(rawDigits) {
-      const d = String(rawDigits || '').replace(/\D/g, '');
+      let d = String(rawDigits || '').replace(/\D/g, '');
+      if ((d.length === 12 || d.length === 13) && d.startsWith('55')) {
+        d = d.slice(2);
+      }
       if (d.length === 0) return '';
       if (d.length <= 2) return `(${d}`;
       if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -2463,6 +2571,20 @@ function parceiroApp() {
       return map[status] || 'Sem status';
     },
 
+    stockPositionValue(value) {
+      const raw = String(value || '').trim().toLowerCase();
+      if (raw.includes('traseiro')) return 'Traseiro';
+      if (raw.includes('dianteiro')) return 'Dianteiro';
+      return '';
+    },
+
+    stockPositionLabel(item) {
+      const fromSupplier = this.stockPositionValue(item?.supplier_name);
+      if (fromSupplier) return fromSupplier;
+      const fromName = this.stockPositionValue(item?.item_name);
+      return fromName || '-';
+    },
+
     stockOriginKey(item) {
       const supplier = String(item?.supplier_name || '').toLowerCase();
       return supplier.includes('2w') ? '2w' : 'porta';
@@ -2475,6 +2597,32 @@ function parceiroApp() {
     stockItemValue(item) {
       const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
       return qty * this.num(item.average_cost || item.sale_price);
+    },
+
+    customerSales(customer) {
+      if (!customer) return [];
+      const cpf = this.cpfDigits(customer.cpf || '');
+      const phone = String(customer.phone || '').replace(/\D/g, '');
+      return (this.vendas || []).filter((sale) => {
+        const saleCpf = this.cpfDigits(sale.customer_cpf || '');
+        const salePhone = String(sale.customer_phone || '').replace(/\D/g, '');
+        return (customer.id && sale.customer_id === customer.id)
+          || (!!cpf && saleCpf === cpf)
+          || (!!phone && salePhone === phone);
+      });
+    },
+
+    customerTotalSpent(customer) {
+      return this.customerSales(customer).reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
+    },
+
+    customerLastSaleLabel(customer) {
+      const sales = this.customerSales(customer);
+      if (!sales.length) return 'sem venda vinculada';
+      const latest = sales
+        .slice()
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+      return this.formatDate(latest.created_at);
     },
 
     purchaseItemsLabel(purchase) {

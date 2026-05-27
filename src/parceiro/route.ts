@@ -34,6 +34,7 @@ import {
   settlePartnerPayable,
   settlePartnerReceivable,
   settlePartnerReceivableInstallment,
+  updatePartnerCustomerVip,
   updatePartnerPayable,
   updatePartnerReceivable,
   upsertPartnerStock,
@@ -138,11 +139,21 @@ const customerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(1).max(40).nullable().optional(),
   cpf: z.string().min(11).max(14).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  is_vip: z.boolean().nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
 });
 
 const customerSearchSchema = z.object({
   q: z.string().min(1).max(120),
+});
+
+const customerVipParamsSchema = paramsSchema.extend({
+  customerId: z.string().uuid(),
+});
+
+const customerVipSchema = z.object({
+  is_vip: z.boolean(),
 });
 
 const purchaseSchema = z.object({
@@ -316,6 +327,22 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
     return reply.status(200).send(await createPartnerCustomer(getPartnerContext(request), parsed.data));
+  });
+
+  fastify.patch('/parceiro/:slug/api/clientes/:customerId/vip', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = customerVipParamsSchema.safeParse(request.params);
+    const body = customerVipSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return reply.status(400).send({ error: 'invalid_customer_vip_payload' });
+    }
+    try {
+      return reply.status(200).send(await updatePartnerCustomerVip(getPartnerContext(request), params.data.customerId, body.data.is_vip));
+    } catch (err) {
+      if (err instanceof Error && err.message === 'customer_not_found') {
+        return reply.status(404).send({ error: 'customer_not_found' });
+      }
+      throw err;
+    }
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta

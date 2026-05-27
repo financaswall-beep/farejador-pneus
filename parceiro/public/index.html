@@ -78,7 +78,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'estoque', 'financeiro'].includes(currentSection)" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -99,7 +99,7 @@
           <span>Frente de caixa</span>
           <kbd>F2</kbd>
         </button>
-        <button class="pos-nav-item">
+        <button @click="goToSection('clientes')" class="pos-nav-item" :class="currentSection === 'clientes' && 'active'">
           <i data-lucide="user"></i>
           <span>Clientes</span>
           <kbd>F3</kbd>
@@ -199,7 +199,7 @@
         </article>
       </section>
 
-      <section x-show="currentSection === 'estoque'" class="pos-kpis">
+      <section x-show="currentSection === 'estoque'" class="pos-kpis stock-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
           <div><small>Itens em estoque</small><strong x-text="stockTotalUnits + ' un.'"></strong><span>saldo atual</span></div>
@@ -210,11 +210,34 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="download"></i></div>
-          <div><small>Entradas no mês</small><strong x-text="purchasedUnitsMonth + ' un.'"></strong><span>compras lançadas</span></div>
+          <div><small>Entradas no mês</small><strong x-text="inventoryEntriesMonth + ' un.'"></strong><span>compras/cadastros</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="upload"></i></div>
+          <div><small>Saídas no mês</small><strong x-text="soldUnitsMonth + ' un.'"></strong><span>vendas baixadas</span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="triangle-alert"></i></div>
           <div><small>Estoque baixo</small><strong x-text="stockLowItems.length + ' itens'"></strong><span>requer atenção</span></div>
+        </article>
+      </section>
+
+      <section x-show="currentSection === 'clientes'" class="pos-kpis">
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="users"></i></div>
+          <div><small>Clientes cadastrados</small><strong x-text="clientes.length"></strong><span>base da unidade</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="phone"></i></div>
+          <div><small>Com telefone</small><strong x-text="customersWithPhoneCount"></strong><span>prontos para contato</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="id-card"></i></div>
+          <div><small>Com CPF</small><strong x-text="customersWithCpfCount"></strong><span>cadastro completo</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="receipt"></i></div>
+          <div><small>Vendas identificadas</small><strong x-text="identifiedSalesCount"></strong><span>com cliente vinculado</span></div>
         </article>
       </section>
 
@@ -379,7 +402,12 @@
                 <i data-lucide="search"></i>
               </div>
               <div class="pos-client-inline-fields">
-                <input x-model="saleForm.customer_phone" placeholder="Telefone" />
+                <input type="tel"
+                       inputmode="numeric"
+                       :value="formatPhoneDisplay(saleForm.customer_phone)"
+                       @input="saleForm.customer_phone = onPhoneInput($event.target.value); $event.target.value = formatPhoneDisplay(saleForm.customer_phone)"
+                       placeholder="Telefone"
+                       maxlength="16" />
                 <input :value="saleForm.customer_cpf"
                        @input="saleForm.customer_cpf = formatCpfInput($event.target.value); $event.target.value = saleForm.customer_cpf"
                        placeholder="CPF" />
@@ -392,22 +420,29 @@
                   </button>
                 </template>
               </div>
-              <button @click="posCustomerFormOpen = !posCustomerFormOpen" class="pos-new-client"><i data-lucide="plus"></i> Novo cliente</button>
-              <div x-show="posCustomerFormOpen" class="pos-new-client-form">
-                <input x-model="customerForm.name" placeholder="Nome do cliente" />
-                <input x-model="customerForm.phone" placeholder="Telefone" />
-                <input :value="customerForm.cpf" @input="customerForm.cpf = formatCpfInput($event.target.value); $event.target.value = customerForm.cpf" placeholder="CPF" />
-                <button @click="createPosCustomer()" :disabled="isSaving('customer')">Salvar cliente</button>
-              </div>
               <div class="pos-client-data">
                 <small>Nome</small><strong x-text="saleForm.customer_name || 'Consumidor Final'"></strong>
                 <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span><span><small>CPF</small><b x-text="formatCpfInput(saleForm.customer_cpf) || '-'"></b></span></div>
               </div>
             </div>
-            <div class="pos-panel pos-notes-panel">
-              <h3>Observações</h3>
-              <textarea x-model="posNotes" maxlength="200" placeholder="Adicionar observações à venda..."></textarea>
-              <small x-text="posNotes.length + '/200'"></small>
+            <div class="pos-panel pos-recent-panel">
+              <div class="pos-recent-head">
+                <strong>Vendas recentes</strong>
+                <span x-text="activeSales.length + ' ativas'"></span>
+              </div>
+              <div class="pos-recent-list">
+                <template x-for="sale in activeSales.slice(0, 12)" :key="sale.order_id">
+                  <div class="pos-recent-sale">
+                    <span>
+                      <b x-text="sale.customer_name || 'Consumidor final'"></b>
+                      <small x-text="formatDateTime(sale.created_at) + ' - ' + sourceLabel(sale.source_tag || sale.source)"></small>
+                    </span>
+                    <strong x-text="money(sale.total_amount)"></strong>
+                    <button @click="cancelSale(sale.order_id)" :disabled="saving">Cancelar</button>
+                  </div>
+                </template>
+                <div x-show="!activeSales.length" class="pos-empty small">Nenhuma venda ativa.</div>
+              </div>
             </div>
           </div>
         </section>
@@ -463,24 +498,105 @@
             <kbd>Esc</kbd>
           </button>
           <div class="pos-secure"><i data-lucide="lock"></i> Venda segura e criptografada</div>
-          <div class="pos-recent-sales">
-            <div class="pos-recent-head">
-              <strong>Vendas recentes</strong>
-              <span x-text="activeSales.length + ' ativas'"></span>
-            </div>
-            <template x-for="sale in activeSales.slice(0, 3)" :key="sale.order_id">
-              <div class="pos-recent-sale">
-                <span>
-                  <b x-text="sale.customer_name || 'Consumidor final'"></b>
-                  <small x-text="formatDateTime(sale.created_at) + ' - ' + sourceLabel(sale.source_tag || sale.source)"></small>
-                </span>
-                <strong x-text="money(sale.total_amount)"></strong>
-                <button @click="cancelSale(sale.order_id)" :disabled="saving">Cancelar</button>
-              </div>
-            </template>
-            <div x-show="!activeSales.length" class="pos-empty small">Nenhuma venda ativa.</div>
-          </div>
         </aside>
+      </section>
+
+      <section x-show="currentSection === 'clientes'" class="pos-workspace">
+        <div class="pos-page-grid customers">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head">
+              <div>
+                <h3>Clientes</h3>
+                <p>Cadastro simples para frente de caixa e histórico de venda</p>
+              </div>
+              <span class="pos-live-badge">dados do banco</span>
+            </div>
+
+            <div class="pos-customer-toolbar">
+              <div class="pos-product-search">
+                <i data-lucide="search"></i>
+                <input x-model="customerListSearch" placeholder="Buscar por nome, telefone ou CPF..." />
+              </div>
+              <button @click="customerListSearch = ''" class="pos-outline-action compact">
+                <i data-lucide="x"></i> Limpar
+              </button>
+            </div>
+
+            <div class="pos-customer-table">
+              <div class="pos-customer-table-head">
+                <span>Cliente</span>
+                <span>VIP</span>
+                <span>Telefone</span>
+                <span>CPF</span>
+                <span>Endereço</span>
+                <span>Vendas</span>
+                <span>Total comprado</span>
+                <span>Última venda</span>
+              </div>
+              <template x-for="customer in filteredCustomers" :key="customer.id">
+                <div class="pos-customer-table-row">
+                  <span class="pos-customer-name">
+                    <b x-text="customer.name"></b>
+                    <small x-text="'Cadastro em ' + formatDate(customer.created_at)"></small>
+                  </span>
+                  <span>
+                    <button @click="toggleCustomerVip(customer)" class="pos-vip-mini" :class="customer.is_vip && 'active'" :disabled="isSaving('customer-vip-' + customer.id)" :title="customer.is_vip ? 'Cliente VIP' : 'Marcar como VIP'">
+                      <i data-lucide="star"></i>
+                    </button>
+                  </span>
+                  <span x-text="formatPhoneDisplay(customer.phone) || '-'"></span>
+                  <span x-text="formatCpfInput(customer.cpf) || '-'"></span>
+                  <span x-text="customer.address || '-'"></span>
+                  <span class="pos-green-text" x-text="customerSales(customer).length"></span>
+                  <span x-text="money(customerTotalSpent(customer))"></span>
+                  <span x-text="customerLastSaleLabel(customer)"></span>
+                </div>
+              </template>
+              <div x-show="!filteredCustomers.length" class="pos-empty">
+                Nenhum cliente encontrado.
+              </div>
+            </div>
+          </section>
+
+          <aside class="pos-panel pos-side-panel">
+            <h3>Cadastrar cliente</h3>
+            <div class="pos-stock-side-form">
+              <label>Nome
+                <input x-model="customerForm.name" placeholder="Ex: João da Silva" />
+              </label>
+              <div class="pos-customer-compact-row">
+                <label>Telefone
+                  <input type="tel"
+                         inputmode="numeric"
+                         :value="formatPhoneDisplay(customerForm.phone)"
+                         @input="customerForm.phone = onPhoneInput($event.target.value); $event.target.value = formatPhoneDisplay(customerForm.phone)"
+                         placeholder="(31) 99999-9999"
+                         maxlength="16" />
+                </label>
+                <label>CPF
+                  <input :value="customerForm.cpf"
+                         @input="customerForm.cpf = formatCpfInput($event.target.value); $event.target.value = customerForm.cpf"
+                         placeholder="000.000.000-00" />
+                </label>
+              </div>
+              <label>Endereço
+                <input x-model="customerForm.address" placeholder="Rua, número, bairro" />
+              </label>
+              <button @click="createPosCustomer()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="user-plus"></i>
+                <span x-text="isSaving('customer') ? 'Salvando...' : 'Salvar cliente'"></span>
+              </button>
+              <button @click="customerForm = { name: '', phone: '', cpf: '', address: '', is_vip: false }" class="pos-mini-clear">Limpar cadastro</button>
+            </div>
+            <div class="pos-divider"></div>
+            <h3>Como usar</h3>
+            <div class="pos-tip-list">
+              <div><i data-lucide="shopping-cart"></i><span>Na frente de caixa, busque o cliente pelo nome, telefone ou CPF.</span></div>
+              <div><i data-lucide="receipt"></i><span>Vendas novas ficam vinculadas ao cliente quando ele é selecionado.</span></div>
+              <div><i data-lucide="shield-check"></i><span>Os dados ficam só no silo do parceiro.</span></div>
+            </div>
+          </aside>
+        </div>
       </section>
 
       <section x-show="currentSection === 'estoque'" class="pos-workspace">
@@ -507,21 +623,28 @@
 
             <div class="pos-dark-table">
               <div class="pos-dark-table-head">
-                <span>Produto</span>
+                <span>Medida</span>
+                <span>Posição</span>
                 <span>Marca</span>
                 <span>Qtd.</span>
                 <span>Custo</span>
                 <span>Venda</span>
                 <span>Status</span>
+                <span>Ações</span>
               </div>
               <template x-for="item in filteredStock.slice(0, 9)" :key="item.id">
                 <div class="pos-dark-table-row">
-                  <span class="pos-product-cell"><span class="pos-tire-thumb small"></span><b x-text="item.tire_size || item.item_name"></b><small x-text="item.item_name"></small></span>
+                  <span class="pos-product-cell"><span class="pos-tire-thumb small"></span><b x-text="item.tire_size || item.item_name || 'Pneu'"></b></span>
+                  <span class="pos-position-cell" x-text="stockPositionLabel(item)"></span>
                   <span x-text="item.brand || '-'"></span>
                   <span class="pos-green-text" x-text="item.is_tracked ? ((item.quantity_on_hand ?? 0) + ' un.') : '-'"></span>
                   <span x-text="money(item.average_cost)"></span>
                   <span x-text="money(item.sale_price)"></span>
                   <span><em class="pos-status-pill" :class="item.stock_status" x-text="stockStatusLabel(item.stock_status)"></em></span>
+                  <span class="pos-row-actions">
+                    <button @click="editStock(item)" title="Editar item"><i data-lucide="pencil"></i></button>
+                    <button @click="deleteStock(item.id)" class="danger" title="Apagar item"><i data-lucide="trash-2"></i></button>
+                  </span>
                 </div>
               </template>
               <div x-show="!filteredStock.length" class="pos-empty">Nenhum item encontrado.</div>
@@ -529,21 +652,13 @@
           </section>
 
           <aside class="pos-panel pos-side-panel">
-            <h3>Resumo do estoque</h3>
-            <div class="pos-side-list">
-              <div><span>Total de unidades</span><strong x-text="stockTotalUnits + ' un.'"></strong></div>
-              <div><span>Valor em estoque</span><strong x-text="money(stockCostValue)"></strong></div>
-              <div><span>Entradas no mês</span><strong x-text="purchasedUnitsMonth + ' un.'"></strong></div>
-              <div><span>Saídas no mês</span><strong x-text="soldUnitsMonth + ' un.'"></strong></div>
-            </div>
-            <div class="pos-divider"></div>
             <h3>Cadastrar pneu</h3>
             <div class="pos-stock-side-form">
               <label>Produto
                 <input x-model="stockForm.item_name" placeholder="Ex: Pneu traseiro" />
               </label>
-              <div class="pos-stock-size-row">
-                <label>Medida
+              <div class="pos-stock-size-position-row">
+                <label class="pos-stock-size-row">Medida
                   <div>
                     <input type="number" min="0" max="999" x-model.number="stockForm.tire_width" placeholder="90" />
                     <span>/</span>
@@ -552,14 +667,18 @@
                     <input type="number" min="0" max="30" x-model.number="stockForm.tire_rim" placeholder="18" />
                   </div>
                 </label>
+                <label>Posição
+                  <select x-model="stockForm.supplier_name">
+                    <option value="">-</option>
+                    <option value="Traseiro">Traseiro</option>
+                    <option value="Dianteiro">Dianteiro</option>
+                  </select>
+                </label>
               </div>
-              <label>Marca
-                <input x-model="stockForm.brand" placeholder="Ex: Levorin" />
-              </label>
-              <label>Fornecedor
-                <input x-model="stockForm.supplier_name" placeholder="Ex: 2W" />
-              </label>
-              <div class="pos-stock-form-grid">
+              <div class="pos-stock-brand-qty-row">
+                <label>Marca
+                  <input x-model="stockForm.brand" placeholder="Levorin" />
+                </label>
                 <label>Qtd.
                   <input type="number" min="0" step="1" x-model.number="stockForm.quantity_on_hand" />
                 </label>
@@ -831,7 +950,7 @@
   </div>
 
   <!-- SIDEBAR -->
-  <aside x-show="!['resumo', 'vendas', 'estoque', 'financeiro'].includes(currentSection)" class="w-64 bg-[#071426] text-white flex flex-col flex-shrink-0">
+  <aside x-show="!['resumo', 'vendas', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" class="w-64 bg-[#071426] text-white flex flex-col flex-shrink-0">
     <div class="px-5 py-6">
       <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-xl bg-white/10 ring-1 ring-white/15 text-white flex items-center justify-center font-bold shadow-sm">BR</div>
@@ -884,7 +1003,7 @@
   </aside>
 
   <!-- MAIN -->
-  <main x-show="!['resumo', 'vendas', 'estoque', 'financeiro'].includes(currentSection)" id="partner-main" class="flex-1 overflow-auto">
+  <main x-show="!['resumo', 'vendas', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" id="partner-main" class="flex-1 overflow-auto">
 
     <!-- TOPBAR -->
     <div class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-gray-200 px-8 py-3 flex items-center justify-between">
