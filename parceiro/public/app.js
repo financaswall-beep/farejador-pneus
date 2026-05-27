@@ -22,6 +22,8 @@ function parceiroApp() {
     authed: false,
     loading: false,
     saving: false,
+    nowTick: Date.now(),
+    nowTimer: null,
     savingAction: '',
     loginError: '',
     statusMessage: '',
@@ -80,12 +82,35 @@ function parceiroApp() {
         this.$nextTick(() => this.loadData());
       }
 
+      // Relogio do footer: re-renderiza a cada 30s.
+      this.nowTimer = setInterval(() => { this.nowTick = Date.now(); }, 30000);
+
       // re-render charts on resize (debounced)
       let resizeTimer = null;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => { if (this.authed) this.renderAllCharts(); }, 160);
       });
+    },
+
+    get nowClockLabel() {
+      // referencia nowTick pra forcar reatividade do Alpine
+      this.nowTick;
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date());
+    },
+
+    get nowDateLabel() {
+      this.nowTick;
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(new Date());
     },
 
     // â”€â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -188,8 +213,13 @@ function parceiroApp() {
       return orders > 0 ? sales / orders : 0;
     },
 
+    // Total de custos do mes (regime de competencia).
+    // Conforme docs/GUIA_INDICADORES_FINANCEIRO_PARCEIRO_2026-05-24.md:
+    //   Total de custos = Compras do mes + Despesas do mes
+    // NAO inclui payables em aberto sem janela mensal — esses ja entram em
+    // expenses_month quando o evento de competencia ocorre.
     get totalCusts() {
-      return this.num(this.resumo?.purchases_month) + this.costExpensesCommitted;
+      return this.num(this.resumo?.purchases_month) + this.num(this.resumo?.expenses_month);
     },
 
     get estimatedMargin() {
@@ -400,14 +430,12 @@ function parceiroApp() {
         .reduce((sum, payable) => sum + this.num(payable.amount), 0);
     },
 
-    get manualOpenPayablesTotal() {
-      return this.payables
-        .filter((payable) => payable.status === 'open' && !payable.source_purchase_id)
-        .reduce((sum, payable) => sum + this.num(payable.amount), 0);
-    },
-
+    // Despesas + contas do mes (regime de competencia).
+    // Conforme docs/GUIA_INDICADORES_FINANCEIRO_PARCEIRO_2026-05-24.md: o
+    // donut "Composicao dos custos" divide compras x despesas do MES, nao
+    // payables em aberto cumulativos.
     get costExpensesCommitted() {
-      return this.num(this.resumo?.expenses_month) + this.manualOpenPayablesTotal;
+      return this.num(this.resumo?.expenses_month);
     },
 
     get receivablesOpenTotal() {
@@ -652,12 +680,20 @@ function parceiroApp() {
       return `Atualizado ${this.lastUpdatedAt.toLocaleString('pt-BR')}`;
     },
 
+    // Compara em America/Sao_Paulo para alinhar com a view SQL
+    // (network.partner_unit_summary usa date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')).
+    // Sem isso, nas primeiras horas do dia 1 o navegador (em outro fuso)
+    // pode considerar o registro como "mes anterior" e desalinhar dos cards.
     isCurrentMonth(value) {
       if (!value) return false;
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return false;
-      const now = new Date();
-      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+      const fmt = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+      });
+      return fmt.format(date) === fmt.format(new Date());
     },
 
     get saleTotalLabel() {
@@ -1889,7 +1925,8 @@ function parceiroApp() {
         },
         options: {
           maintainAspectRatio: false,
-          cutout: '58%',
+          cutout: '68%',
+          layout: { padding: { bottom: 8 } },
           plugins: {
             legend: { position: 'bottom', labels: { color: '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
             tooltip: {
@@ -1906,18 +1943,28 @@ function parceiroApp() {
           afterDraw(chart) {
             const { ctx: canvasCtx, chartArea } = chart;
             if (!chartArea) return;
-            const arc = chart.getDatasetMeta(0).data[0];
-            const x = arc?.x ?? (chartArea.left + chartArea.right) / 2;
-            const y = arc?.y ?? (chartArea.top + chartArea.bottom) / 2;
+            const meta = chart.getDatasetMeta(0);
+            const arc = meta.data && meta.data[0];
+            // Centro do donut: usar coordenadas do próprio arco quando disponíveis
+            // (Chart.js já considera o espaço reservado pra legenda). Fallback pro
+            // centro do chartArea.
+            const cx = (arc && typeof arc.x === 'number')
+              ? arc.x
+              : (chartArea.left + chartArea.right) / 2;
+            const cy = (arc && typeof arc.y === 'number')
+              ? arc.y
+              : (chartArea.top + chartArea.bottom) / 2;
             canvasCtx.save();
             canvasCtx.textAlign = 'center';
             canvasCtx.textBaseline = 'middle';
+            // Offsets simétricos em torno de cy para o bloco (valor + rótulo)
+            // ficar visualmente centralizado no buraco do donut.
             canvasCtx.fillStyle = '#f8fafc';
-            canvasCtx.font = '700 18px Inter, system-ui, sans-serif';
-            canvasCtx.fillText(totalCostsLabel, x, y - 8);
+            canvasCtx.font = '700 15px Inter, system-ui, sans-serif';
+            canvasCtx.fillText(totalCostsLabel, cx, cy - 9);
             canvasCtx.fillStyle = '#9ca3af';
-            canvasCtx.font = '400 11px Inter, system-ui, sans-serif';
-            canvasCtx.fillText('Custos', x, y + 15);
+            canvasCtx.font = '400 10px Inter, system-ui, sans-serif';
+            canvasCtx.fillText('Custos', cx, cy + 9);
             canvasCtx.restore();
           },
         }],

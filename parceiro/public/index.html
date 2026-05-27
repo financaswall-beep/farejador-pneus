@@ -549,10 +549,10 @@
             </div>
 
             <div class="pos-finance-cards">
-              <article><small>Contas a receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
               <article><small>Contas a pagar</small><strong x-text="money(payablesOpenTotal)"></strong><span>em aberto</span></article>
-              <article><small>Recebido no mês</small><strong x-text="money(receivablesReceivedMonthTotal)"></strong><span>entradas confirmadas</span></article>
               <article><small>Pago no mês</small><strong x-text="money(payablesPaidMonthTotal)"></strong><span>saídas confirmadas</span></article>
+              <article><small>Contas a receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
+              <article><small>Recebido no mês</small><strong x-text="money(receivablesReceivedMonthTotal)"></strong><span>entradas confirmadas</span></article>
             </div>
 
             <div class="pos-chart-grid">
@@ -743,8 +743,8 @@
 
       <footer class="pos-footer">
         <span></span>
-        <span><i data-lucide="clock"></i> 10:30</span>
-        <span><i data-lucide="calendar"></i> 23/05/2024</span>
+        <span><i data-lucide="clock"></i> <span x-text="nowClockLabel"></span></span>
+        <span><i data-lucide="calendar"></i> <span x-text="nowDateLabel"></span></span>
       </footer>
     </main>
   </div>
