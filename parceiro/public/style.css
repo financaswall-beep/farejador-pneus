@@ -1040,6 +1040,14 @@ html, body {
   border:1px solid rgba(255,255,255,.06); border-radius:6px; padding:0 10px; background:rgba(255,255,255,.025);
 }
 .pos-cart-list { display:grid; gap:7px; margin-top:7px; }
+.pos-cart-empty {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  padding:32px 12px; border:1px dashed rgba(255,255,255,.08); border-radius:8px;
+  color:#9ca3af; text-align:center;
+}
+.pos-cart-empty svg { width:28px; height:28px; color:#6b7280; }
+.pos-cart-empty span { font-size:13px; font-weight:600; color:#cbd5e1; }
+.pos-cart-empty small { font-size:11px; color:#6b7280; }
 .pos-cart-row {
   display:grid; grid-template-columns:50px minmax(0,1fr) 80px 82px 90px 28px; align-items:center; gap:10px;
   min-height:70px; border-radius:7px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.045); padding:8px 10px;

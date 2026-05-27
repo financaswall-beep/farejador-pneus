@@ -352,23 +352,10 @@
             </div>
             <div class="pos-cart-list">
               <template x-if="!posCart.length">
-                <div>
-                  <div class="pos-cart-row">
-                    <span class="pos-tire-thumb small"></span>
-                    <span><strong>90/90-18</strong><em>Pirelli Diablo Rosso Sport</em><small>Traseiro • Sem câmara</small></span>
-                    <span class="pos-qty"><button>-</button><b>1</b><button>+</button></span>
-                    <span>R$ 549,90</span>
-                    <span>R$ 549,90</span>
-                    <button class="pos-remove">×</button>
-                  </div>
-                  <div class="pos-cart-row">
-                    <span class="pos-tire-thumb small"></span>
-                    <span><strong>110/70-17</strong><em>Michelin Pilot Street 2</em><small>Dianteiro • Sem câmara</small></span>
-                    <span class="pos-qty"><button>-</button><b>1</b><button>+</button></span>
-                    <span>R$ 459,90</span>
-                    <span>R$ 459,90</span>
-                    <button class="pos-remove">×</button>
-                  </div>
+                <div class="pos-cart-empty">
+                  <i data-lucide="shopping-cart"></i>
+                  <span>Carrinho vazio</span>
+                  <small>Clique num produto da lista pra adicionar</small>
                 </div>
               </template>
               <template x-for="item in posCart" :key="item.partner_stock_id">
@@ -427,7 +414,7 @@
 
         <aside class="pos-panel pos-summary">
           <h3>Resumo da venda</h3>
-          <div class="pos-summary-line"><span x-text="'Subtotal (' + (posCartUnits || 2) + ' itens)'"></span><strong x-text="posCart.length ? money(posCartSubtotal) : 'R$ 1.009,80'"></strong></div>
+          <div class="pos-summary-line"><span x-text="'Subtotal (' + posCartUnits + ' itens)'"></span><strong x-text="money(posCartSubtotal)"></strong></div>
           <div class="pos-sale-options">
             <label>
               <span>Origem</span>
@@ -451,7 +438,7 @@
                  x-model="saleForm.delivery_address"
                  class="pos-delivery-input"
                  placeholder="Endereço de entrega" />
-          <div class="pos-total"><span>TOTAL</span><strong x-text="posCart.length ? money(posCartTotal) : 'R$ 1.009,80'"></strong></div>
+          <div class="pos-total"><span>TOTAL</span><strong x-text="money(posCartTotal)"></strong></div>
           <h4>Formas de pagamento</h4>
           <div class="pos-payments">
             <button @click="posSelectPayment('Pix', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Pix' && 'active'">
@@ -465,7 +452,7 @@
             <button @click="posSelectPayment('Cartão crédito', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Cartão crédito' && 'active'"><i data-lucide="credit-card"></i> Cartão</button>
           </div>
           <label>Valor recebido</label>
-          <input class="pos-received" type="text" inputmode="decimal" :value="formatBRLDisplay(posReceivedAmount ?? (posCart.length ? posCartTotal : 1009.80))" @input="posReceivedAmount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(posReceivedAmount)" />
+          <input class="pos-received" type="text" inputmode="decimal" :value="formatBRLDisplay(posReceivedAmount ?? posCartTotal)" @input="posReceivedAmount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(posReceivedAmount)" />
           <div class="pos-change"><span>Troco</span><strong x-text="money(posChangeAmount)"></strong></div>
           <button @click="posFinalizeSale()" :disabled="saving" class="pos-finalize">
             <span class="pos-button-center"><i data-lucide="shopping-bag"></i> <span x-text="isSaving('sale') ? 'FINALIZANDO...' : 'FINALIZAR VENDA'"></span></span>

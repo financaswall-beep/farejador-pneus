@@ -774,23 +774,11 @@ function parceiroApp() {
         const rimOk = this.posRimFilter === 'all' || String(rim || '') === String(this.posRimFilter);
         return brandOk && rimOk;
       });
-      const rows = [...filtered].sort((a, b) => {
+      return [...filtered].sort((a, b) => {
         if (this.posSort === 'price_asc') return this.num(a.sale_price) - this.num(b.sale_price);
         if (this.posSort === 'price_desc') return this.num(b.sale_price) - this.num(a.sale_price);
         if (this.posSort === 'best_sellers') return this.posProductSalesCount(b.stock_id) - this.posProductSalesCount(a.stock_id);
         return 0;
-      });
-      if (rows.length) return rows;
-      return [
-        { stock_id: 'mock-90-90-18', item_name: 'Pirelli Diablo Rosso Sport', tire_size: '90/90-18', brand: 'Pirelli', supplier_name: 'Traseiro - Sem câmara', sale_price: 549.90, quantity_on_hand: 12, is_tracked: true, _mock: true },
-        { stock_id: 'mock-110-70-17', item_name: 'Michelin Pilot Street 2', tire_size: '110/70-17', brand: 'Michelin', supplier_name: 'Dianteiro - Sem câmara', sale_price: 459.90, quantity_on_hand: 8, is_tracked: true, _mock: true },
-        { stock_id: 'mock-140-70-17', item_name: 'Pirelli Angel GT', tire_size: '140/70-17', brand: 'Pirelli', supplier_name: 'Traseiro - Sem câmara', sale_price: 669.90, quantity_on_hand: 5, is_tracked: true, _mock: true },
-        { stock_id: 'mock-120-80-18', item_name: 'Bridgestone Battlax BT46', tire_size: '120/80-18', brand: 'Bridgestone', supplier_name: 'Dianteiro - Sem câmara', sale_price: 499.90, quantity_on_hand: 7, is_tracked: true, _mock: true },
-        { stock_id: 'mock-130-70-13', item_name: 'Dunlop Scoot Smart', tire_size: '130/70-13', brand: 'Dunlop', supplier_name: 'Traseiro - Sem câmara', sale_price: 299.90, quantity_on_hand: 9, is_tracked: true, _mock: true },
-      ].filter((item) => {
-        const search = this.posSearch.trim().toLowerCase();
-        const haystack = [item.item_name, item.tire_size, item.brand, item.supplier_name].join(' ').toLowerCase();
-        return !search || haystack.includes(search);
       });
     },
 
@@ -953,7 +941,6 @@ function parceiroApp() {
         quantity: 1,
         unit_price: this.num(item.sale_price),
         available,
-        is_mock: Boolean(item._mock),
       });
     },
 
@@ -1074,10 +1061,6 @@ function parceiroApp() {
     async posFinalizeSale() {
       if (!this.posCart.length) {
         this.flash('Adicione pelo menos um produto ao carrinho.');
-        return;
-      }
-      if (this.posCart.some((item) => item.is_mock)) {
-        this.flash('Esses produtos são mock visual. Cadastre produtos reais no estoque para finalizar venda.');
         return;
       }
       if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim()) {
