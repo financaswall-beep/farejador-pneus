@@ -36,8 +36,10 @@ export interface PartnerOrderItemInput {
 }
 
 export interface RegisterPartnerSaleInput {
+  customer_id?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
+  customer_cpf?: string | null;
   items: PartnerOrderItemInput[];
   payment_method: string | null;
   payment_status?: 'received' | 'receivable' | null;
@@ -45,8 +47,17 @@ export interface RegisterPartnerSaleInput {
   receivable_installments?: number | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
+  notes?: string | null;
+  received_amount?: number | null;
   source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
   idempotency_key: string;
+}
+
+export interface PartnerCustomerInput {
+  name: string;
+  phone?: string | null;
+  cpf?: string | null;
+  idempotency_key?: string | null;
 }
 
 export interface SettlePartnerReceivableInstallmentInput {
@@ -117,6 +128,11 @@ export interface RegisterPartnerPayableInput {
   force_duplicate?: boolean;
 }
 
+export type UpdatePartnerPayableInput = Pick<
+  RegisterPartnerPayableInput,
+  'counterparty_name' | 'description' | 'category' | 'amount' | 'due_date' | 'notes'
+>;
+
 export interface RegisterPartnerReceivableInput {
   customer_name?: string | null;
   description: string;
@@ -129,6 +145,11 @@ export interface RegisterPartnerReceivableInput {
   notes?: string | null;
   idempotency_key?: string | null;
 }
+
+export type UpdatePartnerReceivableInput = Pick<
+  RegisterPartnerReceivableInput,
+  'customer_name' | 'description' | 'source_tag' | 'amount' | 'due_date' | 'notes'
+>;
 
 export interface SettlePartnerPayableInput {
   paid_at?: string | null;
@@ -215,10 +236,13 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
       `SELECT order_id, created_at,
               contact_name AS customer_name,
               contact_phone AS customer_phone,
+              customer_cpf,
+              customer_id,
               contact_name, contact_phone,
               source_tag AS source,
               source_tag,
-              status, payment_method, fulfillment_mode, total_amount, items
+              status, payment_method, fulfillment_mode, delivery_address,
+              total_amount, received_amount, notes, items
        FROM commerce.partner_orders_full
        WHERE environment = $1 AND unit_id = $2
        ORDER BY created_at DESC
@@ -269,6 +293,46 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
          item_name ASC
        LIMIT 300`,
       [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
+export async function getPartnerCustomers(ctx: PartnerContext): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT id, name, phone, cpf, created_at, updated_at
+       FROM commerce.partner_customers
+       WHERE environment = $1
+         AND unit_id = $2
+         AND deleted_at IS NULL
+       ORDER BY updated_at DESC
+       LIMIT 300`,
+      [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
+export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Promise<unknown[]> {
+  const search = q.trim();
+  if (!search) return [];
+  const digits = search.replace(/\D/g, '');
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT id, name, phone, cpf, created_at, updated_at
+       FROM commerce.partner_customers
+       WHERE environment = $1
+         AND unit_id = $2
+         AND deleted_at IS NULL
+         AND (
+           lower(name) LIKE lower($3)
+           OR ($4 <> '' AND phone LIKE $5)
+           OR ($4 <> '' AND cpf LIKE $5)
+         )
+       ORDER BY updated_at DESC
+       LIMIT 30`,
+      [ctx.environment, ctx.unitId, `%${search}%`, digits, `%${digits}%`],
     );
     return result.rows;
   });
@@ -413,6 +477,31 @@ export async function registerPartnerSale(
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     try {
       const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
+      const normalizedCpf = normalizeCpf(input.customer_cpf);
+      let customerId = input.customer_id ?? null;
+      if (customerId) {
+        const customer = await client.query<{ id: string }>(
+          `SELECT id
+           FROM commerce.partner_customers
+           WHERE id = $1
+             AND environment = $2
+             AND unit_id = $3
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          [customerId, ctx.environment, ctx.unitId],
+        );
+        if (customer.rowCount !== 1) {
+          throw new Error('Cliente nao encontrado nesta unidade.');
+        }
+      } else if (normalizeText(input.customer_name) && (normalizedPhone || normalizedCpf)) {
+        customerId = await upsertPartnerCustomerWithClient(client, ctx, {
+          name: input.customer_name ?? '',
+          phone: normalizedPhone,
+          cpf: normalizedCpf,
+          idempotency_key: `sale:${input.idempotency_key}:customer`,
+        });
+      }
+
       const result = await client.query<{ order_id: string }>(
         `SELECT commerce.register_partner_local_order(
            $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11
@@ -432,6 +521,25 @@ export async function registerPartnerSale(
         ],
       );
       const orderId = result.rows[0]!.order_id;
+      const normalizedNotes = normalizeText(input.notes);
+      const receivedAmount = input.payment_status === 'receivable'
+        ? null
+        : (input.received_amount ?? null);
+
+      if (normalizedNotes !== null || receivedAmount !== null || normalizedCpf !== null || customerId !== null) {
+        await client.query(
+          `UPDATE commerce.partner_orders
+           SET notes = $4,
+               received_amount = $5,
+               customer_cpf = $6,
+               customer_id = $7,
+               updated_at = now()
+           WHERE id = $1
+             AND environment = $2
+             AND unit_id = $3`,
+          [orderId, ctx.environment, ctx.unitId, normalizedNotes, receivedAmount, normalizedCpf, customerId],
+        );
+      }
 
       if (input.payment_status === 'receivable') {
         const order = await client.query<{
@@ -588,6 +696,72 @@ function stockStatus(input: UpsertPartnerStockInput): string {
 function normalizeText(value: string | null | undefined): string | null {
   const text = value?.trim();
   return text ? text : null;
+}
+
+function normalizeCpf(value: string | null | undefined): string | null {
+  const digits = value?.replace(/\D/g, '') ?? '';
+  return digits.length === 11 ? digits : null;
+}
+
+async function upsertPartnerCustomerWithClient(
+  client: PoolClient,
+  ctx: PartnerContext,
+  input: PartnerCustomerInput,
+): Promise<string | null> {
+  const name = normalizeText(input.name);
+  if (!name) return null;
+
+  const phone = normalizeBrazilianPhone(input.phone);
+  const cpf = normalizeCpf(input.cpf);
+  const existing = await client.query<{ id: string }>(
+    `SELECT id
+     FROM commerce.partner_customers
+     WHERE environment = $1
+       AND unit_id = $2
+       AND deleted_at IS NULL
+       AND (
+         ($3::text IS NOT NULL AND cpf = $3)
+         OR ($4::text IS NOT NULL AND phone = $4)
+       )
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [ctx.environment, ctx.unitId, cpf, phone],
+  );
+
+  if (existing.rows[0]?.id) {
+    const customerId = existing.rows[0].id;
+    await client.query(
+      `UPDATE commerce.partner_customers
+       SET name = $4,
+           phone = COALESCE($5, phone),
+           cpf = COALESCE($6, cpf)
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3`,
+      [customerId, ctx.environment, ctx.unitId, name, phone, cpf],
+    );
+    return customerId;
+  }
+
+  const inserted = await client.query<{ id: string }>(
+    `INSERT INTO commerce.partner_customers (
+       environment, unit_id, name, phone, cpf, idempotency_key
+     ) VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+     DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [ctx.environment, ctx.unitId, name, phone, cpf, input.idempotency_key ?? null],
+  );
+  return inserted.rows[0]?.id ?? null;
+}
+
+export async function createPartnerCustomer(
+  ctx: PartnerContext,
+  input: PartnerCustomerInput,
+): Promise<{ customer_id: string | null }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => ({
+    customer_id: await upsertPartnerCustomerWithClient(client, ctx, input),
+  }));
 }
 
 function payableCategoryToExpenseCategory(
@@ -1430,6 +1604,66 @@ export async function settlePartnerPayable(
   });
 }
 
+export async function updatePartnerPayable(
+  ctx: PartnerContext,
+  payableId: string,
+  input: UpdatePartnerPayableInput,
+): Promise<{ payable_id: string; updated: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string }>(
+      `UPDATE finance.partner_payables
+       SET counterparty_name = $4,
+           description = $5,
+           category = COALESCE($6, 'other'),
+           amount = $7,
+           due_date = $8::date,
+           notes = $9
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [
+        payableId,
+        ctx.environment,
+        ctx.unitId,
+        normalizeText(input.counterparty_name),
+        input.description,
+        input.category ?? 'other',
+        input.amount,
+        input.due_date ?? null,
+        normalizeText(input.notes),
+      ],
+    );
+
+    if (result.rowCount === 1) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_payables', $2,
+                   'partner_payable_updated', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          payableId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({
+            unit_id: ctx.unitId,
+            counterparty_name: input.counterparty_name,
+            description: input.description,
+            category: input.category ?? 'other',
+            amount: input.amount,
+            due_date: input.due_date,
+          }),
+        ],
+      );
+    }
+
+    return { payable_id: payableId, updated: result.rowCount === 1 };
+  });
+}
+
 export async function cancelPartnerPayable(
   ctx: PartnerContext,
   payableId: string,
@@ -1576,6 +1810,66 @@ export async function settlePartnerReceivable(
     );
 
     return { receivable_id: receivableId, received: true };
+  });
+}
+
+export async function updatePartnerReceivable(
+  ctx: PartnerContext,
+  receivableId: string,
+  input: UpdatePartnerReceivableInput,
+): Promise<{ receivable_id: string; updated: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string }>(
+      `UPDATE finance.partner_receivables
+       SET customer_name = $4,
+           description = $5,
+           source_tag = COALESCE($6, 'porta'),
+           amount = $7,
+           due_date = $8::date,
+           notes = $9
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND status = 'open'
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [
+        receivableId,
+        ctx.environment,
+        ctx.unitId,
+        normalizeText(input.customer_name),
+        input.description,
+        input.source_tag ?? 'porta',
+        input.amount,
+        input.due_date ?? null,
+        normalizeText(input.notes),
+      ],
+    );
+
+    if (result.rowCount === 1) {
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_finance', 'finance.partner_receivables', $2,
+                   'partner_receivable_updated', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          receivableId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({
+            unit_id: ctx.unitId,
+            customer_name: input.customer_name,
+            description: input.description,
+            source_tag: input.source_tag ?? 'porta',
+            amount: input.amount,
+            due_date: input.due_date,
+          }),
+        ],
+      );
+    }
+
+    return { receivable_id: receivableId, updated: result.rowCount === 1 };
   });
 }
 

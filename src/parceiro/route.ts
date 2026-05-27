@@ -10,16 +10,19 @@ import {
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
+  createPartnerCustomer,
   DuplicateExpenseError,
   InstallmentsTooSmallError,
   PaidPurchaseLockedError,
   PartialStockReversalError,
   getPartnerCompras,
+  getPartnerCustomers,
   getPartnerDespesas,
   getPartnerEstoque,
   getPartnerPayables,
   getPartnerProdutos,
   getPartnerReceivables,
+  searchPartnerCustomers,
   getPartnerFluxoCaixa,
   getPartnerResumo,
   getPartnerVendas,
@@ -31,6 +34,8 @@ import {
   settlePartnerPayable,
   settlePartnerReceivable,
   settlePartnerReceivableInstallment,
+  updatePartnerPayable,
+  updatePartnerReceivable,
   upsertPartnerStock,
 } from './queries.js';
 
@@ -79,8 +84,10 @@ const orderItemSchema = z.object({
 });
 
 const saleSchema = z.object({
+  customer_id: z.string().uuid().nullable().optional(),
   customer_name: z.string().min(1).max(200).nullable().optional(),
   customer_phone: z.string().min(1).max(40).nullable().optional(),
+  customer_cpf: z.string().min(11).max(14).nullable().optional(),
   items: z.array(orderItemSchema).min(1),
   payment_method: z.string().min(1).nullable(),
   payment_status: z.enum(['received', 'receivable']).nullable().optional(),
@@ -88,6 +95,8 @@ const saleSchema = z.object({
   receivable_installments: z.number().int().min(1).max(36).nullable().optional(),
   fulfillment_mode: z.enum(['delivery', 'pickup']),
   delivery_address: z.string().min(1).nullable().optional(),
+  notes: z.string().max(500).nullable().optional(),
+  received_amount: z.number().nonnegative().nullable().optional(),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).optional(),
   idempotency_key: z.string().min(8),
 }).refine(
@@ -123,6 +132,17 @@ const stockSchema = z.object({
   average_cost: z.number().nonnegative().nullable().optional(),
   sale_price: z.number().nonnegative().nullable().optional(),
   is_tracked: z.boolean().default(true),
+});
+
+const customerSchema = z.object({
+  name: z.string().min(1).max(200),
+  phone: z.string().min(1).max(40).nullable().optional(),
+  cpf: z.string().min(11).max(14).nullable().optional(),
+  idempotency_key: z.string().min(8).nullable().optional(),
+});
+
+const customerSearchSchema = z.object({
+  q: z.string().min(1).max(120),
 });
 
 const purchaseSchema = z.object({
@@ -176,6 +196,19 @@ const payableSchema = z.object({
   force_duplicate: z.boolean().optional(),
 });
 
+const payableUpdateSchema = payableSchema
+  .omit({
+    status: true,
+    paid_at: true,
+    payment_method: true,
+    idempotency_key: true,
+    force_duplicate: true,
+  })
+  .refine((data) => !!data.due_date, {
+    message: 'due_date obrigatorio para conta a pagar em aberto',
+    path: ['due_date'],
+  });
+
 const receivableSchema = z.object({
   customer_name: z.string().max(200).nullable().optional(),
   description: z.string().min(1).max(300),
@@ -188,6 +221,18 @@ const receivableSchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
 });
+
+const receivableUpdateSchema = receivableSchema
+  .omit({
+    status: true,
+    received_at: true,
+    payment_method: true,
+    idempotency_key: true,
+  })
+  .refine((data) => !!data.due_date, {
+    message: 'due_date obrigatorio para conta a receber em aberto',
+    path: ['due_date'],
+  });
 
 const settlePayableSchema = z.object({
   paid_at: z.string().datetime().nullable().optional(),
@@ -251,6 +296,26 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.get('/parceiro/:slug/api/produtos', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerProdutos(getPartnerContext(request)) });
+  });
+
+  fastify.get('/parceiro/:slug/api/clientes', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await getPartnerCustomers(getPartnerContext(request)) });
+  });
+
+  fastify.get('/parceiro/:slug/api/clientes/buscar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = customerSearchSchema.safeParse(request.query);
+    if (!parsed.success) return reply.status(200).send({ rows: [] });
+    return reply.status(200).send({ rows: await searchPartnerCustomers(getPartnerContext(request), parsed.data.q) });
+  });
+
+  fastify.post('/parceiro/:slug/api/clientes', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = customerSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+    return reply.status(200).send(await createPartnerCustomer(getPartnerContext(request), parsed.data));
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta
@@ -411,6 +476,22 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
+  fastify.patch('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = payableParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
+
+    const parsed = payableUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await updatePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
+    if (!result.updated) return reply.status(404).send({ error: 'payable_not_found_or_closed' });
+    return reply.status(200).send(result);
+  });
+
   fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const params = payableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
@@ -451,6 +532,22 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
     return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
+  });
+
+  fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = receivableParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
+
+    const parsed = receivableUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await updatePartnerReceivable(getPartnerContext(request), params.data.receivableId, parsed.data);
+    if (!result.updated) return reply.status(404).send({ error: 'receivable_not_found_or_closed' });
+    return reply.status(200).send(result);
   });
 
   fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {

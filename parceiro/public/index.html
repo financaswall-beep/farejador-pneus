@@ -36,7 +36,7 @@
   <link rel="stylesheet" href="./style.css?v=20260526-dark-portal-1" />
 </head>
 
-<body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()" x-cloak>
+<body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
 
 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      LOGIN
@@ -183,19 +183,19 @@
       <section x-show="currentSection === 'vendas'" class="pos-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="archive"></i></div>
-          <div><small>Caixa do dia</small><strong x-text="money(posCashTodayTotal || 3782.60)"></strong><span>Aberto às 08:15</span></div>
+          <div><small>Caixa do dia</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="posFirstSaleTodayLabel"></span></div>
         </article>
         <article>
-          <div><small>Vendas hoje</small><strong x-text="money(posCashTodayTotal || 5246.80)"></strong><span x-text="(salesTodayCount || 12) + ' vendas realizadas'"></span></div>
-          <div class="pos-spark"></div>
+          <div><small>Vendas hoje</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="salesToday.length + ' vendas realizadas'"></span></div>
+          <div class="pos-spark"><canvas id="chartPosSpark"></canvas></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
-          <div><small>Itens no carrinho</small><strong x-text="posCartUnits || 2"></strong><span>Quantidades</span></div>
+          <div><small>Itens no carrinho</small><strong x-text="posCartUnits"></strong><span>Quantidades</span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="tag"></i></div>
-          <div><small>Última venda</small><strong x-text="posLastSale ? money(posLastSale.total_amount) : 'R$ 289,90'"></strong><span x-text="posLastSale ? formatDateTime(posLastSale.created_at) : 'há 15 minutos'"></span></div>
+          <div><small>Última venda</small><strong x-text="posLastSale ? money(posLastSale.total_amount) : 'R$ 0,00'"></strong><span x-text="posLastSale ? formatDateTime(posLastSale.created_at) : 'sem venda ainda'"></span></div>
         </article>
       </section>
 
@@ -297,16 +297,31 @@
           <div class="pos-product-search">
             <i data-lucide="search"></i>
             <input x-model="posSearch" placeholder="Digite a medida, marca ou modelo..." />
-            <button><i data-lucide="barcode"></i></button>
+            <button disabled title="Em breve"><i data-lucide="barcode"></i></button>
           </div>
           <div class="pos-filter-row">
-            <button class="active">Todas as marcas</button>
-            <button>Todos os tipos</button>
-            <button><i data-lucide="list-filter"></i> Filtros</button>
+            <select x-model="posBrandFilter">
+              <option value="all">Todas as marcas</option>
+              <template x-for="brand in posBrandOptions" :key="brand">
+                <option :value="brand" x-text="brand"></option>
+              </template>
+            </select>
+            <select x-model="posRimFilter">
+              <option value="all">Todos os aros</option>
+              <template x-for="rim in posRimOptions" :key="rim">
+                <option :value="rim" x-text="'Aro ' + rim"></option>
+              </template>
+            </select>
+            <select x-model="posSort">
+              <option value="relevance">Relevância</option>
+              <option value="price_asc">Preço crescente</option>
+              <option value="price_desc">Preço decrescente</option>
+              <option value="best_sellers">Mais vendidos</option>
+            </select>
           </div>
           <div class="pos-count-row">
-            <span x-text="(posDisplayProducts.length || 128) + ' produtos encontrados'"></span>
-            <span>Ordenar: Relevância <i data-lucide="chevron-down"></i></span>
+            <span x-text="posDisplayProducts.length + ' produtos encontrados'"></span>
+            <span>Venda pelo estoque local</span>
           </div>
           <div class="pos-product-list">
             <template x-for="(item, index) in posDisplayProducts.slice(0, 5)" :key="item.stock_id">
@@ -327,7 +342,6 @@
               </button>
             </template>
           </div>
-          <button class="pos-more">Ver mais produtos <i data-lucide="chevron-down"></i></button>
         </section>
 
         <section class="pos-center">
@@ -368,17 +382,39 @@
                 </div>
               </template>
             </div>
-            <button class="pos-add-line"><i data-lucide="plus-circle"></i> Adicionar produto ao carrinho</button>
           </div>
 
           <div class="pos-bottom-panels">
             <div class="pos-panel pos-client-panel">
               <h3>Dados do cliente <span>(opcional)</span></h3>
-              <div class="pos-client-search"><input x-model="saleForm.customer_name" placeholder="Buscar cliente por nome, telefone ou CPF..." /><i data-lucide="search"></i></div>
-              <button class="pos-new-client"><i data-lucide="plus"></i> Novo cliente</button>
+              <div class="pos-client-search">
+                <input x-model="posCustomerQuery" @input="onCustomerSearchInput()" placeholder="Buscar cliente por nome, telefone ou CPF..." />
+                <i data-lucide="search"></i>
+              </div>
+              <div class="pos-client-inline-fields">
+                <input x-model="saleForm.customer_phone" placeholder="Telefone" />
+                <input :value="saleForm.customer_cpf"
+                       @input="saleForm.customer_cpf = formatCpfInput($event.target.value); $event.target.value = saleForm.customer_cpf"
+                       placeholder="CPF" />
+              </div>
+              <div x-show="posCustomerResults.length" class="pos-customer-results">
+                <template x-for="customer in posCustomerResults.slice(0, 4)" :key="customer.id">
+                  <button @click="selectPartnerCustomer(customer)">
+                    <b x-text="customer.name"></b>
+                    <small x-text="[formatPhoneDisplay(customer.phone), formatCpfInput(customer.cpf)].filter(Boolean).join(' - ') || 'sem telefone'"></small>
+                  </button>
+                </template>
+              </div>
+              <button @click="posCustomerFormOpen = !posCustomerFormOpen" class="pos-new-client"><i data-lucide="plus"></i> Novo cliente</button>
+              <div x-show="posCustomerFormOpen" class="pos-new-client-form">
+                <input x-model="customerForm.name" placeholder="Nome do cliente" />
+                <input x-model="customerForm.phone" placeholder="Telefone" />
+                <input :value="customerForm.cpf" @input="customerForm.cpf = formatCpfInput($event.target.value); $event.target.value = customerForm.cpf" placeholder="CPF" />
+                <button @click="createPosCustomer()" :disabled="isSaving('customer')">Salvar cliente</button>
+              </div>
               <div class="pos-client-data">
                 <small>Nome</small><strong x-text="saleForm.customer_name || 'Consumidor Final'"></strong>
-                <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span><span><small>CPF</small><b>-</b></span></div>
+                <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span><span><small>CPF</small><b x-text="formatCpfInput(saleForm.customer_cpf) || '-'"></b></span></div>
               </div>
             </div>
             <div class="pos-panel pos-notes-panel">
@@ -392,8 +428,29 @@
         <aside class="pos-panel pos-summary">
           <h3>Resumo da venda</h3>
           <div class="pos-summary-line"><span x-text="'Subtotal (' + (posCartUnits || 2) + ' itens)'"></span><strong x-text="posCart.length ? money(posCartSubtotal) : 'R$ 1.009,80'"></strong></div>
-          <div class="pos-summary-input"><span>Desconto <i data-lucide="info"></i></span><input value="R$ 0,00" disabled /></div>
-          <div class="pos-summary-input"><span>Frete <i data-lucide="info"></i></span><input value="R$ 0,00" disabled /></div>
+          <div class="pos-sale-options">
+            <label>
+              <span>Origem</span>
+              <select x-model="saleForm.source_tag">
+                <option value="porta">Porta</option>
+                <option value="2w">2W</option>
+                <option value="walkin_balcao">Balcão</option>
+                <option value="walkin_telefone">Telefone</option>
+                <option value="outro">Outro</option>
+              </select>
+            </label>
+            <label>
+              <span>Entrega</span>
+              <select x-model="saleForm.fulfillment_mode">
+                <option value="pickup">Retirada</option>
+                <option value="delivery">Entrega</option>
+              </select>
+            </label>
+          </div>
+          <input x-show="saleForm.fulfillment_mode === 'delivery'"
+                 x-model="saleForm.delivery_address"
+                 class="pos-delivery-input"
+                 placeholder="Endereço de entrega" />
           <div class="pos-total"><span>TOTAL</span><strong x-text="posCart.length ? money(posCartTotal) : 'R$ 1.009,80'"></strong></div>
           <h4>Formas de pagamento</h4>
           <div class="pos-payments">
@@ -412,13 +469,30 @@
           <div class="pos-change"><span>Troco</span><strong x-text="money(posChangeAmount)"></strong></div>
           <button @click="posFinalizeSale()" :disabled="saving" class="pos-finalize">
             <span class="pos-button-center"><i data-lucide="shopping-bag"></i> <span x-text="isSaving('sale') ? 'FINALIZANDO...' : 'FINALIZAR VENDA'"></span></span>
-            <kbd>F12</kbd>
+            <kbd>F2</kbd>
           </button>
           <button @click="posClearCart(); flash('Venda cancelada.')" class="pos-cancel">
             <span class="pos-button-center"><i data-lucide="x-circle"></i> CANCELAR VENDA</span>
-            <kbd>F10</kbd>
+            <kbd>Esc</kbd>
           </button>
           <div class="pos-secure"><i data-lucide="lock"></i> Venda segura e criptografada</div>
+          <div class="pos-recent-sales">
+            <div class="pos-recent-head">
+              <strong>Vendas recentes</strong>
+              <span x-text="activeSales.length + ' ativas'"></span>
+            </div>
+            <template x-for="sale in activeSales.slice(0, 3)" :key="sale.order_id">
+              <div class="pos-recent-sale">
+                <span>
+                  <b x-text="sale.customer_name || 'Consumidor final'"></b>
+                  <small x-text="formatDateTime(sale.created_at) + ' - ' + sourceLabel(sale.source_tag || sale.source)"></small>
+                </span>
+                <strong x-text="money(sale.total_amount)"></strong>
+                <button @click="cancelSale(sale.order_id)" :disabled="saving">Cancelar</button>
+              </div>
+            </template>
+            <div x-show="!activeSales.length" class="pos-empty small">Nenhuma venda ativa.</div>
+          </div>
         </aside>
       </section>
 
@@ -598,7 +672,7 @@
                     </select>
                   </label>
                   <label>Situação
-                    <select x-model="payableForm.status">
+                    <select x-model="payableForm.status" :disabled="!!editingPayableId">
                       <option value="open">Em aberto</option>
                       <option value="paid">Pago agora</option>
                     </select>
@@ -631,7 +705,10 @@
                 </div>
                 <button @click="savePayable()" :disabled="saving" class="pos-form-submit danger">
                   <i data-lucide="file-plus-2"></i>
-                  <span x-text="isSaving('payable') ? 'Salvando...' : (payableForm.status === 'paid' ? 'Salvar como pago' : 'Salvar conta a pagar')"></span>
+                  <span x-text="isSaving('payable') ? 'Salvando...' : (editingPayableId ? 'Atualizar conta a pagar' : (payableForm.status === 'paid' ? 'Salvar como pago' : 'Salvar conta a pagar'))"></span>
+                </button>
+                <button x-show="editingPayableId" @click="resetPayableForm()" type="button" class="pos-form-cancel">
+                  Cancelar edição
                 </button>
               </article>
 
@@ -657,7 +734,7 @@
                     </select>
                   </label>
                   <label>Situação
-                    <select x-model="receivableForm.status">
+                    <select x-model="receivableForm.status" :disabled="!!editingReceivableId">
                       <option value="open">Em aberto</option>
                       <option value="received">Recebido agora</option>
                     </select>
@@ -690,7 +767,10 @@
                 </div>
                 <button @click="saveReceivable()" :disabled="saving" class="pos-form-submit success">
                   <i data-lucide="badge-dollar-sign"></i>
-                  <span x-text="isSaving('receivable') ? 'Salvando...' : (receivableForm.status === 'received' ? 'Salvar como recebido' : 'Salvar conta a receber')"></span>
+                  <span x-text="isSaving('receivable') ? 'Salvando...' : (editingReceivableId ? 'Atualizar conta a receber' : (receivableForm.status === 'received' ? 'Salvar como recebido' : 'Salvar conta a receber'))"></span>
+                </button>
+                <button x-show="editingReceivableId" @click="resetReceivableForm()" type="button" class="pos-form-cancel">
+                  Cancelar edição
                 </button>
               </article>
             </div>
@@ -701,7 +781,14 @@
                 <template x-for="item in receivablesDetail.slice(0, 5)" :key="item.id">
                   <div class="pos-money-row positive">
                     <span><b x-text="item.title || 'Cliente'"></b><small x-text="formatDate(item.date)"></small></span>
-                    <strong x-text="money(item.amount)"></strong>
+                    <div class="pos-money-side">
+                      <strong x-text="money(item.amount)"></strong>
+                      <div class="pos-money-actions">
+                        <button @click="editReceivable(item.raw)">Editar</button>
+                        <button class="success" @click="settleReceivable(item.source_id)" :disabled="isSaving('receivable-receive-' + item.source_id)">Receber</button>
+                        <button class="danger" @click="cancelReceivable(item.source_id)" :disabled="isSaving('receivable-cancel-' + item.source_id)">Excluir</button>
+                      </div>
+                    </div>
                   </div>
                 </template>
                 <div x-show="!receivablesDetail.length" class="pos-empty small">Nada a receber em aberto.</div>
@@ -711,7 +798,14 @@
                 <template x-for="item in payablesDetail.slice(0, 5)" :key="item.id">
                   <div class="pos-money-row negative">
                     <span><b x-text="item.title || 'Fornecedor'"></b><small x-text="formatDate(item.date)"></small></span>
-                    <strong x-text="money(item.amount)"></strong>
+                    <div class="pos-money-side">
+                      <strong x-text="money(item.amount)"></strong>
+                      <div class="pos-money-actions">
+                        <button @click="editPayable(item.raw)">Editar</button>
+                        <button class="success" @click="settlePayable(item.source_id)" :disabled="isSaving('payable-pay-' + item.source_id)">Pagar</button>
+                        <button class="danger" @click="cancelPayable(item.source_id)" :disabled="isSaving('payable-cancel-' + item.source_id)">Excluir</button>
+                      </div>
+                    </div>
                   </div>
                 </template>
                 <div x-show="!payablesDetail.length" class="pos-empty small">Nada a pagar em aberto.</div>

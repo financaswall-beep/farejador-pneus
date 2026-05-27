@@ -37,11 +37,20 @@ function parceiroApp() {
     stockOriginFilter: 'all',
     stockStatusFilter: 'all',
     posSearch: '',
+    posBrandFilter: 'all',
+    posRimFilter: 'all',
+    posSort: 'relevance',
     posCart: [],
     posDiscountAmount: 0,
     posFreightAmount: 0,
     posReceivedAmount: null,
     posNotes: '',
+    posSaleIdempotencyKey: null,
+    posCustomerQuery: '',
+    posCustomerResults: [],
+    posCustomerSearchTimer: null,
+    posCustomerFormOpen: false,
+    posKeydownHandler: null,
 
     resumo: null,
     vendas: [],
@@ -53,12 +62,15 @@ function parceiroApp() {
     receivables: [],
     fluxoCaixa: null,
 
-    saleForm: { customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
+    saleForm: { customer_id: null, customer_name: '', customer_phone: '', customer_cpf: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
-    payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' },
-    receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' },
+    payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
+    receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null },
+    customerForm: { name: '', phone: '', cpf: '' },
+    editingPayableId: null,
+    editingReceivableId: null,
 
     menu: [
       { id: 'resumo',     label: 'Resumo',        icon: 'layout-dashboard' },
@@ -84,6 +96,20 @@ function parceiroApp() {
 
       // Relogio do footer: re-renderiza a cada 30s.
       this.nowTimer = setInterval(() => { this.nowTick = Date.now(); }, 30000);
+
+      this.posKeydownHandler = (event) => {
+        if (!this.authed || this.currentSection !== 'vendas') return;
+        if (event.key === 'F2') {
+          event.preventDefault();
+          if (!this.saving) void this.posFinalizeSale();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.posClearCart();
+          this.flash('Venda cancelada.');
+        }
+      };
+      window.addEventListener('keydown', this.posKeydownHandler);
 
       // re-render charts on resize (debounced)
       let resizeTimer = null;
@@ -399,6 +425,8 @@ function parceiroApp() {
         .filter((payable) => payable.status === 'open')
         .map((payable) => ({
           id: `payable-${payable.id}`,
+          source_id: payable.id,
+          raw: payable,
           type: 'Conta a pagar',
           title: payable.counterparty_name || payable.description,
           subtitle: this.payableCategoryLabel(payable.category),
@@ -414,6 +442,8 @@ function parceiroApp() {
         .filter((receivable) => receivable.status === 'open')
         .map((receivable) => ({
           id: `receivable-${receivable.id}`,
+          source_id: receivable.id,
+          raw: receivable,
           type: this.sourceLabel(receivable.source_tag),
           title: receivable.customer_name || receivable.description,
           subtitle: receivable.description,
@@ -713,8 +743,43 @@ function parceiroApp() {
       });
     },
 
+    get posBrandOptions() {
+      return [...new Set(this.produtos.map((item) => item.brand).filter(Boolean))]
+        .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+    },
+
+    get posRimOptions() {
+      return [...new Set(this.produtos.map((item) => {
+        if (item.tire_rim_diameter) return String(item.tire_rim_diameter);
+        return String(this.parseTireSize(item.tire_size).rim || '');
+      }).filter(Boolean))]
+        .sort((a, b) => Number(a) - Number(b));
+    },
+
+    posProductSalesCount(stockId) {
+      if (!stockId) return 0;
+      return this.activeSales.reduce((sum, sale) => {
+        const items = Array.isArray(sale.items) ? sale.items : [];
+        return sum + items.reduce((itemSum, item) => {
+          if (item.partner_stock_id !== stockId) return itemSum;
+          return itemSum + (this.num(item.quantity) || 1);
+        }, 0);
+      }, 0);
+    },
+
     get posDisplayProducts() {
-      const rows = this.posProducts;
+      const filtered = this.posProducts.filter((item) => {
+        const brandOk = this.posBrandFilter === 'all' || item.brand === this.posBrandFilter;
+        const rim = item.tire_rim_diameter || this.parseTireSize(item.tire_size).rim;
+        const rimOk = this.posRimFilter === 'all' || String(rim || '') === String(this.posRimFilter);
+        return brandOk && rimOk;
+      });
+      const rows = [...filtered].sort((a, b) => {
+        if (this.posSort === 'price_asc') return this.num(a.sale_price) - this.num(b.sale_price);
+        if (this.posSort === 'price_desc') return this.num(b.sale_price) - this.num(a.sale_price);
+        if (this.posSort === 'best_sellers') return this.posProductSalesCount(b.stock_id) - this.posProductSalesCount(a.stock_id);
+        return 0;
+      });
       if (rows.length) return rows;
       return [
         { stock_id: 'mock-90-90-18', item_name: 'Pirelli Diablo Rosso Sport', tire_size: '90/90-18', brand: 'Pirelli', supplier_name: 'Traseiro - Sem câmara', sale_price: 549.90, quantity_on_hand: 12, is_tracked: true, _mock: true },
@@ -747,12 +812,38 @@ function parceiroApp() {
     },
 
     get posCashTodayTotal() {
-      const today = new Date().toISOString().slice(0, 10);
-      return this.activeSales.reduce((sum, sale) => {
-        const dateKey = String(sale.created_at || '').slice(0, 10);
-        if (dateKey !== today || sale.payment_method === 'A receber') return sum;
+      return this.salesToday.reduce((sum, sale) => {
+        if (sale.payment_method === 'A receber') return sum;
         return sum + this.num(sale.total_amount);
       }, 0);
+    },
+
+    get salesToday() {
+      const today = this.dateKeySaoPaulo(new Date());
+      return this.activeSales.filter((sale) => this.dateKeySaoPaulo(sale.created_at) === today);
+    },
+
+    get posFirstSaleTodayLabel() {
+      if (!this.salesToday.length) return 'sem venda hoje ainda';
+      const first = [...this.salesToday].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+      return `aberto as ${new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(first.created_at))}`;
+    },
+
+    get posSalesTodayHourly() {
+      const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, label: `${String(hour).padStart(2, '0')}h`, value: 0 }));
+      for (const sale of this.salesToday) {
+        const hour = Number(new Intl.DateTimeFormat('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          hour12: false,
+        }).format(new Date(sale.created_at)));
+        if (Number.isFinite(hour) && buckets[hour]) buckets[hour].value += this.num(sale.total_amount);
+      }
+      return buckets;
     },
 
     get posLastSale() {
@@ -894,6 +985,14 @@ function parceiroApp() {
       this.posFreightAmount = 0;
       this.posReceivedAmount = null;
       this.posNotes = '';
+      this.posSaleIdempotencyKey = null;
+    },
+
+    ensurePosSaleIdempotencyKey() {
+      if (!this.posSaleIdempotencyKey) {
+        this.posSaleIdempotencyKey = this.uuid();
+      }
+      return this.posSaleIdempotencyKey;
     },
 
     posSelectPayment(method, status = 'received') {
@@ -901,6 +1000,74 @@ function parceiroApp() {
       this.saleForm.payment_status = status;
       if (status === 'receivable' && !this.saleForm.receivable_due_date) {
         this.saleForm.receivable_due_date = new Date().toISOString().slice(0, 10);
+      }
+    },
+
+    onCustomerSearchInput() {
+      this.saleForm.customer_name = this.posCustomerQuery.trim();
+      this.saleForm.customer_id = null;
+      clearTimeout(this.posCustomerSearchTimer);
+      const q = this.posCustomerQuery.trim();
+      if (q.length < 2) {
+        this.posCustomerResults = [];
+        return;
+      }
+      this.posCustomerSearchTimer = setTimeout(async () => {
+        try {
+          const result = await this.api(`clientes/buscar?q=${encodeURIComponent(q)}`, { method: 'GET' });
+          this.posCustomerResults = result.rows || [];
+        } catch {
+          this.posCustomerResults = [];
+        }
+      }, 250);
+    },
+
+    selectPartnerCustomer(customer) {
+      if (!customer) return;
+      this.saleForm.customer_id = customer.id;
+      this.saleForm.customer_name = customer.name || '';
+      this.saleForm.customer_phone = customer.phone || '';
+      this.saleForm.customer_cpf = this.formatCpfInput(customer.cpf || '');
+      this.posCustomerQuery = customer.name || '';
+      this.posCustomerResults = [];
+      this.posCustomerFormOpen = false;
+    },
+
+    async createPosCustomer() {
+      if (!this.customerForm.name.trim()) {
+        this.flash('Informe o nome do cliente.');
+        return;
+      }
+      if (this.customerForm.cpf && !this.isValidCpf(this.customerForm.cpf)) {
+        this.flash('CPF inválido.');
+        return;
+      }
+      this.saving = true;
+      this.savingAction = 'customer';
+      try {
+        const payload = {
+          name: this.customerForm.name.trim(),
+          phone: this.toE164Phone(this.customerForm.phone),
+          cpf: this.cpfDigits(this.customerForm.cpf) || null,
+          idempotency_key: this.uuid(),
+        };
+        const result = await this.api('clientes', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        this.selectPartnerCustomer({
+          id: result.customer_id,
+          name: payload.name,
+          phone: payload.phone,
+          cpf: payload.cpf,
+        });
+        this.customerForm = { name: '', phone: '', cpf: '' };
+        this.flash('Cliente cadastrado.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
       }
     },
 
@@ -913,10 +1080,6 @@ function parceiroApp() {
         this.flash('Esses produtos são mock visual. Cadastre produtos reais no estoque para finalizar venda.');
         return;
       }
-      if (this.num(this.posDiscountAmount) > 0 || this.num(this.posFreightAmount) > 0) {
-        this.flash('Desconto e frete ainda não estão ligados ao banco. Finalize sem esses campos por enquanto.');
-        return;
-      }
       if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim()) {
         this.flash('Informe o endereço de entrega ou mude para retirada.');
         return;
@@ -925,12 +1088,26 @@ function parceiroApp() {
         this.flash('Informe a data para receber esta venda.');
         return;
       }
+      if (this.saleForm.customer_cpf && !this.isValidCpf(this.saleForm.customer_cpf)) {
+        this.flash('CPF inválido.');
+        return;
+      }
+      const receivedAmount = this.saleForm.payment_status === 'receivable'
+        ? null
+        : this.num(this.posReceivedAmount ?? this.posCartTotal);
+      if (this.saleForm.payment_status !== 'receivable' && receivedAmount < this.posCartTotal) {
+        this.flash('Valor recebido menor que o total da venda.');
+        return;
+      }
       this.saving = true;
       this.savingAction = 'sale';
       try {
+        const stableIdempotencyKey = this.ensurePosSaleIdempotencyKey();
         const body = {
+          customer_id: this.saleForm.customer_id || null,
           customer_name: this.saleForm.customer_name.trim() || null,
           customer_phone: this.toE164Phone(this.saleForm.customer_phone),
+          customer_cpf: this.cpfDigits(this.saleForm.customer_cpf) || null,
           items: this.posCart.map((item) => ({
             partner_stock_id: item.partner_stock_id,
             quantity: this.num(item.quantity) || 1,
@@ -948,8 +1125,10 @@ function parceiroApp() {
           delivery_address: this.saleForm.fulfillment_mode === 'delivery'
             ? this.saleForm.delivery_address.trim()
             : null,
+          notes: this.posNotes.trim() || null,
+          received_amount: receivedAmount,
           source_tag: this.saleForm.source_tag || 'porta',
-          idempotency_key: this.uuid(),
+          idempotency_key: stableIdempotencyKey,
         };
         await this.api('vendas', {
           method: 'POST',
@@ -961,8 +1140,10 @@ function parceiroApp() {
         const sourceTag = this.saleForm.source_tag || 'porta';
         this.posClearCart();
         this.saleForm = {
+          customer_id: null,
           customer_name: '',
           customer_phone: '',
+          customer_cpf: '',
           partner_stock_id: '',
           source_tag: sourceTag,
           quantity: 1,
@@ -974,6 +1155,9 @@ function parceiroApp() {
           fulfillment_mode: fulfillmentMode,
           delivery_address: '',
         };
+        this.posCustomerQuery = '';
+        this.posCustomerResults = [];
+        this.posSaleIdempotencyKey = null;
         await this.loadData();
         this.flash('Venda finalizada - estoque e financeiro atualizados.');
       } catch (err) {
@@ -997,13 +1181,19 @@ function parceiroApp() {
         this.flash('Informe a data para receber esta venda.');
         return;
       }
+      if (this.saleForm.customer_cpf && !this.isValidCpf(this.saleForm.customer_cpf)) {
+        this.flash('CPF inválido.');
+        return;
+      }
       this.saving = true;
       this.savingAction = 'sale';
       try {
         const body = {
+          customer_id: this.saleForm.customer_id || null,
           customer_name: this.saleForm.customer_name.trim() || null,
           // Telefone vai pro banco em E.164 (+5521...). Estado local guarda sÃ³ dÃ­gitos.
           customer_phone: this.toE164Phone(this.saleForm.customer_phone),
+          customer_cpf: this.cpfDigits(this.saleForm.customer_cpf) || null,
           items: [{
             // Aponta direto pro estoque local do parceiro â€” sem catÃ¡logo da matriz.
             partner_stock_id: this.saleForm.partner_stock_id,
@@ -1032,7 +1222,7 @@ function parceiroApp() {
         });
         // Preserva preferÃªncias do operador (modalidade + pagamento) entre vendas
         this.saleForm = {
-          customer_name: '', customer_phone: '', partner_stock_id: '',
+          customer_id: null, customer_name: '', customer_phone: '', customer_cpf: '', partner_stock_id: '',
           source_tag: this.saleForm.source_tag || 'porta',
           quantity: 1, unit_price: 0,
           payment_method: this.saleForm.payment_method,
@@ -1338,6 +1528,26 @@ function parceiroApp() {
       this.saving = true;
       this.savingAction = 'payable';
       try {
+        const payload = {
+          counterparty_name: this.payableForm.counterparty_name.trim() || null,
+          description: this.payableForm.description.trim(),
+          category: this.payableForm.category || 'other',
+          amount: this.num(this.payableForm.amount),
+          due_date: this.payableForm.status === 'open' ? this.payableForm.due_date || null : null,
+          notes: this.payableForm.notes ?? null,
+        };
+
+        if (this.editingPayableId) {
+          await this.api(`contas-a-pagar/${this.editingPayableId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          });
+          this.resetPayableForm();
+          await this.loadData();
+          this.flash('Conta a pagar atualizada.');
+          return;
+        }
+
         const wasPaid = this.payableForm.status === 'paid';
         const paidAt = this.payableForm.status === 'paid'
           ? (this.payableForm.paid_at ? new Date(`${this.payableForm.paid_at}T12:00:00`).toISOString() : new Date().toISOString())
@@ -1345,18 +1555,14 @@ function parceiroApp() {
         await this.api('contas-a-pagar', {
           method: 'POST',
           body: JSON.stringify({
-            counterparty_name: this.payableForm.counterparty_name.trim() || null,
-            description: this.payableForm.description.trim(),
-            category: this.payableForm.category || 'other',
-            amount: this.num(this.payableForm.amount),
-            due_date: this.payableForm.status === 'open' ? this.payableForm.due_date || null : null,
+            ...payload,
             status: this.payableForm.status || 'open',
             paid_at: paidAt,
             payment_method: this.payableForm.status === 'paid' ? this.payableForm.payment_method || 'Pix' : null,
             idempotency_key: this.uuid(),
           }),
         });
-        this.payableForm = { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix' };
+        this.resetPayableForm();
         await this.loadData();
         this.flash(wasPaid
           ? 'Pagamento registrado no custo do mês.'
@@ -1376,6 +1582,26 @@ function parceiroApp() {
       this.saving = true;
       this.savingAction = 'receivable';
       try {
+        const payload = {
+          customer_name: this.receivableForm.customer_name.trim() || null,
+          description: this.receivableForm.description.trim(),
+          source_tag: this.receivableForm.source_tag || 'porta',
+          amount: this.num(this.receivableForm.amount),
+          due_date: this.receivableForm.status === 'open' ? this.receivableForm.due_date || null : null,
+          notes: this.receivableForm.notes ?? null,
+        };
+
+        if (this.editingReceivableId) {
+          await this.api(`contas-a-receber/${this.editingReceivableId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          });
+          this.resetReceivableForm();
+          await this.loadData();
+          this.flash('Conta a receber atualizada.');
+          return;
+        }
+
         const wasReceived = this.receivableForm.status === 'received';
         const receivedAt = this.receivableForm.status === 'received'
           ? (this.receivableForm.received_at ? new Date(`${this.receivableForm.received_at}T12:00:00`).toISOString() : new Date().toISOString())
@@ -1383,18 +1609,14 @@ function parceiroApp() {
         await this.api('contas-a-receber', {
           method: 'POST',
           body: JSON.stringify({
-            customer_name: this.receivableForm.customer_name.trim() || null,
-            description: this.receivableForm.description.trim(),
-            source_tag: this.receivableForm.source_tag || 'porta',
-            amount: this.num(this.receivableForm.amount),
-            due_date: this.receivableForm.status === 'open' ? this.receivableForm.due_date || null : null,
+            ...payload,
             status: this.receivableForm.status || 'open',
             received_at: receivedAt,
             payment_method: this.receivableForm.status === 'received' ? this.receivableForm.payment_method || 'Pix' : null,
             idempotency_key: this.uuid(),
           }),
         });
-        this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix' };
+        this.resetReceivableForm();
         await this.loadData();
         this.flash(wasReceived
           ? 'Recebimento registrado.'
@@ -1405,6 +1627,58 @@ function parceiroApp() {
         this.saving = false;
         this.savingAction = '';
       }
+    },
+
+    resetPayableForm() {
+      this.editingPayableId = null;
+      this.payableForm = { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null };
+    },
+
+    editPayable(payable) {
+      if (!payable || payable.status !== 'open') {
+        this.flash('Apenas contas em aberto podem ser editadas.');
+        return;
+      }
+      this.editingPayableId = payable.id;
+      this.payableForm = {
+        counterparty_name: payable.counterparty_name || '',
+        description: payable.description || '',
+        category: payable.category || 'other',
+        amount: this.num(payable.amount),
+        due_date: payable.due_date ? String(payable.due_date).slice(0, 10) : '',
+        status: 'open',
+        paid_at: '',
+        payment_method: payable.payment_method || 'Pix',
+        notes: payable.notes ?? null,
+      };
+      document.querySelector('.pos-form-card.payable')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.flash('Editando conta a pagar em aberto.');
+    },
+
+    resetReceivableForm() {
+      this.editingReceivableId = null;
+      this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null };
+    },
+
+    editReceivable(receivable) {
+      if (!receivable || receivable.status !== 'open') {
+        this.flash('Apenas contas em aberto podem ser editadas.');
+        return;
+      }
+      this.editingReceivableId = receivable.id;
+      this.receivableForm = {
+        customer_name: receivable.customer_name || '',
+        description: receivable.description || '',
+        source_tag: receivable.source_tag || 'porta',
+        amount: this.num(receivable.amount),
+        due_date: receivable.due_date ? String(receivable.due_date).slice(0, 10) : '',
+        status: 'open',
+        received_at: '',
+        payment_method: receivable.payment_method || 'Pix',
+        notes: receivable.notes ?? null,
+      };
+      document.querySelector('.pos-form-card.receivable')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.flash('Editando conta a receber em aberto.');
     },
 
     async settlePayable(payableId) {
@@ -1521,6 +1795,7 @@ function parceiroApp() {
 
     // â”€â”€â”€ CHARTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     renderAllCharts() {
+      this.renderPosSparkline();
       this.renderSalesTrendChart();
       this.renderResultChart();
       this.renderStockChart();
@@ -1531,6 +1806,35 @@ function parceiroApp() {
       this.renderFinanceUnitsChart();
       this.renderFinanceRevenuePosChart();
       this.renderFinanceCostsPosChart();
+    },
+
+    renderPosSparkline() {
+      const ctx = document.getElementById('chartPosSpark');
+      if (!ctx) return;
+      if (window._posSparkChart) window._posSparkChart.destroy();
+
+      const series = this.posSalesTodayHourly;
+      window._posSparkChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: series.map((d) => d.label),
+          datasets: [{
+            data: series.map((d) => d.value),
+            borderColor: '#facc15',
+            backgroundColor: 'rgba(250,204,21,.12)',
+            borderWidth: 2,
+            tension: .35,
+            pointRadius: 0,
+            fill: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: { x: { display: false }, y: { display: false } },
+        },
+      });
     },
 
     renderSalesTrendChart() {
@@ -1996,6 +2300,30 @@ function parceiroApp() {
       return `+${d}`;
     },
 
+    cpfDigits(value) {
+      return String(value || '').replace(/\D/g, '').slice(0, 11);
+    },
+
+    formatCpfInput(value) {
+      const d = this.cpfDigits(value);
+      return d
+        .replace(/^(\d{3})(\d)/, '$1.$2')
+        .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+    },
+
+    isValidCpf(value) {
+      const cpf = this.cpfDigits(value);
+      if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+      const calc = (base) => {
+        let sum = 0;
+        for (let i = 0; i < base; i += 1) sum += Number(cpf[i]) * (base + 1 - i);
+        const mod = (sum * 10) % 11;
+        return mod === 10 ? 0 : mod;
+      };
+      return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
+    },
+
     // Moeda BRL: estado guarda Number em reais (ex: 1234.50).
     // Input recebe dÃ­gitos puros, trata como centavos.
     onCurrencyInput(value) {
@@ -2056,6 +2384,16 @@ function parceiroApp() {
 
     uuid() {
       return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    },
+
+    dateKeySaoPaulo(value) {
+      if (!value) return '';
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date(value));
     },
 
     formatDate(value) {
