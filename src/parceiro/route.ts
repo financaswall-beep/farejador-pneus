@@ -231,6 +231,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.get('/parceiro/:slug/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   fastify.get('/parceiro/:slug/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
+  fastify.get('/parceiro/:slug/assets/moto-tire.svg', async (_request, reply) => sendStatic(reply, path.join('assets', 'moto-tire.svg'), 'image/svg+xml; charset=utf-8'));
 
   fastify.get('/parceiro/:slug/api/resumo', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });

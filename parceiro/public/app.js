@@ -31,6 +31,15 @@ function parceiroApp() {
     currentSection: 'resumo',
     currentTab: 'sale',
     financePurchaseMode: 'tires',
+    stockSearch: '',
+    stockOriginFilter: 'all',
+    stockStatusFilter: 'all',
+    posSearch: '',
+    posCart: [],
+    posDiscountAmount: 0,
+    posFreightAmount: 0,
+    posReceivedAmount: null,
+    posNotes: '',
 
     resumo: null,
     vendas: [],
@@ -51,7 +60,7 @@ function parceiroApp() {
 
     menu: [
       { id: 'resumo',     label: 'Resumo',        icon: 'layout-dashboard' },
-      { id: 'vendas',     label: 'Vendas',         icon: 'receipt' },
+      { id: 'vendas',     label: 'Frente de caixa', icon: 'shopping-cart' },
       { id: 'estoque',    label: 'Estoque',        icon: 'package' },
       { id: 'financeiro', label: 'Financeiro',     icon: 'wallet' },
     ],
@@ -195,6 +204,91 @@ function parceiroApp() {
         const value = this.num(item.sale_price || item.average_cost);
         return sum + (qty * value);
       }, 0);
+    },
+
+    get stockCostValue() {
+      return this.estoque.reduce((sum, item) => {
+        const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+        return sum + (qty * this.num(item.average_cost));
+      }, 0);
+    },
+
+    get stockTotalUnits() {
+      return this.estoque.reduce((sum, item) => {
+        return sum + (item.is_tracked ? this.num(item.quantity_on_hand) : 0);
+      }, 0);
+    },
+
+    get stockLowItems() {
+      return this.estoque.filter((item) => ['low_stock', 'out_of_stock'].includes(item.stock_status));
+    },
+
+    get stockOriginSplit() {
+      const split = [
+        { label: '2W', key: '2w', count: 0, value: 0, color: '#047857' },
+        { label: 'Porta', key: 'porta', count: 0, value: 0, color: '#94a3b8' },
+      ];
+      for (const item of this.estoque) {
+        const origin = this.stockOriginKey(item);
+        const bucket = split.find((entry) => entry.key === origin) || split[1];
+        const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+        bucket.count += qty;
+        bucket.value += qty * this.num(item.average_cost || item.sale_price);
+      }
+      const total = split.reduce((sum, item) => sum + item.count, 0) || 1;
+      return split.map((item) => ({ ...item, percent: Math.round((item.count / total) * 100) }));
+    },
+
+    get filteredStock() {
+      const search = this.stockSearch.trim().toLowerCase();
+      return this.estoque.filter((item) => {
+        const origin = this.stockOriginKey(item);
+        const haystack = [item.item_name, item.tire_size, item.brand, item.supplier_name]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (search && !haystack.includes(search)) return false;
+        if (this.stockOriginFilter !== 'all' && origin !== this.stockOriginFilter) return false;
+        if (this.stockStatusFilter !== 'all' && item.stock_status !== this.stockStatusFilter) return false;
+        return true;
+      });
+    },
+
+    get stockMovementSeries() {
+      const weeks = [];
+      const now = new Date();
+      for (let i = 3; i >= 0; i -= 1) {
+        const end = new Date(now);
+        end.setDate(now.getDate() - (i * 7));
+        const start = new Date(end);
+        start.setDate(end.getDate() - 6);
+        weeks.push({
+          start,
+          end,
+          label: `${start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`,
+          entradas: 0,
+          saidas: 0,
+        });
+      }
+      const addToWeek = (dateValue, key, amount) => {
+        if (!dateValue) return;
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return;
+        const week = weeks.find((item) => date >= item.start && date <= item.end);
+        if (week) week[key] += amount;
+      };
+      for (const purchase of this.compras) {
+        if (purchase.status === 'cancelled') continue;
+        const items = Array.isArray(purchase.items) ? purchase.items : [];
+        const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0);
+        addToWeek(purchase.purchased_at || purchase.created_at, 'entradas', qty);
+      }
+      for (const sale of this.activeSales) {
+        const items = Array.isArray(sale.items) ? sale.items : [];
+        const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0) || 1;
+        addToWeek(sale.created_at, 'saidas', qty);
+      }
+      return weeks;
     },
 
     get purchasedUnitsMonth() {
@@ -570,6 +664,65 @@ function parceiroApp() {
       return this.money(this.num(this.saleForm.quantity) * this.num(this.saleForm.unit_price));
     },
 
+    get posProducts() {
+      const search = this.posSearch.trim().toLowerCase();
+      return this.produtos.filter((item) => {
+        const haystack = [
+          item.item_name,
+          item.tire_size,
+          item.brand,
+          item.supplier_name,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return !search || haystack.includes(search);
+      });
+    },
+
+    get posDisplayProducts() {
+      const rows = this.posProducts;
+      if (rows.length) return rows;
+      return [
+        { stock_id: 'mock-90-90-18', item_name: 'Pirelli Diablo Rosso Sport', tire_size: '90/90-18', brand: 'Pirelli', supplier_name: 'Traseiro - Sem câmara', sale_price: 549.90, quantity_on_hand: 12, is_tracked: true, _mock: true },
+        { stock_id: 'mock-110-70-17', item_name: 'Michelin Pilot Street 2', tire_size: '110/70-17', brand: 'Michelin', supplier_name: 'Dianteiro - Sem câmara', sale_price: 459.90, quantity_on_hand: 8, is_tracked: true, _mock: true },
+        { stock_id: 'mock-140-70-17', item_name: 'Pirelli Angel GT', tire_size: '140/70-17', brand: 'Pirelli', supplier_name: 'Traseiro - Sem câmara', sale_price: 669.90, quantity_on_hand: 5, is_tracked: true, _mock: true },
+        { stock_id: 'mock-120-80-18', item_name: 'Bridgestone Battlax BT46', tire_size: '120/80-18', brand: 'Bridgestone', supplier_name: 'Dianteiro - Sem câmara', sale_price: 499.90, quantity_on_hand: 7, is_tracked: true, _mock: true },
+        { stock_id: 'mock-130-70-13', item_name: 'Dunlop Scoot Smart', tire_size: '130/70-13', brand: 'Dunlop', supplier_name: 'Traseiro - Sem câmara', sale_price: 299.90, quantity_on_hand: 9, is_tracked: true, _mock: true },
+      ].filter((item) => {
+        const search = this.posSearch.trim().toLowerCase();
+        const haystack = [item.item_name, item.tire_size, item.brand, item.supplier_name].join(' ').toLowerCase();
+        return !search || haystack.includes(search);
+      });
+    },
+
+    get posCartSubtotal() {
+      return this.posCart.reduce((sum, item) => sum + (this.num(item.quantity) * this.num(item.unit_price)), 0);
+    },
+
+    get posCartTotal() {
+      return Math.max(0, this.posCartSubtotal - this.num(this.posDiscountAmount) + this.num(this.posFreightAmount));
+    },
+
+    get posCartUnits() {
+      return this.posCart.reduce((sum, item) => sum + this.num(item.quantity), 0);
+    },
+
+    get posChangeAmount() {
+      if (this.saleForm.payment_status === 'receivable') return 0;
+      return Math.max(0, this.num(this.posReceivedAmount) - this.posCartTotal);
+    },
+
+    get posCashTodayTotal() {
+      const today = new Date().toISOString().slice(0, 10);
+      return this.activeSales.reduce((sum, sale) => {
+        const dateKey = String(sale.created_at || '').slice(0, 10);
+        if (dateKey !== today || sale.payment_method === 'A receber') return sum;
+        return sum + this.num(sale.total_amount);
+      }, 0);
+    },
+
+    get posLastSale() {
+      return this.activeSales[0] || null;
+    },
+
     get purchaseTotalLabel() {
       return this.money(this.num(this.purchaseForm.quantity) * this.num(this.purchaseForm.unit_cost));
     },
@@ -588,8 +741,8 @@ function parceiroApp() {
           subtitle: 'Vis\u00e3o geral da opera\u00e7\u00e3o local',
         },
         vendas: {
-          title: 'Vendas',
-          subtitle: 'Registrar venda e acompanhar pedidos',
+          title: 'Frente de caixa',
+          subtitle: 'Venda rápida, baixa de estoque e financeiro automático',
         },
         estoque: {
           title: 'Estoque',
@@ -637,6 +790,162 @@ function parceiroApp() {
         : 'sem controle';
       parts.push(qtyLabel);
       return parts.join(' - ');
+    },
+
+    posProductTitle(item) {
+      return [item.tire_size, item.item_name].filter(Boolean).join(' - ') || 'Produto';
+    },
+
+    posProductSubtitle(item) {
+      return [item.brand, item.supplier_name].filter(Boolean).join(' - ') || 'Sem marca';
+    },
+
+    posStockLabel(item) {
+      if (!item.is_tracked) return 'sem controle';
+      return `${item.quantity_on_hand ?? 0} un.`;
+    },
+
+    posAddProduct(item) {
+      if (!item || !item.stock_id) return;
+      const current = this.posCart.find((cartItem) => cartItem.partner_stock_id === item.stock_id);
+      const available = item.is_tracked ? this.num(item.quantity_on_hand) : Infinity;
+      const nextQty = current ? current.quantity + 1 : 1;
+      if (nextQty > available) {
+        this.flash('Quantidade maior que o estoque disponível.');
+        return;
+      }
+      if (current) {
+        current.quantity = nextQty;
+        return;
+      }
+      this.posCart.push({
+        partner_stock_id: item.stock_id,
+        item_name: item.item_name || 'Produto',
+        tire_size: item.tire_size || '',
+        brand: item.brand || '',
+        quantity: 1,
+        unit_price: this.num(item.sale_price),
+        available,
+        is_mock: Boolean(item._mock),
+      });
+    },
+
+    posIncrementItem(cartItem) {
+      if (!cartItem) return;
+      if (cartItem.quantity + 1 > cartItem.available) {
+        this.flash('Quantidade maior que o estoque disponível.');
+        return;
+      }
+      cartItem.quantity += 1;
+    },
+
+    posDecrementItem(cartItem) {
+      if (!cartItem) return;
+      if (cartItem.quantity <= 1) {
+        this.posRemoveItem(cartItem.partner_stock_id);
+        return;
+      }
+      cartItem.quantity -= 1;
+    },
+
+    posRemoveItem(stockId) {
+      this.posCart = this.posCart.filter((item) => item.partner_stock_id !== stockId);
+    },
+
+    posClearCart() {
+      this.posCart = [];
+      this.posDiscountAmount = 0;
+      this.posFreightAmount = 0;
+      this.posReceivedAmount = null;
+      this.posNotes = '';
+    },
+
+    posSelectPayment(method, status = 'received') {
+      this.saleForm.payment_method = method;
+      this.saleForm.payment_status = status;
+      if (status === 'receivable' && !this.saleForm.receivable_due_date) {
+        this.saleForm.receivable_due_date = new Date().toISOString().slice(0, 10);
+      }
+    },
+
+    async posFinalizeSale() {
+      if (!this.posCart.length) {
+        this.flash('Adicione pelo menos um produto ao carrinho.');
+        return;
+      }
+      if (this.posCart.some((item) => item.is_mock)) {
+        this.flash('Esses produtos são mock visual. Cadastre produtos reais no estoque para finalizar venda.');
+        return;
+      }
+      if (this.num(this.posDiscountAmount) > 0 || this.num(this.posFreightAmount) > 0) {
+        this.flash('Desconto e frete ainda não estão ligados ao banco. Finalize sem esses campos por enquanto.');
+        return;
+      }
+      if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim()) {
+        this.flash('Informe o endereço de entrega ou mude para retirada.');
+        return;
+      }
+      if (this.saleForm.payment_status === 'receivable' && !this.saleForm.receivable_due_date) {
+        this.flash('Informe a data para receber esta venda.');
+        return;
+      }
+      this.saving = true;
+      this.savingAction = 'sale';
+      try {
+        const body = {
+          customer_name: this.saleForm.customer_name.trim() || null,
+          customer_phone: this.toE164Phone(this.saleForm.customer_phone),
+          items: this.posCart.map((item) => ({
+            partner_stock_id: item.partner_stock_id,
+            quantity: this.num(item.quantity) || 1,
+            unit_price: this.num(item.unit_price) || 0,
+          })),
+          payment_method: this.saleForm.payment_status === 'receivable' ? 'A receber' : this.saleForm.payment_method,
+          payment_status: this.saleForm.payment_status || 'received',
+          receivable_due_date: this.saleForm.payment_status === 'receivable'
+            ? this.saleForm.receivable_due_date || null
+            : null,
+          receivable_installments: this.saleForm.payment_status === 'receivable'
+            ? Math.max(1, Math.min(36, Number(this.saleForm.receivable_installments) || 1))
+            : null,
+          fulfillment_mode: this.saleForm.fulfillment_mode,
+          delivery_address: this.saleForm.fulfillment_mode === 'delivery'
+            ? this.saleForm.delivery_address.trim()
+            : null,
+          source_tag: this.saleForm.source_tag || 'porta',
+          idempotency_key: this.uuid(),
+        };
+        await this.api('vendas', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        const paymentMethod = this.saleForm.payment_method;
+        const paymentStatus = this.saleForm.payment_status || 'received';
+        const fulfillmentMode = this.saleForm.fulfillment_mode;
+        const sourceTag = this.saleForm.source_tag || 'porta';
+        this.posClearCart();
+        this.saleForm = {
+          customer_name: '',
+          customer_phone: '',
+          partner_stock_id: '',
+          source_tag: sourceTag,
+          quantity: 1,
+          unit_price: 0,
+          payment_method: paymentMethod,
+          payment_status: paymentStatus,
+          receivable_due_date: '',
+          receivable_installments: 1,
+          fulfillment_mode: fulfillmentMode,
+          delivery_address: '',
+        };
+        await this.loadData();
+        this.flash('Venda finalizada - estoque e financeiro atualizados.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
     },
 
     async saveSale() {
@@ -1179,10 +1488,13 @@ function parceiroApp() {
       this.renderSalesTrendChart();
       this.renderResultChart();
       this.renderStockChart();
+      this.renderStockMovementChart();
       this.renderFinanceBarChart();
       this.renderFinanceSplitChart();
       this.renderFinanceOriginChart();
       this.renderFinanceUnitsChart();
+      this.renderFinanceRevenuePosChart();
+      this.renderFinanceCostsPosChart();
     },
 
     renderSalesTrendChart() {
@@ -1299,6 +1611,34 @@ function parceiroApp() {
                 label: (ctx) => total > 0 ? `${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed / total * 100)}%)` : `${ctx.label}: 0`,
               },
             },
+          },
+        },
+      });
+    },
+
+    renderStockMovementChart() {
+      const ctx = document.getElementById('chartStockMovement');
+      if (!ctx) return;
+      if (window._stockMovementChart) window._stockMovementChart.destroy();
+      const series = this.stockMovementSeries;
+      window._stockMovementChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: series.map((item) => item.label),
+          datasets: [
+            { label: 'Entradas', data: series.map((item) => item.entradas), backgroundColor: '#047857', borderRadius: 4 },
+            { label: 'Saídas', data: series.map((item) => item.saidas), backgroundColor: '#94a3b8', borderRadius: 4 },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', align: 'end', labels: { boxWidth: 10, color: '#475569', font: { size: 11 } } },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y} un.` } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } }, border: { display: false } },
+            y: { beginAtZero: true, grid: { color: '#e5e7eb' }, ticks: { precision: 0, color: '#64748b' }, border: { display: false } },
           },
         },
       });
@@ -1480,6 +1820,110 @@ function parceiroApp() {
       });
     },
 
+    renderFinanceRevenuePosChart() {
+      const ctx = document.getElementById('chartFinanceRevenuePos');
+      if (!ctx) return;
+      if (window._financeRevenuePosChart) window._financeRevenuePosChart.destroy();
+
+      const series = this.financeRevenueSeries30d;
+      window._financeRevenuePosChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: series.map((d) => d.label),
+          datasets: [{
+            label: 'Vendas',
+            data: series.map((d) => d.value),
+            borderColor: '#ffd000',
+            backgroundColor: 'rgba(255, 208, 0, 0.14)',
+            fill: true,
+            tension: 0.36,
+            pointRadius: 2.4,
+            pointHoverRadius: 4,
+            pointBackgroundColor: '#ffd000',
+            borderWidth: 2,
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#05080b',
+              borderColor: 'rgba(255,255,255,.12)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: { label: (item) => this.money(item.parsed.y) },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#8b949e', maxTicksLimit: 7, font: { size: 11 } }, border: { color: 'rgba(255,255,255,.1)' } },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255,255,255,.07)' },
+              ticks: { color: '#8b949e', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') },
+              border: { display: false },
+            },
+          },
+        },
+      });
+    },
+
+    renderFinanceCostsPosChart() {
+      const ctx = document.getElementById('chartFinanceCostsPos');
+      if (!ctx) return;
+      if (window._financeCostsPosChart) window._financeCostsPosChart.destroy();
+
+      const split = this.financeCostSplit;
+      const totalCostsLabel = this.money(this.totalCusts);
+      window._financeCostsPosChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: split.map((item) => item.label),
+          datasets: [{
+            data: split.map((item) => item.value),
+            backgroundColor: split.map((item) => item.color === '#dc3f4d' ? '#c94b57' : item.color),
+            borderColor: '#11161b',
+            borderWidth: 5,
+            hoverBorderColor: '#11161b',
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          cutout: '58%',
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: '#05080b',
+              borderColor: 'rgba(255,255,255,.12)',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: { label: (item) => `${item.label}: ${this.money(item.parsed)}` },
+            },
+          },
+        },
+        plugins: [{
+          id: 'financeCostsPosCenterLabel',
+          afterDraw(chart) {
+            const { ctx: canvasCtx, chartArea } = chart;
+            if (!chartArea) return;
+            const arc = chart.getDatasetMeta(0).data[0];
+            const x = arc?.x ?? (chartArea.left + chartArea.right) / 2;
+            const y = arc?.y ?? (chartArea.top + chartArea.bottom) / 2;
+            canvasCtx.save();
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillStyle = '#f8fafc';
+            canvasCtx.font = '700 18px Inter, system-ui, sans-serif';
+            canvasCtx.fillText(totalCostsLabel, x, y - 8);
+            canvasCtx.fillStyle = '#9ca3af';
+            canvasCtx.font = '400 11px Inter, system-ui, sans-serif';
+            canvasCtx.fillText('Custos', x, y + 15);
+            canvasCtx.restore();
+          },
+        }],
+      });
+    },
+
     // â”€â”€â”€ MÃSCARAS / FORMATAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // Telefone: estado guarda apenas dÃ­gitos (max 11). Display Ã© (DD) 9XXXX-XXXX.
@@ -1638,6 +2082,31 @@ function parceiroApp() {
         unknown: 'bg-gray-100 text-gray-500',
       };
       return map[status] || 'bg-gray-100 text-gray-600';
+    },
+
+    stockStatusLabel(status) {
+      const map = {
+        in_stock: 'Em estoque',
+        low_stock: 'Estoque baixo',
+        out_of_stock: 'Zerado',
+        not_tracked: 'Não controlado',
+        unknown: 'Sem mínimo',
+      };
+      return map[status] || 'Sem status';
+    },
+
+    stockOriginKey(item) {
+      const supplier = String(item?.supplier_name || '').toLowerCase();
+      return supplier.includes('2w') ? '2w' : 'porta';
+    },
+
+    stockOriginLabel(item) {
+      return this.stockOriginKey(item) === '2w' ? '2W' : 'Porta';
+    },
+
+    stockItemValue(item) {
+      const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+      return qty * this.num(item.average_cost || item.sale_price);
     },
 
     purchaseItemsLabel(purchase) {
