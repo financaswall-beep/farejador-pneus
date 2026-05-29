@@ -1094,6 +1094,25 @@ function parceiroApp() {
       this.posCustomerFormOpen = false;
     },
 
+    // Abre o cadastro inline no PDV ja pre-preenchido com o texto buscado.
+    openPosCustomerForm() {
+      const q = this.posCustomerQuery.trim();
+      const looksLikePhone = /\d{3,}/.test(q.replace(/\D/g, ''));
+      this.clearCustomerForm();
+      if (looksLikePhone) {
+        this.customerForm.phone = q;
+      } else {
+        this.customerForm.name = q;
+      }
+      this.posCustomerResults = [];
+      this.posCustomerFormOpen = true;
+    },
+
+    closePosCustomerForm() {
+      this.posCustomerFormOpen = false;
+      this.clearCustomerForm();
+    },
+
     async createPosCustomer() {
       if (!this.customerForm.name.trim()) {
         this.flash('Informe o nome do cliente.');

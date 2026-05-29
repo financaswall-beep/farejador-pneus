@@ -409,7 +409,33 @@
                   </button>
                 </template>
               </div>
-              <div class="pos-client-data">
+              <button x-show="!posCustomerFormOpen && !saleForm.customer_id && posCustomerQuery.trim().length >= 2 && !posCustomerResults.length"
+                      class="pos-customer-create-btn" @click="openPosCustomerForm()">
+                <i data-lucide="user-plus"></i>
+                <span>Cadastrar "<b x-text="posCustomerQuery.trim()"></b>"</span>
+              </button>
+              <div x-show="posCustomerFormOpen" class="pos-customer-inline-form">
+                <div class="pos-inline-row">
+                  <input x-model="customerForm.name" placeholder="Nome *" />
+                  <input x-model="customerForm.phone" placeholder="Telefone" />
+                </div>
+                <div class="pos-inline-row">
+                  <input x-model="customerForm.address_street" placeholder="Rua" />
+                  <input x-model="customerForm.address_number" placeholder="Nº" class="pos-inline-num" />
+                </div>
+                <div class="pos-inline-row">
+                  <input x-model="customerForm.address_neighborhood" placeholder="Bairro" />
+                  <input x-model="customerForm.address_city" placeholder="Município" />
+                </div>
+                <div class="pos-inline-actions">
+                  <button class="pos-inline-cancel" @click="closePosCustomerForm()">Cancelar</button>
+                  <button class="pos-inline-save" @click="createPosCustomer()" :disabled="saving || !customerForm.name.trim()">
+                    <span x-show="!(saving && savingAction === 'customer')">Salvar e vincular</span>
+                    <span x-show="saving && savingAction === 'customer'">Salvando...</span>
+                  </button>
+                </div>
+              </div>
+              <div class="pos-client-data" x-show="!posCustomerFormOpen">
                 <small>Nome</small><strong x-text="saleForm.customer_name || 'Consumidor Final'"></strong>
                 <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span></div>
               </div>
