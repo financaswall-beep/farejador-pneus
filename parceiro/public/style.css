@@ -1519,6 +1519,22 @@ html, body {
   font-size:12px;
 }
 .pos-sale-options option { color:#111827; }
+/* Campo fixo (modo determinado pela aba: Frente de caixa=retirada, Pedidos=entrega) */
+.pos-static-field {
+  width:100%; height:38px; box-sizing:border-box;
+  border:1px dashed rgba(255,255,255,.14); border-radius:6px;
+  background:rgba(255,255,255,.03); color:#cbd5e1;
+  padding:0 10px; font-size:12.5px; font-weight:700; cursor:default;
+}
+/* Aviso de pagamento na entrega (pedido COD) */
+.pos-cod-note {
+  display:flex; gap:8px; align-items:flex-start; margin:6px 0 12px;
+  padding:10px 12px; border-radius:8px;
+  background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.32);
+  color:#fcd34d; font-size:12px; line-height:1.4;
+}
+.pos-cod-note svg { width:16px; flex:0 0 auto; margin-top:1px; }
+.pos-cod-note strong { color:#fde68a; }
 .pos-delivery-input { margin-bottom:10px; }
 .pos-input-error {
   border-color:#ef4444 !important;
@@ -1666,6 +1682,7 @@ html, body {
   flex: 0 0 auto; font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
   color: #cbd5e1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
 }
+.pos-delivery-pill.pending { color: #fcd34d; background: rgba(250,204,21,.12); border-color: rgba(250,204,21,.4); }
 .pos-delivery-pill.dispatched { color: #93c5fd; background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.4); }
 .pos-delivery-pill.delivered { color: #4ade80; background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
 .pos-delivery-address { margin: 0; display: flex; gap: 6px; color: #cbd5e1; font-size: 12.5px; line-height: 1.35; }
@@ -1686,7 +1703,189 @@ html, body {
 .pos-delivery-actions .dispatch { background: linear-gradient(180deg,#60a5fa,#3b82f6); color: #fff; }
 .pos-delivery-actions .done { background: linear-gradient(180deg,#34d399,#10b981); color: #06351f; }
 .pos-delivery-actions .undo { flex: 0 0 auto; width: 40px; background: rgba(255,255,255,.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,.12); }
+.pos-delivery-actions .failed { flex: 0 0 auto; background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.4); }
+/* Forma de pagamento recebida na entrega (COD) — fica ao lado de "Marcar finalizada" */
+.pos-delivery-pay {
+  flex: 0 0 auto; height: 38px; border-radius: 7px; padding: 0 8px;
+  background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.35);
+  color: #6ee7b7; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.pos-delivery-pay option { color: #111827; }
 .pos-delivery-actions button:disabled { opacity: .55; }
+.pos-delivery-card.failed { border-left-color: #ef4444; opacity: .7; }
+.pos-delivery-pill.failed { color: #fca5a5; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
+
+/* ─── Aba Pedidos (entrega/COD): lista + ficha + novo pedido ─── */
+.pos-order-list { display: grid; gap: 12px; }
+.pos-order-card {
+  background: rgba(255,255,255,.024); border: 1px solid rgba(255,255,255,.08);
+  border-left: 3px solid #facc15; border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px;
+}
+.pos-order-card.dispatched { border-left-color: #60a5fa; }
+.pos-order-card.delivered { border-left-color: #22c55e; opacity: .85; }
+.pos-order-card.failed { border-left-color: #ef4444; opacity: .7; }
+.pos-order-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pos-order-who strong { display: block; color: #fff; font-size: 14px; font-weight: 800; }
+.pos-order-who a { color: #93c5fd; font-size: 12px; text-decoration: none; }
+.pos-order-addr { margin: 0; display: flex; gap: 6px; color: #cbd5e1; font-size: 12.5px; line-height: 1.35; }
+.pos-order-addr svg { width: 14px; flex: 0 0 auto; color: #8b949e; margin-top: 2px; }
+.pos-order-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.pos-order-items li { display: flex; justify-content: space-between; gap: 10px; color: #cbd5e1; font-size: 12.5px; }
+.pos-order-items b { color: #e5e7eb; }
+.pos-order-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; border-top: 1px solid rgba(255,255,255,.06); padding-top: 8px; }
+.pos-order-meta { display: grid; gap: 2px; color: #9ca3af; font-size: 11.5px; }
+.pos-order-pay { color: #facc15; font-weight: 700; }
+.pos-order-card.delivered .pos-order-pay { color: #4ade80; }
+.pos-order-card.failed .pos-order-pay { color: #fca5a5; }
+.pos-order-total { color: #fff; font-size: 16px; font-weight: 800; white-space: nowrap; }
+
+.pos-field { display: block; margin-bottom: 10px; }
+.pos-field span { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 5px; }
+.pos-field input, .pos-order-add select, .pos-order-add-row input {
+  width: 100%; height: 38px; box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.1); border-radius: 6px;
+  background: rgba(0,0,0,.16); color: #e5e7eb; padding: 0 10px; outline: none; font-size: 13px;
+}
+.pos-form-hint { margin: 0 0 12px; color: #9ca3af; font-size: 12px; line-height: 1.4; }
+.pos-field-label { display: block; color: #9ca3af; font-size: 11px; margin: 4px 0 6px; }
+.pos-order-add { display: grid; gap: 8px; margin-bottom: 10px; }
+.pos-order-add select option { color: #111827; }
+.pos-order-add-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; }
+.pos-order-add-row .pos-outline-action.compact { margin-top: 0; height: 38px; width: auto; padding: 0 12px; white-space: nowrap; }
+.pos-order-cart { display: grid; gap: 6px; margin-bottom: 8px; }
+.pos-order-cart-line { display: grid; grid-template-columns: 1fr auto 34px; align-items: center; gap: 8px; color: #cbd5e1; font-size: 12.5px; }
+.pos-order-cart-line b { color: #fff; }
+.pos-order-cart-line button { width: 34px; height: 32px; border-radius: 7px; background: rgba(239,68,68,.14); border: 1px solid rgba(239,68,68,.4); color: #fca5a5; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.pos-order-cart-line button:hover { background: rgba(239,68,68,.22); color: #fecaca; }
+.pos-order-cart-line button svg { width: 15px; }
+
+/* Busca de cliente no form de pedido (dropdown sobreposto, nao empurra o form) */
+.pos-order-customer { position: relative; }
+.pos-order-customer > input { padding-right: 30px !important; }
+.pos-order-customer > i { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); width: 15px; color: #8b949e; pointer-events: none; }
+.pos-order-customer .pos-customer-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  margin-top: 0; padding: 6px; max-height: 230px; overflow-y: auto;
+  background: #11161b; border: 1px solid rgba(255,255,255,.12); border-radius: 9px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+}
+.pos-order-customer-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; color: #6ee7b7; font-size: 11px; font-weight: 700; }
+.pos-order-customer-tag svg { width: 13px; }
+
+/* ─── Aba Entrega: cartões de rota (grade no desktop, coluna no celular) ─── */
+.pos-route-hint {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 14px;
+  padding: 9px 12px; border-radius: 8px;
+  background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.28);
+  color: #bfdbfe; font-size: 12px; line-height: 1.35;
+}
+.pos-route-hint svg { width: 16px; flex: 0 0 auto; }
+.pos-route-hint b { color: #fff; }
+
+.pos-route-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.pos-route-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 15px 15px 14px; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+  border: 1px solid rgba(255,255,255,.09);
+}
+.pos-route-card::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #facc15;
+}
+.pos-route-card.dispatched::before { background: #60a5fa; }
+.pos-route-card.delivered::before  { background: #22c55e; }
+.pos-route-card.failed::before     { background: #ef4444; }
+.pos-route-card.delivered { opacity: .85; }
+.pos-route-card.failed { opacity: .72; }
+
+.pos-route-card-top { display: flex; align-items: center; gap: 9px; }
+.pos-route-num {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 9px;
+  background: var(--pos-yellow); color: #111827; font-weight: 900; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pos-route-bairro {
+  flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px;
+  color: #e5e7eb; font-weight: 800; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-route-bairro svg { width: 15px; flex: 0 0 auto; color: var(--pos-yellow); }
+.pos-route-card-top .pos-delivery-pill { flex: 0 0 auto; }
+.pos-route-move { flex: 0 0 auto; display: inline-flex; gap: 4px; }
+.pos-route-move button {
+  width: 30px; height: 28px; border-radius: 7px; cursor: pointer;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); color: #cbd5e1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pos-route-move button svg { width: 15px; }
+.pos-route-move button:disabled { opacity: .3; cursor: default; }
+
+.pos-route-who { display: flex; flex-direction: column; gap: 2px; }
+.pos-route-who strong { color: #fff; font-size: 15px; font-weight: 800; }
+.pos-route-who a {
+  width: fit-content; display: inline-flex; align-items: center; gap: 5px;
+  color: #93c5fd; font-size: 12.5px; text-decoration: none;
+}
+.pos-route-who a svg { width: 13px; }
+
+.pos-route-addr, .pos-route-items { margin: 0; display: flex; gap: 7px; font-size: 12.5px; line-height: 1.4; }
+.pos-route-addr { color: #cbd5e1; }
+.pos-route-items { color: #9ca3af; }
+.pos-route-addr svg, .pos-route-items svg { width: 14px; flex: 0 0 auto; color: #8b949e; margin-top: 2px; }
+
+.pos-route-money {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  padding-top: 11px; border-top: 1px solid rgba(255,255,255,.07);
+}
+.pos-route-courier { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pos-route-total small,
+.pos-route-courier label {
+  color: #8b949e; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+}
+.pos-route-courier input {
+  width: 100%; height: 36px; border-radius: 8px; padding: 0 10px; font-size: 13px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.22); color: #e5e7eb; outline: none;
+}
+.pos-route-courier input:focus { border-color: rgba(250,204,21,.5); }
+.pos-route-total { flex: 0 0 auto; text-align: right; }
+.pos-route-total small { display: block; margin-bottom: 1px; }
+.pos-route-total strong { color: #4ade80; font-size: 18px; font-weight: 900; }
+
+.pos-route-pay { display: flex; align-items: center; gap: 10px; }
+.pos-route-pay > span { flex: 0 0 auto; color: #8b949e; font-size: 11px; font-weight: 700; }
+.pos-seg {
+  flex: 1 1 auto; display: inline-flex; gap: 2px; padding: 2px;
+  background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.1); border-radius: 9px;
+}
+.pos-seg button {
+  flex: 1; height: 30px; border: 0; border-radius: 7px; cursor: pointer;
+  background: transparent; color: #9ca3af; font-size: 12px; font-weight: 700;
+}
+.pos-seg button.on { background: rgba(16,185,129,.18); color: #6ee7b7; box-shadow: inset 0 0 0 1px rgba(16,185,129,.4); }
+
+.pos-route-actions { display: flex; gap: 8px; margin-top: 1px; }
+.pos-route-actions .act-primary {
+  flex: 1 1 auto; height: 42px; border: 0; border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.pos-route-actions .act-primary svg { width: 17px; }
+.pos-route-actions .dispatch { background: linear-gradient(180deg,#60a5fa,#3b82f6); color: #fff; }
+.pos-route-actions .done { background: linear-gradient(180deg,#34d399,#10b981); color: #053220; }
+.pos-route-actions .act-icon {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pos-route-actions .act-icon svg { width: 18px; }
+.pos-route-actions .undo { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14); color: #cbd5e1; }
+.pos-route-actions .failed { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.38); color: #fca5a5; }
+.pos-route-actions button:disabled { opacity: .5; cursor: default; }
 
 /* Botao flutuante de finalizar e botao "voltar": so existem no celular (ver @media abaixo) */
 .pos-fab-finalize { display: none; }

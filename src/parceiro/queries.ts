@@ -702,12 +702,33 @@ export async function cancelPartnerSale(
 }
 
 export interface UpdatePartnerDeliveryInput {
-  delivery_status: 'pending' | 'dispatched' | 'delivered';
+  delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
   delivery_courier?: string | null;
+  // Metodo recebido na entrega (pix/dinheiro/cartao). So usado quando delivery_status='delivered':
+  // dispara o recebimento da conta a receber vinculada (COD).
+  payment_method?: string | null;
 }
 
-// Atualiza o estado operacional da entrega de uma venda (fulfillment_mode=delivery).
-// dispatched_at/delivered_at sao carimbados automaticamente conforme o status.
+export class DeliveryAlreadyFinalizedError extends Error {
+  readonly code = 'delivery_already_finalized';
+  constructor() {
+    super('delivery_already_finalized');
+  }
+}
+
+// Atualiza o estado operacional da entrega de um pedido (fulfillment_mode=delivery).
+//
+// COD (0069): o pedido de entrega nasce como "a receber" (payment_method='A receber'
+// + conta a receber aberta apontando via source_order_id). Os gatilhos sao:
+//   - delivered (finalizada): RECEBE a conta a receber -> entra no caixa do dia +
+//     marca o pedido como 'paid'. So aqui ele vira venda do mes (a view exclui
+//     entrega nao-delivered).
+//   - failed (nao entregue/devolvido): CANCELA o pedido (devolve estoque) + CANCELA
+//     a conta a receber. Nada entra no caixa.
+//   - pending/dispatched: so muda estado operacional + carimba dispatched_at.
+//
+// O pedido mantem payment_method='A receber' mesmo apos finalizado: o caixa vem
+// SO da conta a receber recebida, pra nao duplicar.
 export async function updatePartnerDeliveryStatus(
   ctx: PartnerContext,
   orderId: string,
@@ -715,9 +736,68 @@ export async function updatePartnerDeliveryStatus(
 ): Promise<{ order_id: string; delivery_status: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const courier = normalizeText(input.delivery_courier);
+
+    const existing = await client.query<{ status: string; delivery_status: string }>(
+      `SELECT status, delivery_status
+       FROM commerce.partner_orders
+       WHERE id = $1 AND environment = $2 AND unit_id = $3
+         AND fulfillment_mode = 'delivery' AND deleted_at IS NULL
+       LIMIT 1`,
+      [orderId, ctx.environment, ctx.unitId],
+    );
+    if (existing.rowCount !== 1) throw new Error('delivery_not_found');
+
+    // Integridade: uma entrega ja finalizada (dinheiro no caixa) nao pode ser
+    // "reaberta" por este endpoint — evita destravar caixa sem estorno controlado.
+    if (existing.rows[0]!.delivery_status === 'delivered' && input.delivery_status !== 'delivered') {
+      throw new DeliveryAlreadyFinalizedError();
+    }
+
+    // ── Nao entregue / devolvido: estorna estoque + cancela a receber ──
+    if (input.delivery_status === 'failed') {
+      if (existing.rows[0]!.status !== 'cancelled') {
+        await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
+          orderId,
+          `partner:${ctx.slug}`,
+          'entrega nao realizada (nao entregue/devolvido)',
+        ]);
+      }
+      await client.query(
+        `UPDATE commerce.partner_orders
+         SET delivery_status = 'failed',
+             delivery_courier = COALESCE($4, delivery_courier),
+             updated_at = now()
+         WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+        [orderId, ctx.environment, ctx.unitId, courier],
+      );
+      await client.query(
+        `UPDATE finance.partner_receivables
+         SET status = 'cancelled', deleted_at = now(), deleted_by = $4
+         WHERE source_order_id = $1 AND environment = $2 AND unit_id = $3
+           AND status = 'open' AND deleted_at IS NULL`,
+        [orderId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
+      );
+      await client.query(
+        `INSERT INTO audit.events (
+           environment, domain, entity_table, entity_id, event_type,
+           actor_label, payload_after
+         ) VALUES ($1, 'partner_orders', 'commerce.partner_orders', $2,
+                   'partner_delivery_status_changed', $3, $4::jsonb)`,
+        [
+          ctx.environment,
+          orderId,
+          `partner:${ctx.slug}`,
+          JSON.stringify({ unit_id: ctx.unitId, delivery_status: 'failed', delivery_courier: courier }),
+        ],
+      );
+      return { order_id: orderId, delivery_status: 'failed' };
+    }
+
+    // ── pending / dispatched / delivered ──
     const result = await client.query<{ id: string; delivery_status: string }>(
       `UPDATE commerce.partner_orders
        SET delivery_status = $4,
+           status = CASE WHEN $4 = 'delivered' THEN 'paid' ELSE status END,
            delivery_courier = COALESCE($5, delivery_courier),
            dispatched_at = CASE
              WHEN $4 IN ('dispatched', 'delivered') AND dispatched_at IS NULL THEN now()
@@ -739,6 +819,18 @@ export async function updatePartnerDeliveryStatus(
     );
 
     if (result.rowCount !== 1) throw new Error('delivery_not_found');
+
+    // Finalizada: recebe a conta a receber vinculada (COD) -> entra no caixa.
+    if (input.delivery_status === 'delivered') {
+      await client.query(
+        `UPDATE finance.partner_receivables
+         SET status = 'received', received_at = now(),
+             payment_method = COALESCE($4, payment_method)
+         WHERE source_order_id = $1 AND environment = $2 AND unit_id = $3
+           AND status = 'open' AND deleted_at IS NULL`,
+        [orderId, ctx.environment, ctx.unitId, normalizeText(input.payment_method)],
+      );
+    }
 
     await client.query(
       `INSERT INTO audit.events (

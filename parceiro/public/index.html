@@ -78,7 +78,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -114,7 +114,7 @@
           <span>Estoque</span>
           <kbd>F5</kbd>
         </button>
-        <button class="pos-nav-item pos-nav-soon">
+        <button @click="goToSection('pedidos')" class="pos-nav-item" :class="currentSection === 'pedidos' && 'active'">
           <i data-lucide="clipboard-list"></i>
           <span>Pedidos</span>
           <kbd>F6</kbd>
@@ -485,20 +485,11 @@
               </select>
             </label>
             <label>
-              <span>Entrega</span>
-              <select x-model="saleForm.fulfillment_mode" @change="onFulfillmentChange()">
-                <option value="pickup">Retirada</option>
-                <option value="delivery">Entrega</option>
-              </select>
+              <span>Tipo</span>
+              <!-- Frente de caixa = sempre retirada, paga agora. Entrega vive na aba Pedidos. -->
+              <input class="pos-static-field" value="Retirada (paga agora)" readonly />
             </label>
           </div>
-          <input x-show="saleForm.fulfillment_mode === 'delivery'"
-                 x-ref="deliveryAddress"
-                 x-model="saleForm.delivery_address"
-                 @input="deliveryAddressMissing = false"
-                 :class="deliveryAddressMissing && 'pos-input-error'"
-                 class="pos-delivery-input"
-                 placeholder="Endereço de entrega (obrigatório)" />
           <div class="pos-adjust-row">
             <label>
               <span>Desconto</span>
@@ -545,6 +536,156 @@
                 title="Avancar para finalizar a venda">
           <span x-text="'Avançar • ' + money(posCartTotal)"></span>
           <i data-lucide="arrow-right"></i>
+        </button>
+      </section>
+
+      <!-- KPIs da aba Pedidos (ocupa a linha do grid; sem isso o workspace colapsa) -->
+      <section x-show="currentSection === 'pedidos' && (!isMobile || orderMobileStep === 'list')" class="pos-kpis">
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="clipboard-list"></i></div>
+          <div><small>Pedidos em aberto</small><strong x-text="ordersOpenCount"></strong><span>aguardando entrega</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="hand-coins"></i></div>
+          <div><small>A receber (entrega)</small><strong x-text="money(ordersOpenAmount)"></strong><span>entra no caixa ao finalizar</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="check-check"></i></div>
+          <div><small>Finalizados</small><strong x-text="ordersDeliveredCount"></strong><span>viraram venda</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="package-x"></i></div>
+          <div><small>Não entregues</small><strong x-text="ordersFailedCount"></strong><span>estoque devolvido</span></div>
+        </article>
+      </section>
+
+      <section x-show="currentSection === 'pedidos'" class="pos-workspace">
+        <div class="pos-page-grid">
+          <!-- LISTA + FICHA COMPLETA -->
+          <section class="pos-panel pos-data-panel" x-show="!isMobile || orderMobileStep === 'list'">
+            <div class="pos-panel-head">
+              <div>
+                <h3>Pedidos de entrega</h3>
+                <p>Pedidos da internet — pagos na entrega. Ficha completa de cada um.</p>
+              </div>
+              <div class="pos-delivery-toolbar">
+                <button :class="orderFilter === 'open' && 'active'" @click="orderFilter = 'open'">Em aberto <em x-text="ordersOpenCount"></em></button>
+                <button :class="orderFilter === 'delivered' && 'active'" @click="orderFilter = 'delivered'">Finalizados</button>
+                <button :class="orderFilter === 'failed' && 'active'" @click="orderFilter = 'failed'">Não entregues</button>
+                <button :class="orderFilter === 'all' && 'active'" @click="orderFilter = 'all'">Todos</button>
+              </div>
+            </div>
+
+            <div class="pos-order-list">
+              <template x-for="o in filteredOrders" :key="o.order_id">
+                <article class="pos-order-card" :class="o.delivery_status">
+                  <div class="pos-order-card-head">
+                    <div class="pos-order-who">
+                      <strong x-text="o.customer_name || 'Cliente'"></strong>
+                      <a x-show="o.customer_phone" :href="'tel:' + (o.customer_phone || '')" x-text="formatPhoneDisplay(o.customer_phone)"></a>
+                    </div>
+                    <span class="pos-delivery-pill" :class="o.delivery_status" x-text="deliveryStatusLabel(o.delivery_status)"></span>
+                  </div>
+                  <p class="pos-order-addr"><i data-lucide="map-pin"></i> <span x-text="o.delivery_address || 'Sem endereço informado'"></span></p>
+                  <ul class="pos-order-items">
+                    <template x-for="(it, idx) in (o.items || [])" :key="idx">
+                      <li>
+                        <span x-text="num(it.quantity) + '× ' + (it.tire_size || it.item_name || 'item')"></span>
+                        <b x-text="money(num(it.unit_price) * num(it.quantity))"></b>
+                      </li>
+                    </template>
+                  </ul>
+                  <div class="pos-order-foot">
+                    <div class="pos-order-meta">
+                      <span x-text="'Criado ' + formatDateTime(o.created_at)"></span>
+                      <span x-show="o.delivery_courier" x-text="'Entregador: ' + o.delivery_courier"></span>
+                      <span x-show="o.delivered_at" x-text="'Finalizado ' + formatDateTime(o.delivered_at)"></span>
+                      <span class="pos-order-pay" x-text="o.delivery_status === 'delivered' ? ('Recebido' + (o.payment_method && o.payment_method !== 'A receber' ? ' · ' + o.payment_method : '')) : (o.delivery_status === 'failed' ? 'Cancelado — sem cobrança' : 'A receber na entrega')"></span>
+                    </div>
+                    <strong class="pos-order-total" x-text="money(o.total_amount)"></strong>
+                  </div>
+                </article>
+              </template>
+              <div x-show="!filteredOrders.length" class="pos-empty">Nenhum pedido nesta lista.</div>
+            </div>
+          </section>
+
+          <!-- NOVO PEDIDO — formulário próprio, moldado pra entrega/COD -->
+          <aside class="pos-panel pos-side-panel" x-show="!isMobile || orderMobileStep === 'form'">
+            <button class="pos-step-back" x-show="isMobile && orderMobileStep === 'form'" @click="orderMobileStep = 'list'; $nextTick(() => document.querySelector('.pos-main')?.scrollTo({ top: 0 }))">
+              <i data-lucide="arrow-left"></i> Voltar aos pedidos
+            </button>
+            <h3>Novo pedido</h3>
+            <p class="pos-form-hint">Pedido da internet. Reserva o estoque agora; o cliente paga na entrega.</p>
+
+            <label class="pos-field"><span>Cliente</span>
+              <div class="pos-order-customer">
+                <input x-model="orderForm.customer_name" @input="onOrderCustomerSearch()" autocomplete="off" placeholder="Buscar por nome ou telefone..." />
+                <i data-lucide="search"></i>
+                <div x-show="orderCustomerResults.length" class="pos-customer-results">
+                  <template x-for="customer in orderCustomerResults.slice(0, 5)" :key="customer.id">
+                    <button type="button" @click="selectOrderCustomer(customer)">
+                      <b x-text="customer.name"></b>
+                      <small x-text="[formatPhoneDisplay(customer.phone), customerAddressLine(customer)].filter((i) => i && i !== '-').join(' · ') || 'sem telefone'"></small>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </label>
+            <label class="pos-field"><span>Telefone</span>
+              <input inputmode="tel" :value="formatPhoneDisplay(orderForm.customer_phone)"
+                     @input="orderForm.customer_phone = onPhoneInput($event.target.value); $event.target.value = formatPhoneDisplay(orderForm.customer_phone)"
+                     placeholder="(21) 90000-0000" />
+              <small x-show="orderForm.customer_id" class="pos-order-customer-tag"><i data-lucide="check"></i> cliente cadastrado</small>
+            </label>
+            <label class="pos-field"><span>Endereço de entrega</span>
+              <input x-model="orderForm.delivery_address" @input="orderAddressMissing = false" :class="orderAddressMissing && 'pos-input-error'" placeholder="Rua, nº - bairro - cidade" />
+            </label>
+
+            <span class="pos-field-label">Itens do pedido</span>
+            <div class="pos-order-add">
+              <select x-model="orderItemForm.partner_stock_id" @change="onOrderItemChange()">
+                <option value="">Escolha um item do estoque...</option>
+                <template x-for="p in produtos" :key="p.stock_id">
+                  <option :value="p.stock_id" x-text="formatPartnerStockOption(p)"></option>
+                </template>
+              </select>
+              <div class="pos-order-add-row">
+                <input type="number" min="1" x-model.number="orderItemForm.quantity" placeholder="Qtd" />
+                <input type="text" inputmode="decimal" :value="formatBRLDisplay(orderItemForm.unit_price)" @input="orderItemForm.unit_price = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(orderItemForm.unit_price)" placeholder="Preço" />
+                <button class="pos-outline-action compact" @click="addOrderItem()"><i data-lucide="plus"></i> Add</button>
+              </div>
+            </div>
+
+            <div class="pos-order-cart">
+              <template x-for="(it, idx) in orderCart" :key="idx">
+                <div class="pos-order-cart-line">
+                  <span x-text="it.quantity + '× ' + (it.tire_size || it.item_name)"></span>
+                  <b x-text="money(it.unit_price * it.quantity)"></b>
+                  <button @click="removeOrderItem(idx)" title="Remover este item"><i data-lucide="trash-2"></i></button>
+                </div>
+              </template>
+              <div x-show="!orderCart.length" class="pos-empty small">Nenhum item ainda.</div>
+            </div>
+
+            <div class="pos-total"><span>TOTAL</span><strong x-text="money(orderCartTotal)"></strong></div>
+            <div class="pos-cod-note">
+              <i data-lucide="hand-coins"></i>
+              <span>Paga <strong>na entrega</strong>. Entra no caixa só quando o entregador finalizar.</span>
+            </div>
+            <button class="pos-finalize" @click="submitOrder()" :disabled="saving">
+              <span class="pos-button-center"><i data-lucide="clipboard-check"></i> <span x-text="isSaving('order') ? 'GERANDO...' : 'GERAR PEDIDO'"></span></span>
+            </button>
+            <button class="pos-cancel" @click="resetOrderForm()"><span class="pos-button-center"><i data-lucide="eraser"></i> LIMPAR</span></button>
+          </aside>
+        </div>
+
+        <!-- Celular: botao flutuante pra abrir o form de novo pedido (so na lista) -->
+        <button class="pos-fab-finalize" x-show="isMobile && orderMobileStep === 'list'"
+                @click="orderMobileStep = 'form'; $nextTick(() => document.querySelector('.pos-main')?.scrollTo({ top: 0 }))"
+                title="Criar novo pedido de entrega">
+          <i data-lucide="plus"></i>
+          <span>Novo pedido</span>
         </button>
       </section>
 
@@ -780,6 +921,25 @@
         </div>
       </section>
 
+      <section x-show="currentSection === 'entrega'" class="pos-kpis">
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
+          <div><small>Entregas em aberto</small><strong x-text="deliveryOpenCount"></strong><span>pendentes + a caminho</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="package-check"></i></div>
+          <div><small>Em separação</small><strong x-text="deliveriesAll.filter(d => d.delivery_status === 'pending').length"></strong><span>separar e embalar</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="bike"></i></div>
+          <div><small>A caminho</small><strong x-text="deliveriesAll.filter(d => d.delivery_status === 'dispatched').length"></strong><span>com entregador</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="map-pin"></i></div>
+          <div><small>Bairros</small><strong x-text="deliveriesByZone.length"></strong><span>com entrega em aberto</span></div>
+        </article>
+      </section>
+
       <section x-show="currentSection === 'entrega'" class="pos-workspace">
         <div class="pos-page-grid">
           <section class="pos-panel pos-data-panel">
@@ -792,7 +952,7 @@
                 <button :class="!deliveryShowDone && 'active'" @click="deliveryShowDone = false">
                   Em aberto <em x-text="deliveryOpenCount"></em>
                 </button>
-                <button :class="deliveryShowDone && 'active'" @click="deliveryShowDone = true">Entregues</button>
+                <button :class="deliveryShowDone && 'active'" @click="deliveryShowDone = true">Finalizadas</button>
               </div>
             </div>
 
@@ -800,45 +960,73 @@
               <template x-for="name in recentCouriers" :key="name"><option :value="name"></option></template>
             </datalist>
 
-            <template x-for="zone in deliveriesByZone" :key="zone.label">
-              <div class="pos-delivery-zone">
-                <h4><i data-lucide="map-pin"></i> <span x-text="zone.label"></span><em x-text="zone.items.length + ' entrega(s)'"></em></h4>
-                <div class="pos-delivery-grid">
-                  <template x-for="d in zone.items" :key="d.order_id">
-                    <article class="pos-delivery-card" :class="d.delivery_status">
-                      <div class="pos-delivery-card-head">
-                        <div class="pos-delivery-who">
-                          <strong x-text="d.customer_name || 'Cliente'"></strong>
-                          <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')" x-text="formatPhoneDisplay(d.customer_phone)"></a>
-                        </div>
-                        <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
-                      </div>
-                      <p class="pos-delivery-address"><i data-lucide="map-pin"></i> <span x-text="d.delivery_address || 'Sem endereço informado'"></span></p>
-                      <p class="pos-delivery-items" x-text="deliveryItemsLabel(d)"></p>
-                      <div class="pos-delivery-foot">
-                        <strong x-text="money(d.total_amount)"></strong>
-                        <input list="courier-suggestions" class="pos-delivery-courier" placeholder="Entregador"
-                               :value="d.delivery_courier || ''"
-                               @input="deliveryDrafts[d.order_id] = $event.target.value" />
-                      </div>
-                      <div class="pos-delivery-actions">
-                        <button x-show="d.delivery_status === 'pending'" class="dispatch" @click="setDeliveryStatus(d, 'dispatched')" :disabled="isSaving('delivery-' + d.order_id)">
-                          <i data-lucide="bike"></i> Saiu pra entrega
-                        </button>
-                        <button x-show="d.delivery_status === 'dispatched'" class="done" @click="setDeliveryStatus(d, 'delivered')" :disabled="isSaving('delivery-' + d.order_id)">
-                          <i data-lucide="check"></i> Marcar entregue
-                        </button>
-                        <button x-show="d.delivery_status !== 'pending'" class="undo" @click="setDeliveryStatus(d, 'pending')" :disabled="isSaving('delivery-' + d.order_id)" title="Voltar pra pendente">
-                          <i data-lucide="rotate-ccw"></i>
-                        </button>
-                      </div>
-                    </article>
-                  </template>
-                </div>
+            <p class="pos-route-hint" x-show="!deliveryShowDone && routeList.length">
+              <i data-lucide="route"></i> <span>Ordem da rota — use <b>↑ ↓</b> pra ajustar como você vai entregar. Fica salvo neste aparelho.</span>
+            </p>
+
+            <div class="pos-route-list">
+              <template x-for="(d, i) in routeList" :key="d.order_id">
+                <article class="pos-route-card" :class="d.delivery_status">
+                  <header class="pos-route-card-top">
+                    <span class="pos-route-num" x-show="!deliveryShowDone" x-text="i + 1"></span>
+                    <span class="pos-route-bairro"><i data-lucide="map-pin"></i> <span x-text="deliveryZone(d)"></span></span>
+                    <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
+                    <div class="pos-route-move" x-show="!deliveryShowDone">
+                      <button @click="moveRoute(d, -1)" :disabled="i === 0" title="Subir na rota"><i data-lucide="chevron-up"></i></button>
+                      <button @click="moveRoute(d, 1)" :disabled="i === routeList.length - 1" title="Descer na rota"><i data-lucide="chevron-down"></i></button>
+                    </div>
+                  </header>
+
+                  <div class="pos-route-who">
+                    <strong x-text="d.customer_name || 'Cliente'"></strong>
+                    <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')"><i data-lucide="phone"></i> <span x-text="formatPhoneDisplay(d.customer_phone)"></span></a>
+                  </div>
+                  <p class="pos-route-addr"><i data-lucide="map-pin"></i> <span x-text="d.delivery_address || 'Sem endereço informado'"></span></p>
+                  <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
+
+                  <div class="pos-route-money">
+                    <div class="pos-route-courier">
+                      <label>Entregador</label>
+                      <input list="courier-suggestions" placeholder="Quem leva"
+                             :value="d.delivery_courier || ''"
+                             @input="deliveryDrafts[d.order_id] = $event.target.value" />
+                    </div>
+                    <div class="pos-route-total">
+                      <small>Total a receber</small>
+                      <strong x-text="money(d.total_amount)"></strong>
+                    </div>
+                  </div>
+
+                  <!-- Forma recebida na entrega (COD): so quando saiu pra entrega -->
+                  <div class="pos-route-pay" x-show="d.delivery_status === 'dispatched'">
+                    <span>Recebeu em</span>
+                    <div class="pos-seg">
+                      <button :class="(deliveryPayDrafts[d.order_id] || 'Pix') === 'Pix' && 'on'" @click="deliveryPayDrafts[d.order_id] = 'Pix'">Pix</button>
+                      <button :class="deliveryPayDrafts[d.order_id] === 'Dinheiro' && 'on'" @click="deliveryPayDrafts[d.order_id] = 'Dinheiro'">Dinheiro</button>
+                      <button :class="deliveryPayDrafts[d.order_id] === 'Cartão' && 'on'" @click="deliveryPayDrafts[d.order_id] = 'Cartão'">Cartão</button>
+                    </div>
+                  </div>
+
+                  <footer class="pos-route-actions">
+                    <button x-show="d.delivery_status === 'pending'" class="act-primary dispatch" @click="setDeliveryStatus(d, 'dispatched')" :disabled="isSaving('delivery-' + d.order_id)">
+                      <i data-lucide="bike"></i> Saiu pra entrega
+                    </button>
+                    <button x-show="d.delivery_status === 'dispatched'" class="act-primary done" @click="setDeliveryStatus(d, 'delivered')" :disabled="isSaving('delivery-' + d.order_id)">
+                      <i data-lucide="check"></i> Finalizar entrega
+                    </button>
+                    <button x-show="d.delivery_status === 'dispatched'" class="act-icon undo" @click="setDeliveryStatus(d, 'pending')" :disabled="isSaving('delivery-' + d.order_id)" title="Voltar pra pendente">
+                      <i data-lucide="rotate-ccw"></i>
+                    </button>
+                    <!-- Nao entregue / devolvido: devolve o estoque e nao recebe nada (tem confirmacao) -->
+                    <button x-show="d.delivery_status === 'pending' || d.delivery_status === 'dispatched'" class="act-icon failed" @click="confirmDeliveryFailed(d)" :disabled="isSaving('delivery-' + d.order_id)" title="Não entregue / devolveu">
+                      <i data-lucide="package-x"></i>
+                    </button>
+                  </footer>
+                </article>
+              </template>
+              <div x-show="!routeList.length" class="pos-empty">
+                Nenhuma entrega <span x-text="deliveryShowDone ? 'finalizada' : 'em aberto'"></span>.
               </div>
-            </template>
-            <div x-show="!deliveriesByZone.length" class="pos-empty">
-              Nenhuma entrega <span x-text="deliveryShowDone ? 'entregue' : 'em aberto'"></span>.
             </div>
           </section>
         </div>

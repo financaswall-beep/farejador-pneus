@@ -16,6 +16,7 @@ build/
 .env.development
 .env.test
 .env.codex
+.env.preview
 # Keep the template
 !.env.example
 

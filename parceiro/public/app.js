@@ -45,10 +45,15 @@ function parceiroApp() {
     // 'select' = produtos + carrinho; 'checkout' = resumo/pagamento/finalizar.
     // No desktop isMobile fica falso e os x-show mostram tudo junto (sem etapas).
     posMobileStep: 'select',
+    // Mesma ideia na aba Pedidos (celular): 'list' = KPIs+lista; 'form' = novo pedido.
+    orderMobileStep: 'list',
     isMobile: false,
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
+    // Como o cliente pagou na entrega (COD), por pedido. Default Pix; vira o
+    // metodo da conta a receber ao finalizar, pra o caixa registrar a forma.
+    deliveryPayDrafts: {},
     posDiscountAmount: 0,
     posFreightAmount: 0,
     posReceivedAmount: null,
@@ -75,6 +80,17 @@ function parceiroApp() {
     customerListSearch: '',
 
     saleForm: { customer_id: null, customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
+
+    // Aba Pedidos (entrega/COD) — estado próprio, separado do checkout do balcão.
+    orderFilter: 'open',
+    orderForm: { customer_id: null, customer_name: '', customer_phone: '', delivery_address: '' },
+    orderItemForm: { partner_stock_id: '', quantity: 1, unit_price: 0 },
+    orderCart: [],
+    orderAddressMissing: false,
+    orderCustomerResults: [], // resultados da busca de cliente no form de pedido
+
+    // Ordem da rota de entrega (aba Entrega). Salva neste aparelho, por unidade.
+    routeOrder: [],
     stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
@@ -114,6 +130,10 @@ function parceiroApp() {
         this.$nextTick(() => this.loadData());
       }
 
+      // Ordem da rota de entrega — salva neste aparelho (por unidade).
+      try { this.routeOrder = JSON.parse(localStorage.getItem(`farejador_route_order_${this.slug}`) || '[]'); }
+      catch (e) { this.routeOrder = []; }
+
       // Relogio do footer: re-renderiza a cada 30s.
       this.nowTimer = setInterval(() => { this.nowTick = Date.now(); }, 30000);
 
@@ -122,7 +142,7 @@ function parceiroApp() {
       this.isMobile = mqMobile.matches;
       mqMobile.addEventListener('change', (event) => {
         this.isMobile = event.matches;
-        if (!event.matches) this.posMobileStep = 'select'; // ao voltar pro desktop, zera a etapa
+        if (!event.matches) { this.posMobileStep = 'select'; this.orderMobileStep = 'list'; } // ao voltar pro desktop, zera as etapas
       });
 
       this.posKeydownHandler = (event) => {
@@ -656,10 +676,42 @@ function parceiroApp() {
       return parts.length >= 2 ? parts[parts.length - 2] : 'Outras entregas';
     },
 
+    // Lista da aba Entrega. Em aberto = ordem da rota (ajustável pelo entregador, salva no aparelho);
+    // novos pedidos entram no fim. Finalizadas = mais recentes primeiro.
+    get routeList() {
+      const base = this.deliveries;
+      if (this.deliveryShowDone) {
+        return [...base].sort((a, b) => new Date(b.delivered_at || 0) - new Date(a.delivered_at || 0));
+      }
+      const order = this.routeOrder || [];
+      const rank = (id) => { const i = order.indexOf(id); return i === -1 ? 1e9 : i; };
+      return [...base].sort((a, b) => {
+        const r = rank(a.order_id) - rank(b.order_id);
+        if (r !== 0) return r;
+        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      });
+    },
+
+    moveRoute(sale, dir) {
+      const ids = this.routeList.map((d) => d.order_id);
+      const i = ids.indexOf(sale.order_id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      this.routeOrder = ids;
+      this.persistRouteOrder();
+    },
+
+    persistRouteOrder() {
+      try { localStorage.setItem(`farejador_route_order_${this.slug}`, JSON.stringify(this.routeOrder)); }
+      catch (e) { /* localStorage indisponível: ordem só nesta sessão */ }
+    },
+
     deliveryStatusLabel(status) {
       if (status === 'dispatched') return 'Saiu pra entrega';
-      if (status === 'delivered') return 'Entregue';
-      return 'Pendente';
+      if (status === 'delivered') return 'Finalizada';
+      if (status === 'failed') return 'Não entregue';
+      return 'Em separação';
     },
 
     deliveryItemsLabel(sale) {
@@ -670,18 +722,160 @@ function parceiroApp() {
         .join(' · ');
     },
 
+    // ─── Aba Pedidos (entrega/COD): lista, ficha e criação ───
+    get deliveryOrders() {
+      // Inclui cancelados — entrega falhada vira cancelada e precisa aparecer no filtro "Não entregues".
+      return this.vendas.filter((o) => o.fulfillment_mode === 'delivery');
+    },
+    get ordersOpenList() {
+      return this.deliveryOrders.filter((o) => o.status !== 'cancelled'
+        && (o.delivery_status === 'pending' || o.delivery_status === 'dispatched'));
+    },
+    get filteredOrders() {
+      if (this.orderFilter === 'open') return this.ordersOpenList;
+      if (this.orderFilter === 'delivered') return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered');
+      if (this.orderFilter === 'failed') return this.deliveryOrders.filter((o) => o.delivery_status === 'failed');
+      return this.deliveryOrders;
+    },
+    get ordersOpenCount() { return this.ordersOpenList.length; },
+    get ordersOpenAmount() { return this.ordersOpenList.reduce((s, o) => s + this.num(o.total_amount), 0); },
+    get ordersDeliveredCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered').length; },
+    get ordersFailedCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'failed').length; },
+    get orderCartTotal() { return this.orderCart.reduce((s, it) => s + this.num(it.unit_price) * this.num(it.quantity), 0); },
+
+    onOrderItemChange() {
+      const item = this.produtos.find((p) => p.stock_id === this.orderItemForm.partner_stock_id);
+      if (item && item.sale_price !== null && item.sale_price !== undefined) {
+        this.orderItemForm.unit_price = Number(item.sale_price);
+      }
+    },
+    addOrderItem() {
+      const id = this.orderItemForm.partner_stock_id;
+      if (!id) { this.flash('Escolha um item do estoque.'); return; }
+      const prod = this.produtos.find((p) => p.stock_id === id);
+      if (!prod) { this.flash('Item não encontrado no estoque.'); return; }
+      const qty = Math.max(1, this.num(this.orderItemForm.quantity) || 1);
+      const available = prod.is_tracked ? this.num(prod.quantity_on_hand) : Infinity;
+      const existing = this.orderCart.find((it) => it.partner_stock_id === id);
+      if ((existing ? existing.quantity : 0) + qty > available) {
+        this.flash('Quantidade maior que o estoque disponível.');
+        return;
+      }
+      const price = this.num(this.orderItemForm.unit_price) || this.num(prod.sale_price) || 0;
+      if (existing) { existing.quantity += qty; existing.unit_price = price; }
+      else this.orderCart.push({ partner_stock_id: id, item_name: prod.item_name, tire_size: prod.tire_size, quantity: qty, unit_price: price });
+      this.orderItemForm = { partner_stock_id: '', quantity: 1, unit_price: 0 };
+    },
+    removeOrderItem(idx) { this.orderCart.splice(idx, 1); },
+    resetOrderForm() {
+      this.orderForm = { customer_id: null, customer_name: '', customer_phone: '', delivery_address: '' };
+      this.orderItemForm = { partner_stock_id: '', quantity: 1, unit_price: 0 };
+      this.orderCart = [];
+      this.orderAddressMissing = false;
+      this.orderCustomerResults = [];
+    },
+
+    // Busca cliente cadastrado (nome ou telefone) enquanto digita no campo Cliente.
+    // Mesmo endpoint do PDV. Digitar mexe no nome e zera o vinculo ate escolher.
+    onOrderCustomerSearch() {
+      this.orderForm.customer_id = null;
+      clearTimeout(this.orderCustomerTimer);
+      const q = String(this.orderForm.customer_name || '').trim();
+      if (q.length < 2) { this.orderCustomerResults = []; return; }
+      this.orderCustomerTimer = setTimeout(async () => {
+        try {
+          const result = await this.api(`clientes/buscar?q=${encodeURIComponent(q)}`, { method: 'GET' });
+          this.orderCustomerResults = result.rows || [];
+        } catch {
+          this.orderCustomerResults = [];
+        }
+      }, 250);
+    },
+    // Escolhe um cliente da busca: preenche nome, telefone (so digitos) e, se tiver
+    // endereco cadastrado e o campo estiver vazio, ja sugere o endereco de entrega.
+    selectOrderCustomer(customer) {
+      if (!customer) return;
+      this.orderForm.customer_id = customer.id;
+      this.orderForm.customer_name = customer.name || '';
+      let ph = String(customer.phone || '').replace(/\D/g, '');
+      if ((ph.length === 12 || ph.length === 13) && ph.startsWith('55')) ph = ph.slice(2);
+      this.orderForm.customer_phone = ph;
+      const addr = this.customerAddressLine(customer);
+      if (addr && addr !== '-' && !this.orderForm.delivery_address.trim()) {
+        this.orderForm.delivery_address = addr;
+        this.orderAddressMissing = false;
+      }
+      this.orderCustomerResults = [];
+    },
+    async submitOrder() {
+      if (!this.orderCart.length) { this.flash('Adicione pelo menos um item ao pedido.'); return; }
+      if (!this.orderForm.delivery_address.trim()) {
+        this.orderAddressMissing = true;
+        this.flash('Informe o endereço de entrega.');
+        return;
+      }
+      this.saving = true; this.savingAction = 'order';
+      try {
+        const body = {
+          customer_id: this.orderForm.customer_id || null,
+          customer_name: this.orderForm.customer_name.trim() || null,
+          customer_phone: this.toE164Phone(this.orderForm.customer_phone),
+          items: this.orderCart.map((it) => ({
+            partner_stock_id: it.partner_stock_id,
+            quantity: this.num(it.quantity) || 1,
+            unit_price: this.num(it.unit_price) || 0,
+          })),
+          payment_method: 'A receber',
+          payment_status: 'receivable',
+          receivable_due_date: null,
+          fulfillment_mode: 'delivery',
+          delivery_address: this.orderForm.delivery_address.trim(),
+          source_tag: '2w',
+          idempotency_key: 'order-' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2))),
+        };
+        await this.api('vendas', { method: 'POST', body: JSON.stringify(body) });
+        this.resetOrderForm();
+        this.orderFilter = 'open';
+        this.orderMobileStep = 'list'; // no celular, volta pra lista pra ver o pedido criado
+        await this.loadData();
+        this.flash('Pedido gerado — estoque reservado. Entra no caixa quando o entregador finalizar.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    confirmDeliveryFailed(sale) {
+      if (!sale || !sale.order_id) return;
+      const who = sale.customer_name || 'este pedido';
+      if (!confirm(`Marcar a entrega de ${who} como NÃO entregue?\n\nO estoque volta pro disponível e nada entra no caixa.`)) return;
+      this.setDeliveryStatus(sale, 'failed');
+    },
+
     async setDeliveryStatus(sale, status) {
       if (!sale || !sale.order_id) return;
       const courier = (this.deliveryDrafts[sale.order_id] ?? sale.delivery_courier ?? '').trim();
       const action = `delivery-${sale.order_id}`;
+      // So manda forma de pagamento ao finalizar — ai a conta a receber entra
+      // no caixa registrada como Pix/Dinheiro/Cartao em vez de "A receber".
+      const payment_method = status === 'delivered'
+        ? (this.deliveryPayDrafts[sale.order_id] || 'Pix')
+        : null;
       this.saving = true; this.savingAction = action;
       try {
         await this.api(`entregas/${sale.order_id}`, {
           method: 'POST',
-          body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null }),
+          body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null, payment_method }),
         });
         await this.loadData();
-        this.flash(status === 'delivered' ? 'Entrega concluída.' : (status === 'dispatched' ? 'Saiu pra entrega.' : 'Entrega reaberta.'));
+        const flashes = {
+          delivered: 'Entrega finalizada — venda registrada e dinheiro no caixa.',
+          dispatched: 'Saiu pra entrega.',
+          failed: 'Marcado como não entregue — estoque devolvido, nada no caixa.',
+          pending: 'Entrega reaberta.',
+        };
+        this.flash(flashes[status] || 'Entrega atualizada.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -1064,6 +1258,7 @@ function parceiroApp() {
 
     // â”€â”€â”€ NAVEGAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     goToSection(id) {
+      if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
       this.currentSection = id;
       if (id === 'vendas') this.currentTab = 'sale';
       if (id === 'estoque') this.currentTab = 'stock';

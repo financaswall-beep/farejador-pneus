@@ -7,6 +7,7 @@ import {
   cancelPartnerSale,
   cancelPartnerPayable,
   cancelPartnerReceivable,
+  DeliveryAlreadyFinalizedError,
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
@@ -61,8 +62,10 @@ const stockParamsSchema = paramsSchema.extend({
 });
 
 const deliverySchema = z.object({
-  delivery_status: z.enum(['pending', 'dispatched', 'delivered']),
+  delivery_status: z.enum(['pending', 'dispatched', 'delivered', 'failed']),
   delivery_courier: z.string().max(120).nullable().optional(),
+  // Metodo recebido na entrega (COD). So tem efeito quando delivery_status='delivered'.
+  payment_method: z.string().max(80).nullable().optional(),
 });
 
 const purchaseParamsSchema = paramsSchema.extend({
@@ -117,7 +120,11 @@ const saleSchema = z.object({
     path: ['delivery_address'],
   },
 ).refine(
-  (data) => data.payment_status !== 'receivable' || (data.receivable_due_date && data.receivable_due_date.trim().length > 0),
+  // COD (0069): pedido de entrega "a receber" nao tem vencimento — o dinheiro vem
+  // na hora da entrega. So exige due_date pra "a receber" de retirada (pickup).
+  (data) => data.payment_status !== 'receivable'
+    || data.fulfillment_mode === 'delivery'
+    || (data.receivable_due_date && data.receivable_due_date.trim().length > 0),
   {
     message: 'receivable_due_date obrigatorio quando payment_status=receivable',
     path: ['receivable_due_date'],
@@ -451,6 +458,9 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     try {
       return reply.status(200).send(await updatePartnerDeliveryStatus(getPartnerContext(request), params.data.orderId, parsed.data));
     } catch (err) {
+      if (err instanceof DeliveryAlreadyFinalizedError) {
+        return reply.status(409).send({ error: err.code, message: 'Esta entrega ja foi finalizada e nao pode ser reaberta.' });
+      }
       if (err instanceof Error && err.message === 'delivery_not_found') {
         return reply.status(404).send({ error: 'delivery_not_found' });
       }
