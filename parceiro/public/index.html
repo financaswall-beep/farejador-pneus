@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260529-cliente-dados" />
+  <link rel="stylesheet" href="./style.css?v=20260529-itens-vendidos" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -253,7 +253,7 @@
             </div>
             <div class="pos-finance-cards">
               <article><small>Vendas registradas</small><strong x-text="num(resumo?.orders_month)"></strong><span>mês atual</span></article>
-              <article><small>Pneus vendidos</small><strong x-text="soldUnitsMonth + ' un.'"></strong><span>saída por venda</span></article>
+              <article><small>Itens vendidos</small><strong x-text="soldUnitsMonth + ' un.'"></strong><span>saída por venda</span></article>
               <article><small>A receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
               <article><small>A pagar</small><strong x-text="money(payablesOpenTotal)"></strong><span>em aberto</span></article>
             </div>
@@ -1047,6 +1047,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260529-cliente-dados"></script>
+<script src="./app.js?v=20260529-itens-vendidos"></script>
 </body>
 </html>
