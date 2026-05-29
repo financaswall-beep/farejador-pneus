@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260529-resumo-alertas" />
+  <link rel="stylesheet" href="./style.css?v=20260529-cliente-dados" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -437,6 +437,7 @@
               <div class="pos-client-data" x-show="!posCustomerFormOpen">
                 <small>Nome</small><strong x-text="saleForm.customer_name || 'Consumidor Final'"></strong>
                 <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span></div>
+                <div x-show="posSelectedCustomerAddress"><span><small>Endereço</small><b x-text="posSelectedCustomerAddress"></b></span></div>
               </div>
             </div>
             <div class="pos-panel pos-recent-panel">
@@ -1046,6 +1047,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260529-resumo-alertas"></script>
+<script src="./app.js?v=20260529-cliente-dados"></script>
 </body>
 </html>

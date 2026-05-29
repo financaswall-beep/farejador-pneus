@@ -1732,6 +1732,13 @@ html, body {
   }
   /* "Alertas principais" do Resumo sai no celular (estoque baixo ja tem KPI + tela Estoque) */
   .pos-resumo-alertas { display: none; }
+
+  /* "Dados do cliente" no celular: tem largura sobrando -> fonte maior e endereco completo (pode quebrar linha) */
+  .pos-client-data { font-size: 13px; }
+  .pos-client-data > strong { font-size: 16px; }
+  .pos-client-data b { font-size: 15px; }
+  .pos-client-data small { font-size: 11px; }
+  .pos-client-data > strong, .pos-client-data b { white-space: normal; overflow: visible; }
   .pos-footer { display: none; }
 
   /* Card de produto compacto: preco no topo a direita, "Em estoque · 12 un." numa linha so,
