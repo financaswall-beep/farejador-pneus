@@ -19,7 +19,7 @@ Wallace pediu uma versão **clara** do portal (o padrão era só o dark com amar
 ### Estratégia das cores
 
 1. **Redefinir as variáveis** no bloco light pega de graça tudo que usa `var()`: o **`--pos-yellow` vira `#1e40af` (azul)** — assim todo acento amarelo (logo, KPIs, botões "+", total, aba ativa, route-num…) fica azul de uma vez. `--pos-line`, `--pos-green` e `--pos-bg` idem.
-2. **Sobrescrever os hardcoded por superfície** (texto/fundo/borda): sidebar, topbar, KPIs/painéis (fundo branco + sombra suave), tabelas, inputs (fundo claro), produtos/carrinho, resumo/finalizar (azul), formulários, entrega/pedidos/rota, dropdowns, gauge, e o mobile (topbar branco + FAB azul).
+2. **Sobrescrever os hardcoded por superfície** (texto/fundo/borda): sidebar, topbar, KPIs/painéis (fundo branco + sombra suave), tabelas, inputs (fundo claro), produtos/carrinho, resumo/finalizar (azul), formulários, entrega/pedidos/rota, dropdowns, gauge, e o mobile (topbar branco + FAB azul; no celular o toggle de tema **migra pra topbar** como botão sol/lua compacto — na barra de abas de baixo ele espremia as 7 abas).
 3. **Valores com cor clara escurecem** (senão somem no branco): verde → `#15803d`, âmbar → `#b45309`, azul-claro → `#1d4ed8`, rosa → **vermelho vivo `#dc2626`**. Cobre estoque/troco/totais, selos, links de telefone, e o botão **Cancelar venda** (era rosa apagado).
 
 ### Gráficos (canvas) cientes do tema — o pulo do gato

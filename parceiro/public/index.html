@@ -164,6 +164,10 @@
           <button><i data-lucide="bell"></i><b>3</b></button>
           <button><i data-lucide="messages-square"></i><b>1</b></button>
         </div>
+        <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
+                :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
+          <i data-lucide="sun-moon"></i>
+        </button>
         <div class="pos-user">
           <div><i data-lucide="user"></i></div>
           <span><strong>Caixa 01</strong><small>Operador</small></span>
@@ -1309,6 +1313,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260529-tema-claro-3"></script>
+<script src="./app.js?v=20260529-tema-claro-4"></script>
 </body>
 </html>

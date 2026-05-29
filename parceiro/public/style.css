@@ -1890,6 +1890,10 @@ html, body {
 /* Botao flutuante de finalizar e botao "voltar": so existem no celular (ver @media abaixo) */
 .pos-fab-finalize { display: none; }
 .pos-step-back { display: none; }
+/* Toggle de tema compacto (sol/lua) na topbar: so no celular. No desktop o toggle
+   fica na sidebar (.pos-theme-toggle); no celular a sidebar vira barra de abas e
+   esse toggle iria espremer as abas, entao migra pra topbar. */
+.pos-theme-toggle-mobile { display: none; }
 
 @media (max-width: 1280px) {
   .pos-shell { grid-template-columns: 218px 1fr; }
@@ -1958,6 +1962,17 @@ html, body {
   .pos-user small, .pos-user > i { display: none; }
   .pos-company { flex: 1; min-width: 0; }
   .pos-user > div { width: 34px; height: 34px; }
+
+  /* Toggle de tema sai da barra de abas de baixo (espremia as 7 abas) e aparece
+     compacto na topbar (sol/lua). var(--pos-yellow) = ambar no dark, azul no claro. */
+  .pos-sidebar .pos-theme-toggle { display: none; }
+  .pos-theme-toggle-mobile {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 36px; height: 36px;
+    border-radius: 8px; border: 1px solid var(--pos-line);
+    color: var(--pos-yellow); background: transparent;
+  }
+  .pos-theme-toggle-mobile svg { width: 19px; height: 19px; }
 
   /* KPIs: grade de 2 colunas, cards menores e alinhados */
   .pos-kpis, .pos-kpis.stock-kpis, .pos-kpis-inline {
