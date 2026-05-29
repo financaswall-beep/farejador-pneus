@@ -1795,6 +1795,37 @@ html, body {
   .pos-cart-row > span:nth-child(4) { display: none; }   /* celula do preco unit. */
   .pos-cart-row { min-height: 0; padding: 9px 10px; }
 
+  /* Estoque no celular: cabecalho empilha (titulo em cima, busca+filtro full width)
+     e a tabela de 8 colunas (min-width 792px) vira CARDS -> acaba a rolagem lateral. */
+  .pos-panel-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .pos-inline-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+  .pos-dark-search { width: 100%; }
+  .pos-dark-select { width: 100%; }
+
+  .pos-dark-table { overflow-x: hidden; }
+  .pos-dark-table-head { display: none; }
+  .pos-dark-table-row {
+    min-width: 0; min-height: 0;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "medida medida venda"
+      "qtd    status acoes";
+    gap: 6px 10px; padding: 11px 12px;
+  }
+  .pos-dark-table-row > :nth-child(1) { grid-area: medida; }   /* Medida + tipo */
+  .pos-dark-table-row > :nth-child(2),                         /* Posicao  */
+  .pos-dark-table-row > :nth-child(3),                         /* Marca    */
+  .pos-dark-table-row > :nth-child(5) { display: none; }       /* Custo    */
+  .pos-dark-table-row > :nth-child(4) { grid-area: qtd; justify-self: start; }
+  .pos-dark-table-row > :nth-child(6) { grid-area: venda; justify-self: end; color: #fff; font-weight: 800; }
+  .pos-dark-table-row > :nth-child(7) { grid-area: status; justify-self: start; }
+  .pos-dark-table-row > :nth-child(8) { grid-area: acoes; justify-self: end; }
+  /* Medida: sem foto, label + selo do tipo lado a lado */
+  .pos-product-cell { display: flex; align-items: center; gap: 8px; }
+  .pos-product-cell .pos-tire-thumb { display: none; }
+  .pos-product-cell b { font-size: 15px; }
+  .pos-status-pill { min-width: 0; }
+
   /* Cancelar venda rebaixado: vira link discreto pra nao competir com o Finalizar (evita toque errado) */
   .pos-cancel {
     height: auto; min-height: 0; margin-top: 8px; padding: 8px;
