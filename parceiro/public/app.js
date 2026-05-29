@@ -41,6 +41,11 @@ function parceiroApp() {
     posRimFilter: 'all',
     posSort: 'relevance',
     posCart: [],
+    // Wizard mobile do PDV: no celular a venda vira 2 etapas pra evitar rolagem infinita.
+    // 'select' = produtos + carrinho; 'checkout' = resumo/pagamento/finalizar.
+    // No desktop isMobile fica falso e os x-show mostram tudo junto (sem etapas).
+    posMobileStep: 'select',
+    isMobile: false,
     posDiscountAmount: 0,
     posFreightAmount: 0,
     posReceivedAmount: null,
@@ -108,6 +113,14 @@ function parceiroApp() {
 
       // Relogio do footer: re-renderiza a cada 30s.
       this.nowTimer = setInterval(() => { this.nowTick = Date.now(); }, 30000);
+
+      // isMobile reativo: o Alpine decide as etapas do PDV; o CSS sozinho nao sabe (e o Alpine que controla o x-show).
+      const mqMobile = window.matchMedia('(max-width: 768px)');
+      this.isMobile = mqMobile.matches;
+      mqMobile.addEventListener('change', (event) => {
+        this.isMobile = event.matches;
+        if (!event.matches) this.posMobileStep = 'select'; // ao voltar pro desktop, zera a etapa
+      });
 
       this.posKeydownHandler = (event) => {
         if (!this.authed || this.currentSection !== 'vendas') return;
@@ -886,10 +899,16 @@ function parceiroApp() {
     },
 
     get posCashTodayTotal() {
+      // Caixa do dia = o que efetivamente entrou (exclui "A receber").
       return this.salesToday.reduce((sum, sale) => {
         if (sale.payment_method === 'A receber') return sum;
         return sum + this.num(sale.total_amount);
       }, 0);
+    },
+
+    get salesTodayTotal() {
+      // Vendas hoje = faturado total do dia (inclui "A receber"); diferente do caixa.
+      return this.salesToday.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
     },
 
     get salesToday() {
@@ -1075,6 +1094,17 @@ function parceiroApp() {
       this.posReceivedAmount = null;
       this.posNotes = '';
       this.posSaleIdempotencyKey = null;
+      this.posMobileStep = 'select'; // carrinho vazio volta pra etapa de selecao no celular
+    },
+
+    // Avanca pra etapa de finalizar (so faz efeito no celular; no desktop tudo ja aparece junto).
+    posGoCheckout() {
+      if (!this.posCart.length) {
+        this.flash('Adicione pelo menos um produto ao carrinho.');
+        return;
+      }
+      this.posMobileStep = 'checkout';
+      this.$nextTick(() => document.querySelector('.pos-main')?.scrollTo({ top: 0, behavior: 'smooth' }));
     },
 
     ensurePosSaleIdempotencyKey() {

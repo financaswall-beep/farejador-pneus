@@ -1633,8 +1633,167 @@ html, body {
 .pos-footer span { display:flex; align-items:center; gap:8px; }
 .pos-footer svg { width:16px; }
 
+/* Botao flutuante de finalizar e botao "voltar": so existem no celular (ver @media abaixo) */
+.pos-fab-finalize { display: none; }
+.pos-step-back { display: none; }
+
 @media (max-width: 1280px) {
   .pos-shell { grid-template-columns: 218px 1fr; }
   .pos-topbar { grid-template-columns: 220px 1fr 138px 94px 150px; gap:12px; }
   .pos-grid { grid-template-columns: 330px minmax(0,1fr) 330px; }
+}
+
+/* ============================================================
+   Celular (<=768px): layout proprio, nao e o desktop encolhido.
+   Barra lateral vira barra de abas embaixo; conteudo empilha
+   em coluna cheia e rola. Isolado — nao toca o desktop.
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Sidebar -> barra de abas fixa no rodape */
+  .pos-shell { grid-template-columns: 1fr; }
+  .pos-sidebar {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    min-height: 0; height: 60px;
+    /* respeita a faixa do "home indicator" do iPhone pra barra nao colar na borda */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    flex-direction: row; align-items: stretch;
+    padding-left: 0; padding-right: 0; padding-top: 0;
+    border-right: 0; border-top: 1px solid var(--pos-line);
+    z-index: 60;
+  }
+  .pos-logo, .pos-version { display: none; }
+  /* especificidade maior que .pos-nav-item pra de fato esconder Configuracoes no celular */
+  .pos-sidebar .pos-settings { display: none; }
+  /* Pedidos ainda e placeholder: fora da barra no celular pra dar respiro as abas reais.
+     Especificidade maior que .pos-nav-item (que vem depois) senao ela reexibe. */
+  .pos-sidebar .pos-nav-soon { display: none; }
+  .pos-nav { flex: 1; display: flex; flex-direction: row; padding: 0; gap: 0; margin: 0; }
+  .pos-nav-item {
+    flex: 1; height: auto; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 7px 3px; border-radius: 0; font-size: 10px;
+  }
+  .pos-nav-item kbd { display: none; }
+  .pos-nav-item svg { width: 21px; height: 21px; flex: 0 0 auto; }
+  /* label quebra em ate 2 linhas e fica contido na celula (sem encavalar o vizinho) */
+  .pos-nav-item span {
+    font-size: 10px; line-height: 1.05; text-align: center;
+    white-space: normal; max-width: 100%; word-break: break-word;
+  }
+  .pos-nav-item.active { box-shadow: none; }
+
+  /* Main rola, com espaco pra barra de baixo (altura da barra + area segura) */
+  .pos-main {
+    display: block; height: 100%;
+    overflow-y: auto; overflow-x: hidden;
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Topbar compacto: nome + status, esconde busca/icones */
+  .pos-topbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 10px 14px; position: sticky; top: 0; z-index: 20; background: #0b0f12;
+  }
+  .pos-global-search, .pos-top-icons, .pos-online small,
+  .pos-user small, .pos-user > i { display: none; }
+  .pos-company { flex: 1; min-width: 0; }
+  .pos-user > div { width: 34px; height: 34px; }
+
+  /* KPIs: grade de 2 colunas, cards menores e alinhados */
+  .pos-kpis, .pos-kpis.stock-kpis, .pos-kpis-inline {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; padding: 10px 14px 0;
+  }
+  .pos-kpis article { min-width: 0; min-height: 0; padding: 10px 12px; gap: 10px; }
+  .pos-kpis .pos-kpi-icon { width: 38px; height: 38px; }
+  .pos-kpis .pos-kpi-icon svg { width: 21px; height: 21px; }
+  .pos-kpis strong { font-size: 16px; }
+  .pos-kpis small, .pos-kpis span { font-size: 11px; }
+  .pos-spark { display: none; }
+
+  /* Checkout e workspaces: tudo empilhado em coluna cheia */
+  .pos-checkout, .pos-grid {
+    grid-row: auto; display: block; padding: 10px 14px;
+  }
+  .pos-products, .pos-center, .pos-summary {
+    width: 100%; max-width: none; margin-bottom: 10px; grid-column: auto;
+  }
+  .pos-summary { grid-row: auto; }
+
+  .pos-page-grid, .pos-page-grid.finance, .pos-page-grid.customers,
+  .pos-chart-grid, .pos-cadastro-grid {
+    grid-template-columns: 1fr;
+  }
+  .pos-footer { display: none; }
+
+  /* Card de produto compacto: preco no topo a direita, "Em estoque · 12 un." numa linha so,
+     "+" subido pro topo e card mais baixo -> cabem mais produtos sem rolar */
+  .pos-product-card {
+    grid-template-columns: minmax(0,1fr) auto 28px;
+    align-items: start; min-height: 0; padding: 9px 10px; gap: 10px;
+  }
+  .pos-product-card .pos-tire-thumb,
+  .pos-product-card .pos-star { display: none; }
+  .pos-product-info small { display: none; }
+  .pos-product-price em { display: inline; margin: 0; font-size: 10px; }
+  .pos-product-price em::after { content: ' ·'; color: #6b7280; }
+  .pos-product-price small { display: inline; border: 0; padding: 0; margin-left: 3px; }
+  .pos-add { align-self: start; }
+
+  /* Campo de busca ja filtra — esconde os selects */
+  .pos-filter-row { display: none; }
+
+  /* Topo: tira "Sistema online" e mantem o nome em 1 linha */
+  .pos-online { display: none; }
+  .pos-company .font-bold {
+    font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* Botao flutuante amarelo: ir pra finalizar a venda */
+  .pos-fab-finalize {
+    display: flex; align-items: center; gap: 8px;
+    position: fixed; right: 14px; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); z-index: 55;
+    background: linear-gradient(180deg,#ffe100,#ffc400); color: #111;
+    font-weight: 900; font-size: 13px; border: 0; border-radius: 999px;
+    padding: 11px 16px; box-shadow: 0 10px 24px rgba(255,208,0,.4);
+  }
+  .pos-fab-finalize svg { width: 18px; height: 18px; }
+
+  /* Etapa 2: botao de voltar pra selecao de produtos */
+  .pos-step-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: 0; color: var(--pos-yellow);
+    font-size: 13px; font-weight: 700; padding: 0 0 10px; margin: 0;
+  }
+  .pos-step-back svg { width: 16px; height: 16px; }
+
+  /* Menos ruido no celular: KPIs da venda viram do Resumo, fora do caminho buscar->cobrar */
+  .pos-checkout .pos-kpis-inline { display: none; }
+  /* Selo decorativo e legenda "Venda pelo estoque local": ruido na ferramenta interna */
+  .pos-secure { display: none; }
+  .pos-count-row span:last-child { display: none; }
+  /* Botao de codigo de barras "Em breve": botao morto so ocupa espaco */
+  .pos-product-search button:disabled { display: none; }
+
+  /* "Vendas recentes" sai do fluxo da venda no celular; fica so "Dados do cliente" em largura cheia */
+  .pos-recent-panel { display: none; }
+  .pos-bottom-panels { grid-template-columns: 1fr; }
+
+  /* Carrinho no celular: sem foto e sem coluna "Preco unit." (ja aparece na busca).
+     Aqui o que importa e o total -> evita a rolagem horizontal. A medida (90/90-18) fica no Produto. */
+  .pos-cart-head, .pos-cart-row {
+    grid-template-columns: minmax(0,1fr) 78px 84px 28px; gap: 8px;
+  }
+  .pos-cart-head span:nth-child(3) { display: none; }   /* cabecalho "Preco unit." */
+  .pos-cart-row .pos-tire-thumb.small { display: none; } /* foto do pneu */
+  .pos-cart-row > span:nth-child(4) { display: none; }   /* celula do preco unit. */
+  .pos-cart-row { min-height: 0; padding: 9px 10px; }
+
+  /* Cancelar venda rebaixado: vira link discreto pra nao competir com o Finalizar (evita toque errado) */
+  .pos-cancel {
+    height: auto; min-height: 0; margin-top: 8px; padding: 8px;
+    background: none; border: 0; box-shadow: none; color: #9ca3af; font-weight: 600;
+  }
+  .pos-cancel svg { width: 15px; }
+  .pos-cancel kbd { display: none; }
 }

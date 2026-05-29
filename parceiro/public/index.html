@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260528-dark-portal-2" />
+  <link rel="stylesheet" href="./style.css?v=20260529-tabbar2" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -109,7 +109,7 @@
           <span>Estoque</span>
           <kbd>F5</kbd>
         </button>
-        <button class="pos-nav-item">
+        <button class="pos-nav-item pos-nav-soon">
           <i data-lucide="clipboard-list"></i>
           <span>Pedidos</span>
           <kbd>F6</kbd>
@@ -296,13 +296,13 @@
       </section>
 
       <section x-show="currentSection === 'vendas'" class="pos-grid pos-checkout">
-        <div class="pos-kpis pos-kpis-inline">
+        <div class="pos-kpis pos-kpis-inline" x-show="!isMobile || posMobileStep === 'select'">
           <article>
             <div class="pos-kpi-icon"><i data-lucide="archive"></i></div>
             <div><small>Caixa do dia</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="posFirstSaleTodayLabel"></span></div>
           </article>
           <article>
-            <div><small>Vendas hoje</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="salesToday.length + ' vendas realizadas'"></span></div>
+            <div><small>Vendas hoje</small><strong x-text="money(salesTodayTotal)"></strong><span x-text="salesToday.length + ' vendas realizadas'"></span></div>
             <div class="pos-spark"><canvas id="chartPosSpark"></canvas></div>
           </article>
           <article>
@@ -314,7 +314,7 @@
             <div><small>Última venda</small><strong x-text="posLastSale ? money(posLastSale.total_amount) : 'R$ 0,00'"></strong><span x-text="posLastSale ? formatDateTime(posLastSale.created_at) : 'sem venda ainda'"></span></div>
           </article>
         </div>
-        <section class="pos-panel pos-products">
+        <section class="pos-panel pos-products" x-show="!isMobile || posMobileStep === 'select'">
           <h3>Buscar produtos</h3>
           <div class="pos-product-search">
             <i data-lucide="search"></i>
@@ -366,7 +366,7 @@
           </div>
         </section>
 
-        <section class="pos-center">
+        <section class="pos-center" x-show="!isMobile || posMobileStep === 'select'">
           <div class="pos-panel pos-cart-panel">
             <h3>Itens do carrinho</h3>
             <div class="pos-cart-head">
@@ -461,7 +461,10 @@
           </div>
         </section>
 
-        <aside class="pos-panel pos-summary">
+        <aside class="pos-panel pos-summary" x-show="!isMobile || posMobileStep === 'checkout'">
+          <button class="pos-step-back" x-show="posMobileStep === 'checkout'" @click="posMobileStep = 'select'">
+            <i data-lucide="arrow-left"></i> Voltar aos produtos
+          </button>
           <h3>Resumo da venda</h3>
           <div class="pos-summary-line"><span x-text="'Subtotal (' + posCartUnits + ' itens)'"></span><strong x-text="money(posCartSubtotal)"></strong></div>
           <div class="pos-sale-options">
@@ -497,7 +500,7 @@
                      :value="formatBRLDisplay(posDiscountAmount)"
                      @input="posDiscountAmount = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(posDiscountAmount)" />
             </label>
-            <label>
+            <label x-show="saleForm.fulfillment_mode === 'delivery'">
               <span>Frete</span>
               <input type="text" inputmode="decimal"
                      :value="formatBRLDisplay(posFreightAmount)"
@@ -530,6 +533,13 @@
           </button>
           <div class="pos-secure"><i data-lucide="lock"></i> Venda segura e criptografada</div>
         </aside>
+
+        <button class="pos-fab-finalize" x-show="posCart.length && posMobileStep === 'select'"
+                @click="posGoCheckout()"
+                title="Avancar para finalizar a venda">
+          <span x-text="'Avançar • ' + money(posCartTotal)"></span>
+          <i data-lucide="arrow-right"></i>
+        </button>
       </section>
 
       <section x-show="currentSection === 'clientes'" class="pos-workspace">
@@ -1037,6 +1047,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260528-dark-portal-2"></script>
+<script src="./app.js?v=20260529-tabbar"></script>
 </body>
 </html>
