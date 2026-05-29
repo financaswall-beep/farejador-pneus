@@ -478,16 +478,19 @@
             </label>
             <label>
               <span>Entrega</span>
-              <select x-model="saleForm.fulfillment_mode">
+              <select x-model="saleForm.fulfillment_mode" @change="onFulfillmentChange()">
                 <option value="pickup">Retirada</option>
                 <option value="delivery">Entrega</option>
               </select>
             </label>
           </div>
           <input x-show="saleForm.fulfillment_mode === 'delivery'"
+                 x-ref="deliveryAddress"
                  x-model="saleForm.delivery_address"
+                 @input="deliveryAddressMissing = false"
+                 :class="deliveryAddressMissing && 'pos-input-error'"
                  class="pos-delivery-input"
-                 placeholder="Endereço de entrega" />
+                 placeholder="Endereço de entrega (obrigatório)" />
           <div class="pos-total"><span>TOTAL</span><strong x-text="money(posCartTotal)"></strong></div>
           <h4>Formas de pagamento</h4>
           <div class="pos-payments">

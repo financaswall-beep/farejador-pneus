@@ -6,6 +6,36 @@ Portal operacional da unidade parceira (borracheiro credenciado). Roda dentro do
 
 ---
 
+## 👥 2026-05-28 — Tela Clientes + cadastro de cliente no PDV (Claude Opus 4.7)
+
+Trabalho focado no cadastro de clientes e no vínculo cliente↔venda no frente de caixa. Dois migrations novos: `0063_partner_customers_address_parts` (colunas `address_street`, `address_neighborhood`, `address_city`) e `0064_partner_customers_address_number` (coluna `address_number`). Ambos aplicados em prod via MCP Supabase.
+
+### Cadastro de cliente
+- **CPF removido** do cadastro e do frente de caixa. Decisão do Wallace: "ninguém confia em passar CPF pra uma borracharia". Backend ainda aceita `cpf` opcional (não enviado pelo frontend); coluna preservada pra dados legados.
+- **Endereço em campos separados**: Rua, Número, Bairro, Município (antes era um campo "Rua" único). `customerAddressLine()` monta a linha de exibição (`rua, número - bairro - município`), com fallback pro campo `address` legado.
+- **VIP automático**: cliente vira VIP ao atingir `vipMinPurchases` compras (hoje **3**). É calculado no frontend (`customerIsVip()` conta `customerSales()`), não mais um toggle manual. A coluna VIP da lista virou indicador read-only. O endpoint `PATCH /clientes/:id/vip` ficou sem uso pelo frontend mas foi **mantido** (VIP manual futuro).
+
+### Vínculo cliente ↔ venda no frente de caixa
+- **Busca + vínculo**: digitar nome/telefone no painel "Dados do cliente" → clicar no resultado → `selectPartnerCustomer()` grava `saleForm.customer_id`. A venda vai com `customer_id` preenchido. (já existia)
+- **Cadastro inline no PDV** (`openPosCustomerForm()`): quando a busca não acha ninguém (2+ caracteres, zero resultados), aparece um botão **"+ Cadastrar '<texto buscado>'"** pré-preenchido. Abre um mini-form (nome, telefone, rua, nº, bairro, município) ali mesmo; ao salvar, `createPosCustomer()` cria o cliente **e já vincula à venda em andamento** (`selectPartnerCustomer` no branch fora da aba clientes). Ninguém troca de tela. Se o texto buscado for só dígitos, pré-preenche Telefone em vez de Nome.
+- Cliente continua **opcional** — venda avulsa finaliza como "Consumidor Final".
+
+### Endereço de entrega (fulfillment_mode = delivery)
+- Backend exige `delivery_address` não-vazio quando `fulfillment_mode = 'delivery'` (Zod refine em `route.ts`). Sem endereço, não há pra onde entregar.
+- **UX antes**: a regra bloqueava com um toast discreto e parecia que "a venda não efetuava". **Agora**:
+  - Ao escolher **Entrega** (`onFulfillmentChange()`), o campo ganha **foco automático**, placeholder "(obrigatório)".
+  - Clicar finalizar com endereço vazio acende o campo em **vermelho** (`.pos-input-error`) + foca + toast.
+  - **Auto-preenchimento**: se o cliente selecionado tem endereço cadastrado, o endereço dele entra sozinho no campo de entrega (ao selecionar o cliente com Entrega já ativa, ou ao trocar pra Entrega depois). Editável — dá pra entregar num endereço diferente naquele dia. Estado guardado em `posSelectedCustomerAddress`, limpo ao trocar de cliente e ao finalizar a venda.
+- Lógica final: **endereço de entrega = o do cadastro por padrão, editável quando precisar, obrigatório só quando não há nenhum.**
+
+### Telas que a aba Clientes toca
+- **Frente de caixa**: busca (`/clientes/buscar`), vínculo e cadastro inline; a venda faz upsert/link via `customer_id`.
+- **Resumo / vendas recentes**: exibem `customer_name`.
+- **Histórico do cliente**: `customerSales` / `customerTotalSpent` / `customerLastSaleLabel` casam `this.vendas` por `customer_id` (e por telefone/cpf legado).
+- **Gap conhecido**: em Financeiro → contas a receber, `customer_name` é texto livre, **não** vinculado ao cadastro. Backlog.
+
+---
+
 ## 🩹 Fix 2026-05-24 — venda "a receber" (pós-review do commit 522bf86)
 
 Três correções aplicadas em `src/parceiro/queries.ts` (função `registerPartnerSale`):

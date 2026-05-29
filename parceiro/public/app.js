@@ -50,6 +50,8 @@ function parceiroApp() {
     posCustomerResults: [],
     posCustomerSearchTimer: null,
     posCustomerFormOpen: false,
+    deliveryAddressMissing: false,
+    posSelectedCustomerAddress: '',
     posKeydownHandler: null,
 
     resumo: null,
@@ -1068,6 +1070,7 @@ function parceiroApp() {
     onCustomerSearchInput() {
       this.saleForm.customer_name = this.posCustomerQuery.trim();
       this.saleForm.customer_id = null;
+      this.posSelectedCustomerAddress = '';
       clearTimeout(this.posCustomerSearchTimer);
       const q = this.posCustomerQuery.trim();
       if (q.length < 2) {
@@ -1089,6 +1092,13 @@ function parceiroApp() {
       this.saleForm.customer_id = customer.id;
       this.saleForm.customer_name = customer.name || '';
       this.saleForm.customer_phone = customer.phone || '';
+      const addressLine = this.customerAddressLine(customer);
+      this.posSelectedCustomerAddress = addressLine !== '-' ? addressLine : '';
+      // Entrega para cliente com endereco cadastrado: preenche sozinho.
+      if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim() && this.posSelectedCustomerAddress) {
+        this.saleForm.delivery_address = this.posSelectedCustomerAddress;
+        this.deliveryAddressMissing = false;
+      }
       this.posCustomerQuery = customer.name || '';
       this.posCustomerResults = [];
       this.posCustomerFormOpen = false;
@@ -1181,15 +1191,32 @@ function parceiroApp() {
       return this.customerSales(customer).length >= this.vipMinPurchases;
     },
 
+    onFulfillmentChange() {
+      if (this.saleForm.fulfillment_mode !== 'delivery') {
+        this.deliveryAddressMissing = false;
+        return;
+      }
+      // Cliente com endereco cadastrado: ja preenche a entrega.
+      if (!this.saleForm.delivery_address.trim() && this.posSelectedCustomerAddress) {
+        this.saleForm.delivery_address = this.posSelectedCustomerAddress;
+        this.deliveryAddressMissing = false;
+        return;
+      }
+      this.$nextTick(() => this.$refs.deliveryAddress?.focus());
+    },
+
     async posFinalizeSale() {
       if (!this.posCart.length) {
         this.flash('Adicione pelo menos um produto ao carrinho.');
         return;
       }
       if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim()) {
+        this.deliveryAddressMissing = true;
+        this.$nextTick(() => this.$refs.deliveryAddress?.focus());
         this.flash('Informe o endereço de entrega ou mude para retirada.');
         return;
       }
+      this.deliveryAddressMissing = false;
       if (this.saleForm.payment_status === 'receivable' && !this.saleForm.receivable_due_date) {
         this.flash('Informe a data para receber esta venda.');
         return;
@@ -1257,6 +1284,8 @@ function parceiroApp() {
         };
         this.posCustomerQuery = '';
         this.posCustomerResults = [];
+        this.posSelectedCustomerAddress = '';
+        this.deliveryAddressMissing = false;
         this.posSaleIdempotencyKey = null;
         await this.loadData();
         this.flash('Venda finalizada - estoque e financeiro atualizados.');

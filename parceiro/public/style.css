@@ -1438,6 +1438,11 @@ html, body {
 }
 .pos-sale-options option { color:#111827; }
 .pos-delivery-input { margin-bottom:10px; }
+.pos-input-error {
+  border-color:#ef4444 !important;
+  background:rgba(239,68,68,.08) !important;
+}
+.pos-input-error::placeholder { color:#fca5a5; }
 .pos-summary-input { display:grid; grid-template-columns:1fr 134px; align-items:center; gap:10px; margin-bottom:8px; color:#a7b0bd; font-size:13px; }
 .pos-summary-input span { display:flex; align-items:center; gap:5px; }
 .pos-summary-input svg { width:13px; }
