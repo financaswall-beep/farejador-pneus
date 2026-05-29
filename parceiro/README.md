@@ -6,6 +6,90 @@ Portal operacional da unidade parceira (borracheiro credenciado). Roda dentro do
 
 ---
 
+## ☀️ 2026-05-29 — Tema claro (branco + azul) com toggle (Claude Opus 4.8)
+
+Wallace pediu uma versão **clara** do portal (o padrão era só o dark com amarelo). Decisão dele: **branco + azul**, abandonando o amarelo no claro ("amarelo não combina com branco"). Verde (positivo) e vermelho (destrutivo) continuam, porém **escurecidos** pra ler no fundo branco. O **dark continua sendo o padrão** e fica intacto.
+
+### Como funciona (regra de ouro)
+
+- **Tudo do tema claro vive num bloco aditivo** escopado em `.pos-shell[data-theme="light"]`, no fim do `style.css`. O dark não é tocado por nenhuma regra de lá — é o default. Risco zero pro escuro.
+- A escolha é por `data-theme` no `.pos-shell` (`:data-theme="theme"` no [index.html](public/index.html)). O estado `theme` (`'dark'` | `'light'`) é salvo **por aparelho** em `localStorage` (`farejador_theme_<slug>`) e alternado por `toggleTheme()` no [app.js](public/app.js). Botão **"Tema claro / Tema escuro"** (ícone sol/lua) na barra lateral, acima de Configurações.
+- **Maior especificidade** que as utils Tailwind/mobile → vence sem `!important` (exceto o `background` do shell, que disputa com a util `bg-[#0b0f12]` e leva `!important`).
+
+### Estratégia das cores
+
+1. **Redefinir as variáveis** no bloco light pega de graça tudo que usa `var()`: o **`--pos-yellow` vira `#1e40af` (azul)** — assim todo acento amarelo (logo, KPIs, botões "+", total, aba ativa, route-num…) fica azul de uma vez. `--pos-line`, `--pos-green` e `--pos-bg` idem.
+2. **Sobrescrever os hardcoded por superfície** (texto/fundo/borda): sidebar, topbar, KPIs/painéis (fundo branco + sombra suave), tabelas, inputs (fundo claro), produtos/carrinho, resumo/finalizar (azul), formulários, entrega/pedidos/rota, dropdowns, gauge, e o mobile (topbar branco + FAB azul).
+3. **Valores com cor clara escurecem** (senão somem no branco): verde → `#15803d`, âmbar → `#b45309`, azul-claro → `#1d4ed8`, rosa → **vermelho vivo `#dc2626`**. Cobre estoque/troco/totais, selos, links de telefone, e o botão **Cancelar venda** (era rosa apagado).
+
+### Gráficos (canvas) cientes do tema — o pulo do gato
+
+Os 3 gráficos do portal são `<canvas>` (Chart.js): **CSS não entra dentro deles**, a cor é pintada na criação. Por isso são lidos do `this.theme` na hora de desenhar e o `toggleTheme()` chama `renderAllCharts()` no `$nextTick` pra **repintar no toque** (cada chart destrói o antigo antes de recriar; os fora da tela são ignorados).
+- `chartPosSpark` (spark de vendas): amber no dark → **azul** no claro.
+- `chartFinanceRevenuePos` (linha de receita 30d): `#ffd000` → azul; tooltip/ticks/grades claros.
+- `chartFinanceCostsPos` (doughnut de custos): borda branca, legenda/tooltip/rótulo central escuros.
+- **Arco do score** (`financialScoreColor`): no claro as faixas vão pra tons escuros (`#059669`/`#4d7c0f`/`#b45309`/`#dc2626`) pra não sumir.
+
+### Validação
+
+Preview apontando pra prod (`parceiro-prod`, porta 4100): confirmado por cor computada e screenshot que (a) claro aplica em todas as telas, (b) **alternar volta o dark 100% intacto**, (c) os 3 gráficos recolorem no toggle **sem recarregar**, (d) cancelar/estoque/troco/score legíveis no branco.
+
+**Arquivos:** `parceiro/public/{style.css,index.html,app.js}`. Sem backend, sem migration. Cache-bust → `v=20260529-tema-claro-3`.
+
+---
+
+## 🛵 2026-05-29 — Pedido de entrega COD + aba Entrega redesenhada + aba Pedidos (Claude Opus 4.8)
+
+Wallace vende pneu usado pela internet; o cliente **só paga na entrega** (cash on delivery — não confia em pagar antes). O modelo antigo furava: "Entrega" no Frente de caixa era mentira (PDV é quem foi à loja e paga na hora), o pedido da internet não tinha onde entrar, e marcar a entrega como concluída **não fazia nada** no estoque/financeiro. Resolvido amarrando o ciclo **pedido → entrega → recebimento** sem inventar tabela nova.
+
+### O modelo COD (migration `0069`)
+
+| Momento | Estoque | Financeiro | Conta como venda? |
+|---|---|---|---|
+| Pedido criado (internet) | reserva (decremento já existente) | nada — só conta a receber aberta | ❌ não |
+| Saiu pra entrega | continua reservado | nada | ❌ não |
+| **Finalizada** (entregador entregou) | baixa definitiva | **entra no caixa** (recebe a conta a receber) | ✅ sim |
+| Não entregue / devolvido | **devolve** (cancela o pedido) | cancela a conta a receber | ❌ não |
+
+- **Reaproveitou o que já existia** em vez de criar "estado reservado": pedido COD = pedido `payment_method='A receber'` + `finance.partner_receivables` aberta apontando via `source_order_id` (FK da Etapa 2). `register_partner_local_order` já decrementava estoque (= a reserva). Faltava só amarrar os **gatilhos** na finalização.
+- **Migration `0069_partner_delivery_cod`** (✅ **aplicada em prod 2026-05-29** via `scripts/aplicar-0069.cjs --commit`):
+  - Adiciona o estado **`failed`** (não entregue/devolvido) ao CHECK de `commerce.partner_orders.delivery_status` (antes só `pending`/`dispatched`/`delivered`).
+  - Recria `network.partner_unit_summary` pra **excluir** pedido de entrega não-finalizado de `sales_month`/`orders_month` — predicado `NOT (fulfillment_mode='delivery' AND delivery_status <> 'delivered')`. Pickup e entrega finalizada contam normal. Honra o "a venda só se realiza na entrega". Aditiva, não altera dado existente.
+  - Smoke da aplicação confirmou: venda do mês caiu de R$245→R$25 (2 pedidos COD não-entregues saíram da conta de venda).
+
+### Backend (`queries.ts` / `route.ts`)
+
+- `updatePartnerDeliveryStatus` virou o motor dos gatilhos:
+  - **`delivered`** → recebe a conta a receber vinculada (`status='received'`, `received_at=now()`, `payment_method` = forma escolhida na entrega) → entra no caixa; marca o pedido `status='paid'`. Só aqui vira venda do mês.
+  - **`failed`** → `cancel_partner_local_order` (devolve estoque) + cancela a conta a receber. Nada no caixa.
+  - **Trava de integridade:** entrega já `delivered` não pode ser "reaberta" por este endpoint (`DeliveryAlreadyFinalizedError` → **409**) — evita destravar caixa sem estorno controlado.
+  - O pedido mantém `payment_method='A receber'` mesmo após finalizado: o caixa vem **só** da conta a receber recebida, pra não duplicar.
+- `route.ts`: `deliverySchema` aceita `failed` + `payment_method` opcional. O refine de "a receber exige vencimento" passou a **dispensar due_date quando `fulfillment_mode='delivery'`** (COD não tem vencimento — o dinheiro vem na hora da entrega).
+- Desenhado pra o **bot da matriz** poder chamar o mesmo fluxo de criação no futuro (hoje o pedido é digitado à mão na aba Pedidos).
+
+### Aba Pedidos (F6 — era botão morto)
+
+Virou a tela de **pedido da internet**. Esquerda: lista com filtros (Em aberto / Finalizados / Não entregues / Todos) + 4 KPIs (em aberto, a receber, finalizados, não entregues). Direita: form **Novo pedido**.
+- **Form COD:** cria pedido `payment_method='A receber'`, `fulfillment_mode='delivery'`, `source_tag='2w'`, sem vencimento. Aviso "Paga na entrega. Entra no caixa só quando o entregador finalizar."
+- **Busca de cliente** no campo Cliente (mesmo `/clientes/buscar` do PDV): dropdown por nome/telefone → escolher preenche nome + telefone formatado + endereço do cadastro + vincula `customer_id`. Tag "✓ cliente cadastrado".
+- **Telefone com máscara** (mesmo padrão `onPhoneInput`/`formatPhoneDisplay` do resto).
+- **Remover item individual** do carrinho (lixeira ao lado do preço) — sem precisar do "Limpar" que zera tudo.
+
+### Aba Entrega redesenhada (desktop)
+
+A lista de entregas (vendas `fulfillment_mode='delivery'` ativas) ganhou cartões em **grade responsiva** (`repeat(auto-fill, minmax(330px,1fr))` — preenche a largura no desktop) no lugar da coluna única estreita. Cada card: faixa de status colorida no topo, nº da rota + bairro + status + setas ↑↓ (reordena a rota, salvo no aparelho via `localStorage`), cliente/telefone, endereço, itens, campo Entregador, **Total a receber** (verde), e ações balanceadas (ação principal larga + "voltar"/"não entregue" como botões-ícone).
+- **Seletor de pagamento segmentado** (Pix / Dinheiro / Cartão) aparece quando a entrega saiu — define a forma que vai pra conta a receber ao finalizar.
+- **Estado renomeado:** o `pending` virou **"Em separação"** (rótulo, em `deliveryStatusLabel`) — diz o que tem que ser feito (puxar/embalar) em vez do vago "Pendente". Pill amarelo. Fluxo: **Em separação → Saiu pra entrega → Finalizada** (+ "Não entregue"). Só rótulo/CSS, sem mexer no banco.
+- **Frente de caixa:** removida a opção "Entrega" do PDV — vira campo fixo "Retirada (paga agora)". Entrega vive só na aba Pedidos.
+
+### Validação end-to-end em prod
+
+Criado um pedido COD real pela aba Pedidos → confirmado `A receber` + conta a receber aberta → finalizado → conta virou `received` (Pix) + entrou no caixa + passou a contar como venda → tudo apagado e baseline restaurado. O fluxo "não entregue" e a trava de 409 também conferidos.
+
+**Arquivos:** `parceiro/public/{app.js,index.html,style.css}`, `src/parceiro/{queries.ts,route.ts}`, `db/migrations/0069_partner_delivery_cod.sql`, `scripts/aplicar-0069.cjs`, `src/app/preview-parceiro-server.ts`. Commit `29d755c`, push pra `pneus`. **Migration 0069 já em prod; código pendente de deploy (Coolify).** Mobile dessas telas documentado em `docs/PARCEIRO_MOBILE_HANDOFF_2026-05-29.md`. Cache-bust ao publicar.
+
+---
+
 ## 🧰 2026-05-29 — Insumos + serviços no PDV, layout do checkout e gauge do score (Claude Opus 4.8)
 
 Reclamação dos borracheiros: só dava pra cadastrar/vender **pneu**. Não havia como cadastrar **insumo** (câmara de ar, bico, macarrão) nem **serviço** (mão de obra) pra usar no frente de caixa. Resolvido com **uma coluna nova** (`item_type`), sem tabela nova — o banco já era genérico o bastante.

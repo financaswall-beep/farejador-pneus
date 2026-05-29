@@ -2101,3 +2101,397 @@ html, body {
   .pos-cancel svg { width: 15px; }
   .pos-cancel kbd { display: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   TEMA CLARO — branco + AZUL (Claude Opus 4.8, 2026-05-29)
+   ------------------------------------------------------------------------
+   100% ADITIVO: tudo escopado em `.pos-shell[data-theme="light"]`.
+   O dark é o padrão e NÃO é tocado por nenhuma regra abaixo.
+   Estratégia:
+     1) Redefinir as variáveis (pega de graça tudo que usa var(): bordas,
+        acento, verde, fundo). O "amarelo" da marca VIRA AZUL no claro.
+     2) Sobrescrever as cores hardcoded por superfície (texto/fundo/borda).
+   Acento azul: #1e40af. Verde/vermelho continuam (funcionam no branco).
+   Maior especificidade que as classes Tailwind/mobile -> vence sem !important
+   (menos no background do shell, que disputa com a util bg-[#0b0f12]).
+   ════════════════════════════════════════════════════════════════════════ */
+.pos-shell[data-theme="light"] {
+  --pos-bg: #eef2f6;
+  --pos-panel: #ffffff;
+  --pos-panel-2: #ffffff;
+  --pos-line: rgba(15, 23, 42, .12);
+  --pos-yellow: #1e40af;   /* acento: azul no claro */
+  --pos-green: #16a34a;
+  color: #334155;
+  background:
+    radial-gradient(circle at 70% -10%, rgba(30, 64, 175, .06), transparent 30%),
+    linear-gradient(135deg, #f5f8fc 0%, #eef2f6 60%, #e8edf3 100%) !important;
+}
+
+/* ── Sidebar ── */
+.pos-shell[data-theme="light"] .pos-sidebar {
+  background: linear-gradient(180deg, #ffffff, #f5f8fc);
+  border-right-color: rgba(15, 23, 42, .10);
+}
+.pos-shell[data-theme="light"] .pos-logo-main { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-logo-sub { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-nav-item { color: #334155; }
+.pos-shell[data-theme="light"] .pos-nav-item kbd {
+  color: #64748b; border-color: rgba(15, 23, 42, .12); background: rgba(15, 23, 42, .04);
+}
+.pos-shell[data-theme="light"] .pos-nav-item:not(.active):hover { background: rgba(30, 64, 175, .06); }
+.pos-shell[data-theme="light"] .pos-nav-item.active {
+  background: linear-gradient(180deg, #1e40af, #1d4ed8);
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(30, 64, 175, .28);
+}
+.pos-shell[data-theme="light"] .pos-nav-item.active kbd {
+  background: rgba(255, 255, 255, .18); color: #dbeafe; border-color: rgba(255, 255, 255, .3);
+}
+.pos-shell[data-theme="light"] .pos-settings { border-top-color: rgba(15, 23, 42, .10); }
+.pos-shell[data-theme="light"] .pos-version { color: #94a3b8; }
+
+/* ── Topbar ── */
+.pos-shell[data-theme="light"] .pos-topbar { border-bottom-color: rgba(15, 23, 42, .10); }
+.pos-shell[data-theme="light"] .pos-global-search {
+  border-color: rgba(15, 23, 42, .12); background: #ffffff;
+}
+.pos-shell[data-theme="light"] .pos-global-search svg { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-global-search input { color: #1f2937; }
+.pos-shell[data-theme="light"] .pos-global-search input::placeholder { color: #94a3b8; }
+.pos-shell[data-theme="light"] .pos-global-search kbd,
+.pos-shell[data-theme="light"] .pos-budget kbd {
+  color: #64748b; border-color: rgba(15, 23, 42, .14);
+}
+.pos-shell[data-theme="light"] .pos-top-icons { border-color: rgba(15, 23, 42, .12); }
+.pos-shell[data-theme="light"] .pos-top-icons button { color: #475569; }
+.pos-shell[data-theme="light"] .pos-top-icons b { background: #1e40af; color: #fff; }
+.pos-shell[data-theme="light"] .pos-user > div { border-color: rgba(15, 23, 42, .15); color: #1e40af; background: rgba(30, 64, 175, .08); }
+.pos-shell[data-theme="light"] .pos-user strong { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-user small { color: #64748b; }
+
+/* ── KPIs e painéis (fundo branco, sombra suave) ── */
+.pos-shell[data-theme="light"] .pos-kpis article,
+.pos-shell[data-theme="light"] .pos-panel {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
+}
+.pos-shell[data-theme="light"] .pos-kpis small { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-kpis strong { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-kpis span { color: #16a34a; }
+.pos-shell[data-theme="light"] .pos-kpi-icon { color: #1e40af; background: rgba(30, 64, 175, .1); }
+.pos-shell[data-theme="light"] .pos-panel h3,
+.pos-shell[data-theme="light"] .pos-panel-head h3,
+.pos-shell[data-theme="light"] .pos-side-panel h3 { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-panel-head p { color: #64748b; }
+
+/* ── Texto: títulos, corpo e secundário (cobre os cinzas hardcoded) ── */
+.pos-shell[data-theme="light"] .pos-customer-name b,
+.pos-shell[data-theme="light"] .pos-product-cell b,
+.pos-shell[data-theme="light"] .pos-side-list strong,
+.pos-shell[data-theme="light"] .pos-finance-cards strong,
+.pos-shell[data-theme="light"] .pos-chart-card h4,
+.pos-shell[data-theme="light"] .pos-form-head h4,
+.pos-shell[data-theme="light"] .pos-form-head strong,
+.pos-shell[data-theme="light"] .pos-form-total b,
+.pos-shell[data-theme="light"] .pos-money-row b,
+.pos-shell[data-theme="light"] .pos-recent-head strong,
+.pos-shell[data-theme="light"] .pos-recent-sale strong,
+.pos-shell[data-theme="light"] .pos-two-columns h4 { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-dark-table-row,
+.pos-shell[data-theme="light"] .pos-customer-table-row,
+.pos-shell[data-theme="light"] .pos-side-list div,
+.pos-shell[data-theme="light"] .pos-alert-list div,
+.pos-shell[data-theme="light"] .pos-tip-list div,
+.pos-shell[data-theme="light"] .pos-summary-line,
+.pos-shell[data-theme="light"] .pos-client-data { color: #334155; }
+.pos-shell[data-theme="light"] .pos-panel-head p,
+.pos-shell[data-theme="light"] .pos-empty,
+.pos-shell[data-theme="light"] .pos-dark-table-head,
+.pos-shell[data-theme="light"] .pos-customer-table-head,
+.pos-shell[data-theme="light"] .pos-customer-name small,
+.pos-shell[data-theme="light"] .pos-finance-cards small,
+.pos-shell[data-theme="light"] .pos-finance-cards span,
+.pos-shell[data-theme="light"] .pos-chart-card p,
+.pos-shell[data-theme="light"] .pos-form-grid label,
+.pos-shell[data-theme="light"] .pos-stock-side-form label,
+.pos-shell[data-theme="light"] .pos-form-total span,
+.pos-shell[data-theme="light"] .pos-form-head p,
+.pos-shell[data-theme="light"] .pos-money-row small,
+.pos-shell[data-theme="light"] .pos-count-row,
+.pos-shell[data-theme="light"] .pos-recent-head span,
+.pos-shell[data-theme="light"] .pos-recent-sale small,
+.pos-shell[data-theme="light"] .pos-field span,
+.pos-shell[data-theme="light"] .pos-field-label,
+.pos-shell[data-theme="light"] .pos-form-hint,
+.pos-shell[data-theme="light"] .pos-client-data small,
+.pos-shell[data-theme="light"] .pos-sale-options span { color: #64748b; }
+
+/* ── Bordas/divisórias e linhas de tabela (white-opacity -> dark-opacity) ── */
+.pos-shell[data-theme="light"] .pos-dark-table,
+.pos-shell[data-theme="light"] .pos-customer-table { border-color: rgba(15, 23, 42, .1); }
+.pos-shell[data-theme="light"] .pos-dark-table-head,
+.pos-shell[data-theme="light"] .pos-customer-table-head { background: #f8fafc; }
+.pos-shell[data-theme="light"] .pos-dark-table-row,
+.pos-shell[data-theme="light"] .pos-customer-table-row { border-top-color: rgba(15, 23, 42, .08); }
+.pos-shell[data-theme="light"] .pos-dark-table-row:hover,
+.pos-shell[data-theme="light"] .pos-customer-table-row:hover { background: rgba(30, 64, 175, .04); }
+.pos-shell[data-theme="light"] .pos-divider { background: rgba(15, 23, 42, .1); }
+
+/* ── Inputs / selects / busca (fundo dark -> claro) ── */
+.pos-shell[data-theme="light"] .pos-dark-search,
+.pos-shell[data-theme="light"] .pos-dark-select,
+.pos-shell[data-theme="light"] .pos-form-grid input,
+.pos-shell[data-theme="light"] .pos-form-grid select,
+.pos-shell[data-theme="light"] .pos-stock-side-form input,
+.pos-shell[data-theme="light"] .pos-stock-side-form select,
+.pos-shell[data-theme="light"] .pos-product-search,
+.pos-shell[data-theme="light"] .pos-client-search,
+.pos-shell[data-theme="light"] .pos-client-inline-fields input,
+.pos-shell[data-theme="light"] .pos-sale-options select,
+.pos-shell[data-theme="light"] .pos-delivery-input,
+.pos-shell[data-theme="light"] .pos-summary-input input,
+.pos-shell[data-theme="light"] .pos-received,
+.pos-shell[data-theme="light"] .pos-adjust-row input,
+.pos-shell[data-theme="light"] .pos-notes-input,
+.pos-shell[data-theme="light"] .pos-field input,
+.pos-shell[data-theme="light"] .pos-order-add select,
+.pos-shell[data-theme="light"] .pos-order-add-row input,
+.pos-shell[data-theme="light"] .pos-delivery-courier,
+.pos-shell[data-theme="light"] .pos-route-courier input {
+  border-color: rgba(15, 23, 42, .14);
+  background: #f8fafc;
+  color: #1f2937;
+}
+.pos-shell[data-theme="light"] .pos-dark-search svg,
+.pos-shell[data-theme="light"] .pos-product-search { color: #64748b; }
+.pos-shell[data-theme="light"] input::placeholder,
+.pos-shell[data-theme="light"] textarea::placeholder { color: #94a3b8; }
+.pos-shell[data-theme="light"] .pos-form-grid input:focus,
+.pos-shell[data-theme="light"] .pos-form-grid select:focus,
+.pos-shell[data-theme="light"] .pos-stock-side-form input:focus,
+.pos-shell[data-theme="light"] .pos-stock-side-form select:focus {
+  border-color: rgba(30, 64, 175, .5);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, .1);
+}
+.pos-shell[data-theme="light"] .pos-dark-search input,
+.pos-shell[data-theme="light"] .pos-dark-select,
+.pos-shell[data-theme="light"] .pos-product-search input,
+.pos-shell[data-theme="light"] .pos-client-search input { color: #1f2937; }
+
+/* ── Acento azul: superfícies que eram amarelo hardcoded ── */
+.pos-shell[data-theme="light"] .pos-form-head > span { background: rgba(30, 64, 175, .1); color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-outline-action { border-color: rgba(30, 64, 175, .45); color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-alert-list svg,
+.pos-shell[data-theme="light"] .pos-alert-list strong,
+.pos-shell[data-theme="light"] .pos-tip-list svg { color: #d97706; } /* alertas: âmbar mais escuro p/ ler no branco */
+.pos-shell[data-theme="light"] .pos-vip-mini { color: #94a3b8; border-color: rgba(15, 23, 42, .12); background: #f1f5f9; }
+.pos-shell[data-theme="light"] .pos-vip-mini.active {
+  color: #1e40af; border-color: rgba(30, 64, 175, .5); background: rgba(30, 64, 175, .1); filter: none;
+}
+.pos-shell[data-theme="light"] .pos-vip-mini.active svg { fill: #1e40af; }
+.pos-shell[data-theme="light"] .pos-row-actions button { border-color: rgba(15, 23, 42, .12); color: #475569; background: #f8fafc; }
+.pos-shell[data-theme="light"] .pos-row-actions button:hover { border-color: rgba(30, 64, 175, .4); color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-filter-row button,
+.pos-shell[data-theme="light"] .pos-filter-row select,
+.pos-shell[data-theme="light"] .pos-more,
+.pos-shell[data-theme="light"] .pos-mini-clear,
+.pos-shell[data-theme="light"] .pos-money-actions button {
+  border-color: rgba(15, 23, 42, .14); color: #475569; background: #ffffff;
+}
+.pos-shell[data-theme="light"] .pos-filter-row .active {
+  color: #1e40af; border-color: #1e40af; background: rgba(30, 64, 175, .08);
+}
+
+/* ── Produtos / carrinho ── */
+.pos-shell[data-theme="light"] .pos-product-card {
+  border-color: rgba(15, 23, 42, .1); background: #ffffff; color: #334155;
+}
+.pos-shell[data-theme="light"] .pos-product-card.featured { border-color: #1e40af; background: rgba(30, 64, 175, .05); }
+.pos-shell[data-theme="light"] .pos-product-info strong,
+.pos-shell[data-theme="light"] .pos-product-price strong,
+.pos-shell[data-theme="light"] .pos-cart-row strong,
+.pos-shell[data-theme="light"] .pos-qty b { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-product-info em,
+.pos-shell[data-theme="light"] .pos-cart-row em { color: #475569; }
+.pos-shell[data-theme="light"] .pos-product-info small,
+.pos-shell[data-theme="light"] .pos-cart-row small { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-add { border-color: #1e40af; color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-cart-head {
+  color: #64748b; border-color: rgba(15, 23, 42, .08); background: #f8fafc;
+}
+.pos-shell[data-theme="light"] .pos-cart-row {
+  background: #ffffff; border-color: rgba(15, 23, 42, .08); color: #334155;
+}
+.pos-shell[data-theme="light"] .pos-qty { border-color: rgba(15, 23, 42, .12); }
+.pos-shell[data-theme="light"] .pos-qty button { color: #475569; background: #f1f5f9; }
+.pos-shell[data-theme="light"] .pos-remove { border-color: rgba(15, 23, 42, .14); color: #64748b; }
+.pos-shell[data-theme="light"] .pos-add-line { border-color: rgba(15, 23, 42, .2); color: #64748b; }
+.pos-shell[data-theme="light"] .pos-cart-empty { border-color: rgba(15, 23, 42, .14); color: #64748b; }
+.pos-shell[data-theme="light"] .pos-cart-empty svg,
+.pos-shell[data-theme="light"] .pos-cart-empty small { color: #94a3b8; }
+.pos-shell[data-theme="light"] .pos-cart-empty span { color: #475569; }
+
+/* ── Resumo da venda / finalizar ── */
+.pos-shell[data-theme="light"] .pos-total { border-top-color: rgba(15, 23, 42, .1); }
+.pos-shell[data-theme="light"] .pos-total span { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-total strong { color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-static-field {
+  border-color: rgba(15, 23, 42, .18); background: #f8fafc; color: #475569;
+}
+.pos-shell[data-theme="light"] .pos-payments button {
+  border-color: rgba(15, 23, 42, .14); color: #475569;
+}
+.pos-shell[data-theme="light"] .pos-payments button.active {
+  border-color: #1e40af; background: rgba(30, 64, 175, .08); color: #1e40af;
+}
+.pos-shell[data-theme="light"] .pos-finalize {
+  background: linear-gradient(180deg, #1e40af, #1d4ed8); color: #ffffff;
+  box-shadow: 0 10px 22px rgba(30, 64, 175, .25);
+}
+.pos-shell[data-theme="light"] .pos-finalize kbd { color: #dbeafe; background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .3); }
+.pos-shell[data-theme="light"] .pos-budget { border-color: rgba(15, 23, 42, .14); color: #334155; }
+.pos-shell[data-theme="light"] .pos-summary label,
+.pos-shell[data-theme="light"] .pos-summary-input,
+.pos-shell[data-theme="light"] .pos-change { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-secure { color: #94a3b8; }
+
+/* ── Cards de formulário financeiro / chart ── */
+.pos-shell[data-theme="light"] .pos-finance-cards article,
+.pos-shell[data-theme="light"] .pos-chart-card,
+.pos-shell[data-theme="light"] .pos-form-card,
+.pos-shell[data-theme="light"] .pos-money-row,
+.pos-shell[data-theme="light"] .pos-form-total,
+.pos-shell[data-theme="light"] .pos-recent-sale {
+  border-color: rgba(15, 23, 42, .1); background: #ffffff;
+}
+.pos-shell[data-theme="light"] .pos-form-card { border-left-color: rgba(15, 23, 42, .18); }
+
+/* ── Tabs de tipo de item (segmentado): ativo azul ── */
+.pos-shell[data-theme="light"] .pos-stock-type-tabs { border-color: rgba(15, 23, 42, .12); background: #f1f5f9; }
+.pos-shell[data-theme="light"] .pos-stock-type-tabs button { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-stock-type-tabs button.active {
+  background: linear-gradient(180deg, #1e40af, #1d4ed8); color: #ffffff; box-shadow: 0 6px 16px rgba(30, 64, 175, .22);
+}
+.pos-shell[data-theme="light"] .pos-type-badge { border-color: rgba(15, 23, 42, .14); color: #475569; background: #f1f5f9; }
+
+/* ── Empty states / badges neutros ── */
+.pos-shell[data-theme="light"] .pos-customer-results button,
+.pos-shell[data-theme="light"] .pos-recent-sale { background: #ffffff; }
+.pos-shell[data-theme="light"] .pos-customer-results b { color: #1f2937; }
+.pos-shell[data-theme="light"] .pos-customer-results small { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-footer { border-top-color: rgba(15, 23, 42, .1); color: #64748b; }
+
+/* ── Gauge do score financeiro: trilho escuro fica claro (o fill é por cor de faixa via JS) ── */
+.pos-shell[data-theme="light"] .finance-gauge__track { stroke: rgba(15, 23, 42, .1); }
+.finance-gauge__readout span { } /* (readout herda; cor por faixa vem do JS) */
+
+/* ── Entrega / Pedidos / Rota (cartões em fundo branco) ── */
+.pos-shell[data-theme="light"] .pos-delivery-card,
+.pos-shell[data-theme="light"] .pos-order-card,
+.pos-shell[data-theme="light"] .pos-route-card {
+  background: #ffffff; border-color: rgba(15, 23, 42, .1);
+}
+.pos-shell[data-theme="light"] .pos-route-card { background: linear-gradient(180deg, #ffffff, #f8fafc); }
+.pos-shell[data-theme="light"] .pos-delivery-who strong,
+.pos-shell[data-theme="light"] .pos-order-who strong,
+.pos-shell[data-theme="light"] .pos-route-who strong,
+.pos-shell[data-theme="light"] .pos-order-total,
+.pos-shell[data-theme="light"] .pos-order-cart-line b { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-delivery-address,
+.pos-shell[data-theme="light"] .pos-order-addr,
+.pos-shell[data-theme="light"] .pos-route-addr,
+.pos-shell[data-theme="light"] .pos-order-items li,
+.pos-shell[data-theme="light"] .pos-order-cart-line { color: #334155; }
+.pos-shell[data-theme="light"] .pos-delivery-items,
+.pos-shell[data-theme="light"] .pos-route-items,
+.pos-shell[data-theme="light"] .pos-order-meta { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-route-num { background: #1e40af; color: #ffffff; }
+.pos-shell[data-theme="light"] .pos-route-bairro { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-route-money,
+.pos-shell[data-theme="light"] .pos-order-foot { border-top-color: rgba(15, 23, 42, .08); }
+.pos-shell[data-theme="light"] .pos-route-move button { background: #f1f5f9; border-color: rgba(15, 23, 42, .12); color: #475569; }
+.pos-shell[data-theme="light"] .pos-delivery-toolbar button { border-color: rgba(15, 23, 42, .12); color: #475569; background: #ffffff; }
+.pos-shell[data-theme="light"] .pos-delivery-toolbar button.active { background: #1e40af; color: #ffffff; border-color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-delivery-pill { color: #475569; background: #f1f5f9; border-color: rgba(15, 23, 42, .12); }
+.pos-shell[data-theme="light"] .pos-route-hint { background: rgba(30, 64, 175, .07); border-color: rgba(30, 64, 175, .25); color: #1e3a8a; }
+.pos-shell[data-theme="light"] .pos-route-hint b { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-order-card { border-left-color: #1e40af; }
+
+/* ── Dropdowns sobrepostos (fundo escuro -> branco) ── */
+.pos-shell[data-theme="light"] .pos-receivable-customer-results,
+.pos-shell[data-theme="light"] .pos-order-customer .pos-customer-results {
+  background: #ffffff; border-color: rgba(15, 23, 42, .12);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .15);
+}
+.pos-shell[data-theme="light"] .pos-receivable-customer-results button { color: #1f2937; border-bottom-color: rgba(15, 23, 42, .06); }
+
+/* ════════════════════════════════════════════════════════════════
+   VALORES COM COR CLARA -> ESCURECEM (senão somem no fundo branco)
+   Verde claro -> verde escuro (#15803d) | âmbar claro -> âmbar (#b45309)
+   azul claro -> azul forte (#1d4ed8) | rosa -> vermelho vivo (#dc2626)
+   ════════════════════════════════════════════════════════════════ */
+/* Verdes (positivo: estoque, totais, troco, recebido, entregue) */
+.pos-shell[data-theme="light"] .pos-green-text,
+.pos-shell[data-theme="light"] .pos-product-price em,
+.pos-shell[data-theme="light"] .pos-product-price small,
+.pos-shell[data-theme="light"] .pos-money-row.positive strong,
+.pos-shell[data-theme="light"] .pos-change strong,
+.pos-shell[data-theme="light"] .pos-route-total strong,
+.pos-shell[data-theme="light"] .pos-delivery-foot > strong,
+.pos-shell[data-theme="light"] .pos-customer-linked,
+.pos-shell[data-theme="light"] .pos-order-customer-tag,
+.pos-shell[data-theme="light"] .pos-order-card.delivered .pos-order-pay,
+.pos-shell[data-theme="light"] .pos-money-actions button.success { color: #15803d; }
+.pos-shell[data-theme="light"] .pos-product-price small { border-color: rgba(21, 128, 61, .4); background: rgba(21, 128, 61, .06); }
+.pos-shell[data-theme="light"] .pos-status-pill { color: #15803d; background: rgba(22, 163, 74, .1); border-color: rgba(22, 163, 74, .28); }
+.pos-shell[data-theme="light"] .pos-live-badge { color: #15803d; background: rgba(22, 163, 74, .1); border-color: rgba(22, 163, 74, .25); }
+.pos-shell[data-theme="light"] .pos-seg button.on { color: #15803d; background: rgba(22, 163, 74, .14); box-shadow: inset 0 0 0 1px rgba(22, 163, 74, .4); }
+.pos-shell[data-theme="light"] .pos-delivery-pay { color: #15803d; background: rgba(22, 163, 74, .1); border-color: rgba(22, 163, 74, .35); }
+.pos-shell[data-theme="light"] .pos-delivery-pill.delivered { color: #15803d; background: rgba(22, 163, 74, .12); border-color: rgba(22, 163, 74, .35); }
+
+/* Âmbar (pedido em aberto / estoque baixo / serviço / alerta) */
+.pos-shell[data-theme="light"] .pos-order-pay,
+.pos-shell[data-theme="light"] .pos-status-pill.low_stock { color: #b45309; }
+.pos-shell[data-theme="light"] .pos-status-pill.low_stock { background: rgba(180, 83, 9, .1); border-color: rgba(180, 83, 9, .25); }
+.pos-shell[data-theme="light"] .pos-delivery-pill.pending { color: #b45309; background: rgba(180, 83, 9, .1); border-color: rgba(180, 83, 9, .35); }
+.pos-shell[data-theme="light"] .pos-type-badge.servico { color: #b45309; border-color: rgba(180, 83, 9, .4); background: rgba(180, 83, 9, .08); }
+
+/* Azuis claros (telefone, selo insumo, posição, criar cliente) -> azul forte */
+.pos-shell[data-theme="light"] .pos-delivery-who a,
+.pos-shell[data-theme="light"] .pos-order-who a,
+.pos-shell[data-theme="light"] .pos-route-who a { color: #1d4ed8; }
+.pos-shell[data-theme="light"] .pos-type-badge.insumo { color: #1d4ed8; border-color: rgba(29, 78, 216, .4); background: rgba(29, 78, 216, .08); }
+.pos-shell[data-theme="light"] .pos-position-cell { color: #1e3a8a; background: rgba(29, 78, 216, .1); border-color: rgba(29, 78, 216, .2); }
+.pos-shell[data-theme="light"] .pos-customer-create-btn { color: #1d4ed8; border-color: rgba(29, 78, 216, .5); background: rgba(29, 78, 216, .06); }
+.pos-shell[data-theme="light"] .pos-customer-create-btn b { color: #1d4ed8; }
+.pos-shell[data-theme="light"] .pos-delivery-pill.dispatched { color: #1d4ed8; background: rgba(29, 78, 216, .1); border-color: rgba(29, 78, 216, .35); }
+
+/* Vermelhos claros -> vermelho vivo (visível no branco) */
+.pos-shell[data-theme="light"] .pos-money-row.negative strong,
+.pos-shell[data-theme="light"] .pos-order-card.failed .pos-order-pay { color: #dc2626; }
+.pos-shell[data-theme="light"] .pos-status-pill.out_of_stock { color: #dc2626; background: rgba(220, 38, 38, .1); border-color: rgba(220, 38, 38, .28); }
+.pos-shell[data-theme="light"] .pos-form-delete,
+.pos-shell[data-theme="light"] .pos-delivery-pill.failed,
+.pos-shell[data-theme="light"] .pos-route-actions .failed,
+.pos-shell[data-theme="light"] .pos-delivery-actions .failed,
+.pos-shell[data-theme="light"] .pos-order-cart-line button,
+.pos-shell[data-theme="light"] .pos-recent-sale button {
+  color: #dc2626; background: rgba(220, 38, 38, .07); border-color: rgba(220, 38, 38, .4);
+}
+
+/* Botão CANCELAR VENDA: vermelho vivo, não rosa apagado */
+.pos-shell[data-theme="light"] .pos-cancel {
+  color: #dc2626; background: rgba(220, 38, 38, .06); border-color: #dc2626;
+}
+.pos-shell[data-theme="light"] .pos-cancel:hover { color: #b91c1c; background: rgba(220, 38, 38, .12); border-color: #b91c1c; }
+.pos-shell[data-theme="light"] .pos-cancel kbd { color: #dc2626; background: rgba(220, 38, 38, .08); border-color: rgba(220, 38, 38, .4); }
+
+/* ── Mobile no claro: topbar fixo branco + FAB azul ── */
+@media (max-width: 768px) {
+  .pos-shell[data-theme="light"] .pos-topbar { background: #f5f8fc; }
+  .pos-shell[data-theme="light"] .pos-fab-finalize {
+    background: linear-gradient(180deg, #1e40af, #1d4ed8); color: #ffffff;
+    box-shadow: 0 10px 24px rgba(30, 64, 175, .4);
+  }
+}

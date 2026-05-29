@@ -31,6 +31,7 @@ function parceiroApp() {
     statusTimer: null,
     lastUpdatedAt: null,
     currentSection: 'resumo',
+    theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
     financePurchaseMode: 'tires',
     stockSearch: '',
@@ -123,6 +124,16 @@ function parceiroApp() {
     ],
 
     // â”€â”€â”€ INIT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    toggleTheme() {
+      this.theme = this.theme === 'light' ? 'dark' : 'light';
+      try { localStorage.setItem(`farejador_theme_${this.slug}`, this.theme); }
+      catch (e) { /* localStorage indisponível: tema só nesta sessão */ }
+      this.$nextTick(() => {
+        lucide.createIcons();      // garante o ícone (sol/lua) renderizado após a troca
+        this.renderAllCharts();    // canvas não reage a CSS: repinta os gráficos com a cor do tema novo
+      });
+    },
+
     init() {
       this.$nextTick(() => lucide.createIcons());
       if (this.apiToken) {
@@ -978,10 +989,12 @@ function parceiroApp() {
     // Cor do arco do gauge: verde (bom) -> amarelo (mais ou menos) -> vermelho (ruim).
     get financialScoreColor() {
       const score = this.financialScore;
-      if (score >= 800) return '#10b981'; // verde forte
-      if (score >= 650) return '#84cc16'; // verde
-      if (score >= 500) return '#facc15'; // amarelo
-      return '#ef4444';                   // vermelho
+      // No tema claro, as faixas vão pra tons mais escuros — verde/amarelo claros somem no fundo branco.
+      const light = this.theme === 'light';
+      if (score >= 800) return light ? '#059669' : '#10b981'; // verde forte
+      if (score >= 650) return light ? '#4d7c0f' : '#84cc16'; // verde
+      if (score >= 500) return light ? '#b45309' : '#facc15'; // amarelo/âmbar
+      return light ? '#dc2626' : '#ef4444';                   // vermelho
     },
 
     get financialScoreChecks() {
@@ -2416,8 +2429,8 @@ function parceiroApp() {
           labels: series.map((d) => d.label),
           datasets: [{
             data: series.map((d) => d.value),
-            borderColor: '#facc15',
-            backgroundColor: 'rgba(250,204,21,.12)',
+            borderColor: this.theme === 'light' ? '#1e40af' : '#facc15',
+            backgroundColor: this.theme === 'light' ? 'rgba(30,64,175,.12)' : 'rgba(250,204,21,.12)',
             borderWidth: 2,
             tension: .35,
             pointRadius: 0,
@@ -2762,6 +2775,7 @@ function parceiroApp() {
       if (window._financeRevenuePosChart) window._financeRevenuePosChart.destroy();
 
       const series = this.financeRevenueSeries30d;
+      const light = this.theme === 'light';
       window._financeRevenuePosChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -2769,13 +2783,13 @@ function parceiroApp() {
           datasets: [{
             label: 'Vendas',
             data: series.map((d) => d.value),
-            borderColor: '#ffd000',
-            backgroundColor: 'rgba(255, 208, 0, 0.14)',
+            borderColor: light ? '#1e40af' : '#ffd000',
+            backgroundColor: light ? 'rgba(30, 64, 175, 0.10)' : 'rgba(255, 208, 0, 0.14)',
             fill: true,
             tension: 0.36,
             pointRadius: 2.4,
             pointHoverRadius: 4,
-            pointBackgroundColor: '#ffd000',
+            pointBackgroundColor: light ? '#1e40af' : '#ffd000',
             borderWidth: 2,
           }],
         },
@@ -2784,19 +2798,19 @@ function parceiroApp() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#05080b',
-              borderColor: 'rgba(255,255,255,.12)',
+              backgroundColor: light ? '#0f172a' : '#05080b',
+              borderColor: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.12)',
               borderWidth: 1,
               padding: 10,
               callbacks: { label: (item) => this.money(item.parsed.y) },
             },
           },
           scales: {
-            x: { grid: { display: false }, ticks: { color: '#8b949e', maxTicksLimit: 7, font: { size: 11 } }, border: { color: 'rgba(255,255,255,.1)' } },
+            x: { grid: { display: false }, ticks: { color: light ? '#64748b' : '#8b949e', maxTicksLimit: 7, font: { size: 11 } }, border: { color: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.1)' } },
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(255,255,255,.07)' },
-              ticks: { color: '#8b949e', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') },
+              grid: { color: light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.07)' },
+              ticks: { color: light ? '#64748b' : '#8b949e', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') },
               border: { display: false },
             },
           },
@@ -2811,6 +2825,7 @@ function parceiroApp() {
 
       const split = this.financeCostSplit;
       const totalCostsLabel = this.money(this.totalCusts);
+      const light = this.theme === 'light';
       window._financeCostsPosChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -2818,9 +2833,9 @@ function parceiroApp() {
           datasets: [{
             data: split.map((item) => item.value),
             backgroundColor: split.map((item) => item.color === '#dc3f4d' ? '#c94b57' : item.color),
-            borderColor: '#11161b',
+            borderColor: light ? '#ffffff' : '#11161b',
             borderWidth: 5,
-            hoverBorderColor: '#11161b',
+            hoverBorderColor: light ? '#ffffff' : '#11161b',
           }],
         },
         options: {
@@ -2828,10 +2843,10 @@ function parceiroApp() {
           cutout: '68%',
           layout: { padding: { bottom: 8 } },
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
+            legend: { position: 'bottom', labels: { color: light ? '#475569' : '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
             tooltip: {
-              backgroundColor: '#05080b',
-              borderColor: 'rgba(255,255,255,.12)',
+              backgroundColor: light ? '#0f172a' : '#05080b',
+              borderColor: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.12)',
               borderWidth: 1,
               padding: 10,
               callbacks: { label: (item) => `${item.label}: ${this.money(item.parsed)}` },
@@ -2859,10 +2874,10 @@ function parceiroApp() {
             canvasCtx.textBaseline = 'middle';
             // Offsets simétricos em torno de cy para o bloco (valor + rótulo)
             // ficar visualmente centralizado no buraco do donut.
-            canvasCtx.fillStyle = '#f8fafc';
+            canvasCtx.fillStyle = light ? '#0f172a' : '#f8fafc';
             canvasCtx.font = '700 15px Inter, system-ui, sans-serif';
             canvasCtx.fillText(totalCostsLabel, cx, cy - 9);
-            canvasCtx.fillStyle = '#9ca3af';
+            canvasCtx.fillStyle = light ? '#64748b' : '#9ca3af';
             canvasCtx.font = '400 10px Inter, system-ui, sans-serif';
             canvasCtx.fillText('Custos', cx, cy + 9);
             canvasCtx.restore();
