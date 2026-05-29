@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260529-itens-vendidos" />
+  <link rel="stylesheet" href="./style.css?v=20260529-entrega" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -98,6 +98,11 @@
           <i data-lucide="shopping-cart"></i>
           <span>Frente de caixa</span>
           <kbd>F2</kbd>
+        </button>
+        <button @click="goToSection('entrega')" class="pos-nav-item" :class="currentSection === 'entrega' && 'active'">
+          <i data-lucide="truck"></i>
+          <span>Entrega</span>
+          <kbd>F4</kbd>
         </button>
         <button @click="goToSection('clientes')" class="pos-nav-item" :class="currentSection === 'clientes' && 'active'">
           <i data-lucide="user"></i>
@@ -775,6 +780,70 @@
         </div>
       </section>
 
+      <section x-show="currentSection === 'entrega'" class="pos-workspace">
+        <div class="pos-page-grid">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head">
+              <div>
+                <h3>Entregas</h3>
+                <p>Vendas marcadas como entrega — acompanhe o status e quem leva</p>
+              </div>
+              <div class="pos-delivery-toolbar">
+                <button :class="!deliveryShowDone && 'active'" @click="deliveryShowDone = false">
+                  Em aberto <em x-text="deliveryOpenCount"></em>
+                </button>
+                <button :class="deliveryShowDone && 'active'" @click="deliveryShowDone = true">Entregues</button>
+              </div>
+            </div>
+
+            <datalist id="courier-suggestions">
+              <template x-for="name in recentCouriers" :key="name"><option :value="name"></option></template>
+            </datalist>
+
+            <template x-for="zone in deliveriesByZone" :key="zone.label">
+              <div class="pos-delivery-zone">
+                <h4><i data-lucide="map-pin"></i> <span x-text="zone.label"></span><em x-text="zone.items.length + ' entrega(s)'"></em></h4>
+                <div class="pos-delivery-grid">
+                  <template x-for="d in zone.items" :key="d.order_id">
+                    <article class="pos-delivery-card" :class="d.delivery_status">
+                      <div class="pos-delivery-card-head">
+                        <div class="pos-delivery-who">
+                          <strong x-text="d.customer_name || 'Cliente'"></strong>
+                          <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')" x-text="formatPhoneDisplay(d.customer_phone)"></a>
+                        </div>
+                        <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
+                      </div>
+                      <p class="pos-delivery-address"><i data-lucide="map-pin"></i> <span x-text="d.delivery_address || 'Sem endereço informado'"></span></p>
+                      <p class="pos-delivery-items" x-text="deliveryItemsLabel(d)"></p>
+                      <div class="pos-delivery-foot">
+                        <strong x-text="money(d.total_amount)"></strong>
+                        <input list="courier-suggestions" class="pos-delivery-courier" placeholder="Entregador"
+                               :value="d.delivery_courier || ''"
+                               @input="deliveryDrafts[d.order_id] = $event.target.value" />
+                      </div>
+                      <div class="pos-delivery-actions">
+                        <button x-show="d.delivery_status === 'pending'" class="dispatch" @click="setDeliveryStatus(d, 'dispatched')" :disabled="isSaving('delivery-' + d.order_id)">
+                          <i data-lucide="bike"></i> Saiu pra entrega
+                        </button>
+                        <button x-show="d.delivery_status === 'dispatched'" class="done" @click="setDeliveryStatus(d, 'delivered')" :disabled="isSaving('delivery-' + d.order_id)">
+                          <i data-lucide="check"></i> Marcar entregue
+                        </button>
+                        <button x-show="d.delivery_status !== 'pending'" class="undo" @click="setDeliveryStatus(d, 'pending')" :disabled="isSaving('delivery-' + d.order_id)" title="Voltar pra pendente">
+                          <i data-lucide="rotate-ccw"></i>
+                        </button>
+                      </div>
+                    </article>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <div x-show="!deliveriesByZone.length" class="pos-empty">
+              Nenhuma entrega <span x-text="deliveryShowDone ? 'entregue' : 'em aberto'"></span>.
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section x-show="currentSection === 'financeiro'" class="pos-workspace">
         <div class="pos-page-grid finance">
           <section class="pos-panel pos-data-panel">
@@ -1047,6 +1116,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260529-itens-vendidos"></script>
+<script src="./app.js?v=20260529-entrega"></script>
 </body>
 </html>

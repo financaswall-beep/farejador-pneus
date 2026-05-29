@@ -38,6 +38,7 @@ import {
   deletePartnerCustomer,
   updatePartnerPayable,
   updatePartnerReceivable,
+  updatePartnerDeliveryStatus,
   upsertPartnerStock,
 } from './queries.js';
 
@@ -57,6 +58,11 @@ const saleParamsSchema = paramsSchema.extend({
 
 const stockParamsSchema = paramsSchema.extend({
   stockId: z.string().uuid(),
+});
+
+const deliverySchema = z.object({
+  delivery_status: z.enum(['pending', 'dispatched', 'delivered']),
+  delivery_courier: z.string().max(120).nullable().optional(),
 });
 
 const purchaseParamsSchema = paramsSchema.extend({
@@ -430,6 +436,26 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const result = await cancelPartnerSale(getPartnerContext(request), parsed.data.orderId);
     if (!result.cancelled) return reply.status(404).send({ error: 'order_not_found' });
     return reply.status(200).send(result);
+  });
+
+  // Entrega: atualiza status (pendente/saiu/entregue) e entregador de uma venda delivery.
+  fastify.post('/parceiro/:slug/api/entregas/:orderId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = saleParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'order_not_found' });
+    const parsed = deliverySchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+    try {
+      return reply.status(200).send(await updatePartnerDeliveryStatus(getPartnerContext(request), params.data.orderId, parsed.data));
+    } catch (err) {
+      if (err instanceof Error && err.message === 'delivery_not_found') {
+        return reply.status(404).send({ error: 'delivery_not_found' });
+      }
+      throw err;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/estoque', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {

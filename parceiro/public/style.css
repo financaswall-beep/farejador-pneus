@@ -1633,6 +1633,61 @@ html, body {
 .pos-footer span { display:flex; align-items:center; gap:8px; }
 .pos-footer svg { width:16px; }
 
+/* ─── Entrega ────────────────────────────────────────────────── */
+.pos-delivery-toolbar { display: flex; gap: 8px; }
+.pos-delivery-toolbar button {
+  height: 34px; padding: 0 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  border: 1px solid rgba(255,255,255,.12); color: #cbd5e1; background: rgba(255,255,255,.03);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.pos-delivery-toolbar button.active { background: var(--pos-yellow); color: #111; border-color: var(--pos-yellow); }
+.pos-delivery-toolbar em { font-style: normal; font-weight: 900; }
+
+.pos-delivery-zone { margin-top: 16px; }
+.pos-delivery-zone h4 {
+  display: flex; align-items: center; gap: 7px; margin: 0 0 10px;
+  font-size: 13px; font-weight: 800; color: #e5e7eb;
+}
+.pos-delivery-zone h4 svg { width: 15px; color: var(--pos-yellow); }
+.pos-delivery-zone h4 em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 600; color: #8b949e; }
+
+.pos-delivery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.pos-delivery-card {
+  border: 1px solid rgba(255,255,255,.08); border-left: 3px solid #6b7280; border-radius: 10px;
+  padding: 13px 14px; background: rgba(255,255,255,.025);
+  display: flex; flex-direction: column; gap: 9px;
+}
+.pos-delivery-card.dispatched { border-left-color: #60a5fa; }
+.pos-delivery-card.delivered { border-left-color: #22c55e; opacity: .82; }
+.pos-delivery-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pos-delivery-who strong { display: block; color: #fff; font-size: 14px; font-weight: 800; }
+.pos-delivery-who a { color: #93c5fd; font-size: 12px; text-decoration: none; }
+.pos-delivery-pill {
+  flex: 0 0 auto; font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
+  color: #cbd5e1; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+}
+.pos-delivery-pill.dispatched { color: #93c5fd; background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.4); }
+.pos-delivery-pill.delivered { color: #4ade80; background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
+.pos-delivery-address { margin: 0; display: flex; gap: 6px; color: #cbd5e1; font-size: 12.5px; line-height: 1.35; }
+.pos-delivery-address svg { width: 14px; flex: 0 0 auto; color: #8b949e; margin-top: 2px; }
+.pos-delivery-items { margin: 0; color: #9ca3af; font-size: 12px; }
+.pos-delivery-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pos-delivery-foot > strong { color: #4ade80; font-size: 15px; font-weight: 900; }
+.pos-delivery-courier {
+  width: 150px; height: 34px; border-radius: 7px; padding: 0 10px; font-size: 13px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.18); color: #e5e7eb; outline: none;
+}
+.pos-delivery-actions { display: flex; gap: 8px; }
+.pos-delivery-actions button {
+  height: 36px; border-radius: 8px; font-size: 12.5px; font-weight: 800; border: 0; flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+}
+.pos-delivery-actions button svg { width: 16px; }
+.pos-delivery-actions .dispatch { background: linear-gradient(180deg,#60a5fa,#3b82f6); color: #fff; }
+.pos-delivery-actions .done { background: linear-gradient(180deg,#34d399,#10b981); color: #06351f; }
+.pos-delivery-actions .undo { flex: 0 0 auto; width: 40px; background: rgba(255,255,255,.05); color: #cbd5e1; border: 1px solid rgba(255,255,255,.12); }
+.pos-delivery-actions button:disabled { opacity: .55; }
+
 /* Botao flutuante de finalizar e botao "voltar": so existem no celular (ver @media abaixo) */
 .pos-fab-finalize { display: none; }
 .pos-step-back { display: none; }

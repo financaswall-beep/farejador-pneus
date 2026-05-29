@@ -252,6 +252,7 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
               source_tag AS source,
               source_tag,
               status, payment_method, fulfillment_mode, delivery_address,
+              delivery_status, delivery_courier, dispatched_at, delivered_at,
               total_amount, received_amount, notes, items
        FROM commerce.partner_orders_full
        WHERE environment = $1 AND unit_id = $2
@@ -697,6 +698,63 @@ export async function cancelPartnerSale(
     ]);
 
     return { order_id: orderId, cancelled: true };
+  });
+}
+
+export interface UpdatePartnerDeliveryInput {
+  delivery_status: 'pending' | 'dispatched' | 'delivered';
+  delivery_courier?: string | null;
+}
+
+// Atualiza o estado operacional da entrega de uma venda (fulfillment_mode=delivery).
+// dispatched_at/delivered_at sao carimbados automaticamente conforme o status.
+export async function updatePartnerDeliveryStatus(
+  ctx: PartnerContext,
+  orderId: string,
+  input: UpdatePartnerDeliveryInput,
+): Promise<{ order_id: string; delivery_status: string }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const courier = normalizeText(input.delivery_courier);
+    const result = await client.query<{ id: string; delivery_status: string }>(
+      `UPDATE commerce.partner_orders
+       SET delivery_status = $4,
+           delivery_courier = COALESCE($5, delivery_courier),
+           dispatched_at = CASE
+             WHEN $4 IN ('dispatched', 'delivered') AND dispatched_at IS NULL THEN now()
+             WHEN $4 = 'pending' THEN NULL
+             ELSE dispatched_at
+           END,
+           delivered_at = CASE
+             WHEN $4 = 'delivered' THEN now()
+             ELSE NULL
+           END,
+           updated_at = now()
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND fulfillment_mode = 'delivery'
+         AND deleted_at IS NULL
+       RETURNING id, delivery_status`,
+      [orderId, ctx.environment, ctx.unitId, input.delivery_status, courier],
+    );
+
+    if (result.rowCount !== 1) throw new Error('delivery_not_found');
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, payload_after
+       ) VALUES ($1, 'partner_orders', 'commerce.partner_orders', $2,
+                 'partner_delivery_status_changed', $3, $4::jsonb)`,
+      [
+        ctx.environment,
+        orderId,
+        `partner:${ctx.slug}`,
+        JSON.stringify({ unit_id: ctx.unitId, delivery_status: input.delivery_status, delivery_courier: courier }),
+      ],
+    );
+
+    return { order_id: orderId, delivery_status: result.rows[0]!.delivery_status };
   });
 }
 

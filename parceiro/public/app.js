@@ -46,6 +46,9 @@ function parceiroApp() {
     // No desktop isMobile fica falso e os x-show mostram tudo junto (sem etapas).
     posMobileStep: 'select',
     isMobile: false,
+    // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
+    deliveryShowDone: false,
+    deliveryDrafts: {},
     posDiscountAmount: 0,
     posFreightAmount: 0,
     posReceivedAmount: null,
@@ -605,6 +608,85 @@ function parceiroApp() {
       const total = this.activeSales.length;
       if (!total) return 'sem vendas ainda';
       return `${Math.round((this.partnerSales.length / total) * 100)}% das vendas`;
+    },
+
+    // ─── ENTREGA ──────────────────────────────────────────────
+    // Toda venda marcada como entrega (deriva das vendas ja carregadas).
+    get deliveriesAll() {
+      return this.activeSales.filter((sale) => sale.fulfillment_mode === 'delivery');
+    },
+
+    // Em aberto = pendente + saiu; "entregues" quando o filtro pede.
+    get deliveries() {
+      return this.deliveriesAll.filter((d) => this.deliveryShowDone
+        ? d.delivery_status === 'delivered'
+        : d.delivery_status !== 'delivered');
+    },
+
+    get deliveryOpenCount() {
+      return this.deliveriesAll.filter((d) => d.delivery_status !== 'delivered').length;
+    },
+
+    // Agrupa por bairro/regiao extraido do endereco ("rua, num - bairro - cidade").
+    get deliveriesByZone() {
+      const groups = {};
+      for (const d of this.deliveries) {
+        const label = this.deliveryZone(d);
+        (groups[label] = groups[label] || []).push(d);
+      }
+      return Object.keys(groups)
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        .map((label) => ({ label, items: groups[label] }));
+    },
+
+    // Nomes de entregadores usados recentemente (sugestao no campo de texto livre).
+    get recentCouriers() {
+      const seen = [];
+      for (const d of this.deliveriesAll) {
+        const name = String(d.delivery_courier || '').trim();
+        if (name && !seen.includes(name)) seen.push(name);
+      }
+      return seen.slice(0, 8);
+    },
+
+    deliveryZone(sale) {
+      const addr = String(sale?.delivery_address || '').trim();
+      if (!addr) return 'Sem endereço';
+      const parts = addr.split(' - ').map((s) => s.trim()).filter(Boolean);
+      return parts.length >= 2 ? parts[parts.length - 2] : 'Outras entregas';
+    },
+
+    deliveryStatusLabel(status) {
+      if (status === 'dispatched') return 'Saiu pra entrega';
+      if (status === 'delivered') return 'Entregue';
+      return 'Pendente';
+    },
+
+    deliveryItemsLabel(sale) {
+      const items = Array.isArray(sale?.items) ? sale.items : [];
+      if (!items.length) return 'Sem itens';
+      return items
+        .map((item) => `${this.num(item.quantity)}× ${item.tire_size || item.item_name || 'item'}`)
+        .join(' · ');
+    },
+
+    async setDeliveryStatus(sale, status) {
+      if (!sale || !sale.order_id) return;
+      const courier = (this.deliveryDrafts[sale.order_id] ?? sale.delivery_courier ?? '').trim();
+      const action = `delivery-${sale.order_id}`;
+      this.saving = true; this.savingAction = action;
+      try {
+        await this.api(`entregas/${sale.order_id}`, {
+          method: 'POST',
+          body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null }),
+        });
+        await this.loadData();
+        this.flash(status === 'delivered' ? 'Entrega concluída.' : (status === 'dispatched' ? 'Saiu pra entrega.' : 'Entrega reaberta.'));
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
     },
 
     get stockBreakdown() {
