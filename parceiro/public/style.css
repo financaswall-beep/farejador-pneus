@@ -1810,7 +1810,8 @@ html, body {
     grid-template-areas:
       "medida medida venda"
       "qtd    status acoes";
-    gap: 6px 10px; padding: 11px 12px;
+    gap: 6px 10px; padding: 10px 12px;
+    font-size: 12px;   /* base menor: encolhe valor (Venda) e Qtd */
   }
   .pos-dark-table-row > :nth-child(1) { grid-area: medida; }   /* Medida + tipo */
   .pos-dark-table-row > :nth-child(2),                         /* Posicao  */
@@ -1821,10 +1822,13 @@ html, body {
   .pos-dark-table-row > :nth-child(7) { grid-area: status; justify-self: start; }
   .pos-dark-table-row > :nth-child(8) { grid-area: acoes; justify-self: end; }
   /* Medida: sem foto, label + selo do tipo lado a lado */
-  .pos-product-cell { display: flex; align-items: center; gap: 8px; }
+  .pos-product-cell { display: flex; align-items: center; gap: 7px; }
   .pos-product-cell .pos-tire-thumb { display: none; }
-  .pos-product-cell b { font-size: 15px; }
-  .pos-status-pill { min-width: 0; }
+  .pos-product-cell b { font-size: 14px; }
+  .pos-type-badge { font-size: 9px; margin-left: 0; }
+  .pos-status-pill { min-width: 0; height: 21px; font-size: 10px; padding: 0 7px; }
+  .pos-row-actions button { width: 26px; height: 26px; }
+  .pos-row-actions svg { width: 14px; height: 14px; }
 
   /* Cancelar venda rebaixado: vira link discreto pra nao competir com o Finalizar (evita toque errado) */
   .pos-cancel {
