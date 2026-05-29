@@ -6,6 +6,27 @@ Portal operacional da unidade parceira (borracheiro credenciado). Roda dentro do
 
 ---
 
+## 🧹 2026-05-28 — Backlog da auditoria zerado (5 itens) (Claude Opus 4.7)
+
+Resolução do backlog levantado na auditoria de UX/arquitetura do silo parceiro. Cinco itens, dois migrations novos (`0065`, `0066`), ambos aplicados em prod via MCP Supabase. Zero mudança em bot/matriz (silo isolado preservado).
+
+1. **Editar + excluir cliente** — antes só dava pra cadastrar. Agora:
+   - Clicar numa linha da tabela de Clientes carrega o cadastro no form (`editCustomer()`), com destaque verde na linha em edição. O form troca título/botão pra modo edição.
+   - `PUT /clientes/:id` (`updatePartnerCustomer`) faz `SET` direto (permite **trocar telefone** e **limpar campos** — não usa COALESCE). Conflito de telefone/CPF (Postgres 23505) vira `409 customer_phone_conflict`/`customer_cpf_conflict` com mensagem clara.
+   - `DELETE /clientes/:id` (`deletePartnerCustomer`) é **soft-delete** (`deleted_at = now()`). Pede `window.confirm()` antes. Índices únicos de telefone/CPF são parciais (`WHERE deleted_at IS NULL`), então telefone de cliente excluído fica livre pra reuso.
+
+2. **HTML morto removido** — `index.html` tinha ~1.100 linhas de um bloco Tailwind antigo (o portal pré-redesign) que nunca renderizava. Deletado. O toast (preso dentro do bloco morto) foi realocado pra UI viva. Arquivo: 2.245 → ~1.010 linhas.
+
+3. **Dualidade do VIP resolvida** — VIP **automático por nº de compras** (`customerIsVip()`, hoje 3) é a **única** fonte da verdade. Removidos todos os caminhos de escrita mortos: a coluna `is_vip` não é mais escrita (upsert), o endpoint `PATCH /clientes/:id/vip`, o schema e a query `updatePartnerCustomerVip`. A coluna `is_vip` (migration 0062) fica morta no banco; sem dropar pra não arriscar.
+
+4. **Desconto / frete / observação no PDV ativo** — antes o desconto só existia por item. Agora a aside de resumo do PDV tem inputs de **Desconto** e **Frete** (máscara BRL) + textarea de **Observação**. Persistidos no banco (migration `0065`): `partner_orders.discount_amount`/`freight_amount`, e `commerce.register_partner_local_order` recalcula `total := GREATEST(subtotal - desconto + frete, 0)`. **O total exibido = o total gravado** — sem divergência entre tela e contabilidade.
+
+5. **`customer_id` em contas a receber manuais** — antes `customer_name` era texto livre, desvinculado do cadastro. Migration `0066` adiciona `finance.partner_receivables.customer_id` (FK → `commerce.partner_customers` `ON DELETE SET NULL` — excluir cliente desvincula, não apaga a conta). O form de conta a receber agora tem busca de cliente com vínculo/desvínculo, igual ao PDV. `customer_name` continua como rótulo livre/fallback. A venda a prazo já vincula o `customer_id` automaticamente.
+
+Cache-bust → `v=20260528-dark-portal-2`. Migrations aplicadas em prod: `0065_partner_orders_discount_freight`, `0066_partner_receivables_customer_id`.
+
+---
+
 ## 👥 2026-05-28 — Tela Clientes + cadastro de cliente no PDV (Claude Opus 4.7)
 
 Trabalho focado no cadastro de clientes e no vínculo cliente↔venda no frente de caixa. Dois migrations novos: `0063_partner_customers_address_parts` (colunas `address_street`, `address_neighborhood`, `address_city`) e `0064_partner_customers_address_number` (coluna `address_number`). Ambos aplicados em prod via MCP Supabase.
@@ -13,7 +34,7 @@ Trabalho focado no cadastro de clientes e no vínculo cliente↔venda no frente 
 ### Cadastro de cliente
 - **CPF removido** do cadastro e do frente de caixa. Decisão do Wallace: "ninguém confia em passar CPF pra uma borracharia". Backend ainda aceita `cpf` opcional (não enviado pelo frontend); coluna preservada pra dados legados.
 - **Endereço em campos separados**: Rua, Número, Bairro, Município (antes era um campo "Rua" único). `customerAddressLine()` monta a linha de exibição (`rua, número - bairro - município`), com fallback pro campo `address` legado.
-- **VIP automático**: cliente vira VIP ao atingir `vipMinPurchases` compras (hoje **3**). É calculado no frontend (`customerIsVip()` conta `customerSales()`), não mais um toggle manual. A coluna VIP da lista virou indicador read-only. O endpoint `PATCH /clientes/:id/vip` ficou sem uso pelo frontend mas foi **mantido** (VIP manual futuro).
+- **VIP automático**: cliente vira VIP ao atingir `vipMinPurchases` compras (hoje **3**). É calculado no frontend (`customerIsVip()` conta `customerSales()`), não mais um toggle manual. A coluna VIP da lista virou indicador read-only. _(Atualizado 2026-05-28: o endpoint `PATCH /clientes/:id/vip` e a coluna-fonte foram removidos — VIP automático é a única fonte da verdade. Ver seção "Backlog da auditoria zerado".)_
 
 ### Vínculo cliente ↔ venda no frente de caixa
 - **Busca + vínculo**: digitar nome/telefone no painel "Dados do cliente" → clicar no resultado → `selectPartnerCustomer()` grava `saleForm.customer_id`. A venda vai com `customer_id` preenchido. (já existia)
@@ -32,7 +53,7 @@ Trabalho focado no cadastro de clientes e no vínculo cliente↔venda no frente 
 - **Frente de caixa**: busca (`/clientes/buscar`), vínculo e cadastro inline; a venda faz upsert/link via `customer_id`.
 - **Resumo / vendas recentes**: exibem `customer_name`.
 - **Histórico do cliente**: `customerSales` / `customerTotalSpent` / `customerLastSaleLabel` casam `this.vendas` por `customer_id` (e por telefone/cpf legado).
-- **Gap conhecido**: em Financeiro → contas a receber, `customer_name` é texto livre, **não** vinculado ao cadastro. Backlog.
+- ~~**Gap conhecido**: em Financeiro → contas a receber, `customer_name` é texto livre, **não** vinculado ao cadastro.~~ _Resolvido 2026-05-28 (migration 0066): contas a receber têm `customer_id` com busca/vínculo. Ver "Backlog da auditoria zerado"._
 
 ---
 

@@ -49,6 +49,8 @@ export interface RegisterPartnerSaleInput {
   delivery_address?: string | null;
   notes?: string | null;
   received_amount?: number | null;
+  discount_amount?: number | null;
+  freight_amount?: number | null;
   source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
   idempotency_key: string;
 }
@@ -140,6 +142,7 @@ export type UpdatePartnerPayableInput = Pick<
 >;
 
 export interface RegisterPartnerReceivableInput {
+  customer_id?: string | null;
   customer_name?: string | null;
   description: string;
   source_tag?: 'porta' | '2w' | 'walkin_balcao' | 'walkin_telefone' | 'outro' | null;
@@ -154,7 +157,7 @@ export interface RegisterPartnerReceivableInput {
 
 export type UpdatePartnerReceivableInput = Pick<
   RegisterPartnerReceivableInput,
-  'customer_name' | 'description' | 'source_tag' | 'amount' | 'due_date' | 'notes'
+  'customer_id' | 'customer_name' | 'description' | 'source_tag' | 'amount' | 'due_date' | 'notes'
 >;
 
 export interface SettlePartnerPayableInput {
@@ -412,7 +415,7 @@ export async function getPartnerPayables(ctx: PartnerContext): Promise<unknown[]
 export async function getPartnerReceivables(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT pr.id, pr.customer_name, pr.description, pr.source_tag, pr.amount, pr.due_date,
+      `SELECT pr.id, pr.customer_id, pr.customer_name, pr.description, pr.source_tag, pr.amount, pr.due_date,
               pr.status, pr.received_at, pr.payment_method, pr.notes, pr.created_at,
               COALESCE(jsonb_agg(jsonb_build_object(
                 'id', pri.id,
@@ -518,7 +521,7 @@ export async function registerPartnerSale(
 
       const result = await client.query<{ order_id: string }>(
         `SELECT commerce.register_partner_local_order(
-           $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11
+           $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13
          ) AS order_id`,
         [
           ctx.environment,
@@ -532,6 +535,8 @@ export async function registerPartnerSale(
           `partner:${ctx.slug}`,
           input.idempotency_key,
           input.source_tag ?? 'porta',
+          input.discount_amount ?? 0,
+          input.freight_amount ?? 0,
         ],
       );
       const orderId = result.rows[0]!.order_id;
@@ -579,12 +584,12 @@ export async function registerPartnerSale(
 
         const receivableResult = await client.query<{ id: string }>(
           `INSERT INTO finance.partner_receivables (
-             environment, unit_id, customer_name, description, source_tag, amount,
+             environment, unit_id, customer_id, customer_name, description, source_tag, amount,
              due_date, status, received_at, payment_method, notes, created_by,
              idempotency_key, source_order_id
            ) VALUES (
-             $1, $2, $3, $4, COALESCE($5, 'porta'), $6,
-             $7::date, 'open', NULL, NULL, $8, $9, $10, $11
+             $1, $2, $3, $4, $5, COALESCE($6, 'porta'), $7,
+             $8::date, 'open', NULL, NULL, $9, $10, $11, $12
            )
            ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
            DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
@@ -592,6 +597,7 @@ export async function registerPartnerSale(
           [
             ctx.environment,
             ctx.unitId,
+            customerId,
             input.customer_name ?? row.customer_name ?? null,
             `Venda a receber ${orderId.slice(0, 8)}`,
             input.source_tag ?? 'porta',
@@ -732,7 +738,6 @@ async function upsertPartnerCustomerWithClient(
   const addressNumber = normalizeText(input.address_number);
   const addressNeighborhood = normalizeText(input.address_neighborhood);
   const addressCity = normalizeText(input.address_city);
-  const isVip = input.is_vip === true;
   const existing = await client.query<{ id: string }>(
     `SELECT id
      FROM commerce.partner_customers
@@ -759,8 +764,7 @@ async function upsertPartnerCustomerWithClient(
            address_street = COALESCE($8, address_street),
            address_neighborhood = COALESCE($9, address_neighborhood),
            address_city = COALESCE($10, address_city),
-           is_vip = $11,
-           address_number = COALESCE($12, address_number)
+           address_number = COALESCE($11, address_number)
        WHERE id = $1
          AND environment = $2
          AND unit_id = $3`,
@@ -775,7 +779,6 @@ async function upsertPartnerCustomerWithClient(
         addressStreet,
         addressNeighborhood,
         addressCity,
-        isVip,
         addressNumber,
       ],
     );
@@ -786,8 +789,8 @@ async function upsertPartnerCustomerWithClient(
     `INSERT INTO commerce.partner_customers (
        environment, unit_id, name, phone, cpf, address,
        address_street, address_neighborhood, address_city,
-       is_vip, idempotency_key, address_number
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       idempotency_key, address_number
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
      DO UPDATE SET
        name = EXCLUDED.name,
@@ -797,8 +800,7 @@ async function upsertPartnerCustomerWithClient(
        address_street = COALESCE(EXCLUDED.address_street, commerce.partner_customers.address_street),
        address_number = COALESCE(EXCLUDED.address_number, commerce.partner_customers.address_number),
        address_neighborhood = COALESCE(EXCLUDED.address_neighborhood, commerce.partner_customers.address_neighborhood),
-       address_city = COALESCE(EXCLUDED.address_city, commerce.partner_customers.address_city),
-       is_vip = EXCLUDED.is_vip
+       address_city = COALESCE(EXCLUDED.address_city, commerce.partner_customers.address_city)
      RETURNING id`,
     [
       ctx.environment,
@@ -810,7 +812,6 @@ async function upsertPartnerCustomerWithClient(
       addressStreet,
       addressNeighborhood,
       addressCity,
-      isVip,
       input.idempotency_key ?? null,
       addressNumber,
     ],
@@ -827,25 +828,85 @@ export async function createPartnerCustomer(
   }));
 }
 
-export async function updatePartnerCustomerVip(
+export async function updatePartnerCustomer(
   ctx: PartnerContext,
   customerId: string,
-  isVip: boolean,
-): Promise<{ customer_id: string; is_vip: boolean }> {
+  input: PartnerCustomerInput,
+): Promise<{ customer_id: string }> {
+  const name = normalizeText(input.name);
+  if (!name) throw new Error('customer_name_required');
+
+  const phone = normalizeBrazilianPhone(input.phone);
+  const cpf = normalizeCpf(input.cpf);
+  const address = normalizeText(input.address);
+  const addressStreet = normalizeText(input.address_street);
+  const addressNumber = normalizeText(input.address_number);
+  const addressNeighborhood = normalizeText(input.address_neighborhood);
+  const addressCity = normalizeText(input.address_city);
+
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query<{ id: string; is_vip: boolean }>(
+    let result;
+    try {
+      result = await client.query<{ id: string }>(
+        `UPDATE commerce.partner_customers
+         SET name = $4,
+             phone = $5,
+             cpf = $6,
+             address = $7,
+             address_street = $8,
+             address_number = $9,
+             address_neighborhood = $10,
+             address_city = $11
+         WHERE id = $1
+           AND environment = $2
+           AND unit_id = $3
+           AND deleted_at IS NULL
+         RETURNING id`,
+        [
+          customerId,
+          ctx.environment,
+          ctx.unitId,
+          name,
+          phone,
+          cpf,
+          address,
+          addressStreet,
+          addressNumber,
+          addressNeighborhood,
+          addressCity,
+        ],
+      );
+    } catch (err) {
+      if ((err as { code?: string })?.code === '23505') {
+        const constraint = (err as { constraint?: string })?.constraint ?? '';
+        throw new Error(constraint.includes('cpf') ? 'customer_cpf_conflict' : 'customer_phone_conflict');
+      }
+      throw err;
+    }
+    const row = result.rows[0];
+    if (!row) throw new Error('customer_not_found');
+    return { customer_id: row.id };
+  });
+}
+
+export async function deletePartnerCustomer(
+  ctx: PartnerContext,
+  customerId: string,
+): Promise<{ customer_id: string }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<{ id: string }>(
       `UPDATE commerce.partner_customers
-       SET is_vip = $4
+       SET deleted_at = now()
        WHERE id = $1
          AND environment = $2
          AND unit_id = $3
          AND deleted_at IS NULL
-       RETURNING id, is_vip`,
-      [customerId, ctx.environment, ctx.unitId, isVip],
+       RETURNING id`,
+      [customerId, ctx.environment, ctx.unitId],
     );
     const row = result.rows[0];
     if (!row) throw new Error('customer_not_found');
-    return { customer_id: row.id, is_vip: row.is_vip };
+    return { customer_id: row.id };
   });
 }
 
@@ -1800,16 +1861,17 @@ export async function registerPartnerReceivable(
     const status = input.status ?? 'open';
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_receivables (
-         environment, unit_id, customer_name, description, source_tag, amount,
+         environment, unit_id, customer_id, customer_name, description, source_tag, amount,
          due_date, status, received_at, payment_method, notes, created_by, idempotency_key
-       ) VALUES ($1, $2, $3, $4, COALESCE($5, 'porta'), $6,
-                 $7::date, $8, $9::timestamptz, $10, $11, $12, $13)
+       ) VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'porta'), $7,
+                 $8::date, $9, $10::timestamptz, $11, $12, $13, $14)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
       [
         ctx.environment,
         ctx.unitId,
+        input.customer_id ?? null,
         normalizeText(input.customer_name),
         input.description,
         input.source_tag ?? 'porta',
@@ -1906,12 +1968,13 @@ export async function updatePartnerReceivable(
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_receivables
-       SET customer_name = $4,
-           description = $5,
-           source_tag = COALESCE($6, 'porta'),
-           amount = $7,
-           due_date = $8::date,
-           notes = $9
+       SET customer_id = $4,
+           customer_name = $5,
+           description = $6,
+           source_tag = COALESCE($7, 'porta'),
+           amount = $8,
+           due_date = $9::date,
+           notes = $10
        WHERE id = $1
          AND environment = $2
          AND unit_id = $3
@@ -1922,6 +1985,7 @@ export async function updatePartnerReceivable(
         receivableId,
         ctx.environment,
         ctx.unitId,
+        input.customer_id ?? null,
         normalizeText(input.customer_name),
         input.description,
         input.source_tag ?? 'porta',

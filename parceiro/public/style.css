@@ -928,6 +928,55 @@ html, body {
   border-color: rgba(255,255,255,.16);
 }
 
+.pos-form-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  color: #fca5a5;
+  background: rgba(239,68,68,.08);
+  border: 1px solid rgba(239,68,68,.35);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pos-form-delete:hover { background: rgba(239,68,68,.16); color: #fecaca; }
+.pos-form-delete:disabled { opacity: .55; }
+.pos-form-delete svg { width: 16px; height: 16px; }
+
+.pos-receivable-customer { position: relative; }
+.pos-customer-linked {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 5px;
+  font-size: 11px; font-weight: 800; color: #6ee7b7;
+}
+.pos-customer-linked svg { width: 13px; height: 13px; }
+.pos-customer-linked button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px; color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.3); background: rgba(239,68,68,.08);
+}
+.pos-customer-linked button svg { width: 11px; height: 11px; }
+.pos-receivable-customer-results {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 30; margin-top: 4px;
+  background: #0b1a2f; border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); overflow: hidden;
+}
+.pos-receivable-customer-results button {
+  display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left;
+  padding: 8px 11px; color: #e5e7eb; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.pos-receivable-customer-results button:hover { background: rgba(255,255,255,.05); }
+.pos-receivable-customer-results b { font-size: 13px; }
+.pos-receivable-customer-results small { font-size: 11px; color: #9ca3af; }
+
+.pos-customer-row-clickable { cursor: pointer; }
+.pos-customer-row-editing {
+  background: rgba(16,185,129,.10) !important;
+  box-shadow: inset 2px 0 0 #10b981;
+}
+
 .pos-two-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1450,6 +1499,18 @@ html, body {
   height:39px; border:1px solid rgba(255,255,255,.1); border-radius:6px; background:rgba(0,0,0,.16);
   color:#d1d5db; text-align:right; padding:0 12px; outline:none;
 }
+.pos-adjust-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:4px; }
+.pos-adjust-row label { display:block; margin:0; }
+.pos-adjust-row span { display:block; color:#9ca3af; font-size:11px; margin-bottom:5px; }
+.pos-adjust-row input {
+  width:100%; height:38px; border:1px solid rgba(255,255,255,.1); border-radius:6px;
+  background:rgba(0,0,0,.16); color:#d1d5db; text-align:right; padding:0 12px; outline:none; font-size:12px;
+}
+.pos-notes-input {
+  width:100%; border:1px solid rgba(255,255,255,.1); border-radius:6px; background:rgba(0,0,0,.16);
+  color:#d1d5db; padding:8px 12px; outline:none; font-size:12px; resize:vertical; margin-bottom:6px;
+}
+.pos-notes-input::placeholder { color:#6b7280; }
 .pos-total { border-top:1px solid rgba(255,255,255,.08); margin-top:10px; padding-top:16px; }
 .pos-total span { color:#fff; font-weight:800; }
 .pos-total strong { color:var(--pos-yellow); font-size:24px; }

@@ -71,8 +71,12 @@ function parceiroApp() {
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
-    receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null },
+    receivableForm: { customer_id: null, customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null },
+    receivableCustomerQuery: '',
+    receivableCustomerResults: [],
+    receivableCustomerSearchTimer: null,
     customerForm: { name: '', phone: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '' },
+    editingCustomerId: null,
 
     // VIP é automático: cliente vira VIP ao atingir este número de compras.
     vipMinPurchases: 3,
@@ -1184,6 +1188,92 @@ function parceiroApp() {
 
     clearCustomerForm() {
       this.customerForm = { name: '', phone: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '' };
+      this.editingCustomerId = null;
+    },
+
+    // Clique na linha da tabela: carrega o cliente no formulário para edição.
+    editCustomer(customer) {
+      if (!customer?.id) return;
+      this.editingCustomerId = customer.id;
+      this.customerForm = {
+        name: customer.name || '',
+        phone: customer.phone || '',
+        address_street: customer.address_street || '',
+        address_number: customer.address_number || '',
+        address_neighborhood: customer.address_neighborhood || '',
+        address_city: customer.address_city || '',
+      };
+      this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    },
+
+    // Botão do formulário de clientes: decide entre criar e atualizar.
+    saveCustomer() {
+      return this.editingCustomerId ? this.updateCustomer() : this.createPosCustomer();
+    },
+
+    customerPayloadFromForm() {
+      const streetWithNumber = [this.customerForm.address_street, this.customerForm.address_number]
+        .map((item) => String(item || '').trim()).filter(Boolean).join(', ');
+      const addressParts = [
+        streetWithNumber,
+        this.customerForm.address_neighborhood,
+        this.customerForm.address_city,
+      ].map((item) => String(item || '').trim()).filter(Boolean);
+      return {
+        name: this.customerForm.name.trim(),
+        phone: this.toE164Phone(this.customerForm.phone),
+        address: addressParts.join(' - ') || null,
+        address_street: this.customerForm.address_street?.trim() || null,
+        address_number: this.customerForm.address_number?.trim() || null,
+        address_neighborhood: this.customerForm.address_neighborhood?.trim() || null,
+        address_city: this.customerForm.address_city?.trim() || null,
+      };
+    },
+
+    async updateCustomer() {
+      if (!this.editingCustomerId) return;
+      if (!this.customerForm.name.trim()) {
+        this.flash('Informe o nome do cliente.');
+        return;
+      }
+      this.saving = true;
+      this.savingAction = 'customer';
+      try {
+        const payload = this.customerPayloadFromForm();
+        await this.api('clientes/' + this.editingCustomerId, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        this.clearCustomerForm();
+        this.flash('Cliente atualizado.');
+        await this.loadData();
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
+    },
+
+    async deleteCustomer() {
+      if (!this.editingCustomerId) return;
+      const name = this.customerForm.name.trim() || 'este cliente';
+      if (!window.confirm('Excluir ' + name + '? As vendas já registradas serão mantidas.')) return;
+      const id = this.editingCustomerId;
+      this.saving = true;
+      this.savingAction = 'customer';
+      try {
+        await this.api('clientes/' + id, { method: 'DELETE' });
+        this.clientes = this.clientes.filter((item) => item.id !== id);
+        this.clearCustomerForm();
+        this.flash('Cliente excluído.');
+        await this.loadData();
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false;
+        this.savingAction = '';
+      }
     },
 
     // VIP automático: cliente é VIP quando atinge vipMinPurchases compras.
@@ -1255,6 +1345,8 @@ function parceiroApp() {
             : null,
           notes: this.posNotes.trim() || null,
           received_amount: receivedAmount,
+          discount_amount: this.num(this.posDiscountAmount) || 0,
+          freight_amount: this.num(this.posFreightAmount) || 0,
           source_tag: this.saleForm.source_tag || 'porta',
           idempotency_key: stableIdempotencyKey,
         };
@@ -1707,6 +1799,7 @@ function parceiroApp() {
       this.savingAction = 'receivable';
       try {
         const payload = {
+          customer_id: this.receivableForm.customer_id || null,
           customer_name: this.receivableForm.customer_name.trim() || null,
           description: this.receivableForm.description.trim(),
           source_tag: this.receivableForm.source_tag || 'porta',
@@ -1781,7 +1874,9 @@ function parceiroApp() {
 
     resetReceivableForm() {
       this.editingReceivableId = null;
-      this.receivableForm = { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null };
+      this.receivableForm = { customer_id: null, customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null };
+      this.receivableCustomerQuery = '';
+      this.receivableCustomerResults = [];
     },
 
     editReceivable(receivable) {
@@ -1791,6 +1886,7 @@ function parceiroApp() {
       }
       this.editingReceivableId = receivable.id;
       this.receivableForm = {
+        customer_id: receivable.customer_id || null,
         customer_name: receivable.customer_name || '',
         description: receivable.description || '',
         source_tag: receivable.source_tag || 'porta',
@@ -1801,8 +1897,45 @@ function parceiroApp() {
         payment_method: receivable.payment_method || 'Pix',
         notes: receivable.notes ?? null,
       };
+      this.receivableCustomerQuery = receivable.customer_name || '';
+      this.receivableCustomerResults = [];
       document.querySelector('.pos-form-card.receivable')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       this.flash('Editando conta a receber em aberto.');
+    },
+
+    // Busca de cliente cadastrado para vincular na conta a receber.
+    searchReceivableCustomers() {
+      this.receivableForm.customer_id = null;
+      this.receivableForm.customer_name = this.receivableCustomerQuery;
+      clearTimeout(this.receivableCustomerSearchTimer);
+      const q = this.receivableCustomerQuery.trim();
+      if (q.length < 2) {
+        this.receivableCustomerResults = [];
+        return;
+      }
+      this.receivableCustomerSearchTimer = setTimeout(async () => {
+        try {
+          const result = await this.api(`clientes/buscar?q=${encodeURIComponent(q)}`, { method: 'GET' });
+          this.receivableCustomerResults = result.rows || [];
+        } catch {
+          this.receivableCustomerResults = [];
+        }
+      }, 250);
+    },
+
+    selectReceivableCustomer(customer) {
+      if (!customer) return;
+      this.receivableForm.customer_id = customer.id;
+      this.receivableForm.customer_name = customer.name || '';
+      this.receivableCustomerQuery = customer.name || '';
+      this.receivableCustomerResults = [];
+    },
+
+    clearReceivableCustomerLink() {
+      this.receivableForm.customer_id = null;
+      this.receivableForm.customer_name = '';
+      this.receivableCustomerQuery = '';
+      this.receivableCustomerResults = [];
     },
 
     async settlePayable(payableId) {
@@ -2659,8 +2792,14 @@ function parceiroApp() {
     },
 
     errMessage(err) {
-      if (err instanceof Error) return err.message;
-      return String(err);
+      const raw = err instanceof Error ? err.message : String(err);
+      const map = {
+        customer_phone_conflict: 'Já existe um cliente com esse telefone.',
+        customer_cpf_conflict: 'Já existe um cliente com esse CPF.',
+        customer_not_found: 'Cliente não encontrado.',
+        customer_name_required: 'Informe o nome do cliente.',
+      };
+      return map[raw] || raw;
     },
 
     flash(msg, kind) {

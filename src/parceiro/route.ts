@@ -34,7 +34,8 @@ import {
   settlePartnerPayable,
   settlePartnerReceivable,
   settlePartnerReceivableInstallment,
-  updatePartnerCustomerVip,
+  updatePartnerCustomer,
+  deletePartnerCustomer,
   updatePartnerPayable,
   updatePartnerReceivable,
   upsertPartnerStock,
@@ -98,6 +99,8 @@ const saleSchema = z.object({
   delivery_address: z.string().min(1).nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
   received_amount: z.number().nonnegative().nullable().optional(),
+  discount_amount: z.number().nonnegative().nullable().optional(),
+  freight_amount: z.number().nonnegative().nullable().optional(),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).optional(),
   idempotency_key: z.string().min(8),
 }).refine(
@@ -152,12 +155,8 @@ const customerSearchSchema = z.object({
   q: z.string().min(1).max(120),
 });
 
-const customerVipParamsSchema = paramsSchema.extend({
+const customerIdParamsSchema = paramsSchema.extend({
   customerId: z.string().uuid(),
-});
-
-const customerVipSchema = z.object({
-  is_vip: z.boolean(),
 });
 
 const purchaseSchema = z.object({
@@ -225,6 +224,7 @@ const payableUpdateSchema = payableSchema
   });
 
 const receivableSchema = z.object({
+  customer_id: z.string().uuid().nullable().optional(),
   customer_name: z.string().max(200).nullable().optional(),
   description: z.string().min(1).max(300),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).nullable().optional(),
@@ -333,14 +333,33 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await createPartnerCustomer(getPartnerContext(request), parsed.data));
   });
 
-  fastify.patch('/parceiro/:slug/api/clientes/:customerId/vip', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
-    const params = customerVipParamsSchema.safeParse(request.params);
-    const body = customerVipSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      return reply.status(400).send({ error: 'invalid_customer_vip_payload' });
+  fastify.put('/parceiro/:slug/api/clientes/:customerId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = customerIdParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_customer_id' });
+    const parsed = customerSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
     try {
-      return reply.status(200).send(await updatePartnerCustomerVip(getPartnerContext(request), params.data.customerId, body.data.is_vip));
+      return reply.status(200).send(await updatePartnerCustomer(getPartnerContext(request), params.data.customerId, parsed.data));
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message === 'customer_not_found') return reply.status(404).send({ error: 'customer_not_found' });
+        if (err.message === 'customer_phone_conflict') return reply.status(409).send({ error: 'customer_phone_conflict' });
+        if (err.message === 'customer_cpf_conflict') return reply.status(409).send({ error: 'customer_cpf_conflict' });
+        if (err.message === 'customer_name_required') return reply.status(400).send({ error: 'customer_name_required' });
+      }
+      throw err;
+    }
+  });
+
+  fastify.delete('/parceiro/:slug/api/clientes/:customerId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = customerIdParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_customer_id' });
+    try {
+      return reply.status(200).send(await deletePartnerCustomer(getPartnerContext(request), params.data.customerId));
     } catch (err) {
       if (err instanceof Error && err.message === 'customer_not_found') {
         return reply.status(404).send({ error: 'customer_not_found' });
