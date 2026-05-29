@@ -232,8 +232,8 @@
           <div><small>Com telefone</small><strong x-text="customersWithPhoneCount"></strong><span>prontos para contato</span></div>
         </article>
         <article>
-          <div class="pos-kpi-icon"><i data-lucide="id-card"></i></div>
-          <div><small>Com CPF</small><strong x-text="customersWithCpfCount"></strong><span>cadastro completo</span></div>
+          <div class="pos-kpi-icon"><i data-lucide="map-pin"></i></div>
+          <div><small>Com endereço</small><strong x-text="customersWithAddressCount"></strong><span>cadastro completo</span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="receipt"></i></div>
@@ -398,31 +398,20 @@
             <div class="pos-panel pos-client-panel">
               <h3>Dados do cliente <span>(opcional)</span></h3>
               <div class="pos-client-search">
-                <input x-model="posCustomerQuery" @input="onCustomerSearchInput()" placeholder="Buscar cliente por nome, telefone ou CPF..." />
+                <input x-model="posCustomerQuery" @input="onCustomerSearchInput()" placeholder="Buscar cliente por nome ou telefone..." />
                 <i data-lucide="search"></i>
-              </div>
-              <div class="pos-client-inline-fields">
-                <input type="tel"
-                       inputmode="numeric"
-                       :value="formatPhoneDisplay(saleForm.customer_phone)"
-                       @input="saleForm.customer_phone = onPhoneInput($event.target.value); $event.target.value = formatPhoneDisplay(saleForm.customer_phone)"
-                       placeholder="Telefone"
-                       maxlength="16" />
-                <input :value="saleForm.customer_cpf"
-                       @input="saleForm.customer_cpf = formatCpfInput($event.target.value); $event.target.value = saleForm.customer_cpf"
-                       placeholder="CPF" />
               </div>
               <div x-show="posCustomerResults.length" class="pos-customer-results">
                 <template x-for="customer in posCustomerResults.slice(0, 4)" :key="customer.id">
                   <button @click="selectPartnerCustomer(customer)">
                     <b x-text="customer.name"></b>
-                    <small x-text="[formatPhoneDisplay(customer.phone), formatCpfInput(customer.cpf)].filter(Boolean).join(' - ') || 'sem telefone'"></small>
+                    <small x-text="[formatPhoneDisplay(customer.phone), customerAddressLine(customer)].filter((item) => item && item !== '-').join(' - ') || 'sem telefone'"></small>
                   </button>
                 </template>
               </div>
               <div class="pos-client-data">
                 <small>Nome</small><strong x-text="saleForm.customer_name || 'Consumidor Final'"></strong>
-                <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span><span><small>CPF</small><b x-text="formatCpfInput(saleForm.customer_cpf) || '-'"></b></span></div>
+                <div><span><small>Telefone</small><b x-text="formatPhoneDisplay(saleForm.customer_phone) || '-'"></b></span></div>
               </div>
             </div>
             <div class="pos-panel pos-recent-panel">
@@ -515,7 +504,7 @@
             <div class="pos-customer-toolbar">
               <div class="pos-product-search">
                 <i data-lucide="search"></i>
-                <input x-model="customerListSearch" placeholder="Buscar por nome, telefone ou CPF..." />
+                <input x-model="customerListSearch" placeholder="Buscar por nome, telefone ou endereço..." />
               </div>
               <button @click="customerListSearch = ''" class="pos-outline-action compact">
                 <i data-lucide="x"></i> Limpar
@@ -527,7 +516,6 @@
                 <span>Cliente</span>
                 <span>VIP</span>
                 <span>Telefone</span>
-                <span>CPF</span>
                 <span>Endereço</span>
                 <span>Vendas</span>
                 <span>Total comprado</span>
@@ -540,13 +528,12 @@
                     <small x-text="'Cadastro em ' + formatDate(customer.created_at)"></small>
                   </span>
                   <span>
-                    <button @click="toggleCustomerVip(customer)" class="pos-vip-mini" :class="customer.is_vip && 'active'" :disabled="isSaving('customer-vip-' + customer.id)" :title="customer.is_vip ? 'Cliente VIP' : 'Marcar como VIP'">
+                    <span class="pos-vip-mini" :class="customerIsVip(customer) && 'active'" :title="customerIsVip(customer) ? ('Cliente VIP - ' + customerSales(customer).length + ' compras') : (customerSales(customer).length + ' de ' + vipMinPurchases + ' compras para VIP')">
                       <i data-lucide="star"></i>
-                    </button>
+                    </span>
                   </span>
                   <span x-text="formatPhoneDisplay(customer.phone) || '-'"></span>
-                  <span x-text="formatCpfInput(customer.cpf) || '-'"></span>
-                  <span x-text="customer.address || '-'"></span>
+                  <span x-text="customerAddressLine(customer)"></span>
                   <span class="pos-green-text" x-text="customerSales(customer).length"></span>
                   <span x-text="money(customerTotalSpent(customer))"></span>
                   <span x-text="customerLastSaleLabel(customer)"></span>
@@ -573,25 +560,31 @@
                          placeholder="(31) 99999-9999"
                          maxlength="16" />
                 </label>
-                <label>CPF
-                  <input :value="customerForm.cpf"
-                         @input="customerForm.cpf = formatCpfInput($event.target.value); $event.target.value = customerForm.cpf"
-                         placeholder="000.000.000-00" />
+                <label>Bairro
+                  <input x-model="customerForm.address_neighborhood" placeholder="Centro" />
                 </label>
               </div>
-              <label>Endereço
-                <input x-model="customerForm.address" placeholder="Rua, número, bairro" />
+              <div class="pos-customer-compact-row">
+                <label>Rua
+                  <input x-model="customerForm.address_street" placeholder="Ex: Av. Brasil" />
+                </label>
+                <label>Número
+                  <input x-model="customerForm.address_number" placeholder="123" />
+                </label>
+              </div>
+              <label>Município
+                <input x-model="customerForm.address_city" placeholder="Ex: Belo Horizonte" />
               </label>
               <button @click="createPosCustomer()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="user-plus"></i>
                 <span x-text="isSaving('customer') ? 'Salvando...' : 'Salvar cliente'"></span>
               </button>
-              <button @click="customerForm = { name: '', phone: '', cpf: '', address: '', is_vip: false }" class="pos-mini-clear">Limpar cadastro</button>
+              <button @click="clearCustomerForm()" class="pos-mini-clear">Limpar cadastro</button>
             </div>
             <div class="pos-divider"></div>
             <h3>Como usar</h3>
             <div class="pos-tip-list">
-              <div><i data-lucide="shopping-cart"></i><span>Na frente de caixa, busque o cliente pelo nome, telefone ou CPF.</span></div>
+              <div><i data-lucide="shopping-cart"></i><span>Na frente de caixa, busque o cliente pelo nome ou telefone.</span></div>
               <div><i data-lucide="receipt"></i><span>Vendas novas ficam vinculadas ao cliente quando ele é selecionado.</span></div>
               <div><i data-lucide="shield-check"></i><span>Os dados ficam só no silo do parceiro.</span></div>
             </div>

@@ -344,11 +344,11 @@ html, body {
 .pos-customer-table-head,
 .pos-customer-table-row {
   display: grid;
-  grid-template-columns: minmax(152px, 1.15fr) 46px minmax(118px, .9fr) minmax(118px, .86fr) minmax(150px, 1.1fr) 62px minmax(108px, .82fr) minmax(100px, .78fr);
+  grid-template-columns: minmax(152px, 1.15fr) 46px minmax(118px, .9fr) minmax(190px, 1.35fr) 62px minmax(108px, .82fr) minmax(100px, .78fr);
   gap: 12px;
   align-items: center;
   padding: 11px 14px;
-  min-width: 880px;
+  min-width: 820px;
 }
 
 .pos-customer-table-head {
@@ -1289,7 +1289,7 @@ html, body {
 .pos-client-inline-fields {
   margin-top:7px;
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:minmax(0, 1fr);
   gap:6px;
 }
 .pos-client-inline-fields input {
@@ -1326,6 +1326,12 @@ html, body {
 .pos-customer-results b { color:#e5e7eb; font-size:12px; }
 .pos-customer-results small { color:#8b949e; font-size:10px; margin-top:2px; }
 .pos-client-data { margin-top:8px; color:#d1d5db; font-size:10.5px; }
+.pos-client-data > strong {
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 800;
+}
 .pos-client-data strong,
 .pos-client-data b {
   display:block;
@@ -1337,7 +1343,7 @@ html, body {
 .pos-client-data small { display:block; color:#8b949e; font-size:9.5px; margin-top:5px; }
 .pos-client-data div {
   display:grid;
-  grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns:minmax(0, 1fr);
   gap:10px;
 }
 .pos-recent-panel {

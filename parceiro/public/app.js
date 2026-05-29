@@ -64,13 +64,16 @@ function parceiroApp() {
     clientes: [],
     customerListSearch: '',
 
-    saleForm: { customer_id: null, customer_name: '', customer_phone: '', customer_cpf: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
+    saleForm: { customer_id: null, customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
     stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
     receivableForm: { customer_name: '', description: '', source_tag: 'porta', amount: 0, due_date: '', status: 'open', received_at: '', payment_method: 'Pix', notes: null },
-    customerForm: { name: '', phone: '', cpf: '', address: '', is_vip: false },
+    customerForm: { name: '', phone: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '' },
+
+    // VIP é automático: cliente vira VIP ao atingir este número de compras.
+    vipMinPurchases: 3,
     editingPayableId: null,
     editingReceivableId: null,
 
@@ -257,10 +260,10 @@ function parceiroApp() {
       return list.filter((customer) => {
         const name = String(customer?.name || '').toLowerCase();
         const phone = String(customer?.phone || '').replace(/\D/g, '');
-        const cpf = String(customer?.cpf || '').replace(/\D/g, '');
+        const address = this.customerAddressLine(customer).toLowerCase();
         return name.includes(query)
           || (!!digits && phone.includes(digits))
-          || (!!digits && cpf.includes(digits));
+          || address.includes(query);
       });
     },
 
@@ -268,8 +271,8 @@ function parceiroApp() {
       return (this.clientes || []).filter((customer) => String(customer?.phone || '').trim()).length;
     },
 
-    get customersWithCpfCount() {
-      return (this.clientes || []).filter((customer) => String(customer?.cpf || '').trim()).length;
+    get customersWithAddressCount() {
+      return (this.clientes || []).filter((customer) => this.customerAddressLine(customer) !== '-').length;
     },
 
     get identifiedSalesCount() {
@@ -1086,7 +1089,6 @@ function parceiroApp() {
       this.saleForm.customer_id = customer.id;
       this.saleForm.customer_name = customer.name || '';
       this.saleForm.customer_phone = customer.phone || '';
-      this.saleForm.customer_cpf = this.formatCpfInput(customer.cpf || '');
       this.posCustomerQuery = customer.name || '';
       this.posCustomerResults = [];
       this.posCustomerFormOpen = false;
@@ -1097,19 +1099,24 @@ function parceiroApp() {
         this.flash('Informe o nome do cliente.');
         return;
       }
-      if (this.customerForm.cpf && !this.isValidCpf(this.customerForm.cpf)) {
-        this.flash('CPF inválido.');
-        return;
-      }
       this.saving = true;
       this.savingAction = 'customer';
       try {
+        const streetWithNumber = [this.customerForm.address_street, this.customerForm.address_number]
+          .map((item) => String(item || '').trim()).filter(Boolean).join(', ');
+        const addressParts = [
+          streetWithNumber,
+          this.customerForm.address_neighborhood,
+          this.customerForm.address_city,
+        ].map((item) => String(item || '').trim()).filter(Boolean);
         const payload = {
           name: this.customerForm.name.trim(),
           phone: this.toE164Phone(this.customerForm.phone),
-          cpf: this.cpfDigits(this.customerForm.cpf) || null,
-          address: this.customerForm.address?.trim() || null,
-          is_vip: this.customerForm.is_vip === true,
+          address: addressParts.join(' - ') || null,
+          address_street: this.customerForm.address_street?.trim() || null,
+          address_number: this.customerForm.address_number?.trim() || null,
+          address_neighborhood: this.customerForm.address_neighborhood?.trim() || null,
+          address_city: this.customerForm.address_city?.trim() || null,
           idempotency_key: this.uuid(),
         };
         const result = await this.api('clientes', {
@@ -1120,9 +1127,11 @@ function parceiroApp() {
           id: result.customer_id,
           name: payload.name,
           phone: payload.phone,
-          cpf: payload.cpf,
           address: payload.address,
-          is_vip: payload.is_vip,
+          address_street: payload.address_street,
+          address_number: payload.address_number,
+          address_neighborhood: payload.address_neighborhood,
+          address_city: payload.address_city,
           updated_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
         };
@@ -1131,7 +1140,7 @@ function parceiroApp() {
         } else {
           this.selectPartnerCustomer(customer);
         }
-        this.customerForm = { name: '', phone: '', cpf: '', address: '', is_vip: false };
+        this.clearCustomerForm();
         this.flash('Cliente cadastrado.');
         if (this.currentSection === 'clientes') {
           await this.loadData();
@@ -1144,23 +1153,13 @@ function parceiroApp() {
       }
     },
 
-    async toggleCustomerVip(customer) {
-      if (!customer?.id) return;
-      const previous = customer.is_vip === true;
-      const next = !previous;
-      customer.is_vip = next;
-      this.savingAction = `customer-vip-${customer.id}`;
-      try {
-        await this.api(`clientes/${customer.id}/vip`, {
-          method: 'PATCH',
-          body: JSON.stringify({ is_vip: next }),
-        });
-      } catch (err) {
-        customer.is_vip = previous;
-        this.flash(this.errMessage(err));
-      } finally {
-        this.savingAction = '';
-      }
+    clearCustomerForm() {
+      this.customerForm = { name: '', phone: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '' };
+    },
+
+    // VIP automático: cliente é VIP quando atinge vipMinPurchases compras.
+    customerIsVip(customer) {
+      return this.customerSales(customer).length >= this.vipMinPurchases;
     },
 
     async posFinalizeSale() {
@@ -1174,10 +1173,6 @@ function parceiroApp() {
       }
       if (this.saleForm.payment_status === 'receivable' && !this.saleForm.receivable_due_date) {
         this.flash('Informe a data para receber esta venda.');
-        return;
-      }
-      if (this.saleForm.customer_cpf && !this.isValidCpf(this.saleForm.customer_cpf)) {
-        this.flash('CPF inválido.');
         return;
       }
       const receivedAmount = this.saleForm.payment_status === 'receivable'
@@ -1195,7 +1190,6 @@ function parceiroApp() {
           customer_id: this.saleForm.customer_id || null,
           customer_name: this.saleForm.customer_name.trim() || null,
           customer_phone: this.toE164Phone(this.saleForm.customer_phone),
-          customer_cpf: this.cpfDigits(this.saleForm.customer_cpf) || null,
           items: this.posCart.map((item) => ({
             partner_stock_id: item.partner_stock_id,
             quantity: this.num(item.quantity) || 1,
@@ -1231,7 +1225,6 @@ function parceiroApp() {
           customer_id: null,
           customer_name: '',
           customer_phone: '',
-          customer_cpf: '',
           partner_stock_id: '',
           source_tag: sourceTag,
           quantity: 1,
@@ -1269,10 +1262,6 @@ function parceiroApp() {
         this.flash('Informe a data para receber esta venda.');
         return;
       }
-      if (this.saleForm.customer_cpf && !this.isValidCpf(this.saleForm.customer_cpf)) {
-        this.flash('CPF inválido.');
-        return;
-      }
       this.saving = true;
       this.savingAction = 'sale';
       try {
@@ -1281,7 +1270,6 @@ function parceiroApp() {
           customer_name: this.saleForm.customer_name.trim() || null,
           // Telefone vai pro banco em E.164 (+5521...). Estado local guarda sÃ³ dÃ­gitos.
           customer_phone: this.toE164Phone(this.saleForm.customer_phone),
-          customer_cpf: this.cpfDigits(this.saleForm.customer_cpf) || null,
           items: [{
             // Aponta direto pro estoque local do parceiro â€” sem catÃ¡logo da matriz.
             partner_stock_id: this.saleForm.partner_stock_id,
@@ -1310,7 +1298,7 @@ function parceiroApp() {
         });
         // Preserva preferÃªncias do operador (modalidade + pagamento) entre vendas
         this.saleForm = {
-          customer_id: null, customer_name: '', customer_phone: '', customer_cpf: '', partner_stock_id: '',
+          customer_id: null, customer_name: '', customer_phone: '', partner_stock_id: '',
           source_tag: this.saleForm.source_tag || 'porta',
           quantity: 1, unit_price: 0,
           payment_method: this.saleForm.payment_method,
@@ -2395,26 +2383,6 @@ function parceiroApp() {
       return String(value || '').replace(/\D/g, '').slice(0, 11);
     },
 
-    formatCpfInput(value) {
-      const d = this.cpfDigits(value);
-      return d
-        .replace(/^(\d{3})(\d)/, '$1.$2')
-        .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
-        .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
-    },
-
-    isValidCpf(value) {
-      const cpf = this.cpfDigits(value);
-      if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-      const calc = (base) => {
-        let sum = 0;
-        for (let i = 0; i < base; i += 1) sum += Number(cpf[i]) * (base + 1 - i);
-        const mod = (sum * 10) % 11;
-        return mod === 10 ? 0 : mod;
-      };
-      return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
-    },
-
     // Moeda BRL: estado guarda Number em reais (ex: 1234.50).
     // Input recebe dÃ­gitos puros, trata como centavos.
     onCurrencyInput(value) {
@@ -2614,6 +2582,17 @@ function parceiroApp() {
 
     customerTotalSpent(customer) {
       return this.customerSales(customer).reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
+    },
+
+    customerAddressLine(customer) {
+      const streetWithNumber = [customer?.address_street, customer?.address_number]
+        .map((item) => String(item || '').trim()).filter(Boolean).join(', ');
+      const parts = [
+        streetWithNumber,
+        customer?.address_neighborhood,
+        customer?.address_city,
+      ].map((item) => String(item || '').trim()).filter(Boolean);
+      return parts.join(' - ') || customer?.address || '-';
     },
 
     customerLastSaleLabel(customer) {

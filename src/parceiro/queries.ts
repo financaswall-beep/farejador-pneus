@@ -58,6 +58,10 @@ export interface PartnerCustomerInput {
   phone?: string | null;
   cpf?: string | null;
   address?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
   is_vip?: boolean | null;
   idempotency_key?: string | null;
 }
@@ -303,7 +307,9 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
 export async function getPartnerCustomers(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, name, phone, cpf, address, is_vip, created_at, updated_at
+      `SELECT id, name, phone, cpf, address,
+              address_street, address_number, address_neighborhood, address_city,
+              is_vip, created_at, updated_at
        FROM commerce.partner_customers
        WHERE environment = $1
          AND unit_id = $2
@@ -322,7 +328,9 @@ export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Pr
   const digits = search.replace(/\D/g, '');
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, name, phone, cpf, address, is_vip, created_at, updated_at
+      `SELECT id, name, phone, cpf, address,
+              address_street, address_number, address_neighborhood, address_city,
+              is_vip, created_at, updated_at
        FROM commerce.partner_customers
        WHERE environment = $1
          AND unit_id = $2
@@ -332,6 +340,9 @@ export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Pr
            OR ($4 <> '' AND phone LIKE $5)
            OR ($4 <> '' AND cpf LIKE $5)
            OR lower(COALESCE(address, '')) LIKE lower($3)
+           OR lower(COALESCE(address_street, '')) LIKE lower($3)
+           OR lower(COALESCE(address_neighborhood, '')) LIKE lower($3)
+           OR lower(COALESCE(address_city, '')) LIKE lower($3)
          )
        ORDER BY updated_at DESC
        LIMIT 30`,
@@ -717,6 +728,10 @@ async function upsertPartnerCustomerWithClient(
   const phone = normalizeBrazilianPhone(input.phone);
   const cpf = normalizeCpf(input.cpf);
   const address = normalizeText(input.address);
+  const addressStreet = normalizeText(input.address_street);
+  const addressNumber = normalizeText(input.address_number);
+  const addressNeighborhood = normalizeText(input.address_neighborhood);
+  const addressCity = normalizeText(input.address_city);
   const isVip = input.is_vip === true;
   const existing = await client.query<{ id: string }>(
     `SELECT id
@@ -741,28 +756,64 @@ async function upsertPartnerCustomerWithClient(
            phone = COALESCE($5, phone),
            cpf = COALESCE($6, cpf),
            address = COALESCE($7, address),
-           is_vip = $8
+           address_street = COALESCE($8, address_street),
+           address_neighborhood = COALESCE($9, address_neighborhood),
+           address_city = COALESCE($10, address_city),
+           is_vip = $11,
+           address_number = COALESCE($12, address_number)
        WHERE id = $1
          AND environment = $2
          AND unit_id = $3`,
-      [customerId, ctx.environment, ctx.unitId, name, phone, cpf, address, isVip],
+      [
+        customerId,
+        ctx.environment,
+        ctx.unitId,
+        name,
+        phone,
+        cpf,
+        address,
+        addressStreet,
+        addressNeighborhood,
+        addressCity,
+        isVip,
+        addressNumber,
+      ],
     );
     return customerId;
   }
 
   const inserted = await client.query<{ id: string }>(
     `INSERT INTO commerce.partner_customers (
-       environment, unit_id, name, phone, cpf, address, is_vip, idempotency_key
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       environment, unit_id, name, phone, cpf, address,
+       address_street, address_neighborhood, address_city,
+       is_vip, idempotency_key, address_number
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
      DO UPDATE SET
        name = EXCLUDED.name,
        phone = COALESCE(EXCLUDED.phone, commerce.partner_customers.phone),
        cpf = COALESCE(EXCLUDED.cpf, commerce.partner_customers.cpf),
        address = COALESCE(EXCLUDED.address, commerce.partner_customers.address),
+       address_street = COALESCE(EXCLUDED.address_street, commerce.partner_customers.address_street),
+       address_number = COALESCE(EXCLUDED.address_number, commerce.partner_customers.address_number),
+       address_neighborhood = COALESCE(EXCLUDED.address_neighborhood, commerce.partner_customers.address_neighborhood),
+       address_city = COALESCE(EXCLUDED.address_city, commerce.partner_customers.address_city),
        is_vip = EXCLUDED.is_vip
      RETURNING id`,
-    [ctx.environment, ctx.unitId, name, phone, cpf, address, isVip, input.idempotency_key ?? null],
+    [
+      ctx.environment,
+      ctx.unitId,
+      name,
+      phone,
+      cpf,
+      address,
+      addressStreet,
+      addressNeighborhood,
+      addressCity,
+      isVip,
+      input.idempotency_key ?? null,
+      addressNumber,
+    ],
   );
   return inserted.rows[0]?.id ?? null;
 }

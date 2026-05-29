@@ -140,6 +140,10 @@ const customerSchema = z.object({
   phone: z.string().min(1).max(40).nullable().optional(),
   cpf: z.string().min(11).max(14).nullable().optional(),
   address: z.string().max(500).nullable().optional(),
+  address_street: z.string().max(240).nullable().optional(),
+  address_number: z.string().max(40).nullable().optional(),
+  address_neighborhood: z.string().max(160).nullable().optional(),
+  address_city: z.string().max(160).nullable().optional(),
   is_vip: z.boolean().nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
 });
