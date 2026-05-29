@@ -36,7 +36,7 @@ Reclamação dos borracheiros: só dava pra cadastrar/vender **pneu**. Não havi
 - O "Score financeiro" (0–1000, lógica intacta) virou um **arco minimalista** (SVG, `stroke-dashoffset = 100 − score/10`) com o número no centro, em vez do número solto.
 - **Cor por faixa** (getter `financialScoreColor`): 🟢 ≥800 / 🟢 ≥650 / 🟡 ≥500 / 🔴 <500 — mesmas faixas do `financialScoreLevel` (Ótimo/Bom/Regular/Ruim). Transição suave no arco e na cor.
 
-**Migration pendente de aplicar em prod:** `0067_partner_item_type` (ainda **não** aplicada via MCP). As demais mudanças são frontend/app-layer. Cache-bust recomendado ao publicar.
+**Migration `0067_partner_item_type`: ✅ aplicada em prod em 2026-05-29 (via MCP).** Antes disso, como o código no ar já lia/gravava `item_type`, a coluna ausente derrubava `getPartnerEstoque`/`getPartnerProdutos` → o `Promise.all` do `loadData()` rejeitava → **todas** as telas ficavam vazias e os saves "não funcionavam". Aplicar a migration destravou tudo. As demais mudanças são frontend/app-layer. Cache-bust recomendado ao publicar.
 
 ---
 
