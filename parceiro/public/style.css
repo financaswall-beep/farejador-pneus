@@ -1650,8 +1650,10 @@ html, body {
    ============================================================ */
 @media (max-width: 768px) {
   /* iOS da zoom automatico ao focar input com fonte < 16px. Forcar 16px evita o zoom
-     sem desabilitar o pinch-to-zoom (mais acessivel que mexer no viewport). */
-  input, select, textarea { font-size: 16px; }
+     sem desabilitar o pinch-to-zoom (mais acessivel que mexer no viewport).
+     !important porque varios inputs tem fonte menor por classe (.pos-product-search input:13px,
+     .pos-client-search input:12px etc.) e classe ganha de tag — sem !important a regra perde. */
+  input, select, textarea { font-size: 16px !important; }
 
   /* Sidebar -> barra de abas fixa no rodape */
   .pos-shell { grid-template-columns: 1fr; }
