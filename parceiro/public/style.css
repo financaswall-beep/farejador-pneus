@@ -1727,9 +1727,11 @@ html, body {
   .pos-summary { grid-row: auto; }
 
   .pos-page-grid, .pos-page-grid.finance, .pos-page-grid.customers,
-  .pos-chart-grid, .pos-cadastro-grid {
+  .pos-chart-grid, .pos-cadastro-grid, .pos-two-columns {
     grid-template-columns: 1fr;
   }
+  /* "Alertas principais" do Resumo sai no celular (estoque baixo ja tem KPI + tela Estoque) */
+  .pos-resumo-alertas { display: none; }
   .pos-footer { display: none; }
 
   /* Card de produto compacto: preco no topo a direita, "Em estoque · 12 un." numa linha so,
