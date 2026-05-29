@@ -6,6 +6,40 @@ Portal operacional da unidade parceira (borracheiro credenciado). Roda dentro do
 
 ---
 
+## 🧰 2026-05-29 — Insumos + serviços no PDV, layout do checkout e gauge do score (Claude Opus 4.8)
+
+Reclamação dos borracheiros: só dava pra cadastrar/vender **pneu**. Não havia como cadastrar **insumo** (câmara de ar, bico, macarrão) nem **serviço** (mão de obra) pra usar no frente de caixa. Resolvido com **uma coluna nova** (`item_type`), sem tabela nova — o banco já era genérico o bastante.
+
+### Tipo de item: `pneu` | `insumo` | `servico` (migration `0067`)
+
+- **Por que coluna, não dedução:** `partner_stock_levels` já tinha `item_name` livre, `tire_size` opcional e `is_tracked`. Insumo e serviço já "cabiam". Mas deduzir o tipo (tire_size NULL? is_tracked false?) é frágil — insumo e serviço ambos ficam sem medida, e `is_tracked` quer dizer "controla quantidade?", não "é serviço?". São conceitos **ortogonais**. Coluna explícita dá filtro/relatório limpos (faturamento produto × serviço) sem acoplar os dois.
+- **Migration `0067_partner_item_type`**:
+  - `item_type` em `commerce.partner_stock_levels` (`DEFAULT 'pneu'`, CHECK nos 3 valores) — todo registro existente vira `pneu`.
+  - `item_type` (snapshot, nullable) em `commerce.partner_order_items`.
+  - Índice parcial `(environment, unit_id, item_type) WHERE deleted_at IS NULL`.
+  - `CREATE OR REPLACE commerce.register_partner_local_order` (base 0065) — única mudança: grava `item_type` no snapshot do item vendido. Assinatura inalterada.
+- **Convenção app-layer:** `item_type = 'servico'` ⇒ `is_tracked = false` (não baixa estoque, vendido sem limite); `pneu`/`insumo` ⇒ `is_tracked = true` (baixam estoque normal). O **tipo dirige o `is_tracked`** no `saveStock()` — não há toggle manual. A função de venda já respeitava `is_tracked` (decremento só `IF is_tracked AND quantity_on_hand IS NOT NULL`), então serviço entrar na venda sem mexer no estoque **já funcionava** no banco; faltava só a UI.
+- **Backend:** `stockSchema` (Zod) ganhou `item_type: z.enum(['pneu','insumo','servico']).default('pneu')`; `UpsertPartnerStockInput`, o INSERT/upsert de `upsertPartnerStock` e as listagens `getPartnerEstoque`/`getPartnerProdutos` passaram a carregar `item_type`.
+- **Frontend — form de Estoque:** abas **Pneu / Insumo / Serviço** no topo. Pneu mostra a Medida; **insumo/serviço escondem a Medida**; **serviço esconde Marca + Qtd + Mín** (serviço não tem marca nem estoque). Título/placeholder/rodapé do form adaptam ao tipo. `saveStock()` zera medida em não-pneu e marca em serviço.
+- **Frontend — PDV:** lista e cards adaptam por tipo (helpers `itemTypeLabel`/`itemPrimaryLabel` + selo `.pos-type-badge`). Pneu mostra medida; insumo/serviço mostram o nome. O carrinho já aceitava item sem controle de estoque (`available = Infinity`), então serviço/insumo vendem sem fricção.
+- **Ponta solta conhecida:** o fluxo de **Compras** ainda cria item novo como `pneu` por padrão (coluna tem default, não quebra); atualizar quando mexermos naquele form. A view admin `network_stock_unified` não expõe `item_type` (leitura cruzada da rede).
+
+### Layout do checkout (PDV)
+
+- **KPIs encolhidos pra esquerda + Resumo da venda em coluna cheia.** Os 4 cards do topo agora ocupam só as 2 colunas da esquerda e o card "Resumo da venda" sobe até o topo, ganhando ~88px de altura. Feito fundindo a linha de KPIs e o grid de 3 colunas num único grid (`.pos-checkout`, `grid-row: 2 / 4`, summary com `grid-row: 1 / 3`).
+- **Observação removida** do resumo (a pedido), o que dispensou a barra de rolagem que tinha surgido; espaçamentos verticais enxugados pra tudo caber nos modos Retirada e Entrega.
+- **Botões Finalizar/Cancelar** ganharam `flex: 0 0 auto` (não achatam mais se o conteúdo crescer).
+- **Card "Buscar produtos" alargado** (360 → 400px) e **filtros reequilibrados** (`1.1fr 1fr 1fr`, padding menor, rótulos "Marcas"/"Aros") — não cortam mais o texto.
+
+### Score financeiro vira gauge
+
+- O "Score financeiro" (0–1000, lógica intacta) virou um **arco minimalista** (SVG, `stroke-dashoffset = 100 − score/10`) com o número no centro, em vez do número solto.
+- **Cor por faixa** (getter `financialScoreColor`): 🟢 ≥800 / 🟢 ≥650 / 🟡 ≥500 / 🔴 <500 — mesmas faixas do `financialScoreLevel` (Ótimo/Bom/Regular/Ruim). Transição suave no arco e na cor.
+
+**Migration pendente de aplicar em prod:** `0067_partner_item_type` (ainda **não** aplicada via MCP). As demais mudanças são frontend/app-layer. Cache-bust recomendado ao publicar.
+
+---
+
 ## 🧹 2026-05-28 — Backlog da auditoria zerado (5 itens) (Claude Opus 4.7)
 
 Resolução do backlog levantado na auditoria de UX/arquitetura do silo parceiro. Cinco itens, dois migrations novos (`0065`, `0066`), ambos aplicados em prod via MCP Supabase. Zero mudança em bot/matriz (silo isolado preservado).

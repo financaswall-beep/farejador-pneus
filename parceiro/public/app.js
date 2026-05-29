@@ -67,7 +67,7 @@ function parceiroApp() {
     customerListSearch: '',
 
     saleForm: { customer_id: null, customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
-    stockForm: { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
+    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
@@ -686,6 +686,15 @@ function parceiroApp() {
       return { label: 'Ruim', color: 'text-rose-700', tone: 'bg-rose-50 border-rose-100' };
     },
 
+    // Cor do arco do gauge: verde (bom) -> amarelo (mais ou menos) -> vermelho (ruim).
+    get financialScoreColor() {
+      const score = this.financialScore;
+      if (score >= 800) return '#10b981'; // verde forte
+      if (score >= 650) return '#84cc16'; // verde
+      if (score >= 500) return '#facc15'; // amarelo
+      return '#ef4444';                   // vermelho
+    },
+
     get financialScoreChecks() {
       const sales = this.num(this.resumo?.sales_month);
       const result = this.num(this.resumo?.estimated_result_month);
@@ -999,6 +1008,18 @@ function parceiroApp() {
     posStockLabel(item) {
       if (!item.is_tracked) return 'sem controle';
       return `${item.quantity_on_hand ?? 0} un.`;
+    },
+
+    itemTypeLabel(type) {
+      if (type === 'insumo') return 'Insumo';
+      if (type === 'servico') return 'Serviço';
+      return 'Pneu';
+    },
+
+    // Linha principal do card/lista: pneu mostra a medida; insumo/serviço mostram o nome.
+    itemPrimaryLabel(item) {
+      if ((item.item_type || 'pneu') === 'pneu') return item.tire_size || item.item_name || 'Pneu';
+      return item.item_name || this.itemTypeLabel(item.item_type);
     },
 
     posAddProduct(item) {
@@ -1481,6 +1502,7 @@ function parceiroApp() {
       const parsed = this.parseTireSize(item.tire_size);
       this.stockForm = {
         stock_id: item.id,
+        item_type: item.item_type || 'pneu',
         item_name: item.item_name || '',
         tire_width: item.tire_width_mm ?? parsed.width,
         tire_aspect: item.tire_aspect_ratio ?? parsed.aspect,
@@ -1498,20 +1520,29 @@ function parceiroApp() {
     },
 
     clearStockForm() {
-      this.stockForm = { stock_id: null, item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true };
+      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true };
     },
 
     async saveStock() {
       if (!this.stockForm.item_name.trim()) { this.flash('Nome do item é obrigatório.'); return; }
 
-      // ValidaÃ§Ã£o da medida: ou estÃ¡ toda preenchida, ou totalmente vazia.
-      const tireParts = [this.stockForm.tire_width, this.stockForm.tire_aspect, this.stockForm.tire_rim];
-      const filledCount = tireParts.filter((v) => v !== null && v !== '' && Number(v) > 0).length;
-      if (filledCount > 0 && filledCount < 3) {
-        this.flash('Preencha largura, perfil e aro completos, ou deixe os três vazios.');
-        return;
+      const itemType = this.stockForm.item_type || 'pneu';
+      const isService = itemType === 'servico';
+      // Serviço não controla estoque; pneu/insumo controlam. O tipo dirige is_tracked.
+      const isTracked = !isService;
+
+      // Medida só faz sentido pra pneu. Insumo/serviço ignoram os campos de medida.
+      let tireSize = null;
+      if (itemType === 'pneu') {
+        // Validação da medida: ou está toda preenchida, ou totalmente vazia.
+        const tireParts = [this.stockForm.tire_width, this.stockForm.tire_aspect, this.stockForm.tire_rim];
+        const filledCount = tireParts.filter((v) => v !== null && v !== '' && Number(v) > 0).length;
+        if (filledCount > 0 && filledCount < 3) {
+          this.flash('Preencha largura, perfil e aro completos, ou deixe os três vazios.');
+          return;
+        }
+        tireSize = filledCount === 3 ? this.composeTireSize(this.stockForm.tire_width, this.stockForm.tire_aspect, this.stockForm.tire_rim) : null;
       }
-      const tireSize = filledCount === 3 ? this.composeTireSize(this.stockForm.tire_width, this.stockForm.tire_aspect, this.stockForm.tire_rim) : null;
 
       this.saving = true;
       this.savingAction = 'stock';
@@ -1520,19 +1551,20 @@ function parceiroApp() {
           method: 'POST',
           body: JSON.stringify({
             stock_id: this.stockForm.stock_id || null,
+            item_type: itemType,
             item_name: this.stockForm.item_name.trim(),
             tire_size: tireSize,
-            // DimensÃµes separadas (migration 0038) â€” banco indexa pra busca rÃ¡pida
+            // Dimensões separadas (migration 0038) — banco indexa pra busca rápida
             tire_width_mm: tireSize ? this.num(this.stockForm.tire_width) : null,
             tire_aspect_ratio: tireSize ? this.num(this.stockForm.tire_aspect) : null,
             tire_rim_diameter: tireSize ? this.num(this.stockForm.tire_rim) : null,
-            brand: this.stockForm.brand?.trim() || null,
+            brand: isService ? null : (this.stockForm.brand?.trim() || null),
             supplier_name: this.stockPositionValue(this.stockForm.supplier_name) || null,
-            quantity_on_hand: this.stockForm.is_tracked ? this.num(this.stockForm.quantity_on_hand) : null,
-            minimum_quantity: this.stockForm.minimum_quantity !== null && this.stockForm.minimum_quantity !== '' ? this.num(this.stockForm.minimum_quantity) : null,
+            quantity_on_hand: isTracked ? this.num(this.stockForm.quantity_on_hand) : null,
+            minimum_quantity: isTracked && this.stockForm.minimum_quantity !== null && this.stockForm.minimum_quantity !== '' ? this.num(this.stockForm.minimum_quantity) : null,
             average_cost: this.stockForm.average_cost !== null && this.stockForm.average_cost !== '' ? this.num(this.stockForm.average_cost) : null,
             sale_price: this.stockForm.sale_price !== null && this.stockForm.sale_price !== '' ? this.num(this.stockForm.sale_price) : null,
-            is_tracked: this.stockForm.is_tracked,
+            is_tracked: isTracked,
           }),
         });
         this.clearStockForm();

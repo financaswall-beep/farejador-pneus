@@ -180,25 +180,6 @@
         </article>
       </section>
 
-      <section x-show="currentSection === 'vendas'" class="pos-kpis">
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="archive"></i></div>
-          <div><small>Caixa do dia</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="posFirstSaleTodayLabel"></span></div>
-        </article>
-        <article>
-          <div><small>Vendas hoje</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="salesToday.length + ' vendas realizadas'"></span></div>
-          <div class="pos-spark"><canvas id="chartPosSpark"></canvas></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
-          <div><small>Itens no carrinho</small><strong x-text="posCartUnits"></strong><span>Quantidades</span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="tag"></i></div>
-          <div><small>Última venda</small><strong x-text="posLastSale ? money(posLastSale.total_amount) : 'R$ 0,00'"></strong><span x-text="posLastSale ? formatDateTime(posLastSale.created_at) : 'sem venda ainda'"></span></div>
-        </article>
-      </section>
-
       <section x-show="currentSection === 'estoque'" class="pos-kpis stock-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
@@ -314,7 +295,25 @@
         </div>
       </section>
 
-      <section x-show="currentSection === 'vendas'" class="pos-grid">
+      <section x-show="currentSection === 'vendas'" class="pos-grid pos-checkout">
+        <div class="pos-kpis pos-kpis-inline">
+          <article>
+            <div class="pos-kpi-icon"><i data-lucide="archive"></i></div>
+            <div><small>Caixa do dia</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="posFirstSaleTodayLabel"></span></div>
+          </article>
+          <article>
+            <div><small>Vendas hoje</small><strong x-text="money(posCashTodayTotal)"></strong><span x-text="salesToday.length + ' vendas realizadas'"></span></div>
+            <div class="pos-spark"><canvas id="chartPosSpark"></canvas></div>
+          </article>
+          <article>
+            <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
+            <div><small>Itens no carrinho</small><strong x-text="posCartUnits"></strong><span>Quantidades</span></div>
+          </article>
+          <article>
+            <div class="pos-kpi-icon"><i data-lucide="tag"></i></div>
+            <div><small>Última venda</small><strong x-text="posLastSale ? money(posLastSale.total_amount) : 'R$ 0,00'"></strong><span x-text="posLastSale ? formatDateTime(posLastSale.created_at) : 'sem venda ainda'"></span></div>
+          </article>
+        </div>
         <section class="pos-panel pos-products">
           <h3>Buscar produtos</h3>
           <div class="pos-product-search">
@@ -324,13 +323,13 @@
           </div>
           <div class="pos-filter-row">
             <select x-model="posBrandFilter">
-              <option value="all">Todas as marcas</option>
+              <option value="all">Marcas</option>
               <template x-for="brand in posBrandOptions" :key="brand">
                 <option :value="brand" x-text="brand"></option>
               </template>
             </select>
             <select x-model="posRimFilter">
-              <option value="all">Todos os aros</option>
+              <option value="all">Aros</option>
               <template x-for="rim in posRimOptions" :key="rim">
                 <option :value="rim" x-text="'Aro ' + rim"></option>
               </template>
@@ -350,15 +349,15 @@
             <template x-for="(item, index) in posDisplayProducts.slice(0, 5)" :key="item.stock_id">
               <button @click="posAddProduct(item)" class="pos-product-card" :class="index === 0 && 'featured'">
                 <span class="pos-star" x-show="index === 0">★</span>
-                <span class="pos-tire-thumb"></span>
+                <span class="pos-tire-thumb" :class="(item.item_type && item.item_type !== 'pneu') && item.item_type"></span>
                 <span class="pos-product-info">
-                  <strong x-text="item.tire_size || '90/90-18'"></strong>
-                  <em x-text="item.item_name"></em>
-                  <small x-text="item.supplier_name || 'Traseiro • Sem câmara'"></small>
+                  <strong x-text="itemPrimaryLabel(item)"></strong>
+                  <em x-text="(item.item_type || 'pneu') === 'pneu' ? item.item_name : itemTypeLabel(item.item_type)"></em>
+                  <small x-text="(item.item_type || 'pneu') === 'pneu' ? (item.supplier_name || 'Traseiro • Sem câmara') : (item.brand || '-')"></small>
                 </span>
                 <span class="pos-product-price">
                   <strong x-text="money(item.sale_price)"></strong>
-                  <em>Em estoque</em>
+                  <em x-text="item.item_type === 'servico' ? 'Serviço' : 'Em estoque'"></em>
                   <small x-text="posStockLabel(item)"></small>
                 </span>
                 <span class="pos-add">+</span>
@@ -506,8 +505,6 @@
             </label>
           </div>
           <div class="pos-total"><span>TOTAL</span><strong x-text="money(posCartTotal)"></strong></div>
-          <label>Observação</label>
-          <textarea x-model="posNotes" rows="2" class="pos-notes-input" placeholder="Observação da venda (opcional)"></textarea>
           <h4>Formas de pagamento</h4>
           <div class="pos-payments">
             <button @click="posSelectPayment('Pix', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Pix' && 'active'">
@@ -679,7 +676,7 @@
               </div>
               <template x-for="item in filteredStock.slice(0, 9)" :key="item.id">
                 <div class="pos-dark-table-row">
-                  <span class="pos-product-cell"><span class="pos-tire-thumb small"></span><b x-text="item.tire_size || item.item_name || 'Pneu'"></b></span>
+                  <span class="pos-product-cell"><span class="pos-tire-thumb small"></span><b x-text="itemPrimaryLabel(item)"></b><em class="pos-type-badge" :class="item.item_type" x-text="itemTypeLabel(item.item_type)"></em></span>
                   <span class="pos-position-cell" x-text="stockPositionLabel(item)"></span>
                   <span x-text="item.brand || '-'"></span>
                   <span class="pos-green-text" x-text="item.is_tracked ? ((item.quantity_on_hand ?? 0) + ' un.') : '-'"></span>
@@ -697,12 +694,18 @@
           </section>
 
           <aside class="pos-panel pos-side-panel">
-            <h3>Cadastrar pneu</h3>
+            <h3 x-text="stockForm.item_type === 'servico' ? 'Cadastrar serviço' : (stockForm.item_type === 'insumo' ? 'Cadastrar insumo' : 'Cadastrar pneu')"></h3>
             <div class="pos-stock-side-form">
-              <label>Produto
-                <input x-model="stockForm.item_name" placeholder="Ex: Pneu traseiro" />
+              <div class="pos-stock-type-tabs">
+                <button type="button" :class="stockForm.item_type === 'pneu' && 'active'" @click="stockForm.item_type = 'pneu'">Pneu</button>
+                <button type="button" :class="stockForm.item_type === 'insumo' && 'active'" @click="stockForm.item_type = 'insumo'">Insumo</button>
+                <button type="button" :class="stockForm.item_type === 'servico' && 'active'" @click="stockForm.item_type = 'servico'">Serviço</button>
+              </div>
+              <label>
+                <span x-text="stockForm.item_type === 'servico' ? 'Serviço' : (stockForm.item_type === 'insumo' ? 'Insumo' : 'Produto')"></span>
+                <input x-model="stockForm.item_name" :placeholder="stockForm.item_type === 'servico' ? 'Ex: Troca de pneu' : (stockForm.item_type === 'insumo' ? 'Ex: Câmara de ar' : 'Ex: Pneu traseiro')" />
               </label>
-              <div class="pos-stock-size-position-row">
+              <div class="pos-stock-size-position-row" x-show="stockForm.item_type === 'pneu'">
                 <label class="pos-stock-size-row">Medida
                   <div>
                     <input type="number" min="0" max="999" x-model.number="stockForm.tire_width" placeholder="90" />
@@ -720,7 +723,7 @@
                   </select>
                 </label>
               </div>
-              <div class="pos-stock-brand-qty-row">
+              <div class="pos-stock-brand-qty-row" x-show="stockForm.item_type !== 'servico'">
                 <label>Marca
                   <input x-model="stockForm.brand" placeholder="Levorin" />
                 </label>
@@ -740,8 +743,8 @@
                 </label>
               </div>
               <div class="pos-form-total">
-                <span x-text="tireSizePreview() || 'Medida pendente'"></span>
-                <b x-text="money(num(stockForm.quantity_on_hand) * num(stockForm.average_cost))"></b>
+                <span x-text="stockForm.item_type === 'pneu' ? (tireSizePreview() || 'Medida pendente') : (stockForm.item_type === 'servico' ? 'Serviço (sem estoque)' : 'Insumo')"></span>
+                <b x-show="stockForm.item_type !== 'servico'" x-text="money(num(stockForm.quantity_on_hand) * num(stockForm.average_cost))"></b>
               </div>
               <button @click="saveStock()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="download"></i>
@@ -982,8 +985,17 @@
           <aside class="pos-panel pos-side-panel">
             <h3>Score financeiro</h3>
             <div class="pos-score-card">
-              <strong x-text="financialScore"></strong>
-              <span x-text="financialScoreLevel.label"></span>
+              <div class="finance-gauge">
+                <svg class="finance-gauge__svg" viewBox="0 0 200 112" preserveAspectRatio="xMidYMid meet">
+                  <path class="finance-gauge__track" d="M14,100 A86,86 0 0 1 186,100" pathLength="100" />
+                  <path class="finance-gauge__fill" d="M14,100 A86,86 0 0 1 186,100" pathLength="100"
+                        :style="'stroke-dashoffset:' + (100 - financialScore / 10) + '; stroke:' + financialScoreColor" />
+                </svg>
+                <div class="finance-gauge__readout">
+                  <strong :style="'color:' + financialScoreColor" x-text="financialScore"></strong>
+                  <span x-text="financialScoreLevel.label"></span>
+                </div>
+              </div>
             </div>
             <div class="pos-side-list">
               <div><span>Margem</span><strong x-text="estimatedMargin.toFixed(1).replace('.', ',') + '%'"></strong></div>

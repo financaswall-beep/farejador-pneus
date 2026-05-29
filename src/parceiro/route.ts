@@ -123,6 +123,8 @@ const stockSchema = z.object({
   product_id: z.string().uuid().nullable().optional(),
   local_sku: z.string().max(80).nullable().optional(),
   item_name: z.string().min(1).max(240),
+  // Tipo do item (migration 0067): pneu | insumo (camara, bico) | servico (mao de obra).
+  item_type: z.enum(['pneu', 'insumo', 'servico']).default('pneu'),
   tire_size: z.string().max(80).nullable().optional(),
   // Dimensões do pneu (migration 0038). Frontend captura os 3 separados,
   // banco persiste pra busca indexada (commerce.tire_specs ja segue esse padrão).

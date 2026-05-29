@@ -78,6 +78,7 @@ export interface UpsertPartnerStockInput {
   product_id?: string | null;
   local_sku?: string | null;
   item_name: string;
+  item_type?: 'pneu' | 'insumo' | 'servico';
   tire_size?: string | null;
   tire_width_mm?: number | null;
   tire_aspect_ratio?: number | null;
@@ -265,7 +266,7 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
 export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, product_id, local_sku, item_name, tire_size,
+      `SELECT id, product_id, local_sku, item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
               brand, supplier_name,
               quantity_on_hand, minimum_quantity, average_cost, sale_price,
@@ -284,7 +285,7 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT id AS stock_id,
-              item_name, tire_size,
+              item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
               brand, sale_price, average_cost, quantity_on_hand,
               is_tracked, stock_status, local_sku
@@ -936,16 +937,17 @@ export async function upsertPartnerStock(
          id, environment, unit_id, product_id, local_sku, item_name, tire_size,
          tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
          brand, supplier_name, quantity_on_hand, minimum_quantity, average_cost,
-         sale_price, is_tracked, stock_status, updated_by
+         sale_price, is_tracked, stock_status, updated_by, item_type
        ) VALUES (
          COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7,
          $8, $9, $10,
-         $11, $12, $13, $14, $15, $16, $17, $18, $19
+         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
        )
        ON CONFLICT (id) DO UPDATE SET
          product_id = EXCLUDED.product_id,
          local_sku = EXCLUDED.local_sku,
          item_name = EXCLUDED.item_name,
+         item_type = EXCLUDED.item_type,
          tire_size = EXCLUDED.tire_size,
          tire_width_mm = EXCLUDED.tire_width_mm,
          tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
@@ -982,6 +984,7 @@ export async function upsertPartnerStock(
         input.is_tracked,
         stockStatus(input),
         `partner:${ctx.slug}`,
+        input.item_type ?? 'pneu',
       ],
     );
 
