@@ -268,6 +268,20 @@ export async function fanOutMessageToPartnerChat(
           WHERE id = $1`,
         [conversationId, message.sentAt, projection.unreadDelta],
       );
+
+      // Fatia 3 (tempo real): avisa os SSE conectados que há mensagem nova nesta
+      // unidade. pg_notify dentro da transação só dispara no COMMIT — e é
+      // desfeito junto com o SAVEPOINT se algo acima falhar, que é o que
+      // queremos. O hub (partner-chat.notify.ts) escuta e reentrega ao front.
+      await client.query('SELECT pg_notify($1, $2)', [
+        'partner_chat',
+        JSON.stringify({
+          unit_id: unitId,
+          conversation_id: conversationId,
+          chatwoot_conversation_id: message.chatwootConversationId,
+          kind: 'message',
+        }),
+      ]);
     }
 
     await client.query('RELEASE SAVEPOINT partner_chat_fanout');

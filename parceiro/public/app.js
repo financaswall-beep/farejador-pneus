@@ -58,6 +58,8 @@ function parceiroApp() {
     chatConversations: [],
     chatLoading: false,
     chatTimer: null,
+    chatES: null,
+    chatFastTimer: null,
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
@@ -1387,10 +1389,42 @@ function parceiroApp() {
     startChatPolling() {
       this.stopChatPolling();
       void this.loadChat();
-      this.chatTimer = setInterval(() => { void this.loadChat(); }, 5000);
+      // Fatia 3: tempo real via SSE (push). Em cada evento recarrega a lista.
+      this.startChatSse();
+      // Rede de seguranca: poll lento sempre ligado, pega evento perdido (ex.:
+      // SSE caiu e voltou entre dois eventos).
+      this.chatTimer = setInterval(() => { void this.loadChat(); }, 30000);
+    },
+    startChatSse() {
+      if (!window.EventSource || !this.token) { this.startChatFallbackPoll(); return; }
+      try {
+        const url = `/parceiro/${this.slug}/api/chat/stream?token=${encodeURIComponent(this.token)}`;
+        const es = new EventSource(url);
+        es.addEventListener('message', () => { void this.loadChat(); });
+        es.onopen = () => { this.stopChatFallbackPoll(); }; // SSE de pe: nao precisa do poll rapido.
+        es.onerror = () => {
+          // EventSource reconecta sozinho em quedas transitorias (readyState
+          // CONNECTING). So caimos no poll rapido se fechou de vez (ex.: token
+          // invalido -> CLOSED).
+          if (es.readyState === EventSource.CLOSED) { this.startChatFallbackPoll(); }
+        };
+        this.chatES = es;
+      } catch (err) {
+        console.warn('chat_sse_failed', err);
+        this.startChatFallbackPoll();
+      }
+    },
+    startChatFallbackPoll() {
+      if (this.chatFastTimer) return;
+      this.chatFastTimer = setInterval(() => { void this.loadChat(); }, 5000);
+    },
+    stopChatFallbackPoll() {
+      if (this.chatFastTimer) { clearInterval(this.chatFastTimer); this.chatFastTimer = null; }
     },
     stopChatPolling() {
       if (this.chatTimer) { clearInterval(this.chatTimer); this.chatTimer = null; }
+      this.stopChatFallbackPoll();
+      if (this.chatES) { this.chatES.close(); this.chatES = null; }
     },
 
     selectChat(id) {

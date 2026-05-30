@@ -5,6 +5,7 @@ import { pool } from '../persistence/db.js';
 import { registerRoutes } from './routes.js';
 import { startWorker } from '../normalization/worker.js';
 import { startPartnerChatReconciler } from '../normalization/partner-chat.reconcile.js';
+import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
 
 const fastify = Fastify({
@@ -35,6 +36,8 @@ async function start(): Promise<void> {
   stopWorker = startWorker();
   stopAgentV2 = startAgentV2Worker();
   stopPartnerChatReconciler = startPartnerChatReconciler();
+  // Hub de tempo real do chat (LISTEN partner_chat -> SSE). Fatia 3.
+  startPartnerChatNotifyHub();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });

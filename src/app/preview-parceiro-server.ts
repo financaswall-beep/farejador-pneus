@@ -11,6 +11,7 @@ import Fastify from 'fastify';
 import { loggerOptions, logger } from '../shared/logger.js';
 import { partnerPool } from '../parceiro/db.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
+import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 
 const fastify = Fastify({ logger: loggerOptions });
 
@@ -30,6 +31,9 @@ fastify.addContentTypeParser(
 
 async function start(): Promise<void> {
   await registerParceiroRoute(fastify);
+  // Hub de tempo real (Fatia 3): no preview tambem, pra testar SSE local
+  // apontando pro banco de prod (.env.preview).
+  startPartnerChatNotifyHub();
   const port = Number(process.env.PREVIEW_PORT ?? 4100);
   await fastify.listen({ port, host: '0.0.0.0' });
   fastify.log.info({ port }, 'preview parceiro server listening');

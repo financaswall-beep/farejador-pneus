@@ -44,6 +44,36 @@ function extractBearerToken(header: unknown): string | null {
  * o mapa da rede inteira", porque a tabela nao e mais lida em SELECT pelo
  * portal — so pela function controlada.
  */
+/**
+ * Valida slug+token e devolve o contexto do parceiro (ou null se invalido).
+ * Reusavel fora do preHandler — ex.: SSE, onde o token vem por query string
+ * porque EventSource nao manda header Authorization.
+ */
+export async function authenticatePartnerToken(
+  slug: string,
+  token: string,
+): Promise<PartnerContext | null> {
+  // A function e SECURITY DEFINER, entao roda com privilegios do owner e nao
+  // depende da policy aplicada a role 'farejador_partner_app'.
+  const result = await partnerPool.query<PartnerAuthRow>(
+    'SELECT * FROM network.validate_partner_token($1, $2, $3)',
+    [env.FAREJADOR_ENV, slug, token],
+  );
+
+  if (result.rowCount !== 1) return null;
+
+  const row = result.rows[0]!;
+  return {
+    environment: env.FAREJADOR_ENV,
+    partnerId: row.partner_id,
+    partnerUnitId: row.partner_unit_id,
+    unitId: row.unit_id,
+    slug: row.slug,
+    partnerName: row.partner_name,
+    unitName: row.unit_name,
+  };
+}
+
 export async function requirePartnerAuth(request: PartnerAuthedRequest, reply: FastifyReply): Promise<void> {
   const params = request.params as { slug?: string };
   const slug = params.slug?.trim();
@@ -56,30 +86,13 @@ export async function requirePartnerAuth(request: PartnerAuthedRequest, reply: F
     return;
   }
 
-  // Antes da validacao, GUC nao esta setado. A function e SECURITY DEFINER,
-  // entao roda com privilegios do owner e nao depende da policy aplicada
-  // a role 'farejador_partner_app'.
-  const result = await partnerPool.query<PartnerAuthRow>(
-    'SELECT * FROM network.validate_partner_token($1, $2, $3)',
-    [env.FAREJADOR_ENV, slug, token],
-  );
-
-  if (result.rowCount !== 1) {
+  const context = await authenticatePartnerToken(slug, token);
+  if (!context) {
     void reply.status(401).send({ error: 'partner_unauthorized' });
     return;
   }
 
-  const row = result.rows[0]!;
-
-  request.partnerContext = {
-    environment: env.FAREJADOR_ENV,
-    partnerId: row.partner_id,
-    partnerUnitId: row.partner_unit_id,
-    unitId: row.unit_id,
-    slug: row.slug,
-    partnerName: row.partner_name,
-    unitName: row.unit_name,
-  };
+  request.partnerContext = context;
 }
 
 export function getPartnerContext(request: PartnerAuthedRequest): PartnerContext {

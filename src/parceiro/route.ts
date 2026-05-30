@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, getPartnerContext, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, getPartnerContext, authenticatePartnerToken, type PartnerAuthedRequest } from './auth.js';
 import {
   cancelPartnerSale,
   cancelPartnerPayable,
@@ -46,6 +46,7 @@ import {
   updatePartnerDeliveryStatus,
   upsertPartnerStock,
 } from './queries.js';
+import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
 
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
@@ -461,6 +462,50 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const ok = await markPartnerChatRead(getPartnerContext(request), params.data.conversationId);
     if (!ok) return reply.status(404).send({ error: 'conversation_not_found' });
     return reply.status(200).send({ ok: true });
+  });
+
+  // Tempo real (Fatia 3): SSE que empurra um evento quando chega mensagem nova,
+  // pra UI atualizar na hora sem depender do polling. EventSource NAO manda
+  // header Authorization — por isso o token vem por query string e e validado
+  // aqui do mesmo jeito (mesma function SECURITY DEFINER). O front cai no
+  // polling se o SSE nao conectar.
+  fastify.get('/parceiro/:slug/api/chat/stream', async (request, reply) => {
+    const { slug } = request.params as { slug: string };
+    const { token } = request.query as { token?: string };
+    if (!slug || !token) return reply.code(401).send({ error: 'partner_unauthorized' });
+    const ctx = await authenticatePartnerToken(slug.trim(), token);
+    if (!ctx) return reply.code(401).send({ error: 'partner_unauthorized' });
+
+    // Assume o controle da resposta crua (stream que nao fecha).
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no', // desliga buffering de proxy (nginx)
+    });
+    raw.write('retry: 3000\n\n');
+    raw.write(': conectado\n\n');
+
+    const send = (event: PartnerChatEvent): void => {
+      raw.write(`event: message\ndata: ${JSON.stringify(event)}\n\n`);
+    };
+    const unsubscribe = subscribePartnerChat(ctx.unitId, send);
+
+    // Heartbeat: mantem a conexao viva atraves de proxies com idle timeout.
+    const heartbeat = setInterval(() => {
+      raw.write(': hb\n\n');
+    }, 25000);
+
+    // close/error podem disparar os dois; clearInterval e unsubscribe sao
+    // idempotentes, entao chamar o cleanup duas vezes e inofensivo.
+    const cleanup = (): void => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    };
+    request.raw.on('close', cleanup);
+    request.raw.on('error', cleanup);
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta
