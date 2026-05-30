@@ -447,6 +447,12 @@ parceiro em ≤5s, com selo do canal certo, isolada por RLS (outro parceiro não
 **Pronto quando:** respondo pelo portal e o cliente recebe ✅; a mensagem não duplica ✅;
 o canal de origem aparece certo ✅. **Tudo confirmado em prod.**
 
+**Polish pós-Fatia 2 (commits `9e82a0c` + `7b05964`):** "marcar como lido" no servidor
+(endpoint `.../chat/conversations/:id/read` zera `unread_count` — antes o badge voltava no poll)
+e **foto do contato** (migration `0072` + `meta.sender.thumbnail` no fan-out + `<img>` no avatar
+com fallback pras iniciais). Detalhes e pendências (backfill de foto, delete das 4 órfãs) no
+[handoff da Fatia 2](SESSAO_2026-05-30_FATIA2_HANDOFF.md).
+
 ### Fatia 3 — "Tempo real" (trocar polling por push) — ~1 dia
 **Objetivo:** instantâneo, sem polling.
 

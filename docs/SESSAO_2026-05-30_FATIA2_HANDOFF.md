@@ -108,4 +108,51 @@ O Chatwoot de prod (account 2, `chatwoot.smarttecsolutions.com.br`) entrega:
 
 ---
 
+## Adendo 2026-05-30 (continuação) — "marcar como lido" + foto do contato
+
+Dois ajustes pedidos pelo Wallace depois da Fatia 2 validada. Commits no `pneus`:
+`9e82a0c` (feature) + `7b05964` (fix de CSS da foto).
+
+### Bug: badge "não lido" não sumia
+- **Causa:** o fan-out incrementa `unread_count` no banco, mas **não havia "marcar como
+  lido" no servidor** — o front só zerava localmente. A cada polling (5s) o servidor devolvia
+  `unread_count > 0` de novo, prendendo o badge da navegação e o card "Conversas hoje".
+- **Fix:** novo endpoint `POST /parceiro/:slug/api/chat/conversations/:conversationId/read` →
+  `markPartnerChatRead()` zera `unread_count` pelo **pool do bot** (parceiro só tem SELECT na
+  conversa, sem UPDATE), com `unit_id`/`environment` explícitos. Distingue 404 (conversa de
+  outra unidade) de "já lido". Front (`app.js`) chama em `selectChat` e quando uma msg nova
+  chega na conversa **aberta** (em `loadChat`).
+- **Efeito:** os badges hoje presos limpam quando o parceiro **abrir** cada conversa.
+
+### Feature: importar a foto do contato do Chatwoot
+- **Origem da foto:** `payload.conversation.meta.sender.thumbnail` (é o CONTATO; o sender do
+  topo, em outgoing, é o agente — por isso lemos de `meta.sender`). Fallback `avatar_url`.
+- **Migration `0072_partner_chat_avatar.sql`:** add `customer_avatar_url TEXT` (nullable).
+  **JÁ APLICADA em prod** via `ADD COLUMN IF NOT EXISTS` (idempotente). `GRANT SELECT` na tabela
+  já cobre coluna nova — sem mudança de grant.
+- **Fan-out:** `deriveCustomer` agora retorna `avatarUrl`; upsert grava `customer_avatar_url`
+  (`COALESCE(EXCLUDED, existing)` — pega a foto mais recente não-nula).
+- **Front:** `mapChatConversation` expõe `avatar`; `index.html` mostra `<img>` redonda no
+  `.pos-chat-avatar` (3 lugares: lista, header do fio, painel de detalhes) com **fallback pras
+  iniciais** (`x-show` + `@error` que zera o avatar se a imagem falhar). CSS `.pos-chat-avatar img`
+  (100%, `border-radius:999px`, `object-fit:cover`); o selo de canal (`::after`) segue no canto.
+- **ORDEM CRÍTICA:** a migration TEM que estar aplicada **antes** do deploy do fan-out novo —
+  senão o INSERT da conversa estoura (coluna inexistente) e o SAVEPOINT descarta a msg. Como a
+  0072 já foi aplicada, o redeploy é seguro.
+
+### Pendências (precisam de OK / ação do Wallace)
+1. **Redeploy no Coolify** do `7b05964` — sem ele, nem o "lido" nem a foto entram.
+2. **Foto das conversas que já existem** (#624/#627/#628): só aparece quando chegar msg nova
+   (o fan-out grava no próximo evento). Backfill possível: puxar o último `thumbnail` de cada
+   conversa em `raw.raw_events` (`payload->'conversation'->'meta'->'sender'->>'thumbnail'`) e
+   gravar em `customer_avatar_url`. **Aguarda OK.**
+3. **4 linhas órfãs duplicadas** (de antes do fix `7bb8c18`): `DELETE` em prod, **aguarda OK**.
+
+### Observação de verificação
+As duas mudanças **não foram verificadas ao vivo** ainda: o "lido" precisa do endpoint
+deployado e a foto precisa de dado novo (a coluna está vazia até o fan-out gravar). typecheck
+limpo + 245 testes verdes. Validar no portal após o redeploy.
+
+---
+
 Assinatura: Claude (Opus 4.8), em conversa com Wallace, 2026-05-30.
