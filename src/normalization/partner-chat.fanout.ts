@@ -68,15 +68,20 @@ function deriveChannel(rawPayload: Record<string, unknown>): 'whatsapp' | 'insta
 }
 
 /** Extrai nome/identificador do cliente do payload da mensagem (meta.sender é sempre o contato). */
-function deriveCustomer(rawPayload: Record<string, unknown>): { name: string | null; identifier: string | null } {
+function deriveCustomer(
+  rawPayload: Record<string, unknown>,
+): { name: string | null; identifier: string | null; avatarUrl: string | null } {
   const conversation = readObject(rawPayload, 'conversation');
   const meta = readObject(conversation, 'meta');
   const metaSender = readObject(meta, 'sender');
   const topSender = readObject(rawPayload, 'sender');
+  // meta.sender é sempre o CONTATO (cliente); o sender do topo, em outgoing, é o
+  // agente — por isso preferimos meta.sender pra nome E foto.
   const sender = metaSender ?? topSender;
   return {
     name: readString(sender, 'name'),
     identifier: readString(sender, 'phone_number') ?? readString(sender, 'identifier'),
+    avatarUrl: readString(sender, 'thumbnail') ?? readString(sender, 'avatar_url'),
   };
 }
 
@@ -161,11 +166,12 @@ export async function fanOutMessageToPartnerChat(
     //    e ainda estiverem vazios; nunca regride canal já identificado.
     const convResult = await client.query<{ id: string }>(
       `INSERT INTO commerce.partner_conversations
-         (environment, unit_id, chatwoot_conversation_id, channel, customer_name, customer_identifier, last_message_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (environment, unit_id, chatwoot_conversation_id, channel, customer_name, customer_identifier, customer_avatar_url, last_message_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (environment, chatwoot_conversation_id) DO UPDATE SET
          customer_name       = COALESCE(commerce.partner_conversations.customer_name, EXCLUDED.customer_name),
          customer_identifier = COALESCE(commerce.partner_conversations.customer_identifier, EXCLUDED.customer_identifier),
+         customer_avatar_url = COALESCE(EXCLUDED.customer_avatar_url, commerce.partner_conversations.customer_avatar_url),
          channel             = CASE WHEN commerce.partner_conversations.channel = 'other'
                                     THEN EXCLUDED.channel ELSE commerce.partner_conversations.channel END
        RETURNING id`,
@@ -176,6 +182,7 @@ export async function fanOutMessageToPartnerChat(
         channel,
         customer.name,
         customer.identifier,
+        customer.avatarUrl,
         message.sentAt,
       ],
     );

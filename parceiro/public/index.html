@@ -1334,7 +1334,10 @@
             <div class="pos-chat-list-body">
               <template x-for="c in chatFilteredConversations" :key="c.id">
                 <button class="pos-chat-item" :class="c.id === chatActiveId && 'active'" @click="selectChat(c.id)">
-                  <span class="pos-chat-avatar" :data-channel="c.channel" x-text="c.initials"></span>
+                  <span class="pos-chat-avatar" :data-channel="c.channel">
+                    <img x-show="c.avatar" :src="c.avatar" alt="" loading="lazy" @error="c.avatar=null" />
+                    <span x-show="!c.avatar" x-text="c.initials"></span>
+                  </span>
                   <span class="pos-chat-item-body">
                     <span class="pos-chat-item-top">
                       <b x-text="c.name"></b>
@@ -1355,7 +1358,10 @@
           <section class="pos-chat-thread pos-panel" x-show="chatActive">
             <header class="pos-chat-thread-head">
               <div class="pos-chat-thread-who">
-                <span class="pos-chat-avatar" :data-channel="chatActive?.channel" x-text="chatActive?.initials"></span>
+                <span class="pos-chat-avatar" :data-channel="chatActive?.channel">
+                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                  <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
+                </span>
                 <div>
                   <b x-text="chatActive?.name"></b>
                   <small><span x-text="chatActive?.channelLabel"></span> • <i class="pos-chat-online">Online</i></small>

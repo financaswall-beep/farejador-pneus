@@ -1322,6 +1322,7 @@ function parceiroApp() {
         initials: this.chatInitials(name),
         channel: row.channel || 'other',
         channelLabel: this.chatChannelLabel(row.channel),
+        avatar: row.customer_avatar_url || null,
         phone: row.customer_identifier || '',
         time: this.chatTimeLabel(row.last_message_at || row.created_at),
         unread: Number(row.unread_count || 0),
@@ -1352,8 +1353,12 @@ function parceiroApp() {
           const old = prev.get(row.id);
           const mapped = this.mapChatConversation(row, old ? old.messages : null);
           mapped._loaded = old ? old._loaded : false;
-          // Conversa aberta: zera o badge localmente (read-state real e futuro).
-          if (row.id === this.chatActiveId) mapped.unread = 0;
+          // Conversa aberta = lida. Se chegou msg nova (servidor ainda conta),
+          // avisa o servidor pra zerar de vez (senao o badge volta no proximo poll).
+          if (row.id === this.chatActiveId) {
+            if (mapped.unread > 0) void this.markChatRead(row.id);
+            mapped.unread = 0;
+          }
           return mapped;
         });
         // Mantem o fio aberto atualizado (mensagens novas aparecem no polling).
@@ -1392,8 +1397,16 @@ function parceiroApp() {
       this.chatActiveId = id;
       const c = this.chatConversations.find((x) => x.id === id);
       if (c) c.unread = 0;
+      void this.markChatRead(id); // zera no servidor (senao o badge volta no poll)
       void this.loadChatMessages(id);
       this.$nextTick(() => { lucide.createIcons(); this.scrollChatToEnd(); });
+    },
+    async markChatRead(id) {
+      try {
+        await this.api(`chat/conversations/${id}/read`, { method: 'POST' });
+      } catch (err) {
+        console.warn('chat_mark_read_failed', err);
+      }
     },
     async sendChat() {
       // Fatia 2: grava otimista na tela, manda pro backend (que grava no banco

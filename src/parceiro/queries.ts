@@ -2231,7 +2231,8 @@ export async function getPartnerChatConversations(ctx: PartnerContext): Promise<
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT c.id, c.chatwoot_conversation_id, c.channel,
-              c.customer_name, c.customer_identifier, c.customer_location, c.initial_intent,
+              c.customer_name, c.customer_identifier, c.customer_avatar_url,
+              c.customer_location, c.initial_intent,
               c.status, c.last_message_at, c.unread_count, c.created_at, c.updated_at,
               (SELECT m.content
                  FROM commerce.partner_messages m
@@ -2345,4 +2346,32 @@ export async function sendPartnerChatMessage(
   }
 
   return { status: 'ok', message: inserted.message };
+}
+
+// ============================================================
+// Chat unificado (Fatia 2) — MARCAR COMO LIDO. Zera unread_count
+// quando o parceiro abre a conversa. O portal só tem SELECT na
+// conversa (sem UPDATE), então o reset vai pelo pool do bot com
+// unit_id/environment explícitos (mesmo padrão da limpeza de envio).
+// ============================================================
+
+export async function markPartnerChatRead(
+  ctx: PartnerContext,
+  conversationId: string,
+): Promise<boolean> {
+  const result = await pool.query(
+    `UPDATE commerce.partner_conversations
+        SET unread_count = 0
+      WHERE id = $1 AND environment = $2 AND unit_id = $3 AND unread_count <> 0`,
+    [conversationId, ctx.environment, ctx.unitId],
+  );
+  // rowCount 0 = conversa inexistente/de outra unidade OU já estava zerada.
+  // Confirmamos existência separado pra distinguir 404 de "já lido".
+  if ((result.rowCount ?? 0) > 0) return true;
+  const exists = await pool.query(
+    `SELECT 1 FROM commerce.partner_conversations
+      WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+    [conversationId, ctx.environment, ctx.unitId],
+  );
+  return (exists.rowCount ?? 0) > 0;
 }

@@ -19,6 +19,7 @@ import {
   getPartnerChatConversations,
   getPartnerChatMessages,
   sendPartnerChatMessage,
+  markPartnerChatRead,
   getPartnerCompras,
   getPartnerCustomers,
   getPartnerDespesas,
@@ -450,6 +451,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (result.status === 'not_found') return reply.status(404).send({ error: 'conversation_not_found' });
     if (result.status === 'send_failed') return reply.status(502).send({ error: 'send_failed' });
     return reply.status(200).send({ message: result.message });
+  });
+
+  // Marca a conversa como lida (zera unread_count) quando o parceiro a abre.
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/read', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = chatConversationParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
+
+    const ok = await markPartnerChatRead(getPartnerContext(request), params.data.conversationId);
+    if (!ok) return reply.status(404).send({ error: 'conversation_not_found' });
+    return reply.status(200).send({ ok: true });
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta
