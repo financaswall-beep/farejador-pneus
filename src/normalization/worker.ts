@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg';
+import { Client, type PoolClient } from 'pg';
 import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
@@ -6,6 +6,12 @@ import { dispatch, SkipEventError } from './dispatcher.js';
 
 const MAX_PER_POLL = 50; // máximo de eventos drenados por ciclo de poll; encerra mais cedo se a fila esvaziar
 const POLL_INTERVAL_MS = 5_000;
+const LISTEN_CHANNEL = 'raw_events_new';
+const LISTEN_RECONNECT_MS = 3_000;
+
+function usesSupabase(url: string): boolean {
+  return url.includes('supabase.co') || url.includes('supabase.com');
+}
 
 interface RawEventRow {
   id: number;
@@ -102,16 +108,91 @@ export async function pollAndNormalize(): Promise<void> {
 
 export function startWorker(): () => void {
   let stopped = false;
+  let draining = false;
+  let wakePending = false;
+  let pollTimer: NodeJS.Timeout | null = null;
+  let listenClient: Client | null = null;
+  let reconnectTimer: NodeJS.Timeout | null = null;
 
+  // Serializa as drenagens: se chega um wake enquanto ja esta drenando, marca
+  // pra rodar de novo no fim (em vez de abrir drenagens concorrentes).
+  async function drain(): Promise<void> {
+    if (draining) {
+      wakePending = true;
+      return;
+    }
+    draining = true;
+    try {
+      do {
+        wakePending = false;
+        await pollAndNormalize();
+      } while (wakePending && !stopped);
+    } finally {
+      draining = false;
+    }
+  }
+
+  // Poll de seguranca (fallback): garante o processamento mesmo se um NOTIFY se
+  // perder (worker offline na hora do aviso, queda da conexao LISTEN, etc.).
   async function loop(): Promise<void> {
     if (stopped) return;
-    await pollAndNormalize();
-    setTimeout(loop, POLL_INTERVAL_MS);
+    await drain();
+    pollTimer = setTimeout(() => void loop(), POLL_INTERVAL_MS);
+  }
+
+  // Tempo real: webhook faz pg_notify('raw_events_new') ao gravar evento novo;
+  // aqui escutamos e drenamos na hora, sem esperar o ciclo de 5s.
+  function scheduleReconnect(): void {
+    if (stopped || reconnectTimer) return;
+    if (listenClient) {
+      listenClient.removeAllListeners();
+      listenClient.end().catch(() => undefined);
+      listenClient = null;
+    }
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      void connectListen();
+    }, LISTEN_RECONNECT_MS);
+  }
+
+  async function connectListen(): Promise<void> {
+    if (stopped) return;
+    const client = new Client({
+      connectionString: env.DATABASE_URL,
+      ssl: env.DATABASE_SSL || usesSupabase(env.DATABASE_URL) ? { rejectUnauthorized: false } : undefined,
+    });
+    client.on('error', (err) => {
+      logger.error({ err }, 'normalization worker LISTEN client error');
+      scheduleReconnect();
+    });
+    client.on('end', () => {
+      if (!stopped) scheduleReconnect();
+    });
+    client.on('notification', (msg) => {
+      if (msg.channel === LISTEN_CHANNEL) void drain();
+    });
+    try {
+      await client.connect();
+      await client.query(`LISTEN ${LISTEN_CHANNEL}`);
+      listenClient = client;
+      logger.info('normalization worker: LISTEN raw_events_new ativo (tempo real)');
+    } catch (err) {
+      logger.error({ err }, 'normalization worker: falha no LISTEN; seguindo só com o poll de 5s');
+      scheduleReconnect();
+    }
   }
 
   void loop();
+  void connectListen();
 
   return function stop(): void {
     stopped = true;
+    if (pollTimer) clearTimeout(pollTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (listenClient) {
+      listenClient.removeAllListeners();
+      listenClient.end().catch(() => undefined);
+      listenClient = null;
+    }
   };
 }
