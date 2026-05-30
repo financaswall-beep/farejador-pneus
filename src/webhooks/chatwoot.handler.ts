@@ -84,6 +84,12 @@ export async function chatwootWebhookHandler(
       return reply.status(200).send({ received: true, delivery_id: chatwootDeliveryId });
     }
 
+    // Tempo real: acorda o worker de normalizacao na hora. pg_notify dentro da
+    // transacao dispara no COMMIT. Aqui rawEventId sempre e novo (duplicata ja
+    // retornou acima), entao avisamos sem condicao extra. O worker tem o poll de
+    // 5s como rede de seguranca caso o aviso se perca.
+    await client.query("SELECT pg_notify('raw_events_new', '')");
+
     await client.query('COMMIT');
 
     logger.info(handlerLogCtx, 'webhook received and persisted');
