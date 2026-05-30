@@ -132,6 +132,12 @@ describe('partner chat fanout', () => {
 
     const msgInsert = findCall(calls, 'INSERT INTO commerce.partner_messages');
     expect(msgInsert).toBeDefined();
+    // O índice partner_messages_cw_uniq é PARCIAL (WHERE chatwoot_message_id IS NOT NULL).
+    // Postgres exige repetir esse predicado no ON CONFLICT, senão estoura 42P10 em runtime
+    // (bug pego só em prod — o mock não valida índices). Regressão guardada aqui.
+    expect(msgInsert!.sql).toMatch(
+      /ON CONFLICT \(environment, chatwoot_message_id\)\s+WHERE chatwoot_message_id IS NOT NULL\s+DO NOTHING/,
+    );
     // params: env, unit_id, conv_id, chatwoot_message_id, direction, sender, content
     expect(msgInsert!.params[4]).toBe('inbound');
     expect(msgInsert!.params[5]).toBe('customer');

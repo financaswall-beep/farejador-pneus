@@ -185,11 +185,15 @@ export async function fanOutMessageToPartnerChat(
     }
 
     // 3) Insere a mensagem. Dedup do eco via UNIQUE(environment, chatwoot_message_id).
+    //    O índice é PARCIAL (partner_messages_cw_uniq ... WHERE chatwoot_message_id
+    //    IS NOT NULL, p/ permitir várias mensagens otimistas com id nulo). Postgres
+    //    exige repetir esse predicado no ON CONFLICT pra inferir o índice; sem ele
+    //    estoura 42P10 ("no unique or exclusion constraint matching").
     const msgResult = await client.query(
       `INSERT INTO commerce.partner_messages
          (environment, unit_id, conversation_id, chatwoot_message_id, direction, sender, content)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (environment, chatwoot_message_id) DO NOTHING
+       ON CONFLICT (environment, chatwoot_message_id) WHERE chatwoot_message_id IS NOT NULL DO NOTHING
        RETURNING id`,
       [
         message.environment,
