@@ -312,7 +312,26 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.get('/parceiro/:slug/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   fastify.get('/parceiro/:slug/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
-  fastify.get('/parceiro/:slug/assets/moto-tire.svg', async (_request, reply) => sendStatic(reply, path.join('assets', 'moto-tire.svg'), 'image/svg+xml; charset=utf-8'));
+
+  // Assets estáticos (logo, ícones de canal do chat, fundo). Genérico + seguro:
+  // basename evita path traversal; só extensões de imagem conhecidas são servidas.
+  const assetContentTypes: Record<string, string> = {
+    '.svg': 'image/svg+xml; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+  };
+  fastify.get('/parceiro/:slug/assets/:asset', async (request: PartnerAuthedRequest, reply) => {
+    const asset = path.basename(String((request.params as { asset?: string }).asset || ''));
+    const type = assetContentTypes[path.extname(asset).toLowerCase()];
+    if (!type) return reply.status(404).send({ error: 'asset_not_found' });
+    try {
+      return await sendStatic(reply, path.join('assets', asset), type);
+    } catch {
+      return reply.status(404).send({ error: 'asset_not_found' });
+    }
+  });
 
   fastify.get('/parceiro/:slug/api/resumo', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });
