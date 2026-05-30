@@ -19,11 +19,12 @@ interface QueryCall {
 interface MockOpts {
   hasUnit?: boolean;
   echoClaims?: boolean;
+  contentClaims?: boolean;
   messageInserted?: boolean;
 }
 
 function createMockClient(calls: QueryCall[], opts: MockOpts = {}) {
-  const { hasUnit = true, echoClaims = false, messageInserted = true } = opts;
+  const { hasUnit = true, echoClaims = false, contentClaims = false, messageInserted = true } = opts;
   return {
     query: vi.fn().mockImplementation((sql: string, params: unknown[] = []) => {
       calls.push({ sql, params });
@@ -34,7 +35,11 @@ function createMockClient(calls: QueryCall[], opts: MockOpts = {}) {
         return Promise.resolve({ rowCount: 1, rows: [{ id: 'conv-1' }] });
       }
       if (sql.includes('UPDATE commerce.partner_messages')) {
-        return Promise.resolve({ rowCount: echoClaims ? 1 : 0, rows: [] });
+        // Dois UPDATEs possíveis: claim por echo_id (client_token = $3) e
+        // claim por conteúdo (subselect com conversation_id).
+        const isEchoClaim = sql.includes('client_token = $3');
+        const matched = isEchoClaim ? echoClaims : contentClaims;
+        return Promise.resolve({ rowCount: matched ? 1 : 0, rows: [] });
       }
       if (sql.includes('INSERT INTO commerce.partner_messages')) {
         return Promise.resolve({ rowCount: messageInserted ? 1 : 0, rows: messageInserted ? [{ id: 'msg-1' }] : [] });
@@ -186,6 +191,26 @@ describe('partner chat fanout', () => {
     const claim = findCall(calls, 'UPDATE commerce.partner_messages');
     expect(claim).toBeDefined();
     expect(claim!.params[2]).toBe('tok-abc'); // client_token = echo_id
+    expect(findCall(calls, 'INSERT INTO commerce.partner_messages')).toBeUndefined();
+  });
+
+  it('claims the optimistic outbound row by content when Chatwoot does not echo echo_id', async () => {
+    // Prod real: payload.echo_id vem null nos outgoing. Sem isto, o eco da nossa
+    // própria mensagem entraria como linha duplicada. O fallback casa por conteúdo.
+    const fanOut = await load();
+    const calls: QueryCall[] = [];
+    const client = createMockClient(calls, { contentClaims: true });
+    await fanOut(
+      client as never,
+      makeMessage({ messageType: 1, senderType: 'user', echoId: null, content: 'Olá' }),
+      rawWhatsapp,
+    );
+    const contentClaim = calls.find(
+      (c) => c.sql.includes('UPDATE commerce.partner_messages') && c.sql.includes('IS NOT DISTINCT FROM'),
+    );
+    expect(contentClaim).toBeDefined();
+    expect(contentClaim!.params[3]).toBe('Olá'); // casa pelo conteúdo
+    // Não reinsere nem reconta unread.
     expect(findCall(calls, 'INSERT INTO commerce.partner_messages')).toBeUndefined();
   });
 

@@ -181,20 +181,47 @@ export async function fanOutMessageToPartnerChat(
     );
     const conversationId = convResult.rows[0]!.id;
 
-    // 2) Eco da Fatia 2: se for saída com echo_id, casa a mensagem otimista que
-    //    o portal já inseriu (client_token = echo_id) e adota o chatwoot_message_id.
-    //    Se casar, não insere de novo.
+    // 2) Eco da nossa própria mensagem (Fatia 2): casa a linha OTIMISTA que o
+    //    portal já inseriu e adota o chatwoot_message_id, em vez de duplicar.
+    //    a) por echo_id (quando o Chatwoot ecoa o client_token);
+    //    b) FALLBACK por conteúdo: este Chatwoot/integração NÃO ecoa echo_id
+    //       (verificado em prod: payload.echo_id vem sempre null nos outgoing),
+    //       então casamos a linha otimista mais recente da MESMA conversa,
+    //       outbound, ainda sem chatwoot_message_id, com o MESMO conteúdo, numa
+    //       janela de 10min. Idempotente: o UNIQUE(environment, chatwoot_message_id)
+    //       é a rede de segurança final contra reentrega do webhook.
     let recordedNew = false;
-    if (projection.direction === 'outbound' && message.echoId) {
-      const claim = await client.query(
+    if (projection.direction === 'outbound') {
+      if (message.echoId) {
+        const claimByEcho = await client.query(
+          `UPDATE commerce.partner_messages
+              SET chatwoot_message_id = $1
+            WHERE environment = $2 AND client_token = $3 AND chatwoot_message_id IS NULL`,
+          [message.chatwootMessageId, message.environment, message.echoId],
+        );
+        if ((claimByEcho.rowCount ?? 0) > 0) {
+          await client.query('RELEASE SAVEPOINT partner_chat_fanout');
+          return; // era a nossa própria mensagem; já estava na tela.
+        }
+      }
+
+      const claimByContent = await client.query(
         `UPDATE commerce.partner_messages
             SET chatwoot_message_id = $1
-          WHERE environment = $2 AND client_token = $3 AND chatwoot_message_id IS NULL`,
-        [message.chatwootMessageId, message.environment, message.echoId],
+          WHERE id = (
+            SELECT id FROM commerce.partner_messages
+             WHERE environment = $2 AND conversation_id = $3
+               AND direction = 'outbound' AND chatwoot_message_id IS NULL
+               AND content IS NOT DISTINCT FROM $4
+               AND created_at > now() - interval '10 minutes'
+             ORDER BY created_at DESC
+             LIMIT 1
+          )`,
+        [message.chatwootMessageId, message.environment, conversationId, message.content],
       );
-      if ((claim.rowCount ?? 0) > 0) {
+      if ((claimByContent.rowCount ?? 0) > 0) {
         await client.query('RELEASE SAVEPOINT partner_chat_fanout');
-        return; // era a nossa própria mensagem; já estava na tela.
+        return; // casou a otimista pelo conteúdo; não duplica.
       }
     }
 
