@@ -13,6 +13,7 @@ import { mapTags } from './tag.mapper.js';
 import { upsertContact } from '../persistence/contacts.repository.js';
 import { upsertConversation } from '../persistence/conversations.repository.js';
 import { upsertMessage } from '../persistence/messages.repository.js';
+import { fanOutMessageToPartnerChat } from './partner-chat.fanout.js';
 import { upsertAttachment } from '../persistence/attachments.repository.js';
 import { insertStatusEvent } from '../persistence/status-events.repository.js';
 import { insertAssignment } from '../persistence/assignments.repository.js';
@@ -198,6 +199,12 @@ export async function dispatch(
 
       const message = mapMessage(payload, environment, lastEventAt);
       const upsertedMessage = await upsertMessage(client, message);
+
+      // Fan-out pro chat do Portal Parceiro (Fatia 1). Defensivo: nunca lança,
+      // isola falha por SAVEPOINT próprio. Atrás da flag PARTNER_CHAT_FANOUT_ENABLED.
+      if (eventType === 'message_created') {
+        await fanOutMessageToPartnerChat(client, message, payload);
+      }
 
       // Enfileira job do Agent V2 para a conversa.
       // So para message_created; message_updated nao dispara processamento.

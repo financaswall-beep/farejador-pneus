@@ -37,6 +37,10 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
+  // Chat unificado do Portal Parceiro (Fatia 1): espelha mensagens do Chatwoot em
+  // commerce.partner_messages durante a normalizacao. Defensivo e isolado por SAVEPOINT
+  // — nunca quebra a normalizacao core. Desligado por padrao.
+  PARTNER_CHAT_FANOUT_ENABLED: booleanStringSchema,
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   // Coalescing window: segundos de pausa do cliente antes do bot responder.
   // A cada nova mensagem o timer RESETA. So responde quando o cliente para
