@@ -1395,12 +1395,44 @@ function parceiroApp() {
       void this.loadChatMessages(id);
       this.$nextTick(() => { lucide.createIcons(); this.scrollChatToEnd(); });
     },
-    sendChat() {
-      // Fatia 1 e so leitura. Responder pelo portal (banco -> Chatwoot -> Meta)
-      // entra na Fatia 2; por enquanto avisa em vez de fingir que enviou.
+    async sendChat() {
+      // Fatia 2: grava otimista na tela, manda pro backend (que grava no banco
+      // e dispara o Chatwoot). O polling/eco traz a versao persistida depois.
       const text = (this.chatDraft || '').trim();
-      if (!text || !this.chatActive) return;
-      this.flash('Responder pelo portal chega na proxima etapa (Fatia 2). Por enquanto o chat e so leitura.');
+      const conv = this.chatActive;
+      if (!text || !conv || this.chatSending) return;
+
+      const clientToken = 'pc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+      const optimistic = {
+        id: clientToken,
+        from: 'me',
+        text,
+        time: this.chatTimeLabel(new Date().toISOString()),
+        pending: true,
+      };
+      conv.messages = conv.messages || [];
+      conv.messages.push(optimistic);
+      this.chatDraft = '';
+      this.chatSending = true;
+      this.$nextTick(() => this.scrollChatToEnd());
+
+      try {
+        await this.api(`chat/conversations/${conv.id}/send`, {
+          method: 'POST',
+          body: { content: text, client_token: clientToken },
+        });
+        optimistic.pending = false;
+        // Recarrega o fio: a msg ja esta persistida no banco (substitui a otimista).
+        await this.loadChatMessages(conv.id);
+      } catch (err) {
+        // Rollback: tira a bolha otimista e devolve o texto pro input.
+        conv.messages = conv.messages.filter((m) => m.id !== clientToken);
+        this.chatDraft = text;
+        this.flash('Nao consegui enviar a mensagem. Tente de novo.');
+        console.warn('chat_send_failed', err);
+      } finally {
+        this.chatSending = false;
+      }
     },
     _chatNearBottom() {
       const box = document.getElementById('pos-chat-messages');

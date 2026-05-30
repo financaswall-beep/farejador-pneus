@@ -156,7 +156,39 @@ export class ChatwootApiClient {
     });
   }
 
-  private async requestPost(url: URL, payload: Record<string, unknown>): Promise<void> {
+  /**
+   * Envia uma mensagem PÚBLICA (outgoing, private=false) ao cliente, via Chatwoot.
+   * Diferente de createNote (nota interna), esta o cliente recebe no WhatsApp.
+   *
+   * `echoId` viaja no payload e o Chatwoot o ecoa no webhook message_created
+   * (mapeado por message.mapper como echoId). O fan-out casa esse eco com a
+   * mensagem otimista que o portal já inseriu (client_token = echo_id) e adota
+   * o chatwoot_message_id — é assim que a mensagem não duplica na tela.
+   *
+   * Retorna o id da mensagem criada no Chatwoot (ou null se a resposta não trouxe).
+   */
+  async sendMessage(
+    chatwootConversationId: number,
+    content: string,
+    echoId?: string,
+  ): Promise<{ chatwootMessageId: number | null }> {
+    const url = new URL(
+      `${this.baseUrl}/accounts/${this.accountId}/conversations/${chatwootConversationId}/messages`,
+    );
+    const payload: Record<string, unknown> = {
+      content,
+      message_type: 'outgoing',
+      content_type: 'text',
+      private: false,
+    };
+    if (echoId) payload.echo_id = echoId;
+
+    const body = await this.requestPost(url, payload);
+    const id = (body as { id?: unknown } | null)?.id;
+    return { chatwootMessageId: typeof id === 'number' ? id : null };
+  }
+
+  private async requestPost(url: URL, payload: Record<string, unknown>): Promise<unknown> {
     const startedAt = Date.now();
     let lastError: unknown = null;
 
@@ -198,7 +230,12 @@ export class ChatwootApiClient {
           );
         }
 
-        return;
+        const okBody = await response.text();
+        try {
+          return okBody ? JSON.parse(okBody) : null;
+        } catch {
+          return null;
+        }
       } catch (err) {
         clearTimeout(timeout);
 

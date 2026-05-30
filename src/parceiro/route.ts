@@ -18,6 +18,7 @@ import {
   PartialStockReversalError,
   getPartnerChatConversations,
   getPartnerChatMessages,
+  sendPartnerChatMessage,
   getPartnerCompras,
   getPartnerCustomers,
   getPartnerDespesas,
@@ -178,6 +179,11 @@ const customerIdParamsSchema = paramsSchema.extend({
 
 const chatConversationParamsSchema = paramsSchema.extend({
   conversationId: z.string().uuid(),
+});
+
+const chatSendBodySchema = z.object({
+  content: z.string().trim().min(1).max(4096),
+  client_token: z.string().trim().min(1).max(128),
 });
 
 const purchaseSchema = z.object({
@@ -421,6 +427,29 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const rows = await getPartnerChatMessages(getPartnerContext(request), params.data.conversationId);
     if (rows === null) return reply.status(404).send({ error: 'conversation_not_found' });
     return reply.status(200).send({ rows });
+  });
+
+  // Fatia 2 — envio. O parceiro responde o cliente; grava otimista + manda pro
+  // Chatwoot (echo_id = client_token); o eco do webhook preenche o id depois.
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/send', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = chatConversationParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
+
+    const body = chatSendBodySchema.safeParse(request.body);
+    if (!body.success) {
+      const issue = body.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path.join('.')}: ${issue?.message ?? 'invalid'}` });
+    }
+
+    const result = await sendPartnerChatMessage(
+      getPartnerContext(request),
+      params.data.conversationId,
+      body.data.content,
+      body.data.client_token,
+    );
+    if (result.status === 'not_found') return reply.status(404).send({ error: 'conversation_not_found' });
+    if (result.status === 'send_failed') return reply.status(502).send({ error: 'send_failed' });
+    return reply.status(200).send({ message: result.message });
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta

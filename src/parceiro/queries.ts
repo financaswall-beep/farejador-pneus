@@ -25,6 +25,9 @@
 
 import type { PoolClient } from 'pg';
 import { withPartnerContext } from './db.js';
+import { pool } from '../persistence/db.js';
+import { logger } from '../shared/logger.js';
+import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
 import type { PartnerContext } from './auth.js';
 
@@ -2270,4 +2273,76 @@ export async function getPartnerChatMessages(
     );
     return result.rows;
   });
+}
+
+// ============================================================
+// Chat unificado (Fatia 2) — ENVIO. O parceiro responde o cliente
+// pelo portal: grava a msg otimista no banco (pool do parceiro, RLS
+// via WITH CHECK garante a unidade), manda pro Chatwoot com
+// echo_id = client_token, e o eco do webhook casa essa msg e preenche
+// o chatwoot_message_id (fan-out). Sem duplicar na tela.
+// ============================================================
+
+export type SendPartnerChatStatus = 'ok' | 'not_found' | 'send_failed';
+
+export interface SendPartnerChatResult {
+  status: SendPartnerChatStatus;
+  message?: Record<string, unknown>;
+}
+
+export async function sendPartnerChatMessage(
+  ctx: PartnerContext,
+  conversationId: string,
+  content: string,
+  clientToken: string,
+): Promise<SendPartnerChatResult> {
+  // 1) Acha a conversa (RLS) e insere a mensagem otimista. O portal só tem
+  //    SELECT/INSERT em partner_messages; o chatwoot_message_id fica NULL até
+  //    o eco. last_message_at/unread não mexem aqui (sem grant de UPDATE na
+  //    conversa) — o eco do fan-out cuida disso quando a msg volta.
+  const inserted = await withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const conv = await client.query(
+      `SELECT chatwoot_conversation_id FROM commerce.partner_conversations
+        WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [conversationId, ctx.environment, ctx.unitId],
+    );
+    if (conv.rowCount !== 1) return null;
+
+    const msg = await client.query(
+      `INSERT INTO commerce.partner_messages
+         (environment, unit_id, conversation_id, chatwoot_message_id, direction, sender, content, client_token)
+       VALUES ($1, $2, $3, NULL, 'outbound', 'partner', $4, $5)
+       RETURNING id, chatwoot_message_id, direction, sender, content, attachments, created_at`,
+      [ctx.environment, ctx.unitId, conversationId, content, clientToken],
+    );
+    return {
+      chatwootConversationId: Number(conv.rows[0]!.chatwoot_conversation_id),
+      message: msg.rows[0] as Record<string, unknown>,
+    };
+  });
+
+  if (!inserted) return { status: 'not_found' };
+
+  // 2) Manda pro Chatwoot com echo_id = client_token (o eco preenche o id).
+  try {
+    const api = new ChatwootApiClient();
+    await api.sendMessage(inserted.chatwootConversationId, content, clientToken);
+  } catch (err) {
+    // 3) Falhou o envio: remove a msg otimista pra não ficar fantasma na tela.
+    //    Partner não tem DELETE; usa o pool do bot (bypassa RLS) com unit_id
+    //    explícito pra segurança.
+    await pool
+      .query(
+        `DELETE FROM commerce.partner_messages
+          WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+        [(inserted.message as { id: string }).id, ctx.environment, ctx.unitId],
+      )
+      .catch((cleanupErr) =>
+        logger.error({ err: cleanupErr, conversationId }, 'falha ao limpar msg otimista'),
+      );
+    logger.error({ err, conversationId }, 'partner chat send failed');
+    return { status: 'send_failed' };
+  }
+
+  return { status: 'ok', message: inserted.message };
 }
