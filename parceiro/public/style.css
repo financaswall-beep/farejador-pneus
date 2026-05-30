@@ -1192,6 +1192,17 @@ html, body {
   padding: 10px 18px 0;
 }
 
+/* Aba Bate-papo: 3 KPIs (sem "Vendas fechadas") — preenchem a faixa sem buraco. */
+.pos-kpis.chat-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* No batepapo a faixa de KPIs vive DENTRO do grid do chat (.pos-chat). A aba so
+   tem 3 filhos visiveis no .pos-main (header, workspace, footer), entao o grid
+   passa a ter 3 linhas e o workspace fica com o 1fr (senao cai na linha de 88px
+   e colapsa o chat). */
+.pos-main.chat-mode { grid-template-rows: 80px 1fr 46px; }
+
 .pos-kpis article,
 .pos-panel {
   border: 1px solid var(--pos-line);
@@ -2522,9 +2533,38 @@ html, body {
 
 .pos-chat {
   display: grid; grid-template-columns: 330px 1fr 312px; gap: 14px;
+  grid-template-rows: auto 1fr;
   height: 100%; min-height: 0;
 }
 .pos-chat .pos-panel { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
+
+/* KPIs do chat ocupam a faixa de cima (linha 1) da lista+conversa; o painel
+   "Detalhes" sobe ate o topo (coluna 3, linhas 1-2) ao lado deles. */
+.pos-chat .chat-kpis { grid-column: 1 / 3; grid-row: 1; padding: 0; }
+.pos-chat-list { grid-column: 1; grid-row: 2; }
+.pos-chat-thread { grid-column: 2; grid-row: 2; }
+.pos-chat-details { grid-column: 3; grid-row: 1 / 3; }
+.pos-chat-placeholder { grid-row: 2; }
+/* Sem conversa aberta: nao ha "Detalhes" pra subir, entao os KPIs ocupam a largura toda. */
+.pos-chat:not(.has-active) .chat-kpis { grid-column: 1 / -1; }
+
+/* Estado vazio da LISTA (coluna 1): nenhuma conversa / filtro sem resultado. */
+.pos-chat-empty-list {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 40px 20px; text-align: center; color: #94a3b8;
+}
+.pos-chat-empty-list svg { width: 34px; height: 34px; opacity: .55; }
+.pos-chat-empty-list p { font-size: 13px; line-height: 1.4; }
+
+/* Placeholder central (colunas 2+3): nenhuma conversa aberta. */
+.pos-chat-placeholder {
+  grid-column: 2 / 4;
+  align-items: center; justify-content: center;
+  gap: 12px; padding: 32px; text-align: center;
+}
+.pos-chat-placeholder svg { width: 56px; height: 56px; color: var(--pos-accent, #2563eb); opacity: .5; }
+.pos-chat-placeholder b { font-size: 16px; font-weight: 700; color: var(--pos-text, #e2e8f0); }
+.pos-chat-placeholder p { font-size: 13px; line-height: 1.5; color: #94a3b8; max-width: 320px; }
 
 /* coluna 1 — lista */
 .pos-chat-list-head {
@@ -2695,6 +2735,11 @@ html, body {
 .pos-chat-close-conv svg { width: 15px; height: 15px; }
 
 @media (max-width: 980px) {
-  .pos-chat { grid-template-columns: 1fr; height: auto; }
+  .pos-chat { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
   .pos-chat-details { display: none !important; }
+  /* Reseta o posicionamento de grid do desktop pra empilhar normal no mobile. */
+  .pos-chat .chat-kpis,
+  .pos-chat-list,
+  .pos-chat-thread,
+  .pos-chat-placeholder { grid-column: auto; grid-row: auto; }
 }

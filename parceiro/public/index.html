@@ -34,6 +34,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <link rel="stylesheet" href="./style.css?v=20260529-tema-claro-2" />
+  <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
+  <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -148,7 +150,7 @@
       </div>
     </aside>
 
-    <main class="pos-main">
+    <main class="pos-main" :class="currentSection === 'batepapo' && 'chat-mode'">
       <header class="pos-topbar">
         <div class="pos-company">
           <div class="font-bold">Pneus Max Moto Center</div>
@@ -1296,27 +1298,24 @@
       </section>
 
       <!-- â•â•â•â•â•  BATE-PAPO (F7)  â•â•â•â•â• -->
-      <section x-show="currentSection === 'batepapo'" class="pos-kpis">
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="message-circle"></i></div>
-          <div><small>Conversas hoje</small><strong x-text="chatConversations.length"></strong><span x-text="chatUnreadTotal + ' não lidas'"></span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
-          <div><small>Pedidos em aberto</small><strong x-text="num(resumo?.orders_month)"></strong><span>do atendimento</span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="clock"></i></div>
-          <div><small>Tempo médio de resposta</small><strong>2m 18s</strong><span>últimas 24h</span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
-          <div><small>Vendas fechadas</small><strong x-text="salesToday.length"></strong><span x-text="money(salesTodayTotal)"></span></div>
-        </article>
-      </section>
-
       <section x-show="currentSection === 'batepapo'" class="pos-workspace">
-        <div class="pos-chat">
+        <div class="pos-chat" :class="chatActive && 'has-active'">
+
+          <!-- KPIs do chat: faixa de cima sobre lista+conversa; Detalhes sobe ao lado -->
+          <section class="pos-kpis chat-kpis">
+            <article>
+              <div class="pos-kpi-icon"><i data-lucide="message-circle"></i></div>
+              <div><small>Conversas hoje</small><strong x-text="chatConversations.length"></strong><span x-text="chatUnreadTotal + ' não lidas'"></span></div>
+            </article>
+            <article>
+              <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
+              <div><small>Pedidos em aberto</small><strong x-text="num(resumo?.orders_month)"></strong><span>do atendimento</span></div>
+            </article>
+            <article>
+              <div class="pos-kpi-icon"><i data-lucide="clock"></i></div>
+              <div><small>Tempo médio de resposta</small><strong>2m 18s</strong><span>últimas 24h</span></div>
+            </article>
+          </section>
 
           <!-- COLUNA 1: lista de conversas -->
           <aside class="pos-chat-list pos-panel">
@@ -1350,9 +1349,21 @@
                   </span>
                 </button>
               </template>
+              <!-- Estado vazio: nenhuma conversa na lista (ou filtro sem resultado). -->
+              <div class="pos-chat-empty-list" x-show="chatFilteredConversations.length === 0">
+                <i data-lucide="message-square-dashed"></i>
+                <p x-text="chatFilter === 'all' ? 'Nenhuma conversa por aqui ainda.' : 'Nenhuma conversa neste filtro.'"></p>
+              </div>
             </div>
             <button class="pos-chat-list-foot">Ver todas as conversas <i data-lucide="chevron-right"></i></button>
           </aside>
+
+          <!-- Placeholder central: nenhuma conversa aberta (ocupa colunas 2+3). -->
+          <section class="pos-chat-placeholder pos-panel" x-show="!chatActive">
+            <i data-lucide="messages-square"></i>
+            <b>Selecione uma conversa</b>
+            <p>Escolha um atendimento na lista ao lado para ver as mensagens e os detalhes do cliente.</p>
+          </section>
 
           <!-- COLUNA 2: thread -->
           <section class="pos-chat-thread pos-panel" x-show="chatActive">
