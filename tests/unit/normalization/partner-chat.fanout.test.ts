@@ -204,4 +204,32 @@ describe('partner chat fanout', () => {
     });
     expect(findCall(fb, 'INSERT INTO commerce.partner_conversations')!.params[3]).toBe('facebook');
   });
+
+  it('derives the channel from the inbox name when the conversation is a generic API channel', async () => {
+    // Caso real de prod: IG/FB entram por um inbox tipo API (Channel::Api), em que
+    // a conversa NÃO rotula o canal — só payload.inbox.name ("Facebook") revela.
+    const fanOut = await load();
+
+    const fbApi: QueryCall[] = [];
+    await fanOut(createMockClient(fbApi) as never, makeMessage(), {
+      conversation: { id: 1, channel: 'Channel::Api' },
+      inbox: { id: 22, name: 'Facebook' },
+    });
+    expect(findCall(fbApi, 'INSERT INTO commerce.partner_conversations')!.params[3]).toBe('facebook');
+
+    const igApi: QueryCall[] = [];
+    await fanOut(createMockClient(igApi) as never, makeMessage(), {
+      conversation: { id: 1, channel: 'Channel::Api' },
+      inbox: { id: 23, name: 'Instagram' },
+    });
+    expect(findCall(igApi, 'INSERT INTO commerce.partner_conversations')!.params[3]).toBe('instagram');
+
+    // "WhatsApp API Oficial" (inbox nativo) continua whatsapp.
+    const waApi: QueryCall[] = [];
+    await fanOut(createMockClient(waApi) as never, makeMessage(), {
+      conversation: { id: 1, channel: 'Channel::Whatsapp' },
+      inbox: { id: 30, name: 'WhatsApp API Oficial' },
+    });
+    expect(findCall(waApi, 'INSERT INTO commerce.partner_conversations')!.params[3]).toBe('whatsapp');
+  });
 });

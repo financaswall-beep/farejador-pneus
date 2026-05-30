@@ -37,19 +37,33 @@ function readString(source: unknown, key: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-/** Mapeia o channel_type do Chatwoot ("Channel::Whatsapp") pro nosso enum textual. */
+/**
+ * Mapeia o canal do Chatwoot pro nosso enum textual.
+ *
+ * Inboxes NATIVOS trazem `conversation.channel = "Channel::Whatsapp"` etc.
+ * Mas Instagram/Facebook costumam entrar por um inbox do tipo API
+ * (`Channel::Api`), em que o Chatwoot NÃO rotula a origem — só o NOME do inbox
+ * (`payload.inbox.name`, ex. "Facebook", "Instagram") revela o canal real.
+ * Por isso juntamos todas as pistas num "palheiro" e procuramos a palavra-chave.
+ */
 function deriveChannel(rawPayload: Record<string, unknown>): 'whatsapp' | 'instagram' | 'facebook' | 'other' {
   const conversation = readObject(rawPayload, 'conversation');
   const additional = readObject(conversation, 'additional_attributes');
-  const raw =
-    readString(conversation, 'channel') ??
-    readString(additional, 'channel_type') ??
-    readString(rawPayload, 'channel') ??
-    '';
-  const lower = raw.toLowerCase();
-  if (lower.includes('whatsapp')) return 'whatsapp';
-  if (lower.includes('instagram')) return 'instagram';
-  if (lower.includes('facebook')) return 'facebook';
+  const inbox = readObject(rawPayload, 'inbox');
+  const haystack = [
+    readString(conversation, 'channel'),
+    readString(additional, 'channel_type'),
+    readString(inbox, 'channel_type'),
+    readString(inbox, 'name'),
+    readString(rawPayload, 'channel'),
+  ]
+    .filter((s): s is string => !!s)
+    .join(' ')
+    .toLowerCase();
+
+  if (haystack.includes('whatsapp')) return 'whatsapp';
+  if (haystack.includes('instagram')) return 'instagram';
+  if (haystack.includes('facebook')) return 'facebook';
   return 'other';
 }
 
