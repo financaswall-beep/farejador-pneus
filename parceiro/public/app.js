@@ -1419,7 +1419,7 @@ function parceiroApp() {
       try {
         await this.api(`chat/conversations/${conv.id}/send`, {
           method: 'POST',
-          body: { content: text, client_token: clientToken },
+          body: JSON.stringify({ content: text, client_token: clientToken }),
         });
         optimistic.pending = false;
         // Recarrega o fio: a msg ja esta persistida no banco (substitui a otimista).
