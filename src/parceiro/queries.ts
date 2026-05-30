@@ -2217,3 +2217,57 @@ export async function cancelPartnerReceivable(
     return { receivable_id: receivableId, cancelled: result.rowCount === 1 };
   });
 }
+
+// ============================================================
+// Chat unificado (Fatia 1.3) — LEITURA das conversas/mensagens
+// espelhadas pelo fan-out (commerce.partner_*). Só lê; o envio é
+// Fatia 2. RLS isola por unidade; o WHERE unit_id é defesa extra.
+// ============================================================
+
+export async function getPartnerChatConversations(ctx: PartnerContext): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query(
+      `SELECT c.id, c.chatwoot_conversation_id, c.channel,
+              c.customer_name, c.customer_identifier, c.customer_location, c.initial_intent,
+              c.status, c.last_message_at, c.unread_count, c.created_at, c.updated_at,
+              (SELECT m.content
+                 FROM commerce.partner_messages m
+                WHERE m.conversation_id = c.id AND m.environment = c.environment
+                ORDER BY m.created_at DESC, m.id DESC
+                LIMIT 1) AS last_message
+       FROM commerce.partner_conversations c
+       WHERE c.environment = $1 AND c.unit_id = $2
+       ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+       LIMIT 100`,
+      [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
+export async function getPartnerChatMessages(
+  ctx: PartnerContext,
+  conversationId: string,
+): Promise<unknown[] | null> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    // Confirma que a conversa existe e pertence à unidade (RLS + WHERE).
+    // null distingue "conversa inexistente/de outro parceiro" (404) de
+    // "conversa sem mensagens" ([]), pra a rota responder certo.
+    const conv = await client.query(
+      `SELECT 1 FROM commerce.partner_conversations
+       WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [conversationId, ctx.environment, ctx.unitId],
+    );
+    if (conv.rowCount !== 1) return null;
+
+    const result = await client.query(
+      `SELECT id, chatwoot_message_id, direction, sender, content, attachments, created_at
+       FROM commerce.partner_messages
+       WHERE environment = $1 AND unit_id = $2 AND conversation_id = $3
+       ORDER BY created_at ASC, id ASC
+       LIMIT 500`,
+      [ctx.environment, ctx.unitId, conversationId],
+    );
+    return result.rows;
+  });
+}

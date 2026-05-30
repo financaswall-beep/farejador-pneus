@@ -78,7 +78,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro'].includes(currentSection)" :data-theme="theme" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro', 'batepapo'].includes(currentSection)" :data-theme="theme" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -123,6 +123,12 @@
           <i data-lucide="chart-no-axes-combined"></i>
           <span>Financeiro</span>
           <kbd>F8</kbd>
+        </button>
+        <button @click="goToSection('batepapo')" class="pos-nav-item" :class="currentSection === 'batepapo' && 'active'">
+          <i data-lucide="message-circle"></i>
+          <span>Bate-papo</span>
+          <kbd>F7</kbd>
+          <b class="pos-nav-badge" x-show="chatUnreadTotal > 0" x-text="chatUnreadTotal"></b>
         </button>
       </nav>
 
@@ -1286,6 +1292,145 @@
               </template>
             </div>
           </aside>
+        </div>
+      </section>
+
+      <!-- â•â•â•â•â•  BATE-PAPO (F7)  â•â•â•â•â• -->
+      <section x-show="currentSection === 'batepapo'" class="pos-kpis">
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="message-circle"></i></div>
+          <div><small>Conversas hoje</small><strong x-text="chatConversations.length"></strong><span x-text="chatUnreadTotal + ' não lidas'"></span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
+          <div><small>Pedidos em aberto</small><strong x-text="num(resumo?.orders_month)"></strong><span>do atendimento</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="clock"></i></div>
+          <div><small>Tempo médio de resposta</small><strong>2m 18s</strong><span>últimas 24h</span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
+          <div><small>Vendas fechadas</small><strong x-text="salesToday.length"></strong><span x-text="money(salesTodayTotal)"></span></div>
+        </article>
+      </section>
+
+      <section x-show="currentSection === 'batepapo'" class="pos-workspace">
+        <div class="pos-chat">
+
+          <!-- COLUNA 1: lista de conversas -->
+          <aside class="pos-chat-list pos-panel">
+            <div class="pos-chat-list-head">
+              <h3>Conversas</h3>
+              <div class="pos-chat-list-tools">
+                <select x-model="chatFilter">
+                  <option value="all">Todas</option>
+                  <option value="unread">Não lidas</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="instagram">Instagram</option>
+                </select>
+              </div>
+            </div>
+            <div class="pos-chat-list-body">
+              <template x-for="c in chatFilteredConversations" :key="c.id">
+                <button class="pos-chat-item" :class="c.id === chatActiveId && 'active'" @click="selectChat(c.id)">
+                  <span class="pos-chat-avatar" :data-channel="c.channel" x-text="c.initials"></span>
+                  <span class="pos-chat-item-body">
+                    <span class="pos-chat-item-top">
+                      <b x-text="c.name"></b>
+                      <small x-text="c.time"></small>
+                    </span>
+                    <span class="pos-chat-item-bottom">
+                      <span x-text="c.last"></span>
+                      <i class="pos-chat-unread" x-show="c.unread > 0" x-text="c.unread"></i>
+                    </span>
+                  </span>
+                </button>
+              </template>
+            </div>
+            <button class="pos-chat-list-foot">Ver todas as conversas <i data-lucide="chevron-right"></i></button>
+          </aside>
+
+          <!-- COLUNA 2: thread -->
+          <section class="pos-chat-thread pos-panel" x-show="chatActive">
+            <header class="pos-chat-thread-head">
+              <div class="pos-chat-thread-who">
+                <span class="pos-chat-avatar" :data-channel="chatActive?.channel" x-text="chatActive?.initials"></span>
+                <div>
+                  <b x-text="chatActive?.name"></b>
+                  <small><span x-text="chatActive?.channelLabel"></span> • <i class="pos-chat-online">Online</i></small>
+                </div>
+              </div>
+              <div class="pos-chat-thread-actions">
+                <button title="Etiquetar"><i data-lucide="tag"></i></button>
+                <button title="Favoritar"><i data-lucide="star"></i></button>
+                <button title="Mais"><i data-lucide="more-horizontal"></i></button>
+              </div>
+            </header>
+
+            <div class="pos-chat-messages" id="pos-chat-messages">
+              <div class="pos-chat-daysep"><span>Hoje</span></div>
+              <template x-for="m in chatActive?.messages || []" :key="m.id">
+                <div class="pos-chat-bubble-row" :class="m.from === 'me' ? 'mine' : 'theirs'">
+                  <div class="pos-chat-bubble">
+                    <span x-text="m.text"></span>
+                    <small><span x-text="m.time"></span><i data-lucide="check-check" x-show="m.from === 'me'"></i></small>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <footer class="pos-chat-input">
+              <button title="Emoji"><i data-lucide="smile"></i></button>
+              <input x-model="chatDraft" @keydown.enter="sendChat()" placeholder="Digite sua mensagem..." />
+              <button title="Anexo"><i data-lucide="paperclip"></i></button>
+              <button title="Áudio"><i data-lucide="mic"></i></button>
+              <button class="pos-chat-send" @click="sendChat()"><i data-lucide="send"></i></button>
+            </footer>
+          </section>
+
+          <!-- COLUNA 3: detalhes do atendimento -->
+          <aside class="pos-chat-details pos-panel" x-show="chatActive">
+            <div class="pos-chat-details-head"><h3>Detalhes do atendimento</h3></div>
+
+            <div class="pos-chat-contact">
+              <span class="pos-chat-avatar" :data-channel="chatActive?.channel" x-text="chatActive?.initials"></span>
+              <div><b x-text="chatActive?.name"></b><small x-text="chatActive?.phone"></small></div>
+            </div>
+
+            <div class="pos-chat-facts">
+              <div><span><i data-lucide="map-pin"></i> Origem</span><b x-text="chatActive?.channelLabel"></b></div>
+              <div><span><i data-lucide="ruler"></i> Medida</span><b x-text="chatActive?.measure || '—'"></b></div>
+              <div><span><i data-lucide="move"></i> Posição</span><b x-text="chatActive?.position || '—'"></b></div>
+              <div><span><i data-lucide="bike"></i> Moto</span><b x-text="chatActive?.bike || '—'"></b></div>
+              <div><span><i data-lucide="map"></i> Cidade / UF</span><b x-text="chatActive?.city || '—'"></b></div>
+            </div>
+
+            <div class="pos-chat-suggest" x-show="chatActive?.suggested">
+              <small>Produto sugerido</small>
+              <div class="pos-chat-suggest-card">
+                <span class="pos-chat-suggest-thumb"><i data-lucide="disc"></i></span>
+                <div>
+                  <b x-text="chatActive?.suggested?.name"></b>
+                  <small x-text="chatActive?.suggested?.spec"></small>
+                  <i class="pos-chat-instock"><i data-lucide="check-circle"></i> Em estoque</i>
+                </div>
+                <strong x-text="money(chatActive?.suggested?.price)"></strong>
+              </div>
+            </div>
+
+            <div class="pos-chat-actions">
+              <small>Ações rápidas</small>
+              <div class="pos-chat-actions-grid">
+                <button @click="flash('Catálogo enviado (mock)')"><i data-lucide="book-open"></i>Enviar catálogo</button>
+                <button class="primary" @click="goToSection('vendas')"><i data-lucide="shopping-cart"></i>Criar pedido</button>
+                <button @click="flash('Orçamento enviado (mock)')"><i data-lucide="file-text"></i>Enviar orçamento</button>
+                <button @click="flash('Transferir (mock)')"><i data-lucide="users"></i>Transferir</button>
+              </div>
+              <button class="pos-chat-close-conv" @click="flash('Conversa encerrada (mock)')"><i data-lucide="power"></i> Encerrar conversa</button>
+            </div>
+          </aside>
+
         </div>
       </section>
 

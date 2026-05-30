@@ -16,6 +16,8 @@ import {
   InstallmentsTooSmallError,
   PaidPurchaseLockedError,
   PartialStockReversalError,
+  getPartnerChatConversations,
+  getPartnerChatMessages,
   getPartnerCompras,
   getPartnerCustomers,
   getPartnerDespesas,
@@ -172,6 +174,10 @@ const customerSearchSchema = z.object({
 
 const customerIdParamsSchema = paramsSchema.extend({
   customerId: z.string().uuid(),
+});
+
+const chatConversationParamsSchema = paramsSchema.extend({
+  conversationId: z.string().uuid(),
 });
 
 const purchaseSchema = z.object({
@@ -381,6 +387,21 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       }
       throw err;
     }
+  });
+
+  // Chat unificado (Fatia 1.3) — leitura. Conversas e mensagens espelhadas
+  // pelo fan-out do Chatwoot. Só leitura; o envio (POST) é Fatia 2.
+  fastify.get('/parceiro/:slug/api/chat/conversations', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await getPartnerChatConversations(getPartnerContext(request)) });
+  });
+
+  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/messages', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = chatConversationParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
+
+    const rows = await getPartnerChatMessages(getPartnerContext(request), params.data.conversationId);
+    if (rows === null) return reply.status(404).send({ error: 'conversation_not_found' });
+    return reply.status(200).send({ rows });
   });
 
   // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta

@@ -49,6 +49,15 @@ function parceiroApp() {
     // Mesma ideia na aba Pedidos (celular): 'list' = KPIs+lista; 'form' = novo pedido.
     orderMobileStep: 'list',
     isMobile: false,
+
+    // â”€â”€â”€ BATE-PAPO (F7) â”€ Fatia 1.4: dados reais via API (fan-out Chatwoot->banco).
+    //     Leitura + polling 5s. Responder pelo portal e Fatia 2 (ainda nao envia).
+    chatFilter: 'all',
+    chatActiveId: null,
+    chatDraft: '',
+    chatConversations: [],
+    chatLoading: false,
+    chatTimer: null,
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
@@ -1265,13 +1274,150 @@ function parceiroApp() {
           title: 'Financeiro',
           subtitle: 'Compras, despesas e resultado simples',
         },
+        batepapo: {
+          title: 'Bate-papo',
+          subtitle: 'Atendimento unificado WhatsApp, Instagram e Facebook',
+        },
       };
       return meta[this.currentSection] || meta.resumo;
+    },
+
+    // â”€â”€â”€ BATE-PAPO (F7) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    get chatActive() {
+      return this.chatConversations.find((c) => c.id === this.chatActiveId) || null;
+    },
+    get chatUnreadTotal() {
+      return this.chatConversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+    },
+    get chatFilteredConversations() {
+      const f = this.chatFilter;
+      return this.chatConversations.filter((c) => {
+        if (f === 'all') return true;
+        if (f === 'unread') return (c.unread || 0) > 0;
+        return c.channel === f;
+      });
+    },
+
+    // â”€â”€ Mapeamento banco -> formato que a tela consome â”€â”€
+    chatChannelLabel(channel) {
+      return { whatsapp: 'WhatsApp', instagram: 'Instagram', facebook: 'Facebook' }[channel] || 'Outro';
+    },
+    chatInitials(name) {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 0) return '?';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    },
+    chatTimeLabel(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(d);
+    },
+    mapChatConversation(row, keepMessages) {
+      const name = row.customer_name || row.customer_identifier || 'Cliente';
+      return {
+        id: row.id,
+        name,
+        initials: this.chatInitials(name),
+        channel: row.channel || 'other',
+        channelLabel: this.chatChannelLabel(row.channel),
+        phone: row.customer_identifier || '',
+        time: this.chatTimeLabel(row.last_message_at || row.created_at),
+        unread: Number(row.unread_count || 0),
+        last: row.last_message || '',
+        // Slots captados pelo bot (ainda nao estruturados): so localizacao/intent existem.
+        measure: null, position: null, bike: null,
+        city: row.customer_location || null,
+        suggested: null,
+        messages: keepMessages || [],
+        _loaded: !!keepMessages,
+      };
+    },
+    chatMapMessage(row) {
+      return {
+        id: row.id,
+        from: row.direction === 'inbound' ? 'them' : 'me',
+        text: row.content || '',
+        time: this.chatTimeLabel(row.created_at),
+      };
+    },
+
+    async loadChat() {
+      if (!this.apiToken) return;
+      try {
+        const data = await this.api('chat/conversations');
+        const prev = new Map(this.chatConversations.map((c) => [c.id, c]));
+        this.chatConversations = (data.rows || []).map((row) => {
+          const old = prev.get(row.id);
+          const mapped = this.mapChatConversation(row, old ? old.messages : null);
+          mapped._loaded = old ? old._loaded : false;
+          // Conversa aberta: zera o badge localmente (read-state real e futuro).
+          if (row.id === this.chatActiveId) mapped.unread = 0;
+          return mapped;
+        });
+        // Mantem o fio aberto atualizado (mensagens novas aparecem no polling).
+        if (this.chatActiveId && this.chatConversations.some((c) => c.id === this.chatActiveId)) {
+          await this.loadChatMessages(this.chatActiveId);
+        }
+      } catch (err) {
+        console.warn('chat_load_failed', err);
+      }
+    },
+
+    async loadChatMessages(id) {
+      try {
+        const data = await this.api(`chat/conversations/${id}/messages`);
+        const conv = this.chatConversations.find((c) => c.id === id);
+        if (!conv) return;
+        const wasAtEnd = this._chatNearBottom();
+        conv.messages = (data.rows || []).map((row) => this.chatMapMessage(row));
+        conv._loaded = true;
+        if (wasAtEnd) this.$nextTick(() => this.scrollChatToEnd());
+      } catch (err) {
+        console.warn('chat_messages_failed', err);
+      }
+    },
+
+    startChatPolling() {
+      this.stopChatPolling();
+      void this.loadChat();
+      this.chatTimer = setInterval(() => { void this.loadChat(); }, 5000);
+    },
+    stopChatPolling() {
+      if (this.chatTimer) { clearInterval(this.chatTimer); this.chatTimer = null; }
+    },
+
+    selectChat(id) {
+      this.chatActiveId = id;
+      const c = this.chatConversations.find((x) => x.id === id);
+      if (c) c.unread = 0;
+      void this.loadChatMessages(id);
+      this.$nextTick(() => { lucide.createIcons(); this.scrollChatToEnd(); });
+    },
+    sendChat() {
+      // Fatia 1 e so leitura. Responder pelo portal (banco -> Chatwoot -> Meta)
+      // entra na Fatia 2; por enquanto avisa em vez de fingir que enviou.
+      const text = (this.chatDraft || '').trim();
+      if (!text || !this.chatActive) return;
+      this.flash('Responder pelo portal chega na proxima etapa (Fatia 2). Por enquanto o chat e so leitura.');
+    },
+    _chatNearBottom() {
+      const box = document.getElementById('pos-chat-messages');
+      if (!box) return true;
+      return (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+    },
+    scrollChatToEnd() {
+      const box = document.getElementById('pos-chat-messages');
+      if (box) box.scrollTop = box.scrollHeight;
     },
 
     // â”€â”€â”€ NAVEGAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     goToSection(id) {
       if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
+      // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
+      if (id === 'batepapo') this.startChatPolling();
+      else this.stopChatPolling();
       this.currentSection = id;
       if (id === 'vendas') this.currentTab = 'sale';
       if (id === 'estoque') this.currentTab = 'stock';
@@ -1281,6 +1427,7 @@ function parceiroApp() {
         if (main) main.scrollTo({ top: 0, behavior: 'auto' });
         lucide.createIcons();
         requestAnimationFrame(() => this.renderAllCharts());
+        if (id === 'batepapo') this.scrollChatToEnd();
       });
     },
 
