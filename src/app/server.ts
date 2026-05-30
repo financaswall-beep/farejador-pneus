@@ -4,6 +4,7 @@ import { logger, loggerOptions } from '../shared/logger.js';
 import { pool } from '../persistence/db.js';
 import { registerRoutes } from './routes.js';
 import { startWorker } from '../normalization/worker.js';
+import { startPartnerChatReconciler } from '../normalization/partner-chat.reconcile.js';
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
 
 const fastify = Fastify({
@@ -12,6 +13,7 @@ const fastify = Fastify({
 
 let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;
+let stopPartnerChatReconciler: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -32,6 +34,7 @@ async function start(): Promise<void> {
 
   stopWorker = startWorker();
   stopAgentV2 = startAgentV2Worker();
+  stopPartnerChatReconciler = startPartnerChatReconciler();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -42,6 +45,7 @@ async function shutdown(signal: string): Promise<void> {
   fastify.log.info({ signal }, 'shutting down gracefully');
   stopWorker?.();
   stopAgentV2?.();
+  stopPartnerChatReconciler?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');

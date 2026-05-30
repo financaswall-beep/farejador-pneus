@@ -191,8 +191,8 @@ export async function fanOutMessageToPartnerChat(
     //    estoura 42P10 ("no unique or exclusion constraint matching").
     const msgResult = await client.query(
       `INSERT INTO commerce.partner_messages
-         (environment, unit_id, conversation_id, chatwoot_message_id, direction, sender, content)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (environment, unit_id, conversation_id, chatwoot_message_id, direction, sender, content, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (environment, chatwoot_message_id) WHERE chatwoot_message_id IS NOT NULL DO NOTHING
        RETURNING id`,
       [
@@ -203,6 +203,9 @@ export async function fanOutMessageToPartnerChat(
         projection.direction,
         projection.sender,
         message.content,
+        // Horário REAL da mensagem (Chatwoot), não o do insert — senão a
+        // reconciliação grava tudo com a hora do backfill e bagunça a ordem.
+        message.sentAt,
       ],
     );
     recordedNew = (msgResult.rowCount ?? 0) > 0;
