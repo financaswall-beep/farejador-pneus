@@ -37,6 +37,12 @@ function parceiroApp() {
     stockSearch: '',
     stockOriginFilter: 'all',
     stockStatusFilter: 'all',
+    stockBrandFilter: 'all',
+    stockPositionFilter: 'all',
+    stockPage: 1,
+    stockPageSize: 10,
+    stockSelected: null,
+    stockModalOpen: false,
     posSearch: '',
     posBrandFilter: 'all',
     posRimFilter: 'all',
@@ -492,6 +498,87 @@ function parceiroApp() {
 
     get soldUnitsMonth() {
       return this.salesUnitsFor(this.activeSales);
+    },
+
+    // ── Indicadores extras da tela de estoque (refit mockup) ──────────────
+    get stockCategoriesCount() {
+      // "Categorias" = marcas distintas com itens rastreados no estoque.
+      const brands = new Set();
+      for (const item of this.estoque) {
+        if (item.brand) brands.add(String(item.brand).trim().toLowerCase());
+      }
+      return brands.size;
+    },
+
+    get stockTopSizes() {
+      // Top medidas por quantidade em estoque (pra barra "Medidas com maior estoque").
+      const bySize = new Map();
+      for (const item of this.estoque) {
+        const size = item.tire_size;
+        if (!size) continue;
+        const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
+        bySize.set(size, (bySize.get(size) || 0) + qty);
+      }
+      const rows = [...bySize.entries()]
+        .map(([label, qty]) => ({ label, qty }))
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 5);
+      const max = rows.reduce((m, r) => Math.max(m, r.qty), 0) || 1;
+      return rows.map((r) => ({ ...r, pct: Math.round((r.qty / max) * 100) }));
+    },
+
+    get stockTurnover() {
+      // Giro aproximado: saídas do mês / estoque médio atual. Sem ledger, usa
+      // o saldo atual como proxy do estoque médio.
+      const base = this.stockTotalUnits || 0;
+      if (!base) return 0;
+      return this.soldUnitsMonth / base;
+    },
+
+    get stockBrandOptions() {
+      const set = new Set();
+      for (const i of this.estoque) { if (i.brand) set.add(String(i.brand).trim()); }
+      return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    },
+
+    get stockFilteredRows() {
+      // Aplica os filtros de chip (marca/posição) por cima do filteredStock,
+      // que já cuida de busca + status + origem.
+      return this.filteredStock.filter((item) => {
+        if (this.stockBrandFilter !== 'all' && String(item.brand || '').trim() !== this.stockBrandFilter) return false;
+        if (this.stockPositionFilter !== 'all' && this.stockPositionLabel(item) !== this.stockPositionFilter) return false;
+        return true;
+      });
+    },
+
+    get stockTotalPages() {
+      return Math.max(1, Math.ceil(this.stockFilteredRows.length / this.stockPageSize));
+    },
+
+    get stockPagedRows() {
+      const page = Math.min(this.stockPage, this.stockTotalPages);
+      const start = (page - 1) * this.stockPageSize;
+      return this.stockFilteredRows.slice(start, start + this.stockPageSize);
+    },
+
+    get stockDetail() {
+      // Item mostrado no painel de detalhes: o selecionado, ou o 1º da lista.
+      if (this.stockSelected) {
+        const found = this.estoque.find((i) => i.id === this.stockSelected);
+        if (found) return found;
+      }
+      return this.stockFilteredRows[0] || null;
+    },
+
+    get stockModelsCount() {
+      const set = new Set();
+      for (const i of this.estoque) { const n = String(i.item_name || '').trim().toLowerCase(); if (n) set.add(n); }
+      return set.size;
+    },
+
+    get stockLowPercent() {
+      const total = this.estoque.length || 1;
+      return Math.round((this.stockLowItems.length / total) * 100);
     },
 
     get financeOriginSplit() {
@@ -2114,6 +2201,7 @@ function parceiroApp() {
           }),
         });
         this.clearStockForm();
+        this.stockModalOpen = false;
         await this.loadData();
         this.flash('Estoque salvo.');
       } catch (err) {
@@ -3326,6 +3414,38 @@ function parceiroApp() {
     stockItemValue(item) {
       const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
       return qty * this.num(item.average_cost || item.sale_price);
+    },
+
+    selectStock(item) {
+      this.stockSelected = item.id;
+    },
+
+    openStockModal(item) {
+      if (item) {
+        this.editStock(item);
+      } else {
+        this.clearStockForm();
+      }
+      this.stockModalOpen = true;
+    },
+
+    closeStockModal() {
+      this.stockModalOpen = false;
+    },
+
+    skuFor(item) {
+      // SKU derivado e estável a partir do id (o banco não tem coluna SKU — visual de demo).
+      const digits = String(item.id || '').replace(/\D/g, '').slice(0, 5).padStart(5, '0');
+      return 'SKU' + digits;
+    },
+
+    stockLocation(item) {
+      // Endereço de prateleira placeholder, estável por item (demo — sem coluna no banco).
+      const n = parseInt(String(item.id || '').replace(/\D/g, '').slice(0, 4) || '0', 10);
+      const rua = String.fromCharCode(65 + (n % 4)); // A–D
+      const col = String((n % 9) + 1).padStart(2, '0');
+      const niv = String((n % 5) + 1).padStart(2, '0');
+      return `${rua}-${col}-${niv}`;
     },
 
     customerSales(customer) {

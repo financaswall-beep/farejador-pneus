@@ -205,11 +205,11 @@
       <section x-show="currentSection === 'estoque'" class="pos-kpis stock-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
-          <div><small>Itens em estoque</small><strong x-text="stockTotalUnits + ' un.'"></strong><span>saldo atual</span></div>
+          <div><small>Itens em estoque</small><strong x-text="stockTotalUnits + ' un.'"></strong><span x-text="stockModelsCount + ' modelos'"></span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="coins"></i></div>
-          <div><small>Valor em estoque</small><strong x-text="money(stockCostValue)"></strong><span>custo médio</span></div>
+          <div><small>Valor em estoque</small><strong x-text="money(stockCostValue)"></strong><span>custo total</span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="download"></i></div>
@@ -221,7 +221,11 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="triangle-alert"></i></div>
-          <div><small>Estoque baixo</small><strong x-text="stockLowItems.length + ' itens'"></strong><span>requer atenção</span></div>
+          <div><small>Estoque baixo</small><strong x-text="stockLowItems.length + ' itens'"></strong><span x-text="stockLowPercent + '% do total'"></span></div>
+        </article>
+        <article>
+          <div class="pos-kpi-icon"><i data-lucide="layout-grid"></i></div>
+          <div><small>Categorias</small><strong x-text="stockCategoriesCount"></strong><span>marcas ativas</span></div>
         </article>
       </section>
 
@@ -814,60 +818,173 @@
         </div>
       </section>
 
-      <section x-show="currentSection === 'estoque'" class="pos-workspace">
-        <div class="pos-page-grid">
+      <section x-show="currentSection === 'estoque'" class="pos-workspace stock-workspace">
+        <div class="pos-stock-grid">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
-                <h3>Estoque de produtos</h3>
+                <h3>Produtos em estoque</h3>
                 <p>Medidas, marcas, custo, preço e quantidade disponível</p>
-              </div>
-              <div class="pos-inline-actions">
-                <div class="pos-dark-search">
-                  <i data-lucide="search"></i>
-                  <input x-model="stockSearch" placeholder="Buscar por medida, marca ou modelo..." />
-                </div>
-                <select x-model="stockStatusFilter" class="pos-dark-select">
-                  <option value="all">Todos status</option>
-                  <option value="in_stock">Em estoque</option>
-                  <option value="low_stock">Baixo</option>
-                  <option value="out_of_stock">Zerado</option>
-                </select>
               </div>
             </div>
 
-            <div class="pos-dark-table">
+            <div class="pos-stock-toolbar">
+              <select x-model="stockBrandFilter" class="pos-chip-select">
+                <option value="all">Marca: todas</option>
+                <template x-for="b in stockBrandOptions" :key="b"><option :value="b" x-text="b"></option></template>
+              </select>
+              <select x-model="stockPositionFilter" class="pos-chip-select">
+                <option value="all">Posição: todas</option>
+                <option value="Traseiro">Traseiro</option>
+                <option value="Dianteiro">Dianteiro</option>
+              </select>
+              <select x-model="stockStatusFilter" class="pos-chip-select">
+                <option value="all">Status: todos</option>
+                <option value="in_stock">Em estoque</option>
+                <option value="low_stock">Baixo</option>
+                <option value="out_of_stock">Zerado</option>
+              </select>
+              <div class="pos-dark-search compact">
+                <i data-lucide="search"></i>
+                <input x-model="stockSearch" placeholder="Buscar na tabela..." />
+              </div>
+              <button class="pos-chip-clear" @click="stockBrandFilter='all'; stockPositionFilter='all'; stockStatusFilter='all'; stockSearch=''; stockPage=1"><i data-lucide="list-filter"></i> Limpar filtros</button>
+              <button class="pos-add-product" @click="openStockModal()"><i data-lucide="plus"></i> Adicionar produto</button>
+            </div>
+
+            <div class="pos-dark-table stock-table">
               <div class="pos-dark-table-head">
+                <span>SKU</span>
                 <span>Medida</span>
-                <span>Posição</span>
                 <span>Marca</span>
+                <span>Modelo</span>
+                <span>Posição</span>
+                <span>Cond.</span>
                 <span>Qtd.</span>
                 <span>Custo</span>
-                <span>Venda</span>
+                <span>Preço</span>
+                <span>Local</span>
                 <span>Status</span>
-                <span>Ações</span>
               </div>
-              <template x-for="item in filteredStock.slice(0, 9)" :key="item.id">
-                <div class="pos-dark-table-row">
-                  <span class="pos-product-cell"><span class="pos-tire-thumb small"></span><b x-text="itemPrimaryLabel(item)"></b><em class="pos-type-badge" :class="item.item_type" x-text="itemTypeLabel(item.item_type)"></em></span>
-                  <span class="pos-position-cell" x-text="stockPositionLabel(item)"></span>
+              <template x-for="item in stockPagedRows" :key="item.id">
+                <div class="pos-dark-table-row" :class="stockDetail && stockDetail.id === item.id && 'selected'" @click="selectStock(item)">
+                  <span class="pos-sku"><i class="pos-radio"></i><span x-text="skuFor(item)"></span></span>
+                  <span x-text="item.tire_size || '-'"></span>
                   <span x-text="item.brand || '-'"></span>
-                  <span class="pos-green-text" x-text="item.is_tracked ? ((item.quantity_on_hand ?? 0) + ' un.') : '-'"></span>
+                  <span class="pos-model" x-text="itemPrimaryLabel(item)"></span>
+                  <span x-text="stockPositionLabel(item)"></span>
+                  <span class="pos-cond">Novo</span>
+                  <span class="pos-green-text" x-text="item.is_tracked ? (item.quantity_on_hand ?? 0) : '-'"></span>
                   <span x-text="money(item.average_cost)"></span>
                   <span x-text="money(item.sale_price)"></span>
+                  <span class="pos-loc" x-text="stockLocation(item)"></span>
                   <span><em class="pos-status-pill" :class="item.stock_status" x-text="stockStatusLabel(item.stock_status)"></em></span>
-                  <span class="pos-row-actions">
-                    <button @click="editStock(item)" title="Editar item"><i data-lucide="pencil"></i></button>
-                    <button @click="deleteStock(item.id)" class="danger" title="Apagar item"><i data-lucide="trash-2"></i></button>
-                  </span>
                 </div>
               </template>
-              <div x-show="!filteredStock.length" class="pos-empty">Nenhum item encontrado.</div>
+              <div x-show="!stockFilteredRows.length" class="pos-empty">Nenhum item encontrado.</div>
+            </div>
+
+            <div class="pos-table-foot">
+              <span x-text="`Mostrando ${stockPagedRows.length} de ${stockFilteredRows.length} produtos`"></span>
+              <div class="pos-pager">
+                <button :disabled="stockPage <= 1" @click="stockPage = Math.max(1, stockPage - 1)"><i data-lucide="chevron-left"></i></button>
+                <b x-text="stockPage"></b><span>/ <span x-text="stockTotalPages"></span></span>
+                <button :disabled="stockPage >= stockTotalPages" @click="stockPage = Math.min(stockTotalPages, stockPage + 1)"><i data-lucide="chevron-right"></i></button>
+              </div>
             </div>
           </section>
 
-          <aside class="pos-panel pos-side-panel">
-            <h3 x-text="stockForm.item_type === 'servico' ? 'Cadastrar serviço' : (stockForm.item_type === 'insumo' ? 'Cadastrar insumo' : 'Cadastrar pneu')"></h3>
+          <aside class="pos-panel pos-detail-panel">
+            <template x-if="stockDetail">
+              <div class="pos-detail-body">
+                <div class="pos-detail-head"><h3>Detalhes do produto</h3></div>
+                <div class="pos-detail-hero">
+                  <div>
+                    <b x-text="itemPrimaryLabel(stockDetail)"></b>
+                    <small class="pos-detail-size" x-text="stockDetail.tire_size || ''"></small>
+                    <em class="pos-status-pill" :class="stockDetail.stock_status" x-text="stockStatusLabel(stockDetail.stock_status)"></em>
+                    <small class="pos-detail-sku" x-text="skuFor(stockDetail)"></small>
+                  </div>
+                  <img src="assets/pneu-promo.png" alt="" />
+                </div>
+                <div class="pos-detail-specs">
+                  <div><span>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>
+                  <div><span>Posição</span><b x-text="stockPositionLabel(stockDetail)"></b></div>
+                  <div><span>Localização</span><b x-text="stockLocation(stockDetail)"></b></div>
+                  <div><span>Condição</span><b>Novo</b></div>
+                  <div><span>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
+                </div>
+                <div class="pos-detail-figures">
+                  <div><small>Quantidade atual</small><b x-text="(stockDetail.quantity_on_hand ?? 0) + ' un.'"></b></div>
+                  <div><small>Valor em estoque</small><b x-text="money(stockItemValue(stockDetail))"></b></div>
+                </div>
+                <div class="pos-detail-actions">
+                  <button @click="openStockModal(stockDetail)"><i data-lucide="download"></i> Dar entrada</button>
+                  <button @click="openStockModal(stockDetail)"><i data-lucide="sliders-horizontal"></i> Ajustar saldo</button>
+                  <button @click="openStockModal(stockDetail)"><i data-lucide="pencil"></i> Editar</button>
+                  <button class="danger" @click="deleteStock(stockDetail.id)"><i data-lucide="trash-2"></i> Apagar</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="!stockDetail" class="pos-empty">Selecione um produto na tabela.</div>
+
+            <article class="pos-promo-card right" title="Espaço de anúncio da rede">
+              <img src="assets/promo-carga-nova.png" alt="Carga nova" loading="lazy" />
+            </article>
+          </aside>
+        </div>
+
+        <div class="pos-stock-analytics">
+          <article class="pos-panel pos-mini-card">
+            <div class="pos-mini-head"><h4>Medidas com maior estoque</h4></div>
+            <div class="pos-bar-list">
+              <template x-for="row in stockTopSizes" :key="row.label">
+                <div class="pos-bar-row">
+                  <span class="pos-bar-label" x-text="row.label"></span>
+                  <span class="pos-bar-track"><i :style="`width:${row.pct}%`"></i></span>
+                  <span class="pos-bar-val" x-text="row.qty + ' un.'"></span>
+                </div>
+              </template>
+              <div x-show="!stockTopSizes.length" class="pos-empty small">Sem dados de medida.</div>
+            </div>
+          </article>
+
+          <article class="pos-panel pos-mini-card pos-turnover-card">
+            <div class="pos-mini-head"><h4>Giro de estoque</h4><small>últimos 30 dias</small></div>
+            <div class="pos-donut-wrap">
+              <div class="pos-donut" :style="`--pct:${Math.min(stockTurnover / 3, 1) * 100}`">
+                <b x-text="stockTurnover.toFixed(1) + 'x'"></b>
+              </div>
+              <ul class="pos-donut-legend">
+                <li><span x-text="soldUnitsMonth + ' un.'"></span><small>saídas no mês</small></li>
+                <li><span x-text="inventoryEntriesMonth + ' un.'"></span><small>entradas no mês</small></li>
+                <li><span x-text="stockTotalUnits + ' un.'"></span><small>estoque atual</small></li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="pos-panel pos-mini-card">
+            <div class="pos-mini-head"><h4>Alertas de estoque</h4><small x-text="stockLowItems.length + ' itens'"></small></div>
+            <div class="pos-alert-list">
+              <template x-for="item in stockLowItems.slice(0, 4)" :key="item.id">
+                <div @click="selectStock(item)">
+                  <i data-lucide="triangle-alert"></i>
+                  <span x-text="item.tire_size || item.item_name"></span>
+                  <strong x-text="(item.quantity_on_hand ?? 0) + ' un.'"></strong>
+                </div>
+              </template>
+              <div x-show="!stockLowItems.length" class="pos-empty small">Sem alerta de estoque. 👍</div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Modal de cadastro/edição -->
+        <div class="pos-modal-overlay" x-show="stockModalOpen" x-cloak @click.self="closeStockModal()">
+          <div class="pos-modal">
+            <div class="pos-modal-head">
+              <h3 x-text="stockForm.stock_id ? 'Editar item' : (stockForm.item_type === 'servico' ? 'Cadastrar serviço' : (stockForm.item_type === 'insumo' ? 'Cadastrar insumo' : 'Adicionar produto'))"></h3>
+              <button class="pos-modal-close" @click="closeStockModal()"><i data-lucide="x"></i></button>
+            </div>
             <div class="pos-stock-side-form">
               <div class="pos-stock-type-tabs">
                 <button type="button" :class="stockForm.item_type === 'pneu' && 'active'" @click="stockForm.item_type = 'pneu'">Pneu</button>
@@ -925,16 +1042,7 @@
               </button>
               <button @click="clearStockForm()" class="pos-mini-clear">Limpar cadastro</button>
             </div>
-            <div class="pos-divider"></div>
-            <h3>Alertas</h3>
-            <div class="pos-alert-list">
-              <template x-for="item in stockLowItems.slice(0, 5)" :key="item.id">
-                <div><i data-lucide="triangle-alert"></i><span x-text="item.tire_size || item.item_name"></span><strong x-text="(item.quantity_on_hand ?? 0) + ' un.'"></strong></div>
-              </template>
-              <div x-show="!stockLowItems.length" class="pos-empty small">Sem alerta de estoque.</div>
-            </div>
-            <button class="pos-outline-action" @click="stockSearch = ''"><i data-lucide="list-filter"></i> Limpar filtros</button>
-          </aside>
+          </div>
         </div>
       </section>
 
