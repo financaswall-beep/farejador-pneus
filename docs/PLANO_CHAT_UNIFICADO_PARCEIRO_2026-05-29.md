@@ -18,6 +18,94 @@ Nada aqui é risco técnico ou pesquisa. É encanamento conhecido sobre infra qu
 
 ---
 
+## 0.1 HANDOFF — ONDE PARAMOS (2026-05-29, fim do dia)
+
+> **Para a próxima LLM/sessão:** leia isto primeiro. Resume o estado exato e o que fazer
+> a seguir. Detalhes completos nas seções 4-13.
+
+### Estado atual
+- **Fatia 1.1 (tabelas) — FEITA e aplicada em prod.** Migration `0070_partner_chat.sql`
+  criou `commerce.partner_conversations` e `commerce.partner_messages` (RLS por unidade).
+  Verificada em prod.
+- **Fatia 1.2 (fan-out do webhook) — CÓDIGO FEITO + BUG DE RUNTIME CORRIGIDO; AGUARDA REDEPLOY+VALIDAÇÃO.**
+  - Commit base `b782080` na branch `main`, **pushado pro remote `pneus`**
+    (`github.com/financaswall-beep/farejador-pneus`), que é de onde o Coolify deploya o
+    Farejador.
+  - Arquivos: `src/normalization/partner-chat.fanout.ts` (novo),
+    `src/normalization/dispatcher.ts` (hook em `message_created`),
+    `src/shared/config/env.ts` (flag nova), teste novo. 240 testes verdes.
+  - **Flag `PARTNER_CHAT_FANOUT_ENABLED=true` setada no Coolify** (serviço `farejador`).
+  - **BUG ACHADO E CORRIGIDO em 2026-05-30 (commit `df05382`, pushado pro `pneus`):**
+    no primeiro teste o fan-out RODOU (flag ok, env ok), mas falhou em runtime com
+    Postgres `42P10 "no unique or exclusion constraint matching the ON CONFLICT
+    specification"`. Causa: o INSERT em `partner_messages` usava
+    `ON CONFLICT (environment, chatwoot_message_id) DO NOTHING`, mas o índice
+    `partner_messages_cw_uniq` é **PARCIAL** (`WHERE chatwoot_message_id IS NOT NULL`).
+    Postgres não infere índice parcial sem repetir o predicado. Como o SAVEPOINT
+    desfazia tudo, conversa+mensagem sumiam (tabelas vazias apesar da flag). Fix:
+    `ON CONFLICT (environment, chatwoot_message_id) WHERE chatwoot_message_id IS NOT NULL
+    DO NOTHING`. (O `ON CONFLICT` da conversa já estava certo — índice cheio.)
+  - **VALIDADO EM PROD em 2026-05-30** (redeploy do `df05382` às 02:23): msg de teste na conv
+    #624 caiu certinho — unidade `borracharia-rio-do-ouro`, canal `whatsapp`, cliente Wallace
+    `+5521976674264`, unread=1, inbound/customer + outbound/partner. **Fatia 1.2 CONCLUÍDA.**
+
+### O QUE FALTA AGORA (próxima ação concreta)
+**Fatia 1.2, 1.3 e 1.4 FEITAS (commits `df05382` e `11c519f`).** A aba Bate-papo já lê as
+conversas reais e faz polling 5s; verificado no preview com a conv #624.
+**Próximo passo = Fatia 1.5 (validar em prod):**
+1. Redeploy do `11c519f` no Coolify (serviço `farejador`).
+2. Gerar token do parceiro: `node scripts/gerar-token-parceiro.cjs --slug=borracharia-rio-do-ouro --env=prod`
+   (token aparece 1x no stdout; cola no login de `/parceiro/borracharia-rio-do-ouro/`).
+3. Abrir o portal, aba Bate-papo, e ver a conversa do WhatsApp aparecer e atualizar sozinha.
+
+Depois disso, **Fatia 2** (responder pelo portal): `sendMessage()` no
+`chatwoot-api.client.ts` + `POST .../chat/:id/send` + tratamento do eco (§7 Fatia 2).
+
+Ponto em aberto p/ a tela: respostas do Agent V2 entram como `sender='partner'` (o bot envia
+ao Chatwoot como agente normal, `sender_type='user'`, não `agent_bot`); distinguir bot vs
+humano exige detectar pela conta/autor no Chatwoot.
+
+#### (Histórico) SQL de verificação usado na validação da 1.2:
+1. Manda **uma mensagem de texto de teste** de um WhatsApp real pro número da loja.
+2. Conferir no Supabase (projeto **Farejador**, ref `aoqtgwzeyznycuakrdhp`) se a conversa e a
+   mensagem caíram. SQL de verificação:
+   ```sql
+   SELECT id, unit_id, chatwoot_conversation_id, channel, customer_name,
+          customer_identifier, last_message_at, unread_count
+   FROM commerce.partner_conversations
+   ORDER BY created_at DESC LIMIT 5;
+
+   SELECT id, conversation_id, chatwoot_message_id, direction, sender, content, created_at
+   FROM commerce.partner_messages
+   ORDER BY created_at DESC LIMIT 10;
+   ```
+   **Esperado:** 1 conversa na unidade `borracharia-rio-do-ouro`
+   (unit_id `36203e18-c3fb-4201-bca1-b15c605faa37`), canal `whatsapp`, com o nome/telefone
+   do cliente; e a mensagem de texto com `direction='inbound'`, `sender='customer'`.
+3. Se NÃO aparecer, depurar nesta ordem: (a) a mensagem chegou em `raw.raw_events`? (b) foi
+   normalizada (`core.messages`)? (c) logs do serviço `farejador` têm
+   "partner chat fanout failed"? (d) a flag está mesmo `true` no container? (e) existe
+   exatamente 1 `network.partner_units` ativa? (se 0 ou >1, o fan-out pula de propósito).
+
+### DEPOIS da validação — seguir para:
+- **Fatia 1.3** — endpoints de leitura no portal (`src/parceiro/route.ts` + `queries.ts`),
+  sob `withPartnerContext`. Ver §7.
+- **Fatia 1.4** — ligar o front: trocar o array `chatConversations` (mock) em
+  `parceiro/public/app.js` por `fetch` + polling 5s. A tela (aba Bate-papo F7) já existe.
+
+### Fatos que a próxima LLM precisa (não re-derivar)
+- Supabase prod: projeto **Farejador**, ref `aoqtgwzeyznycuakrdhp`. (Há também `betaAgente`,
+  ref `vyxdquwxmgibpkoswxut` — NÃO é o de prod do chat.)
+- Deploy do Farejador: remote **`pneus`**, branch `main`. Coolify (Docker Compose).
+- Worker de normalização roda em prod (`src/app/server.ts` → `startWorker()`), então o
+  fan-out dispara sozinho ao processar `raw.events`.
+- Variáveis do Chatwoot (todas já no Coolify): ver §10.1.
+- Única unidade de parceiro ativa hoje: `borracharia-rio-do-ouro`.
+- Convenção de RLS/identidade do portal: §3.3. Padrão de migration de parceiro:
+  `db/migrations/0060_partner_customers.sql`.
+
+---
+
 ## 1. Objetivo
 
 O cliente fala com a loja pelo WhatsApp / Instagram / Facebook. O Chatwoot já recebe e
@@ -303,33 +391,61 @@ atualizando sozinha. Ainda não responde.
       `partner_messages` (§6.1). Atribuição fixa ao parceiro único (§5).
       **Implementado e testado em 2026-05-29** (ver §13). Atrás da flag
       `PARTNER_CHAT_FANOUT_ENABLED` (default false). Falta ligar a flag em prod + teste real.
-- [ ] **1.3** Endpoint `GET /parceiro/:slug/api/chat/conversations` e
-      `GET /parceiro/:slug/api/chat/conversations/:id/messages` em
-      [src/parceiro/route.ts](../src/parceiro/route.ts) + queries em `queries.ts`, sob
-      `withPartnerContext`. Schemas Zod no padrão dos endpoints existentes.
-- [ ] **1.4** Front: em [parceiro/public/app.js](../parceiro/public/app.js), trocar o array
-      `chatConversations` de exemplo por `fetch` aos endpoints; polling de 5s (igual o
-      painel admin já faz). Manter o formato de objeto que a tela já consome
-      (`id, name, initials, channel, channelLabel, phone, time, unread, last, messages[]`).
-- [ ] **1.5** Teste ponta-a-ponta com `ATENDENTE_SHADOW`/webhook real numa conversa de teste.
+- [x] **1.3** Endpoints `GET /parceiro/:slug/api/chat/conversations` e
+      `GET /parceiro/:slug/api/chat/conversations/:conversationId/messages` em
+      [src/parceiro/route.ts](../src/parceiro/route.ts) + queries
+      `getPartnerChatConversations`/`getPartnerChatMessages` em `queries.ts`, sob
+      `withPartnerContext`. **FEITO 2026-05-30 (commit `11c519f`).** A lista traz o preview
+      da última mensagem (subquery); messages retorna `null`→404 p/ conversa de outra unidade.
+      Verificado direto contra prod (retornou a conv #624).
+- [x] **1.4** Front: [parceiro/public/app.js](../parceiro/public/app.js) — mock
+      `chatConversations` trocado por `fetch` aos endpoints + polling 5s ligado só enquanto a
+      aba Bate-papo está aberta (`goToSection`). Mapeia banco→tela (canal, iniciais, hora BRT,
+      preview, direção inbound/outbound→them/me). `sendChat` avisa que envio é Fatia 2.
+      **FEITO 2026-05-30 (commit `11c519f`).** Verificado no preview: conversa #624 renderiza
+      (lista + fio + detalhes).
+- [x] **1.5** Validado em prod 2026-05-30: portal aberto com token real, conversa do WhatsApp
+      aparece e atualiza via polling 5s. Token gerado p/ `borracharia-rio-do-ouro`.
+- [x] **1.6 Reconciliador (rede de segurança) — commit `3d59802`.** Descoberto que a resposta
+      do **bot** às vezes não era espelhada: o fan-out roda na normalização e, sob carga (banco
+      lento logo após o Agent V2 responder), a cópia da msg de saída estourava e o SAVEPOINT a
+      descartava (msg intacta em raw/core, fora de `partner_messages`). O fan-out está correto
+      (reproduzido com payload real → insere ok). Correção: `src/normalization/partner-chat.reconcile.ts`
+      roda a cada 30s, acha `message_created` processados sem cópia (LEFT JOIN, janela 15min) e
+      reprocessa pelo MESMO fan-out (idempotente). Ligado no `server.ts`. Também: INSERT do
+      fan-out agora grava `created_at = message.sentAt` (horário real), senão msgs reconciliadas
+      entram com a hora do backfill e bagunçam a ordem. Backfill manual já recuperou as perdidas
+      em prod. **Falta: redeploy do `3d59802` p/ o reconciliador rodar sozinho em prod.**
+- [x] **Bug de assets corrigido (`08bc86c`):** ícones de canal (whatsapp/instagram/facebook) e
+      fundo davam 404; rota de assets agora é genérica e segura.
 
 **Pronto quando:** mando mensagem no WhatsApp de teste e ela aparece na aba Bate-papo do
 parceiro em ≤5s, com selo do canal certo, isolada por RLS (outro parceiro não vê).
 
-### Fatia 2 — "Responder" — ~2 dias
-**Objetivo:** chat completo (parceiro responde, cliente recebe no WhatsApp).
+### Fatia 2 — "Responder" — CONCLUÍDA e VALIDADA em prod 2026-05-30
+**Objetivo:** chat completo (parceiro responde, cliente recebe no WhatsApp/IG/FB).
+> Handoff detalhado desta fatia: [SESSAO_2026-05-30_FATIA2_HANDOFF.md](SESSAO_2026-05-30_FATIA2_HANDOFF.md).
+> Commits no `pneus`: `a693157` (feature), `4624aa0`, `b0132b1`, `7bb8c18` (fixes).
 
-- [ ] **2.1** Método `sendMessage(conversationId, content)` em
+- [x] **2.1** `sendMessage(convId, content, echoId?)` em
       [src/admin/chatwoot-api.client.ts](../src/admin/chatwoot-api.client.ts)
-      (`message_type:'outgoing', content_type:'text', private:false`). Reusa `requestPost`.
-- [ ] **2.2** Endpoint `POST /parceiro/:slug/api/chat/:conversationId/send` (§6.2).
-- [ ] **2.3** Tratamento do eco (§6.2): `ON CONFLICT DO NOTHING` + casamento por
-      `client_token`.
-- [ ] **2.4** Front: ligar `sendChat()` (já existe a função e o input na tela) ao endpoint,
-      com envio otimista + reconciliação quando o `chatwoot_message_id` volta.
+      (`message_type:'outgoing', private:false`). `requestPost` agora **retorna o JSON** p/ pegar o id.
+- [x] **2.2** Endpoint `POST /parceiro/:slug/api/chat/conversations/:conversationId/send` (zod, 200/400/404/502).
+- [x] **2.3** Tratamento do eco. **DESCOBERTA:** este Chatwoot **NÃO ecoa `echo_id`** (vem null).
+      O casamento por `client_token=echo_id` nunca funcionava → msg duplicava. Fix `7bb8c18`:
+      fallback que casa a otimista por **conteúdo** (mesma conv, outbound, sem id, mesmo content,
+      janela 10min); `UNIQUE(env, chatwoot_message_id)` = rede final.
+- [x] **2.4** Front `sendChat()` async (otimista + rollback). Fix `4624aa0`: o body precisava de
+      `JSON.stringify` (o helper `api()` não serializa).
+- [x] **Bônus — canal IG/FB (`b0132b1`):** IG/FB entram por inbox tipo API (`Channel::Api`) que não
+      rotula origem; `deriveChannel` agora lê também `payload.inbox.name`. WhatsApp e Instagram são
+      canais nativos (`Channel::Whatsapp`/`Channel::Instagram`); Facebook só pelo nome do inbox.
 
-**Pronto quando:** respondo pelo portal e o cliente recebe no WhatsApp; a mensagem não
-duplica quando o eco chega.
+**Pendência (não bloqueia):** apagar 4 linhas órfãs duplicadas geradas ANTES do fix `7bb8c18`
+(conteúdo preservado na gêmea) — aguarda OK pra `DELETE` em prod. Ver handoff.
+
+**Pronto quando:** respondo pelo portal e o cliente recebe ✅; a mensagem não duplica ✅;
+o canal de origem aparece certo ✅. **Tudo confirmado em prod.**
 
 ### Fatia 3 — "Tempo real" (trocar polling por push) — ~1 dia
 **Objetivo:** instantâneo, sem polling.
@@ -448,6 +564,17 @@ Tudo isso é **front-end com dados de exemplo**. Este plano é o backend que tor
 ---
 
 ## 13. Log de execução
+
+### 2026-05-29 — Fatia 1.2: deploy + flag ligada (validação pendente)
+- Commit `b782080` (fan-out + migration + plano) pushado pro remote `pneus` (fast-forward
+  limpo, `fea954b..b782080`).
+- Wallace fez redeploy no Coolify e setou `PARTNER_CHAT_FANOUT_ENABLED=true` no serviço
+  `farejador`. **Redeploy em andamento.**
+- **PENDENTE:** mandar mensagem de teste no WhatsApp e validar as tabelas em prod (SQL e
+  passos no §0.1 HANDOFF). Enquanto não validar, considerar 1.2 "no ar mas não confirmado".
+- Front-end da aba Bate-papo (UI mock: `parceiro/public/index.html|app.js|style.css` +
+  assets de fundo/ícones) está MODIFICADO localmente mas **ainda NÃO commitado** — fica
+  pra Fatia 1.4 ou um commit de UI à parte.
 
 ### 2026-05-29 — Fatia 1, passo 1.1: migration `0070_partner_chat.sql` escrita
 - Criadas `commerce.partner_conversations` e `commerce.partner_messages` no estilo de
