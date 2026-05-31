@@ -2867,7 +2867,7 @@ html, body {
 .pos-detail-panel { display: flex; flex-direction: column; gap: 14px; }
 .pos-detail-body { display: flex; flex-direction: column; gap: 16px; }
 .pos-detail-head h3 { font-size: 15px; font-weight: 800; margin: 0; }
-.pos-detail-hero { position: relative; display: block; min-height: 120px; }
+.pos-detail-hero { position: relative; display: block; min-height: 72px; }
 .pos-detail-hero > div { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
 .pos-detail-hero b { font-size: 18px; font-weight: 800; line-height: 1.15; }
 .pos-detail-size { font-size: 13px; color: #cbd5e1; }
@@ -2877,9 +2877,15 @@ html, body {
   width: 320px; height: 256px; object-fit: contain; flex: none;
   filter: drop-shadow(0 6px 14px rgba(34, 197, 94, .35));
 }
-.pos-detail-specs { display: flex; flex-direction: column; gap: 10px; }
-.pos-detail-specs > div { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
-.pos-detail-specs span { color: #94a3b8; }
+.pos-detail-specs { display: flex; flex-direction: column; gap: 0; }
+.pos-detail-specs > div {
+  display: flex; align-items: center; justify-content: space-between; font-size: 13px;
+  padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.pos-detail-specs > div:first-child { padding-top: 0; }
+.pos-detail-specs > div:last-child { border-bottom: none; padding-bottom: 0; }
+.pos-detail-specs span { color: #94a3b8; display: inline-flex; align-items: center; gap: 7px; }
+.pos-detail-specs span svg { width: 13px; height: 13px; stroke-width: 2; flex: none; opacity: .85; }
 .pos-detail-specs b { font-weight: 600; }
 .pos-detail-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pos-detail-figures > div {

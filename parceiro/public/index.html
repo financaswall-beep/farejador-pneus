@@ -906,11 +906,11 @@
                   </picture>
                 </div>
                 <div class="pos-detail-specs">
-                  <div><span>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>
-                  <div><span>Posição</span><b x-text="stockPositionLabel(stockDetail)"></b></div>
-                  <div><span>Localização</span><b x-text="stockDetail.shelf_location || '—'"></b></div>
-                  <div><span>Condição</span><b x-text="stockDetail.tire_condition || '—'"></b></div>
-                  <div><span>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
+                  <div><span><i data-lucide="tag"></i>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>
+                  <div><span><i data-lucide="compass"></i>Posição</span><b x-text="stockPositionLabel(stockDetail)"></b></div>
+                  <div><span><i data-lucide="map-pin"></i>Localização</span><b x-text="stockDetail.shelf_location || '—'"></b></div>
+                  <div><span><i data-lucide="shield-check"></i>Condição</span><b x-text="stockDetail.tire_condition || '—'"></b></div>
+                  <div><span><i data-lucide="layers"></i>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
                 </div>
                 <div class="pos-detail-figures">
                   <div><small>Quantidade atual</small><b x-text="(stockDetail.quantity_on_hand ?? 0) + ' un.'"></b></div>
