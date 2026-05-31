@@ -3592,6 +3592,7 @@ function parceiroApp() {
       const cpf = this.cpfDigits(customer.cpf || '');
       const phone = String(customer.phone || '').replace(/\D/g, '');
       return (this.vendas || []).filter((sale) => {
+        if (!this.isPhysicalExitSale(sale)) return false;
         const saleCpf = this.cpfDigits(sale.customer_cpf || '');
         const salePhone = String(sale.customer_phone || '').replace(/\D/g, '');
         return (customer.id && sale.customer_id === customer.id)
