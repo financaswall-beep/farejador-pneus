@@ -16,6 +16,8 @@ import {
   InstallmentsTooSmallError,
   PaidPurchaseLockedError,
   PartialStockReversalError,
+  StockBelowReservedError,
+  StockReservedCannotDeleteError,
   getPartnerChatConversations,
   getPartnerChatMessages,
   sendPartnerChatMessage,
@@ -594,6 +596,14 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       if (err instanceof Error && err.message === 'delivery_not_found') {
         return reply.status(404).send({ error: 'delivery_not_found' });
       }
+      // 0076: deliver_partner_local_order falha alto se a reserva for insuficiente, ou
+      // se a entrega já estiver finalizada (backstop do guard de estado no TS).
+      if (err instanceof Error && err.message.includes('Reserva insuficiente')) {
+        return reply.status(409).send({ error: 'reserva_insuficiente', message: err.message });
+      }
+      if (err instanceof Error && err.message.includes('Entrega ja finalizada')) {
+        return reply.status(409).send({ error: 'delivery_already_finalized', message: 'Esta entrega ja foi finalizada.' });
+      }
       throw err;
     }
   });
@@ -605,16 +615,37 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       const path = issue?.path?.join('.') || 'body';
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
-    return reply.status(200).send(await upsertPartnerStock(getPartnerContext(request), parsed.data));
+    try {
+      return reply.status(200).send(await upsertPartnerStock(getPartnerContext(request), parsed.data));
+    } catch (err) {
+      if (err instanceof StockBelowReservedError) {
+        return reply.status(409).send({
+          error: err.code,
+          message: 'O saldo fisico nao pode ficar abaixo da quantidade reservada em entregas abertas.',
+        });
+      }
+      throw err;
+    }
   });
 
   fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = stockParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'stock_not_found' });
 
-    const result = await deletePartnerStock(getPartnerContext(request), parsed.data.stockId);
-    if (!result.deleted) return reply.status(404).send({ error: 'stock_not_found' });
-    return reply.status(200).send(result);
+    try {
+      const result = await deletePartnerStock(getPartnerContext(request), parsed.data.stockId);
+      if (!result.deleted) return reply.status(404).send({ error: 'stock_not_found' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      if (err instanceof StockReservedCannotDeleteError) {
+        return reply.status(409).send({
+          error: err.code,
+          message: 'Este item tem quantidade reservada em entrega aberta e nao pode ser inativado agora.',
+          stock_id: err.stock_id,
+        });
+      }
+      throw err;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/compras', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {

@@ -462,6 +462,8 @@ function parceiroApp() {
         }
       }
       for (const sale of this.activeSales) {
+        // 0076: só saída física (pickup + delivery entregue); reserva não é saída.
+        if (!this.isPhysicalExitSale(sale)) continue;
         const items = Array.isArray(sale.items) ? sale.items : [];
         const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0) || 1;
         addToWeek(sale.created_at, 'saidas', qty);
@@ -504,9 +506,20 @@ function parceiroApp() {
       return Math.max(this.purchasedUnitsMonth, this.stockCreatedUnitsMonth);
     },
 
+    // 0076: saída FÍSICA realizada = pickup/balcão (baixa na hora) ou delivery
+    // que chegou em 'delivered'. Delivery pending/dispatched só RESERVOU — o pneu
+    // ainda não saiu; failed/cancelled também não são saída. Não conta como saída do mês.
+    isPhysicalExitSale(sale) {
+      if (!sale || sale.status === 'cancelled') return false;
+      if (sale.fulfillment_mode === 'delivery') return sale.delivery_status === 'delivered';
+      return true;
+    },
+
     get soldUnitsMonth() {
-      // Só vendas (não-canceladas) do mês corrente — antes somava todas de sempre.
-      return this.salesUnitsFor(this.activeSales.filter((s) => this.isCurrentMonth(s.created_at)));
+      // Só saídas físicas (pickup + delivery entregue) do mês corrente.
+      return this.salesUnitsFor(
+        this.activeSales.filter((s) => this.isPhysicalExitSale(s) && this.isCurrentMonth(s.created_at)),
+      );
     },
 
     // ── Indicadores extras da tela de estoque (refit mockup) ──────────────
@@ -887,7 +900,7 @@ function parceiroApp() {
       const prod = this.produtos.find((p) => p.stock_id === id);
       if (!prod) { this.flash('Item não encontrado no estoque.'); return; }
       const qty = Math.max(1, this.num(this.orderItemForm.quantity) || 1);
-      const available = prod.is_tracked ? this.num(prod.quantity_on_hand) : Infinity;
+      const available = this.stockAvailable(prod);
       const existing = this.orderCart.find((it) => it.partner_stock_id === id);
       if ((existing ? existing.quantity : 0) + qty > available) {
         this.flash('Quantidade maior que o estoque disponível.');
@@ -1670,7 +1683,7 @@ function parceiroApp() {
     posAddProduct(item) {
       if (!item || !item.stock_id) return;
       const current = this.posCart.find((cartItem) => cartItem.partner_stock_id === item.stock_id);
-      const available = item.is_tracked ? this.num(item.quantity_on_hand) : Infinity;
+      const available = this.stockAvailable(item);
       const nextQty = current ? current.quantity + 1 : 1;
       if (nextQty > available) {
         this.flash('Quantidade maior que o estoque disponível.');
@@ -3402,6 +3415,7 @@ function parceiroApp() {
       const map = {
         in_stock: 'bg-emerald-50 text-emerald-700',
         low_stock: 'bg-amber-50 text-amber-700',
+        reserved: 'bg-indigo-50 text-indigo-700',
         out_of_stock: 'bg-rose-50 text-rose-700',
         not_tracked: 'bg-gray-100 text-gray-600',
         unknown: 'bg-gray-100 text-gray-500',
@@ -3413,11 +3427,20 @@ function parceiroApp() {
       const map = {
         in_stock: 'Em estoque',
         low_stock: 'Estoque baixo',
+        reserved: 'Reservado',
         out_of_stock: 'Zerado',
         not_tracked: 'Não controlado',
         unknown: 'Sem mínimo',
       };
       return map[status] || 'Sem status';
+    },
+
+    // 0076: disponível = físico − reservado (item não rastreado = sem limite).
+    // O carrinho/pedido bloqueia pela DISPONIBILIDADE, não pelo físico, para não
+    // vender um pneu já comprometido com uma entrega.
+    stockAvailable(item) {
+      if (!item || !item.is_tracked) return Infinity;
+      return this.num(item.quantity_on_hand) - this.num(item.quantity_reserved);
     },
 
     stockPositionValue(value) {
@@ -3450,6 +3473,16 @@ function parceiroApp() {
     stockItemValue(item) {
       const qty = item.is_tracked ? this.num(item.quantity_on_hand) : 0;
       return qty * this.num(item.average_cost || item.sale_price);
+    },
+
+    // 0076: rótulo de quantidade na tabela. Mostra físico; quando há reserva aberta,
+    // anexa o disponível ("físico (N disp.)") para deixar claro o que está comprometido.
+    stockQtyDisplay(item) {
+      if (!item || !item.is_tracked) return '-';
+      const physical = this.num(item.quantity_on_hand);
+      const reserved = this.num(item.quantity_reserved);
+      if (reserved > 0) return `${physical} (${this.stockAvailable(item)} disp.)`;
+      return physical;
     },
 
     selectStock(item) {

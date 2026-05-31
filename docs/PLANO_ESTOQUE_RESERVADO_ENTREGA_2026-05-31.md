@@ -90,8 +90,11 @@
 
 ## Backfill / dados
 - `quantity_reserved` default 0 → linhas atuais consistentes. **Não há entregas em
-  aberto** (as 12 ordens estão `cancelled`); `delivered` antigas já têm on_hand baixado.
-  Migration é segura, sem re-reserva.
+  aberto** (número canônico reconciliado em 2026-05-31: entre os delivery não-deletados
+  existem só 3, todos `status='cancelled'` — `delivery_status` 2 `delivered`, 1
+  `dispatched`; o resto, 11 no bruto, é soft-deleted). `delivered` antigas já têm on_hand
+  baixado. Migration é segura, sem re-reserva. (Correção: versões anteriores deste doc
+  diziam "12 ordens, todas cancelled" — impreciso, ver seção 12 do plano mestre.)
 
 ## Verificação end-to-end (preview prod, restaurar saldo ao fim)
 1. `npm run typecheck`.
@@ -117,3 +120,18 @@
   roteiro dos 3 fluxos antes do deploy.
 - Status novo `reserved` precisa do label no front (senão "Sem status").
 - "Entradas/Saídas no mês" seguem proxy (dívida do *ledger* de movimentação, fora deste escopo).
+
+## Adendo de auditoria (Opus, 2026-05-31) — LER ANTES DE IMPLEMENTAR
+A auditoria crítica desta feature está na **seção 12** de
+`docs/PLANO_ESTOQUE_INTEGRADO_SECOES_2026-05-31.md`. Pontos que ESTE handoff não cobria
+e são obrigatórios:
+- **P1 (bloqueante):** gate pré-deploy "zero entregas em aberto" — a reescrita causa
+  **dupla baixa** em qualquer delivery `pending`/`dispatched` no momento do deploy.
+- **P2:** `delivered → delivered` repetido baixa estoque de novo — `deliver` só pode
+  rodar na transição (`existing.delivery_status !== 'delivered'`).
+- **P3:** `upsertPartnerStock` regrava `stock_status` ignorando `reserved` — status
+  passa a ser dono do banco (helper SQL), nunca do `stockStatus` TS.
+- **Snapshot de rollback** das funções `register`/`cancel` ANTES da 0076 (faltava aqui).
+- **`getPartnerProdutos` também** precisa de `quantity_reserved` (não só `getPartnerEstoque`).
+- **Pickup desconta `reserved`**; `is_tracked=false`/`servico` e `on_hand IS NULL` não reservam.
+- **Pular E2.5** (ponte por `audit.events`): ir E1 → E2(docs) → E3 direto.

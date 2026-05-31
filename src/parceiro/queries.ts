@@ -213,6 +213,25 @@ export class PartialStockReversalError extends Error {
   }
 }
 
+// 0076: ajuste/edição de estoque que deixaria quantity_on_hand abaixo do reservado
+// (viola o CHECK partner_stock_levels_reserved_check). Vira 409/422 amigável na route.
+export class StockBelowReservedError extends Error {
+  readonly code = 'saldo_below_reserved';
+  constructor() {
+    super('saldo_below_reserved');
+  }
+}
+
+// 0076: tentativa de inativar item de estoque que tem reserva aberta (entrega em curso).
+export class StockReservedCannotDeleteError extends Error {
+  readonly code = 'stock_reserved_cannot_delete';
+  readonly stock_id: string;
+  constructor(stockId: string) {
+    super('stock_reserved_cannot_delete');
+    this.stock_id = stockId;
+  }
+}
+
 export interface SettlePartnerReceivableInput {
   received_at?: string | null;
   payment_method?: string | null;
@@ -276,7 +295,7 @@ export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]>
       `SELECT id, product_id, local_sku, item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
               brand, supplier_name, tire_condition, shelf_location, tire_position,
-              quantity_on_hand, minimum_quantity, average_cost, sale_price,
+              quantity_on_hand, quantity_reserved, minimum_quantity, average_cost, sale_price,
               is_tracked, stock_status, created_at, updated_at
        FROM commerce.partner_stock_levels
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
@@ -294,7 +313,7 @@ export async function getPartnerProdutos(ctx: PartnerContext): Promise<unknown[]
       `SELECT id AS stock_id,
               item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
-              brand, sale_price, average_cost, quantity_on_hand,
+              brand, sale_price, average_cost, quantity_on_hand, quantity_reserved,
               is_tracked, stock_status, local_sku
        FROM commerce.partner_stock_levels
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
@@ -800,6 +819,17 @@ export async function updatePartnerDeliveryStatus(
     }
 
     // ── pending / dispatched / delivered ──
+    // P2/Codex#3: na TRANSIÇÃO para delivered, converte a reserva em baixa física
+    // ANTES de marcar o pedido como delivered. A função SQL levanta erro se o pedido
+    // já estiver delivered, então a ordem importa: deliver primeiro, UPDATE depois.
+    // O guard !== 'delivered' evita que duplo-clique inocente vire erro.
+    if (input.delivery_status === 'delivered' && existing.rows[0]!.delivery_status !== 'delivered') {
+      await client.query('SELECT commerce.deliver_partner_local_order($1, $2)', [
+        orderId,
+        `partner:${ctx.slug}`,
+      ]);
+    }
+
     const result = await client.query<{ id: string; delivery_status: string }>(
       `UPDATE commerce.partner_orders
        SET delivery_status = $4,
@@ -1088,7 +1118,9 @@ export async function upsertPartnerStock(
 ): Promise<{ stock_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const isCreate = !input.stock_id;
-    const result = await client.query<{ id: string }>(
+    let result;
+    try {
+      result = await client.query<{ id: string }>(
       `INSERT INTO commerce.partner_stock_levels (
          id, environment, unit_id, product_id, local_sku, item_name, tire_size,
          tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
@@ -1150,9 +1182,30 @@ export async function upsertPartnerStock(
         input.shelf_location ?? null,
         input.tire_position ?? null,
       ],
-    );
+      );
+    } catch (err) {
+      // P3/A3: o upsert grava quantity_on_hand. Se um "Ajustar saldo" tentar deixar
+      // on_hand < quantity_reserved, o CHECK partner_stock_levels_reserved_check dispara
+      // aqui (transação faz rollback). Devolve erro sinalizável (saldo_below_reserved).
+      if ((err as { code?: string })?.code === '23514') {
+        throw new StockBelowReservedError();
+      }
+      throw err;
+    }
 
     const stockId = result.rows[0]!.id;
+
+    // P3: stock_status é dono do banco. O upsert acima gravou um status calculado pelo
+    // helper TS que NÃO conhece o quantity_reserved real da linha. Recalcula agora pelo
+    // helper SQL com o reserved atual — fonte única de status (item reservado mantém
+    // 'reserved' mesmo ao editar preço/custo).
+    await client.query(
+      `UPDATE commerce.partner_stock_levels
+       SET stock_status = commerce.partner_stock_status(
+             quantity_on_hand, quantity_reserved, minimum_quantity, is_tracked)
+       WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [stockId, ctx.environment, ctx.unitId],
+    );
 
     await client.query(
       `INSERT INTO audit.events (
@@ -1188,7 +1241,31 @@ export async function deletePartnerStock(
   stockId: string,
 ): Promise<{ stock_id: string; deleted: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query<{ id: string; item_name: string; quantity_on_hand: number | null }>(
+    const stock = await client.query<{
+      id: string;
+      item_name: string;
+      quantity_on_hand: number | null;
+      quantity_reserved: number | null;
+    }>(
+      `SELECT id, item_name, quantity_on_hand, quantity_reserved
+       FROM commerce.partner_stock_levels
+       WHERE id = $1
+         AND environment = $2
+         AND unit_id = $3
+         AND deleted_at IS NULL
+       FOR UPDATE`,
+      [stockId, ctx.environment, ctx.unitId],
+    );
+
+    if (stock.rowCount !== 1) {
+      return { stock_id: stockId, deleted: false };
+    }
+
+    if (Number(stock.rows[0]!.quantity_reserved ?? 0) > 0) {
+      throw new StockReservedCannotDeleteError(stockId);
+    }
+
+    const result = await client.query<{ id: string }>(
       `UPDATE commerce.partner_stock_levels
        SET deleted_at = now(),
            updated_by = $4
@@ -1212,8 +1289,8 @@ export async function deletePartnerStock(
           `partner:${ctx.slug}`,
           JSON.stringify({
             unit_id: ctx.unitId,
-            item_name: result.rows[0]!.item_name,
-            last_quantity: result.rows[0]!.quantity_on_hand,
+            item_name: stock.rows[0]!.item_name,
+            last_quantity: stock.rows[0]!.quantity_on_hand,
           }),
         ],
       );
@@ -1318,12 +1395,12 @@ export async function registerPartnerPurchase(
                average_cost = $5,
                sale_price = COALESCE($6, sale_price),
                is_tracked = true,
-               stock_status = CASE
-                 WHEN COALESCE(quantity_on_hand, 0) + $4 <= 0 THEN 'out_of_stock'
-                 WHEN minimum_quantity IS NOT NULL
-                      AND COALESCE(quantity_on_hand, 0) + $4 <= minimum_quantity THEN 'low_stock'
-                 ELSE 'in_stock'
-               END,
+               stock_status = commerce.partner_stock_status(
+                 COALESCE(quantity_on_hand, 0) + $4,
+                 quantity_reserved,
+                 minimum_quantity,
+                 true
+               ),
                updated_by = $7,
                updated_at = now()
            WHERE id = $1
@@ -1353,7 +1430,7 @@ export async function registerPartnerPurchase(
              $6, $7, $8,
              $9, $10, $11, NULL,
              $12, $13, true,
-             CASE WHEN $11 <= 0 THEN 'out_of_stock' ELSE 'in_stock' END,
+             commerce.partner_stock_status($11, 0, NULL, true),
              $14
            )
            RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
@@ -1512,12 +1589,10 @@ export async function deletePartnerPurchase(
          )
          UPDATE commerce.partner_stock_levels ps
          SET quantity_on_hand = ps.quantity_on_hand - $5,
-             stock_status = CASE
-               WHEN ps.quantity_on_hand - $5 <= 0 THEN 'out_of_stock'
-               WHEN ps.minimum_quantity IS NOT NULL
-                    AND ps.quantity_on_hand - $5 <= ps.minimum_quantity THEN 'low_stock'
-               ELSE 'in_stock'
-             END,
+             -- A5: estorno de compra recalcula status pelo helper. Se o disponível
+             -- voltar a <= 0 com reserva aberta, o item volta corretamente a 'reserved'.
+             stock_status = commerce.partner_stock_status(
+               ps.quantity_on_hand - $5, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
              updated_by = $6,
              updated_at = now()
          FROM target

@@ -870,7 +870,7 @@
                   <span x-text="item.brand || '-'"></span>
                   <span x-text="stockPositionLabel(item)"></span>
                   <span class="pos-cond" x-text="item.tire_condition || '—'"></span>
-                  <span class="pos-green-text" x-text="item.is_tracked ? (item.quantity_on_hand ?? 0) : '-'"></span>
+                  <span class="pos-green-text" x-text="stockQtyDisplay(item)"></span>
                   <span x-text="money(item.average_cost)"></span>
                   <span x-text="money(item.sale_price)"></span>
                   <span class="pos-loc" x-text="item.shelf_location || '—'"></span>
@@ -913,7 +913,14 @@
                   <div><span><i data-lucide="layers"></i>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
                 </div>
                 <div class="pos-detail-figures">
-                  <div><small>Quantidade atual</small><b x-text="(stockDetail.quantity_on_hand ?? 0) + ' un.'"></b></div>
+                  <div><small>Físico</small><b x-text="(stockDetail.quantity_on_hand ?? 0) + ' un.'"></b></div>
+                  <!-- 0076: reservado e disponível só aparecem quando há reserva aberta. -->
+                  <div x-show="stockDetail.is_tracked && num(stockDetail.quantity_reserved) > 0">
+                    <small>Reservado</small><b x-text="num(stockDetail.quantity_reserved) + ' un.'"></b>
+                  </div>
+                  <div x-show="stockDetail.is_tracked && num(stockDetail.quantity_reserved) > 0">
+                    <small>Disponível</small><b x-text="stockAvailable(stockDetail) + ' un.'"></b>
+                  </div>
                   <div><small>Valor em estoque</small><b x-text="money(stockItemValue(stockDetail))"></b></div>
                 </div>
                 <div class="pos-detail-actions">
