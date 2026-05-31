@@ -158,6 +158,8 @@ const stockSchema = z.object({
   // Campos do refit da tela de estoque (migration 0073).
   tire_condition: z.string().max(40).nullable().optional(),
   shelf_location: z.string().max(60).nullable().optional(),
+  // Posição do pneu em coluna própria (migration 0075) — antes vivia em supplier_name.
+  tire_position: z.string().max(40).nullable().optional(),
   is_tracked: z.boolean().default(true),
 });
 

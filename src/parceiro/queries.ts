@@ -94,6 +94,7 @@ export interface UpsertPartnerStockInput {
   sale_price?: number | null;
   tire_condition?: string | null;
   shelf_location?: string | null;
+  tire_position?: string | null;
   is_tracked: boolean;
 }
 
@@ -274,7 +275,7 @@ export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]>
     const result = await client.query(
       `SELECT id, product_id, local_sku, item_name, item_type, tire_size,
               tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
-              brand, supplier_name, tire_condition, shelf_location,
+              brand, supplier_name, tire_condition, shelf_location, tire_position,
               quantity_on_hand, minimum_quantity, average_cost, sale_price,
               is_tracked, stock_status, created_at, updated_at
        FROM commerce.partner_stock_levels
@@ -1093,12 +1094,12 @@ export async function upsertPartnerStock(
          tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
          brand, supplier_name, quantity_on_hand, minimum_quantity, average_cost,
          sale_price, is_tracked, stock_status, updated_by, item_type,
-         tire_condition, shelf_location
+         tire_condition, shelf_location, tire_position
        ) VALUES (
          COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7,
          $8, $9, $10,
          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-         $21, $22
+         $21, $22, $23
        )
        ON CONFLICT (id) DO UPDATE SET
          product_id = EXCLUDED.product_id,
@@ -1119,6 +1120,7 @@ export async function upsertPartnerStock(
          stock_status = EXCLUDED.stock_status,
          tire_condition = EXCLUDED.tire_condition,
          shelf_location = EXCLUDED.shelf_location,
+         tire_position = EXCLUDED.tire_position,
          updated_by = EXCLUDED.updated_by
        WHERE commerce.partner_stock_levels.environment = $2
          AND commerce.partner_stock_levels.unit_id = $3
@@ -1146,6 +1148,7 @@ export async function upsertPartnerStock(
         input.item_type ?? 'pneu',
         input.tire_condition ?? null,
         input.shelf_location ?? null,
+        input.tire_position ?? null,
       ],
     );
 

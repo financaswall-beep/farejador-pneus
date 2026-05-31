@@ -43,6 +43,12 @@ function parceiroApp() {
     stockPageSize: 10,
     stockSelected: null,
     stockModalOpen: false,
+    // Mini-modais de movimentação de saldo (botões distintos do card de detalhe).
+    stockOpItem: null,        // item alvo da entrada/ajuste
+    stockEntryOpen: false,    // "Dar entrada": soma unidades ao saldo
+    stockEntryQty: null,
+    stockAdjustOpen: false,   // "Ajustar saldo": define saldo absoluto
+    stockAdjustQty: null,
     posSearch: '',
     posBrandFilter: 'all',
     posRimFilter: 'all',
@@ -109,7 +115,7 @@ function parceiroApp() {
 
     // Ordem da rota de entrega (aba Entrega). Salva neste aparelho, por unidade.
     routeOrder: [],
-    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', is_tracked: true },
+    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
@@ -466,6 +472,8 @@ function parceiroApp() {
     get purchasedUnitsMonth() {
       return this.compras.reduce((sum, purchase) => {
         if (purchase.status === 'cancelled') return sum;
+        // Só compras do mês corrente (antes somava todas de sempre).
+        if (!this.isCurrentMonth(purchase.purchased_at || purchase.created_at)) return sum;
         const items = Array.isArray(purchase.items) ? purchase.items : [];
         return sum + items.reduce((itemSum, item) => itemSum + this.num(item.quantity), 0);
       }, 0);
@@ -497,7 +505,8 @@ function parceiroApp() {
     },
 
     get soldUnitsMonth() {
-      return this.salesUnitsFor(this.activeSales);
+      // Só vendas (não-canceladas) do mês corrente — antes somava todas de sempre.
+      return this.salesUnitsFor(this.activeSales.filter((s) => this.isCurrentMonth(s.created_at)));
     },
 
     // ── Indicadores extras da tela de estoque (refit mockup) ──────────────
@@ -590,6 +599,17 @@ function parceiroApp() {
         { label: '2W', value: this.partnerSalesTotal, count: partnerUnits, percent: Math.round((partnerUnits / safeTotal) * 100), color: '#047857' },
         { label: 'Porta', value: this.doorSalesTotal, count: doorUnits, percent: Math.round((doorUnits / safeTotal) * 100), color: '#9ca3af' },
       ];
+    },
+
+    // True se a data cai no mês corrente (fuso de São Paulo). Usado pelos KPIs "do mês".
+    isCurrentMonth(dateValue) {
+      if (!dateValue) return false;
+      const d = new Date(dateValue);
+      if (Number.isNaN(d.getTime())) return false;
+      const fmt = (date) => new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+      }).format(date);
+      return fmt(d) === fmt(new Date());
     },
 
     salesUnitsFor(sales) {
@@ -2151,6 +2171,8 @@ function parceiroApp() {
         sale_price: item.sale_price ?? null,
         tire_condition: item.tire_condition || 'Novo',
         shelf_location: item.shelf_location || '',
+        // Posição em coluna própria (migration 0075); fallback à heurística p/ legado.
+        tire_position: item.tire_position || this.stockPositionValue(item.supplier_name) || this.stockPositionValue(item.item_name) || '',
         is_tracked: Boolean(item.is_tracked),
       };
       this.currentTab = 'stock';
@@ -2158,7 +2180,7 @@ function parceiroApp() {
     },
 
     clearStockForm() {
-      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', is_tracked: true };
+      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true };
     },
 
     async saveStock() {
@@ -2197,7 +2219,10 @@ function parceiroApp() {
             tire_aspect_ratio: tireSize ? this.num(this.stockForm.tire_aspect) : null,
             tire_rim_diameter: tireSize ? this.num(this.stockForm.tire_rim) : null,
             brand: isService ? null : (this.stockForm.brand?.trim() || null),
-            supplier_name: this.stockPositionValue(this.stockForm.supplier_name) || null,
+            // supplier_name volta a ser só fornecedor/origem — passa direto, sem posição (migration 0075).
+            supplier_name: this.stockForm.supplier_name?.trim() || null,
+            // Posição do pneu em coluna própria.
+            tire_position: itemType === 'pneu' ? (this.stockPositionValue(this.stockForm.tire_position) || null) : null,
             quantity_on_hand: isTracked ? this.num(this.stockForm.quantity_on_hand) : null,
             minimum_quantity: isTracked && this.stockForm.minimum_quantity !== null && this.stockForm.minimum_quantity !== '' ? this.num(this.stockForm.minimum_quantity) : null,
             average_cost: this.stockForm.average_cost !== null && this.stockForm.average_cost !== '' ? this.num(this.stockForm.average_cost) : null,
@@ -3403,6 +3428,10 @@ function parceiroApp() {
     },
 
     stockPositionLabel(item) {
+      // Coluna própria (migration 0075) tem prioridade.
+      const fromColumn = this.stockPositionValue(item?.tire_position);
+      if (fromColumn) return fromColumn;
+      // Fallback p/ linhas legadas ainda não re-salvas.
       const fromSupplier = this.stockPositionValue(item?.supplier_name);
       if (fromSupplier) return fromSupplier;
       const fromName = this.stockPositionValue(item?.item_name);
@@ -3440,19 +3469,81 @@ function parceiroApp() {
       this.stockModalOpen = false;
     },
 
-    skuFor(item) {
-      // SKU derivado e estável a partir do id (o banco não tem coluna SKU — visual de demo).
-      const digits = String(item.id || '').replace(/\D/g, '').slice(0, 5).padStart(5, '0');
-      return 'SKU' + digits;
+    // ─── Movimentação de saldo (botões "Dar entrada" / "Ajustar saldo") ───────
+    // Reusa POST /estoque (upsert). Como o upsert sobrescreve todas as colunas,
+    // remontamos o payload COMPLETO do item e só trocamos quantity_on_hand.
+    async _persistStockQuantity(item, newQty) {
+      await this.api('estoque', {
+        method: 'POST',
+        body: JSON.stringify({
+          stock_id: item.id,
+          item_type: item.item_type || 'pneu',
+          item_name: item.item_name,
+          tire_size: item.tire_size ?? null,
+          tire_width_mm: item.tire_width_mm ?? null,
+          tire_aspect_ratio: item.tire_aspect_ratio ?? null,
+          tire_rim_diameter: item.tire_rim_diameter ?? null,
+          brand: item.brand ?? null,
+          supplier_name: item.supplier_name ?? null,
+          quantity_on_hand: newQty,
+          minimum_quantity: item.minimum_quantity ?? null,
+          average_cost: item.average_cost != null ? this.num(item.average_cost) : null,
+          sale_price: item.sale_price != null ? this.num(item.sale_price) : null,
+          tire_condition: item.tire_condition ?? null,
+          shelf_location: item.shelf_location ?? null,
+          tire_position: item.tire_position ?? null,
+          is_tracked: Boolean(item.is_tracked),
+        }),
+      });
+      await this.loadData();
     },
 
-    stockLocation(item) {
-      // Endereço de prateleira placeholder, estável por item (demo — sem coluna no banco).
-      const n = parseInt(String(item.id || '').replace(/\D/g, '').slice(0, 4) || '0', 10);
-      const rua = String.fromCharCode(65 + (n % 4)); // A–D
-      const col = String((n % 9) + 1).padStart(2, '0');
-      const niv = String((n % 5) + 1).padStart(2, '0');
-      return `${rua}-${col}-${niv}`;
+    openStockEntry(item) {
+      if (!item || !item.is_tracked) return;
+      this.stockOpItem = item;
+      this.stockEntryQty = null;
+      this.stockEntryOpen = true;
+    },
+    closeStockEntry() { this.stockEntryOpen = false; this.stockOpItem = null; },
+
+    async saveStockEntry() {
+      const item = this.stockOpItem;
+      const delta = this.num(this.stockEntryQty);
+      if (!item) return;
+      if (delta <= 0) { this.flash('Informe quantas unidades entraram (maior que zero).'); return; }
+      this.saving = true; this.savingAction = 'stock-entry';
+      try {
+        const newQty = this.num(item.quantity_on_hand) + delta;
+        await this._persistStockQuantity(item, newQty);
+        this.closeStockEntry();
+        this.flash(`Entrada de ${delta} un. registrada.`);
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally { this.saving = false; this.savingAction = ''; }
+    },
+
+    openStockAdjust(item) {
+      if (!item || !item.is_tracked) return;
+      this.stockOpItem = item;
+      this.stockAdjustQty = this.num(item.quantity_on_hand);
+      this.stockAdjustOpen = true;
+    },
+    closeStockAdjust() { this.stockAdjustOpen = false; this.stockOpItem = null; },
+
+    async saveStockAdjust() {
+      const item = this.stockOpItem;
+      if (!item) return;
+      if (this.stockAdjustQty === null || this.stockAdjustQty === '' || this.num(this.stockAdjustQty) < 0) {
+        this.flash('Informe o novo saldo (zero ou mais).'); return;
+      }
+      this.saving = true; this.savingAction = 'stock-adjust';
+      try {
+        await this._persistStockQuantity(item, this.num(this.stockAdjustQty));
+        this.closeStockAdjust();
+        this.flash('Saldo ajustado.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally { this.saving = false; this.savingAction = ''; }
     },
 
     customerSales(customer) {

@@ -897,7 +897,7 @@
                 <div class="pos-detail-hero">
                   <div>
                     <b x-text="itemPrimaryLabel(stockDetail)"></b>
-                    <small class="pos-detail-size" x-text="stockDetail.tire_size || ''"></small>
+                    <small class="pos-detail-size" x-show="stockDetail.tire_size && itemPrimaryLabel(stockDetail) !== stockDetail.tire_size" x-text="stockDetail.tire_size || ''"></small>
                     <em class="pos-status-pill" :class="stockDetail.stock_status" x-text="stockStatusLabel(stockDetail.stock_status)"></em>
                   </div>
                   <picture>
@@ -917,8 +917,8 @@
                   <div><small>Valor em estoque</small><b x-text="money(stockItemValue(stockDetail))"></b></div>
                 </div>
                 <div class="pos-detail-actions">
-                  <button @click="openStockModal(stockDetail)"><i data-lucide="download"></i> Dar entrada</button>
-                  <button @click="openStockModal(stockDetail)"><i data-lucide="sliders-horizontal"></i> Ajustar saldo</button>
+                  <button x-show="stockDetail.is_tracked" @click="openStockEntry(stockDetail)"><i data-lucide="download"></i> Dar entrada</button>
+                  <button x-show="stockDetail.is_tracked" @click="openStockAdjust(stockDetail)"><i data-lucide="sliders-horizontal"></i> Ajustar saldo</button>
                   <button @click="openStockModal(stockDetail)"><i data-lucide="pencil"></i> Editar</button>
                   <button class="danger" @click="deleteStock(stockDetail.id)"><i data-lucide="trash-2"></i> Apagar</button>
                 </div>
@@ -1004,7 +1004,7 @@
                   </div>
                 </label>
                 <label>Posição
-                  <select x-model="stockForm.supplier_name">
+                  <select x-model="stockForm.tire_position">
                     <option value="">-</option>
                     <option value="Traseiro">Traseiro</option>
                     <option value="Dianteiro">Dianteiro</option>
@@ -1051,6 +1051,57 @@
                 <span x-text="isSaving('stock') ? 'Salvando...' : 'Salvar no estoque'"></span>
               </button>
               <button @click="clearStockForm()" class="pos-mini-clear">Limpar cadastro</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini-modal: Dar entrada (soma unidades ao saldo) -->
+        <div class="pos-modal-overlay" x-show="stockEntryOpen" x-cloak @click.self="closeStockEntry()">
+          <div class="pos-modal pos-modal-narrow">
+            <div class="pos-modal-head">
+              <h3>Dar entrada no estoque</h3>
+              <button class="pos-modal-close" @click="closeStockEntry()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="pos-stock-side-form">
+              <p class="pos-modal-sub" x-show="stockOpItem">
+                <b x-text="stockOpItem ? itemPrimaryLabel(stockOpItem) : ''"></b>
+                — saldo atual: <b x-text="stockOpItem ? (num(stockOpItem.quantity_on_hand) + ' un.') : ''"></b>
+              </p>
+              <label>
+                <span>Quantas unidades entraram?</span>
+                <input type="number" min="1" step="1" x-model.number="stockEntryQty" placeholder="Ex: 10" @keydown.enter="saveStockEntry()" />
+              </label>
+              <p class="pos-modal-sub" x-show="num(stockEntryQty) > 0 && stockOpItem">
+                Novo saldo: <b x-text="(num(stockOpItem.quantity_on_hand) + num(stockEntryQty)) + ' un.'"></b>
+              </p>
+              <button @click="saveStockEntry()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="download"></i>
+                <span x-text="isSaving('stock-entry') ? 'Salvando...' : 'Confirmar entrada'"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini-modal: Ajustar saldo (define saldo absoluto) -->
+        <div class="pos-modal-overlay" x-show="stockAdjustOpen" x-cloak @click.self="closeStockAdjust()">
+          <div class="pos-modal pos-modal-narrow">
+            <div class="pos-modal-head">
+              <h3>Ajustar saldo</h3>
+              <button class="pos-modal-close" @click="closeStockAdjust()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="pos-stock-side-form">
+              <p class="pos-modal-sub" x-show="stockOpItem">
+                <b x-text="stockOpItem ? itemPrimaryLabel(stockOpItem) : ''"></b>
+                — saldo atual: <b x-text="stockOpItem ? (num(stockOpItem.quantity_on_hand) + ' un.') : ''"></b>
+              </p>
+              <label>
+                <span>Novo saldo (contagem real)</span>
+                <input type="number" min="0" step="1" x-model.number="stockAdjustQty" @keydown.enter="saveStockAdjust()" />
+              </label>
+              <button @click="saveStockAdjust()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="sliders-horizontal"></i>
+                <span x-text="isSaving('stock-adjust') ? 'Salvando...' : 'Confirmar saldo'"></span>
+              </button>
             </div>
           </div>
         </div>

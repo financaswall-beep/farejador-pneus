@@ -35,6 +35,6 @@ Template pronto em [`_TEMPLATE.md`](_TEMPLATE.md).
 
 | Seção | Arquivo | Status | Última auditoria |
 |---|---|---|---|
-| Estoque | [ESTOQUE.md](ESTOQUE.md) | ⚠️ funcional com ressalvas | 2026-05-31 |
+| Estoque | [ESTOQUE.md](ESTOQUE.md) | ✅ estável | 2026-05-31 |
 
 _(As próximas seções entram aqui conforme forem auditadas.)_

@@ -2916,6 +2916,9 @@ html, body {
   background: var(--pos-panel-2); border: 1px solid var(--pos-line); border-radius: 14px;
   padding: 18px 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
 }
+.pos-modal-narrow { max-width: 380px; }
+.pos-modal-sub { font-size: 13px; color: #94a3b8; margin: 0 0 12px; }
+.pos-modal-sub b { color: inherit; font-weight: 700; }
 .pos-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .pos-modal-head h3 { font-size: 16px; font-weight: 800; margin: 0; }
 .pos-modal-close { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
