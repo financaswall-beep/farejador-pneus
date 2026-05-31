@@ -198,7 +198,7 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="activity"></i></div>
-          <div><small>Score financeiro</small><strong x-text="financialScore"></strong><span x-text="financialScoreLevel.label"></span></div>
+          <div><small>Saúde da loja</small><strong x-text="financialScore"></strong><span x-text="financialScoreLevel.label"></span></div>
         </article>
       </section>
 
@@ -255,11 +255,11 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="receipt"></i></div>
-          <div><small>Ticket médio</small><strong x-text="money(avgTicket)"></strong><span x-text="num(resumo?.orders_month) + ' vendas no mês'"></span></div>
+          <div><small>Média por venda</small><strong x-text="money(avgTicket)"></strong><span x-text="num(resumo?.orders_month) + ' vendas no mês'"></span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="percent"></i></div>
-          <div><small>Margem estimada</small><strong x-text="estimatedMargin.toFixed(1).replace('.', ',') + '%'"></strong><span>resultado sobre vendas</span></div>
+          <div><small>Lucro do mês</small><strong x-text="money(resumo?.estimated_result_month)"></strong><span x-text="'margem ' + estimatedMargin.toFixed(1).replace('.', ',') + '%'"></span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="wallet"></i></div>
@@ -1255,8 +1255,8 @@
               </article>
               <article class="pos-chart-card">
                 <div>
-                  <h4>Composição dos custos</h4>
-                  <p>CMV (custo do que vendeu) x despesas</p>
+                  <h4>Para onde foi o dinheiro</h4>
+                  <p>Custo dos pneus vendidos x despesas/contas</p>
                 </div>
                 <div class="pos-chart-box doughnut"><canvas id="chartFinanceCostsPos"></canvas></div>
               </article>
@@ -1445,7 +1445,7 @@
           </section>
 
           <aside class="pos-panel pos-side-panel">
-            <h3>Score financeiro</h3>
+            <h3>Saúde da loja</h3>
             <div class="pos-score-card">
               <div class="finance-gauge">
                 <svg class="finance-gauge__svg" viewBox="0 0 200 112" preserveAspectRatio="xMidYMid meet">
@@ -1461,7 +1461,7 @@
             </div>
             <div class="pos-side-list">
               <div><span>Margem</span><strong x-text="estimatedMargin.toFixed(1).replace('.', ',') + '%'"></strong></div>
-              <div><span>Ticket médio</span><strong x-text="money(avgTicket)"></strong></div>
+              <div><span>Média por venda</span><strong x-text="money(avgTicket)"></strong></div>
               <div><span>Caixa líquido</span><strong x-text="money(resumo?.cash_net_month)"></strong></div>
             </div>
             <div class="pos-divider"></div>

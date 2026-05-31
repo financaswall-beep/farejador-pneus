@@ -1400,7 +1400,7 @@ function parceiroApp() {
 
     get financeCostSplit() {
       return [
-        { label: 'CMV', value: this.num(this.resumo?.cogs_month), color: '#7f8f83' },
+        { label: 'Custo dos pneus vendidos', value: this.num(this.resumo?.cogs_month), color: '#7f8f83' },
         { label: 'Despesas/contas', value: this.costExpensesCommitted, color: '#dc3f4d' },
       ];
     },
@@ -2887,7 +2887,7 @@ function parceiroApp() {
       window._resultChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Vendas', 'CMV', 'Despesas', 'Saldo'],
+          labels: ['Vendas', 'Custo pneus', 'Despesas', 'Lucro'],
           datasets: [{
             data,
             backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', result >= 0 ? '#10b981' : '#e11d48'],
@@ -2987,7 +2987,7 @@ function parceiroApp() {
       window._financeBarChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Vendas', 'CMV', 'Despesas', 'Resultado'],
+          labels: ['Vendas', 'Custo pneus', 'Despesas', 'Lucro'],
           datasets: [{
             // Reconcilia: Resultado = Vendas - CMV - Despesas (nao Compras).
             data: [this.num(r.sales_month), this.num(r.cogs_month), this.num(r.expenses_month), result],
