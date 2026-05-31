@@ -934,13 +934,13 @@
             <div x-show="!stockDetail" class="pos-empty">Selecione um produto na tabela.</div>
 
             <article class="pos-promo-card right" title="Espaço de anúncio da rede">
-              <img src="assets/promo-carga-nova.png" alt="Carga nova" loading="lazy" />
+              <img src="assets/promo-carga-nova.webp" alt="Carga nova" loading="lazy" />
             </article>
           </aside>
         </div>
 
         <div class="pos-stock-analytics">
-          <article class="pos-panel pos-mini-card">
+          <article class="pos-panel pos-mini-card pos-card-bg-verde">
             <div class="pos-mini-head"><h4>Medidas com maior estoque</h4></div>
             <div class="pos-bar-list">
               <template x-for="row in stockTopSizes" :key="row.label">
@@ -954,7 +954,7 @@
             </div>
           </article>
 
-          <article class="pos-panel pos-mini-card pos-turnover-card">
+          <article class="pos-panel pos-mini-card pos-turnover-card pos-card-bg-giro">
             <div class="pos-mini-head"><h4>Giro de estoque</h4><small>últimos 30 dias</small></div>
             <div class="pos-donut-wrap">
               <div class="pos-donut" :style="`--pct:${Math.min(stockTurnover / 3, 1) * 100}`">
@@ -968,7 +968,7 @@
             </div>
           </article>
 
-          <article class="pos-panel pos-mini-card">
+          <article class="pos-panel pos-mini-card pos-card-bg-alertas">
             <div class="pos-mini-head"><h4>Alertas de estoque</h4><small x-text="stockLowItems.length + ' itens'"></small></div>
             <div class="pos-alert-list">
               <template x-for="item in stockLowItems.slice(0, 4)" :key="item.id">

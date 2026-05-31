@@ -2752,6 +2752,24 @@ html, body {
   margin-top: 14px;
 }
 .pos-mini-card { padding: 16px 18px; }
+.pos-card-bg-verde {
+  background-image: url('assets/card-bg-verde.webp');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.pos-card-bg-giro {
+  background-image: url('assets/card-bg-giro.webp');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.pos-card-bg-alertas {
+  background-image: url('assets/card-bg-alertas.webp');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 .pos-mini-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
 .pos-mini-head h4 { font-size: 14px; font-weight: 700; margin: 0; }
 .pos-mini-head small { font-size: 11px; color: #94a3b8; }
