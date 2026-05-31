@@ -1,8 +1,27 @@
 # Plano mestre — Estoque integrado às seções do parceiro
 
-> Status: planejamento. Não implementado.
+> Status: 0076/0077 implementadas em produção em 2026-05-31.
 > Objetivo: deixar o Estoque como fonte confiável para Frente de caixa, Pedidos,
 > Entrega, Compras, Financeiro, Clientes, Bate-papo e futuro Atendente.
+> Contrato obrigatório pós-implementação:
+> `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`.
+
+## 0. Estado final aplicado
+
+As fases críticas de estoque reservado e financeiro realizado foram implementadas:
+
+- `0076_partner_stock_reserved.sql`: estoque reservado, status `reserved`,
+  baixa física só na entrega, cancelamento libera reserva.
+- `0077_partner_finance_realized_delivery_dates.sql`: financeiro mensal usa data
+  de realização (`created_at` para pickup/balcão, `delivered_at` para delivery).
+- Frente de caixa vende pelo disponível, não pelo físico bruto.
+- Clientes/VIP contam somente vendas realizadas.
+- Caixa do dia soma venda à vista + recebíveis recebidos hoje.
+- Parcelamento de venda está bloqueado.
+
+Antes de qualquer nova alteração em Estoque, Pedidos, Entrega, Frente de caixa,
+Clientes ou Financeiro, leia o contrato acima. Ele é a fonte curta e obrigatória
+para não quebrar o trabalho já validado.
 
 ## 1. Norte do desenho
 

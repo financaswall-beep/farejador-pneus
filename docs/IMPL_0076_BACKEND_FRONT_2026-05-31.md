@@ -3,6 +3,8 @@
 > SQL aplicado em prod em 2026-05-31: `db/migrations/0076_partner_stock_reserved.sql`.
 > Contrato: seção 12 de `docs/PLANO_ESTOQUE_INTEGRADO_SECOES_2026-05-31.md`.
 > Snapshot/rollback: `docs/SNAPSHOT_FUNCOES_PRE_0076_2026-05-31.sql`.
+> Contrato operacional pós-0076/0077:
+> `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`.
 
 ## A. Backend — `src/parceiro/queries.ts`
 
