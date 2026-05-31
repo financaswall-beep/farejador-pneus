@@ -453,14 +453,26 @@ e **foto do contato** (migration `0072` + `meta.sender.thumbnail` no fan-out + `
 com fallback pras iniciais). Detalhes e pendências (backfill de foto, delete das 4 órfãs) no
 [handoff da Fatia 2](SESSAO_2026-05-30_FATIA2_HANDOFF.md).
 
-### Fatia 3 — "Tempo real" (trocar polling por push) — ~1 dia
-**Objetivo:** instantâneo, sem polling.
+### Fatia 3 — "Tempo real" (trocar polling por push) — CONCLUÍDA 2026-05-30
+**Objetivo:** instantâneo, sem polling. **Feito de ponta a ponta** (commits no `pneus`:
+`ef7694d`, `8e470aa`, `4793c6c`). Detalhes no Log §13 (2026-05-30). **Falta só o redeploy
+no Coolify pra ligar em prod.**
 
-- [ ] **3.1** `LISTEN/NOTIFY` no Postgres: o fan-out faz `pg_notify('partner_chat', payload)`.
-- [ ] **3.2** Endpoint SSE `GET /parceiro/:slug/api/chat/stream` que escuta o NOTIFY e
-      empurra eventos pro front. (SSE, não WebSocket: é unidirecional servidor→cliente, que
-      é o que precisamos; o cliente→servidor continua sendo o POST da Fatia 2.)
-- [ ] **3.3** Front: `EventSource` substitui o `setInterval` do poll.
+- [x] **3.1** `LISTEN/NOTIFY` no Postgres: o fan-out faz `pg_notify('partner_chat', ...)`
+      ao gravar mensagem nova (dentro da transação → dispara no COMMIT; desfeito junto com o
+      SAVEPOINT se algo falhar). Payload carrega `unit_id` (multi-unidade desde já).
+- [x] **3.2** Endpoint SSE `GET /parceiro/:slug/api/chat/stream` (token por query string,
+      pois EventSource não manda header `Authorization`; validado pela mesma function
+      SECURITY DEFINER). Hub `partner-chat.notify.ts` mantém 1 conexão `LISTEN` por processo,
+      reconexão com backoff, entrega por `unit_id`. Heartbeat 25s + cleanup no close.
+- [x] **3.3** Front: `EventSource` substitui o `setInterval`, **com fallback automático**:
+      se o SSE não conectar (CLOSED), cai no polling de 5s; + poll lento de 30s sempre ligado
+      como rede de segurança.
+- [x] **3.4 (extra, não estava no plano) — wake do worker.** Descoberto que o SSE sozinho não
+      deixa instantâneo: o worker de normalização processava `raw_events` por **poll de 5s**, então
+      a msg esperava até ~5s pro fan-out rodar. Corrigido: o webhook faz `pg_notify('raw_events_new')`
+      ao gravar evento novo, e o worker dá `LISTEN` nesse canal e drena na hora (drenagens
+      serializadas; poll de 5s vira rede de segurança). Canal global (escala pra N lojas).
 
 > **Decisão de arquitetura (importante):** NÃO usar Supabase Realtime. O app conecta no
 > Postgres via `pg` Pool e a auth do portal é token próprio (não Supabase Auth). Supabase
@@ -570,6 +582,44 @@ Tudo isso é **front-end com dados de exemplo**. Este plano é o backend que tor
 ---
 
 ## 13. Log de execução
+
+### 2026-05-30 — Fatia 3: tempo real (SSE + LISTEN/NOTIFY) + wake do worker
+Implementada e validada localmente (typecheck limpo, **245 testes verdes**). Pushada pro
+remote `pneus`, branch `main`. **Falta redeploy no Coolify pra ligar em prod.**
+
+**Commits:**
+- `ef7694d` — SSE de ponta (banco → tela). Novo `src/normalization/partner-chat.notify.ts`
+  (hub `LISTEN partner_chat`, 1 conexão/processo, reconexão com backoff, entrega por `unit_id`).
+  `pg_notify` no fan-out (`partner-chat.fanout.ts`) só em msg nova. Endpoint SSE
+  `GET .../chat/stream` em `route.ts` (token por query; validação extraída pra
+  `authenticatePartnerToken()` em `auth.ts`). Hub ligado no boot (`server.ts` +
+  `preview-parceiro-server.ts`). Front (`parceiro/public/app.js`): `EventSource` no lugar do
+  `setInterval`, com fallback automático pro polling 5s + poll lento 30s de segurança.
+- `8e470aa` — wake do worker. `worker.ts` ganha `LISTEN raw_events_new` → drena na hora;
+  drenagens serializadas (`draining`/`wakePending`); reconexão com backoff; poll de 5s vira
+  fallback.
+- `4793c6c` — webhook (`chatwoot.handler.ts`) emite `pg_notify('raw_events_new')` após gravar
+  evento novo (dentro da transação → dispara no COMMIT). Liga o wake do `8e470aa`.
+
+**Diagnóstico que motivou o `8e470aa`/`4793c6c`:** o SSE sozinho deixou o transporte
+banco→tela instantâneo, mas sobrava ~5s ANTES: o worker de normalização lê `raw_events` por
+poll de 5s. Agora a cadeia é instantânea: Chatwoot → webhook → NOTIFY → worker acorda →
+fan-out → NOTIFY → SSE → tela. Única espera restante = Chatwoot→webhook (fora do nosso controle).
+
+**Sem migration e sem variável de ambiente nova.** `pg_notify` não precisa de tabela; os hubs
+usam a `DATABASE_URL` que já existe.
+
+**Multi-unidade (pergunta do Wallace 2026-05-30):** a camada de tempo real **já é por unidade** —
+o `partner_chat` carrega `unit_id`, o hub entrega só pros SSE daquela unidade, o portal assina
+só o `unit_id` do próprio token (isolamento por RLS + filtro). O `raw_events_new` é global de
+propósito (o worker drena tudo; o fan-out roteia). **Pendência REAL pra multi-loja = atribuição:**
+hoje o fan-out só espelha se houver **exatamente 1** unidade ativa (`resolveDefaultPartnerUnit`);
+com 2+ ele para de espelhar de propósito. Ligar multi-loja exige o roteamento/geofencing (§5) —
+sprint à parte; o cano do tempo real não muda.
+
+**Como validar pós-redeploy:** DevTools → Network → filtra `stream`: a requisição `chat/stream`
+fica **aberta/pendente** (SSE conectado). Manda msg no WhatsApp de teste → deve aparecer na hora.
+Se `chat/stream` der 401/404 e o chat atualizar de 5 em 5s, é o fallback (investigar proxy/Traefik).
 
 ### 2026-05-29 — Fatia 1.2: deploy + flag ligada (validação pendente)
 - Commit `b782080` (fan-out + migration + plano) pushado pro remote `pneus` (fast-forward

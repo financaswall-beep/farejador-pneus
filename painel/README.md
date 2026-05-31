@@ -6,6 +6,43 @@ Painel operacional da loja. Roda dentro do próprio Farejador, sem repo separado
 
 ---
 
+## 🔒 Auditoria de segurança 2026-05-21 — RLS efetivo (Etapa 5)
+
+A partir desta data, o módulo (painel admin + portal parceiro) passou por auditoria completa que resolveu 5 etapas e os 3 problemas críticos.
+
+### Resumo da auditoria
+**21 problemas identificados** (5 críticos, 6 sérios, 10 médios).
+**Nota geral: 6,4 → 8,8** (após 5 etapas de correção).
+
+### Etapas executadas (todas concluídas)
+1. **0042/0043 reconciliadas no Git** — fim do drift repo ↔ prod
+2. **Smoke test SQL contra prod** — validação do caminho crítico
+3. **32 testes automatizados** (15 portal + 10 RLS + 17 unit) — fim de "zero testes"
+4. **Bugs sérios corrigidos** — timezone na Rede (S1), delivery_address obrigatório (S6), normalização E.164 do telefone (S4)
+5. **RLS efetivo + role separada + pool dedicado** — defesa em profundidade no banco
+
+### Impacto no painel admin
+O painel admin **não mudou de comportamento** — continua usando o pool global `pg` com role `postgres` (BYPASSRLS). Pode ler a Rede inteira sem restrição. A RLS efetiva é só pro Portal Parceiro (`farejador_partner_app`).
+
+**Mas ganhou correções de bugs:**
+- Filtro `Hoje` da Rede agora respeita timezone America/Sao_Paulo (S1)
+- `delivery_address` obrigatório em pedido com `fulfillment_mode='delivery'` (S6)
+- `customer_phone` normalizado pra E.164 antes de gravar (S4)
+
+### Trilha auditável
+- `docs/AUDITORIA_PAINEL_PARCEIRO_2026-05-21.md` — diagnóstico original
+- `docs/EXECUCAO_AUDITORIA_2026-05-21.md` — execução das 5 etapas
+- `docs/PACOTE_INTEGRACAO_AUDITORIA_2026-05-21.md` — instruções de deploy
+- `docs/PLANO_ETAPA5_RLS_2026-05-21_V2.md` — plano técnico Etapa 5
+- `docs/RUNBOOK_ETAPA5_RLS_2026-05-21.md` — runbook operacional
+
+### Migrations aplicadas (todas em prod)
+- `0042_partner_sale_consistency` — `register_partner_local_order` com BUG #2 (EXCEPTION estoque insuficiente) e BUG #5 (audit separado)
+- `0043_partner_hardening` — triggers + FKs ON DELETE SET NULL + UNIQUE natural-key
+- `0044_partner_rls_policies` — role `farejador_partner_app` + RLS estrita + function SECURITY DEFINER
+
+---
+
 ## Atualizacao operacional 2026-05-20: Rede com dados reais do parceiro
 
 A tela **Rede** do admin agora esta ligada ao banco real do Portal Parceiro.

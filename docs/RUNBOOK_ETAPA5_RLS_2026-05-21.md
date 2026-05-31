@@ -270,12 +270,29 @@ postgresql://postgres.<projid>:<senha_postgres>@<host>:<porta>/postgres
 ```
 
 Construir `PARTNER_DATABASE_URL` substituindo:
-- Usuário `postgres.<projid>` por `farejador_partner_app`
+- Usuário `postgres.<projid>` por `farejador_partner_app.<projid>` quando usar Supabase pooler/Supavisor
 - Senha do `postgres` pela senha gerada no passo 1
 
 ```
-postgresql://farejador_partner_app:<SENHA_PASSO_1>@<host>:<porta>/postgres
+postgresql://farejador_partner_app.<projid>:<SENHA_PASSO_1>@<host>:<porta>/postgres
 ```
+
+Exemplo do projeto Farejador usando Supabase pooler:
+
+```
+postgresql://farejador_partner_app.aoqtgwzeyznycuakrdhp:<SENHA_PASSO_1>@aws-1-us-west-2.pooler.supabase.com:5432/postgres
+```
+
+**Importante:** no Supabase pooler o usuario precisa carregar o project ref.
+Sem isso, o backend sobe mas o portal parceiro falha com:
+
+```
+(ENOTFOUND) tenant/user farejador_partner_app.aws-1-us-west-2.pooler.supabase.com not found
+```
+
+Portas do pooler:
+- `5432`: Supavisor session mode. Aceitavel para backend persistente/Fastify.
+- `6543`: Supavisor transaction mode. Usar apenas se optar por esse modo explicitamente.
 
 **Testar a conexão antes de usar no Coolify:**
 
@@ -288,6 +305,9 @@ Esperado: `current_user = farejador_partner_app`.
 
 Se falhar com `password authentication failed`: senha errada — voltar ao passo 1 ou conferir o que foi colado no passo 2.
 
+Se falhar com `tenant/user ... not found`: conferir se o usuario no pooler esta no formato
+`farejador_partner_app.<project-ref>`, nao apenas `farejador_partner_app`.
+
 ---
 
 ## Passo 6 — Adicionar PARTNER_DATABASE_URL no Coolify
@@ -298,6 +318,15 @@ Coolify → Application `farejador-pneus:main` → **Environment Variables** →
 - **Value:** connection string completa do passo 5
 - **Available at Buildtime:** **desmarcado** (Runtime only — segue padrão do `DATABASE_URL`)
 - Salvar
+
+No Coolify, usar campos separados:
+
+```
+Name:  PARTNER_DATABASE_URL
+Value: postgresql://farejador_partner_app.<projid>:<SENHA>@<host>:5432/postgres
+```
+
+Nao colocar `PARTNER_DATABASE_URL=` dentro do campo **Value**. Isso so vale para arquivo `.env`.
 
 **Confirmação visual:**
 - A variável aparece na lista com valor mascarado
