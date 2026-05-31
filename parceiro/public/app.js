@@ -31,6 +31,7 @@ function parceiroApp() {
     statusTimer: null,
     lastUpdatedAt: null,
     currentSection: 'resumo',
+    sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
     financePurchaseMode: 'tires',
@@ -147,6 +148,15 @@ function parceiroApp() {
     ],
 
     // â”€â”€â”€ INIT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Recolhe/expande o menu lateral (só ícones <-> completo). Libera largura pra tela.
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed;
+      try { localStorage.setItem(`farejador_sidebar_collapsed_${this.slug}`, this.sidebarCollapsed ? '1' : '0'); }
+      catch (e) { /* localStorage indisponível: estado só nesta sessão */ }
+      // largura do conteúdo mudou: re-renderiza ícones e gráficos pra reajustar.
+      this.$nextTick(() => { lucide.createIcons(); requestAnimationFrame(() => this.renderAllCharts()); });
+    },
+
     toggleTheme() {
       this.theme = this.theme === 'light' ? 'dark' : 'light';
       try { localStorage.setItem(`farejador_theme_${this.slug}`, this.theme); }
@@ -1648,6 +1658,12 @@ function parceiroApp() {
       // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
       if (id === 'batepapo') this.startChatPolling();
       else this.stopChatPolling();
+      // Abrir o chat recolhe o menu automaticamente pra dar espaço; o botão manual sempre manda.
+      if (id === 'batepapo' && !this.sidebarCollapsed) {
+        this.sidebarCollapsed = true;
+        try { localStorage.setItem(`farejador_sidebar_collapsed_${this.slug}`, '1'); }
+        catch (e) { /* localStorage indisponível */ }
+      }
       this.currentSection = id;
       if (id === 'vendas') this.currentTab = 'sale';
       if (id === 'estoque') this.currentTab = 'stock';

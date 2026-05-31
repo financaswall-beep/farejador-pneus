@@ -94,6 +94,35 @@ html, body {
   flex-direction: column;
 }
 
+.pos-sidebar-toggle { color: #94a3b8; }
+.pos-toggle-chevron { flex: 0 0 auto; transition: transform .15s ease; }
+
+/* ---- Menu recolhível (só ícones) — desktop apenas; libera largura pra tela/chat ---- */
+@media (min-width: 769px) {
+  .pos-shell.sidebar-collapsed { grid-template-columns: 64px 1fr; }
+  .sidebar-collapsed .pos-sidebar { padding-left: 8px; padding-right: 8px; }
+  .sidebar-collapsed .pos-logo { justify-content: center; gap: 0; }
+  .sidebar-collapsed .pos-logo > div:last-child { display: none; }
+  /* recolhido: cada item vira um quadradinho centralizado (só o ícone), pra o
+     destaque amarelo do ativo ficar alinhado com o ícone e não estourar a barra */
+  .sidebar-collapsed .pos-nav-item {
+    display: flex; align-items: center; justify-content: center;
+    width: 46px; height: 46px; padding: 0; gap: 0; margin: 2px auto;
+    position: relative;
+  }
+  .sidebar-collapsed .pos-nav-item > span,
+  .sidebar-collapsed .pos-nav-item kbd,
+  .sidebar-collapsed .pos-version { display: none; }
+  .sidebar-collapsed .pos-toggle-chevron { transform: rotate(180deg); }
+  /* nome vira tooltip no hover quando recolhido */
+  .sidebar-collapsed .pos-nav-item:hover > span {
+    display: block; position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+    background: #1c2026; color: #f8fafc; padding: 5px 9px; border-radius: 6px;
+    white-space: nowrap; z-index: 70; box-shadow: 0 6px 18px rgba(0,0,0,.45);
+    font-size: 13px; pointer-events: none;
+  }
+}
+
 .pos-logo {
   display: flex;
   align-items: center;
@@ -170,10 +199,12 @@ html, body {
   border-color: rgba(0,0,0,.12);
 }
 
-.pos-settings {
+/* grupo do rodape (tema / recolher / configuracoes) ancora no fim da barra.
+   margin-top:auto no primeiro item empurra os tres pra baixo; divisor acima. */
+.pos-theme-toggle {
   margin-top: auto;
   border-top: 1px solid rgba(255, 255, 255, .08);
-  padding-top: 24px;
+  padding-top: 18px;
 }
 
 .pos-version {
@@ -1945,6 +1976,8 @@ html, body {
   .pos-logo, .pos-version { display: none; }
   /* especificidade maior que .pos-nav-item pra de fato esconder Configuracoes no celular */
   .pos-sidebar .pos-settings { display: none; }
+  /* botao de recolher e conceito de desktop; no celular a sidebar ja e barra de abas */
+  .pos-sidebar .pos-sidebar-toggle { display: none; }
   /* Pedidos ainda e placeholder: fora da barra no celular pra dar respiro as abas reais.
      Especificidade maior que .pos-nav-item (que vem depois) senao ela reexibe. */
   .pos-sidebar .pos-nav-soon { display: none; }

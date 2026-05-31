@@ -80,7 +80,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro', 'batepapo'].includes(currentSection)" :data-theme="theme" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro', 'batepapo'].includes(currentSection)" :data-theme="theme" :class="sidebarCollapsed && 'sidebar-collapsed'" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -138,6 +138,11 @@
               :title="theme === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro'">
         <i data-lucide="sun-moon"></i>
         <span x-text="theme === 'light' ? 'Tema escuro' : 'Tema claro'"></span>
+      </button>
+      <button class="pos-nav-item pos-sidebar-toggle" @click="toggleSidebar()"
+              :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
+        <svg class="pos-toggle-chevron" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+        <span x-text="sidebarCollapsed ? 'Expandir' : 'Recolher'"></span>
       </button>
       <button class="pos-nav-item pos-settings">
         <i data-lucide="settings"></i>
