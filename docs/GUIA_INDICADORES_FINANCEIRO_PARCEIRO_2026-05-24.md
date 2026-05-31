@@ -118,6 +118,9 @@ Observacao:
 
 - Nao e um ponto de equilibrio contabil real (nao separa custo fixo, custo variavel,
   imposto ou margem por produto). E uma leitura simples de cobertura de custo.
+- Desde 2026-05-31 (migration 0078), "Despesas do mes" e por COMPETENCIA: uma conta a
+  pagar de despesa (ex.: aluguel) ja pesa no resultado no mes em que vence, mesmo antes
+  de ser paga. Compra de pneu continua de fora (so vira custo via CMV quando vende).
 
 ### Resultado estimado
 

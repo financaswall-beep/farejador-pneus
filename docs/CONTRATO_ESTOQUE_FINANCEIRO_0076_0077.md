@@ -233,6 +233,37 @@ Onde isso vive no front (`parceiro/public/app.js`):
 Doc de indicadores (linguagem do dono): `docs/GUIA_INDICADORES_FINANCEIRO_PARCEIRO_2026-05-24.md`.
 Este contrato versionado prevalece se houver divergencia.
 
+### Migration 0078 — expenses_month = competencia (aplicada em prod 2026-05-31)
+
+Arquivo: `db/migrations/0078_partner_expenses_competence.sql`.
+Snapshot/rollback: `docs/SNAPSHOT_VIEW_PRE_0078_2026-05-31.sql` (reaplicar reverte).
+
+Recria SO `network.partner_unit_summary`, mudando APENAS a lateral `expenses_month`.
+Preserva todas as colunas, ordem, `security_invoker = true` e `GRANT SELECT` ao app.
+
+`expenses_month` passou de "despesa realizada" para **despesa/conta de COMPETENCIA**:
+
+```text
+expenses_month =
+  (1) finance.partner_expenses do mes, nao deletadas, source_payable_id IS NULL
+      (despesa lancada direto; a despesa gerada por payable fica de fora aqui)
++ (2) finance.partner_payables de DESPESA (status open/paid, nao deletadas,
+      source_purchase_id IS NULL), reconhecidas pela competencia
+      COALESCE(due_date, paid_at, created_at) dentro do mes [limite inferior e superior]
+```
+
+Efeitos garantidos (validados com dado real + dry-run BEGIN/ROLLBACK):
+
+- conta a pagar de despesa **aberta** ja pesa no resultado (competencia), antes de pagar;
+- conta paga conta **uma vez** (via payable; a expense com source_payable_id fica de fora);
+- **compra de pneu (source_purchase_id IS NOT NULL) NUNCA entra** em expenses_month — so
+  vira custo no resultado via `cogs_month` quando vende (linha vermelha);
+- conta de despesa com vencimento de outro mes nao entra no mes corrente (limite superior);
+- `cash_in_month`/`cash_out_month` NAO mudaram — caixa segue regime de dinheiro de verdade.
+
+`result_competencia_month` e `estimated_result_month` derivam de `expenses_month`, entao
+ja refletem a competencia. Front nao mudou (le `expenses_month`/`estimated_result_month`).
+
 ## Parcelamento
 
 Regra atual do negocio: nao existe venda parcelada.
