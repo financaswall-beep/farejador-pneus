@@ -112,10 +112,13 @@ A venda das 22h aparece no dia certo, não empurrada pro dia seguinte.
 
 ---
 
-## 6. ⚠️ "Resultado" e "Margem" — isto é uma DECISÃO SUA (não mexi ainda)
+## 6. ✅ "Resultado" e "Margem" agora são lucro real (CGV) — FEITO
 
-Esse é diferente dos outros: **não é um defeito de programação, é uma escolha de como
-calcular** — e por isso eu prefiro você decidir antes de eu mexer.
+> **Atualização (31/05):** você autorizou e eu **já implementei**. Resultado e Margem
+> agora usam o **custo do que foi vendido (CGV)**, não mais "todas as compras do mês".
+
+Esse era diferente dos outros: não era um defeito, era uma escolha de cálculo — por isso
+eu esperei tua autorização antes de mexer.
 
 **Como funciona hoje:**
 O painel calcula o **resultado do mês** assim:
@@ -135,16 +138,21 @@ vendido bem.
 Isso se chama **CGV / custo da mercadoria vendida**. Reflete o lucro real da operação,
 sem distorcer nos meses de reposição.
 
-**Por que eu não mudei sozinho:**
-1. Muda o significado de "Resultado", "Margem" e o **Score financeiro** no painel todo —
-   os números vão mudar, e você precisa saber por quê.
-2. O indicador atual está **documentado** assim de propósito (era uma escolha anterior).
-3. Calcular o "custo do que vendeu" exige confirmar de onde vem o custo de cada venda.
+**O que eu fiz:**
+- O **Resultado do mês** agora é: Vendas − **CGV** − Despesas (não mais "− Compras").
+- O **CGV** = soma de (quantidade vendida × custo médio do item no estoque), só dos
+  pedidos que contam como venda no mês.
+- **Margem** e **Score financeiro** acompanham automaticamente (passam a refletir lucro
+  real, sem precisar mexer em mais nada).
+- A mudança foi no banco (migration **0074**), recriando a view de resumo. Adicionei uma
+  coluna `cogs_month` pra transparência.
 
-**Minha recomendação:** mudar para o cálculo de lucro real (CGV), porque "margem
-negativa só porque comprei estoque" engana e pode te assustar à toa. Mas é teu negócio,
-tua decisão. **Me diz "pode mudar pra lucro real" que eu implemento** (com cuidado, e
-mostrando o antes/depois).
+**O que eu NÃO mudei (de propósito):** o donut "Composição dos custos" e o "Total de
+custos" continuam mostrando **Compras + Despesas** (a saída de caixa do mês) — é uma
+visão de **caixa**, diferente do lucro. Então pode acontecer, num mês de reposição
+grande, do "Resultado" estar **positivo** (deu lucro nas vendas) e ao mesmo tempo você
+ter gasto bastante em estoque. As duas coisas são verdade e medem coisas diferentes
+(lucro × caixa).
 
 **Analogia:** é a diferença entre dizer "fiquei no vermelho esse mês porque enchi o
 estoque" e "tive lucro nas vendas, e à parte investi em estoque pra vender depois". As
@@ -176,6 +184,6 @@ Pra você ficar tranquilo, estas partes eu auditei e **estão corretas**:
 | 3 | "Vendas hoje" com fuso errado | ✅ Corrigido |
 | 4 | Métricas só viam 100 pedidos | ✅ Corrigido (subiu pra 500) |
 | 5 | Gráficos por dia no fuso errado | ✅ Corrigido |
-| 6 | "Resultado/Margem" conta compra como custo | ⏳ Aguarda tua decisão |
+| 6 | "Resultado/Margem" usava compra como custo | ✅ Corrigido (agora CGV — migration 0074) |
 
-Os itens 1–5 já estão prontos no painel. O item 6 é o único que espera tua palavra.
+Os 6 itens estão resolvidos. ✅
