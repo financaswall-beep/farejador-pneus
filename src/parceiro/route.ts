@@ -13,6 +13,7 @@ import {
   deletePartnerExpense,
   createPartnerCustomer,
   DuplicateExpenseError,
+  InstallmentsNotAllowedError,
   InstallmentsTooSmallError,
   PaidPurchaseLockedError,
   PartialStockReversalError,
@@ -552,6 +553,12 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
           message: err.message,
           total_cents: err.total_cents,
           installments: err.installments,
+        });
+      }
+      if (err instanceof InstallmentsNotAllowedError) {
+        return reply.status(400).send({
+          error: err.code,
+          message: 'Venda parcelada nao e suportada.',
         });
       }
       // BUG #2: erros de regra de negocio (estoque insuficiente, item inativado) viram

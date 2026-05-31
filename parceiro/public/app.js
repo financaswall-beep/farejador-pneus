@@ -352,7 +352,7 @@ function parceiroApp() {
     },
 
     get identifiedSalesCount() {
-      return (this.vendas || []).filter((sale) => sale.customer_id || sale.customer_name || sale.customer_phone || sale.customer_cpf).length;
+      return this.completedSales.filter((sale) => sale.customer_id || sale.customer_name || sale.customer_phone || sale.customer_cpf).length;
     },
 
     // Total de custos do mes (regime de competencia).
@@ -466,7 +466,7 @@ function parceiroApp() {
         if (!this.isPhysicalExitSale(sale)) continue;
         const items = Array.isArray(sale.items) ? sale.items : [];
         const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0) || 1;
-        addToWeek(sale.created_at, 'saidas', qty);
+        addToWeek(this.saleRealizedAt(sale), 'saidas', qty);
       }
       return weeks;
     },
@@ -515,10 +515,16 @@ function parceiroApp() {
       return true;
     },
 
+    saleRealizedAt(sale) {
+      if (!sale) return null;
+      if (sale.fulfillment_mode === 'delivery') return sale.delivered_at || sale.created_at;
+      return sale.created_at;
+    },
+
     get soldUnitsMonth() {
       // Só saídas físicas (pickup + delivery entregue) do mês corrente.
       return this.salesUnitsFor(
-        this.activeSales.filter((s) => this.isPhysicalExitSale(s) && this.isCurrentMonth(s.created_at)),
+        this.completedSales.filter((s) => this.isCurrentMonth(this.saleRealizedAt(s))),
       );
     },
 
@@ -604,13 +610,13 @@ function parceiroApp() {
     },
 
     get financeOriginSplit() {
-      const partnerUnits = this.salesUnitsFor(this.partnerSales);
-      const doorUnits = this.salesUnitsFor(this.doorSales);
+      const partnerUnits = this.salesUnitsFor(this.completedPartnerSales);
+      const doorUnits = this.salesUnitsFor(this.completedDoorSales);
       const totalUnits = partnerUnits + doorUnits;
       const safeTotal = totalUnits || 1;
       return [
-        { label: '2W', value: this.partnerSalesTotal, count: partnerUnits, percent: Math.round((partnerUnits / safeTotal) * 100), color: '#047857' },
-        { label: 'Porta', value: this.doorSalesTotal, count: doorUnits, percent: Math.round((doorUnits / safeTotal) * 100), color: '#9ca3af' },
+        { label: '2W', value: this.completedPartnerSalesTotal, count: partnerUnits, percent: Math.round((partnerUnits / safeTotal) * 100), color: '#047857' },
+        { label: 'Porta', value: this.completedDoorSalesTotal, count: doorUnits, percent: Math.round((doorUnits / safeTotal) * 100), color: '#9ca3af' },
       ];
     },
 
@@ -645,8 +651,8 @@ function parceiroApp() {
           value: 0,
         });
       }
-      for (const sale of this.activeSales) {
-        const key = this.dateKeySaoPaulo(sale.created_at);
+      for (const sale of this.completedSales) {
+        const key = this.dateKeySaoPaulo(this.saleRealizedAt(sale));
         const day = days.find((d) => d.key === key);
         if (!day) continue;
         const items = Array.isArray(sale.items) ? sale.items : [];
@@ -668,8 +674,8 @@ function parceiroApp() {
           value: 0,
         });
       }
-      for (const sale of this.activeSales) {
-        const key = this.dateKeySaoPaulo(sale.created_at);
+      for (const sale of this.completedSales) {
+        const key = this.dateKeySaoPaulo(this.saleRealizedAt(sale));
         const day = days.find((d) => d.key === key);
         if (day) day.value += this.num(sale.total_amount);
       }
@@ -744,33 +750,41 @@ function parceiroApp() {
 
     get salesTodayCount() {
       const today = this.dateKeySaoPaulo(new Date());
-      return this.vendas.filter((sale) => this.dateKeySaoPaulo(sale.created_at) === today && sale.status !== 'cancelled').length;
+      return this.completedSales.filter((sale) => this.dateKeySaoPaulo(this.saleRealizedAt(sale)) === today).length;
     },
 
     get activeSales() {
       return this.vendas.filter((sale) => sale.status !== 'cancelled');
     },
 
-    get partnerSales() {
-      return this.activeSales.filter((sale) => this.normalizeSource(sale.source_tag || sale.source) === '2w');
+    // Venda realizada: pickup/balcão conta na criação; delivery só depois de entregue.
+    // Delivery aberto é reserva + a receber, não venda concluída.
+    get completedSales() {
+      return this.activeSales
+        .filter((sale) => this.isPhysicalExitSale(sale))
+        .sort((a, b) => new Date(this.saleRealizedAt(b) || 0).getTime() - new Date(this.saleRealizedAt(a) || 0).getTime());
     },
 
-    get doorSales() {
-      return this.activeSales.filter((sale) => this.normalizeSource(sale.source_tag || sale.source) === 'porta');
+    get completedPartnerSales() {
+      return this.completedSales.filter((sale) => this.normalizeSource(sale.source_tag || sale.source) === '2w');
     },
 
-    get partnerSalesTotal() {
-      return this.partnerSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
+    get completedDoorSales() {
+      return this.completedSales.filter((sale) => this.normalizeSource(sale.source_tag || sale.source) === 'porta');
     },
 
-    get doorSalesTotal() {
-      return this.doorSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
+    get completedPartnerSalesTotal() {
+      return this.completedPartnerSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
+    },
+
+    get completedDoorSalesTotal() {
+      return this.completedDoorSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
     },
 
     get partnerSalesShareLabel() {
-      const total = this.activeSales.length;
+      const total = this.completedSales.length;
       if (!total) return 'sem vendas ainda';
-      return `${Math.round((this.partnerSales.length / total) * 100)}% das vendas`;
+      return `${Math.round((this.completedPartnerSales.length / total) * 100)}% das vendas`;
     },
 
     // ─── ENTREGA ──────────────────────────────────────────────
@@ -1214,8 +1228,8 @@ function parceiroApp() {
         });
       }
       for (const sale of this.vendas) {
-        if (sale.status === 'cancelled') continue;
-        const key = this.dateKeySaoPaulo(sale.created_at);
+        if (!this.isPhysicalExitSale(sale)) continue;
+        const key = this.dateKeySaoPaulo(this.saleRealizedAt(sale));
         const day = days.find((d) => d.key === key);
         if (day) day.value += this.num(sale.total_amount);
       }
@@ -1280,7 +1294,7 @@ function parceiroApp() {
 
     posProductSalesCount(stockId) {
       if (!stockId) return 0;
-      return this.activeSales.reduce((sum, sale) => {
+      return this.completedSales.reduce((sum, sale) => {
         const items = Array.isArray(sale.items) ? sale.items : [];
         return sum + items.reduce((itemSum, item) => {
           if (item.partner_stock_id !== stockId) return itemSum;
@@ -1322,11 +1336,24 @@ function parceiroApp() {
     },
 
     get posCashTodayTotal() {
-      // Caixa do dia = o que efetivamente entrou (exclui "A receber").
-      return this.salesToday.reduce((sum, sale) => {
+      // Caixa do dia = dinheiro que efetivamente entrou hoje. Duas fontes, sem
+      // dupla contagem:
+      //   (1) vendas concluidas hoje pagas na hora (exclui "A receber": COD/fiado
+      //       nao entram aqui — entram via recebivel recebido em (2));
+      //   (2) recebiveis com status 'received' e received_at hoje (COD entregue
+      //       hoje + fiado quitado hoje). Venda a vista nao gera recebivel, entao
+      //       nao ha sobreposicao com (1).
+      const today = this.dateKeySaoPaulo(new Date());
+      const cashSales = this.salesToday.reduce((sum, sale) => {
         if (sale.payment_method === 'A receber') return sum;
         return sum + this.num(sale.total_amount);
       }, 0);
+      const receivablesToday = (this.receivables || []).reduce((sum, receivable) => {
+        if (receivable.status !== 'received' || !receivable.received_at) return sum;
+        if (this.dateKeySaoPaulo(receivable.received_at) !== today) return sum;
+        return sum + this.num(receivable.amount);
+      }, 0);
+      return cashSales + receivablesToday;
     },
 
     get salesTodayTotal() {
@@ -1336,17 +1363,17 @@ function parceiroApp() {
 
     get salesToday() {
       const today = this.dateKeySaoPaulo(new Date());
-      return this.activeSales.filter((sale) => this.dateKeySaoPaulo(sale.created_at) === today);
+      return this.completedSales.filter((sale) => this.dateKeySaoPaulo(this.saleRealizedAt(sale)) === today);
     },
 
     get posFirstSaleTodayLabel() {
       if (!this.salesToday.length) return 'sem venda hoje ainda';
-      const first = [...this.salesToday].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+      const first = [...this.salesToday].sort((a, b) => new Date(this.saleRealizedAt(a) || 0) - new Date(this.saleRealizedAt(b) || 0))[0];
       return `aberto as ${new Intl.DateTimeFormat('pt-BR', {
         timeZone: 'America/Sao_Paulo',
         hour: '2-digit',
         minute: '2-digit',
-      }).format(new Date(first.created_at))}`;
+      }).format(new Date(this.saleRealizedAt(first)))}`;
     },
 
     get posSalesTodayHourly() {
@@ -1356,14 +1383,14 @@ function parceiroApp() {
           timeZone: 'America/Sao_Paulo',
           hour: '2-digit',
           hour12: false,
-        }).format(new Date(sale.created_at)));
+        }).format(new Date(this.saleRealizedAt(sale))));
         if (Number.isFinite(hour) && buckets[hour]) buckets[hour].value += this.num(sale.total_amount);
       }
       return buckets;
     },
 
     get posLastSale() {
-      return this.activeSales[0] || null;
+      return this.completedSales[0] || null;
     },
 
     get purchaseTotalLabel() {
@@ -2024,9 +2051,8 @@ function parceiroApp() {
           receivable_due_date: this.saleForm.payment_status === 'receivable'
             ? this.saleForm.receivable_due_date || null
             : null,
-          receivable_installments: this.saleForm.payment_status === 'receivable'
-            ? Math.max(1, Math.min(36, Number(this.saleForm.receivable_installments) || 1))
-            : null,
+          // Parcelamento desligado: o negocio nao vende parcelado. Sempre 1.
+          receivable_installments: 1,
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: this.saleForm.fulfillment_mode === 'delivery'
             ? this.saleForm.delivery_address.trim()
@@ -2109,9 +2135,8 @@ function parceiroApp() {
           receivable_due_date: this.saleForm.payment_status === 'receivable'
             ? this.saleForm.receivable_due_date || null
             : null,
-          receivable_installments: this.saleForm.payment_status === 'receivable'
-            ? Math.max(1, Math.min(36, Number(this.saleForm.receivable_installments) || 1))
-            : null,
+          // Parcelamento desligado: o negocio nao vende parcelado. Sempre 1.
+          receivable_installments: 1,
           fulfillment_mode: this.saleForm.fulfillment_mode,
           delivery_address: this.saleForm.fulfillment_mode === 'delivery'
             ? this.saleForm.delivery_address.trim()
@@ -3621,8 +3646,8 @@ function parceiroApp() {
       if (!sales.length) return 'sem venda vinculada';
       const latest = sales
         .slice()
-        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
-      return this.formatDate(latest.created_at);
+        .sort((a, b) => new Date(this.saleRealizedAt(b) || 0).getTime() - new Date(this.saleRealizedAt(a) || 0).getTime())[0];
+      return this.formatDate(this.saleRealizedAt(latest));
     },
 
     purchaseItemsLabel(purchase) {
@@ -3638,6 +3663,7 @@ function parceiroApp() {
         customer_cpf_conflict: 'Já existe um cliente com esse CPF.',
         customer_not_found: 'Cliente não encontrado.',
         customer_name_required: 'Informe o nome do cliente.',
+        installments_not_supported: 'Venda parcelada nao e suportada.',
       };
       return map[raw] || raw;
     },

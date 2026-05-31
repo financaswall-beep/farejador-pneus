@@ -286,13 +286,13 @@
             <div class="pos-two-columns">
               <div>
                 <h4>Últimas vendas</h4>
-                <template x-for="sale in activeSales.slice(0, 5)" :key="sale.id">
+                <template x-for="sale in completedSales.slice(0, 5)" :key="sale.id">
                   <div class="pos-money-row positive">
-                    <span><b x-text="sale.customer_name || 'Consumidor final'"></b><small x-text="formatDate(sale.created_at)"></small></span>
+                    <span><b x-text="sale.customer_name || 'Consumidor final'"></b><small x-text="formatDate(saleRealizedAt(sale))"></small></span>
                     <strong x-text="money(sale.total_amount)"></strong>
                   </div>
                 </template>
-                <div x-show="!activeSales.length" class="pos-empty small">Nenhuma venda registrada.</div>
+                <div x-show="!completedSales.length" class="pos-empty small">Nenhuma venda registrada.</div>
               </div>
               <div class="pos-resumo-alertas">
                 <h4>Alertas principais</h4>

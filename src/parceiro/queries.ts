@@ -193,6 +193,16 @@ export class InstallmentsTooSmallError extends Error {
   }
 }
 
+// Parcelamento desligado: o negocio nao vende parcelado (recebimento a vista
+// ou na entrega/COD em parcela unica). Recusado no servidor como defesa em
+// profundidade — o front tambem envia sempre receivable_installments=1.
+export class InstallmentsNotAllowedError extends Error {
+  readonly code = 'installments_not_supported';
+  constructor() {
+    super('installments_not_supported: venda parcelada nao e suportada (recebimento a vista ou na entrega)');
+  }
+}
+
 export class PaidPurchaseLockedError extends Error {
   readonly code = 'cannot_delete_paid_purchase';
   readonly purchase_id: string;
@@ -518,6 +528,11 @@ export async function registerPartnerSale(
   ctx: PartnerContext,
   input: RegisterPartnerSaleInput,
 ): Promise<{ order_id: string }> {
+  // Parcelamento desligado: o negocio nao vende parcelado. Recusa antes de
+  // qualquer escrita. O front ja envia sempre 1; este guard e defesa em profundidade.
+  if (Number(input.receivable_installments ?? 1) > 1) {
+    throw new InstallmentsNotAllowedError();
+  }
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     try {
       const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
@@ -841,7 +856,8 @@ export async function updatePartnerDeliveryStatus(
              ELSE dispatched_at
            END,
            delivered_at = CASE
-             WHEN $4 = 'delivered' THEN now()
+             WHEN $4 = 'delivered' AND delivered_at IS NULL THEN now()
+             WHEN $4 = 'delivered' THEN delivered_at
              ELSE NULL
            END,
            updated_at = now()
