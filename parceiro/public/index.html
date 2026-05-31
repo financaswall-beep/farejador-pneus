@@ -900,7 +900,10 @@
                     <small class="pos-detail-size" x-text="stockDetail.tire_size || ''"></small>
                     <em class="pos-status-pill" :class="stockDetail.stock_status" x-text="stockStatusLabel(stockDetail.stock_status)"></em>
                   </div>
-                  <img src="assets/pneu-promo.png" alt="" />
+                  <picture>
+                    <source srcset="assets/pneu-detalhe.webp" type="image/webp" />
+                    <img src="assets/pneu-detalhe.png" alt="" />
+                  </picture>
                 </div>
                 <div class="pos-detail-specs">
                   <div><span>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>

@@ -2867,13 +2867,14 @@ html, body {
 .pos-detail-panel { display: flex; flex-direction: column; gap: 14px; }
 .pos-detail-body { display: flex; flex-direction: column; gap: 16px; }
 .pos-detail-head h3 { font-size: 15px; font-weight: 800; margin: 0; }
-.pos-detail-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.pos-detail-hero > div { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+.pos-detail-hero { position: relative; display: block; min-height: 120px; }
+.pos-detail-hero > div { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
 .pos-detail-hero b { font-size: 18px; font-weight: 800; line-height: 1.15; }
 .pos-detail-size { font-size: 13px; color: #cbd5e1; }
 .pos-detail-sku { font-size: 11px; color: #94a3b8; margin-top: 2px; }
 .pos-detail-hero img {
-  width: 116px; height: 92px; object-fit: contain; flex: none;
+  position: absolute; top: -140px; right: -8px; z-index: 1; pointer-events: none;
+  width: 320px; height: 256px; object-fit: contain; flex: none;
   filter: drop-shadow(0 6px 14px rgba(34, 197, 94, .35));
 }
 .pos-detail-specs { display: flex; flex-direction: column; gap: 10px; }
