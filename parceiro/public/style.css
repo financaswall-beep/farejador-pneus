@@ -608,6 +608,12 @@ html, body {
   margin-bottom: 14px;
 }
 
+/* Bloco de caixa/fluxo do Financeiro tem 5 cards (inclui "Compras do mês").
+   Modificador proprio pra nao afetar o Resumo da unidade, que segue com 4. */
+.pos-finance-cards-flow {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .pos-finance-cards article {
   border: 1px solid rgba(255,255,255,.08);
   background: rgba(255,255,255,.035);

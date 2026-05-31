@@ -196,6 +196,43 @@ Nao somar COD aberto como caixa.
 
 Nao duplicar venda a vista: venda a vista nao gera recebivel.
 
+## Custo de competencia vs compra/reposicao (Passo 1, 2026-05-31)
+
+Regra-matriz do financeiro de resultado. Vale para todos os indicadores, graficos e
+score que falam de lucro/resultado/competencia.
+
+- **Resultado / competencia do mes:**
+  ```text
+  resultado = sales_month - cogs_month - expenses_month
+  ```
+- **Custo do mes (competencia):**
+  ```text
+  custo_do_mes = cogs_month + expenses_month
+  ```
+- **`cogs_month` (CMV)** = custo dos pneus efetivamente VENDIDOS no mes. E a unica base
+  de custo do resultado. Vem de `network.partner_unit_summary` (0077), por data de
+  realizacao (pickup `created_at`, delivery `delivered_at`).
+- **`purchases_month` (compras/reposicao)** = quanto foi comprado no mes. E
+  fluxo/compromisso de caixa, **NAO** e CMV e **NAO** e custo de competencia.
+
+Proibicoes:
+
+- `purchases_month` **nao** entra em: lucro/resultado, donut "Composicao dos custos",
+  score de resultado, nem nos graficos de competencia (barras Vendas/CMV/Despesas/Resultado).
+- Graficos que explicam lucro/resultado usam **CMV** (`cogs_month`), nunca "Compras".
+- `purchases_month` so pode aparecer como indicador proprio de compra/reposicao no bloco
+  de **caixa/fluxo** (ex.: card "Compras do mes"), separado da composicao de resultado.
+
+Onde isso vive no front (`parceiro/public/app.js`):
+
+- `totalCusts` = `cogs_month + expenses_month`.
+- `financeCostSplit` (donut) usa `cogs_month` com label "CMV".
+- `renderResultChart` e o grafico de barras de resultado usam `cogs_month`.
+- Card "Compras do mes" (index.html, bloco `pos-finance-cards`) usa `purchases_month`.
+
+Doc de indicadores (linguagem do dono): `docs/GUIA_INDICADORES_FINANCEIRO_PARCEIRO_2026-05-24.md`.
+Este contrato versionado prevalece se houver divergencia.
+
 ## Parcelamento
 
 Regra atual do negocio: nao existe venda parcelada.

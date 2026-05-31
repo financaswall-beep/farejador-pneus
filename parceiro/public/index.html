@@ -1236,9 +1236,11 @@
               <span class="pos-live-badge">dados do banco</span>
             </div>
 
-            <div class="pos-finance-cards">
+            <div class="pos-finance-cards pos-finance-cards-flow">
               <article><small>Contas a pagar</small><strong x-text="money(payablesOpenTotal)"></strong><span>em aberto</span></article>
               <article><small>Pago no mês</small><strong x-text="money(payablesPaidMonthTotal)"></strong><span>saídas confirmadas</span></article>
+              <!-- Compra/reposicao: fluxo/compromisso, NAO custo de competencia (nao entra em CMV/resultado). -->
+              <article><small>Compras do mês</small><strong x-text="money(resumo?.purchases_month)"></strong><span>reposição / compromisso</span></article>
               <article><small>Contas a receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
               <article><small>Recebido no mês</small><strong x-text="money(receivablesReceivedMonthTotal)"></strong><span>entradas confirmadas</span></article>
             </div>
@@ -1254,7 +1256,7 @@
               <article class="pos-chart-card">
                 <div>
                   <h4>Composição dos custos</h4>
-                  <p>Compras de pneus x despesas</p>
+                  <p>CMV (custo do que vendeu) x despesas</p>
                 </div>
                 <div class="pos-chart-box doughnut"><canvas id="chartFinanceCostsPos"></canvas></div>
               </article>

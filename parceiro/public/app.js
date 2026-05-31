@@ -355,13 +355,14 @@ function parceiroApp() {
       return this.completedSales.filter((sale) => sale.customer_id || sale.customer_name || sale.customer_phone || sale.customer_cpf).length;
     },
 
-    // Total de custos do mes (regime de competencia).
-    // Conforme docs/GUIA_INDICADORES_FINANCEIRO_PARCEIRO_2026-05-24.md:
-    //   Total de custos = Compras do mes + Despesas do mes
-    // NAO inclui payables em aberto sem janela mensal — esses ja entram em
-    // expenses_month quando o evento de competencia ocorre.
+    // Custo realizado do mes (regime de competencia).
+    // Alinhado ao resultado pos-0077: Resultado = Vendas - CMV - Despesas.
+    //   Custo do mes = CMV (cogs_month) + Despesas do mes
+    // CMV = custo dos pneus efetivamente VENDIDOS no mes (nao o que foi comprado).
+    // purchases_month (compras/reposicao) NAO entra aqui: e fluxo de caixa/compromisso,
+    // nao custo de competencia do resultado.
     get totalCusts() {
-      return this.num(this.resumo?.purchases_month) + this.num(this.resumo?.expenses_month);
+      return this.num(this.resumo?.cogs_month) + this.num(this.resumo?.expenses_month);
     },
 
     get estimatedMargin() {
@@ -1160,7 +1161,7 @@ function parceiroApp() {
           label: 'Resultado',
           ok: result >= 0,
           value: this.money(result),
-          hint: result >= 0 ? 'Venda cobre compras e despesas.' : 'Revise preço, custo ou despesas.',
+          hint: result >= 0 ? 'Venda cobre CMV e despesas.' : 'Revise preço, custo ou despesas.',
         },
         {
           label: 'Margem',
@@ -1169,10 +1170,10 @@ function parceiroApp() {
           hint: sales <= 0 ? 'Sem vendas no mês.' : (this.estimatedMargin >= 15 ? 'Margem saudável.' : 'Margem baixa para o mês.'),
         },
         {
-          label: 'Equilíbrio',
+          label: 'Custo do mês',
           ok: sales >= breakEven || breakEven <= 0,
           value: this.money(breakEven),
-          hint: breakEven <= 0 ? 'Sem custos lançados.' : (sales >= breakEven ? 'Passou do ponto de equilíbrio.' : `Faltam ${this.money(Math.max(0, breakEven - sales))} em vendas.`),
+          hint: breakEven <= 0 ? 'Sem custos lançados.' : (sales >= breakEven ? 'Vendas cobrem o custo do mês.' : `Faltam ${this.money(Math.max(0, breakEven - sales))} em vendas.`),
         },
         {
           label: 'Vencidos',
@@ -1207,7 +1208,7 @@ function parceiroApp() {
       if (overdueOut > 0) tips.push(`Pague ou renegocie ${this.money(overdueOut)} vencidos.`);
       if (overdueIn > 0) tips.push(`Cobre ${this.money(overdueIn)} de clientes vencidos.`);
       if (sales <= 0) tips.push('Registre as vendas do dia para o score sair do modo inicial.');
-      if (breakEven > 0 && sales < breakEven) tips.push(`Venda mais ${this.money(breakEven - sales)} para bater o equilíbrio.`);
+      if (breakEven > 0 && sales < breakEven) tips.push(`Venda mais ${this.money(breakEven - sales)} para cobrir o custo do mês.`);
       if (this.estimatedMargin > 0 && this.estimatedMargin < 15) tips.push('Aumente preço ou reduza custo: margem abaixo de 15%.');
       if (futureNet < 0) tips.push('Evite nova compra a prazo até o futuro ficar positivo.');
       if (lowStockItems > 0) tips.push(`Reponha ${lowStockItems} item(ns) abaixo do mínimo.`);
@@ -1399,7 +1400,7 @@ function parceiroApp() {
 
     get financeCostSplit() {
       return [
-        { label: 'Compras', value: this.num(this.resumo?.purchases_month), color: '#7f8f83' },
+        { label: 'CMV', value: this.num(this.resumo?.cogs_month), color: '#7f8f83' },
         { label: 'Despesas/contas', value: this.costExpensesCommitted, color: '#dc3f4d' },
       ];
     },
@@ -2880,12 +2881,13 @@ function parceiroApp() {
 
       const r = this.resumo || {};
       const result = this.num(r.estimated_result_month);
-      const data = [this.num(r.sales_month), this.num(r.purchases_month), this.num(r.expenses_month), result];
+      // Reconcilia com o resultado: Saldo = Vendas - CMV - Despesas (nao Compras).
+      const data = [this.num(r.sales_month), this.num(r.cogs_month), this.num(r.expenses_month), result];
 
       window._resultChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Vendas', 'Compras', 'Despesas', 'Saldo'],
+          labels: ['Vendas', 'CMV', 'Despesas', 'Saldo'],
           datasets: [{
             data,
             backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', result >= 0 ? '#10b981' : '#e11d48'],
@@ -2985,9 +2987,10 @@ function parceiroApp() {
       window._financeBarChart = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Vendas', 'Compras', 'Despesas', 'Resultado'],
+          labels: ['Vendas', 'CMV', 'Despesas', 'Resultado'],
           datasets: [{
-            data: [this.num(r.sales_month), this.num(r.purchases_month), this.num(r.expenses_month), result],
+            // Reconcilia: Resultado = Vendas - CMV - Despesas (nao Compras).
+            data: [this.num(r.sales_month), this.num(r.cogs_month), this.num(r.expenses_month), result],
             backgroundColor: ['#047857', '#6b7280', '#dc3f4d', result >= 0 ? '#047857' : '#be123c'],
             borderRadius: 5,
             barThickness: 46,
