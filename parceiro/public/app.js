@@ -607,13 +607,13 @@ function parceiroApp() {
         const d = new Date(now);
         d.setDate(now.getDate() - i);
         days.push({
-          key: d.toISOString().slice(0, 10),
-          label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''),
+          key: this.dateKeySaoPaulo(d),
+          label: d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short' }).replace('.', ''),
           value: 0,
         });
       }
       for (const sale of this.activeSales) {
-        const key = String(sale.created_at || '').slice(0, 10);
+        const key = this.dateKeySaoPaulo(sale.created_at);
         const day = days.find((d) => d.key === key);
         if (!day) continue;
         const items = Array.isArray(sale.items) ? sale.items : [];
@@ -628,14 +628,15 @@ function parceiroApp() {
       const now = new Date();
       for (let i = 29; i >= 0; i -= 1) {
         const d = new Date(now);
+        d.setDate(now.getDate() - i);
         days.push({
-          key: d.toISOString().slice(0, 10),
-          label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''),
+          key: this.dateKeySaoPaulo(d),
+          label: d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short' }).replace('.', ''),
           value: 0,
         });
       }
       for (const sale of this.activeSales) {
-        const key = String(sale.created_at || '').slice(0, 10);
+        const key = this.dateKeySaoPaulo(sale.created_at);
         const day = days.find((d) => d.key === key);
         if (day) day.value += this.num(sale.total_amount);
       }
@@ -709,8 +710,8 @@ function parceiroApp() {
     },
 
     get salesTodayCount() {
-      const today = new Date().toISOString().slice(0, 10);
-      return this.vendas.filter((sale) => String(sale.created_at || '').slice(0, 10) === today && sale.status !== 'cancelled').length;
+      const today = this.dateKeySaoPaulo(new Date());
+      return this.vendas.filter((sale) => this.dateKeySaoPaulo(sale.created_at) === today && sale.status !== 'cancelled').length;
     },
 
     get activeSales() {
@@ -842,14 +843,16 @@ function parceiroApp() {
     },
     get filteredOrders() {
       if (this.orderFilter === 'open') return this.ordersOpenList;
-      if (this.orderFilter === 'delivered') return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered');
-      if (this.orderFilter === 'failed') return this.deliveryOrders.filter((o) => o.delivery_status === 'failed');
+      // Finalizados = entregue de verdade (cancelado nao conta como finalizado).
+      if (this.orderFilter === 'delivered') return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered' && o.status !== 'cancelled');
+      // Nao entregues = falha de entrega OU pedido cancelado.
+      if (this.orderFilter === 'failed') return this.deliveryOrders.filter((o) => o.delivery_status === 'failed' || o.status === 'cancelled');
       return this.deliveryOrders;
     },
     get ordersOpenCount() { return this.ordersOpenList.length; },
     get ordersOpenAmount() { return this.ordersOpenList.reduce((s, o) => s + this.num(o.total_amount), 0); },
-    get ordersDeliveredCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered').length; },
-    get ordersFailedCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'failed').length; },
+    get ordersDeliveredCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'delivered' && o.status !== 'cancelled').length; },
+    get ordersFailedCount() { return this.deliveryOrders.filter((o) => o.delivery_status === 'failed' || o.status === 'cancelled').length; },
     get orderCartTotal() { return this.orderCart.reduce((s, it) => s + this.num(it.unit_price) * this.num(it.quantity), 0); },
 
     onOrderItemChange() {
@@ -1172,14 +1175,14 @@ function parceiroApp() {
         const d = new Date(now);
         d.setDate(now.getDate() - i);
         days.push({
-          key: d.toISOString().slice(0, 10),
-          label: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          key: this.dateKeySaoPaulo(d),
+          label: d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' }),
           value: 0,
         });
       }
       for (const sale of this.vendas) {
         if (sale.status === 'cancelled') continue;
-        const key = String(sale.created_at || '').slice(0, 10);
+        const key = this.dateKeySaoPaulo(sale.created_at);
         const day = days.find((d) => d.key === key);
         if (day) day.value += this.num(sale.total_amount);
       }

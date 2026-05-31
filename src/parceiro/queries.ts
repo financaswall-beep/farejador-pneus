@@ -262,7 +262,7 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
        FROM commerce.partner_orders_full
        WHERE environment = $1 AND unit_id = $2
        ORDER BY created_at DESC
-       LIMIT 100`,
+       LIMIT 500`,
       [ctx.environment, ctx.unitId],
     );
     return result.rows;

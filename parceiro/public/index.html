@@ -599,13 +599,13 @@
 
             <div class="pos-order-list">
               <template x-for="o in filteredOrders" :key="o.order_id">
-                <article class="pos-order-card" :class="o.delivery_status">
+                <article class="pos-order-card" :class="o.status === 'cancelled' ? 'failed' : o.delivery_status">
                   <div class="pos-order-card-head">
                     <div class="pos-order-who">
                       <strong x-text="o.customer_name || 'Cliente'"></strong>
                       <a x-show="o.customer_phone" :href="'tel:' + (o.customer_phone || '')" x-text="formatPhoneDisplay(o.customer_phone)"></a>
                     </div>
-                    <span class="pos-delivery-pill" :class="o.delivery_status" x-text="deliveryStatusLabel(o.delivery_status)"></span>
+                    <span class="pos-delivery-pill" :class="o.status === 'cancelled' ? 'failed' : o.delivery_status" x-text="o.status === 'cancelled' ? 'Cancelado' : deliveryStatusLabel(o.delivery_status)"></span>
                   </div>
                   <p class="pos-order-addr"><i data-lucide="map-pin"></i> <span x-text="o.delivery_address || 'Sem endereço informado'"></span></p>
                   <ul class="pos-order-items">
@@ -621,7 +621,7 @@
                       <span x-text="'Criado ' + formatDateTime(o.created_at)"></span>
                       <span x-show="o.delivery_courier" x-text="'Entregador: ' + o.delivery_courier"></span>
                       <span x-show="o.delivered_at" x-text="'Finalizado ' + formatDateTime(o.delivered_at)"></span>
-                      <span class="pos-order-pay" x-text="o.delivery_status === 'delivered' ? ('Recebido' + (o.payment_method && o.payment_method !== 'A receber' ? ' · ' + o.payment_method : '')) : (o.delivery_status === 'failed' ? 'Cancelado — sem cobrança' : 'A receber na entrega')"></span>
+                      <span class="pos-order-pay" x-text="o.status === 'cancelled' ? 'Cancelado — sem cobrança' : (o.delivery_status === 'delivered' ? ('Recebido' + (o.payment_method && o.payment_method !== 'A receber' ? ' · ' + o.payment_method : '')) : (o.delivery_status === 'failed' ? 'Cancelado — sem cobrança' : 'A receber na entrega'))"></span>
                     </div>
                     <strong class="pos-order-total" x-text="money(o.total_amount)"></strong>
                   </div>
