@@ -1648,9 +1648,7 @@ function parceiroApp() {
       const parts = [item.item_name];
       if (item.tire_size) parts.push(item.tire_size);
       if (item.brand) parts.push(item.brand);
-      const qtyLabel = item.is_tracked
-        ? `${item.quantity_on_hand ?? 0} un.`
-        : 'sem controle';
+      const qtyLabel = this.stockAvailabilityLabel(item);
       parts.push(qtyLabel);
       return parts.join(' - ');
     },
@@ -1665,7 +1663,7 @@ function parceiroApp() {
 
     posStockLabel(item) {
       if (!item.is_tracked) return 'sem controle';
-      return `${item.quantity_on_hand ?? 0} un.`;
+      return this.stockAvailabilityLabel(item);
     },
 
     itemTypeLabel(type) {
@@ -3441,6 +3439,16 @@ function parceiroApp() {
     stockAvailable(item) {
       if (!item || !item.is_tracked) return Infinity;
       return this.num(item.quantity_on_hand) - this.num(item.quantity_reserved);
+    },
+
+    // Frente de caixa e dropdown de venda mostram o que pode ser vendido agora.
+    // Se houver reserva aberta, explicita o físico para o usuário entender a diferença.
+    stockAvailabilityLabel(item) {
+      if (!item || !item.is_tracked) return 'sem controle';
+      const available = this.stockAvailable(item);
+      const reserved = this.num(item.quantity_reserved);
+      if (reserved > 0) return `${available} disp. (${this.num(item.quantity_on_hand)} fis.)`;
+      return `${available} un.`;
     },
 
     stockPositionValue(value) {
