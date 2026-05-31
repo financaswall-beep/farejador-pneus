@@ -854,10 +854,8 @@
 
             <div class="pos-dark-table stock-table">
               <div class="pos-dark-table-head">
-                <span>SKU</span>
                 <span>Medida</span>
                 <span>Marca</span>
-                <span>Modelo</span>
                 <span>Posição</span>
                 <span>Cond.</span>
                 <span>Qtd.</span>
@@ -868,16 +866,14 @@
               </div>
               <template x-for="item in stockPagedRows" :key="item.id">
                 <div class="pos-dark-table-row" :class="stockDetail && stockDetail.id === item.id && 'selected'" @click="selectStock(item)">
-                  <span class="pos-sku"><i class="pos-radio"></i><span x-text="skuFor(item)"></span></span>
-                  <span x-text="item.tire_size || '-'"></span>
+                  <span class="pos-medida"><i class="pos-radio"></i><span x-text="item.tire_size || itemPrimaryLabel(item)"></span></span>
                   <span x-text="item.brand || '-'"></span>
-                  <span class="pos-model" x-text="itemPrimaryLabel(item)"></span>
                   <span x-text="stockPositionLabel(item)"></span>
-                  <span class="pos-cond">Novo</span>
+                  <span class="pos-cond" x-text="item.tire_condition || '—'"></span>
                   <span class="pos-green-text" x-text="item.is_tracked ? (item.quantity_on_hand ?? 0) : '-'"></span>
                   <span x-text="money(item.average_cost)"></span>
                   <span x-text="money(item.sale_price)"></span>
-                  <span class="pos-loc" x-text="stockLocation(item)"></span>
+                  <span class="pos-loc" x-text="item.shelf_location || '—'"></span>
                   <span><em class="pos-status-pill" :class="item.stock_status" x-text="stockStatusLabel(item.stock_status)"></em></span>
                 </div>
               </template>
@@ -903,15 +899,14 @@
                     <b x-text="itemPrimaryLabel(stockDetail)"></b>
                     <small class="pos-detail-size" x-text="stockDetail.tire_size || ''"></small>
                     <em class="pos-status-pill" :class="stockDetail.stock_status" x-text="stockStatusLabel(stockDetail.stock_status)"></em>
-                    <small class="pos-detail-sku" x-text="skuFor(stockDetail)"></small>
                   </div>
                   <img src="assets/pneu-promo.png" alt="" />
                 </div>
                 <div class="pos-detail-specs">
                   <div><span>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>
                   <div><span>Posição</span><b x-text="stockPositionLabel(stockDetail)"></b></div>
-                  <div><span>Localização</span><b x-text="stockLocation(stockDetail)"></b></div>
-                  <div><span>Condição</span><b>Novo</b></div>
+                  <div><span>Localização</span><b x-text="stockDetail.shelf_location || '—'"></b></div>
+                  <div><span>Condição</span><b x-text="stockDetail.tire_condition || '—'"></b></div>
                   <div><span>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
                 </div>
                 <div class="pos-detail-figures">
@@ -1022,6 +1017,18 @@
                 </label>
                 <label>Mín.
                   <input type="number" min="0" step="1" x-model.number="stockForm.minimum_quantity" />
+                </label>
+              </div>
+              <div class="pos-stock-form-grid" x-show="stockForm.item_type !== 'servico'">
+                <label x-show="stockForm.item_type === 'pneu'">Condição
+                  <select x-model="stockForm.tire_condition">
+                    <option value="Novo">Novo</option>
+                    <option value="Usado">Usado</option>
+                    <option value="Recapado">Recapado</option>
+                  </select>
+                </label>
+                <label>Localização
+                  <input x-model="stockForm.shelf_location" placeholder="Ex: A-01-02" />
                 </label>
               </div>
               <div class="pos-stock-form-grid">

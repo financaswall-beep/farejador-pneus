@@ -155,6 +155,9 @@ const stockSchema = z.object({
   minimum_quantity: z.number().int().nonnegative().nullable().optional(),
   average_cost: z.number().nonnegative().nullable().optional(),
   sale_price: z.number().nonnegative().nullable().optional(),
+  // Campos do refit da tela de estoque (migration 0073).
+  tire_condition: z.string().max(40).nullable().optional(),
+  shelf_location: z.string().max(60).nullable().optional(),
   is_tracked: z.boolean().default(true),
 });
 

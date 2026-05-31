@@ -109,7 +109,7 @@ function parceiroApp() {
 
     // Ordem da rota de entrega (aba Entrega). Salva neste aparelho, por unidade.
     routeOrder: [],
-    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true },
+    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', is_tracked: true },
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
@@ -2146,6 +2146,8 @@ function parceiroApp() {
         minimum_quantity: item.minimum_quantity ?? null,
         average_cost: item.average_cost ?? null,
         sale_price: item.sale_price ?? null,
+        tire_condition: item.tire_condition || 'Novo',
+        shelf_location: item.shelf_location || '',
         is_tracked: Boolean(item.is_tracked),
       };
       this.currentTab = 'stock';
@@ -2153,7 +2155,7 @@ function parceiroApp() {
     },
 
     clearStockForm() {
-      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, is_tracked: true };
+      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', is_tracked: true };
     },
 
     async saveStock() {
@@ -2197,6 +2199,8 @@ function parceiroApp() {
             minimum_quantity: isTracked && this.stockForm.minimum_quantity !== null && this.stockForm.minimum_quantity !== '' ? this.num(this.stockForm.minimum_quantity) : null,
             average_cost: this.stockForm.average_cost !== null && this.stockForm.average_cost !== '' ? this.num(this.stockForm.average_cost) : null,
             sale_price: this.stockForm.sale_price !== null && this.stockForm.sale_price !== '' ? this.num(this.stockForm.sale_price) : null,
+            tire_condition: itemType === 'pneu' ? (this.stockForm.tire_condition?.trim() || null) : null,
+            shelf_location: isService ? null : (this.stockForm.shelf_location?.trim() || null),
             is_tracked: isTracked,
           }),
         });
