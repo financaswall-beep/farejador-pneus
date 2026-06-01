@@ -1484,15 +1484,15 @@
       <section x-show="currentSection === 'batepapo'" class="pos-workspace">
         <div class="pos-chat" :class="chatActive && 'has-active'">
 
-          <!-- KPIs do chat: faixa de cima sobre lista+conversa; Detalhes sobe ao lado -->
+          <!-- KPIs do chat: faixa de cima sobre lista+conversa; coluna direita sobe ao lado -->
           <section class="pos-kpis chat-kpis">
             <article>
               <div class="pos-kpi-icon"><i data-lucide="message-circle"></i></div>
-              <div><small>Conversas hoje</small><strong x-text="chatConversations.length"></strong><span x-text="chatUnreadTotal + ' não lidas'"></span></div>
+              <div><small>Conversas hoje</small><strong x-text="chatConversations.length"></strong><span x-text="(chatConversations.length ? '↑' : '') + ' atendimentos'"></span></div>
             </article>
             <article>
-              <div class="pos-kpi-icon"><i data-lucide="shopping-cart"></i></div>
-              <div><small>Pedidos em aberto</small><strong x-text="num(resumo?.orders_month)"></strong><span>do atendimento</span></div>
+              <div class="pos-kpi-icon"><i data-lucide="mail"></i></div>
+              <div><small>Mensagens não lidas</small><strong x-text="chatUnreadTotal"></strong><span>aguardando resposta</span></div>
             </article>
             <article>
               <div class="pos-kpi-icon"><i data-lucide="clock"></i></div>
@@ -1529,6 +1529,11 @@
                       <span x-text="c.last"></span>
                       <i class="pos-chat-unread" x-show="c.unread > 0" x-text="c.unread"></i>
                     </span>
+                    <span class="cx-conv-tags" x-show="convTags(c.id).length">
+                      <template x-for="tg in convTags(c.id)" :key="tg">
+                        <i class="cx-tag" :class="tagMeta(tg)?.cls" x-text="tagMeta(tg)?.label"></i>
+                      </template>
+                    </span>
                   </span>
                 </button>
               </template>
@@ -1559,12 +1564,27 @@
                 <div>
                   <b x-text="chatActive?.name"></b>
                   <small><span x-text="chatActive?.channelLabel"></span> • <i class="pos-chat-online">Online</i></small>
+                  <span class="cx-th-tags" x-show="convTags(chatActiveId).length">
+                    <template x-for="tg in convTags(chatActiveId)" :key="tg">
+                      <span class="cx-tag" :class="tagMeta(tg)?.cls" @click="toggleConvTag(tg)" x-text="tagMeta(tg)?.label"></span>
+                    </template>
+                  </span>
                 </div>
               </div>
               <div class="pos-chat-thread-actions">
-                <button title="Etiquetar"><i data-lucide="tag"></i></button>
+                <button title="Etiquetar" :class="convTags(chatActiveId).length && 'on'" @click="chatTagMenu = !chatTagMenu"><i data-lucide="tag"></i></button>
                 <button title="Favoritar"><i data-lucide="star"></i></button>
                 <button title="Mais"><i data-lucide="more-horizontal"></i></button>
+                <div class="cx-tag-pop" x-show="chatTagMenu" @click.outside="chatTagMenu = false" x-cloak>
+                  <div class="cx-tag-pop-head">Etiquetas da conversa</div>
+                  <template x-for="t in chatTagPalette" :key="t.id">
+                    <div class="cx-tag-opt" :class="convTags(chatActiveId).includes(t.id) && 'on'" @click="toggleConvTag(t.id)">
+                      <span class="cx-tag-dot" :class="t.cls"></span>
+                      <span x-text="t.label"></span>
+                      <i class="cx-chk" data-lucide="check"></i>
+                    </div>
+                  </template>
+                </div>
               </div>
             </header>
 
@@ -1580,6 +1600,13 @@
               </template>
             </div>
 
+            <div class="cx-quick">
+              <button @click="flash('Orçamento enviado (mock)')"><i data-lucide="file-text"></i> Enviar orçamento</button>
+              <button @click="openChatPanel('pedido')"><i data-lucide="check-circle"></i> Confirmar pedido</button>
+              <button @click="flash('Localização enviada (mock)')"><i data-lucide="map-pin"></i> Localização da loja</button>
+              <button @click="flash('Catálogo enviado (mock)')"><i data-lucide="book-open"></i> Catálogo</button>
+            </div>
+
             <footer class="pos-chat-input">
               <button title="Emoji"><i data-lucide="smile"></i></button>
               <input x-model="chatDraft" @keydown.enter="sendChat()" placeholder="Digite sua mensagem..." />
@@ -1589,46 +1616,109 @@
             </footer>
           </section>
 
-          <!-- COLUNA 3: detalhes do atendimento -->
-          <aside class="pos-chat-details pos-panel" x-show="chatActive">
-            <div class="pos-chat-details-head"><h3>Detalhes do atendimento</h3></div>
+          <!-- COLUNA 3: Criar/Editar pedido + Cliente (acordeão) + card ocioso -->
+          <aside class="pos-chat-right" x-show="chatActive">
 
-            <div class="pos-chat-contact">
-              <span class="pos-chat-avatar" :data-channel="chatActive?.channel" x-text="chatActive?.initials"></span>
-              <div><b x-text="chatActive?.name"></b><small x-text="chatActive?.phone"></small></div>
-            </div>
-
-            <div class="pos-chat-facts">
-              <div><span><i data-lucide="map-pin"></i> Origem</span><b x-text="chatActive?.channelLabel"></b></div>
-              <div><span><i data-lucide="ruler"></i> Medida</span><b x-text="chatActive?.measure || '—'"></b></div>
-              <div><span><i data-lucide="move"></i> Posição</span><b x-text="chatActive?.position || '—'"></b></div>
-              <div><span><i data-lucide="bike"></i> Moto</span><b x-text="chatActive?.bike || '—'"></b></div>
-              <div><span><i data-lucide="map"></i> Cidade / UF</span><b x-text="chatActive?.city || '—'"></b></div>
-            </div>
-
-            <div class="pos-chat-suggest" x-show="chatActive?.suggested">
-              <small>Produto sugerido</small>
-              <div class="pos-chat-suggest-card">
-                <span class="pos-chat-suggest-thumb"><i data-lucide="disc"></i></span>
-                <div>
-                  <b x-text="chatActive?.suggested?.name"></b>
-                  <small x-text="chatActive?.suggested?.spec"></small>
-                  <i class="pos-chat-instock"><i data-lucide="check-circle"></i> Em estoque</i>
+            <!-- CRIAR/EDITAR PEDIDO (visual — liga ao estoque/PDV na Fase 2) -->
+            <div class="cx-acc cx-acc-pedido" :class="!chatPanelPedido && 'collapsed'">
+              <div class="cx-acc-head" @click="toggleChatPanel('pedido')">
+                <h3><i data-lucide="shopping-cart"></i> Criar/Editar pedido</h3>
+                <i class="cx-chev" data-lucide="chevron-up"></i>
+              </div>
+              <div class="cx-acc-body">
+                <span class="cx-demo">Demonstração — conecta ao estoque na Fase 2</span>
+                <div class="cx-ordsearch"><i data-lucide="search"></i> <span>Buscar pneu no estoque...</span> <i class="cx-box" data-lucide="package-search"></i></div>
+                <div class="cx-prodbox">
+                  <div class="cx-prod">
+                    <div class="cx-brand">PIRELLI</div>
+                    <div class="cx-prod-info">
+                      <b>Pirelli Diablo Rosso Sport</b>
+                      <div class="cx-spec">Traseiro · Sport Touring</div>
+                      <div class="cx-size">190/50-18 <span class="cx-badge"><i data-lucide="check-circle"></i> Em estoque</span> <span class="cx-badge cx-cond"><i data-lucide="sparkles"></i> Novo</span> <span class="cx-muted">15 unid.</span></div>
+                    </div>
+                    <button class="cx-alter"><i data-lucide="pencil"></i> Alterar</button>
+                  </div>
                 </div>
-                <strong x-text="money(chatActive?.suggested?.price)"></strong>
+                <div class="cx-frow3">
+                  <div class="cx-fld"><label>Quantidade</label><div class="cx-stepper"><button>−</button><span>1</span><button>+</button></div></div>
+                  <div class="cx-fld"><label>Preço unitário</label><div class="cx-inp"><i data-lucide="tag"></i> R$ 548,90</div></div>
+                  <div class="cx-fld"><label>Desconto</label><div class="cx-inp"><i data-lucide="tag"></i> R$ 0,00</div></div>
+                </div>
+                <div class="cx-frow2">
+                  <div class="cx-fld"><label>Frete</label><div class="cx-inp"><i data-lucide="truck"></i> Entrega expressa <span class="cx-cv">R$ 25,90 <i data-lucide="chevron-down"></i></span></div></div>
+                  <div class="cx-fld"><label>Prazo estimado</label><div class="cx-inp"><i data-lucide="calendar"></i> 24/05 · 1 dia útil</div></div>
+                </div>
+                <div class="cx-fld"><label>Forma de pagamento</label><div class="cx-inp"><i data-lucide="credit-card"></i> Pix <span class="cx-cv"><i data-lucide="chevron-down"></i></span></div></div>
+                <div class="cx-breakdown">
+                  <div><span><i data-lucide="credit-card"></i> Subtotal</span><b>R$ 548,90</b></div>
+                  <div><span><i data-lucide="tag"></i> Desconto</span><b>− R$ 0,00</b></div>
+                  <div><span><i data-lucide="truck"></i> Frete</span><b>+ R$ 25,90</b></div>
+                </div>
+                <div class="cx-total"><b>Total</b><strong>R$ 574,90</strong></div>
+                <button class="cx-btn-y"><i data-lucide="file-text"></i> Gerar orçamento</button>
+                <button class="cx-btn-o"><i data-lucide="file-check"></i> Converter em pedido</button>
               </div>
             </div>
 
-            <div class="pos-chat-actions">
-              <small>Ações rápidas</small>
-              <div class="pos-chat-actions-grid">
-                <button @click="flash('Catálogo enviado (mock)')"><i data-lucide="book-open"></i>Enviar catálogo</button>
-                <button class="primary" @click="goToSection('vendas')"><i data-lucide="shopping-cart"></i>Criar pedido</button>
-                <button @click="flash('Orçamento enviado (mock)')"><i data-lucide="file-text"></i>Enviar orçamento</button>
-                <button @click="flash('Transferir (mock)')"><i data-lucide="users"></i>Transferir</button>
+            <!-- CLIENTE (herói = dados reais do chat; métricas = Fase 2) -->
+            <div class="cx-acc" :class="!chatPanelCliente && 'collapsed'">
+              <div class="cx-acc-head" @click="toggleChatPanel('cliente')">
+                <h3><i data-lucide="user"></i> Cliente</h3>
+                <i class="cx-chev" data-lucide="chevron-up"></i>
               </div>
-              <button class="pos-chat-close-conv" @click="flash('Conversa encerrada (mock)')"><i data-lucide="power"></i> Encerrar conversa</button>
+              <div class="cx-acc-body">
+                <div class="cx-hero">
+                  <div class="cx-hero-wheel"></div>
+                  <div class="cx-hero-top">
+                    <span class="cx-hero-photo pos-chat-avatar" :data-channel="chatActive?.channel">
+                      <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                      <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
+                    </span>
+                    <div class="cx-hero-info">
+                      <h2 x-text="chatActive?.name"></h2>
+                      <div class="cx-row" x-show="chatActive?.phone"><i data-lucide="phone"></i> <span x-text="chatActive?.phone"></span></div>
+                      <div class="cx-row"><i data-lucide="map-pin"></i> <span x-text="chatActive?.city || '—'"></span></div>
+                      <div class="cx-row cx-sub"><i data-lucide="radio"></i> <span x-text="chatActive?.channelLabel"></span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <span class="cx-demo">Demonstração — histórico real do cliente na Fase 2</span>
+
+                <div class="cx-stats">
+                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="shopping-cart"></i></div><div><small>COMPRAS</small><b>—</b><span>pedidos</span></div></div>
+                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="tag"></i></div><div><small>TICKET MÉDIO</small><b>—</b><span>por compra</span></div></div>
+                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="coins"></i></div><div><small>TOTAL GASTO</small><b>—</b><span>acumulado</span></div></div>
+                </div>
+
+                <div class="cx-section">
+                  <div class="cx-sec-head"><h4><i data-lucide="disc"></i> Últimas compras</h4><a>Ver todas <i data-lucide="chevron-right"></i></a></div>
+                  <div class="cx-empty"><i data-lucide="receipt"></i> O histórico aparece aqui quando a conversa estiver vinculada ao cliente.</div>
+                </div>
+
+                <div class="cx-section">
+                  <h4 class="cx-addr-head"><span><i data-lucide="map-pin"></i> Endereço principal</span><a :href="chatMapUrl()" target="_blank" rel="noopener"><i data-lucide="map"></i> Ver no mapa</a></h4>
+                  <div class="cx-empty">Endereço do cliente entra no vínculo da Fase 2.</div>
+                </div>
+              </div>
             </div>
+
+            <!-- CARD OCIOSO: aparece quando Pedido e Cliente estão recolhidos -->
+            <div class="cx-idle" x-show="chatIdle">
+              <div class="cx-idle-head"><i data-lucide="headphones"></i> Atendimento em foco</div>
+              <div class="cx-idle-top">
+                <span class="cx-idle-av pos-chat-avatar" :data-channel="chatActive?.channel">
+                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                  <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
+                </span>
+                <div><b x-text="chatActive?.name"></b><small x-text="chatActive?.channelLabel"></small></div>
+              </div>
+              <div class="cx-idle-actions">
+                <button class="cx-btn-y" @click="openChatPanel('pedido')"><i data-lucide="shopping-cart"></i> Criar pedido</button>
+                <button class="cx-idle-ghost" @click="openChatPanel('cliente')"><i data-lucide="user"></i> Ver cliente</button>
+              </div>
+            </div>
+
           </aside>
 
         </div>

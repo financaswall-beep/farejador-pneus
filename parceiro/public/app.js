@@ -73,6 +73,19 @@ function parceiroApp() {
     chatTimer: null,
     chatES: null,
     chatFastTimer: null,
+    // ─── BATE-PAPO (Tela 4): UI do painel direito ───
+    chatPanelPedido: true,    // painel "Criar/Editar pedido" expandido?
+    chatPanelCliente: true,   // painel "Cliente" expandido?
+    chatTagMenu: false,       // seletor de etiquetas aberto?
+    chatTags: {},             // { [conversationId]: ['orcamento', ...] } — LOCAL (Fase 1, nao persiste)
+    chatTagPalette: [
+      { id: 'orcamento', label: 'Orçamento', cls: 't-orcamento' },
+      { id: 'pedido',    label: 'Pedido',    cls: 't-pedido' },
+      { id: 'duvida',    label: 'Dúvida',    cls: 't-duvida' },
+      { id: 'garantia',  label: 'Garantia',  cls: 't-garantia' },
+      { id: 'retorno',   label: 'Retorno',   cls: 't-retorno' },
+      { id: 'vip',       label: 'VIP',       cls: 't-vip' },
+    ],
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
@@ -1451,6 +1464,35 @@ function parceiroApp() {
     },
     get chatUnreadTotal() {
       return this.chatConversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+    },
+    // ─── Tela 4: acordeão Pedido/Cliente + card ocioso ───
+    get chatIdle() { return !this.chatPanelPedido && !this.chatPanelCliente; },
+    toggleChatPanel(which) {
+      if (which === 'pedido') this.chatPanelPedido = !this.chatPanelPedido;
+      else this.chatPanelCliente = !this.chatPanelCliente;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    openChatPanel(which) {
+      if (which === 'pedido') this.chatPanelPedido = true;
+      else this.chatPanelCliente = true;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    // ─── Tela 4: etiquetas manuais (LOCAL, Fase 1 nao persiste) ───
+    convTags(id) { return (id && this.chatTags[id]) || []; },
+    tagMeta(tagId) { return this.chatTagPalette.find((t) => t.id === tagId) || null; },
+    toggleConvTag(tagId) {
+      const id = this.chatActiveId;
+      if (!id) return;
+      const cur = new Set(this.chatTags[id] || []);
+      if (cur.has(tagId)) cur.delete(tagId); else cur.add(tagId);
+      this.chatTags = { ...this.chatTags, [id]: [...cur] };
+      this.$nextTick(() => lucide.createIcons());
+    },
+    chatMapUrl() {
+      const c = this.chatActive;
+      if (!c) return '#';
+      const q = encodeURIComponent([c.name, c.city].filter(Boolean).join(' '));
+      return `https://www.google.com/maps/search/?api=1&query=${q}`;
     },
     get chatFilteredConversations() {
       const f = this.chatFilter;
