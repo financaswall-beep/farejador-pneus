@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260529-tema-claro-2" />
+  <link rel="stylesheet" href="./style.css?v=20260601-chat-direita-6" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 </head>
@@ -1622,7 +1622,8 @@
             <!-- CRIAR/EDITAR PEDIDO (visual — liga ao estoque/PDV na Fase 2) -->
             <div class="cx-acc cx-acc-pedido" :class="!chatPanelPedido && 'collapsed'">
               <div class="cx-acc-head" @click="toggleChatPanel('pedido')">
-                <h3><i data-lucide="shopping-cart"></i> Criar/Editar pedido</h3>
+                <h3><i data-lucide="shopping-cart"></i> Criar pedido</h3>
+                <span class="cx-acc-pill ok" x-show="chatOrderCart.length" x-text="chatOrderCart.length + (chatOrderCart.length > 1 ? ' itens' : ' item')"></span>
                 <i class="cx-chev" data-lucide="chevron-up"></i>
               </div>
               <div class="cx-acc-body">
@@ -1662,15 +1663,23 @@
 
                 <div class="cx-total" x-show="chatOrderCart.length"><b>Total</b><strong x-text="money(chatOrderTotal)"></strong></div>
 
-                <button class="cx-btn-y" @click="chatGerarOrcamento()"><i data-lucide="file-text"></i> Gerar orçamento</button>
-                <button class="cx-btn-o" :disabled="saving" @click="chatConverterPedido()"><i data-lucide="file-check"></i> Converter em pedido</button>
+                <div class="cx-order-actions" x-show="chatOrderCart.length">
+                  <button class="cx-btn-go" :disabled="saving" @click="chatConverterPedido()">
+                    <i data-lucide="check-circle"></i> <span x-text="(saving && savingAction==='chatorder') ? 'Criando pedido...' : 'Criar pedido'"></span>
+                  </button>
+                  <p class="cx-act-hint">Reserva o estoque agora. O cliente paga na entrega — entra no caixa só quando o entregador finalizar.</p>
+                  <button class="cx-btn-ghost2" @click="chatGerarOrcamento()"><i data-lucide="file-text"></i> Gerar orçamento</button>
+                  <p class="cx-act-hint">Só monta o texto no campo de mensagem pra você revisar e enviar. Não cria pedido.</p>
+                </div>
               </div>
             </div>
 
             <!-- CLIENTE (herói = dados reais do chat; métricas = Fase 2) -->
-            <div class="cx-acc" :class="!chatPanelCliente && 'collapsed'">
+            <div class="cx-acc cx-acc-cliente" :class="!chatPanelCliente && 'collapsed'">
               <div class="cx-acc-head" @click="toggleChatPanel('cliente')">
                 <h3><i data-lucide="user"></i> Cliente</h3>
+                <span class="cx-acc-pill ok"   x-show="chatCustomer && chatCustomer.linked"><i data-lucide="check"></i> Cadastrado</span>
+                <span class="cx-acc-pill warn" x-show="chatCustomer && !chatCustomer.linked"><i data-lucide="user-plus"></i> Novo</span>
                 <i class="cx-chev" data-lucide="chevron-up"></i>
               </div>
               <div class="cx-acc-body">
@@ -1730,11 +1739,55 @@
 
                 <!-- SEM VÍNCULO: CTA cadastrar -->
                 <template x-if="chatCustomer && !chatCustomer.linked">
-                  <div class="cx-link-cta">
-                    <i data-lucide="user-plus"></i>
-                    <b>Cliente não vinculado</b>
-                    <p>Não encontramos um cadastro com este contato. Cadastre para ver o histórico de compras e agilizar pedidos.</p>
-                    <button class="cx-btn-y" @click="openCustomerFromChat()"><i data-lucide="user-plus"></i> Cadastrar cliente</button>
+                  <div>
+                    <!-- CTA (some quando o form abre) -->
+                    <div class="cx-link-cta" x-show="!chatCustomerFormOpen">
+                      <i data-lucide="user-plus"></i>
+                      <b>Cliente não vinculado</b>
+                      <p>Vincule a um cadastro existente ou cadastre um novo para ver o histórico e agilizar pedidos.</p>
+
+                      <!-- Buscar cliente JÁ cadastrado -->
+                      <div class="cx-cust-search">
+                        <input class="cx-input" x-model="chatCustomerSearch" @input="onChatCustomerSearch()" placeholder="Buscar cliente cadastrado (nome ou telefone)...">
+                        <div class="cx-cust-results" x-show="chatCustomerSearchResults.length">
+                          <template x-for="c in chatCustomerSearchResults" :key="c.id">
+                            <button class="cx-cust-hit" :disabled="saving" @click="linkExistingChatCustomer(c)">
+                              <span class="cx-cust-hit-ic"><i data-lucide="user"></i></span>
+                              <span class="cx-cust-hit-main"><b x-text="c.name"></b><small x-text="formatPhoneDisplay((c.phone||'').replace(/\\D/g,'').replace(/^55/,'')) || c.phone || '—'"></small></span>
+                              <i data-lucide="link" class="cx-cust-hit-go"></i>
+                            </button>
+                          </template>
+                        </div>
+                      </div>
+
+                      <div class="cx-or"><span>ou</span></div>
+                      <button class="cx-btn-y" @click="openChatCustomerForm()"><i data-lucide="user-plus"></i> Cadastrar novo cliente</button>
+                    </div>
+
+                    <!-- FORM INLINE: cadastra sem sair do bate-papo -->
+                    <div class="cx-custform" x-show="chatCustomerFormOpen">
+                      <div class="cx-custform-head"><i data-lucide="user-plus"></i> Cadastrar cliente</div>
+                      <div class="cx-fld"><label>Nome *</label>
+                        <input class="cx-input" x-model="customerForm.name" placeholder="Ex: João da Silva">
+                      </div>
+                      <div class="cx-fld"><label>Telefone</label>
+                        <input class="cx-input" :value="formatPhoneDisplay(customerForm.phone)"
+                               @input="customerForm.phone = onPhoneInput($event.target.value); $event.target.value = formatPhoneDisplay(customerForm.phone)"
+                               placeholder="(11) 99999-9999" inputmode="numeric">
+                      </div>
+                      <div class="cx-pick-row" style="grid-template-columns:1fr 90px">
+                        <div class="cx-fld"><label>Rua</label><input class="cx-input" x-model="customerForm.address_street" placeholder="Ex: Av. Brasil"></div>
+                        <div class="cx-fld"><label>Nº</label><input class="cx-input" x-model="customerForm.address_number" placeholder="123"></div>
+                      </div>
+                      <div class="cx-pick-row" style="grid-template-columns:1fr 1fr">
+                        <div class="cx-fld"><label>Bairro</label><input class="cx-input" x-model="customerForm.address_neighborhood" placeholder="Centro"></div>
+                        <div class="cx-fld"><label>Município</label><input class="cx-input" x-model="customerForm.address_city" placeholder="Ex: Niterói"></div>
+                      </div>
+                      <button class="cx-btn-go" :disabled="saving || !customerForm.name.trim()" @click="createChatCustomer()">
+                        <i data-lucide="user-check"></i> <span x-text="(saving && savingAction==='chatcustomer') ? 'Salvando...' : 'Salvar e vincular'"></span>
+                      </button>
+                      <button class="cx-btn-ghost2" @click="closeChatCustomerForm()"><i data-lucide="x"></i> Cancelar</button>
+                    </div>
                   </div>
                 </template>
               </div>
@@ -1785,6 +1838,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260529-tema-claro-4"></script>
+<script src="./app.js?v=20260601-chat-direita-6"></script>
 </body>
 </html>

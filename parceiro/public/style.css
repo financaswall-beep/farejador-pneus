@@ -2794,6 +2794,17 @@ html, body {
 .cx-acc-body { padding: 0 16px 16px; border-top: 1px solid var(--cx-line2); padding-top: 14px; }
 .cx-acc-pedido { background-image: linear-gradient(180deg, rgba(11,16,20,.40), rgba(11,16,20,.58)), url('./assets/chat-card-texture.webp'); background-size: cover; background-position: center; }
 
+/* Ordem da coluna (acordeão exclusivo): Cliente em cima, Pedido embaixo, ocioso por último */
+.cx-acc-cliente { order: 1; }
+.cx-acc-pedido  { order: 2; }
+.cx-idle        { order: 3; }
+
+/* Pill de status no cabeçalho do acordeão (Cadastrado/Novo, contador de itens) */
+.cx-acc-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: .2px; white-space: nowrap; }
+.cx-acc-pill svg { width: 12px; height: 12px; }
+.cx-acc-pill.ok   { background: rgba(34,197,94,.16);  color: #4ade80; border: 1px solid rgba(34,197,94,.32); }
+.cx-acc-pill.warn { background: rgba(250,204,21,.16); color: #facc15; border: 1px solid rgba(250,204,21,.34); }
+
 .cx-demo { display: inline-block; font-size: 10px; color: #fcd34d; background: rgba(202,138,4,.18); border: 1px solid rgba(202,138,4,.35); padding: 3px 9px; border-radius: 7px; margin-bottom: 12px; }
 .cx-muted { color: #94a3b8; font-size: 12px; }
 
@@ -2836,6 +2847,45 @@ html, body {
 .cx-btn-o { width: 100%; background: transparent; border: 1px solid var(--pos-green); color: var(--pos-green); font-weight: 600; padding: 13px; border-radius: 11px; display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 10px; }
 .cx-btn-o svg { width: 17px; height: 17px; }
 
+/* Ações do pedido no chat — hierarquia clara: primária (criar) + secundária (orçamento) */
+.cx-order-actions { margin-top: 4px; }
+.cx-btn-go { width: 100%; background: linear-gradient(180deg, #22c55e, #16a34a); color: #052e16; font-weight: 800; padding: 14px; border-radius: 11px; display: flex; align-items: center; justify-content: center; gap: 9px; box-shadow: 0 6px 16px rgba(22,163,74,.28); }
+.cx-btn-go svg { width: 18px; height: 18px; }
+.cx-btn-go:hover:not(:disabled) { filter: brightness(1.06); }
+.cx-btn-go:disabled { opacity: .55; cursor: default; box-shadow: none; }
+.cx-btn-ghost2 { width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--cx-line2); color: inherit; font-weight: 600; padding: 12px; border-radius: 11px; display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 12px; }
+.cx-btn-ghost2 svg { width: 16px; height: 16px; color: var(--pos-yellow); }
+.cx-btn-ghost2:hover { background: rgba(255,255,255,.07); }
+.cx-act-hint { font-size: 11px; color: #94a3b8; line-height: 1.4; margin: 7px 2px 0; }
+
+/* Criar pedido: campos PLANOS (sem relevo) — tira a plaquinha e a sombra interna */
+.cx-acc-pedido .cx-fld { border: none; background: none; box-shadow: none; padding: 0; border-radius: 0; }
+.cx-acc-pedido .cx-input { box-shadow: none; background: rgba(0,0,0,.18); border: 1px solid var(--cx-line2); }
+.cx-acc-pedido .cx-input:focus { outline: none; border-color: rgba(255,208,0,.55); }
+
+/* Buscar + vincular cliente JÁ cadastrado (estado "não vinculado") */
+.cx-cust-search { width: 100%; margin-top: 6px; text-align: left; }
+.cx-cust-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.cx-cust-hit { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; border-radius: 9px; background: rgba(255,255,255,.04); border: 1px solid var(--cx-line2); text-align: left; }
+.cx-cust-hit:hover:not(:disabled) { background: rgba(255,255,255,.08); border-color: rgba(255,208,0,.4); }
+.cx-cust-hit:disabled { opacity: .6; cursor: default; }
+.cx-cust-hit-ic { width: 30px; height: 30px; border-radius: 7px; background: var(--pos-panel-2); display: grid; place-items: center; color: #94a3b8; flex: 0 0 auto; }
+.cx-cust-hit-ic svg { width: 15px; height: 15px; }
+.cx-cust-hit-main { flex: 1; min-width: 0; }
+.cx-cust-hit-main b { display: block; font-size: 13px; font-weight: 600; }
+.cx-cust-hit-main small { font-size: 11px; color: #94a3b8; }
+.cx-cust-hit-go { width: 16px; height: 16px; color: var(--pos-yellow); flex: 0 0 auto; }
+.cx-or { display: flex; align-items: center; gap: 10px; width: 100%; margin: 14px 0 10px; color: #94a3b8; font-size: 11px; }
+.cx-or::before, .cx-or::after { content: ""; flex: 1; height: 1px; background: var(--cx-line2); }
+
+/* Form inline de cadastro de cliente dentro do chat */
+.cx-custform { display: flex; flex-direction: column; gap: 10px; }
+.cx-custform-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #e6edf3; margin-bottom: 2px; }
+.cx-custform-head svg { width: 16px; height: 16px; color: var(--pos-yellow); }
+.cx-custform .cx-pick-row { margin: 0; gap: 10px; }
+.cx-custform .cx-btn-go { margin-top: 4px; }
+.cx-custform .cx-btn-ghost2 { margin-top: 0; }
+
 /* ─── Cliente ─── */
 .cx-hero { position: relative; display: flex; flex-direction: column; gap: 14px; border-radius: 14px; padding: 16px; margin-bottom: 14px; overflow: hidden; }
 .cx-hero-wheel { position: absolute; top: 0; right: 0; width: 46%; height: 100%; z-index: 0; opacity: .7; filter: grayscale(.15) brightness(1.1);
@@ -2870,6 +2920,12 @@ html, body {
 .cx-addr-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 11px; }
 .cx-addr-head > span { display: inline-flex; align-items: center; gap: 8px; }
 .cx-addr-head svg { width: 17px; height: 17px; color: var(--pos-yellow); }
+/* Endereço principal — organizado: Logradouro full-width, Bairro + Cidade lado a lado */
+.addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.addr-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 9px 12px; border-radius: 9px; background: rgba(0,0,0,.18); border: 1px solid var(--cx-line2); }
+.addr-f.addr-full { grid-column: 1 / -1; }
+.addr-f small { font-size: 9.5px; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+.addr-f b { font-size: 13px; font-weight: 600; line-height: 1.35; word-break: break-word; }
 .cx-empty { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #94a3b8; line-height: 1.4; }
 .cx-empty svg { width: 18px; height: 18px; flex: 0 0 auto; opacity: .7; }
 .cx-vip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; font-weight: 700; color: #fcd34d; background: rgba(202,138,4,.2); border: 1px solid rgba(202,138,4,.4); padding: 4px 11px; border-radius: 8px; }

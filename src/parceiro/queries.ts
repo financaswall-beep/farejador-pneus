@@ -2360,8 +2360,8 @@ export async function getPartnerChatCustomer(
   conversationId: string,
 ): Promise<unknown | null> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const conv = await client.query<{ customer_name: string | null; customer_identifier: string | null }>(
-      `SELECT customer_name, customer_identifier
+    const conv = await client.query<{ customer_name: string | null; customer_identifier: string | null; customer_id: string | null }>(
+      `SELECT customer_name, customer_identifier, customer_id
          FROM commerce.partner_conversations
         WHERE id = $1 AND environment = $2 AND unit_id = $3`,
       [conversationId, ctx.environment, ctx.unitId],
@@ -2369,14 +2369,58 @@ export async function getPartnerChatCustomer(
     const convRow = conv.rows[0];
     if (!convRow) return null;
 
+    // Monta o payload "vinculado" (cliente + métricas + últimas compras).
+    // Só conta COMPRA REALIZADA: descarta cancelada e descarta entrega COD
+    // ainda não finalizada (a venda só se realiza na entrega — regra do 0069).
+    // Pickup (delivery_status NULL) e entrega 'delivered' contam; o resto não.
+    const REALIZED_SALE = `status <> 'cancelled'
+        AND NOT (fulfillment_mode = 'delivery' AND delivery_status IS DISTINCT FROM 'delivered')`;
+    const buildLinked = async (customer: { id: string }): Promise<unknown> => {
+      const agg = await client.query(
+        `SELECT COUNT(*)::int AS purchase_count,
+                COALESCE(SUM(total_amount), 0)::float AS total_spent,
+                COALESCE(AVG(total_amount), 0)::float AS avg_ticket
+           FROM commerce.partner_orders_full
+          WHERE environment = $1 AND unit_id = $2 AND customer_id = $3
+            AND ${REALIZED_SALE}`,
+        [ctx.environment, ctx.unitId, customer.id],
+      );
+      const last = await client.query(
+        `SELECT order_id, created_at, total_amount, status, delivery_status, items
+           FROM commerce.partner_orders_full
+          WHERE environment = $1 AND unit_id = $2 AND customer_id = $3
+            AND ${REALIZED_SALE}
+          ORDER BY created_at DESC
+          LIMIT 5`,
+        [ctx.environment, ctx.unitId, customer.id],
+      );
+      return { linked: true, customer, metrics: agg.rows[0], last_orders: last.rows };
+    };
+
+    const CUSTOMER_COLS = `id, name, phone, cpf, address,
+            address_street, address_number, address_neighborhood, address_city,
+            is_vip, created_at`;
+
+    // 1) Vínculo DURÁVEL por customer_id (gravado ao cadastrar/vincular pelo
+    //    chat). Funciona em qualquer canal — não depende de telefone.
+    if (convRow.customer_id) {
+      const byId = await client.query(
+        `SELECT ${CUSTOMER_COLS}
+           FROM commerce.partner_customers
+          WHERE id = $1 AND environment = $2 AND unit_id = $3 AND deleted_at IS NULL`,
+        [convRow.customer_id, ctx.environment, ctx.unitId],
+      );
+      if (byId.rowCount === 1) return buildLinked(byId.rows[0] as { id: string });
+      // cliente excluído/inconsistente → cai pro match por telefone abaixo.
+    }
+
+    // 2) Fallback legado: casa por telefone (WhatsApp sem vínculo gravado).
     const phone = normalizeBrazilianPhone(convRow.customer_identifier ?? '');
     const suggestion = { name: convRow.customer_name ?? null, phone: phone ?? null };
     if (!phone) return { linked: false, suggestion };
 
     const cust = await client.query(
-      `SELECT id, name, phone, cpf, address,
-              address_street, address_number, address_neighborhood, address_city,
-              is_vip, created_at
+      `SELECT ${CUSTOMER_COLS}
          FROM commerce.partner_customers
         WHERE environment = $1 AND unit_id = $2 AND phone = $3 AND deleted_at IS NULL
         ORDER BY updated_at DESC
@@ -2384,32 +2428,40 @@ export async function getPartnerChatCustomer(
       [ctx.environment, ctx.unitId, phone],
     );
     if (cust.rowCount !== 1) return { linked: false, suggestion };
-    const customer = cust.rows[0] as { id: string };
-
-    const agg = await client.query(
-      `SELECT COUNT(*)::int AS purchase_count,
-              COALESCE(SUM(total_amount), 0)::float AS total_spent,
-              COALESCE(AVG(total_amount), 0)::float AS avg_ticket
-         FROM commerce.partner_orders_full
-        WHERE environment = $1 AND unit_id = $2 AND customer_id = $3`,
-      [ctx.environment, ctx.unitId, customer.id],
-    );
-    const last = await client.query(
-      `SELECT order_id, created_at, total_amount, status, delivery_status, items
-         FROM commerce.partner_orders_full
-        WHERE environment = $1 AND unit_id = $2 AND customer_id = $3
-        ORDER BY created_at DESC
-        LIMIT 5`,
-      [ctx.environment, ctx.unitId, customer.id],
-    );
-
-    return {
-      linked: true,
-      customer,
-      metrics: agg.rows[0],
-      last_orders: last.rows,
-    };
+    return buildLinked(cust.rows[0] as { id: string });
   });
+}
+
+// ============================================================
+// Chat unificado — VINCULAR CLIENTE à conversa (vínculo durável).
+// Grava partner_conversations.customer_id pelo pool do bot (o portal
+// só tem SELECT na conversa), com unit_id/environment explícitos —
+// mesmo padrão de markPartnerChatRead. Valida que o cliente é da
+// unidade antes de gravar.
+// ============================================================
+
+export type LinkPartnerChatCustomerStatus = 'ok' | 'conversation_not_found' | 'customer_not_found';
+
+export async function linkPartnerChatCustomer(
+  ctx: PartnerContext,
+  conversationId: string,
+  customerId: string,
+): Promise<LinkPartnerChatCustomerStatus> {
+  const cust = await pool.query(
+    `SELECT 1 FROM commerce.partner_customers
+      WHERE id = $1 AND environment = $2 AND unit_id = $3 AND deleted_at IS NULL`,
+    [customerId, ctx.environment, ctx.unitId],
+  );
+  if ((cust.rowCount ?? 0) === 0) return 'customer_not_found';
+
+  const upd = await pool.query(
+    `UPDATE commerce.partner_conversations
+        SET customer_id = $4
+      WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+    [conversationId, ctx.environment, ctx.unitId, customerId],
+  );
+  if ((upd.rowCount ?? 0) === 0) return 'conversation_not_found';
+  return 'ok';
 }
 
 export async function getPartnerChatMessages(

@@ -24,6 +24,7 @@ import {
   getPartnerChatCustomer,
   sendPartnerChatMessage,
   markPartnerChatRead,
+  linkPartnerChatCustomer,
   getPartnerCompras,
   getPartnerCustomers,
   getPartnerDespesas,
@@ -195,6 +196,10 @@ const chatConversationParamsSchema = paramsSchema.extend({
 const chatSendBodySchema = z.object({
   content: z.string().trim().min(1).max(4096),
   client_token: z.string().trim().min(1).max(128),
+});
+
+const chatLinkCustomerBodySchema = z.object({
+  customer_id: z.string().uuid(),
 });
 
 const purchaseSchema = z.object({
@@ -481,6 +486,26 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
     const ok = await markPartnerChatRead(getPartnerContext(request), params.data.conversationId);
     if (!ok) return reply.status(404).send({ error: 'conversation_not_found' });
+    return reply.status(200).send({ ok: true });
+  });
+
+  // Vincula um cliente à conversa de forma DURÁVEL (grava customer_id).
+  // Resolve IG/FB, cujo identificador não é telefone — o vínculo persiste
+  // em qualquer canal e sobrevive a reload/troca de conversa.
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/link-customer', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = chatConversationParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
+
+    const body = chatLinkCustomerBodySchema.safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: 'customer_id inválido' });
+
+    const status = await linkPartnerChatCustomer(
+      getPartnerContext(request),
+      params.data.conversationId,
+      body.data.customer_id,
+    );
+    if (status === 'conversation_not_found') return reply.status(404).send({ error: 'conversation_not_found' });
+    if (status === 'customer_not_found') return reply.status(404).send({ error: 'customer_not_found' });
     return reply.status(200).send({ ok: true });
   });
 

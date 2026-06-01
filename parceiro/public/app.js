@@ -74,8 +74,8 @@ function parceiroApp() {
     chatES: null,
     chatFastTimer: null,
     // ─── BATE-PAPO (Tela 4): UI do painel direito ───
-    chatPanelPedido: true,    // painel "Criar/Editar pedido" expandido?
-    chatPanelCliente: true,   // painel "Cliente" expandido?
+    chatPanelPedido: false,   // painel "Criar pedido" expandido? (acordeão exclusivo: começa fechado)
+    chatPanelCliente: true,   // painel "Cliente" expandido? (contexto do atendimento — abre primeiro)
     chatTagMenu: false,       // seletor de etiquetas aberto?
     chatTags: {},             // { [conversationId]: ['orcamento', ...] } — LOCAL (Fase 1, nao persiste)
     chatTagPalette: [
@@ -87,6 +87,10 @@ function parceiroApp() {
       { id: 'vip',       label: 'VIP',       cls: 't-vip' },
     ],
     chatCustomer: null,       // Fase 2a: cliente vinculado + métricas { linked, customer, metrics, last_orders } | { linked:false, suggestion }
+    chatCustomerFormOpen: false, // cadastro inline do cliente na própria tela do chat
+    chatCustomerSearch: '',       // busca de cliente JÁ cadastrado pra vincular
+    chatCustomerSearchResults: [],
+    chatCustomerSearchTimer: null,
     // Fase 2b: carrinho próprio do chat (separado do PDV do balcão)
     chatOrderCart: [],
     chatOrderProduct: '',
@@ -1474,14 +1478,20 @@ function parceiroApp() {
     },
     // ─── Tela 4: acordeão Pedido/Cliente + card ocioso ───
     get chatIdle() { return !this.chatPanelPedido && !this.chatPanelCliente; },
+    // Acordeão EXCLUSIVO: abrir um fecha o outro (uma seção por vez na coluna).
     toggleChatPanel(which) {
-      if (which === 'pedido') this.chatPanelPedido = !this.chatPanelPedido;
-      else this.chatPanelCliente = !this.chatPanelCliente;
+      if (which === 'pedido') {
+        this.chatPanelPedido = !this.chatPanelPedido;
+        if (this.chatPanelPedido) this.chatPanelCliente = false;
+      } else {
+        this.chatPanelCliente = !this.chatPanelCliente;
+        if (this.chatPanelCliente) this.chatPanelPedido = false;
+      }
       this.$nextTick(() => lucide.createIcons());
     },
     openChatPanel(which) {
-      if (which === 'pedido') this.chatPanelPedido = true;
-      else this.chatPanelCliente = true;
+      if (which === 'pedido') { this.chatPanelPedido = true; this.chatPanelCliente = false; }
+      else { this.chatPanelCliente = true; this.chatPanelPedido = false; }
       this.$nextTick(() => lucide.createIcons());
     },
     // ─── Tela 4: etiquetas manuais (LOCAL, Fase 1 nao persiste) ───
@@ -1541,14 +1551,121 @@ function parceiroApp() {
       if (c.address) return { street: c.address, neighborhood: '', city: '' };
       return null;
     },
-    // CTA "Cadastrar cliente": prefilla o form de clientes e vai pra aba Clientes.
-    openCustomerFromChat() {
+    // CTA "Cadastrar cliente": abre o mini-form INLINE na própria tela do chat
+    // (não vai mais pra aba Clientes), pré-preenchido com nome/telefone do contato.
+    openChatCustomerForm() {
       const s = (this.chatCustomer && this.chatCustomer.suggestion) || {};
       this.clearCustomerForm();
       this.customerForm.name = s.name || this.chatActive?.name || '';
-      this.customerForm.phone = s.phone || this.chatActive?.phone || '';
-      this.goToSection('clientes');
-      this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      // telefone em dígitos nacionais (sem +55) pra máscara exibir certo;
+      // toE164Phone recoloca o +55 no submit e casa com normalizeBrazilianPhone do backend.
+      let phoneDigits = String(s.phone || this.chatActive?.phone || '').replace(/\D/g, '');
+      if (phoneDigits.startsWith('55') && phoneDigits.length >= 12) phoneDigits = phoneDigits.slice(2);
+      this.customerForm.phone = phoneDigits;
+      this.chatCustomerFormOpen = true;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    closeChatCustomerForm() {
+      this.chatCustomerFormOpen = false;
+      this.clearCustomerForm();
+      this.$nextTick(() => lucide.createIcons());
+    },
+    // Busca cliente JÁ cadastrado (mesma busca do PDV) pra vincular à conversa.
+    onChatCustomerSearch() {
+      clearTimeout(this.chatCustomerSearchTimer);
+      const q = this.chatCustomerSearch.trim();
+      if (q.length < 2) { this.chatCustomerSearchResults = []; return; }
+      this.chatCustomerSearchTimer = setTimeout(async () => {
+        try {
+          const result = await this.api(`clientes/buscar?q=${encodeURIComponent(q)}`, { method: 'GET' });
+          this.chatCustomerSearchResults = result.rows || [];
+        } catch { this.chatCustomerSearchResults = []; }
+        this.$nextTick(() => lucide.createIcons());
+      }, 250);
+    },
+    // Vincula um cliente existente à conversa (grava customer_id) e recarrega
+    // o painel com as métricas reais. Funciona em qualquer canal.
+    async linkExistingChatCustomer(customer) {
+      if (!customer || !this.chatActiveId) return;
+      if (this.saving) return;
+      this.saving = true; this.savingAction = 'chatlink';
+      try {
+        await this.api(`chat/conversations/${this.chatActiveId}/link-customer`, {
+          method: 'POST', body: JSON.stringify({ customer_id: customer.id }),
+        });
+        this.chatCustomerSearch = ''; this.chatCustomerSearchResults = [];
+        await this.loadChatCustomer(this.chatActiveId); // traz métricas reais (já respeita cancelados)
+        this.flash('Cliente vinculado à conversa.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+        this.$nextTick(() => lucide.createIcons());
+      }
+    },
+    // Cria o cliente e JÁ VINCULA à conversa usando o cliente recém-criado
+    // (não reconsulta por telefone — assim funciona pra IG/FB, cuja conversa
+    // não tem telefone no identificador). Vira "Cadastrado" sem sair do chat.
+    async createChatCustomer() {
+      if (!this.customerForm.name.trim()) { this.flash('Informe o nome do cliente.'); return; }
+      if (this.saving) return;
+      this.saving = true; this.savingAction = 'chatcustomer';
+      try {
+        const streetWithNumber = [this.customerForm.address_street, this.customerForm.address_number]
+          .map((item) => String(item || '').trim()).filter(Boolean).join(', ');
+        const addressParts = [streetWithNumber, this.customerForm.address_neighborhood, this.customerForm.address_city]
+          .map((item) => String(item || '').trim()).filter(Boolean);
+        const payload = {
+          name: this.customerForm.name.trim(),
+          phone: this.toE164Phone(this.customerForm.phone),
+          address: addressParts.join(' - ') || null,
+          address_street: this.customerForm.address_street?.trim() || null,
+          address_number: this.customerForm.address_number?.trim() || null,
+          address_neighborhood: this.customerForm.address_neighborhood?.trim() || null,
+          address_city: this.customerForm.address_city?.trim() || null,
+          idempotency_key: this.uuid(),
+        };
+        const result = await this.api('clientes', { method: 'POST', body: JSON.stringify(payload) });
+        this.chatCustomerFormOpen = false;
+        // Grava o vínculo DURÁVEL na conversa (sobrevive reload/troca, qualquer canal).
+        if (this.chatActiveId) {
+          try {
+            await this.api(`chat/conversations/${this.chatActiveId}/link-customer`, {
+              method: 'POST', body: JSON.stringify({ customer_id: result.customer_id }),
+            });
+          } catch (e) { console.warn('link_customer_failed', e); }
+        }
+        // Vincula DIRETO com o cliente recém-criado (id veio na resposta) —
+        // não depende de telefone na conversa, então casa em qualquer canal.
+        const customer = {
+          id: result.customer_id,
+          name: payload.name,
+          phone: payload.phone,
+          address: payload.address,
+          address_street: payload.address_street,
+          address_number: payload.address_number,
+          address_neighborhood: payload.address_neighborhood,
+          address_city: payload.address_city,
+        };
+        this.chatCustomer = {
+          linked: true,
+          customer,
+          metrics: { purchase_count: 0, total_spent: 0, avg_ticket: 0 },
+          last_orders: [],
+        };
+        // Prefilla o endereço do pedido em aberto, se ainda vazio.
+        const a = this.chatCustomerAddr();
+        if (a && !this.chatOrderAddress.trim()) {
+          this.chatOrderAddress = [a.street, a.neighborhood, a.city].filter(Boolean).join(', ');
+        }
+        this.clearCustomerForm();
+        this.flash('Cliente cadastrado e vinculado à conversa.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+        this.$nextTick(() => lucide.createIcons());
+      }
     },
 
     // ─── Fase 2b: Criar pedido pelo chat (carrinho próprio + endpoint /vendas) ───
