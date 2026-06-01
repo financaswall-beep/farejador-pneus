@@ -1683,23 +1683,53 @@
                   </div>
                 </div>
 
-                <span class="cx-demo">Demonstração — histórico real do cliente na Fase 2</span>
+                <!-- Carregando -->
+                <div class="cx-empty" x-show="!chatCustomer"><i data-lucide="loader"></i> Carregando dados do cliente...</div>
 
-                <div class="cx-stats">
-                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="shopping-cart"></i></div><div><small>COMPRAS</small><b>—</b><span>pedidos</span></div></div>
-                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="tag"></i></div><div><small>TICKET MÉDIO</small><b>—</b><span>por compra</span></div></div>
-                  <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="coins"></i></div><div><small>TOTAL GASTO</small><b>—</b><span>acumulado</span></div></div>
-                </div>
+                <!-- VINCULADO: métricas reais -->
+                <template x-if="chatCustomer && chatCustomer.linked">
+                  <div>
+                    <div class="cx-stats">
+                      <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="shopping-cart"></i></div><div><small>COMPRAS</small><b x-text="chatCustomer.metrics.purchase_count"></b><span>pedidos</span></div></div>
+                      <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="tag"></i></div><div><small>TICKET MÉDIO</small><b x-text="money(chatCustomer.metrics.avg_ticket)"></b><span>por compra</span></div></div>
+                      <div class="cx-stat"><div class="cx-stat-ic"><i data-lucide="coins"></i></div><div><small>TOTAL GASTO</small><b x-text="money(chatCustomer.metrics.total_spent)"></b><span>acumulado</span></div></div>
+                    </div>
 
-                <div class="cx-section">
-                  <div class="cx-sec-head"><h4><i data-lucide="disc"></i> Últimas compras</h4><a>Ver todas <i data-lucide="chevron-right"></i></a></div>
-                  <div class="cx-empty"><i data-lucide="receipt"></i> O histórico aparece aqui quando a conversa estiver vinculada ao cliente.</div>
-                </div>
+                    <div class="cx-section">
+                      <div class="cx-sec-head"><h4><i data-lucide="disc"></i> Últimas compras</h4></div>
+                      <template x-for="o in chatCustomer.last_orders" :key="o.order_id">
+                        <div class="cx-buy">
+                          <span class="cx-buy-ic"><i data-lucide="disc"></i></span>
+                          <div class="cx-buy-main"><b x-text="chatLastItemLabel(o)"></b><small x-text="chatDateLabel(o.created_at)"></small></div>
+                          <span class="cx-buy-price" x-text="money(o.total_amount)"></span>
+                        </div>
+                      </template>
+                      <div class="cx-empty" x-show="!chatCustomer.last_orders.length"><i data-lucide="receipt"></i> Sem compras registradas ainda.</div>
+                    </div>
 
-                <div class="cx-section">
-                  <h4 class="cx-addr-head"><span><i data-lucide="map-pin"></i> Endereço principal</span><a :href="chatMapUrl()" target="_blank" rel="noopener"><i data-lucide="map"></i> Ver no mapa</a></h4>
-                  <div class="cx-empty">Endereço do cliente entra no vínculo da Fase 2.</div>
-                </div>
+                    <div class="cx-section">
+                      <h4 class="cx-addr-head"><span><i data-lucide="map-pin"></i> Endereço principal</span><a x-show="chatCustomerAddr()" :href="chatMapUrl()" target="_blank" rel="noopener"><i data-lucide="map"></i> Ver no mapa</a></h4>
+                      <template x-if="chatCustomerAddr()">
+                        <div class="addr-grid">
+                          <div class="addr-f addr-full" x-show="chatCustomerAddr().street"><small>Logradouro</small><b x-text="chatCustomerAddr().street"></b></div>
+                          <div class="addr-f" x-show="chatCustomerAddr().neighborhood"><small>Bairro</small><b x-text="chatCustomerAddr().neighborhood"></b></div>
+                          <div class="addr-f" x-show="chatCustomerAddr().city"><small>Cidade / UF</small><b x-text="chatCustomerAddr().city"></b></div>
+                        </div>
+                      </template>
+                      <div class="cx-empty" x-show="!chatCustomerAddr()">Endereço não cadastrado.</div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- SEM VÍNCULO: CTA cadastrar -->
+                <template x-if="chatCustomer && !chatCustomer.linked">
+                  <div class="cx-link-cta">
+                    <i data-lucide="user-plus"></i>
+                    <b>Cliente não vinculado</b>
+                    <p>Não encontramos um cadastro com este contato. Cadastre para ver o histórico de compras e agilizar pedidos.</p>
+                    <button class="cx-btn-y" @click="openCustomerFromChat()"><i data-lucide="user-plus"></i> Cadastrar cliente</button>
+                  </div>
+                </template>
               </div>
             </div>
 

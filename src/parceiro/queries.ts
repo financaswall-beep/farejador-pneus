@@ -2351,6 +2351,67 @@ export async function getPartnerChatConversations(ctx: PartnerContext): Promise<
   });
 }
 
+// Fase 2a do chat: liga a conversa ao cliente cadastrado (por telefone) e
+// devolve metricas reais de compra. Retorna null se a conversa nao existe/
+// nao e da unidade (404). Sem match -> { linked:false, suggestion } pra o
+// front oferecer "cadastrar". Read-only; nao cria nada.
+export async function getPartnerChatCustomer(
+  ctx: PartnerContext,
+  conversationId: string,
+): Promise<unknown | null> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const conv = await client.query<{ customer_name: string | null; customer_identifier: string | null }>(
+      `SELECT customer_name, customer_identifier
+         FROM commerce.partner_conversations
+        WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [conversationId, ctx.environment, ctx.unitId],
+    );
+    const convRow = conv.rows[0];
+    if (!convRow) return null;
+
+    const phone = normalizeBrazilianPhone(convRow.customer_identifier ?? '');
+    const suggestion = { name: convRow.customer_name ?? null, phone: phone ?? null };
+    if (!phone) return { linked: false, suggestion };
+
+    const cust = await client.query(
+      `SELECT id, name, phone, cpf, address,
+              address_street, address_number, address_neighborhood, address_city,
+              is_vip, created_at
+         FROM commerce.partner_customers
+        WHERE environment = $1 AND unit_id = $2 AND phone = $3 AND deleted_at IS NULL
+        ORDER BY updated_at DESC
+        LIMIT 1`,
+      [ctx.environment, ctx.unitId, phone],
+    );
+    if (cust.rowCount !== 1) return { linked: false, suggestion };
+    const customer = cust.rows[0] as { id: string };
+
+    const agg = await client.query(
+      `SELECT COUNT(*)::int AS purchase_count,
+              COALESCE(SUM(total_amount), 0)::float AS total_spent,
+              COALESCE(AVG(total_amount), 0)::float AS avg_ticket
+         FROM commerce.partner_orders_full
+        WHERE environment = $1 AND unit_id = $2 AND customer_id = $3`,
+      [ctx.environment, ctx.unitId, customer.id],
+    );
+    const last = await client.query(
+      `SELECT order_id, created_at, total_amount, status, delivery_status, items
+         FROM commerce.partner_orders_full
+        WHERE environment = $1 AND unit_id = $2 AND customer_id = $3
+        ORDER BY created_at DESC
+        LIMIT 5`,
+      [ctx.environment, ctx.unitId, customer.id],
+    );
+
+    return {
+      linked: true,
+      customer,
+      metrics: agg.rows[0],
+      last_orders: last.rows,
+    };
+  });
+}
+
 export async function getPartnerChatMessages(
   ctx: PartnerContext,
   conversationId: string,

@@ -21,6 +21,7 @@ import {
   StockReservedCannotDeleteError,
   getPartnerChatConversations,
   getPartnerChatMessages,
+  getPartnerChatCustomer,
   sendPartnerChatMessage,
   markPartnerChatRead,
   getPartnerCompras,
@@ -437,6 +438,17 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const rows = await getPartnerChatMessages(getPartnerContext(request), params.data.conversationId);
     if (rows === null) return reply.status(404).send({ error: 'conversation_not_found' });
     return reply.status(200).send({ rows });
+  });
+
+  // Fase 2a — cliente vinculado à conversa (por telefone) + métricas de compra.
+  // Read-only. 404 se a conversa não existe/não é da unidade.
+  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/customer', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const params = chatConversationParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
+
+    const data = await getPartnerChatCustomer(getPartnerContext(request), params.data.conversationId);
+    if (data === null) return reply.status(404).send({ error: 'conversation_not_found' });
+    return reply.status(200).send(data);
   });
 
   // Fatia 2 — envio. O parceiro responde o cliente; grava otimista + manda pro
