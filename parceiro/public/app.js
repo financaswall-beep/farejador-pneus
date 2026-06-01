@@ -86,6 +86,7 @@ function parceiroApp() {
       { id: 'retorno',   label: 'Retorno',   cls: 't-retorno' },
       { id: 'vip',       label: 'VIP',       cls: 't-vip' },
     ],
+    chatCustomer: null,       // Fase 2a: cliente vinculado + métricas { linked, customer, metrics, last_orders } | { linked:false, suggestion }
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
@@ -1489,10 +1490,52 @@ function parceiroApp() {
       this.$nextTick(() => lucide.createIcons());
     },
     chatMapUrl() {
-      const c = this.chatActive;
-      if (!c) return '#';
-      const q = encodeURIComponent([c.name, c.city].filter(Boolean).join(' '));
-      return `https://www.google.com/maps/search/?api=1&query=${q}`;
+      const cust = this.chatCustomer && this.chatCustomer.linked ? this.chatCustomer.customer : null;
+      const parts = cust
+        ? [cust.address_street, cust.address_number, cust.address_neighborhood, cust.address_city]
+        : [this.chatActive?.name, this.chatActive?.city];
+      const q = encodeURIComponent(parts.filter(Boolean).join(' '));
+      return q ? `https://www.google.com/maps/search/?api=1&query=${q}` : '#';
+    },
+    // Fase 2a: puxa o cliente vinculado + métricas ao abrir a conversa.
+    async loadChatCustomer(id) {
+      this.chatCustomer = null;
+      try {
+        const data = await this.api(`chat/conversations/${id}/customer`);
+        if (this.chatActiveId === id) this.chatCustomer = data;
+      } catch (err) {
+        console.warn('chat_customer_failed', err);
+      }
+      this.$nextTick(() => lucide.createIcons());
+    },
+    chatDateLabel(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR');
+    },
+    chatLastItemLabel(order) {
+      const it = (order && Array.isArray(order.items) && order.items[0]) || null;
+      if (!it) return 'Pedido';
+      const top = [it.brand, it.tire_size].filter(Boolean).join(' ');
+      return top || it.item_name || 'Pedido';
+    },
+    chatCustomerAddr() {
+      const c = this.chatCustomer && this.chatCustomer.linked ? this.chatCustomer.customer : null;
+      if (!c) return null;
+      const street = [c.address_street, c.address_number].filter(Boolean).join(', ');
+      const hasParts = street || c.address_neighborhood || c.address_city;
+      if (hasParts) return { street, neighborhood: c.address_neighborhood || '—', city: c.address_city || '—' };
+      if (c.address) return { street: c.address, neighborhood: '', city: '' };
+      return null;
+    },
+    // CTA "Cadastrar cliente": prefilla o form de clientes e vai pra aba Clientes.
+    openCustomerFromChat() {
+      const s = (this.chatCustomer && this.chatCustomer.suggestion) || {};
+      this.clearCustomerForm();
+      this.customerForm.name = s.name || this.chatActive?.name || '';
+      this.customerForm.phone = s.phone || this.chatActive?.phone || '';
+      this.goToSection('clientes');
+      this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     },
     get chatFilteredConversations() {
       const f = this.chatFilter;
@@ -1632,10 +1675,12 @@ function parceiroApp() {
 
     selectChat(id) {
       this.chatActiveId = id;
+      this.chatCustomer = null; // Fase 2a: limpa enquanto carrega o cliente da nova conversa
       const c = this.chatConversations.find((x) => x.id === id);
       if (c) c.unread = 0;
       void this.markChatRead(id); // zera no servidor (senao o badge volta no poll)
       void this.loadChatMessages(id);
+      void this.loadChatCustomer(id); // Fase 2a: cliente vinculado + métricas
       this.$nextTick(() => { lucide.createIcons(); this.scrollChatToEnd(); });
     },
     async markChatRead(id) {
