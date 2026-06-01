@@ -2887,6 +2887,17 @@ html, body {
 .cx-link-cta b { font-size: 15px; font-weight: 700; }
 .cx-link-cta p { font-size: 12.5px; color: #94a3b8; line-height: 1.45; max-width: 280px; }
 .cx-link-cta .cx-btn-y { margin-top: 6px; width: auto; padding: 12px 20px; }
+/* Picker/carrinho do pedido no chat (Fase 2b) */
+.cx-input { width: 100%; background: rgba(0,0,0,.25); border: 1px solid var(--cx-line2, rgba(255,255,255,.14)); border-radius: 9px; padding: 9px 11px; color: inherit; font-size: 13.5px; box-shadow: inset 0 1px 3px rgba(0,0,0,.4); }
+.cx-input::placeholder { color: #94a3b8; }
+.cx-pick-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin: 12px 0; }
+.cx-add { background: rgba(255,208,0,.14); color: var(--pos-yellow); border: 1px solid rgba(255,208,0,.3); border-radius: 9px; padding: 0 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; height: 38px; white-space: nowrap; }
+.cx-add svg.lucide { width: 15px; height: 15px; }
+.cx-cart { display: flex; flex-direction: column; margin-bottom: 8px; }
+.cx-buy-del { color: #94a3b8; flex: 0 0 auto; }
+.cx-buy-del:hover { color: #fb7185; }
+.cx-buy-del svg.lucide { width: 15px; height: 15px; }
+.cx-btn-o:disabled, .cx-btn-y:disabled { opacity: .6; cursor: default; }
 
 /* ─── Card ocioso ─── */
 .cx-idle { border-radius: 14px; padding: 18px; flex: 0 0 auto; }

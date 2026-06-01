@@ -87,6 +87,12 @@ function parceiroApp() {
       { id: 'vip',       label: 'VIP',       cls: 't-vip' },
     ],
     chatCustomer: null,       // Fase 2a: cliente vinculado + métricas { linked, customer, metrics, last_orders } | { linked:false, suggestion }
+    // Fase 2b: carrinho próprio do chat (separado do PDV do balcão)
+    chatOrderCart: [],
+    chatOrderProduct: '',
+    chatOrderQty: 1,
+    chatOrderPrice: 0,
+    chatOrderAddress: '',
     // Entrega: filtro (em aberto x entregues) e rascunho do entregador por pedido.
     deliveryShowDone: false,
     deliveryDrafts: {},
@@ -1502,7 +1508,14 @@ function parceiroApp() {
       this.chatCustomer = null;
       try {
         const data = await this.api(`chat/conversations/${id}/customer`);
-        if (this.chatActiveId === id) this.chatCustomer = data;
+        if (this.chatActiveId === id) {
+          this.chatCustomer = data;
+          // Prefilla o endereço do pedido com o do cliente vinculado (Fase 2b).
+          const a = this.chatCustomerAddr();
+          if (a && !this.chatOrderAddress.trim()) {
+            this.chatOrderAddress = [a.street, a.neighborhood, a.city].filter(Boolean).join(', ');
+          }
+        }
       } catch (err) {
         console.warn('chat_customer_failed', err);
       }
@@ -1536,6 +1549,77 @@ function parceiroApp() {
       this.customerForm.phone = s.phone || this.chatActive?.phone || '';
       this.goToSection('clientes');
       this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    },
+
+    // ─── Fase 2b: Criar pedido pelo chat (carrinho próprio + endpoint /vendas) ───
+    get chatOrderTotal() {
+      return this.chatOrderCart.reduce((s, it) => s + this.num(it.quantity) * this.num(it.unit_price), 0);
+    },
+    chatOrderOnProduct() {
+      const p = this.produtos.find((x) => x.stock_id === this.chatOrderProduct);
+      if (p && p.sale_price !== null && p.sale_price !== undefined) this.chatOrderPrice = Number(p.sale_price);
+    },
+    chatOrderAdd() {
+      const p = this.produtos.find((x) => x.stock_id === this.chatOrderProduct);
+      if (!p) { this.flash('Escolha um pneu do estoque.'); return; }
+      const qty = this.num(this.chatOrderQty) || 1;
+      const price = this.num(this.chatOrderPrice) || 0;
+      const ex = this.chatOrderCart.find((it) => it.partner_stock_id === p.stock_id);
+      if (ex) ex.quantity = this.num(ex.quantity) + qty;
+      else this.chatOrderCart.push({ partner_stock_id: p.stock_id, item_name: p.item_name, tire_size: p.tire_size, brand: p.brand, quantity: qty, unit_price: price });
+      this.chatOrderProduct = ''; this.chatOrderQty = 1; this.chatOrderPrice = 0;
+      this.$nextTick(() => lucide.createIcons());
+    },
+    chatOrderRemove(id) {
+      this.chatOrderCart = this.chatOrderCart.filter((it) => it.partner_stock_id !== id);
+      this.$nextTick(() => lucide.createIcons());
+    },
+    chatResetOrder() {
+      this.chatOrderCart = []; this.chatOrderProduct = ''; this.chatOrderQty = 1; this.chatOrderPrice = 0; this.chatOrderAddress = '';
+    },
+    // "Gerar orçamento": monta o texto no campo de mensagem (operador revisa e envia).
+    chatGerarOrcamento() {
+      if (!this.chatOrderCart.length) { this.flash('Adicione itens ao pedido primeiro.'); return; }
+      const lines = this.chatOrderCart.map((it) =>
+        `• ${this.num(it.quantity)}x ${[it.brand, it.tire_size, it.item_name].filter(Boolean).join(' ')} — ${this.money(this.num(it.quantity) * this.num(it.unit_price))}`);
+      this.chatDraft = `Orçamento:\n${lines.join('\n')}\n\nTotal: ${this.money(this.chatOrderTotal)}`;
+      this.flash('Orçamento montado no campo de mensagem — revise e envie.');
+    },
+    // "Converter em pedido": cria pedido em aberto p/ entrega (a receber), igual ao fluxo de Entrega.
+    async chatConverterPedido() {
+      if (!this.chatOrderCart.length) { this.flash('Adicione itens ao pedido primeiro.'); return; }
+      if (!this.chatOrderAddress.trim()) { this.flash('Informe o endereço de entrega.'); return; }
+      if (this.saving) return;
+      this.saving = true; this.savingAction = 'chatorder';
+      try {
+        const c = this.chatActive;
+        const linked = (this.chatCustomer && this.chatCustomer.linked) ? this.chatCustomer.customer : null;
+        const body = {
+          customer_id: linked ? linked.id : null,
+          customer_name: (c && c.name) || null,
+          customer_phone: this.toE164Phone((linked && linked.phone) || (c && c.phone) || ''),
+          items: this.chatOrderCart.map((it) => ({
+            partner_stock_id: it.partner_stock_id,
+            quantity: this.num(it.quantity) || 1,
+            unit_price: this.num(it.unit_price) || 0,
+          })),
+          payment_method: 'A receber',
+          payment_status: 'receivable',
+          receivable_due_date: null,
+          fulfillment_mode: 'delivery',
+          delivery_address: this.chatOrderAddress.trim(),
+          source_tag: 'outro',
+          idempotency_key: 'chat-' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2))),
+        };
+        await this.api('vendas', { method: 'POST', body: JSON.stringify(body) });
+        this.chatResetOrder();
+        await this.loadData();
+        this.flash('Pedido gerado — estoque reservado. Entra no caixa quando o entregador finalizar.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
     },
     get chatFilteredConversations() {
       const f = this.chatFilter;
@@ -1676,6 +1760,7 @@ function parceiroApp() {
     selectChat(id) {
       this.chatActiveId = id;
       this.chatCustomer = null; // Fase 2a: limpa enquanto carrega o cliente da nova conversa
+      this.chatResetOrder();    // Fase 2b: zera o carrinho ao trocar de conversa
       const c = this.chatConversations.find((x) => x.id === id);
       if (c) c.unread = 0;
       void this.markChatRead(id); // zera no servidor (senao o badge volta no poll)

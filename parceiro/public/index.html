@@ -1626,37 +1626,44 @@
                 <i class="cx-chev" data-lucide="chevron-up"></i>
               </div>
               <div class="cx-acc-body">
-                <span class="cx-demo">Demonstração — conecta ao estoque na Fase 2</span>
-                <div class="cx-ordsearch"><i data-lucide="search"></i> <span>Buscar pneu no estoque...</span> <i class="cx-box" data-lucide="package-search"></i></div>
-                <div class="cx-prodbox">
-                  <div class="cx-prod">
-                    <div class="cx-brand">PIRELLI</div>
-                    <div class="cx-prod-info">
-                      <b>Pirelli Diablo Rosso Sport</b>
-                      <div class="cx-spec">Traseiro · Sport Touring</div>
-                      <div class="cx-size">190/50-18 <span class="cx-badge"><i data-lucide="check-circle"></i> Em estoque</span> <span class="cx-badge cx-cond"><i data-lucide="sparkles"></i> Novo</span> <span class="cx-muted">15 unid.</span></div>
+                <!-- Picker de produto do estoque -->
+                <div class="cx-fld"><label>Buscar pneu no estoque</label>
+                  <select class="cx-input" x-model="chatOrderProduct" @change="chatOrderOnProduct()">
+                    <option value="">Selecione um pneu...</option>
+                    <template x-for="p in produtos" :key="p.stock_id">
+                      <option :value="p.stock_id" x-text="[p.brand, p.tire_size, p.item_name].filter(Boolean).join(' · ')"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="cx-pick-row">
+                  <div class="cx-fld"><label>Qtd</label><input type="number" min="1" class="cx-input" x-model.number="chatOrderQty"></div>
+                  <div class="cx-fld"><label>Preço unit.</label><input type="number" step="0.01" class="cx-input" x-model.number="chatOrderPrice"></div>
+                  <button class="cx-add" @click="chatOrderAdd()"><i data-lucide="plus"></i> Adicionar</button>
+                </div>
+
+                <!-- Carrinho -->
+                <div class="cx-cart" x-show="chatOrderCart.length">
+                  <template x-for="it in chatOrderCart" :key="it.partner_stock_id">
+                    <div class="cx-buy">
+                      <span class="cx-buy-ic"><i data-lucide="disc"></i></span>
+                      <div class="cx-buy-main"><b x-text="[it.brand, it.tire_size].filter(Boolean).join(' ') || it.item_name"></b><small x-text="it.quantity + 'x ' + money(it.unit_price)"></small></div>
+                      <span class="cx-buy-price" x-text="money(num(it.quantity)*num(it.unit_price))"></span>
+                      <button class="cx-buy-del" @click="chatOrderRemove(it.partner_stock_id)"><i data-lucide="x"></i></button>
                     </div>
-                    <button class="cx-alter"><i data-lucide="pencil"></i> Alterar</button>
-                  </div>
+                  </template>
                 </div>
-                <div class="cx-frow3">
-                  <div class="cx-fld"><label>Quantidade</label><div class="cx-stepper"><button>−</button><span>1</span><button>+</button></div></div>
-                  <div class="cx-fld"><label>Preço unitário</label><div class="cx-inp"><i data-lucide="tag"></i> R$ 548,90</div></div>
-                  <div class="cx-fld"><label>Desconto</label><div class="cx-inp"><i data-lucide="tag"></i> R$ 0,00</div></div>
+                <div class="cx-empty" x-show="!chatOrderCart.length"><i data-lucide="package-search"></i> Busque um pneu acima e adicione ao pedido.</div>
+
+                <!-- Endereço de entrega (pedido em aberto p/ entrega) -->
+                <div class="cx-fld" x-show="chatOrderCart.length" style="margin-top:12px">
+                  <label>Endereço de entrega</label>
+                  <input class="cx-input" x-model="chatOrderAddress" placeholder="Rua, número, bairro, cidade...">
                 </div>
-                <div class="cx-frow2">
-                  <div class="cx-fld"><label>Frete</label><div class="cx-inp"><i data-lucide="truck"></i> Entrega expressa <span class="cx-cv">R$ 25,90 <i data-lucide="chevron-down"></i></span></div></div>
-                  <div class="cx-fld"><label>Prazo estimado</label><div class="cx-inp"><i data-lucide="calendar"></i> 24/05 · 1 dia útil</div></div>
-                </div>
-                <div class="cx-fld"><label>Forma de pagamento</label><div class="cx-inp"><i data-lucide="credit-card"></i> Pix <span class="cx-cv"><i data-lucide="chevron-down"></i></span></div></div>
-                <div class="cx-breakdown">
-                  <div><span><i data-lucide="credit-card"></i> Subtotal</span><b>R$ 548,90</b></div>
-                  <div><span><i data-lucide="tag"></i> Desconto</span><b>− R$ 0,00</b></div>
-                  <div><span><i data-lucide="truck"></i> Frete</span><b>+ R$ 25,90</b></div>
-                </div>
-                <div class="cx-total"><b>Total</b><strong>R$ 574,90</strong></div>
-                <button class="cx-btn-y" @click="flash('Criar pedido pelo chat chega na Fase 2')"><i data-lucide="file-text"></i> Gerar orçamento</button>
-                <button class="cx-btn-o" @click="flash('Criar pedido pelo chat chega na Fase 2')"><i data-lucide="file-check"></i> Converter em pedido</button>
+
+                <div class="cx-total" x-show="chatOrderCart.length"><b>Total</b><strong x-text="money(chatOrderTotal)"></strong></div>
+
+                <button class="cx-btn-y" @click="chatGerarOrcamento()"><i data-lucide="file-text"></i> Gerar orçamento</button>
+                <button class="cx-btn-o" :disabled="saving" @click="chatConverterPedido()"><i data-lucide="file-check"></i> Converter em pedido</button>
               </div>
             </div>
 
