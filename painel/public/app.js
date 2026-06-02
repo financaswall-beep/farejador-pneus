@@ -35,7 +35,6 @@ function painelApp() {
     chatwootBaseUrl: null,
     chatwootAccountId: null,
     agentV2WorkerEnabled: null,
-    shadowSelectedIndex: 0,
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
@@ -55,17 +54,11 @@ function painelApp() {
       { id: 'dependencia_2w', label: 'Dependentes 2W' },
       { id: 'risco', label: 'Score baixo' },
     ],
-    shadowLastLoadedAt: null,
-    shadowRefreshing: false,
-    shadowAutoRefreshId: null,
-
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
-      { id: 'resumo',   label: 'Resumo',       icon: 'layout-dashboard' },
-      { id: 'operacao', label: 'Operação',     icon: 'message-circle', badge: '3' },
-      { id: 'pedidos',  label: 'Pedidos',      icon: 'shopping-bag' },
-      { id: 'rede',     label: 'Rede',         icon: 'network', badge: '6' },
-      { id: 'shadow',   label: 'Bot / Shadow', icon: 'bot', badge: '125' },
+      { id: 'resumo',   label: 'Resumo',  icon: 'layout-dashboard' },
+      { id: 'pedidos',  label: 'Pedidos', icon: 'shopping-bag' },
+      { id: 'rede',     label: 'Rede',    icon: 'network' },
     ],
 
     futureMenu: [
@@ -86,490 +79,23 @@ function painelApp() {
       { id: 'ano',     label: 'Último ano' },
     ],
 
-    // ─── MOCK: Notificações ─────────────────────────
-    notificacoes: [
-      {
-        title: 'Draft pronto · aguardando confirmação',
-        desc: 'João Silva · 1× Levorin 90/90-18 · R$ 180 · Pix',
-        time: 'há 2 min',
-        icon: 'receipt',
-        iconBg: 'bg-orange-100',
-        iconColor: 'text-brand-600',
-        read: false
-      },
-      {
-        title: 'Bot bloqueado pelo validador',
-        desc: 'SayValidator rejeitou preço abaixo do mínimo na conversa #c2e0',
-        time: 'há 5 min',
-        icon: 'shield-alert',
-        iconBg: 'bg-rose-100',
-        iconColor: 'text-rose-600',
-        read: false
-      },
-      {
-        title: 'Cliente aguardando há 12 min',
-        desc: 'Maria Costa · WhatsApp · sem resposta humana',
-        time: 'há 12 min',
-        icon: 'clock',
-        iconBg: 'bg-amber-100',
-        iconColor: 'text-amber-700',
-        read: false
-      },
-      {
-        title: 'Nova escalação humana',
-        desc: 'Ana Lima pediu pra falar com um humano',
-        time: 'há 18 min',
-        icon: 'arrow-up-right',
-        iconBg: 'bg-blue-100',
-        iconColor: 'text-blue-700',
-        read: false
-      },
-      {
-        title: 'Estoque baixo',
-        desc: 'Pirelli 100/80-18 · apenas 3 unidades em estoque',
-        time: 'há 28 min',
-        icon: 'package',
-        iconBg: 'bg-amber-100',
-        iconColor: 'text-amber-700',
-        read: false
-      },
-      {
-        title: 'Venda registrada',
-        desc: 'Carlos R. · 2× Michelin 180/55-17 · R$ 1.420 · Cartão',
-        time: 'há 32 min · Wallace',
-        icon: 'check-circle-2',
-        iconBg: 'bg-emerald-100',
-        iconColor: 'text-emerald-700',
-        read: true
-      },
-      {
-        title: 'Incidente do bot · severidade média',
-        desc: 'Validator bloqueou bot 5x na última hora',
-        time: 'há 1h',
-        icon: 'alert-triangle',
-        iconBg: 'bg-rose-100',
-        iconColor: 'text-rose-600',
-        read: true
-      },
-      {
-        title: 'Pedido cancelado',
-        desc: '#42 · Ana Lima · motivo: cliente desistiu',
-        time: 'há 1h15',
-        icon: 'x-circle',
-        iconBg: 'bg-gray-100',
-        iconColor: 'text-gray-600',
-        read: true
-      },
-    ],
-
-    // ─── MOCK: KPIs ─────────────────────────────────
-    kpis: [
-      {
-        label: 'Faturamento',
-        value: 'R$ 121.920',
-        delta: '+21,20%',
-        deltaClass: 'bg-emerald-50 text-emerald-700',
-        icon: 'trending-up',
-        iconBg: 'bg-emerald-100',
-        iconColor: 'text-emerald-700'
-      },
-      {
-        label: 'Pedidos',
-        value: '89',
-        delta: '+12',
-        deltaClass: 'bg-purple-50 text-purple-700',
-        icon: 'shopping-bag',
-        iconBg: 'bg-purple-100',
-        iconColor: 'text-purple-700'
-      },
-      {
-        label: 'Clientes',
-        value: '127',
-        delta: '+18',
-        deltaClass: 'bg-blue-50 text-blue-700',
-        icon: 'users',
-        iconBg: 'bg-blue-100',
-        iconColor: 'text-blue-700'
-      },
-      {
-        label: 'Conversas',
-        value: '412',
-        delta: '+18%',
-        deltaClass: 'bg-amber-50 text-amber-700',
-        icon: 'message-circle',
-        iconBg: 'bg-amber-100',
-        iconColor: 'text-amber-700'
-      },
-    ],
-
-    // ─── MOCK: Últimas vendas ───────────────────────
-    ultimasVendas: [
-      {
-        nome: 'João Silva', initial: 'J', avatarBg: 'bg-gradient-to-br from-orange-400 to-orange-600',
-        local: 'Rio do Ouro', itens: '1× Levorin 90/90-18',
-        tag: 'Recorrente', tagClass: 'bg-emerald-50 text-emerald-700',
-        valor: '+R$ 180,00', delta: '+7,5%', deltaClass: 'text-emerald-600'
-      },
-      {
-        nome: 'Maria Costa', initial: 'M', avatarBg: 'bg-gradient-to-br from-pink-400 to-pink-600',
-        local: 'Niterói', itens: '2× Pirelli 110/80-17',
-        tag: 'Novo cliente', tagClass: 'bg-blue-50 text-blue-700',
-        valor: '+R$ 720,00', delta: '+22,5%', deltaClass: 'text-emerald-600'
-      },
-      {
-        nome: 'Pedro Santos', initial: 'P', avatarBg: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
-        local: 'São Gonçalo', itens: '1× Pirelli 130/90-16',
-        tag: 'Recorrente', tagClass: 'bg-emerald-50 text-emerald-700',
-        valor: '+R$ 380,00', delta: '+8,21%', deltaClass: 'text-emerald-600'
-      },
-      {
-        nome: 'Carlos Rodrigues', initial: 'C', avatarBg: 'bg-gradient-to-br from-teal-400 to-teal-600',
-        local: 'Centro', itens: '2× Michelin 180/55-17',
-        tag: 'VIP', tagClass: 'bg-amber-50 text-amber-700',
-        valor: '+R$ 1.420,00', delta: '+34,12%', deltaClass: 'text-emerald-600'
-      },
-      {
-        nome: 'Ana Lima', initial: 'A', avatarBg: 'bg-gradient-to-br from-rose-400 to-rose-600',
-        local: 'Madureira', itens: '1× Levorin 140/70-17',
-        tag: 'Cancelado', tagClass: 'bg-rose-50 text-rose-700',
-        valor: '−R$ 250,00', delta: '−100%', deltaClass: 'text-rose-600'
-      },
-    ],
-
-    // ─── MOCK: Conversas ativas ─────────────────────
-    conversasAtivas: [
-      {
-        name: 'João Silva', initial: 'J',
-        avatarBg: 'bg-gradient-to-br from-orange-400 to-orange-600',
-        channel: 'WhatsApp', channelClass: 'bg-emerald-50 text-emerald-700',
-        ago: '2min', lastMsg: 'pode fechar, é Pix mesmo',
-        slots: [
-          { k: 'moto', v: 'Fan 160' },
-          { k: 'medida', v: '90/90-18' },
-          { k: 'posição', v: 'traseiro' },
-          { k: 'pagto', v: 'Pix' },
-          { k: 'bairro', v: 'Rio do Ouro' },
-        ],
-        phone: '+55 21 99999-1234',
-        draft: '1× Levorin 90/90-18 · R$ 180 · Pix · Entrega Rio do Ouro'
-      },
-      {
-        name: 'Maria Costa', initial: 'M',
-        avatarBg: 'bg-gradient-to-br from-pink-400 to-pink-600',
-        channel: 'Instagram', channelClass: 'bg-pink-50 text-pink-700',
-        ago: '8min', lastMsg: 'tem 100/80 pra Titan?',
-        slots: [
-          { k: 'moto', v: 'Titan' },
-          { k: 'medida', v: '100/80-17' },
-        ],
-        phone: '@mariacosta',
-        draft: null
-      },
-      {
-        name: 'Pedro Santos', initial: 'P',
-        avatarBg: 'bg-gradient-to-br from-indigo-400 to-indigo-600',
-        channel: 'WhatsApp', channelClass: 'bg-emerald-50 text-emerald-700',
-        ago: '14min', lastMsg: 'qual o preço pra par no Twister?',
-        slots: [
-          { k: 'moto', v: 'Twister' },
-          { k: 'medida', v: '110/70-17 + 140/70-17' },
-          { k: 'qtd', v: '2 pneus' },
-        ],
-        phone: '+55 21 98888-5678',
-        draft: '1× Pirelli 110/70-17 + 1× Pirelli 140/70-17 · R$ 720 · ?'
-      },
-    ],
-
-    // ─── MOCK: Pedidos ──────────────────────────────
-    pedidos: [
-      { data: '18/05 14:32', cliente: 'João Silva',   itens: '1× Levorin 90/90-18',           pagto: 'Pix',      operador: 'Wallace', total: 'R$ 180',   status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-      { data: '18/05 11:15', cliente: 'Maria Costa',  itens: '2× Pirelli 110/80-17',          pagto: 'Cartão',   operador: 'Wallace', total: 'R$ 720',   status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-      { data: '17/05 18:42', cliente: 'Pedro Santos', itens: '1× Pirelli 130/90-16',          pagto: 'Pix',      operador: 'Wallace', total: 'R$ 380',   status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-      { data: '17/05 16:01', cliente: 'Ana Lima',     itens: '1× Levorin 140/70-17',          pagto: 'Pix',      operador: 'Wallace', total: 'R$ 250',   status: 'Cancelado',  statusClass: 'bg-rose-50 text-rose-700',       dotClass: 'bg-rose-500' },
-      { data: '17/05 12:48', cliente: 'Carlos R.',    itens: '2× Michelin 180/55-17',         pagto: 'Cartão',   operador: 'Wallace', total: 'R$ 1.420', status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-      { data: '17/05 10:22', cliente: 'Bruno F.',     itens: '1× Levorin 100/80-18 + serviço',pagto: 'Dinheiro', operador: 'Wallace', total: 'R$ 240',   status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-      { data: '16/05 19:14', cliente: 'Felipe S.',    itens: '1× Pirelli 150/60-17',          pagto: 'Pix',      operador: 'Wallace', total: 'R$ 410',   status: 'Confirmado', statusClass: 'bg-emerald-50 text-emerald-700', dotClass: 'bg-emerald-500' },
-    ],
+    // Resumo (cockpit do dono) = bot/tráfego (applyMatrizResumo) + cobrança (applyRede).
+    notificacoes: [],
+    kpis: [],
+    leadsRecuperar: [],
+    resumoSeries: [],
+    pedidos: [],
 
     produtos: [],
 
-    redeKpis: [
-      { label: 'Parceiros ativos', value: '6', detail: '2 em credenciamento', icon: 'building-2', tone: 'bg-blue-50 text-blue-700' },
-      { label: 'Vendas da rede', value: 'R$ 18.430', detail: 'últimos 7 dias', icon: 'trending-up', tone: 'bg-emerald-50 text-emerald-700' },
-      { label: 'SKUs cadastrados', value: '214', detail: 'somando estoques locais', icon: 'package', tone: 'bg-amber-50 text-amber-700' },
-      { label: 'Alertas operacionais', value: '9', detail: 'estoque baixo ou sem venda', icon: 'alert-triangle', tone: 'bg-rose-50 text-rose-700' },
-    ],
+    redeKpis: [],
 
-    parceirosRede: [
-      {
-        nome: 'Borracharia Rio do Ouro',
-        documento: '12.345.678/0001-90',
-        responsavel: 'Carlos',
-        whatsapp: '+55 21 98888-0101',
-        endereco: 'Estrada do Rio do Ouro, 1200 - São Gonçalo/RJ',
-        modeloComercial: 'Credenciado · comissão por venda',
-        comissao: '8%',
-        cidade: 'São Gonçalo',
-        status: 'Ativo',
-        vendas: 'R$ 4.820',
-        vendasValor: 4820,
-        pedidos: 31,
-        ticket: 'R$ 155',
-        estoque: '43 SKUs',
-        estoqueBaixo: 3,
-        margem: '28%',
-        comprasPneus: 2710,
-        folha: 1280,
-        despesasExtras: 420,
-        lucroEstimado: 410,
-        alerta: '3 baixos',
-        serieVendas: [420, 610, 540, 790, 880, 720, 860],
-        seriePedidos: [3, 4, 3, 6, 7, 4, 4],
-        topPneus: ['90/90-18', '100/80-18', '110/70-17'],
-        estoqueItens: [
-          { pneu: '90/90-18 traseiro', qtd: 4, minimo: 6, ultimaCompra: '14/05', fornecedor: 'Rinaldi', custoMedio: 'R$ 92', custo: 'R$ 92', venda: 'R$ 155', margem: '41%', status: 'baixo' },
-          { pneu: '100/80-18 traseiro', qtd: 11, minimo: 5, ultimaCompra: '12/05', fornecedor: 'Levorin', custoMedio: 'R$ 108', custo: 'R$ 108', venda: 'R$ 180', margem: '40%', status: 'ok' },
-          { pneu: '110/70-17 dianteiro', qtd: 7, minimo: 4, ultimaCompra: '10/05', fornecedor: 'Pirelli', custoMedio: 'R$ 120', custo: 'R$ 120', venda: 'R$ 210', margem: '43%', status: 'ok' },
-          { pneu: '80/100-18 dianteiro', qtd: null, minimo: null, ultimaCompra: '-', fornecedor: '-', custoMedio: '-', custo: '-', venda: '-', margem: '-', status: 'não controlado' },
-        ],
-        equipe: ['Carlos', 'João'],
-        diasSemAtualizar: 1,
-        lancamentos: [
-          { tipo: 'Venda', data: 'Hoje 15:20', descricao: '90/90-18 traseiro · Pix', valor: 155 },
-          { tipo: 'Compra pneus', data: 'Ontem 10:14', descricao: 'Reposição 90/90-18 · 10 un.', valor: -920 },
-          { tipo: 'Pagamento funcionário', data: '17/05', descricao: 'Diária João', valor: -180 },
-          { tipo: 'Despesa extra', data: '16/05', descricao: 'Conserto compressor', valor: -240 },
-        ],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 2.710' },
-          { label: 'Funcionários', value: 'R$ 1.280' },
-          { label: 'Despesas extras', value: 'R$ 420' },
-        ],
-      },
-      {
-        nome: 'Pneus Alcântara',
-        documento: '23.456.789/0001-10',
-        responsavel: 'Renata',
-        whatsapp: '+55 21 97777-0202',
-        endereco: 'Rua João Caetano, 88 - Alcântara, São Gonçalo/RJ',
-        modeloComercial: 'Credenciado · mensalidade + comissão',
-        comissao: '6%',
-        cidade: 'São Gonçalo',
-        status: 'Ativo',
-        vendas: 'R$ 3.260',
-        vendasValor: 3260,
-        pedidos: 19,
-        ticket: 'R$ 172',
-        estoque: '31 SKUs',
-        estoqueBaixo: 0,
-        margem: '24%',
-        comprasPneus: 1840,
-        folha: 980,
-        despesasExtras: 260,
-        lucroEstimado: 180,
-        alerta: 'ok',
-        serieVendas: [280, 320, 410, 520, 480, 610, 640],
-        seriePedidos: [2, 2, 3, 4, 3, 3, 2],
-        topPneus: ['100/80-18', '80/100-18', '2.75-18'],
-        estoqueItens: [
-          { pneu: '100/80-18 traseiro', qtd: 8, minimo: 4, ultimaCompra: '15/05', fornecedor: 'Levorin', custoMedio: 'R$ 104', custo: 'R$ 104', venda: 'R$ 175', margem: '41%', status: 'ok' },
-          { pneu: '80/100-18 dianteiro', qtd: 6, minimo: 4, ultimaCompra: '13/05', fornecedor: 'Rinaldi', custoMedio: 'R$ 88', custo: 'R$ 88', venda: 'R$ 150', margem: '41%', status: 'ok' },
-          { pneu: '2.75-18 dianteiro', qtd: 5, minimo: 3, ultimaCompra: '09/05', fornecedor: 'Technic', custoMedio: 'R$ 72', custo: 'R$ 72', venda: 'R$ 130', margem: '45%', status: 'ok' },
-        ],
-        equipe: ['Renata'],
-        diasSemAtualizar: 0,
-        lancamentos: [
-          { tipo: 'Venda', data: 'Hoje 12:11', descricao: '100/80-18 traseiro', valor: 175 },
-          { tipo: 'Ajuste estoque', data: 'Hoje 09:40', descricao: 'Conferência balcão', valor: 0 },
-          { tipo: 'Despesa extra', data: 'Ontem', descricao: 'Motoboy local', valor: -60 },
-        ],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 1.840' },
-          { label: 'Funcionários', value: 'R$ 980' },
-          { label: 'Despesas extras', value: 'R$ 260' },
-        ],
-      },
-      {
-        nome: 'Moto Pneus Niterói',
-        documento: '34.567.890/0001-22',
-        responsavel: 'Paulo',
-        whatsapp: '+55 21 96666-0303',
-        endereco: 'Av. Central, 455 - Niterói/RJ',
-        modeloComercial: 'Credenciado premium',
-        comissao: '10%',
-        cidade: 'Niterói',
-        status: 'Ativo',
-        vendas: 'R$ 5.910',
-        vendasValor: 5910,
-        pedidos: 27,
-        ticket: 'R$ 219',
-        estoque: '58 SKUs',
-        estoqueBaixo: 1,
-        margem: '31%',
-        comprasPneus: 3290,
-        folha: 1460,
-        despesasExtras: 480,
-        lucroEstimado: 680,
-        alerta: '1 baixo',
-        serieVendas: [760, 830, 690, 920, 870, 1010, 830],
-        seriePedidos: [4, 5, 3, 5, 4, 4, 2],
-        topPneus: ['140/70-17', '110/70-17', '130/70-17'],
-        estoqueItens: [
-          { pneu: '140/70-17 traseiro', qtd: 9, minimo: 4, ultimaCompra: '16/05', fornecedor: 'Pirelli', custoMedio: 'R$ 210', custo: 'R$ 210', venda: 'R$ 330', margem: '36%', status: 'ok' },
-          { pneu: '110/70-17 dianteiro', qtd: 3, minimo: 5, ultimaCompra: '11/05', fornecedor: 'Michelin', custoMedio: 'R$ 128', custo: 'R$ 128', venda: 'R$ 215', margem: '40%', status: 'baixo' },
-          { pneu: '130/70-17 traseiro', qtd: 14, minimo: 6, ultimaCompra: '12/05', fornecedor: 'Levorin', custoMedio: 'R$ 176', custo: 'R$ 176', venda: 'R$ 285', margem: '38%', status: 'ok' },
-          { pneu: '150/60-17 traseiro', qtd: 2, minimo: 3, ultimaCompra: '08/05', fornecedor: 'Pirelli', custoMedio: 'R$ 260', custo: 'R$ 260', venda: 'R$ 410', margem: '37%', status: 'baixo' },
-        ],
-        equipe: ['Paulo', 'Diego'],
-        diasSemAtualizar: 0,
-        lancamentos: [
-          { tipo: 'Venda', data: 'Hoje 16:05', descricao: '140/70-17 + instalação', valor: 330 },
-          { tipo: 'Venda', data: 'Hoje 11:18', descricao: '130/70-17 traseiro', valor: 285 },
-          { tipo: 'Compra pneus', data: '16/05', descricao: 'Pirelli mix aro 17', valor: -3290 },
-          { tipo: 'Pagamento funcionário', data: '15/05', descricao: 'Diária Diego', valor: -220 },
-        ],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 3.290' },
-          { label: 'Funcionários', value: 'R$ 1.460' },
-          { label: 'Despesas extras', value: 'R$ 480' },
-        ],
-      },
-      {
-        nome: 'Parceiro Tribobó',
-        documento: 'CPF 123.456.789-00',
-        responsavel: 'Marcos',
-        whatsapp: '+55 21 95555-0404',
-        endereco: 'Tribobó - São Gonçalo/RJ',
-        modeloComercial: 'Em credenciamento',
-        comissao: 'a definir',
-        cidade: 'São Gonçalo',
-        status: 'Credenciamento',
-        vendas: 'R$ 0',
-        vendasValor: 0,
-        pedidos: 0,
-        ticket: 'R$ 0',
-        estoque: 'aguardando',
-        estoqueBaixo: 0,
-        margem: '-',
-        comprasPneus: 0,
-        folha: 0,
-        despesasExtras: 0,
-        lucroEstimado: 0,
-        alerta: 'cadastro',
-        serieVendas: [0, 0, 0, 0, 0, 0, 0],
-        seriePedidos: [0, 0, 0, 0, 0, 0, 0],
-        topPneus: ['aguardando catálogo'],
-        estoqueItens: [],
-        equipe: ['Marcos'],
-        diasSemAtualizar: 8,
-        lancamentos: [],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 0' },
-          { label: 'Funcionários', value: 'R$ 0' },
-          { label: 'Despesas extras', value: 'R$ 0' },
-        ],
-      },
-      {
-        nome: 'Borracharia Itaipu',
-        documento: '45.678.901/0001-33',
-        responsavel: 'Leandro',
-        whatsapp: '+55 21 94444-0505',
-        endereco: 'Estrada de Itaipu, 300 - Niterói/RJ',
-        modeloComercial: 'Credenciado · comissão por venda',
-        comissao: '7%',
-        cidade: 'Niterói',
-        status: 'Ativo',
-        vendas: 'R$ 2.140',
-        vendasValor: 2140,
-        pedidos: 12,
-        ticket: 'R$ 178',
-        estoque: '27 SKUs',
-        estoqueBaixo: 2,
-        margem: '21%',
-        comprasPneus: 1260,
-        folha: 740,
-        despesasExtras: 310,
-        lucroEstimado: -170,
-        alerta: 'sem venda hoje',
-        serieVendas: [390, 420, 310, 460, 360, 200, 0],
-        seriePedidos: [2, 3, 2, 2, 2, 1, 0],
-        topPneus: ['90/90-18', '100/90-18', '110/90-17'],
-        estoqueItens: [
-          { pneu: '90/90-18 traseiro', qtd: 0, minimo: 5, ultimaCompra: '02/05', fornecedor: 'Rinaldi', custoMedio: 'R$ 94', custo: 'R$ 94', venda: 'R$ 155', margem: '39%', status: 'zerado' },
-          { pneu: '100/90-18 traseiro', qtd: 2, minimo: 4, ultimaCompra: '07/05', fornecedor: 'Levorin', custoMedio: 'R$ 118', custo: 'R$ 118', venda: 'R$ 190', margem: '38%', status: 'baixo' },
-          { pneu: '110/90-17 traseiro', qtd: 6, minimo: 3, ultimaCompra: '04/05', fornecedor: 'Technic', custoMedio: 'R$ 132', custo: 'R$ 132', venda: 'R$ 220', margem: '40%', status: 'ok' },
-        ],
-        equipe: ['Leandro'],
-        diasSemAtualizar: 4,
-        lancamentos: [
-          { tipo: 'Compra pneus', data: '07/05', descricao: 'Reposição aro 18', valor: -1260 },
-          { tipo: 'Pagamento funcionário', data: '06/05', descricao: 'Ajuda balcão', valor: -160 },
-          { tipo: 'Despesa extra', data: '05/05', descricao: 'Energia/água rateada', valor: -150 },
-        ],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 1.260' },
-          { label: 'Funcionários', value: 'R$ 740' },
-          { label: 'Despesas extras', value: 'R$ 310' },
-        ],
-      },
-      {
-        nome: 'Oficina Colubandê',
-        documento: 'CPF 987.654.321-00',
-        responsavel: 'Aline',
-        whatsapp: '+55 21 93333-0606',
-        endereco: 'Colubandê - São Gonçalo/RJ',
-        modeloComercial: 'Em credenciamento',
-        comissao: 'a definir',
-        cidade: 'São Gonçalo',
-        status: 'Credenciamento',
-        vendas: 'R$ 0',
-        vendasValor: 0,
-        pedidos: 0,
-        ticket: 'R$ 0',
-        estoque: '12 SKUs',
-        estoqueBaixo: 0,
-        margem: '-',
-        comprasPneus: 650,
-        folha: 0,
-        despesasExtras: 90,
-        lucroEstimado: -740,
-        alerta: 'validar preço',
-        serieVendas: [0, 0, 0, 0, 0, 0, 0],
-        seriePedidos: [0, 0, 0, 0, 0, 0, 0],
-        topPneus: ['90/90-18', '100/80-18'],
-        estoqueItens: [
-          { pneu: '90/90-18 traseiro', qtd: 4, minimo: 3, ultimaCompra: '18/05', fornecedor: 'Rinaldi', custoMedio: 'R$ 96', custo: 'R$ 96', venda: 'pendente', margem: '-', status: 'validar preço' },
-          { pneu: '100/80-18 traseiro', qtd: 8, minimo: 3, ultimaCompra: '18/05', fornecedor: 'Levorin', custoMedio: 'R$ 109', custo: 'R$ 109', venda: 'pendente', margem: '-', status: 'validar preço' },
-        ],
-        equipe: ['Aline'],
-        diasSemAtualizar: 2,
-        lancamentos: [
-          { tipo: 'Compra pneus', data: '18/05', descricao: 'Carga inicial credenciamento', valor: -650 },
-          { tipo: 'Despesa extra', data: '18/05', descricao: 'Material cadastro visual', valor: -90 },
-        ],
-        custosRecentes: [
-          { label: 'Compra pneus', value: 'R$ 650' },
-          { label: 'Funcionários', value: 'R$ 0' },
-          { label: 'Despesas extras', value: 'R$ 90' },
-        ],
-      },
-    ],
+    parceirosRede: [],
 
-    alertasRede: [
-      { tipo: 'Estoque baixo', texto: '90/90-18 traseiro abaixo do mínimo em 3 parceiros', tom: 'text-amber-700 bg-amber-50' },
-      { tipo: 'Sem venda hoje', texto: 'Borracharia Itaipu ainda não registrou venda hoje', tom: 'text-rose-700 bg-rose-50' },
-      { tipo: 'Credenciamento', texto: '2 parceiros aguardam validação de catálogo inicial', tom: 'text-blue-700 bg-blue-50' },
-    ],
+    // 2026-06-01: alertas fake removidos — os alertas reais saem de redeAlertasOperacionais (computa de parceirosRede).
+    alertasRede: [],
 
     // ─── COMPUTED ───────────────────────────────────
-    shadowPairs: [],
-    shadowKpis: [
-      { label: 'Mensagens cliente', value: '0' },
-      { label: 'Bot gerou resposta', value: '0' },
-      { label: 'Humano respondeu', value: '0' },
-      { label: 'Bot bloqueado', value: '0' },
-    ],
-
     currentPageTitle() {
       const all = [...this.liveMenu, ...this.futureMenu];
       return all.find(i => i.id === this.currentPage)?.label || '';
@@ -577,15 +103,6 @@ function painelApp() {
 
     notifBadgeCount() {
       return this.notificacoes.filter(n => !n.read).length;
-    },
-
-    currentShadowPair() {
-      return this.shadowPairs[this.shadowSelectedIndex] || this.shadowPairs[0] || null;
-    },
-
-    selectShadowPair(index) {
-      this.shadowSelectedIndex = index;
-      this.$nextTick(() => lucide.createIcons());
     },
 
     selectedParceiro() {
@@ -709,6 +226,18 @@ function painelApp() {
 
     redeTotalPorta() {
       return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.vendasPorta || 0), 0);
+    },
+
+    redeTotalComissao() {
+      return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.comissaoDevida || 0), 0);
+    },
+
+    redeTotalMensalidade() {
+      return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.mensalidadeDevida || 0), 0);
+    },
+
+    redeTotalDevido() {
+      return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.devidoMatriz || 0), 0);
     },
 
     redeConversao2w() {
@@ -1026,48 +555,6 @@ function painelApp() {
       return `${text.slice(0, max - 1)}...`;
     },
 
-    shadowStatusLabel(pair) {
-      if (!pair) return 'Sem par';
-      if (pair.comparison_status === 'paired') return 'Pareado';
-      if (pair.comparison_status === 'bot_blocked') return 'Bot bloqueado';
-      if (pair.comparison_status === 'missing_human_reply') return 'Aguardando humano';
-      if (pair.comparison_status === 'missing_bot_shadow') return 'Sem shadow';
-      if (pair.comparison_status === 'bot_empty') return 'Bot vazio';
-      return pair.comparison_status || 'Pendente';
-    },
-
-    shadowStatusClass(pair) {
-      const status = pair?.comparison_status;
-      if (status === 'paired') return 'bg-emerald-50 text-emerald-700';
-      if (status === 'bot_blocked') return 'bg-rose-50 text-rose-700';
-      if (status === 'missing_human_reply') return 'bg-amber-50 text-amber-700';
-      if (status === 'missing_bot_shadow' || status === 'bot_empty') return 'bg-gray-100 text-gray-700';
-      return 'bg-blue-50 text-blue-700';
-    },
-
-    chatwootUrl(target = this.currentShadowPair()) {
-      if (!target?.chatwoot_conversation_id || !this.chatwootBaseUrl || !this.chatwootAccountId) return null;
-      return `${this.chatwootBaseUrl}/app/accounts/${this.chatwootAccountId}/conversations/${target.chatwoot_conversation_id}`;
-    },
-
-    openChatwootConversation(target) {
-      const url = this.chatwootUrl(target);
-      if (!url) return;
-
-      const popup = window.open('', '_blank');
-      if (popup) {
-        popup.opener = null;
-        popup.location.href = url;
-        return;
-      }
-
-      window.location.assign(url);
-    },
-
-    openCurrentShadowInChatwoot() {
-      this.openChatwootConversation(this.currentShadowPair());
-    },
-
     initials(name) {
       return (name || '?').trim().slice(0, 1).toUpperCase();
     },
@@ -1101,41 +588,6 @@ function painelApp() {
       this.saleForm.unit_price = Number(product?.price_amount || 0);
     },
 
-    applyResumo(rows) {
-      const row = rows?.[0];
-      if (!row) return;
-      this.kpis = [
-        { label: 'Faturamento hoje', value: this.formatCurrency(row.faturamento_hoje), delta: 'real', deltaClass: 'bg-emerald-50 text-emerald-700', icon: 'trending-up', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
-        { label: 'Pedidos hoje', value: String(row.pedidos_confirmados || row.vendas_hoje || 0), delta: `${row.vendas_hoje || 0} vendas`, deltaClass: 'bg-purple-50 text-purple-700', icon: 'shopping-bag', iconBg: 'bg-purple-100', iconColor: 'text-purple-700' },
-        { label: 'Conversas hoje', value: String(row.conversas_hoje || 0), delta: `${row.drafts_pendentes || 0} drafts`, deltaClass: 'bg-blue-50 text-blue-700', icon: 'message-circle', iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
-        { label: 'Bot shadow', value: String(row.shadow_turns_hoje || 0), delta: `${row.shadow_blocked_hoje || 0} blocked`, deltaClass: 'bg-amber-50 text-amber-700', icon: 'bot', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
-      ];
-    },
-
-    applyOperacao(rows) {
-      this.conversasAtivas = (rows || []).map((row, index) => {
-        const slots = row.slots ? Object.entries(row.slots).slice(0, 6).map(([k, v]) => ({ k, v: this.displaySlot(v) })) : [];
-        return {
-          id: row.conversation_id,
-          chatwoot_conversation_id: row.chatwoot_conversation_id,
-          draft_id: row.draft_id,
-          draft_payment_method: row.draft_payment_method,
-          draft_fulfillment_mode: row.draft_fulfillment_mode,
-          draft_delivery_address: row.draft_delivery_address,
-          name: row.contact_name || `Conversa ${row.chatwoot_conversation_id}`,
-          initial: this.initials(row.contact_name),
-          avatarBg: ['bg-gradient-to-br from-orange-400 to-orange-600', 'bg-gradient-to-br from-pink-400 to-pink-600', 'bg-gradient-to-br from-indigo-400 to-indigo-600'][index % 3],
-          channel: row.channel_type || 'Chatwoot',
-          channelClass: row.channel_type === 'instagram' ? 'bg-pink-50 text-pink-700' : 'bg-emerald-50 text-emerald-700',
-          ago: row.last_activity_at ? this.formatDateTime(row.last_activity_at) : '-',
-          lastMsg: row.last_customer_message || '(sem mensagem)',
-          slots,
-          phone: row.contact_phone || '',
-          draft: row.draft_id ? [row.draft_payment_method, row.draft_fulfillment_mode, row.draft_delivery_address].filter(Boolean).join(' · ') : null,
-        };
-      });
-    },
-
     applyPedidos(rows) {
       this.pedidos = (rows || []).map((row) => {
         const cancelled = row.status === 'cancelled';
@@ -1155,6 +607,33 @@ function painelApp() {
 
     applyProdutos(rows) {
       this.produtos = rows || [];
+    },
+
+    // Resumo do dono: bot/tráfego (analytics, read-only) + leads a recuperar.
+    applyMatrizResumo(data) {
+      const m = (data && data.metrics) || {};
+      this.kpis = [
+        { label: 'Conversas', value: String(m.conversas || 0), delta: `${m.fecharam || 0} fecharam`, deltaClass: 'bg-blue-50 text-blue-700', icon: 'message-circle', iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
+        { label: 'Conversão', value: `${Number(m.taxa_conversao || 0)}%`, delta: `${m.abandonaram || 0} largaram`, deltaClass: 'bg-emerald-50 text-emerald-700', icon: 'trending-up', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-700' },
+        { label: 'Faturamento via bot', value: this.formatCurrency(m.faturamento), delta: `ticket ${this.formatCurrency(m.ticket_medio)}`, deltaClass: 'bg-purple-50 text-purple-700', icon: 'wallet', iconBg: 'bg-purple-100', iconColor: 'text-purple-700' },
+        { label: 'Custo do bot', value: this.formatCurrency(m.custo_bot), delta: 'IA no período', deltaClass: 'bg-amber-50 text-amber-700', icon: 'bot', iconBg: 'bg-amber-100', iconColor: 'text-amber-700' },
+      ];
+      this.leadsRecuperar = ((data && data.leads) || []).map((l) => ({
+        nome: l.cliente_nome || 'Sem nome',
+        telefone: l.cliente_telefone || '-',
+        moto: l.moto || '-',
+        bairro: l.bairro || '-',
+        preco: l.ultimo_preco_cotado || null,
+        motivo: l.provavel_motivo || l.etapa_atingida || 'sem motivo',
+        horas: l.horas != null ? Math.round(Number(l.horas)) : null,
+        reclamouPreco: !!l.reclamou_preco,
+        concorrente: !!l.mencionou_concorrente,
+      }));
+      this.resumoSeries = ((data && data.series) || []).map((s) => ({
+        dia: s.dia,
+        conversas: Number(s.conversas || 0),
+        faturamento: Number(s.faturamento || 0),
+      }));
     },
 
     partnerStatusLabel(status) {
@@ -1186,7 +665,9 @@ function painelApp() {
     },
 
     applyRede(rows) {
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows)) return;
+      // API vazia = rede sem parceiros reais → lista vazia (NÃO volta pro mock).
+      if (rows.length === 0) { this.parceirosRede = []; return; }
 
       this.parceirosRede = rows.map((row) => {
         const vendasValor = Number(row.sales_month || 0);
@@ -1225,6 +706,22 @@ function painelApp() {
         const pedidosPorta = Number(row.orders_porta || 0);
         const percentual2w = vendasValor > 0 ? Math.round((vendas2w / vendasValor) * 100) : 0;
 
+        // ─── Cobrança matriz↔parceiro ──────────────────────────────
+        // Base da comissão = vendas de origem 2W (o que a matriz trouxe).
+        // Mensalidade é valor fixo do mês. O modelo comercial decide o que incide.
+        const modeloComercialRaw = row.commercial_model || 'commission';
+        const comissaoPercent = row.commission_percent === null || row.commission_percent === undefined
+          ? null
+          : Number(row.commission_percent);
+        const mensalidadeValor = row.monthly_fee === null || row.monthly_fee === undefined
+          ? null
+          : Number(row.monthly_fee);
+        const cobraComissao = modeloComercialRaw === 'commission' || modeloComercialRaw === 'hybrid';
+        const cobraMensalidade = modeloComercialRaw === 'monthly' || modeloComercialRaw === 'hybrid';
+        const comissaoDevida = cobraComissao && comissaoPercent ? vendas2w * (comissaoPercent / 100) : 0;
+        const mensalidadeDevida = cobraMensalidade && mensalidadeValor ? mensalidadeValor : 0;
+        const devidoMatriz = comissaoDevida + mensalidadeDevida;
+
         return {
           id: row.partner_unit_id,
           unitId: row.unit_id,
@@ -1256,6 +753,12 @@ function painelApp() {
           pedidos2w,
           pedidosPorta,
           percentual2w,
+          commercialModel: modeloComercialRaw,
+          comissaoPercent,
+          mensalidadeValor,
+          comissaoDevida,
+          mensalidadeDevida,
+          devidoMatriz,
           alerta: Number(row.low_stock_items || 0) > 0
             ? `${row.low_stock_items} baixos`
             : Number(row.orders_today || 0) <= 0
@@ -1319,26 +822,6 @@ function painelApp() {
       }
     },
 
-    applyShadow(rows) {
-      this.shadowPairs = rows || [];
-      if (this.shadowSelectedIndex >= this.shadowPairs.length) {
-        this.shadowSelectedIndex = Math.max(0, this.shadowPairs.length - 1);
-      }
-      const total = this.shadowPairs.length;
-      const withBot = this.shadowPairs.filter((row) => row.agent_turn_id).length;
-      const withHuman = this.shadowPairs.filter((row) => row.human_text).length;
-      const blocked = this.shadowPairs.filter((row) => row.bot_status === 'blocked').length;
-      this.shadowKpis = [
-        { label: 'Mensagens cliente', value: String(total) },
-        { label: 'Bot gerou resposta', value: String(withBot) },
-        { label: 'Humano respondeu', value: String(withHuman) },
-        { label: 'Bot bloqueado', value: String(blocked) },
-      ];
-      const shadowMenuItem = this.liveMenu.find((item) => item.id === 'shadow');
-      if (shadowMenuItem) shadowMenuItem.badge = total > 0 ? String(total) : '';
-      this.shadowLastLoadedAt = new Date();
-    },
-
     async submitManualOrder() {
       if (this.orderSubmitting) return;
       if (!this.saleForm.product_id) {
@@ -1396,83 +879,45 @@ function painelApp() {
       }
     },
 
-    async reviewShadow(pair, verdict) {
-      if (!pair?.agent_turn_id) return;
-
-      try {
-        await this.apiPost('/admin/api/shadow/review', {
-          turn_id: pair.agent_turn_id,
-          verdict,
-        });
-        this.shadowPairs = this.shadowPairs.filter((row) => row.agent_turn_id !== pair.agent_turn_id);
-        if (this.shadowSelectedIndex >= this.shadowPairs.length) {
-          this.shadowSelectedIndex = Math.max(0, this.shadowPairs.length - 1);
-        }
-        this.applyShadow(this.shadowPairs);
-      } catch (err) {
-        this.apiError = err instanceof Error ? err.message : String(err);
-      }
-    },
-
-    async refreshShadowData() {
-      this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
-
-      this.shadowRefreshing = true;
-      try {
-        const shadow = await this.apiGet('/admin/api/dashboard/shadow?limit=50');
-        this.serverEnvironment = shadow.environment || this.serverEnvironment;
-        this.chatwootBaseUrl = shadow.chatwoot_base_url || this.chatwootBaseUrl;
-        this.chatwootAccountId = shadow.chatwoot_account_id || this.chatwootAccountId;
-        this.agentV2WorkerEnabled = shadow.agent_v2_worker_enabled;
-        this.applyShadow(shadow.rows);
-        this.apiStatus = 'real';
-        this.apiError = null;
-      } catch (err) {
-        this.apiStatus = 'mock';
-        this.apiError = err instanceof Error ? err.message : String(err);
-      } finally {
-        this.shadowRefreshing = false;
-      }
-    },
-
-    startShadowAutoRefresh() {
-      if (this.shadowAutoRefreshId) return;
-      this.shadowAutoRefreshId = setInterval(() => {
-        if (this.currentPage === 'shadow' && !this.shadowRefreshing) {
-          void this.refreshShadowData();
-        }
-      }, 10000);
-    },
-
     async loadRealData() {
       this.ensureCredentials();
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
 
-      try {
-        const [resumo, operacao, pedidos, shadow, produtos, rede] = await Promise.all([
-          this.apiGet('/admin/api/dashboard/resumo'),
-          this.apiGet('/admin/api/dashboard/operacao?limit=50'),
-          this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
-          this.apiGet('/admin/api/dashboard/shadow?limit=50'),
-          this.apiGet('/admin/api/dashboard/produtos?limit=100'),
-          this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`),
-        ]);
-        this.serverEnvironment = resumo.environment || operacao.environment || pedidos.environment || shadow.environment || produtos.environment || rede.environment || null;
-        this.chatwootBaseUrl = shadow.chatwoot_base_url || operacao.chatwoot_base_url || resumo.chatwoot_base_url || pedidos.chatwoot_base_url || produtos.chatwoot_base_url || rede.chatwoot_base_url || null;
-        this.chatwootAccountId = shadow.chatwoot_account_id || operacao.chatwoot_account_id || resumo.chatwoot_account_id || pedidos.chatwoot_account_id || produtos.chatwoot_account_id || rede.chatwoot_account_id || null;
-        this.agentV2WorkerEnabled = shadow.agent_v2_worker_enabled ?? resumo.agent_v2_worker_enabled ?? null;
-        this.applyResumo(resumo.rows);
-        this.applyOperacao(operacao.rows);
-        this.applyPedidos(pedidos.rows);
-        this.applyShadow(shadow.rows);
-        this.applyProdutos(produtos.rows);
-        this.applyRede(rede.rows);
+      // Promise.allSettled: cada bloco é independente — um endpoint que falhe
+      // não derruba os outros pro mock. Resumo = bot/tráfego (matriz-resumo,
+      // analytics read-only) + cobrança (rede). Rede = operação dos parceiros.
+      const [pedidos, produtos, rede, resumo] = await Promise.allSettled([
+        this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
+        this.apiGet('/admin/api/dashboard/produtos?limit=100'),
+        this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`),
+        this.apiGet('/admin/api/dashboard/matriz-resumo?period=7d'),
+      ]);
+
+      const val = (settled) => (settled.status === 'fulfilled' ? settled.value : null);
+      const settledList = [pedidos, produtos, rede, resumo];
+      const ok = settledList.map(val).filter(Boolean);
+
+      this.serverEnvironment = ok.map((r) => r.environment).find(Boolean) || this.serverEnvironment;
+      this.chatwootBaseUrl = ok.map((r) => r.chatwoot_base_url).find(Boolean) || this.chatwootBaseUrl;
+      this.chatwootAccountId = ok.map((r) => r.chatwoot_account_id).find(Boolean) || this.chatwootAccountId;
+      const workerFlag = ok.map((r) => r.agent_v2_worker_enabled).find((v) => v !== undefined && v !== null);
+      if (workerFlag !== undefined) this.agentV2WorkerEnabled = workerFlag;
+
+      if (val(pedidos)) this.applyPedidos(pedidos.value.rows);
+      if (val(produtos)) this.applyProdutos(produtos.value.rows);
+      if (val(rede)) this.applyRede(rede.value.rows);
+      if (val(resumo)) this.applyMatrizResumo(resumo.value);
+
+      // "real" se qualquer bloco respondeu; só cai pro mock se TUDO falhou.
+      if (ok.length > 0) {
         this.apiStatus = 'real';
         this.apiError = null;
-      } catch (err) {
+      } else {
         this.apiStatus = 'mock';
-        this.apiError = err instanceof Error ? err.message : String(err);
+        const firstErr = settledList.find((s) => s.status === 'rejected');
+        this.apiError = firstErr && firstErr.reason
+          ? (firstErr.reason instanceof Error ? firstErr.reason.message : String(firstErr.reason))
+          : 'todos os endpoints falharam';
         console.warn('Painel usando dados mockados:', this.apiError);
       }
     },
@@ -1509,7 +954,6 @@ function painelApp() {
 
     init() {
       void this.loadRealData();
-      this.startShadowAutoRefresh();
       this.$nextTick(() => {
         lucide.createIcons();
         this.renderChart();
@@ -1542,7 +986,6 @@ function painelApp() {
             this.renderParceiroChart();
           }
           if (this.currentPage === 'unidade') this.renderParceiroChart();
-          if (this.currentPage === 'shadow') void this.refreshShadowData();
         });
       });
     },
@@ -2079,12 +1522,16 @@ function painelApp() {
       if (!ctx) return;
       if (window._perfChart) window._perfChart.destroy();
 
+      const fmtDia = (d) => {
+        const dt = new Date(d);
+        return Number.isFinite(dt.getTime()) ? dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : String(d);
+      };
       window._perfChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Hoje'],
+          labels: this.resumoSeries.map((s) => fmtDia(s.dia)),
           datasets: [{
-            data: [180, 240, 60, 320, 280, 410, 432],
+            data: this.resumoSeries.map((s) => s.faturamento),
             borderColor: '#111827',
             backgroundColor: 'rgba(17,24,39,0.05)',
             tension: 0.35,
@@ -2106,7 +1553,7 @@ function painelApp() {
               titleFont: { size: 11 },
               bodyFont: { size: 12, weight: '600' },
               callbacks: {
-                label: function(ctx) { return 'R$ ' + (ctx.parsed.y * 10).toFixed(0); }
+                label: (item) => this.formatCurrency(item.parsed.y)
               }
             }
           },

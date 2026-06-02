@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260521-rede-audit-1"></script>
+<script src="/admin/painel/app.js?v=20260601-rede-real-1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260521-rede-audit-1"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260521-rede-audit-1" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260601-rede-real-1"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260601-rede-real-1" />
 
 <script>
   tailwind.config = {
@@ -304,51 +304,50 @@
         <!-- COLUNA PRINCIPAL -->
         <div class="lg:col-span-2 space-y-4">
 
-          <!-- Últimas vendas -->
+          <!-- Leads a recuperar (clientes que o bot atendeu e esfriaram) -->
           <div class="bg-white border border-gray-200 rounded-xl">
             <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 class="font-semibold">Últimas vendas</h3>
-              <a href="#" class="text-xs text-gray-500 hover:text-gray-900">Ver todas →</a>
+              <div>
+                <h3 class="font-semibold">Leads a recuperar</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Clientes do bot que esfriaram — vale uma mensagem</p>
+              </div>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-50 text-amber-700" x-text="leadsRecuperar.length"></span>
             </div>
             <div class="divide-y divide-gray-100">
-              <template x-for="venda in ultimasVendas">
-                <div class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                  <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
-                       :class="venda.avatarBg" x-text="venda.initial"></div>
+              <template x-for="(lead, i) in leadsRecuperar" :key="i">
+                <div class="flex items-start gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
-                      <span class="font-medium text-sm" x-text="venda.nome"></span>
-                      <span class="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                            :class="venda.tagClass" x-text="venda.tag"></span>
+                      <span class="font-medium text-sm" x-text="lead.nome"></span>
+                      <span x-show="lead.reclamouPreco" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-50 text-rose-700">reclamou preço</span>
+                      <span x-show="lead.concorrente" class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">citou concorrente</span>
                     </div>
-                    <div class="text-xs text-gray-500" x-text="venda.local + ' · ' + venda.itens"></div>
+                    <div class="text-xs text-gray-500 truncate">
+                      <span x-text="lead.moto"></span> · <span x-text="lead.bairro"></span>
+                      <span x-show="lead.preco"> · <span x-text="lead.preco"></span></span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-0.5" x-text="lead.motivo"></div>
                   </div>
                   <div class="text-right flex-shrink-0">
-                    <div class="font-semibold text-sm" x-text="venda.valor"></div>
-                    <div class="text-xs" :class="venda.deltaClass" x-text="venda.delta"></div>
+                    <div class="text-sm font-medium text-gray-700" x-text="lead.telefone"></div>
+                    <div class="text-[11px] text-gray-400" x-show="lead.horas !== null" x-text="'há ' + lead.horas + 'h'"></div>
                   </div>
                 </div>
               </template>
+              <div x-show="leadsRecuperar.length === 0" class="px-5 py-8 text-center text-sm text-gray-500">
+                Nenhum lead esfriou — bot em dia. 👏
+              </div>
             </div>
           </div>
 
-          <!-- Performance (gráfico) -->
+          <!-- Performance do bot (gráfico) -->
           <div class="bg-white border border-gray-200 rounded-xl p-5">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h3 class="font-semibold">Performance</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Vendas nos últimos 7 dias</p>
+                <h3 class="font-semibold">Faturamento via bot</h3>
+                <p class="text-xs text-gray-500 mt-0.5">O que o tráfego/bot fechou nos últimos 7 dias</p>
               </div>
-              <div class="flex items-center gap-4">
-                <div>
-                  <div class="text-xs text-gray-500">Hoje</div>
-                  <div class="flex items-baseline gap-1.5">
-                    <span class="text-xl font-bold">+R$ 4.320</span>
-                    <span class="text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">+12%</span>
-                  </div>
-                </div>
-                <button class="text-xs text-gray-500 hover:text-gray-900">Ver tudo →</button>
-              </div>
+              <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">7 dias</span>
             </div>
             <div class="h-56">
               <canvas id="chartPerformance"></canvas>
@@ -359,19 +358,27 @@
         <!-- COLUNA LATERAL -->
         <div class="space-y-4">
 
-          <!-- Card: relatório diário -->
+          <!-- Card: a receber da rede (cobrança) -->
           <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 class="font-semibold mb-1">Complete seu relatório diário</h3>
-            <p class="text-xs text-gray-500 mb-3">63% das informações do dia</p>
-
-            <div class="w-full bg-gray-100 rounded-full h-1.5 mb-4">
-              <div class="bg-gray-900 h-1.5 rounded-full" style="width: 63%"></div>
+            <div class="flex items-center justify-between mb-1">
+              <h3 class="font-semibold">A receber da rede</h3>
+              <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(redeTotalDevido())"></span>
             </div>
-
-            <button class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium transition-colors">
-              <i data-lucide="file-text" class="w-4 h-4 text-gray-700"></i>
-              <span>Completar relatório</span>
-            </button>
+            <p class="text-xs text-gray-500 mb-3">Mensalidade + comissão sobre vendas 2W · <span x-text="redePeriodLabel()"></span></p>
+            <div class="space-y-1.5 text-sm">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">Mensalidades</span>
+                <span class="font-medium" x-text="formatCurrency(redeTotalMensalidade())"></span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500">Comissão 2W</span>
+                <span class="font-medium" x-text="formatCurrency(redeTotalComissao())"></span>
+              </div>
+            </div>
+            <a href="#" @click.prevent="currentPage = 'rede'" class="mt-4 flex items-center justify-between text-sm text-gray-900 hover:underline">
+              <span>Ver a rede</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </a>
           </div>
 
           <!-- Card: insights -->
@@ -393,118 +400,7 @@
             </button>
           </div>
 
-          <!-- Mini card: Bot status -->
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-sm">Atendente Bot</h3>
-              <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                Shadow Mode
-              </span>
-            </div>
-            <div class="space-y-2.5">
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-500">Turns gerados hoje</span>
-                <span class="font-semibold">147</span>
-              </div>
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-500">Bloqueados</span>
-                <span class="font-semibold text-rose-600">23</span>
-              </div>
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-500">Pareados c/ humano</span>
-                <span class="font-semibold">98</span>
-              </div>
-            </div>
-            <a href="#" @click.prevent="currentPage = 'shadow'"
-               class="mt-4 flex items-center justify-between text-sm text-gray-900 hover:underline">
-              <span>Ir para revisão</span>
-              <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </a>
-          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- ═══ TELA: OPERAÇÃO ═══ -->
-    <div x-show="currentPage === 'operacao'" class="p-8">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">Operação ao vivo</h1>
-          <p class="text-sm text-gray-500 mt-1">Conversas ativas e drafts do bot</p>
-        </div>
-        <div class="flex items-center gap-2 text-xs">
-          <button class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300">
-            <i data-lucide="filter" class="w-4 h-4 text-gray-600"></i>
-            Filtros
-          </button>
-          <button class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300">
-            <i data-lucide="refresh-cw" class="w-4 h-4 text-gray-600"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Busca -->
-      <div class="relative mb-5">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-        <input type="text" placeholder="Buscar por cliente, telefone ou pneu..."
-               class="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
-      </div>
-
-      <!-- Conversas -->
-      <div class="space-y-3">
-        <template x-for="conv in conversasAtivas">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
-            <div class="flex items-start gap-4">
-              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
-                   :class="conv.avatarBg" x-text="conv.initial"></div>
-
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                  <h4 class="font-semibold text-sm" x-text="conv.name"></h4>
-                  <span class="text-[10px] font-medium px-1.5 py-0.5 rounded" :class="conv.channelClass"
-                        x-text="conv.channel"></span>
-                  <span class="text-xs text-gray-500" x-text="'há ' + conv.ago"></span>
-                </div>
-                <p class="text-sm text-gray-600 italic mb-3">"<span x-text="conv.lastMsg"></span>"</p>
-
-                <div class="flex flex-wrap gap-1.5 mb-3">
-                  <template x-for="slot in conv.slots">
-                    <span class="text-xs px-2 py-1 bg-gray-50 border border-gray-200 rounded">
-                      <span class="text-gray-500" x-text="slot.k + ':'"></span>
-                      <span class="font-medium ml-1" x-text="slot.v"></span>
-                    </span>
-                  </template>
-                </div>
-
-                <div x-show="conv.draft" class="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <i data-lucide="receipt" class="w-3.5 h-3.5 text-brand-600"></i>
-                    <span class="text-xs font-semibold text-brand-600 uppercase tracking-wide">Draft pronto pelo bot</span>
-                  </div>
-                  <div class="text-sm" x-text="conv.draft"></div>
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-2 flex-shrink-0">
-                <button @click="openSaleModal(conv)"
-                        class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors">
-                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-                  Registrar venda
-                  <span x-show="!conv.draft" class="text-[10px] font-normal opacity-70 ml-1">(sem draft)</span>
-                </button>
-                <a :href="chatwootUrl(conv) || '#'"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   @click.prevent="openChatwootConversation(conv)"
-                   :class="!chatwootUrl(conv) ? 'opacity-50 cursor-not-allowed' : ''"
-                   class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 rounded-lg text-sm transition-colors">
-                  <i data-lucide="external-link" class="w-4 h-4 text-gray-600"></i>
-                  Chatwoot
-                </a>
-              </div>
-            </div>
-          </div>
-        </template>
       </div>
     </div>
 
@@ -662,6 +558,33 @@
             <canvas id="chartRedeCompras"></canvas>
           </div>
         </div>
+      </div>
+
+      <!-- Cobrança matriz↔parceiro: o que a rede deve à matriz no período -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="font-semibold text-sm">A receber da rede</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Mensalidade + comissão sobre vendas 2W · <span x-text="redePeriodLabel()"></span></p>
+          </div>
+          <span class="text-sm font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
+                x-text="formatCurrency(redeTotalDevido())"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <div class="text-xs text-gray-500 mb-1">Mensalidades</div>
+            <div class="font-semibold" x-text="formatCurrency(redeTotalMensalidade())"></div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">Comissão (2W)</div>
+            <div class="font-semibold" x-text="formatCurrency(redeTotalComissao())"></div>
+          </div>
+          <div>
+            <div class="text-xs text-gray-500 mb-1">Total devido</div>
+            <div class="font-bold text-emerald-700" x-text="formatCurrency(redeTotalDevido())"></div>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-3">Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.</p>
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
@@ -1221,6 +1144,24 @@
             </div>
           </div>
 
+          <div class="mt-5 border-t border-gray-100 pt-4">
+            <div class="text-xs text-gray-500 mb-2">Cobrança à matriz · <span x-text="redePeriodLabel()"></span></div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">Mensalidade</span>
+                <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.mensalidadeDevida)"></span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">Comissão sobre 2W<span x-show="selectedParceiro()?.comissaoPercent" x-text="' (' + selectedParceiro()?.comissaoPercent + '%)'"></span></span>
+                <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.comissaoDevida)"></span>
+              </div>
+              <div class="border-t border-gray-100 pt-2 flex items-center justify-between text-sm">
+                <span class="font-medium">Total devido</span>
+                <span class="font-bold text-emerald-700" x-text="formatCurrency(selectedParceiro()?.devidoMatriz)"></span>
+              </div>
+            </div>
+          </div>
+
           <div class="mt-5">
             <div class="text-xs text-gray-500 mb-2">Responsável operacional</div>
             <div class="flex flex-wrap gap-2">
@@ -1408,27 +1349,20 @@
         </button>
       </div>
 
-      <!-- Totalizadores -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <!-- Totalizadores (reais, da lista carregada) -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Hoje</div>
-          <div class="text-lg font-bold">12 pedidos</div>
-          <div class="text-xs text-emerald-600 mt-1 font-medium">R$ 4.320</div>
+          <div class="text-xs text-gray-500 mb-1">Pedidos carregados</div>
+          <div class="text-lg font-bold" x-text="pedidos.length"></div>
+          <div class="text-xs text-gray-400 mt-1 font-medium">últimos registros</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Esta semana</div>
-          <div class="text-lg font-bold">47 pedidos</div>
-          <div class="text-xs text-emerald-600 mt-1 font-medium">R$ 18.430</div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Mês</div>
-          <div class="text-lg font-bold">156 pedidos</div>
-          <div class="text-xs text-emerald-600 mt-1 font-medium">R$ 62.180</div>
+          <div class="text-xs text-gray-500 mb-1">Confirmados</div>
+          <div class="text-lg font-bold text-emerald-700" x-text="pedidos.filter(p => p.status !== 'Cancelado').length"></div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Cancelados</div>
-          <div class="text-lg font-bold">3</div>
-          <div class="text-xs text-rose-600 mt-1 font-medium">1.9%</div>
+          <div class="text-lg font-bold text-rose-600" x-text="pedidos.filter(p => p.status === 'Cancelado').length"></div>
         </div>
       </div>
 
@@ -1480,209 +1414,6 @@
             </template>
           </tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- ═══ TELA: SHADOW ═══ -->
-    <div x-show="currentPage === 'shadow'" class="p-8">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">Bot / Shadow</h1>
-          <p class="text-sm text-gray-500 mt-1">Compare o que o bot diria com o que o humano respondeu</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-medium px-3 py-1.5 rounded-full"
-                :class="apiStatus === 'real' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
-                x-text="apiStatus === 'real' ? 'Dados reais · env ' + (serverEnvironment || '?') : 'Sem dados reais'">
-            Sem dados reais
-          </span>
-          <span class="text-xs font-medium px-3 py-1.5 rounded-full"
-                :class="shadowWorkerEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-                x-text="shadowWorkerEnabled ? 'Worker Shadow ligado' : 'Worker Shadow desligado'">
-            Worker Shadow
-          </span>
-          <button @click="refreshShadowData()"
-                  class="text-xs font-medium px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200">
-            <span x-text="shadowRefreshing ? 'Atualizando...' : 'Recarregar'">Recarregar</span>
-          </button>
-          <span class="text-xs font-medium px-3 py-1.5 rounded-full bg-amber-50 text-amber-700">
-            Shadow Mode · 14 dias restantes
-          </span>
-        </div>
-      </div>
-
-      <div x-show="apiStatus !== 'real' || shadowPairs.length === 0"
-           class="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
-        <span x-show="apiStatus !== 'real'" x-text="'API nao carregou dados reais: ' + (apiError || 'sem token ou abriu arquivo direto')"></span>
-        <span x-show="apiStatus === 'real' && shadowPairs.length === 0"
-              x-text="'API respondeu, mas nao ha pares Shadow no ambiente ' + (serverEnvironment || '?') + '.'"></span>
-      </div>
-
-      <!-- KPIs -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <template x-for="kpi in shadowKpis">
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1" x-text="kpi.label"></div>
-            <div class="text-lg font-bold" x-text="kpi.value"></div>
-          </div>
-        </template>
-      </div>
-
-      <!-- Card de revisão -->
-      <div class="bg-white border border-gray-200 rounded-xl">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h3 class="font-semibold">Fila de revisão</h3>
-            <p class="text-xs text-gray-500 mt-0.5">
-              <span x-text="shadowPairs.length + ' pares pendentes'">0 pares pendentes</span>
-              <span x-show="shadowLastLoadedAt"> · atualizado <span x-text="timeAgo(shadowLastLoadedAt)"></span></span>
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <button @click="refreshShadowData()"
-                    :disabled="shadowRefreshing"
-                    class="px-3 py-1.5 bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg text-xs disabled:opacity-50">
-              Recarregar
-            </button>
-            <button @click="selectShadowPair(Math.floor(Math.random() * Math.max(shadowPairs.length, 1)))"
-                    :disabled="shadowPairs.length === 0"
-                    class="px-3 py-1.5 bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg text-xs disabled:opacity-50">
-              Aleatorio
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr]">
-          <div class="border-b lg:border-b-0 lg:border-r border-gray-100 bg-gray-50/40">
-            <div class="max-h-[620px] overflow-y-auto p-3 space-y-2">
-              <template x-for="(pair, index) in shadowPairs" :key="pair.agent_turn_id || pair.conversation_id || index">
-                <button @click="selectShadowPair(index)"
-                        class="w-full text-left rounded-lg border p-3 transition-colors"
-                        :class="index === shadowSelectedIndex ? 'bg-white border-gray-900 shadow-sm' : 'bg-white/70 border-gray-200 hover:border-gray-300'">
-                  <div class="flex items-center justify-between gap-2 mb-2">
-                    <span class="text-xs font-semibold text-gray-800"
-                          x-text="pair.chatwoot_conversation_id ? 'Conversa #' + pair.chatwoot_conversation_id : 'Conversa'">
-                      Conversa
-                    </span>
-                    <span class="text-[11px] px-2 py-0.5 rounded-full"
-                          :class="shadowStatusClass(pair)"
-                          x-text="shadowStatusLabel(pair)">
-                      Pendente
-                    </span>
-                  </div>
-                  <div class="text-xs text-gray-500 mb-2">
-                    <span x-text="pair.contact_name || 'Cliente'">Cliente</span>
-                    <span> · </span>
-                    <span x-text="formatDateTime(pair.customer_sent_at)">-</span>
-                  </div>
-                  <p class="text-xs text-gray-700 leading-relaxed line-clamp-2"
-                     x-text="truncateText(pair.customer_text || '(sem texto do cliente)', 96)">
-                    Sem texto
-                  </p>
-                </button>
-              </template>
-
-              <div x-show="shadowPairs.length === 0" class="text-sm text-gray-500 px-3 py-8 text-center">
-                Nenhum par pendente agora.
-              </div>
-            </div>
-          </div>
-
-          <div class="p-6 min-w-0">
-            <div class="flex items-center gap-3 mb-4 text-xs flex-wrap">
-              <span class="text-gray-500" x-text="currentShadowPair()?.chatwoot_conversation_id ? 'Conversa #' + currentShadowPair().chatwoot_conversation_id : 'Conversa'">Conversa</span>
-              <span class="text-gray-300">·</span>
-              <span class="text-gray-700" x-text="currentShadowPair()?.contact_name || 'Cliente'">Cliente</span>
-              <span class="text-gray-300">·</span>
-              <span class="text-gray-500" x-text="currentShadowPair() ? formatDateTime(currentShadowPair().customer_sent_at) : '-'">-</span>
-              <div class="flex-1"></div>
-              <span class="text-xs px-2 py-0.5 rounded"
-                    :class="shadowStatusClass(currentShadowPair())"
-                    x-text="shadowStatusLabel(currentShadowPair())">
-                Pendente
-              </span>
-              <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded" x-text="'skill: ' + (currentShadowPair()?.selected_skill || '-')">skill: -</span>
-              <a :href="chatwootUrl() || '#'"
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 @click.prevent="openCurrentShadowInChatwoot()"
-                 :class="chatwootUrl() ? 'bg-gray-900 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'"
-                 class="text-xs px-2 py-0.5 rounded">
-                Abrir Chatwoot
-              </a>
-            </div>
-
-            <!-- Mensagem do cliente -->
-            <div class="mb-4">
-              <div class="text-xs text-gray-500 mb-2 flex items-center gap-2 font-medium">
-                <i data-lucide="message-square" class="w-3 h-3"></i>
-                Cliente disse
-              </div>
-              <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm whitespace-pre-wrap"
-                   x-text="currentShadowPair()?.customer_text || 'Sem par real carregado ainda.'">
-                Sem par real carregado ainda.
-              </div>
-            </div>
-
-            <!-- Comparacao -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-              <div class="bg-blue-50/50 border border-blue-200 rounded-lg p-4">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                    <i data-lucide="user" class="w-3 h-3 text-blue-700"></i>
-                  </div>
-                  <span class="text-xs font-semibold text-blue-700">Humano respondeu</span>
-                </div>
-                <p class="text-sm whitespace-pre-wrap" x-text="currentShadowPair()?.human_text || 'Sem resposta humana pareada.'">Sem resposta humana pareada.</p>
-              </div>
-
-              <div class="bg-orange-50/50 border border-orange-200 rounded-lg p-4">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
-                    <i data-lucide="bot" class="w-3 h-3 text-brand-600"></i>
-                  </div>
-                  <span class="text-xs font-semibold text-brand-600">Bot teria dito</span>
-                  <span class="text-xs text-gray-500" x-text="'· ' + (currentShadowPair()?.bot_status || 'shadow')">· shadow</span>
-                </div>
-                <p class="text-sm whitespace-pre-wrap" x-text="currentShadowPair()?.bot_text || 'Bot nao gerou resposta para este par.'">Bot nao gerou resposta para este par.</p>
-              </div>
-            </div>
-
-            <!-- Verdicts -->
-            <div class="flex flex-wrap gap-2">
-              <button @click="reviewShadow(currentShadowPair(), 'human_better')"
-                      :disabled="!currentShadowPair()?.agent_turn_id"
-                      class="flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                <i data-lucide="user" class="w-4 h-4"></i>
-                Humano melhor
-              </button>
-              <button @click="reviewShadow(currentShadowPair(), 'bot_better')"
-                      :disabled="!currentShadowPair()?.agent_turn_id"
-                      class="flex items-center gap-2 px-4 py-2 bg-orange-50 hover:bg-orange-100 text-brand-600 border border-orange-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                <i data-lucide="bot" class="w-4 h-4"></i>
-                Bot melhor
-              </button>
-              <button @click="reviewShadow(currentShadowPair(), 'equivalent')"
-                      :disabled="!currentShadowPair()?.agent_turn_id"
-                      class="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                <i data-lucide="equal" class="w-4 h-4"></i>
-                Equivalente
-              </button>
-              <button @click="reviewShadow(currentShadowPair(), 'bot_unsure')"
-                      :disabled="!currentShadowPair()?.agent_turn_id"
-                      class="flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-                Bot inseguro
-              </button>
-              <button @click="reviewShadow(currentShadowPair(), 'skip')"
-                      :disabled="!currentShadowPair()?.agent_turn_id"
-                      class="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-                <i data-lucide="skip-forward" class="w-4 h-4"></i>
-                Pular
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 

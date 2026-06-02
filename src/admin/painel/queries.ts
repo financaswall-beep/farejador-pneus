@@ -51,56 +51,12 @@ export interface CancelManualOrderInput {
   reason: string;
 }
 
-export interface ReviewHumanBotInput {
-  environment?: 'prod' | 'test';
-  turn_id: string;
-  verdict: 'human_better' | 'bot_better' | 'equivalent' | 'bot_unsure' | 'skip';
-  notes?: string | null;
-  reviewer_label: string;
-}
-
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 function clampLimit(limit?: number): number {
   if (!limit || Number.isNaN(limit)) return DEFAULT_LIMIT;
   return Math.max(1, Math.min(MAX_LIMIT, Math.floor(limit)));
-}
-
-export async function getPainelResumo(dbPool: Pool = defaultPool): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT *
-     FROM dashboard.resumo_hoje
-     WHERE environment = $1
-     ORDER BY unit_id NULLS LAST`,
-    [env.FAREJADOR_ENV],
-  );
-  return result.rows;
-}
-
-export async function getPainelOperacao(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT *
-     FROM dashboard.operacao_ativa
-     WHERE environment = $1
-     ORDER BY last_activity_at DESC NULLS LAST
-     LIMIT $2`,
-    [env.FAREJADOR_ENV, clampLimit(limit)],
-  );
-  return result.rows;
-}
-
-export async function getPainelShadow(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT *
-     FROM dashboard.shadow_pairs
-     WHERE environment = $1
-       AND review_id IS NULL
-     ORDER BY customer_sent_at DESC
-     LIMIT $2`,
-    [env.FAREJADOR_ENV, clampLimit(limit)],
-  );
-  return result.rows;
 }
 
 export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
@@ -410,6 +366,85 @@ export async function getPainelRede(
   return result.rows;
 }
 
+export interface MatrizResumo {
+  metrics: Record<string, unknown> | null;
+  series: unknown[];
+  leads: unknown[];
+}
+
+/**
+ * Resumo do dono (cockpit da matriz): performance do BOT/tráfego + leads a recuperar.
+ * LÊ (read-only) das views derivadas do V2 — nunca escreve em analytics/agent/core.
+ * Distinto da aba Rede (que é operação dos parceiros). Janela: today/7d/30d/month.
+ *
+ * Defensivo por bloco: se uma view faltar/quebrar, devolve o bloco vazio em vez
+ * de derrubar o endpoint inteiro.
+ */
+export async function getMatrizResumo(
+  period: PainelRedePeriod = '7d',
+  dbPool: Pool = defaultPool,
+): Promise<MatrizResumo> {
+  // Janela por `dia` (date). Expressao constante (sem input) -> sem injection.
+  const sinceSql =
+    period === 'today' ? `current_date`
+    : period === '7d' ? `(current_date - 6)`
+    : period === '30d' ? `(current_date - 29)`
+    : `date_trunc('month', current_date)::date`;
+
+  let metrics: Record<string, unknown> | null = null;
+  let series: unknown[] = [];
+  let leads: unknown[] = [];
+
+  try {
+    const r = await dbPool.query(
+      `SELECT
+         COALESCE(sum(conversas_total), 0)::int AS conversas,
+         COALESCE(sum(fecharam), 0)::int AS fecharam,
+         COALESCE(sum(escalaram), 0)::int AS escalaram,
+         COALESCE(sum(abandonaram), 0)::int AS abandonaram,
+         COALESCE(sum(faturamento), 0)::numeric AS faturamento,
+         COALESCE(sum(custo_bot_brl), 0)::numeric AS custo_bot,
+         CASE WHEN sum(conversas_total) > 0
+              THEN round(100.0 * sum(fecharam) / sum(conversas_total), 1)
+              ELSE 0 END AS taxa_conversao,
+         CASE WHEN sum(fecharam) > 0
+              THEN round(sum(faturamento) / sum(fecharam), 2)
+              ELSE 0 END AS ticket_medio
+       FROM analytics.v_daily_metrics
+       WHERE dia >= ${sinceSql}`,
+    );
+    metrics = r.rows[0] ?? null;
+  } catch { /* bloco vazio se a view faltar */ }
+
+  try {
+    const r = await dbPool.query(
+      `SELECT dia,
+              conversas_total::int AS conversas,
+              fecharam::int AS fecharam,
+              faturamento::numeric AS faturamento,
+              custo_bot_brl::numeric AS custo_bot
+       FROM analytics.v_daily_metrics
+       WHERE dia >= ${sinceSql}
+       ORDER BY dia`,
+    );
+    series = r.rows;
+  } catch { /* bloco vazio */ }
+
+  try {
+    const r = await dbPool.query(
+      `SELECT cliente_nome, cliente_telefone, moto, bairro, ultimo_preco_cotado,
+              etapa_atingida, provavel_motivo, horas_sem_resposta::numeric AS horas,
+              reclamou_preco, mencionou_concorrente
+       FROM analytics.v_clientes_pra_recuperar
+       ORDER BY started_at DESC NULLS LAST
+       LIMIT 12`,
+    );
+    leads = r.rows;
+  } catch { /* bloco vazio */ }
+
+  return { metrics, series, leads };
+}
+
 async function resolveContactId(
   dbPool: Pool,
   environment: 'prod' | 'test',
@@ -504,26 +539,4 @@ export async function cancelManualOrder(
   ]);
 
   return { cancelled: true };
-}
-
-export async function reviewHumanBot(
-  input: ReviewHumanBotInput,
-  dbPool: Pool = defaultPool,
-): Promise<{ review_id: string }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const result = await dbPool.query<{ id: string }>(
-    `INSERT INTO ops.human_bot_reviews
-       (environment, turn_id, verdict, notes, reviewer_label)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (turn_id) WHERE verdict != 'skip'
-     DO UPDATE SET
-       verdict = EXCLUDED.verdict,
-       notes = EXCLUDED.notes,
-       reviewer_label = EXCLUDED.reviewer_label,
-       created_at = now()
-     RETURNING id`,
-    [environment, input.turn_id, input.verdict, input.notes ?? null, input.reviewer_label],
-  );
-
-  return { review_id: result.rows[0]!.id };
 }

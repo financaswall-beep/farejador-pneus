@@ -7,15 +7,12 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
   cancelManualOrder,
-  getPainelOperacao,
+  getMatrizResumo,
   getPainelPedidos,
   getPainelProdutos,
   getPainelRede,
-  getPainelResumo,
-  getPainelShadow,
   registerManualOrder,
   registerWalkinOrder,
-  reviewHumanBot,
 } from './queries.js';
 
 const publicDir = path.join(process.cwd(), 'painel', 'public');
@@ -26,6 +23,10 @@ const limitQuerySchema = z.object({
 
 const redeQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d', 'month']).default('month'),
+});
+
+const resumoQuerySchema = z.object({
+  period: z.enum(['today', '7d', '30d', 'month']).default('7d'),
 });
 
 const orderItemSchema = z.object({
@@ -76,13 +77,6 @@ const cancelParamsSchema = z.object({
 
 const cancelBodySchema = z.object({
   reason: z.string().min(1).max(500),
-});
-
-const reviewBodySchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
-  turn_id: z.string().uuid(),
-  verdict: z.enum(['human_better', 'bot_better', 'equivalent', 'bot_unsure', 'skip']),
-  notes: z.string().max(2000).nullable().optional(),
 });
 
 function operatorLabel(headers: Record<string, unknown>): string {
@@ -136,22 +130,6 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   fastify.get('/admin/painel/rede-fallback.js', async (_request, reply) => sendStatic(reply, 'rede-fallback.js', 'text/javascript; charset=utf-8'));
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
 
-  fastify.get('/admin/api/dashboard/resumo', { preHandler: requireAdminAuth }, async (_request, reply) => {
-    return reply.status(200).send(dashboardPayload(await getPainelResumo()));
-  });
-
-  fastify.get('/admin/api/dashboard/operacao', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const parsed = limitQuerySchema.safeParse(request.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    return reply.status(200).send(dashboardPayload(await getPainelOperacao(parsed.data.limit)));
-  });
-
-  fastify.get('/admin/api/dashboard/shadow', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const parsed = limitQuerySchema.safeParse(request.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    return reply.status(200).send(dashboardPayload(await getPainelShadow(parsed.data.limit)));
-  });
-
   fastify.get('/admin/api/dashboard/pedidos', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = limitQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
@@ -170,6 +148,15 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     const parsed = redeQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send(dashboardPayload(await getPainelRede(parsed.data.period)));
+  });
+
+  // Resumo do dono (cockpit da matriz): performance do bot/tráfego + leads a
+  // recuperar. Lê (read-only) das views analytics derivadas do V2.
+  fastify.get('/admin/api/dashboard/matriz-resumo', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = resumoQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    const resumo = await getMatrizResumo(parsed.data.period);
+    return reply.status(200).send({ ...dashboardPayload([]), ...resumo });
   });
 
   fastify.post('/admin/api/orders/register-manual', { preHandler: requireAdminAuth }, async (request, reply) => {
@@ -230,20 +217,4 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     }
   });
 
-  fastify.post('/admin/api/shadow/review', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const parsed = reviewBodySchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
-    }
-
-    try {
-      return reply.status(200).send(await reviewHumanBot({
-        ...parsed.data,
-        reviewer_label: operatorLabel(request.headers),
-      }));
-    } catch (err) {
-      logger.error({ err }, 'painel human-bot review failed');
-      return reply.status(500).send({ error: 'internal_server_error' });
-    }
-  });
 }
