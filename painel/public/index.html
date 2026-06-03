@@ -863,6 +863,30 @@
 
             <div class="rounded-lg border border-gray-200 overflow-hidden mb-4">
               <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Conversão do bot na área</span>
+                <span class="text-[11px] text-gray-500" x-text="redePeriodLabel()"></span>
+              </div>
+              <div class="grid grid-cols-3 divide-x divide-gray-100 text-center">
+                <div class="px-2 py-3">
+                  <div class="text-[11px] text-gray-500">🗣️ Atendeu</div>
+                  <div class="font-bold text-lg mt-1" x-text="selectedParceiro()?.funilTentou || 0"></div>
+                </div>
+                <div class="px-2 py-3">
+                  <div class="text-[11px] text-gray-500">🛒 Fechou</div>
+                  <div class="font-bold text-lg mt-1" x-text="selectedParceiro()?.funilPediu || 0"></div>
+                  <div class="text-[11px] text-gray-400" x-text="funilPct(selectedParceiro()?.funilPediu, selectedParceiro()?.funilTentou)"></div>
+                </div>
+                <div class="px-2 py-3">
+                  <div class="text-[11px] text-gray-500">📦 Entregou</div>
+                  <div class="font-bold text-lg mt-1" x-text="selectedParceiro()?.funilEfetivou || 0"></div>
+                  <div class="text-[11px] text-gray-400" x-text="funilPct(selectedParceiro()?.funilEfetivou, selectedParceiro()?.funilPediu)"></div>
+                </div>
+              </div>
+              <div class="px-3 py-2 text-[11px] text-gray-400 border-t border-gray-100">Atendimentos do bot na área do parceiro que viraram pedido e entrega.</div>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 overflow-hidden mb-4">
+              <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <span class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Resultado operacional</span>
                 <span class="text-[11px] text-gray-500">mês atual</span>
               </div>

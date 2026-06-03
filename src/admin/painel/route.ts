@@ -11,6 +11,7 @@ import {
   getPainelPedidos,
   getPainelProdutos,
   getPainelRede,
+  getRedeFunnel,
   registerManualOrder,
   registerWalkinOrder,
 } from './queries.js';
@@ -147,7 +148,17 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   fastify.get('/admin/api/dashboard/rede', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = redeQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    return reply.status(200).send(dashboardPayload(await getPainelRede(parsed.data.period)));
+    const [rows, funnel] = await Promise.all([getPainelRede(parsed.data.period), getRedeFunnel()]);
+    const funilByUnit = new Map(
+      funnel
+        .filter((f) => f.unit_id)
+        .map((f) => [String(f.unit_id), { tentou: f.tentou, pediu: f.pediu, efetivou: f.efetivou }] as const),
+    );
+    const merged = (rows as Array<Record<string, unknown>>).map((r) => ({
+      ...r,
+      funil: funilByUnit.get(String(r.unit_id)) ?? { tentou: 0, pediu: 0, efetivou: 0 },
+    }));
+    return reply.status(200).send(dashboardPayload(merged));
   });
 
   // Resumo do dono (cockpit da matriz): performance do bot/tráfego + leads a

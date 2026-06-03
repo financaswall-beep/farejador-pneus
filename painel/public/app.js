@@ -35,6 +35,8 @@ function painelApp() {
     chatwootBaseUrl: null,
     chatwootAccountId: null,
     agentV2WorkerEnabled: null,
+    liveRefreshing: false,
+    liveRefreshId: null,
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
@@ -664,6 +666,12 @@ function painelApp() {
       return type || 'Lançamento';
     },
 
+    funilPct(num, den) {
+      const n = Number(num || 0);
+      const d = Number(den || 0);
+      return d > 0 ? Math.round((n / d) * 100) + '%' : '–';
+    },
+
     applyRede(rows) {
       if (!Array.isArray(rows)) return;
       // API vazia = rede sem parceiros reais → lista vazia (NÃO volta pro mock).
@@ -753,6 +761,9 @@ function painelApp() {
           pedidos2w,
           pedidosPorta,
           percentual2w,
+          funilTentou: Number((row.funil && row.funil.tentou) || 0),
+          funilPediu: Number((row.funil && row.funil.pediu) || 0),
+          funilEfetivou: Number((row.funil && row.funil.efetivou) || 0),
           commercialModel: modeloComercialRaw,
           comissaoPercent,
           mensalidadeValor,
@@ -972,22 +983,63 @@ function painelApp() {
       this.$watch('currentPage', () => {
         this.$nextTick(() => {
           lucide.createIcons();
-          if (this.currentPage === 'resumo') this.renderChart();
-          if (this.currentPage === 'rede') {
-            this.renderRedeChart();
-            this.renderRedeLucroChart();
-            this.renderRedeComprasChart();
-            this.renderEstoqueParadoChart();
-            this.renderMargemChart();
-            this.renderVendaHojeChart();
-            this.renderPneusRedeChart();
-            this.renderRedeOrigemChart();
-            this.renderRedeSaudeChart();
-            this.renderParceiroChart();
-          }
-          if (this.currentPage === 'unidade') this.renderParceiroChart();
+          this.renderCurrentPageCharts();
         });
       });
+
+      this.startLiveRefresh();
+    },
+
+    renderCurrentPageCharts() {
+      if (this.currentPage === 'resumo') this.renderChart();
+      if (this.currentPage === 'rede') {
+        this.renderRedeChart();
+        this.renderRedeLucroChart();
+        this.renderRedeComprasChart();
+        this.renderEstoqueParadoChart();
+        this.renderMargemChart();
+        this.renderVendaHojeChart();
+        this.renderPneusRedeChart();
+        this.renderRedeOrigemChart();
+        this.renderRedeSaudeChart();
+        this.renderParceiroChart();
+      }
+      if (this.currentPage === 'unidade') this.renderParceiroChart();
+    },
+
+    // Atualização near real-time: a cada 15s rebusca os dados das telas vivas
+    // (rede + resumo + pedidos) e re-renderiza, sem F5. Silencioso em erro
+    // (mantém o último dado bom). Pausa quando a aba do navegador está oculta.
+    startLiveRefresh() {
+      if (this.liveRefreshId) return;
+      this.liveRefreshId = setInterval(() => { void this.liveRefresh(); }, 15000);
+    },
+
+    async liveRefresh() {
+      if (this.liveRefreshing || document.hidden) return;
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!['resumo', 'rede', 'unidade', 'pedidos'].includes(this.currentPage)) return;
+
+      this.liveRefreshing = true;
+      try {
+        const [rede, resumo, pedidos] = await Promise.allSettled([
+          this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`),
+          this.apiGet('/admin/api/dashboard/matriz-resumo?period=7d'),
+          this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
+        ]);
+        if (rede.status === 'fulfilled') this.applyRede(rede.value.rows);
+        if (resumo.status === 'fulfilled') this.applyMatrizResumo(resumo.value);
+        if (pedidos.status === 'fulfilled') this.applyPedidos(pedidos.value.rows);
+        if ([rede, resumo, pedidos].some((r) => r.status === 'fulfilled')) {
+          this.apiStatus = 'real';
+          this.apiError = null;
+          this.$nextTick(() => { lucide.createIcons(); this.renderCurrentPageCharts(); });
+        }
+      } catch (err) {
+        /* silencioso: mantém o último dado bom na tela */
+      } finally {
+        this.liveRefreshing = false;
+      }
     },
 
     // ─── GRÁFICO ────────────────────────────────────
