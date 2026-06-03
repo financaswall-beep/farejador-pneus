@@ -32,6 +32,7 @@ import {
   getPartnerPayables,
   getPartnerProdutos,
   getPartnerReceivables,
+  searchPartnerCatalog,
   searchPartnerCustomers,
   getPartnerFluxoCaixa,
   getPartnerResumo,
@@ -553,8 +554,15 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     request.raw.on('error', cleanup);
   });
 
-  // Endpoint /catalogo removido em 2026-05-19: parceiro é silo isolado, não consulta
-  // commerce.products. Venda aponta direto pra partner_stock_levels.id.
+  // Endpoint /catalogo (de VENDA) removido em 2026-05-19: a venda do parceiro é silo
+  // isolado, aponta direto pra partner_stock_levels.id — isso CONTINUA assim.
+  // P1 (Fundação Bot→Rede): busca read-only no catálogo central SÓ pra o parceiro
+  // VINCULAR um item de estoque a um produto (preenche partner_stock_levels.product_id),
+  // o ponteiro que o bot usa pra rotear a venda. Não toca o fluxo de venda.
+  fastify.get('/parceiro/:slug/api/catalogo/busca', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const q = typeof (request.query as { q?: unknown })?.q === 'string' ? (request.query as { q: string }).q : '';
+    return reply.status(200).send({ rows: await searchPartnerCatalog(getPartnerContext(request), q) });
+  });
 
   fastify.get('/parceiro/:slug/api/despesas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerDespesas(getPartnerContext(request)) });

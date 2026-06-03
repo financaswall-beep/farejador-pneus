@@ -582,6 +582,35 @@ roda direto no client do bot (sem RLS); corretude depende de passar `unit_id` ce
 
 ---
 
+### ✅ P1 — UI de recebimento: estoque do parceiro ↔ catálogo central — FEITO e PROVADO (2026-06-03)
+Fecha o último pré-requisito da Etapa 2 que faltava produtizar (a "aba de recebimento"): o parceiro
+agora **vincula cada item de estoque a um produto do catálogo central** (preenche
+`partner_stock_levels.product_id`) — o ponteiro que o bot usa pra casar cotação↔estoque e rotear a 2w.
+
+- **Tensão resolvida (silo isolado):** a VENDA do parceiro continua silo (aponta pra
+  `partner_stock_levels.id` — decisão 2026-05-19, intacta). O vínculo é só **metadado de leitura** no
+  cadastro de estoque. Verificado no banco: o role `farejador_partner_app` **já** tem SELECT em
+  `commerce.products` (sem RLS) — o "silo" era de PRODUTO (endpoint removido), não trava técnica.
+- **Backend:** `searchPartnerCatalog` (queries.ts) — busca read-only em `commerce.products` por
+  nome/código/marca; rota `GET /parceiro/:slug/api/catalogo/busca`. `getPartnerEstoque` ganhou
+  `LEFT JOIN commerce.products` → `catalog_product_name` (mostra o vínculo na lista/edição).
+  `upsertPartnerStock`/`stockSchema` **já** aceitavam `product_id` — só faltava o front passar.
+- **Front (Portal Parceiro):** campo "Vincular ao catálogo (pro robô achar esse pneu)" no modal de
+  estoque (só pneu) — busca com dropdown (nome+código) → seleciona → chip verde com "Trocar". Vínculo
+  **opcional** (item sem vínculo = "livre"; o bot só não roteia). **Bug evitado:** "Dar entrada"/
+  "Ajustar saldo" (`_persistStockQuantity`) remontava o payload sem `product_id` → **apagaria o
+  vínculo**; agora preserva.
+- **Prova:** backend — `searchPartnerCatalog` e o JOIN rodados contra prod (item ligado mostra
+  "Pneu Moto 100/80-17 Dianteiro Diagonal", livres = null). Front — `parceiro-static` (4599): Alpine
+  boota sem erro de console, o campo renderiza nos 2 estados (busca com dropdown + chip vinculado,
+  screenshots), e a interação busca→seleciona→chip→limpar funciona. typecheck ✅.
+- **Escopo:** vínculo só pra `item_type='pneu'` (o que o bot roteia) e **opcional** (reversível);
+  estende a outros tipos depois se precisar.
+- **Estado:** branch `feat/fundacao-bot-partner-orders`, **não deployado**. Com o P1, a Etapa 2 fecha
+  de verdade; faltam o parceiro real ligar o estoque dele + o gate Wallace (Etapa 5: aplicar 0081 + deploy).
+
+---
+
 ## 11. Resumo executivo (1 parágrafo)
 
 Toda venda do bot grava em `commerce.orders` (o analytics exige — verificado). Quando roteada a um

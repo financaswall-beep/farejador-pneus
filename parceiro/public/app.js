@@ -140,7 +140,11 @@ function parceiroApp() {
 
     // Ordem da rota de entrega (aba Entrega). Salva neste aparelho, por unidade.
     routeOrder: [],
-    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true },
+    stockForm: { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true, product_id: null, catalog_name: null },
+    // P1 (vínculo ao catálogo): estado da busca de produto pro robô achar o estoque.
+    catalogQuery: '',
+    catalogResults: [],
+    catalogSearching: false,
     purchaseForm: { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' },
     expenseForm: { category: 'employee_payment', description: '', amount: 0 },
     payableForm: { counterparty_name: '', description: '', category: 'supplier', amount: 0, due_date: '', status: 'open', paid_at: '', payment_method: 'Pix', notes: null },
@@ -2516,13 +2520,48 @@ function parceiroApp() {
         // Posição em coluna própria (migration 0075); fallback à heurística p/ legado.
         tire_position: item.tire_position || this.stockPositionValue(item.supplier_name) || this.stockPositionValue(item.item_name) || '',
         is_tracked: Boolean(item.is_tracked),
+        // P1: vínculo ao catálogo (NULL = item livre). catalog_name vem do JOIN em getPartnerEstoque.
+        product_id: item.product_id ?? null,
+        catalog_name: item.catalog_product_name ?? null,
       };
+      this.catalogResults = [];
       this.currentTab = 'stock';
       this.goToSection('estoque');
     },
 
     clearStockForm() {
-      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true };
+      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true, product_id: null, catalog_name: null };
+      this.catalogQuery = '';
+      this.catalogResults = [];
+    },
+
+    // ─── P1: vínculo do estoque ao catálogo central (pro robô achar o item) ─────
+    // Busca read-only em commerce.products (endpoint /catalogo/busca). NÃO é a venda
+    // (que segue silo); é só o ponteiro product_id que o bot usa pra rotear.
+    async searchCatalog() {
+      const q = (this.catalogQuery || '').trim();
+      if (q.length < 2) { this.catalogResults = []; return; }
+      this.catalogSearching = true;
+      try {
+        const result = await this.api(`catalogo/busca?q=${encodeURIComponent(q)}`, { method: 'GET' });
+        this.catalogResults = result.rows || [];
+      } catch (err) {
+        this.catalogResults = [];
+      } finally {
+        this.catalogSearching = false;
+      }
+    },
+    selectCatalogProduct(p) {
+      this.stockForm.product_id = p.id;
+      this.stockForm.catalog_name = p.product_name;
+      this.catalogResults = [];
+      this.catalogQuery = '';
+    },
+    clearCatalogLink() {
+      this.stockForm.product_id = null;
+      this.stockForm.catalog_name = null;
+      this.catalogResults = [];
+      this.catalogQuery = '';
     },
 
     async saveStock() {
@@ -2572,6 +2611,8 @@ function parceiroApp() {
             tire_condition: itemType === 'pneu' ? (this.stockForm.tire_condition?.trim() || null) : null,
             shelf_location: isService ? null : (this.stockForm.shelf_location?.trim() || null),
             is_tracked: isTracked,
+            // P1: ponteiro pro catálogo central (o robô casa por aqui). Serviço nunca vincula.
+            product_id: isService ? null : (this.stockForm.product_id || null),
           }),
         });
         this.clearStockForm();
@@ -3867,6 +3908,8 @@ function parceiroApp() {
           shelf_location: item.shelf_location ?? null,
           tire_position: item.tire_position ?? null,
           is_tracked: Boolean(item.is_tracked),
+          // P1: preserva o vínculo ao catálogo (o upsert sobrescreve tudo; omitir = apagar o link).
+          product_id: item.product_id ?? null,
         }),
       });
       await this.loadData();

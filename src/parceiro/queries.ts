@@ -302,16 +302,56 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
 export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, product_id, local_sku, item_name, item_type, tire_size,
-              tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
-              brand, supplier_name, tire_condition, shelf_location, tire_position,
-              quantity_on_hand, quantity_reserved, minimum_quantity, average_cost, sale_price,
-              is_tracked, stock_status, created_at, updated_at
-       FROM commerce.partner_stock_levels
-       WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
-       ORDER BY stock_status DESC, item_name ASC
+      `SELECT ps.id, ps.product_id, ps.local_sku, ps.item_name, ps.item_type, ps.tire_size,
+              ps.tire_width_mm, ps.tire_aspect_ratio, ps.tire_rim_diameter,
+              ps.brand, ps.supplier_name, ps.tire_condition, ps.shelf_location, ps.tire_position,
+              ps.quantity_on_hand, ps.quantity_reserved, ps.minimum_quantity, ps.average_cost, ps.sale_price,
+              ps.is_tracked, ps.stock_status, ps.created_at, ps.updated_at,
+              -- P1: nome do produto do catálogo central VINCULADO (NULL = item "livre",
+              -- que o bot não consegue rotear). LEFT JOIN: vínculo é opcional.
+              cp.product_name AS catalog_product_name
+       FROM commerce.partner_stock_levels ps
+       LEFT JOIN commerce.products cp ON cp.id = ps.product_id AND cp.environment = ps.environment
+       WHERE ps.environment = $1 AND ps.unit_id = $2 AND ps.deleted_at IS NULL
+       ORDER BY ps.stock_status DESC, ps.item_name ASC
        LIMIT 300`,
       [ctx.environment, ctx.unitId],
+    );
+    return result.rows;
+  });
+}
+
+export interface CatalogSearchRow {
+  id: string;
+  product_code: string | null;
+  product_name: string;
+  brand: string | null;
+  product_type: string | null;
+}
+
+/**
+ * P1 (Fundação Bot→Rede): busca read-only no CATÁLOGO CENTRAL pro parceiro VINCULAR
+ * um item de estoque a um produto do catálogo (preenche `partner_stock_levels.product_id`).
+ * É o ponteiro que o bot usa pra casar cotação↔estoque do parceiro e rotear a venda (2w).
+ *
+ * NÃO reabre o catálogo pra VENDA: a venda do parceiro continua silo (aponta pra
+ * `partner_stock_levels.id` — decisão "silo isolado" 2026-05-19). Aqui é só LEITURA, e
+ * só pro cadastro de estoque. O role `farejador_partner_app` já tem SELECT em
+ * `commerce.products` (sem RLS); a view `product_full` fica fora (sem grant) — por isso
+ * a busca é direta na tabela base. A medida costuma vir embutida no `product_name`.
+ */
+export async function searchPartnerCatalog(ctx: PartnerContext, termo: string): Promise<CatalogSearchRow[]> {
+  const q = termo.trim();
+  if (q.length < 2) return [];
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const result = await client.query<CatalogSearchRow>(
+      `SELECT id, product_code, product_name, brand, product_type
+       FROM commerce.products
+       WHERE environment = $1 AND deleted_at IS NULL
+         AND (product_name ILIKE $2 OR product_code ILIKE $2 OR brand ILIKE $2)
+       ORDER BY product_name ASC
+       LIMIT 20`,
+      [ctx.environment, `%${q}%`],
     );
     return result.rows;
   });

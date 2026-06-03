@@ -1005,6 +1005,30 @@
                 <span x-text="stockForm.item_type === 'servico' ? 'Serviço' : (stockForm.item_type === 'insumo' ? 'Insumo' : 'Produto')"></span>
                 <input x-model="stockForm.item_name" :placeholder="stockForm.item_type === 'servico' ? 'Ex: Troca de pneu' : (stockForm.item_type === 'insumo' ? 'Ex: Câmara de ar' : 'Ex: Pneu traseiro')" />
               </label>
+              <!-- P1 (Fundação Bot→Rede): vincular o item ao catálogo central. É o ponteiro
+                   que o robô usa pra achar o pneu do parceiro e rotear a venda. Opcional. -->
+              <label x-show="stockForm.item_type === 'pneu'" class="pos-catalog-link">
+                <span>Vincular ao catálogo <small>(pro robô achar esse pneu)</small></span>
+                <div x-show="stockForm.product_id" class="pos-catalog-linked">
+                  <span class="pos-catalog-chip">🔗 <b x-text="stockForm.catalog_name || 'Produto do catálogo'"></b></span>
+                  <button type="button" class="pos-catalog-clear" @click="clearCatalogLink()">Trocar</button>
+                </div>
+                <div x-show="!stockForm.product_id" class="pos-catalog-search">
+                  <input type="text" x-model="catalogQuery" @input.debounce.300ms="searchCatalog()"
+                         placeholder="Buscar no catálogo (ex: 100/80-17)" autocomplete="off" />
+                  <div x-show="catalogResults.length" class="pos-catalog-results">
+                    <template x-for="p in catalogResults" :key="p.id">
+                      <button type="button" class="pos-catalog-result" @click="selectCatalogProduct(p)">
+                        <b x-text="p.product_name"></b>
+                        <small x-text="p.product_code"></small>
+                      </button>
+                    </template>
+                  </div>
+                  <div x-show="catalogQuery.length >= 2 && !catalogSearching && !catalogResults.length" class="pos-catalog-empty">
+                    Nada no catálogo com esse termo. Pode deixar em branco — o robô só não roteia esse item.
+                  </div>
+                </div>
+              </label>
               <div class="pos-stock-size-position-row" x-show="stockForm.item_type === 'pneu'">
                 <label class="pos-stock-size-row">Medida
                   <div>
