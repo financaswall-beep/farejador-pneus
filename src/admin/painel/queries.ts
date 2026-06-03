@@ -130,6 +130,11 @@ export async function getPainelRede(
   // de injection apesar de interpolada como string.
   const periodStartSql = resolveRedePeriodStartSql(period);
   const todayStartSql = `(date_trunc('day', now() AT TIME ZONE '${PAINEL_TZ}') AT TIME ZONE '${PAINEL_TZ}')`;
+  // 0077: venda do parceiro SÓ "realiza" na entrega (delivery → delivered_at) ou no fechamento
+  // no balcão (pickup → created_at). Pedido de entrega aberto/em separação NÃO é venda realizada
+  // (mesma regra da view network.partner_unit_summary). Fragmentos reusados nos laterais de venda.
+  const realizedWhere = `po.status <> 'cancelled' AND po.deleted_at IS NULL AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')`;
+  const realizedDate = `(CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE po.created_at END)`;
   const result = await dbPool.query(
     `SELECT
        s.environment,
@@ -198,9 +203,8 @@ export async function getPainelRede(
        FROM commerce.partner_orders po
        WHERE po.environment = s.environment
          AND po.unit_id = s.unit_id
-         AND po.status <> 'cancelled'
-         AND po.deleted_at IS NULL
-         AND po.created_at >= ${periodStartSql}::timestamptz
+         AND ${realizedWhere}
+         AND ${realizedDate} >= ${periodStartSql}::timestamptz
      ) period_sales ON true
      LEFT JOIN LATERAL (
        SELECT COALESCE(sum(total_amount), 0) AS purchases_total
@@ -216,9 +220,8 @@ export async function getPainelRede(
        FROM commerce.partner_orders po
        WHERE po.environment = s.environment
          AND po.unit_id = s.unit_id
-         AND po.status <> 'cancelled'
-         AND po.deleted_at IS NULL
-         AND po.created_at >= ${todayStartSql}
+         AND ${realizedWhere}
+         AND ${realizedDate} >= ${todayStartSql}
      ) today_sales ON true
      LEFT JOIN LATERAL (
        SELECT
@@ -233,9 +236,8 @@ export async function getPainelRede(
        FROM commerce.partner_orders po
        WHERE po.environment = s.environment
          AND po.unit_id = s.unit_id
-         AND po.status <> 'cancelled'
-         AND po.deleted_at IS NULL
-          AND po.created_at >= ${periodStartSql}::timestamptz
+         AND ${realizedWhere}
+         AND ${realizedDate} >= ${periodStartSql}::timestamptz
      ) source_stats ON true
      LEFT JOIN LATERAL (
        SELECT jsonb_agg(jsonb_build_object(
@@ -335,10 +337,9 @@ export async function getPainelRede(
          FROM commerce.partner_orders po
          WHERE po.environment = s.environment
            AND po.unit_id = s.unit_id
-           AND po.status <> 'cancelled'
-           AND po.deleted_at IS NULL
-           AND po.created_at >= day_ref.day
-           AND po.created_at < day_ref.day + interval '1 day'
+           AND ${realizedWhere}
+           AND ${realizedDate} >= day_ref.day
+           AND ${realizedDate} < day_ref.day + interval '1 day'
        ) day_sales ON true
      ) sales_series ON true
      LEFT JOIN LATERAL (
@@ -353,10 +354,9 @@ export async function getPainelRede(
          FROM commerce.partner_orders po
          WHERE po.environment = s.environment
            AND po.unit_id = s.unit_id
-           AND po.status <> 'cancelled'
-           AND po.deleted_at IS NULL
-           AND po.created_at >= day_ref.day
-           AND po.created_at < day_ref.day + interval '1 day'
+           AND ${realizedWhere}
+           AND ${realizedDate} >= day_ref.day
+           AND ${realizedDate} < day_ref.day + interval '1 day'
        ) day_orders ON true
      ) order_series ON true
      WHERE s.environment = $1
@@ -364,6 +364,51 @@ export async function getPainelRede(
     [env.FAREJADOR_ENV],
   );
   return result.rows;
+}
+
+export interface RedeFunnelRow {
+  municipio: string;
+  unit_id: string | null;
+  tentou: number;
+  pediu: number;
+  efetivou: number;
+}
+
+/**
+ * Funil de conversão da REDE por município (Analytics da Rede v1) — desempenho do BOT
+ * na área de cada parceiro:
+ *   - tentou:   conversas em que o bot OFERTOU entrega na região (fact `municipio_entrega`);
+ *   - pediu:    dessas, quantas viraram pedido DO PARCEIRO (espelho com `partner_order_id`);
+ *   - efetivou: desses, quantos foram ENTREGUES (`delivery_status='delivered'`).
+ * `unit_id` = unidade parceira que atende o município (v1: 1 parceiro/município, derivado
+ * dos pedidos existentes; vira `network.unit_coverage` quando houver vários). Só leitura.
+ */
+export async function getRedeFunnel(dbPool: Pool = defaultPool): Promise<RedeFunnelRow[]> {
+  const result = await dbPool.query(
+    `WITH conv AS (
+       SELECT cf.conversation_id,
+              replace(max(cf.fact_value::text) FILTER (WHERE cf.fact_key = 'municipio_entrega'), '"', '') AS municipio
+       FROM analytics.conversation_facts cf
+       WHERE cf.environment = $1
+       GROUP BY cf.conversation_id
+     )
+     SELECT c.municipio,
+            max(po.unit_id::text) AS unit_id,
+            count(DISTINCT c.conversation_id)::int AS tentou,
+            count(DISTINCT c.conversation_id) FILTER (WHERE o.partner_order_id IS NOT NULL)::int AS pediu,
+            count(DISTINCT c.conversation_id) FILTER (WHERE po.delivery_status = 'delivered')::int AS efetivou
+     FROM conv c
+     LEFT JOIN commerce.orders o
+       ON o.source_conversation_id = c.conversation_id
+      AND o.environment = $1
+      AND o.partner_order_id IS NOT NULL
+     LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
+     WHERE c.municipio IS NOT NULL
+     GROUP BY c.municipio
+     ORDER BY tentou DESC`,
+    [env.FAREJADOR_ENV],
+  );
+  return result.rows as RedeFunnelRow[];
 }
 
 export interface MatrizResumo {
