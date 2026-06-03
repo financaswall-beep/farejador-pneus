@@ -926,7 +926,7 @@ function normalizeCpf(value: string | null | undefined): string | null {
   return digits.length === 11 ? digits : null;
 }
 
-async function upsertPartnerCustomerWithClient(
+export async function upsertPartnerCustomerWithClient(
   client: PoolClient,
   ctx: PartnerContext,
   input: PartnerCustomerInput,

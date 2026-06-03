@@ -9,6 +9,15 @@ import {
 import { logger } from '../shared/logger.js';
 import type { ToolDefinition } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import {
+  resolveMatrizUnitId,
+  resolveMunicipioFromGeo,
+  decideStoreForOrder,
+  materializePartnerOrder,
+  FRETE_PADRAO_BRL,
+} from './fulfillment.js';
+import type { PartnerContext } from '../parceiro/auth.js';
+import { createHash } from 'node:crypto';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 
@@ -332,6 +341,82 @@ interface PedidoItem {
   preco_unitario: number;
 }
 
+/**
+ * Grava o ESPELHO em commerce.orders + order_items e devolve {id, order_number}.
+ * Extraído do criar_pedido (Tijolo 3.2) pra os DOIS caminhos — matriz e parceiro —
+ * usarem a MESMA peça, sem duplicar o INSERT. Comportamento idêntico ao de antes;
+ * o caminho parceiro vai passar unit_id da loja (e, após a migration 0081, o link).
+ */
+async function insertCommerceOrderMirror(
+  client: PoolClient,
+  environment: Environment,
+  input: {
+    contactId: string;
+    conversationId: string;
+    totalAmount: string;
+    fulfillmentMode: string;
+    paymentMethod: string | null;
+    deliveryAddress: string | null;
+    geoResolutionId: string | null;
+    customerName: string | null;
+    unitId: string | null;
+    partnerOrderId?: string | null;
+    idempotencyKey?: string | null;
+    items: { product_id: string; quantity: number; unit_price: string }[];
+  },
+): Promise<{ id: string; order_number: string }> {
+  // idempotency_key não-nulo (caminho parceiro) dedup via índice parcial
+  // orders_idempotency_key_uniq; chave NULA (matriz) nunca conflita → INSERT normal,
+  // comportamento idêntico ao de antes.
+  const ins = await client.query<{ id: string; order_number: string }>(
+    `INSERT INTO commerce.orders (
+       environment, contact_id, source_conversation_id, total_amount, status,
+       fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source, customer_name, unit_id,
+       partner_order_id, idempotency_key
+     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9, $10, $11, $12)
+     ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+     RETURNING id, order_number`,
+    [
+      environment,
+      input.contactId,
+      input.conversationId,
+      input.totalAmount,
+      input.fulfillmentMode,
+      input.paymentMethod,
+      input.deliveryAddress,
+      input.geoResolutionId,
+      input.customerName,
+      input.unitId,
+      input.partnerOrderId ?? null,
+      input.idempotencyKey ?? null,
+    ],
+  );
+
+  if (ins.rows[0]) {
+    const order = ins.rows[0];
+    for (const item of input.items) {
+      await client.query(
+        `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [environment, order.id, item.product_id, item.quantity, item.unit_price],
+      );
+    }
+    return order;
+  }
+
+  // Sem linha = colisão de idempotência (retry do MESMO pedido): devolve o existente
+  // sem reinserir itens. Só ocorre com idempotencyKey não-nulo (caminho parceiro).
+  if (input.idempotencyKey) {
+    const ex = await client.query<{ id: string; order_number: string }>(
+      `SELECT id, order_number FROM commerce.orders
+       WHERE environment = $1 AND idempotency_key = $2 LIMIT 1`,
+      [environment, input.idempotencyKey],
+    );
+    if (ex.rows[0]) return ex.rows[0];
+  }
+  throw new Error('Falha ao criar pedido');
+}
+
 async function criarPedido(
   client: PoolClient,
   environment: Environment,
@@ -364,49 +449,161 @@ async function criarPedido(
     return JSON.stringify({ erro: 'Contato não encontrado para esta conversa.' });
   }
 
-  const orderResult = await client.query<{ id: string; order_number: string }>(
-    `INSERT INTO commerce.orders (
-       environment, contact_id, source_conversation_id, total_amount, status,
-       fulfillment_mode, payment_method, delivery_address, geo_resolution_id, source, customer_name
-     ) VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, 'chatwoot_com_bot', $9)
-     RETURNING id, order_number`,
-    [
-      environment,
-      contactId,
-      conversationId,
-      totalAmount.toFixed(2),
-      modalidade,
-      args.forma_pagamento ?? null,
-      modalidade === 'delivery' ? (args.endereco_entrega ?? null) : null,
-      args.geo_resolution_id ?? null,
-      // customer_name: nome dado NA conversa (pode diferir de core.contacts.name
-      // quando o WhatsApp e compartilhado). Mantemos core.contacts.name intocado.
-      (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null,
-    ],
-  );
+  // Dados comuns aos dois caminhos.
+  const customerName = (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null;
+  const deliveryAddress =
+    modalidade === 'delivery' ? ((args.endereco_entrega as string | undefined) ?? null) : null;
+  const geoResolutionId = (args.geo_resolution_id as string | undefined) ?? null;
+  const formaPagamento = (args.forma_pagamento as string | undefined) ?? null;
 
-  const order = orderResult.rows[0];
-  if (!order) throw new Error('Falha ao criar pedido');
+  // ── ROTEAMENTO (Tijolo 3.2): decidir matriz vs parceiro ───────────────────
+  // Só ENTREGA com região conhecida pode ir pro parceiro (H4: pickup → matriz,
+  // senão recebível COD fantasma). O pedido só vai pro parceiro se TODOS os itens
+  // caem no MESMO parceiro com estoque rastreado e disponível (H5); senão matriz.
+  let partner:
+    | {
+        ctx: PartnerContext;
+        unitId: string;
+        items: { product_id: string; partner_stock_id: string; quantity: number; central_price: number }[];
+      }
+    | null = null;
 
-  for (const item of itens) {
-    await client.query(
-      `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [environment, order.id, item.product_id, item.quantidade, item.preco_unitario.toFixed(2)],
-    );
+  if (modalidade === 'delivery' && geoResolutionId) {
+    const municipio = await resolveMunicipioFromGeo(client, environment, geoResolutionId);
+    if (municipio) {
+      const decisions = await Promise.all(
+        itens.map((i) =>
+          decideStoreForOrder(client, environment, {
+            municipio,
+            productId: i.product_id,
+            quantity: i.quantidade,
+          }),
+        ),
+      );
+      const allPartner = decisions.every(
+        (d) => d.store === 'partner' && d.partner && d.partner_stock_id && d.central_price != null,
+      );
+      const oneUnit = new Set(decisions.map((d) => d.unit_id)).size === 1;
+      if (allPartner && oneUnit) {
+        partner = {
+          ctx: decisions[0]!.partner!,
+          unitId: decisions[0]!.unit_id,
+          items: itens.map((i, idx) => ({
+            product_id: i.product_id,
+            partner_stock_id: decisions[idx]!.partner_stock_id!,
+            quantity: i.quantidade,
+            central_price: decisions[idx]!.central_price!,
+          })),
+        };
+      }
+    }
   }
 
-  logger.info(
-    { environment, conversation_id: conversationId, order_id: order.id, order_number: order.order_number },
-    'agent_v2: pedido criado',
-  );
+  let order: { id: string; order_number: string };
+  let respSubtotal: number;
+  let respFrete: number;
+  let respTotal: number;
+
+  if (partner) {
+    // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
+    // Impressão digital estável (H2): o MESMO pedido em retry gera a MESMA chave →
+    // não duplica o espelho nem o partner_order (register_partner_local_order dedup).
+    const idempotencyKey = `bot:order:${conversationId}:${createHash('sha1')
+      .update(JSON.stringify({ u: partner.unitId, itens, modalidade }))
+      .digest('hex')
+      .slice(0, 16)}`;
+
+    const mat = await materializePartnerOrder(client, partner.ctx, {
+      customer_name: customerName,
+      customer_phone: null,
+      items: partner.items.map((it) => ({
+        partner_stock_id: it.partner_stock_id,
+        quantity: it.quantity,
+        unit_price: it.central_price,
+      })),
+      fulfillment_mode: 'delivery',
+      delivery_address: deliveryAddress,
+      freight_amount: FRETE_PADRAO_BRL,
+      idempotency_key: idempotencyKey,
+    });
+
+    // H1: o total do espelho é LIDO DE VOLTA do partner_order (uma fonte de número,
+    // nunca o que o LLM cotou) — e os itens vão a preço CENTRAL.
+    order = await insertCommerceOrderMirror(client, environment, {
+      contactId,
+      conversationId,
+      totalAmount: mat.total_amount,
+      fulfillmentMode: 'delivery',
+      paymentMethod: 'A receber',
+      deliveryAddress,
+      geoResolutionId,
+      customerName,
+      unitId: partner.unitId,
+      partnerOrderId: mat.partner_order_id,
+      idempotencyKey,
+      items: partner.items.map((it) => ({
+        product_id: it.product_id,
+        quantity: it.quantity,
+        unit_price: it.central_price.toFixed(2),
+      })),
+    });
+
+    respSubtotal = partner.items.reduce((s, it) => s + it.central_price * it.quantity, 0);
+    respFrete = FRETE_PADRAO_BRL;
+    respTotal = Number(mat.total_amount);
+
+    logger.info(
+      {
+        environment,
+        conversation_id: conversationId,
+        order_id: order.id,
+        order_number: order.order_number,
+        partner_order_id: mat.partner_order_id,
+        unit_id: partner.unitId,
+        store: 'partner',
+      },
+      'agent_v2: pedido criado (parceiro 2w)',
+    );
+  } else {
+    // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
+    // Idêntico a hoje (idempotencyKey NULL não dedup). Defensivo: unit_id NULL se não achar.
+    const unitId = await resolveMatrizUnitId(client, environment);
+    order = await insertCommerceOrderMirror(client, environment, {
+      contactId,
+      conversationId,
+      totalAmount: totalAmount.toFixed(2),
+      fulfillmentMode: modalidade,
+      paymentMethod: formaPagamento,
+      deliveryAddress,
+      geoResolutionId,
+      // customer_name: nome dado NA conversa (pode diferir de core.contacts.name).
+      customerName,
+      unitId,
+      partnerOrderId: null,
+      idempotencyKey: null,
+      items: itens.map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantidade,
+        unit_price: i.preco_unitario.toFixed(2),
+      })),
+    });
+
+    respSubtotal = subtotal;
+    respFrete = valorFrete;
+    respTotal = totalAmount;
+
+    logger.info(
+      { environment, conversation_id: conversationId, order_id: order.id, order_number: order.order_number },
+      'agent_v2: pedido criado',
+    );
+  }
 
   return JSON.stringify({
     ok: true,
     order_number: order.order_number,
-    subtotal_itens: subtotal.toFixed(2),
-    valor_frete: valorFrete.toFixed(2),
-    total: totalAmount.toFixed(2),
+    subtotal_itens: respSubtotal.toFixed(2),
+    valor_frete: respFrete.toFixed(2),
+    total: respTotal.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
   });
 }
@@ -561,8 +758,9 @@ async function cancelarPedido(
     total_amount: string;
     contact_id: string | null;
     conv_contact_id: string | null;
+    partner_order_id: string | null;
   }>(
-    `SELECT o.id, o.status, o.total_amount, o.contact_id,
+    `SELECT o.id, o.status, o.total_amount, o.contact_id, o.partner_order_id,
             (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
      FROM commerce.orders o
      WHERE o.environment = $1 AND o.order_number = $3
@@ -578,6 +776,16 @@ async function cancelarPedido(
   // Bot so cancela pedido do PROPRIO cliente
   if (order.contact_id && order.conv_contact_id && order.contact_id !== order.conv_contact_id) {
     return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
+  }
+
+  // H3 (Tijolo 3.2): pedido roteado a parceiro NÃO é cancelado pelo bot ainda. O
+  // cancelamento correto (libera reserva + estorna recebível via cancel_partner_local_order)
+  // é o Tijolo 3.4. Até lá, escala humano pra não deixar reserva/recebível órfãos.
+  if (order.partner_order_id) {
+    return JSON.stringify({
+      erro: 'Pedido de parceiro: cancelamento precisa de atendente humano.',
+      sugestao: 'Escalando pra humano (pedido roteado a parceiro).',
+    });
   }
 
   if (order.status !== 'open') {
@@ -650,8 +858,9 @@ async function editarPedido(
     contact_id: string | null;
     conv_contact_id: string | null;
     fulfillment_mode: string;
+    partner_order_id: string | null;
   }>(
-    `SELECT o.id, o.status, o.contact_id, o.fulfillment_mode,
+    `SELECT o.id, o.status, o.contact_id, o.fulfillment_mode, o.partner_order_id,
             (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
      FROM commerce.orders o
      WHERE o.environment = $1 AND o.order_number = $3
@@ -664,6 +873,15 @@ async function editarPedido(
 
   if (order.contact_id && order.conv_contact_id && order.contact_id !== order.conv_contact_id) {
     return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
+  }
+
+  // H3 (Tijolo 3.2): pedido roteado a parceiro NÃO é editado pelo bot ainda
+  // (propagar mudança ao partner_order é o Tijolo 3.4). Escala humano.
+  if (order.partner_order_id) {
+    return JSON.stringify({
+      erro: 'Pedido de parceiro: alteração precisa de atendente humano.',
+      sugestao: 'Escalando pra humano (pedido roteado a parceiro).',
+    });
   }
 
   if (order.status !== 'open') {
