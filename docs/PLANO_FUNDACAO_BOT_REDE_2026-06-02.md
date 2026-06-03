@@ -482,10 +482,43 @@ C1-C5 + P1 + P2). Assim a parte seamless de parceiro não atrasa o ganho da matr
 - **Estado:** branch `feat/fundacao-bot-partner-orders`, **não commitado, não deployado**. Falta só
   (gate Wallace, Etapa 5): **aplicar 0081 em prod + deploy** — código e migration sobem JUNTOS.
 
+**Tijolo 3.3 — Bot COTA a loja certa na conversa — NÚCLEO FEITO e PROVADO (2026-06-03)**
+- **Keystone (pré-requisito que faltava):** `calcular_frete` agora **devolve `geo_resolution_id`** (a
+  função já o calculava internamente mas não o expunha em `FreteResultado`). Sem isso o bot nunca
+  conseguia repassar o id ao `criar_pedido` → na prática **o roteamento do 3.2 era INALCANÇÁVEL numa
+  conversa real** (só passava na prova porque o id era injetado à mão). Campo aditivo e neutro.
+- **C3a — fonte única da decisão (DRY):** extraído `decideStoreForItems(municipio, items)` em
+  `fulfillment.ts` (encapsula "roteia cada item → só parceiro se TODOS no MESMO parceiro com estoque").
+  `criar_pedido` passou a chamá-lo (≈35 linhas → 6). Refactor **sem mudança de comportamento** (245/245).
+- **C3b — frete honesto:** `calcular_frete` (camada V2) consulta o MESMO `decideStoreForItems` e,
+  quando a entrega cai num parceiro, devolve **R$ 9,90** em vez do frete da matriz — pra a cotação
+  BATER com o que o `criar_pedido` cobra. Sem produto / fora de cobertura / parceiro sem o pneu →
+  frete da matriz (backstop). Tool ganhou `produtos` (opcional) + 1 linha de prompt (plumbing).
+- **C2 — busca mostra a loja que ATENDE:** `buscar_produto`/`buscar_compatibilidade` (camada V2)
+  sobrepõem o estoque do parceiro (helper `getPartnerStockMap`) nos pneus que ele tem, quando o
+  `bairro` cai numa região de parceiro; resto = matriz. Evita dizer "acabou" quando o parceiro tem.
+  Schemas ganharam `bairro`/`municipio` (opcionais) + 1 linha de prompt.
+- **Arquitetura:** toda a "consciência de parceiro" ficou na camada V2 (`tools.ts`/`prompt.ts`) +
+  `fulfillment.ts`; o módulo compartilhado `src/atendente/tools/commerce-tools.ts` ficou **intacto
+  (matriz puro)** — só ganhou o campo neutro `geo_resolution_id`.
+- **Provas só-leitura** (calcular_frete/buscas só fazem SELECT → sem rollback): `scripts/prova-3.3-c3b.ts`
+  → Itaboraí com produto = frete **9,90**, decisão casa o município "Itaboraí", keystone fluindo.
+  `scripts/prova-3.3-c2.ts` → **TUDO VERDE** com contraste limpo: busca em Itaboraí mostra **9**
+  (parceiro) **vs 10** (matriz) sem bairro → o bairro realmente troca o estoque mostrado.
+- **Regressão:** `typecheck` ✅ · `npm test` ✅ **245/245** (após cada tijolo).
+- **Decisões de escopo (Wallace, 2026-06-03):** **C1 (rotear cedo) DESCARTADO** — redundante (busca,
+  frete e pedido já chamam o mesmo cérebro determinístico, concordam sozinhos). **C5 (endereço/prazo
+  do parceiro) NÃO feito** — sem ganho real (prazo já vem certo da zona; entrega usa o endereço do
+  cliente). **C4 (prompt sem identidade fixa / voz) NÃO feito — decisão do Wallace de não mexer na voz
+  agora** (cosmético; o bot ainda diz "loja em São Gonçalo", mas nenhum NÚMERO mente).
+- **Estado:** branch `feat/fundacao-bot-partner-orders`, **não commitado, não deployado**. Núcleo do
+  3.3 (fala = registro, honestos e provados) fechado. **Gate real restante NÃO é mais código:**
+  parceiro operacional de verdade? + **P1** (hoje só 1 produto ligado ao catálogo). Depois: aplicar
+  0081 + deploy (gate Wallace, Etapa 5).
+
 **Tijolos restantes da Etapa 3 (próximos):**
-- 3.3 — Bot **cota a loja certa** (C1 rotear cedo / C2 estoque do parceiro / C3 frete 9,90 /
-  C5 endereço do parceiro) + prompt sem identidade fixa (C4). *(Hoje o bot ainda cota a matriz na
-  conversa; o 3.2 garantiu que o registro nasce certo, mas a fala ainda é da matriz até o 3.3.)*
+- 3.3 (polimento, ADIADO por decisão do Wallace 2026-06-03) — C4 (voz / prompt sem identidade fixa) +
+  C5 (prazo/endereço do parceiro). C1 descartado (redundante). Núcleo do 3.3 já feito+provado (acima).
 - 3.4 — Sync `consultar`/`cancelar`/`editar` (C6/C7) + suavizar resumo (C8); a propagação REAL de
   cancel/edit (que o 3.2 hoje bloqueia) usa `cancel_partner_local_order` (já pronta na 0080).
 

@@ -244,6 +244,50 @@ function partnerCoversRegion(partner: PartnerContext, municipio: string | null |
   });
 }
 
+/** Resolve o município canônico a partir do bairro (mesma fonte do calcular_frete). */
+export async function resolveMunicipioFromBairro(
+  client: PoolClient,
+  environment: Environment,
+  bairro: string,
+  municipio?: string | null,
+): Promise<string | null> {
+  const r = await client.query<{ city_name: string | null }>(
+    `SELECT city_name FROM commerce.resolve_neighborhood($1, $2, $3) LIMIT 1`,
+    [environment, bairro, municipio ?? null],
+  );
+  return r.rows[0]?.city_name ?? null;
+}
+
+/**
+ * Mapa product_id → quantidade DISPONÍVEL no parceiro que cobre `municipio`
+ * (vazio se não há parceiro/cobertura). Mesma régua de disponível do roteamento
+ * (H5: rastreado + on_hand−reserved). Usado pelo C2 pra as buscas mostrarem o
+ * estoque da loja que VAI atender, sem duplicar a lógica de cobertura.
+ */
+export async function getPartnerStockMap(
+  client: PoolClient,
+  environment: Environment,
+  municipio: string | null,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!municipio) return map;
+  const partner = await resolveUnitForOrder(client, environment);
+  if (!partner || !partnerCoversRegion(partner, municipio)) return map;
+  const r = await client.query<{ product_id: string; disponivel: string }>(
+    `SELECT product_id, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
+     FROM commerce.partner_stock_levels
+     WHERE environment = $1
+       AND unit_id = $2
+       AND product_id IS NOT NULL
+       AND is_tracked = true
+       AND quantity_on_hand IS NOT NULL
+       AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0`,
+    [environment, partner.unitId],
+  );
+  for (const row of r.rows) map.set(row.product_id, Number(row.disponivel));
+  return map;
+}
+
 /**
  * O CÉREBRO do roteamento (ETAPA 0). Decide a loja por **região → estoque →
  * fallback matriz**:
@@ -308,6 +352,60 @@ export async function decideStoreForOrder(
 
   // Fora da região do parceiro (ou sem parceiro ativo) → matriz
   return toMatriz(partner ? 'fora da região do parceiro → matriz' : 'sem parceiro ativo → matriz');
+}
+
+export interface ItemForDecision {
+  product_id: string;
+  quantity: number;
+}
+
+/** Roteamento resolvido pro parceiro (ou `null` = matriz). */
+export interface PartnerOrderRouting {
+  ctx: NonNullable<StoreDecision['partner']>;
+  unitId: string;
+  items: { product_id: string; partner_stock_id: string; quantity: number; central_price: number }[];
+}
+
+/**
+ * Decisão de loja para um CONJUNTO de itens de entrega — FONTE ÚNICA, usada tanto
+ * pelo `criar_pedido` (registro) quanto pelo `calcular_frete` (cotação), pra a FALA e
+ * o REGISTRO nunca divergirem. Regra (H4/H5): exige município conhecido e só vai pro
+ * parceiro se TODOS os itens caem no MESMO parceiro com estoque disponível; senão
+ * `null` (= matriz, o backstop).
+ */
+export async function decideStoreForItems(
+  client: PoolClient,
+  environment: Environment,
+  input: { municipio: string | null; items: ItemForDecision[] },
+): Promise<PartnerOrderRouting | null> {
+  if (!input.municipio || input.items.length === 0) return null;
+
+  const decisions = await Promise.all(
+    input.items.map((i) =>
+      decideStoreForOrder(client, environment, {
+        municipio: input.municipio,
+        productId: i.product_id,
+        quantity: i.quantity,
+      }),
+    ),
+  );
+
+  const allPartner = decisions.every(
+    (d) => d.store === 'partner' && d.partner && d.partner_stock_id && d.central_price != null,
+  );
+  const oneUnit = new Set(decisions.map((d) => d.unit_id)).size === 1;
+  if (!allPartner || !oneUnit) return null;
+
+  return {
+    ctx: decisions[0]!.partner!,
+    unitId: decisions[0]!.unit_id,
+    items: input.items.map((i, idx) => ({
+      product_id: i.product_id,
+      partner_stock_id: decisions[idx]!.partner_stock_id!,
+      quantity: i.quantity,
+      central_price: decisions[idx]!.central_price!,
+    })),
+  };
 }
 
 export interface BotPartnerOrderItem {

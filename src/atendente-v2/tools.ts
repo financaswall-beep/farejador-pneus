@@ -12,11 +12,13 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import {
   resolveMatrizUnitId,
   resolveMunicipioFromGeo,
-  decideStoreForOrder,
+  resolveMunicipioFromBairro,
+  decideStoreForItems,
+  getPartnerStockMap,
   materializePartnerOrder,
   FRETE_PADRAO_BRL,
+  type PartnerOrderRouting,
 } from './fulfillment.js';
-import type { PartnerContext } from '../parceiro/auth.js';
 import { createHash } from 'node:crypto';
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
@@ -33,6 +35,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           moto_modelo: { type: 'string', description: 'Modelo da moto. Ex: "Fan 150", "CG Titan 160"' },
           moto_ano: { type: 'integer', description: 'Ano do modelo (opcional)' },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'], description: 'Posição do pneu (opcional)' },
+          bairro: { type: 'string', description: 'Bairro do cliente, se já informado — pra mostrar o estoque da loja que vai atender.' },
+          municipio: { type: 'string', description: 'Cidade (opcional, ajuda a localizar o bairro).' },
         },
         required: ['moto_modelo'],
         additionalProperties: false,
@@ -51,6 +55,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           marca: { type: 'string', description: 'Marca. Ex: "Pirelli", "Levorin"' },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'] },
           apenas_com_estoque: { type: 'boolean', description: 'Filtrar só com estoque disponível' },
+          bairro: { type: 'string', description: 'Bairro do cliente, se já informado — pra mostrar o estoque da loja que vai atender.' },
+          municipio: { type: 'string', description: 'Cidade (opcional, ajuda a localizar o bairro).' },
         },
         required: [],
         additionalProperties: false,
@@ -67,6 +73,19 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         properties: {
           bairro: { type: 'string', description: 'Nome do bairro. Ex: "Centro", "Vila Mariana"' },
           municipio: { type: 'string', description: 'Cidade (opcional)' },
+          produtos: {
+            type: 'array',
+            description: 'Os pneus já escolhidos pelo cliente (dos resultados de busca). Inclua o product_id de cada um — necessário para cotar o frete da loja certa.',
+            items: {
+              type: 'object',
+              properties: {
+                product_id: { type: 'string', description: 'UUID do produto' },
+                quantidade: { type: 'number', description: 'Quantidade (padrão 1)' },
+              },
+              required: ['product_id'],
+              additionalProperties: false,
+            },
+          },
         },
         required: ['bairro'],
         additionalProperties: false,
@@ -256,6 +275,22 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        // C2: na região de parceiro, o estoque mostrado é o da loja que VAI atender.
+        {
+          const bairro = args.bairro as string | undefined;
+          if (bairro) {
+            const municipio = await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined);
+            const partnerStock = await getPartnerStockMap(client, environment, municipio);
+            if (partnerStock.size > 0) {
+              for (const v of result) {
+                for (const p of v.produtos) {
+                  const q = partnerStock.get(p.product_id);
+                  if (q != null) p.total_stock = q;
+                }
+              }
+            }
+          }
+        }
         return JSON.stringify({ encontrado: true, veiculos: result });
       }
 
@@ -269,6 +304,20 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        // C2: na região de parceiro, o estoque mostrado é o da loja que VAI atender.
+        {
+          const bairro = args.bairro as string | undefined;
+          if (bairro) {
+            const municipio = await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined);
+            const partnerStock = await getPartnerStockMap(client, environment, municipio);
+            if (partnerStock.size > 0) {
+              for (const p of result) {
+                const q = partnerStock.get(p.product_id);
+                if (q != null) p.total_stock_available = q;
+              }
+            }
+          }
+        }
         return JSON.stringify({ encontrado: true, produtos: result });
       }
 
@@ -278,6 +327,26 @@ export async function executeTool(
           bairro: args.bairro as string,
           municipio: args.municipio as string | undefined,
         });
+        // C3b: se a entrega cai num parceiro (MESMA decisão do criar_pedido), o frete é
+        // o fixo do parceiro (FRETE_PADRAO_BRL), não o da matriz — pra a cotação bater
+        // com o que o pedido vai cobrar. Sem produtos / fora de cobertura / parceiro sem
+        // o pneu → frete da matriz (o backstop). decideStoreForItems é a fonte única.
+        const produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
+        if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
+          const municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
+          const partner = await decideStoreForItems(client, environment, {
+            municipio,
+            items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
+          });
+          if (partner) {
+            return JSON.stringify({
+              ...result,
+              disponivel: true,
+              valor: FRETE_PADRAO_BRL.toFixed(2),
+              motivo: undefined,
+            });
+          }
+        }
         return JSON.stringify(result);
       }
 
@@ -460,43 +529,14 @@ async function criarPedido(
   // Só ENTREGA com região conhecida pode ir pro parceiro (H4: pickup → matriz,
   // senão recebível COD fantasma). O pedido só vai pro parceiro se TODOS os itens
   // caem no MESMO parceiro com estoque rastreado e disponível (H5); senão matriz.
-  let partner:
-    | {
-        ctx: PartnerContext;
-        unitId: string;
-        items: { product_id: string; partner_stock_id: string; quantity: number; central_price: number }[];
-      }
-    | null = null;
+  let partner: PartnerOrderRouting | null = null;
 
   if (modalidade === 'delivery' && geoResolutionId) {
     const municipio = await resolveMunicipioFromGeo(client, environment, geoResolutionId);
-    if (municipio) {
-      const decisions = await Promise.all(
-        itens.map((i) =>
-          decideStoreForOrder(client, environment, {
-            municipio,
-            productId: i.product_id,
-            quantity: i.quantidade,
-          }),
-        ),
-      );
-      const allPartner = decisions.every(
-        (d) => d.store === 'partner' && d.partner && d.partner_stock_id && d.central_price != null,
-      );
-      const oneUnit = new Set(decisions.map((d) => d.unit_id)).size === 1;
-      if (allPartner && oneUnit) {
-        partner = {
-          ctx: decisions[0]!.partner!,
-          unitId: decisions[0]!.unit_id,
-          items: itens.map((i, idx) => ({
-            product_id: i.product_id,
-            partner_stock_id: decisions[idx]!.partner_stock_id!,
-            quantity: i.quantidade,
-            central_price: decisions[idx]!.central_price!,
-          })),
-        };
-      }
-    }
+    partner = await decideStoreForItems(client, environment, {
+      municipio,
+      items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
+    });
   }
 
   let order: { id: string; order_number: string };

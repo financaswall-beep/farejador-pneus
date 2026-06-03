@@ -112,6 +112,7 @@ export interface FreteResultado {
   valor: string | null;
   prazo_dias: number | null;
   delivery_mode: string | null;
+  geo_resolution_id: string | null;
   motivo?: string;
 }
 
@@ -360,6 +361,7 @@ export async function calcularFrete(
       valor: null,
       prazo_dias: null,
       delivery_mode: null,
+      geo_resolution_id: null,
       motivo: 'bairro_nao_encontrado',
     };
   }
@@ -385,6 +387,7 @@ export async function calcularFrete(
       valor: null,
       prazo_dias: null,
       delivery_mode: null,
+      geo_resolution_id: geo.geo_resolution_id,
       motivo: 'zona_sem_configuracao',
     };
   }
@@ -399,6 +402,7 @@ export async function calcularFrete(
     valor: zone.delivery_fee,
     prazo_dias: zone.delivery_days,
     delivery_mode: zone.delivery_mode,
+    geo_resolution_id: geo.geo_resolution_id,
     motivo: zone.is_available ? undefined : 'entrega_indisponivel',
   };
 }
