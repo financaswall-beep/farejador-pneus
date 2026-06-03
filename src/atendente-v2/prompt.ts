@@ -105,6 +105,7 @@ paid = pago
 delivered = entregue
 cancelled = cancelado
 If another status appears, explain it in simple Portuguese using the returned context.
+If the order has 'situacao_parceiro' (partner order), use THAT value directly — it is already in customer language and reflects the real delivery state; ignore 'status' in that case.
 
 QUICK REPLIES
 When asking delivery or pickup, end with: OPCOES: Entrega | Retirada

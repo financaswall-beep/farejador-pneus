@@ -516,11 +516,39 @@ C1-C5 + P1 + P2). Assim a parte seamless de parceiro não atrasa o ganho da matr
   parceiro operacional de verdade? + **P1** (hoje só 1 produto ligado ao catálogo). Depois: aplicar
   0081 + deploy (gate Wallace, Etapa 5).
 
+**Tijolo 3.4 — propagação REAL de cancelamento + status do parceiro no consultar (C6) — FEITO e PROVADO (2026-06-03)**
+- **cancelar_pedido (o coração):** pedido roteado a parceiro deixou de ser BLOQUEADO (o guard H3 do
+  3.2) e passou a **cancelar de verdade, propagado nos dois lados, atômico**: `cancel_partner_local_order`
+  (0080: libera reserva + estorna o recebível — `open`/`received`) no DONO **+** `cancel_manual_order`
+  (0032: só marca `status='cancelled'`, **não toca estoque da matriz**) no ESPELHO. BEGIN/COMMIT próprio
+  (cancelar roda FORA da transação do `agent.ts`, que só envolve `criar_pedido`). **Guard de segurança:**
+  só cancela enquanto `delivery_status='pending'` (Em separação); **despachado/entregue/falhou → escala
+  humano** (mercadoria em trânsito / disputa). Já cancelado → informa.
+- **C6 `consultar_pedido`:** o espelho `commerce.orders.status` de pedido de parceiro fica eternamente
+  `'open'` (quem avança o estado é a máquina do parceiro). Agora o consultar faz LEFT JOIN no DONO e
+  devolve `eh_parceiro=true` + `situacao_parceiro` já em linguagem de cliente (em separação / saiu para
+  entrega / entregue / cancelado / entrega não concluída). +1 linha de prompt mandando o bot usar
+  `situacao_parceiro` em vez do `status` do espelho.
+- **C7 `editar_pedido` — ADIADO de propósito:** mantém escala-humano (seguro, zero órfão). Não existe
+  `edit_partner_local_order` (re-reserva de estoque) na máquina; editar só metade (endereço sim, itens
+  não) faria espelho e dono divergirem → **viola a LEI**. Propagação real de edição = follow-up (precisa
+  da função de re-reserva). **C8 (suavizar resumo)** segue adiado com o C4 (cosmético).
+- **Prova ponta-a-ponta** (`scripts/prova-3.4-cancel.ts`, base real, transação que aplica a 0081 +
+  **ROLLBACK** → nada persistiu): **TUDO VERDE.** (1) parceiro PED-0020, reserva 0→1. (2) C6 antes →
+  `em separação`. (3) cancelar → partner_order `cancelled`, **reserva 1→0**, recebível `cancelled`,
+  espelho `cancelled`. (4) C6 depois → `cancelado`. (5) pedido `dispatched` → cancelar **bloqueado**
+  (escala humano), partner_order segue `confirmed`, espelho `open`, reserva intacta (2).
+- **Regressão:** `typecheck` ✅ · `npm test` ✅ **245/245**.
+- **Estado:** branch `feat/fundacao-bot-partner-orders`, **não deployado**. A propagação de cancel já
+  não está mais bloqueada no código; ainda depende do gate Wallace (Etapa 5: aplicar 0081 + deploy).
+
 **Tijolos restantes da Etapa 3 (próximos):**
 - 3.3 (polimento, ADIADO por decisão do Wallace 2026-06-03) — C4 (voz / prompt sem identidade fixa) +
   C5 (prazo/endereço do parceiro). C1 descartado (redundante). Núcleo do 3.3 já feito+provado (acima).
-- 3.4 — Sync `consultar`/`cancelar`/`editar` (C6/C7) + suavizar resumo (C8); a propagação REAL de
-  cancel/edit (que o 3.2 hoje bloqueia) usa `cancel_partner_local_order` (já pronta na 0080).
+- 3.4 — **núcleo FEITO** (cancel + C6, acima). Restam: **C7 (propagação real de edição)** — follow-up
+  que precisa de uma função de re-reserva no parceiro; e **C8** (cosmético, com o C4). Sync de status
+  parceiro→espelho na ENTREGA (quando o parceiro despacha no portal) segue como item futuro se o bot
+  precisar refletir mudanças que ocorrem fora da conversa.
 
 **🔬 Revisão multi-agente do 3.2 (2026-06-03) — desenho ENDURECIDO antes de codar**
 3 agentes (arquiteto `Plan` / red-team / reuso) revisaram a planta do 3.2 na fonte (código + prod).

@@ -661,6 +661,11 @@ interface OrderRow {
   customer_name: string | null;
   created_at: Date;
   closed_at: Date | null;
+  // C6 (Tijolo 3.4): pedido de parceiro tem o status operacional REAL no dono
+  // (partner_orders), não no espelho — o espelho fica eternamente 'open'.
+  partner_order_id: string | null;
+  partner_delivery_status: string | null;
+  partner_status: string | null;
 }
 
 interface OrderItemRow {
@@ -668,6 +673,28 @@ interface OrderItemRow {
   product_code: string;
   quantity: number;
   unit_price: string;
+}
+
+/**
+ * C6 (Tijolo 3.4): situação de um pedido de PARCEIRO em linguagem de cliente,
+ * derivada do DONO (`partner_orders`). O espelho `commerce.orders.status` fica
+ * sempre 'open' pra pedido de parceiro (quem avança o estado é a máquina do
+ * parceiro), então o bot tem que ler daqui pra responder "cadê meu pedido" certo.
+ */
+function situacaoParceiro(deliveryStatus: string | null, partnerStatus: string | null): string {
+  if (partnerStatus === 'cancelled') return 'cancelado';
+  switch (deliveryStatus) {
+    case 'pending':
+      return 'em separação';
+    case 'dispatched':
+      return 'saiu para entrega';
+    case 'delivered':
+      return 'entregue';
+    case 'failed':
+      return 'entrega não concluída';
+    default:
+      return 'em separação';
+  }
 }
 
 async function consultarPedido(
@@ -692,11 +719,13 @@ async function consultarPedido(
     // Busca por numero — pode ser de qualquer contato (cliente pode estar
     // perguntando de pedido de outra conta dele).
     const result = await client.query<OrderRow>(
-      `SELECT id, order_number, status, total_amount, fulfillment_mode,
-              payment_method, delivery_address, customer_name, created_at, closed_at
-       FROM commerce.orders
-       WHERE environment = $1
-         AND order_number = $2
+      `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
+              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
+              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status
+       FROM commerce.orders o
+       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
+       WHERE o.environment = $1
+         AND o.order_number = $2
        LIMIT 1`,
       [environment, orderNumber.toUpperCase().trim()],
     );
@@ -717,12 +746,14 @@ async function consultarPedido(
       });
     }
     const result = await client.query<OrderRow>(
-      `SELECT id, order_number, status, total_amount, fulfillment_mode,
-              payment_method, delivery_address, customer_name, created_at, closed_at
-       FROM commerce.orders
-       WHERE environment = $1
-         AND contact_id = $2
-       ORDER BY created_at DESC
+      `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
+              o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
+              o.partner_order_id, po.delivery_status AS partner_delivery_status, po.status AS partner_status
+       FROM commerce.orders o
+       LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
+       WHERE o.environment = $1
+         AND o.contact_id = $2
+       ORDER BY o.created_at DESC
        LIMIT $3`,
       [environment, contactId, limit],
     );
@@ -751,6 +782,14 @@ async function consultarPedido(
       return {
         order_number: o.order_number,
         status: o.status,
+        // C6: pedido de parceiro → situação REAL (em separação/saiu/entregue),
+        // já em linguagem de cliente. O `status` do espelho fica sempre 'open'.
+        ...(o.partner_order_id
+          ? {
+              eh_parceiro: true,
+              situacao_parceiro: situacaoParceiro(o.partner_delivery_status, o.partner_status),
+            }
+          : {}),
         total: o.total_amount,
         modalidade: o.fulfillment_mode,
         pagamento: o.payment_method,
@@ -799,10 +838,14 @@ async function cancelarPedido(
     contact_id: string | null;
     conv_contact_id: string | null;
     partner_order_id: string | null;
+    partner_delivery_status: string | null;
+    partner_status: string | null;
   }>(
     `SELECT o.id, o.status, o.total_amount, o.contact_id, o.partner_order_id,
+            po.delivery_status AS partner_delivery_status, po.status AS partner_status,
             (SELECT contact_id FROM core.conversations WHERE id = $2) AS conv_contact_id
      FROM commerce.orders o
+     LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
      WHERE o.environment = $1 AND o.order_number = $3
      LIMIT 1`,
     [environment, conversationId, orderNumber],
@@ -818,14 +861,48 @@ async function cancelarPedido(
     return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
   }
 
-  // H3 (Tijolo 3.2): pedido roteado a parceiro NÃO é cancelado pelo bot ainda. O
-  // cancelamento correto (libera reserva + estorna recebível via cancel_partner_local_order)
-  // é o Tijolo 3.4. Até lá, escala humano pra não deixar reserva/recebível órfãos.
+  // Tijolo 3.4: pedido roteado a parceiro → cancelamento REAL e propagado.
+  // Dono (partner_orders) e espelho (commerce.orders) cancelados JUNTOS, atômico
+  // (BEGIN/COMMIT próprio — cancelar_pedido roda FORA da transação do agent.ts,
+  // que só envolve criar_pedido). cancel_partner_local_order libera a reserva +
+  // estorna o recebível (0080); cancel_manual_order só marca o espelho (NÃO toca
+  // estoque da matriz — 0032). A LEI: o dono cancela, o espelho segue.
   if (order.partner_order_id) {
-    return JSON.stringify({
-      erro: 'Pedido de parceiro: cancelamento precisa de atendente humano.',
-      sugestao: 'Escalando pra humano (pedido roteado a parceiro).',
-    });
+    if (order.partner_status === 'cancelled') {
+      return JSON.stringify({ erro: `Pedido ${orderNumber} já está cancelado.` });
+    }
+    // Bot só cancela enquanto EM SEPARAÇÃO (pending). Despachado/entregue/falhou =
+    // mercadoria em trânsito ou em disputa → atendente humano.
+    if (order.partner_delivery_status !== 'pending') {
+      return JSON.stringify({
+        erro: 'Pedido de parceiro já saiu pra entrega ou foi entregue: cancelamento precisa de atendente humano.',
+        sugestao: 'Escalando pra humano.',
+      });
+    }
+    const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
+        order.partner_order_id,
+        'agent_v2_bot',
+        reason,
+      ]);
+      await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [order.id, 'agent_v2_bot', reason]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        { environment, order_number: orderNumber, partner_order_id: order.partner_order_id, err: message },
+        'agent_v2: erro ao cancelar pedido de parceiro',
+      );
+      return JSON.stringify({ erro: `Não foi possível cancelar: ${message}`, sugestao: 'Escalando pra humano.' });
+    }
+    logger.info(
+      { environment, conversation_id: conversationId, order_number: orderNumber, partner_order_id: order.partner_order_id, motivo },
+      'agent_v2: pedido de parceiro cancelado via bot (reserva liberada + recebível estornado + espelho)',
+    );
+    return JSON.stringify({ ok: true, order_number: orderNumber, motivo, mensagem: `Pedido ${orderNumber} cancelado.` });
   }
 
   if (order.status !== 'open') {
@@ -915,8 +992,11 @@ async function editarPedido(
     return JSON.stringify({ erro: 'Esse pedido nao eh deste contato. Escalando pra humano.' });
   }
 
-  // H3 (Tijolo 3.2): pedido roteado a parceiro NÃO é editado pelo bot ainda
-  // (propagar mudança ao partner_order é o Tijolo 3.4). Escala humano.
+  // Tijolo 3.4: edição de pedido de parceiro fica ADIADA de propósito (escala
+  // humano — seguro, sem órfão). Não existe `edit_partner_local_order` (re-reserva
+  // de estoque) na máquina do parceiro; editar só metade (endereço sim, itens não)
+  // faria o espelho e o dono divergirem → viola a LEI ("um dono por número").
+  // Propagação real de edição é follow-up (precisa da função de re-reserva).
   if (order.partner_order_id) {
     return JSON.stringify({
       erro: 'Pedido de parceiro: alteração precisa de atendente humano.',
