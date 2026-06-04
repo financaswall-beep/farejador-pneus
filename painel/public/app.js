@@ -27,6 +27,20 @@ function painelApp() {
     },
     orderSubmitting: false,
     orderError: null,
+    partnerModalOpen: false,
+    partnerSubmitting: false,
+    partnerError: null,
+    partnerResult: null,
+    partnerForm: {
+      trade_name: '',
+      responsible_name: '',
+      whatsapp_phone: '',
+      email: '',
+      address: '',
+      commission_percent: '',
+      municipios: '',
+      slug: '',
+    },
     apiToken: localStorage.getItem('farejador_admin_token') || '',
     operatorLabel: localStorage.getItem('farejador_operator_label') || 'Wallace',
     apiStatus: 'mock',
@@ -911,6 +925,40 @@ function painelApp() {
         this.orderError = err instanceof Error ? err.message : String(err);
       } finally {
         this.orderSubmitting = false;
+      }
+    },
+
+    openPartnerModal() {
+      this.partnerError = null;
+      this.partnerResult = null;
+      this.partnerForm = { trade_name: '', responsible_name: '', whatsapp_phone: '', email: '', address: '', commission_percent: '', municipios: '', slug: '' };
+      this.partnerModalOpen = true;
+    },
+
+    async submitNewPartner() {
+      if (this.partnerSubmitting) return;
+      if (!this.partnerForm.trade_name.trim()) { this.partnerError = 'Informe o nome do parceiro.'; return; }
+      const municipios = this.partnerForm.municipios.split(',').map((s) => s.trim()).filter(Boolean);
+      if (municipios.length === 0) { this.partnerError = 'Informe ao menos uma cidade de cobertura.'; return; }
+      this.partnerSubmitting = true;
+      this.partnerError = null;
+      try {
+        const result = await this.apiPost('/admin/api/partners', {
+          trade_name: this.partnerForm.trade_name.trim(),
+          responsible_name: this.partnerForm.responsible_name.trim() || null,
+          whatsapp_phone: this.partnerForm.whatsapp_phone.trim() || null,
+          email: this.partnerForm.email.trim() || null,
+          address: this.partnerForm.address.trim() || null,
+          commission_percent: this.partnerForm.commission_percent === '' ? null : Number(this.partnerForm.commission_percent),
+          municipios,
+          slug: this.partnerForm.slug.trim() || null,
+        });
+        this.partnerResult = result; // { slug, token, ... } — token (login) mostrado UMA vez
+        await this.loadRealData();
+      } catch (err) {
+        this.partnerError = err instanceof Error ? err.message : String(err);
+      } finally {
+        this.partnerSubmitting = false;
       }
     },
 

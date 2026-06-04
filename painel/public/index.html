@@ -139,6 +139,13 @@
         Nova venda
       </button>
 
+      <!-- Novo parceiro (cadastro na matriz — Etapa 1 onboarding) -->
+      <button @click="openPartnerModal()"
+              class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+        <i data-lucide="store" class="w-4 h-4"></i>
+        Novo parceiro
+      </button>
+
       <!-- Separador vertical -->
       <div class="w-px h-6 bg-gray-200 mx-1"></div>
 
@@ -1460,6 +1467,96 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: Novo parceiro (Etapa 1 onboarding)
+     ═══════════════════════════════════════════════ -->
+<div x-show="partnerModalOpen"
+     x-cloak
+     @keydown.escape.window="partnerModalOpen = false"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+     style="display:none;">
+  <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+       @click.outside="partnerModalOpen = false">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div>
+        <h3 class="font-semibold">Novo parceiro</h3>
+        <p class="text-xs text-gray-500">Cria o parceiro, o acesso (login) e a cobertura de cidades.</p>
+      </div>
+      <button @click="partnerModalOpen = false" class="p-2 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Resultado: login gerado (token mostrado UMA vez) -->
+    <template x-if="partnerResult">
+      <div class="p-6 space-y-4">
+        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
+          <div class="text-sm font-semibold text-emerald-800 mb-1">Parceiro criado ✅</div>
+          <div class="text-xs text-emerald-700">Endereço de acesso (slug): <span class="font-mono" x-text="partnerResult.slug"></span></div>
+        </div>
+        <div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+          <div class="text-xs font-semibold text-amber-800 mb-1">⚠️ Login (copie agora — não será mostrado de novo)</div>
+          <div class="font-mono text-xs break-all bg-white border border-amber-200 rounded p-2" x-text="partnerResult.token"></div>
+          <button @click="navigator.clipboard && navigator.clipboard.writeText(partnerResult.token)"
+                  class="mt-2 text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg">Copiar login</button>
+        </div>
+        <div class="text-xs text-gray-500">O parceiro entra em <span class="font-mono" x-text="'/parceiro/' + partnerResult.slug + '/'"></span> com esse login.</div>
+        <button @click="partnerModalOpen = false" class="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">Fechar</button>
+      </div>
+    </template>
+
+    <!-- Formulário -->
+    <template x-if="!partnerResult">
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="text-xs font-medium text-gray-700 mb-1 block">Nome do parceiro *</label>
+          <input x-model="partnerForm.trade_name" type="text" placeholder="Ex: Borracharia do Zé"
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-medium text-gray-700 mb-1 block">Responsável</label>
+            <input x-model="partnerForm.responsible_name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-700 mb-1 block">WhatsApp</label>
+            <input x-model="partnerForm.whatsapp_phone" type="text" placeholder="+55..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-medium text-gray-700 mb-1 block">E-mail</label>
+            <input x-model="partnerForm.email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-700 mb-1 block">Comissão (%)</label>
+            <input x-model="partnerForm.commission_percent" type="number" min="0" max="100" step="0.5" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-700 mb-1 block">Endereço</label>
+          <input x-model="partnerForm.address" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-700 mb-1 block">Cidades que atende * <span class="text-gray-400">(separadas por vírgula)</span></label>
+          <input x-model="partnerForm.municipios" type="text" placeholder="Niterói, São Gonçalo" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-700 mb-1 block">Endereço de acesso (slug) <span class="text-gray-400">(opcional — gerado do nome)</span></label>
+          <input x-model="partnerForm.slug" type="text" placeholder="borracharia-do-ze" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div x-show="partnerError" class="text-sm text-rose-600" x-text="partnerError"></div>
+        <div class="flex gap-2 pt-2">
+          <button @click="partnerModalOpen = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancelar</button>
+          <button @click="submitNewPartner()" :disabled="partnerSubmitting"
+                  class="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm disabled:opacity-50"
+                  x-text="partnerSubmitting ? 'Criando...' : 'Criar parceiro'"></button>
+        </div>
+      </div>
+    </template>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
