@@ -1,206 +1,99 @@
-# Handoff — Sessão 2026-06-04 (Rede em prod, fixes tela Pedidos + SEC-001)
+# Handoff — Sessão 2026-06-04 (Painel/Rede + SEC-001 + Onboarding Etapas 1 e 2)
 
-**Pra quem vai continuar (outra LLM/sessão).** Este doc é auto-contido: não depende do histórico
-do chat. Plano-mestre da Fundação Bot→Rede: `docs/PLANO_FUNDACAO_BOT_REDE_2026-06-02.md`.
+**Pra quem continuar (outra LLM/sessão).** Auto-contido. Substitui o handoff de 2026-06-03
+(que dizia "nada deployado" — hoje está tudo no ar).
 
-> ⚠️ **Este handoff SUPERA o de 2026-06-03.** Aquele dizia "NADA deployado" — isso está superado.
-> A Fundação Bot→Rede está em produção desde 2026-06-03 (validada pelo dono com testes reais no
-> WhatsApp). Os commits descritos lá (1db2afc, 6697443, 7eeb191) já estão no ar.
-
-- **Repo:** `C:\Farejador agente` · **Branch:** `feat/fundacao-bot-partner-orders`
-- **HEAD atual:** `1d79735` · **Remote de deploy:** `pneus` (github.com/financaswall-beep/farejador-pneus)
-- **Deploy:** Coolify deploya o branch `main`; hoje `main == feat` (mesmo commit).
-- **Supabase prod (projeto "Farejador"):** `aoqtgwzeyznycuakrdhp` (us-west-2). NÃO confundir com
-  `vyxdquwxmgibpkoswxut` ("betaAgente").
-- **Data:** 2026-06-04.
+- **Repo:** `C:\Farejador agente` · **Branch:** `feat/fundacao-bot-partner-orders` (= `main`)
+- **Remote de deploy:** `pneus` (github.com/financaswall-beep/farejador-pneus). Coolify faz deploy do `main`.
+- **HEAD final:** `94da672` · **Tudo DEPLOYADO em prod.**
+- **Supabase prod ("Farejador"):** `aoqtgwzeyznycuakrdhp` (us-west-2).
 
 ---
 
-## 0. TL;DR (o estado em 5 linhas)
-
-A Fundação Bot→Rede está **no ar e funcionando**. Nesta sessão foram entregues 4 commits de
-manutenção/fix em cima dessa base: cartão Conversão do Bot no painel da Rede, fix do feed de
-lançamentos (status real do pedido, não "Venda" prematura), fix da tela Pedidos (migration 0082,
-view genérica multi-parceiro), e **SEC-001** (furo de segurança — consultar_pedido sem amarrar
-contato). **O último deploy que entrou foi `fe79047`.** Os commits `f103331` e `1d79735` ainda não
-foram deployados — **Redeploy no Coolify é o próximo passo crítico.** Migrations (0081, 0082) já
-estão aplicadas em prod.
+## 0. TL;DR
+Dia grande. Consertados 3 problemas (feed da Rede, tela Pedidos, vazamento SEC-001), todos no ar.
+Construídas e deployadas as **Etapas 1 e 2 do onboarding da Rede**: cobertura saiu do código pra
+uma tabela, o bot roteia data-driven (multi-parceiro), e há uma tela "Novo parceiro" que cria
+parceiro + login + cobertura. **Validado AO VIVO:** o dono criou o parceiro "Anderson Tavares"
+(Niterói) pela tela e o bot, numa conversa real no WhatsApp, roteou um pedido de Niterói pra ele.
 
 ---
 
-## 1. A LEI e a arquitetura (não quebrar)
+## 1. Entregue e NO AR hoje (em ordem de commit)
+1. **Fix feed da Rede** (`getPainelRede` recent_events/top_items): mostra status real do pedido;
+   "Venda" só conta na entrega. — `fe79047`.
+2. **Fix tela Pedidos** (migration **0082**): `dashboard.pedidos_recentes` ganhou colunas
+   `is_partner`/`partner_status`/`delivery_status`/`payment_status` lidas de `partner_orders`;
+   `commerce.network_orders_unified` parou de duplicar pedido de parceiro. Front `painel/public/app.js`. — `f103331`.
+3. **Fix SEC-001** (`src/atendente-v2/tools.ts`, `consultar_pedido`): busca por número agora exige
+   `o.contact_id` = contato da conversa. Fecha vazamento (cliente lia pedido de outro pelo número).
+   Verificado em prod. — `1d79735`.
+4. **Plano de onboarding aprovado + docs** — `b29713a` (`docs/PLANO_ONBOARDING_REDE_2026-06-04.md`).
+5. **Onboarding ETAPA 1 (motor)** — `322d92c` + `9f99de4`:
+   - migration **0083**: `network.unit_coverage` (cobertura por tabela) + coluna `role`
+     (owner/funcionario, com CHECK) nos `partner_access_tokens`.
+   - `resolveUnitForMunicipio` (em `fulfillment.ts`): bot resolve o parceiro pela cobertura na
+     tabela — multi-parceiro, substituiu o `PARTNER_COVERAGE` hardcoded.
+   - `createPartnerUnit` (TS, transacional, **sem SECURITY DEFINER**) + endpoint admin
+     **`POST /admin/api/partners`** (cria unidade+parceiro+login+cobertura; slug auto com sufixo em
+     colisão; token em texto só 1x; `already_exists` se slug explícito já existe).
+   - Validado: typecheck + `scripts/test-create-partner.ts` (cria no env `test`, valida login/cobertura/role, limpa).
+6. **Onboarding ETAPA 2** — `59f55bf` + `94da672`: tela **"Novo parceiro"** no painel da matriz
+   (`painel/public`): botão no topo + modal → chama o endpoint, mostra o login 1x com botão copiar.
+   (`94da672` = fix: modal não fecha ao clicar fora.)
 
-> **Cada número tem UM dono. O outro lado só APONTA — nunca guarda uma cópia que pode divergir.**
-
-- **Toda** venda do bot grava em `commerce.orders` (espelho). Analytics EXIGE isso
-  (`analytics.v_conversation_summary` liga conversa→pedido por `source_conversation_id`).
-- Venda roteada a parceiro **também** grava em `commerce.partner_orders` com `source_tag='2w'`
-  (o dono operacional: estoque/COD/recebível). Cobrança 2w da matriz lê `source_tag='2w'` via
-  `getPainelRede`.
-- Espelho e dono ligados por `commerce.orders.partner_order_id` (FK da migration `0081`, já em
-  prod).
-- **Roteamento:** `decideStoreForItems(municipio, items)` em `src/atendente-v2/fulfillment.ts`.
-  Só vai pro parceiro se TODOS os itens caem no MESMO parceiro com estoque rastreado+disponível;
-  senão matriz (backstop). Só `delivery` roteia (pickup→matriz). Frete do parceiro = **R$ 9,90
-  fixo** (`FRETE_PADRAO_BRL`).
-- Cobertura de região hoje é config hardcoded: `PARTNER_COVERAGE` em `fulfillment.ts`
-  (Borracharia = Itaboraí). Vira tabela `network.unit_coverage` quando houver vários parceiros.
-
-**IDs fixos:**
-- Matriz `unit_id` = `1742c95e-727b-4bb8-8dff-c419e3e21297`
-- Borracharia Rio do Ouro `unit_id` = `36203e18-c3fb-4201-bca1-b15c605faa37` · `slug` =
-  `borracharia-rio-do-ouro` · `environment` = `prod` · status `active`
-
----
-
-## 2. O que foi feito nesta sessão (4 commits)
-
-### `cc89fe5` — Cartão Conversão do Bot + venda conta só na entrega (getRedeFunnel)
-
-- Cartão "Conversão do Bot" (tentou/pediu/efetivou) adicionado ao painel da Rede.
-- `getRedeFunnel`: venda de parceiro passa a contar **só na entrega** (alinhado com a decisão do
-  financeiro; o commit anterior contava na criação).
-
-### `f1fd7f2` — (incluído no cc89fe5 — ver acima)
-
-### `fe79047` — FIX feed da Rede: status real do pedido (DEPLOYADO)
-
-- **Problema:** `getPainelRede` (`recent_events` + `top_items` em
-  `src/admin/painel/queries.ts`) carimbava `"Venda"` em todo pedido desde a criação.
-- **Fix:** pedido em curso → status real (`Em separação / Saiu pra entrega / Entregue`); venda
-  realizada = `"Venda"` datada na entrega.
-- Front: `painel/public/app.js`.
-- **JÁ DEPLOYADO em prod.**
-
-### `f103331` — FIX tela Pedidos: view 0082 multi-parceiro (MIGRATION OK, FRONT PENDENTE)
-
-- Migration `0082` (`db/migrations/0082_painel_orders_reflect_partner_status.sql`): adiciona
-  colunas aditivas (`is_partner`, `partner_status`, `delivery_status`, `payment_status`) na view
-  `dashboard.pedidos_recentes` lidas de `partner_orders` via `partner_order_id`. View é
-  **genérica** — vale pra todos os parceiros atuais e futuros.
-- Fix em `commerce.network_orders_unified` pra não duplicar pedido de parceiro.
-- Front `painel/public/app.js` (`applyPedidos`) traduz os novos campos.
-- **Migration 0082 JÁ APLICADA em prod via MCP. O front AINDA NÃO foi deployado.**
-
-### `1d79735` — FIX SEC-001: consultar_pedido amarra ao contato (PENDENTE DEPLOY)
-
-- **Furo:** `consultar_pedido` (`src/atendente-v2/tools.ts`) buscava por `order_number` SEM
-  verificar `contact_id` → qualquer cliente lia pedido alheio (nome/endereço/itens/valor) chutando
-  o número.
-- **Fix:** query agora exige `o.contact_id = <contato da conversa>`. Pedido de outro contato
-  retorna "não encontrado".
-- **O fix SÓ PROTEGE DEPOIS DO DEPLOY.** Enquanto `1d79735` não for deployado, o furo persiste
-  em prod.
+**Migrations aplicadas hoje em prod:** 0082, 0083.
 
 ---
 
-## 3. Deploy: o que está em cada commit
-
-| Commit | Conteúdo | Status em prod |
-|---|---|---|
-| `7eeb191` e anteriores | Fundação Bot→Rede inteira (migrations 0078–0081) | ✅ Deployado (2026-06-03) |
-| `cc89fe5`, `f1fd7f2` | Cartão Conversão + getRedeFunnel corrigido | ✅ Deployado |
-| `fe79047` | Fix feed status real | ✅ Deployado |
-| `f103331` | Fix tela Pedidos front (0082 já no banco) | ❌ **Pendente deploy** |
-| `1d79735` | SEC-001 fix (consultar_pedido) | ❌ **Pendente deploy — CRÍTICO** |
-
-**Ação imediata:** Redeploy no Coolify (main está no `1d79735`). Não há risco de regressão —
-typecheck e testes passando, migrations já no banco.
+## 2. Limpeza feita
+Os 2 pedidos de teste antigos — Wallace `PED-0022` (partner_order `0498caab`) e Rodrigo `PED-0023`
+(`4c4d8af7`), unidade Rio do Ouro — foram **cancelados** (dono+espelho via `cancel_partner_local_order`
++ `cancel_manual_order`): estoque restaurado, recebíveis estornados.
 
 ---
 
-## 4. Limpeza de pedidos de teste (feita hoje em prod)
-
-Os 2 pedidos de teste criados durante a validação foram cancelados com sucesso:
-
-| Pedido | partner_order | Unidade | Ação |
-|---|---|---|---|
-| PED-0022 (dono/Wallace) | `0498caab-...` | — | `cancel_partner_local_order` + `cancel_manual_order` |
-| PED-0023 (Rodrigo) | `4c4d8af7-...` | Borracharia Rio do Ouro | idem |
-
-Resultado verificado: estoque restaurado (reservas zeradas, `on_hand` voltou a 9 e 10),
-recebíveis estornados (cancelados + deletados). Eles aparecem como `"Cancelado"` na tela Pedidos
-e somem do feed da Rede.
+## 3. Validação AO VIVO (o marco do dia)
+- Wallace criou **pela tela "Novo parceiro"**, em prod, o parceiro **"Anderson Tavares"**
+  (slug `anderson-tavares`, `unit_id 90dc9048-53c7-47ac-a583-bc330b6664fb`, cobre `niteroi`).
+- Inserimos 2 pneus de teste no estoque dele (90/90-18 → produto `803a4169`; 140/70-17 → `fd79ffbf`;
+  5 un cada; `updated_by='cadastro-teste-niteroi'`).
+- Wallace conversou com o bot no WhatsApp pedindo entrega em **Fonseca/Niterói** → o bot roteou pro
+  Anderson e gerou o pedido **`df730693` "Em separação"** (R$ 108,90). **Loop Uber provado end-to-end.**
+- Robustez observada: o bot **não** ancorou no endereço antigo do cliente (tinha histórico de Manilha,
+  cliente disse Niterói → corrigiu) e **não** forçou item que só existe na matriz ("150") no parceiro.
 
 ---
 
-## 5. Pendências / decisões em aberto
-
-### 5.1 ACHADO 2 — cockpit do dono conta faturamento antes da entrega (decisão pendente)
-
-`analytics.v_daily_metrics` ← `analytics.v_conversation_summary`: conta faturamento e "fechou"
-de pedido de parceiro pela **data da conversa**, antes da entrega, e não filtra cancelado (usa
-`o.id IS NOT NULL` sem checar status). Inconsistente com a regra "venda conta na entrega"
-adotada no `getRedeFunnel`.
-
-**Decisão pendente do dono:** faturamento do bot conta na criação do pedido ou só na entrega?
-NÃO corrigido.
-
-### 5.2 ACHADO 4 — getRedeFunnel conta cancelados no funil (baixa prioridade)
-
-- `"pediu"` conta pedido que foi depois cancelado.
-- `"efetivou"` conta `delivery_status='delivered'` mesmo se o pedido foi cancelado.
-NÃO corrigido.
-
-### 5.3 Expansão multi-parceiro (aguardando 2º parceiro real)
-
-Decisão do dono: NÃO começar até ter 2º parceiro real. Quando vier:
-1. Trocar `PARTNER_COVERAGE` (config hardcoded em `src/atendente-v2/fulfillment.ts` ~linha 225)
-   por tabela `network.unit_coverage`.
-2. Tela de cadastro "Novo parceiro" no painel matriz (cria `network.partners` + `partner_units`
-   + token).
-
-Modelo é **multi-tenant** (mesmo banco/tabelas, isolado por `unit_id` + RLS) — NÃO criar
-banco/tabela por parceiro.
-
-### 5.4 Segurança backlog
-
-44 tabelas com RLS desabilitado (dados centrais `core`/`commerce`/`analytics`; as `partner_*` já
-têm RLS). Ver `docs/SEGURANCA.md`.
-
-### 5.5 Pendências herdadas do handoff anterior (não resolvidas)
-
-- **C7** propagação real de edição de pedido de parceiro (`editar_pedido` ainda escala humano)
-  — precisa de `edit_partner_local_order` no banco antes.
-- **Bug pré-existente** (não é da rede): `editar_pedido` perde frete no recálculo ao editar
-  itens de entrega — tarefa separada.
-- **2 arquivos soltos não-commitados:** `painel/public/app.js` (+sobra do commit cobrança
-  `662c29f`) e `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`.
+## 4. PENDÊNCIAS / DECISÕES DO DONO
+- **Limpar dado de teste em prod (quando quiser):**
+  - pedido `df730693` do Anderson "Em separação" (segura reserva de 1× 90/90-18; cancelar libera);
+  - os 2 pneus de teste do Anderson (`updated_by='cadastro-teste-niteroi'`);
+  - decidir se **"Anderson Tavares" é parceiro real ou teste**.
+- **Conversas de teste (Wallace/Rodrigo) NÃO foram apagadas:** bloqueadas pelo trigger
+  `analytics.enforce_fact_evidence_immutability` (`fact_evidence` é append-only). Apagar exige
+  **exceção controlada** (desligar trigger → apagar → religar) + **OK explícito do dono**.
+  Detalhe técnico: deletar a conversa cascateia facts→evidence; e `commerce.orders.source_conversation_id`
+  é NO ACTION (detachar antes com `UPDATE ... source_conversation_id=NULL`).
+- **ACHADO 2 (auditoria):** cockpit do dono (`analytics.v_daily_metrics` ← `v_conversation_summary`)
+  conta faturamento/"fechou" de pedido de parceiro ANTES da entrega e mesmo cancelado (usa só
+  `o.id IS NOT NULL`). Decisão pendente: contar na criação ou só na entrega? Não corrigido.
+- **ACHADO 4 (baixo):** `getRedeFunnel` "pediu" conta pedido depois cancelado.
+- **TODO sugerido:** teste do "endereço velho" — cliente com histórico de uma cidade que só diz
+  "quero entrega" sem repetir; ver se o bot reconfirma a cidade ou chuta a antiga. Se chutar → guard
+  "reconfirmar cidade antes de rotear".
+- **RECOMENDAÇÃO forte:** testar o bot no ambiente **`test`**, não no prod. Cada conversa gera
+  ~50 linhas de analytics IMUTÁVEL no prod (≈21 fatos + evidência + classificações + dicas) — testar
+  no `test` evita sujar o prod e a dor de limpeza.
 
 ---
 
-## 6. Como rodar / comandos úteis
-
-```bash
-# typecheck + testes (gate de regressão)
-npx tsc --noEmit -p tsconfig.json
-npm test
-
-# preview do portal parceiro (sem worker do bot — NÃO liga o atendente)
-# ver .claude/launch.json: parceiro-static (4599) ou parceiro-preview (4100)
-```
-
-**Constantes de referência** (de scripts/provas existentes):
-- Conversa de teste: `d08d4d61-8668-4ed7-8029-ebd9c4d66a6d`
-- Geo Itaboraí: `d640c120-0b85-45ad-a0e1-0bc8ee0d0aa9`
-- Token do parceiro: ver `scripts/gerar-token-parceiro.cjs`
+## 5. Falta do plano de onboarding (`docs/PLANO_ONBOARDING_REDE_2026-06-04.md`)
+- **Etapa 3** — formulário público "quero ser parceiro" + fila de candidaturas na matriz.
+- **Etapa 4** — níveis de acesso (dono vê financeiro, funcionário não), usando a coluna `role` já criada.
 
 ---
 
-## 7. Guards do desenho (não desfazer)
-
-- **H1** total do espelho é LIDO do `partner_order` (nunca recalculado do LLM).
-- **H2** idempotência: `bot:order:{conversationId}:{hash}` no espelho+materialize (`ON CONFLICT`).
-- **H3** cancelar pedido de parceiro = propagação real (commit 3.4); editar segue bloqueado
-  (escala humano) — sem `edit_partner_local_order`.
-- **H4** caminho parceiro SÓ `delivery` (pickup→matriz; senão recebível COD fantasma).
-- **H5** `mapProductToPartnerStock` exige `is_tracked` + disponível.
-- **H6** `insertCommerceOrderMirror` compartilhado pelos 2 caminhos.
-
----
-
-## 8. Próximo passo recomendado (1 frase)
-
-Fazer o **Redeploy no Coolify** para subir `1d79735` (SEC-001) e `f103331` (tela Pedidos com
-front da 0082); depois trazer o **Achado 2** pro dono decidir se o faturamento do bot conta na
-criação ou só na entrega.
+## 6. Próximo passo recomendado (1 frase)
+Decidir o destino do dado de teste do Anderson (limpar ou manter como parceiro real) e então escolher
+entre **Etapa 3**, **Etapa 4** ou o **Achado 2**.
