@@ -27,8 +27,11 @@ const usesSupabase =
   partnerDatabaseUrl.includes('supabase.co') || partnerDatabaseUrl.includes('supabase.com');
 
 export const partnerPool = new Pool({
+  // max=5 era pouco: o portal dispara ~12 chamadas de API ao abrir e elas faziam fila
+  // esperando conexão (responseTime subia 1.5s→3.4s). 15 deixa as ~12 rodarem em paralelo.
+  // Seguro com o pooler do Supabase (6543, multiplexa); de olho no teto de 60 conexões.
   connectionString: partnerDatabaseUrl,
-  max: 5,
+  max: 15,
   ssl: (env.DATABASE_SSL || usesSupabase) ? { rejectUnauthorized: false } : undefined,
 });
 
