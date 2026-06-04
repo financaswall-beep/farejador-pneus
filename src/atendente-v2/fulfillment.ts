@@ -94,6 +94,56 @@ export async function resolveUnitForOrder(
 }
 
 /**
+ * Resolve a unidade parceira que COBRE o município (Etapa 1 onboarding 2026-06-04):
+ * a cobertura vem da tabela `network.unit_coverage`, não mais de PARTNER_COVERAGE
+ * hardcoded. Já é multi-parceiro: adicionar parceiro numa região = inserir linha de
+ * cobertura. Match: o município do cliente CONTÉM a área coberta (mesma régua do antigo
+ * partnerCoversRegion). Empate → cobertura mais específica, depois parceiro mais antigo.
+ * Retorna null se nenhum parceiro ativo cobre o município.
+ */
+export async function resolveUnitForMunicipio(
+  client: PoolClient,
+  environment: Environment,
+  municipio: string | null | undefined,
+): Promise<PartnerContext | null> {
+  const m = normalizeRegion(municipio);
+  if (!m) return null;
+  const result = await client.query<RoutedUnitRow>(
+    `SELECT pu.id            AS partner_unit_id,
+            pu.unit_id       AS unit_id,
+            p.id             AS partner_id,
+            pu.slug          AS slug,
+            p.trade_name     AS partner_name,
+            COALESCE(pu.display_name, u.name) AS unit_name
+     FROM network.unit_coverage uc
+     JOIN network.partner_units pu ON pu.unit_id = uc.unit_id AND pu.environment = uc.environment
+     JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+     JOIN core.units u ON u.id = pu.unit_id
+     WHERE uc.environment = $1
+       AND $2 LIKE '%' || uc.municipio || '%'
+       AND pu.status = 'active'
+       AND p.status = 'active'
+       AND pu.deleted_at IS NULL
+       AND p.deleted_at IS NULL
+     ORDER BY length(uc.municipio) DESC, pu.created_at ASC
+     LIMIT 1`,
+    [environment, m],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    environment,
+    partnerId: row.partner_id,
+    partnerUnitId: row.partner_unit_id,
+    unitId: row.unit_id,
+    slug: row.slug,
+    partnerName: row.partner_name,
+    unitName: row.unit_name,
+  };
+}
+
+/**
  * Resolve o `unit_id` da MATRIZ (loja própria do dono, `slug='main'`). Usado pra
  * carimbar `commerce.orders.unit_id` nas vendas da matriz (ETAPA 1 / Fase 0a).
  * Retorna null se não achar (defensivo — o INSERT mantém unit_id NULL, como hoje).
@@ -222,9 +272,8 @@ export interface StoreDecision {
  * isto vira a tabela `network.unit_coverage` (unit_id → áreas) sem mudar a
  * assinatura de `decideStoreForOrder`.
  */
-const PARTNER_COVERAGE: Record<string, string[]> = {
-  'borracharia-rio-do-ouro': ['itaborai'],
-};
+// PARTNER_COVERAGE saiu daqui (Etapa 1 onboarding 2026-06-04): cobertura agora vem da
+// tabela network.unit_coverage, via resolveUnitForMunicipio. Adicionar parceiro = inserir linha.
 
 /** Frete fixo da rede (decisão Wallace 2026-06-02): R$ 9,90 pra todos. */
 export const FRETE_PADRAO_BRL = 9.9;
@@ -233,16 +282,8 @@ function normalizeRegion(s: string | null | undefined): string {
   return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
 
-function partnerCoversRegion(partner: PartnerContext, municipio: string | null | undefined): boolean {
-  const areas = PARTNER_COVERAGE[partner.slug];
-  if (!areas || areas.length === 0) return false;
-  const m = normalizeRegion(municipio);
-  if (!m) return false;
-  return areas.some((a) => {
-    const an = normalizeRegion(a);
-    return an === m || m.includes(an);
-  });
-}
+// partnerCoversRegion saiu daqui: a cobertura agora é resolvida por resolveUnitForMunicipio
+// (lê network.unit_coverage). normalizeRegion continua em uso lá.
 
 /** Resolve o município canônico a partir do bairro (mesma fonte do calcular_frete). */
 export async function resolveMunicipioFromBairro(
@@ -271,8 +312,8 @@ export async function getPartnerStockMap(
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   if (!municipio) return map;
-  const partner = await resolveUnitForOrder(client, environment);
-  if (!partner || !partnerCoversRegion(partner, municipio)) return map;
+  const partner = await resolveUnitForMunicipio(client, environment, municipio);
+  if (!partner) return map;
   const r = await client.query<{ product_id: string; disponivel: string }>(
     `SELECT product_id, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
      FROM commerce.partner_stock_levels
@@ -302,7 +343,7 @@ export async function decideStoreForOrder(
   environment: Environment,
   input: { municipio?: string | null; productId: string; quantity?: number },
 ): Promise<StoreDecision> {
-  const partner = await resolveUnitForOrder(client, environment);
+  const partner = await resolveUnitForMunicipio(client, environment, input.municipio);
 
   const matrizRes = await client.query<{ id: string; name: string }>(
     `SELECT id, name FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
@@ -330,8 +371,8 @@ export async function decideStoreForOrder(
     reason,
   });
 
-  // 1. Região do parceiro?
-  if (partner && partnerCoversRegion(partner, input.municipio)) {
+  // 1. Região do parceiro? (partner já vem resolvido pela cobertura do município)
+  if (partner) {
     // 2. Parceiro tem o produto?
     const mapping = await mapProductToPartnerStock(client, environment, partner.unitId, input.productId, input.quantity ?? 1);
     if (mapping) {

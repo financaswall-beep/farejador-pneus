@@ -13,7 +13,7 @@ import { decideStoreForItems, resolveMunicipioFromGeo } from '../src/atendente-v
 
 const ENV = 'prod' as const;
 const CONV = 'd08d4d61-8668-4ed7-8029-ebd9c4d66a6d';
-const PRODUTO = '4252423b-8085-4a07-a02f-d1730bf108a9'; // Pneu 100/80-17, ligado ao estoque do parceiro
+const PRODUTO = '803a4169-45e6-4233-a6ac-01212497c0cb'; // Pneu Moto 90/90-18 Traseiro, ligado ao estoque do Rio do Ouro (atualizado 2026-06-04: 4252423b foi desvinculado em sessao anterior)
 const GEO_ITABORAI = 'd640c120-0b85-45ad-a0e1-0bc8ee0d0aa9'; // Manilha / Itaboraí (região do parceiro)
 const UNIT_PARCEIRO = '36203e18-c3fb-4201-bca1-b15c605faa37';
 const BAIRRO = 'Manilha';
