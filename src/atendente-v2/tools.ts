@@ -716,8 +716,15 @@ async function consultarPedido(
   let orders: OrderRow[];
 
   if (orderNumber) {
-    // Busca por numero — pode ser de qualquer contato (cliente pode estar
-    // perguntando de pedido de outra conta dele).
+    // SEC-001: busca por número SÓ retorna pedido do PRÓPRIO contato da conversa.
+    // Sem esse vínculo, qualquer cliente lia pedido (nome/endereço/itens/valor) de
+    // outro cliente só chutando o número. Segurança > conveniência de "outra conta dele".
+    if (!contactId) {
+      return JSON.stringify({
+        encontrado: false,
+        mensagem: 'Não consegui identificar seu contato pra localizar esse pedido. Me chama pelo mesmo número da compra?',
+      });
+    }
     const result = await client.query<OrderRow>(
       `SELECT o.id, o.order_number, o.status, o.total_amount, o.fulfillment_mode,
               o.payment_method, o.delivery_address, o.customer_name, o.created_at, o.closed_at,
@@ -726,15 +733,16 @@ async function consultarPedido(
        LEFT JOIN commerce.partner_orders po ON po.id = o.partner_order_id
        WHERE o.environment = $1
          AND o.order_number = $2
+         AND o.contact_id = $3
        LIMIT 1`,
-      [environment, orderNumber.toUpperCase().trim()],
+      [environment, orderNumber.toUpperCase().trim(), contactId],
     );
     orders = result.rows;
 
     if (orders.length === 0) {
       return JSON.stringify({
         encontrado: false,
-        mensagem: `Não encontrei pedido ${orderNumber}. Confere o número?`,
+        mensagem: `Não encontrei o pedido ${orderNumber} na sua conta. Confere o número?`,
       });
     }
   } else {
