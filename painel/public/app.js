@@ -593,18 +593,36 @@ function painelApp() {
     },
 
     applyPedidos(rows) {
+      const deliveryLabels = { pending: 'Em separação', dispatched: 'Saiu pra entrega', delivered: 'Entregue', failed: 'Entrega falhou' };
       this.pedidos = (rows || []).map((row) => {
-        const cancelled = row.status === 'cancelled';
+        // Pedido de parceiro tem o ciclo de vida real no partner_orders; o espelho fica 'open'.
+        const isPartner = !!row.is_partner;
+        const cancelled = row.status === 'cancelled' || row.partner_status === 'cancelled';
+        let status, statusClass, dotClass;
+        if (cancelled) {
+          status = 'Cancelado'; statusClass = 'bg-rose-50 text-rose-700'; dotClass = 'bg-rose-500';
+        } else if (isPartner) {
+          status = deliveryLabels[row.delivery_status] || row.partner_status || 'Pedido';
+          const done = row.delivery_status === 'delivered';
+          statusClass = done ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700';
+          dotClass = done ? 'bg-emerald-500' : 'bg-indigo-500';
+        } else {
+          status = row.status === 'confirmed' ? 'Confirmado' : (row.status || 'Aberto');
+          statusClass = 'bg-emerald-50 text-emerald-700'; dotClass = 'bg-emerald-500';
+        }
+        const pagto = isPartner
+          ? (row.payment_status === 'pago' ? 'Pago' : 'A receber')
+          : (row.payment_method || '-');
         return {
           data: this.formatDateTime(row.created_at),
           cliente: row.contact_name || 'Cliente',
           itens: this.itemSummary(row.items),
-          pagto: row.payment_method || '-',
+          pagto,
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
-          status: cancelled ? 'Cancelado' : (row.status === 'confirmed' ? 'Confirmado' : row.status || 'Aberto'),
-          statusClass: cancelled ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
-          dotClass: cancelled ? 'bg-rose-500' : 'bg-emerald-500',
+          status,
+          statusClass,
+          dotClass,
         };
       });
     },
