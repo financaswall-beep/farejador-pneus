@@ -7,6 +7,7 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
   cancelManualOrder,
+  createPartnerUnit,
   getMatrizResumo,
   getPainelPedidos,
   getPainelProdutos,
@@ -28,6 +29,24 @@ const redeQuerySchema = z.object({
 
 const resumoQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d', 'month']).default('7d'),
+});
+
+// Onboarding de parceiro (Etapa 1). Termos comerciais são definidos pela matriz aqui,
+// não pelo candidato. municipios = cobertura inicial; slug opcional (gerado do nome).
+const createPartnerSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  trade_name: z.string().min(2),
+  legal_name: z.string().min(1).nullable().optional(),
+  document_number: z.string().min(1).nullable().optional(),
+  responsible_name: z.string().min(1).nullable().optional(),
+  whatsapp_phone: z.string().min(1).nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  address: z.string().min(1).nullable().optional(),
+  commercial_model: z.string().min(1).nullable().optional(),
+  commission_percent: z.number().min(0).max(100).nullable().optional(),
+  monthly_fee: z.number().min(0).nullable().optional(),
+  municipios: z.array(z.string().min(1)).default([]),
+  slug: z.string().min(1).nullable().optional(),
 });
 
 const orderItemSchema = z.object({
@@ -168,6 +187,26 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     const resumo = await getMatrizResumo(parsed.data.period);
     return reply.status(200).send({ ...dashboardPayload([]), ...resumo });
+  });
+
+  // Cadastro de parceiro (Etapa 1 onboarding): cria unidade + parceiro + LOGIN + cobertura.
+  // O token (login) volta em texto SÓ aqui, uma vez. Admin-only.
+  fastify.post('/admin/api/partners', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = createPartnerSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await createPartnerUnit({ ...parsed.data, actor_label: operatorLabel(request.headers) });
+      if (result.already_exists) {
+        return reply.status(409).send({ error: 'slug_already_exists', slug: result.slug });
+      }
+      return reply.status(201).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel create partner failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   fastify.post('/admin/api/orders/register-manual', { preHandler: requireAdminAuth }, async (request, reply) => {
