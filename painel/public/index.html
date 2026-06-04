@@ -1262,7 +1262,7 @@
                     <span class="text-xs text-gray-500" x-text="lancamento.data"></span>
                   </div>
                   <div class="text-sm font-medium" x-text="lancamento.descricao"></div>
-                  <div class="text-sm font-semibold mt-1" :class="lancamentoValorClass(lancamento.valor)" x-text="formatCurrency(lancamento.valor)"></div>
+                  <div class="text-sm font-semibold mt-1" :class="lancamentoValorClass(lancamento)" x-text="formatCurrency(lancamento.valor)"></div>
                 </div>
               </template>
               <div x-show="(selectedParceiro()?.lancamentos || []).length === 0"

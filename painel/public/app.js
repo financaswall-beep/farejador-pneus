@@ -367,14 +367,16 @@ function painelApp() {
 
     lancamentoClass(tipo) {
       if (tipo === 'Venda') return 'bg-emerald-50 text-emerald-700';
+      if (typeof tipo === 'string' && tipo.startsWith('Pedido')) return 'bg-indigo-50 text-indigo-700';
       if (tipo === 'Compra pneus') return 'bg-blue-50 text-blue-700';
       if (tipo === 'Pagamento funcionário') return 'bg-purple-50 text-purple-700';
       if (tipo === 'Despesa extra') return 'bg-amber-50 text-amber-700';
       return 'bg-gray-100 text-gray-700';
     },
 
-    lancamentoValorClass(valor) {
-      return Number(valor || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700';
+    lancamentoValorClass(lancamento) {
+      if (lancamento && lancamento.pendente) return 'text-gray-400';
+      return Number((lancamento && lancamento.valor) || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700';
     },
 
     saudeChecks(parceiro = this.selectedParceiro()) {
@@ -805,12 +807,16 @@ function painelApp() {
           lastActivityAt,
           diasSemAtualizar,
           ultimaAtualizacao: lastActivityAt ? this.formatDateTime(lastActivityAt) : 'sem registro',
-          lancamentos: events.map((event) => ({
-            tipo: this.mapPartnerEventType(event.type),
-            data: event.event_at ? this.formatDateTime(event.event_at) : '-',
-            descricao: event.description || '-',
-            valor: Number(event.amount || 0),
-          })),
+          lancamentos: events.map((event) => {
+            const tipo = this.mapPartnerEventType(event.type);
+            return {
+              tipo,
+              pendente: typeof tipo === 'string' && tipo.startsWith('Pedido'),
+              data: event.event_at ? this.formatDateTime(event.event_at) : '-',
+              descricao: event.description || '-',
+              valor: Number(event.amount || 0),
+            };
+          }),
           custosRecentes: [
             { label: 'Compra pneus', value: this.formatCurrency(comprasPneus) },
             { label: 'Folha / funcionários', value: this.formatCurrency(folha) },

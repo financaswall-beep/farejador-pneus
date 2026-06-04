@@ -135,6 +135,10 @@ export async function getPainelRede(
   // (mesma regra da view network.partner_unit_summary). Fragmentos reusados nos laterais de venda.
   const realizedWhere = `po.status <> 'cancelled' AND po.deleted_at IS NULL AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')`;
   const realizedDate = `(CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE po.created_at END)`;
+  // Pedido de ENTREGA ainda não entregue NÃO é venda — no feed ele aparece com o status atual.
+  const isRealizedExpr = `NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')`;
+  // Data do evento no feed: venda realizada usa a data de realização; pedido em curso usa a criação.
+  const eventDateExpr = `(CASE WHEN ${isRealizedExpr} THEN ${realizedDate} ELSE po.created_at END)`;
   const result = await dbPool.query(
     `SELECT
        s.environment,
@@ -262,10 +266,16 @@ export async function getPainelRede(
      LEFT JOIN LATERAL (
        SELECT jsonb_agg(event ORDER BY event_at DESC) AS events
        FROM (
-         SELECT po.created_at AS event_at,
+         SELECT ${eventDateExpr} AS event_at,
                 jsonb_build_object(
-                  'type', 'Venda',
-                  'event_at', po.created_at,
+                  'type', CASE
+                    WHEN ${isRealizedExpr} THEN 'Venda'
+                    WHEN po.delivery_status = 'pending' THEN 'Pedido · Em separação'
+                    WHEN po.delivery_status = 'dispatched' THEN 'Pedido · Saiu pra entrega'
+                    WHEN po.delivery_status = 'failed' THEN 'Pedido · Entrega falhou'
+                    ELSE 'Pedido'
+                  END,
+                  'event_at', ${eventDateExpr},
                   'description', COALESCE(po.customer_name, 'Cliente') || ' - pedido',
                   'amount', po.total_amount
                 ) AS event
@@ -317,9 +327,8 @@ export async function getPainelRede(
            ON ps.id = poi.partner_stock_id AND ps.environment = poi.environment
          WHERE po.environment = s.environment
             AND po.unit_id = s.unit_id
-            AND po.status <> 'cancelled'
-            AND po.deleted_at IS NULL
-            AND po.created_at >= ${periodStartSql}::timestamptz
+            AND ${realizedWhere}
+            AND ${realizedDate} >= ${periodStartSql}::timestamptz
          GROUP BY COALESCE(ps.tire_size, ps.item_name, poi.partner_stock_id::text)
          ORDER BY qty DESC
          LIMIT 5
