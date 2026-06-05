@@ -58,7 +58,12 @@ const partnerApplicationSchema = z.object({
   trade_name: z.string().min(2),
   responsible_name: z.string().min(1).nullable().optional(),
   whatsapp_phone: z.string().min(1).nullable().optional(),
-  email: z.string().email().nullable().optional(),
+  // E-mail é opcional e sem validação de formato: o canal real é o WhatsApp.
+  // Vazio vira null pra não derrubar o envio.
+  email: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().max(160).nullable().optional(),
+  ),
   address: z.string().min(1).nullable().optional(),
   municipios: z.string().min(1).nullable().optional(),
   message: z.string().max(1000).nullable().optional(),
