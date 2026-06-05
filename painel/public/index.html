@@ -146,6 +146,16 @@
         Novo parceiro
       </button>
 
+      <!-- Candidaturas (Etapa 3) -->
+      <button @click="openApplications()"
+              class="relative flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+        <i data-lucide="inbox" class="w-4 h-4"></i>
+        Candidaturas
+        <span x-show="applications.length > 0" x-cloak
+              class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+              x-text="applications.length"></span>
+      </button>
+
       <!-- Separador vertical -->
       <div class="w-px h-6 bg-gray-200 mx-1"></div>
 
@@ -1467,6 +1477,93 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: Candidaturas a parceiro (Etapa 3)
+     ═══════════════════════════════════════════════ -->
+<div x-show="applicationsModalOpen" x-cloak
+     @keydown.escape.window="applicationsModalOpen = false"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+     style="display:none;">
+  <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+      <div>
+        <h3 class="font-semibold">Candidaturas a parceiro</h3>
+        <p class="text-xs text-gray-500">Quem se candidatou pelo formulário público. Aprovar cria o parceiro com login.</p>
+      </div>
+      <button @click="applicationsModalOpen = false" class="p-2 hover:bg-gray-100 rounded-lg">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-3">
+      <div x-show="applicationsLoading" class="text-sm text-gray-500 text-center py-6">Carregando...</div>
+      <div x-show="!applicationsLoading && applications.length === 0" class="text-sm text-gray-500 text-center py-8">
+        Nenhuma candidatura pendente.
+      </div>
+
+      <template x-for="app in applications" :key="app.id">
+        <div class="rounded-xl border border-gray-200 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="font-semibold" x-text="app.trade_name"></div>
+            <span class="text-xs text-gray-400" x-text="formatDateTime(app.created_at)"></span>
+          </div>
+          <div class="text-sm text-gray-600 mt-1 space-y-0.5">
+            <div x-show="app.responsible_name">👤 <span x-text="app.responsible_name"></span></div>
+            <div x-show="app.whatsapp_phone">📱 <span x-text="app.whatsapp_phone"></span></div>
+            <div x-show="app.email">✉️ <span x-text="app.email"></span></div>
+            <div x-show="app.municipios">📍 <span x-text="app.municipios"></span></div>
+            <div x-show="app.address" class="text-gray-500" x-text="app.address"></div>
+            <div x-show="app.message" class="text-gray-500 italic mt-1" x-text="app.message"></div>
+          </div>
+
+          <div x-show="!approvingApp || approvingApp.id !== app.id" class="flex gap-2 mt-3">
+            <button @click="startApprove(app)" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm">Aprovar</button>
+            <button @click="rejectApplication(app)" class="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm">Recusar</button>
+          </div>
+
+          <div x-show="approvingApp && approvingApp.id === app.id" class="mt-3 border-t border-gray-100 pt-3">
+            <template x-if="!approveResult">
+              <div class="space-y-2">
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-1">Cidades que ele vai atender (cobertura) *</label>
+                  <input x-model="approveForm.municipios" type="text" placeholder="Niterói, São Gonçalo"
+                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-700 block mb-1">Comissão (%)</label>
+                  <input x-model="approveForm.commission_percent" type="number" min="0" max="100" step="0.5"
+                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div x-show="approveError" class="text-sm text-rose-600" x-text="approveError"></div>
+                <div class="flex gap-2">
+                  <button @click="approvingApp = null" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm">Cancelar</button>
+                  <button @click="confirmApprove()" :disabled="approveSubmitting"
+                          class="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50"
+                          x-text="approveSubmitting ? 'Aprovando...' : 'Confirmar e criar parceiro'"></button>
+                </div>
+              </div>
+            </template>
+            <template x-if="approveResult">
+              <div class="space-y-2">
+                <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
+                  Parceiro criado ✅ — slug <span class="font-mono" x-text="approveResult.slug"></span>
+                </div>
+                <div class="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                  <div class="text-xs font-semibold text-amber-800 mb-1">⚠️ Login (copie agora — não some de novo)</div>
+                  <div class="font-mono text-xs break-all bg-white border border-amber-200 rounded p-2" x-text="approveResult.token"></div>
+                  <button @click="navigator.clipboard && navigator.clipboard.writeText(approveResult.token)"
+                          class="mt-2 text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg">Copiar login</button>
+                </div>
+                <button @click="approvingApp = null; approveResult = null" class="w-full px-3 py-2 bg-gray-900 text-white rounded-lg text-sm">Pronto</button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════

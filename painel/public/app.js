@@ -41,6 +41,15 @@ function painelApp() {
       municipios: '',
       slug: '',
     },
+    // Etapa 3: fila de candidaturas
+    applicationsModalOpen: false,
+    applications: [],
+    applicationsLoading: false,
+    approvingApp: null,
+    approveForm: { municipios: '', commission_percent: '', slug: '' },
+    approveSubmitting: false,
+    approveError: null,
+    approveResult: null,
     apiToken: localStorage.getItem('farejador_admin_token') || '',
     operatorLabel: localStorage.getItem('farejador_operator_label') || 'Wallace',
     apiStatus: 'mock',
@@ -962,9 +971,69 @@ function painelApp() {
       }
     },
 
+    // ── Etapa 3: candidaturas de parceiro ──
+    async loadApplications() {
+      if (!this.apiToken) return;
+      this.applicationsLoading = true;
+      try {
+        const payload = await this.apiGet('/admin/api/partner-applications?status=pending');
+        this.applications = Array.isArray(payload) ? payload : (payload.rows || []);
+      } catch (err) {
+        this.applications = [];
+      } finally {
+        this.applicationsLoading = false;
+      }
+    },
+
+    async openApplications() {
+      this.approvingApp = null;
+      this.approveResult = null;
+      this.approveError = null;
+      this.applicationsModalOpen = true;
+      await this.loadApplications();
+    },
+
+    startApprove(app) {
+      this.approvingApp = app;
+      this.approveResult = null;
+      this.approveError = null;
+      this.approveForm = { municipios: app.municipios || '', commission_percent: '', slug: '' };
+    },
+
+    async confirmApprove() {
+      if (this.approveSubmitting || !this.approvingApp) return;
+      const municipios = (this.approveForm.municipios || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (municipios.length === 0) { this.approveError = 'Informe ao menos uma cidade de cobertura.'; return; }
+      this.approveSubmitting = true;
+      this.approveError = null;
+      try {
+        const result = await this.apiPost(`/admin/api/partner-applications/${this.approvingApp.id}/approve`, {
+          municipios,
+          commission_percent: this.approveForm.commission_percent === '' ? null : Number(this.approveForm.commission_percent),
+          slug: this.approveForm.slug.trim() || null,
+        });
+        this.approveResult = result; // { slug, token, ... } — login mostrado UMA vez
+        await this.loadApplications();
+      } catch (err) {
+        this.approveError = err instanceof Error ? err.message : String(err);
+      } finally {
+        this.approveSubmitting = false;
+      }
+    },
+
+    async rejectApplication(app) {
+      try {
+        await this.apiPost(`/admin/api/partner-applications/${app.id}/reject`, {});
+        await this.loadApplications();
+      } catch (err) {
+        // silencioso — recusar é best-effort
+      }
+    },
+
     async loadRealData() {
       this.ensureCredentials();
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      this.loadApplications(); // Etapa 3: badge de candidaturas (não bloqueia o resto)
 
       // Promise.allSettled: cada bloco é independente — um endpoint que falhe
       // não derruba os outros pro mock. Resumo = bot/tráfego (matriz-resumo,

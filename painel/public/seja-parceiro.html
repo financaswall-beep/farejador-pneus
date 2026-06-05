@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Seja parceiro — Farejador</title>
+<style>
+  /* CSS embutido de propósito: página pública carrega instantânea, sem depender de CDN
+     externo (que antivírus de cliente costuma travar). */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #f8fafc; color: #1e293b; line-height: 1.5; padding: 24px 16px; }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 24px;
+          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:800; font-size:20px; color:#ea580c; margin-bottom:4px; }
+  h1 { font-size: 22px; margin: 14px 0 6px; }
+  .sub { color:#64748b; font-size:14px; margin-bottom:20px; }
+  label { display:block; font-size:13px; font-weight:600; color:#334155; margin:14px 0 5px; }
+  .req { color:#ea580c; }
+  input, textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px;
+                    font-size:15px; font-family:inherit; background:#fff; }
+  input:focus, textarea:focus { outline:none; border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,.12); }
+  textarea { min-height:80px; resize:vertical; }
+  .hp { position:absolute; left:-9999px; }       /* honeypot escondido */
+  button { width:100%; margin-top:22px; padding:13px; background:#ea580c; color:#fff; border:none;
+           border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .msg { margin-top:16px; padding:12px 14px; border-radius:10px; font-size:14px; display:none; }
+  .ok { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+  .err { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  .ok-screen { text-align:center; padding:20px 0; }
+  .ok-screen .big { font-size:42px; }
+  .foot { text-align:center; color:#94a3b8; font-size:12px; margin-top:18px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="formCard">
+      <div class="brand">🐾 Farejador</div>
+      <h1>Seja um parceiro da Rede</h1>
+      <p class="sub">Sua borracharia recebe pedidos do nosso bot na sua região. Preencha que a gente entra em contato.</p>
+
+      <form id="form">
+        <label>Nome da borracharia <span class="req">*</span></label>
+        <input name="trade_name" required maxlength="120" placeholder="Ex: Borracharia do Zé" />
+
+        <label>Seu nome</label>
+        <input name="responsible_name" maxlength="120" placeholder="Quem fala com a gente" />
+
+        <label>WhatsApp</label>
+        <input name="whatsapp_phone" maxlength="40" placeholder="(21) 9...." />
+
+        <label>E-mail</label>
+        <input name="email" type="email" maxlength="160" placeholder="opcional" />
+
+        <label>Cidade(s) que você atende</label>
+        <input name="municipios" maxlength="200" placeholder="Ex: Niterói, São Gonçalo" />
+
+        <label>Endereço da borracharia</label>
+        <input name="address" maxlength="200" placeholder="Rua, número, bairro" />
+
+        <label>Mensagem</label>
+        <textarea name="message" maxlength="1000" placeholder="Conte um pouco da sua loja (opcional)"></textarea>
+
+        <!-- honeypot anti-spam: humano não vê, bot preenche -->
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+        <button type="submit" id="btn">Quero ser parceiro</button>
+        <div class="msg err" id="errMsg"></div>
+      </form>
+    </div>
+
+    <div class="card ok-screen" id="okCard" style="display:none;">
+      <div class="big">✅</div>
+      <h1>Candidatura enviada!</h1>
+      <p class="sub">Recebemos seus dados. Em breve a gente entra em contato pelo WhatsApp. Obrigado! 🧡</p>
+    </div>
+
+    <div class="foot">Farejador · Rede de parceiros</div>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const btn = document.getElementById('btn');
+    const errMsg = document.getElementById('errMsg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errMsg.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        const res = await fetch('/api/seja-parceiro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload.error || ('erro_' + res.status));
+        }
+        document.getElementById('formCard').style.display = 'none';
+        document.getElementById('okCard').style.display = 'block';
+      } catch (err) {
+        errMsg.textContent = 'Não consegui enviar (' + (err.message || err) + '). Tenta de novo?';
+        errMsg.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Quero ser parceiro';
+      }
+    });
+  </script>
+</body>
+</html>
