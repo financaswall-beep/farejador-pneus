@@ -741,3 +741,120 @@ export async function createPartnerUnit(
     client.release();
   }
 }
+
+// ─── Candidaturas de parceiro (Etapa 3 — funil de recrutamento) ───────────────
+export interface PartnerApplicationInput {
+  environment?: 'prod' | 'test';
+  trade_name: string;
+  responsible_name?: string | null;
+  whatsapp_phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  municipios?: string | null;
+  message?: string | null;
+}
+
+/** Insere uma candidatura pública (status=pending). Sem auth — vem do formulário público. */
+export async function createPartnerApplication(
+  input: PartnerApplicationInput,
+  dbPool: Pool = defaultPool,
+): Promise<{ id: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const r = await dbPool.query<{ id: string }>(
+    `INSERT INTO network.partner_applications
+       (environment, trade_name, responsible_name, whatsapp_phone, email, address, municipios, message)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+    [
+      environment, input.trade_name.trim(),
+      input.responsible_name?.trim() || null, input.whatsapp_phone?.trim() || null,
+      input.email?.trim() || null, input.address?.trim() || null,
+      input.municipios?.trim() || null, input.message?.trim() || null,
+    ],
+  );
+  return { id: r.rows[0]!.id };
+}
+
+/** Lista candidaturas pra fila da matriz (default: só pendentes). */
+export async function listPartnerApplications(
+  status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending',
+  dbPool: Pool = defaultPool,
+): Promise<unknown[]> {
+  const r = await dbPool.query(
+    `SELECT id, trade_name, responsible_name, whatsapp_phone, email, address, municipios, message,
+            status, created_at, reviewed_by, reviewed_at, review_notes, created_partner_unit_id
+     FROM network.partner_applications
+     WHERE environment = $1 AND ($2 = 'all' OR status = $2)
+     ORDER BY created_at DESC LIMIT 100`,
+    [env.FAREJADOR_ENV, status],
+  );
+  return r.rows;
+}
+
+export interface ApproveApplicationInput {
+  application_id: string;
+  actor_label: string;
+  municipios: string[];                 // cobertura REAL definida pelo dono na aprovação
+  commission_percent?: number | null;   // termos comerciais: definidos pelo dono aqui
+  monthly_fee?: number | null;
+  commercial_model?: string | null;
+  slug?: string | null;
+}
+
+/** Aprova: cria o parceiro (reusa createPartnerUnit) e marca a candidatura como approved. */
+export async function approvePartnerApplication(
+  input: ApproveApplicationInput,
+  dbPool: Pool = defaultPool,
+): Promise<CreatePartnerResult & { application_id: string }> {
+  const appRes = await dbPool.query<{
+    environment: 'prod' | 'test'; trade_name: string; responsible_name: string | null;
+    whatsapp_phone: string | null; email: string | null; address: string | null; status: string;
+  }>(
+    `SELECT environment, trade_name, responsible_name, whatsapp_phone, email, address, status
+     FROM network.partner_applications WHERE id = $1 AND environment = $2`,
+    [input.application_id, env.FAREJADOR_ENV],
+  );
+  const app = appRes.rows[0];
+  if (!app) throw new Error('application_not_found');
+  if (app.status !== 'pending') throw new Error('application_not_pending');
+
+  const created = await createPartnerUnit({
+    environment: app.environment,
+    trade_name: app.trade_name,
+    responsible_name: app.responsible_name,
+    whatsapp_phone: app.whatsapp_phone,
+    email: app.email,
+    address: app.address,
+    commission_percent: input.commission_percent ?? null,
+    monthly_fee: input.monthly_fee ?? null,
+    commercial_model: input.commercial_model ?? null,
+    municipios: input.municipios,
+    slug: input.slug ?? null,
+    actor_label: input.actor_label,
+  }, dbPool);
+
+  if (!created.already_exists) {
+    await dbPool.query(
+      `UPDATE network.partner_applications
+       SET status='approved', reviewed_by=$1, reviewed_at=now(), created_partner_unit_id=$2
+       WHERE id=$3`,
+      [input.actor_label, created.partner_unit_id ?? null, input.application_id],
+    );
+  }
+  return { ...created, application_id: input.application_id };
+}
+
+/** Recusa uma candidatura pendente. */
+export async function rejectPartnerApplication(
+  applicationId: string,
+  actorLabel: string,
+  notes: string | null,
+  dbPool: Pool = defaultPool,
+): Promise<{ rejected: boolean }> {
+  const r = await dbPool.query(
+    `UPDATE network.partner_applications
+     SET status='rejected', reviewed_by=$1, reviewed_at=now(), review_notes=$2
+     WHERE id=$3 AND environment=$4 AND status='pending'`,
+    [actorLabel, notes, applicationId, env.FAREJADOR_ENV],
+  );
+  return { rejected: (r.rowCount ?? 0) > 0 };
+}
