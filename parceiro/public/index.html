@@ -189,6 +189,10 @@
         <span>Configurações</span>
         <kbd>F9</kbd>
       </button>
+      <button @click="logout()" class="pos-nav-item pos-logout" title="Sair da conta">
+        <i data-lucide="log-out"></i>
+        <span>Sair</span>
+      </button>
       <div class="pos-version">
         <span>Versão 2.3.1</span>
         <span class="text-emerald-400">Ambiente: Produção</span>
@@ -220,6 +224,9 @@
         <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
                 :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
           <i data-lucide="sun-moon"></i>
+        </button>
+        <button class="pos-theme-toggle-mobile" @click="logout()" title="Sair da conta">
+          <i data-lucide="log-out"></i>
         </button>
         <div class="pos-user">
           <div><i data-lucide="user"></i></div>
