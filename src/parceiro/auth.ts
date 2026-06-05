@@ -2,6 +2,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { partnerPool } from './db.js';
 import { env } from '../shared/config/env.js';
 
+export type PartnerRole = 'owner' | 'funcionario';
+
 export interface PartnerContext {
   environment: 'prod' | 'test';
   partnerId: string;
@@ -10,6 +12,7 @@ export interface PartnerContext {
   slug: string;
   partnerName: string;
   unitName: string;
+  role: PartnerRole;
 }
 
 export interface PartnerAuthedRequest extends FastifyRequest {
@@ -24,6 +27,7 @@ interface PartnerAuthRow {
   partner_name: string;
   unit_name: string;
   token_id: string;
+  role: string;
 }
 
 function extractBearerToken(header: unknown): string | null {
@@ -63,6 +67,9 @@ export async function authenticatePartnerToken(
   if (result.rowCount !== 1) return null;
 
   const row = result.rows[0]!;
+  // Fail-safe: qualquer valor inesperado de role é tratado como 'funcionario'
+  // (o menos privilegiado). Só 'owner' explícito libera tudo.
+  const role: PartnerRole = row.role === 'owner' ? 'owner' : 'funcionario';
   return {
     environment: env.FAREJADOR_ENV,
     partnerId: row.partner_id,
@@ -71,6 +78,7 @@ export async function authenticatePartnerToken(
     slug: row.slug,
     partnerName: row.partner_name,
     unitName: row.unit_name,
+    role,
   };
 }
 
@@ -100,4 +108,24 @@ export function getPartnerContext(request: PartnerAuthedRequest): PartnerContext
     throw new Error('partner_context_missing');
   }
   return request.partnerContext;
+}
+
+/**
+ * Guarda de autorização: só DONO (role='owner') passa. Funcionário leva 403.
+ *
+ * Etapa 4 (níveis dono/funcionário). Usar SEMPRE depois de requirePartnerAuth,
+ * encadeado: { preHandler: [requirePartnerAuth, requireOwner] }. A trava real
+ * é aqui no servidor — esconder a aba no front sem barrar o endpoint seria
+ * teatro (funcionário poderia chamar a API direto).
+ */
+export async function requireOwner(request: PartnerAuthedRequest, reply: FastifyReply): Promise<void> {
+  const context = request.partnerContext;
+  if (!context) {
+    void reply.status(401).send({ error: 'partner_unauthorized' });
+    return;
+  }
+  if (context.role !== 'owner') {
+    void reply.status(403).send({ error: 'partner_forbidden_owner_only' });
+    return;
+  }
 }

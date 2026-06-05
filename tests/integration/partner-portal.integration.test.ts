@@ -226,6 +226,64 @@ describe('Portal Parceiro — autenticação', () => {
 });
 
 // --------------------------------------------------------------
+// Etapa 4 — níveis dono/funcionário (requireOwner)
+// --------------------------------------------------------------
+describe('Portal Parceiro — autorização por papel (Etapa 4)', () => {
+  it('token de dono traz role=owner e passa no requireOwner', async () => {
+    const { requirePartnerAuth, requireOwner } = await importAuth();
+    const f = await createPartnerFixture(db.pool, { role: 'owner' });
+
+    const request = {
+      headers: { authorization: `Bearer ${f.tokenPlain}` },
+      params: { slug: f.slug },
+      partnerContext: undefined,
+    } as unknown as Parameters<typeof requirePartnerAuth>[0];
+
+    const authReply = createMockReply();
+    await requirePartnerAuth(request, authReply as unknown as FastifyReply);
+    expect((request as any).partnerContext?.role).toBe('owner');
+
+    // requireOwner não deve barrar o dono
+    const ownerReply = createMockReply();
+    await requireOwner(request, ownerReply as unknown as FastifyReply);
+    expect(ownerReply.statusCode).toBe(200);
+  });
+
+  it('token de funcionário traz role=funcionario e leva 403 no requireOwner', async () => {
+    const { requirePartnerAuth, requireOwner } = await importAuth();
+    const f = await createPartnerFixture(db.pool, { role: 'funcionario' });
+
+    const request = {
+      headers: { authorization: `Bearer ${f.tokenPlain}` },
+      params: { slug: f.slug },
+      partnerContext: undefined,
+    } as unknown as Parameters<typeof requirePartnerAuth>[0];
+
+    // 1. autentica OK (funcionário é login válido)
+    const authReply = createMockReply();
+    await requirePartnerAuth(request, authReply as unknown as FastifyReply);
+    expect(authReply.statusCode).toBe(200);
+    expect((request as any).partnerContext?.role).toBe('funcionario');
+
+    // 2. mas requireOwner barra com 403 (financeiro/config é só do dono)
+    const ownerReply = createMockReply();
+    await requireOwner(request, ownerReply as unknown as FastifyReply);
+    expect(ownerReply.statusCode).toBe(403);
+    expect(ownerReply.payload).toEqual({ error: 'partner_forbidden_owner_only' });
+  });
+
+  it('requireOwner sem contexto (não autenticado) retorna 401', async () => {
+    const { requireOwner } = await importAuth();
+
+    const request = { partnerContext: undefined } as unknown as Parameters<typeof requireOwner>[0];
+    const reply = createMockReply();
+    await requireOwner(request, reply as unknown as FastifyReply);
+
+    expect(reply.statusCode).toBe(401);
+  });
+});
+
+// --------------------------------------------------------------
 // 6. S4 — normalizacao E.164 do telefone (auditoria 2026-05-21)
 // --------------------------------------------------------------
 describe('Portal Parceiro — normalizacao de telefone E.164 (S4)', () => {

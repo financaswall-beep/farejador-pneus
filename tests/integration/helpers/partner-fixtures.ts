@@ -17,6 +17,8 @@ export interface PartnerFixtureOptions {
   partnerStatus?: 'credentialing' | 'active' | 'suspended';
   unitStatus?: 'credentialing' | 'active' | 'suspended';
   revokeToken?: boolean;
+  /** Etapa 4: papel do token. Default 'owner' (igual ao default da coluna). */
+  role?: 'owner' | 'funcionario';
 }
 
 export interface PartnerFixture {
@@ -43,6 +45,7 @@ export interface PartnerFixture {
     slug: string;
     partnerName: string;
     unitName: string;
+    role: 'owner' | 'funcionario';
   };
 }
 
@@ -97,15 +100,17 @@ export async function createPartnerFixture(
   // 4. network.partner_access_tokens
   const tokenPlain = `token-${suffix}-${randomUUID()}`;
   const tokenHash = sha256(tokenPlain);
+  const role = opts.role ?? 'owner';
   await pool.query(
     `INSERT INTO network.partner_access_tokens (
-       environment, partner_unit_id, token_hash, label, created_by, revoked_at
-     ) VALUES ('test', $1, $2, $3, 'fixture', $4)`,
+       environment, partner_unit_id, token_hash, label, created_by, revoked_at, role
+     ) VALUES ('test', $1, $2, $3, 'fixture', $4, $5)`,
     [
       partnerUnitId,
       tokenHash,
       `token piloto ${suffix}`,
       opts.revokeToken ? new Date() : null,
+      role,
     ],
   );
 
@@ -140,6 +145,7 @@ export async function createPartnerFixture(
       slug,
       partnerName: `Teste ${suffix}`,
       unitName: `Loja Teste ${suffix}`,
+      role,
     },
   };
 }

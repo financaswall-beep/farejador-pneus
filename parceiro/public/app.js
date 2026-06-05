@@ -31,6 +31,7 @@ function parceiroApp() {
     statusTimer: null,
     lastUpdatedAt: null,
     currentSection: 'resumo',
+    role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
     sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
@@ -318,30 +319,48 @@ function parceiroApp() {
       return response.json();
     },
 
+    get isOwner() { return this.role === 'owner'; },
+
     async loadData() {
       if (!this.apiToken) return;
       this.loading = true;
       try {
-        const [resumo, vendas, estoque, compras, despesas, produtos, payables, receivables, fluxo] = await Promise.all([
-          this.api('resumo'),
+        // Etapa 4: descobre o papel ANTES de carregar. Funcionário não pode
+        // bater nos endpoints de financeiro (403) — /api/me é liberado pros dois.
+        const me = await this.api('me');
+        this.role = me.role === 'owner' ? 'owner' : 'funcionario';
+        // Se um funcionário cair logado numa seção que não é dele, manda pra Frente de caixa.
+        if (!this.isOwner && ['resumo', 'financeiro'].includes(this.currentSection)) {
+          this.currentSection = 'vendas';
+        }
+
+        // Operacional: os dois papéis carregam.
+        const [vendas, estoque, produtos] = await Promise.all([
           this.api('vendas'),
           this.api('estoque'),
-          this.api('compras'),
-          this.api('despesas'),
           this.api('produtos'),
-          this.api('contas-a-pagar'),
-          this.api('contas-a-receber'),
-          this.api('fluxo-caixa'),
         ]);
-        this.resumo = (resumo.rows && resumo.rows[0]) || null;
         this.vendas = vendas.rows || [];
         this.estoque = estoque.rows || [];
-        this.compras = compras.rows || [];
-        this.despesas = despesas.rows || [];
         this.produtos = produtos.rows || [];
-        this.payables = payables.rows || [];
-        this.receivables = receivables.rows || [];
-        this.fluxoCaixa = (fluxo.rows && fluxo.rows[0]) || null;
+
+        // Financeiro: SÓ o dono. Funcionário nem chama (evita o 403).
+        if (this.isOwner) {
+          const [resumo, compras, despesas, payables, receivables, fluxo] = await Promise.all([
+            this.api('resumo'),
+            this.api('compras'),
+            this.api('despesas'),
+            this.api('contas-a-pagar'),
+            this.api('contas-a-receber'),
+            this.api('fluxo-caixa'),
+          ]);
+          this.resumo = (resumo.rows && resumo.rows[0]) || null;
+          this.compras = compras.rows || [];
+          this.despesas = despesas.rows || [];
+          this.payables = payables.rows || [];
+          this.receivables = receivables.rows || [];
+          this.fluxoCaixa = (fluxo.rows && fluxo.rows[0]) || null;
+        }
         try {
           const clientes = await this.api('clientes');
           this.clientes = clientes.rows || [];
@@ -1947,6 +1966,9 @@ function parceiroApp() {
 
     // â”€â”€â”€ NAVEGAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     goToSection(id) {
+      // Etapa 4: funcionário não entra em Resumo/Financeiro nem por atalho de
+      // teclado. (A trava real é no backend; isto é só pra UI não ir pra uma tela vazia.)
+      if (!this.isOwner && ['resumo', 'financeiro'].includes(id)) return;
       if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
       // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
       if (id === 'batepapo') this.startChatPolling();
