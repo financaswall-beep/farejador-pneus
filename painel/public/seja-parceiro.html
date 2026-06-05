@@ -3,111 +3,220 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Seja parceiro — Farejador</title>
+<title>Seja parceiro - 2W</title>
 <style>
-  /* CSS embutido de propósito: página pública carrega instantânea, sem depender de CDN
-     externo (que antivírus de cliente costuma travar). */
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         background: #f8fafc; color: #1e293b; line-height: 1.5; padding: 24px 16px; }
-  .wrap { max-width: 520px; margin: 0 auto; }
-  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 24px;
-          box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-  .brand { display:flex; align-items:center; gap:8px; font-weight:800; font-size:20px; color:#ea580c; margin-bottom:4px; }
-  h1 { font-size: 22px; margin: 14px 0 6px; }
-  .sub { color:#64748b; font-size:14px; margin-bottom:20px; }
-  label { display:block; font-size:13px; font-weight:600; color:#334155; margin:14px 0 5px; }
-  .req { color:#ea580c; }
-  input, textarea { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px;
-                    font-size:15px; font-family:inherit; background:#fff; }
-  input:focus, textarea:focus { outline:none; border-color:#ea580c; box-shadow:0 0 0 3px rgba(234,88,12,.12); }
-  textarea { min-height:80px; resize:vertical; }
-  .hp { position:absolute; left:-9999px; }       /* honeypot escondido */
-  button { width:100%; margin-top:22px; padding:13px; background:#ea580c; color:#fff; border:none;
-           border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; }
-  button:disabled { opacity:.6; cursor:default; }
-  .msg { margin-top:16px; padding:12px 14px; border-radius:10px; font-size:14px; display:none; }
-  .ok { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
-  .err { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
-  .ok-screen { text-align:center; padding:20px 0; }
-  .ok-screen .big { font-size:42px; }
-  .foot { text-align:center; color:#94a3b8; font-size:12px; margin-top:18px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    min-height: 100vh;
+    background: #000;
+    color: #fff;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: auto;
+  }
+  .stage {
+    position: relative;
+    width: min(100vw, calc(100vh * 1.7779));
+    min-width: 960px;
+    aspect-ratio: 1672 / 941;
+    margin: 0 auto;
+    background: #000 url('seja-parceiro-2w.png') center / cover no-repeat;
+  }
+  .signup-form {
+    position: absolute;
+    left: 57.76%;
+    top: 24.86%;
+    width: 34.72%;
+    height: 67.16%;
+  }
+  .field,
+  .message {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #f7f7f1;
+    font: 500 18px/1.2 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 0 17px;
+    caret-color: #ffd400;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  }
+  .field:focus,
+  .message:focus {
+    box-shadow: inset 0 0 0 2px rgba(255, 212, 0, .45);
+    border-radius: 8px;
+  }
+  .field::placeholder,
+  .message::placeholder { color: transparent; }
+  .field { height: 6.9%; }
+  .trade { top: 0; }
+  .name { top: 12.48%; }
+  .phone { top: 24.96%; }
+  .email { top: 37.44%; }
+  .cities { top: 49.92%; }
+  .address { top: 62.4%; }
+  .message {
+    top: 75.04%;
+    height: 12.2%;
+    padding-top: 13px;
+    resize: none;
+  }
+  .submit-hit {
+    position: absolute;
+    left: -9.62%;
+    top: 89.98%;
+    width: 110.32%;
+    height: 10.13%;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: transparent;
+    cursor: pointer;
+  }
+  .submit-hit:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, .82);
+    outline-offset: 3px;
+  }
+  .submit-hit:disabled {
+    cursor: wait;
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .status {
+    position: absolute;
+    left: 54%;
+    top: 40%;
+    width: 40%;
+    min-height: 180px;
+    display: none;
+    place-items: center;
+    padding: 32px;
+    border: 1px solid rgba(255, 212, 0, .58);
+    border-radius: 24px;
+    background: rgba(8, 9, 7, .9);
+    box-shadow: 0 0 42px rgba(255, 212, 0, .18);
+    text-align: center;
+  }
+  .status h1 {
+    margin: 0 0 10px;
+    font-size: 34px;
+  }
+  .status p {
+    margin: 0;
+    color: #d6d6cf;
+    font-size: 18px;
+    line-height: 1.45;
+  }
+  .status.err h1 { color: #ffd400; }
+  @media (max-aspect-ratio: 1672 / 941) {
+    .stage {
+      width: calc(100vh * 1.7779);
+      min-height: 100vh;
+    }
+  }
+  @media (max-width: 980px) {
+    body {
+      min-width: 960px;
+    }
+    .stage {
+      width: 960px;
+      min-width: 960px;
+    }
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card" id="formCard">
-      <div class="brand">🐾 Farejador</div>
-      <h1>Seja um parceiro da Rede</h1>
-      <p class="sub">Sua borracharia recebe pedidos do nosso bot na sua região. Preencha que a gente entra em contato.</p>
+  <main class="stage" aria-label="Cadastro para parceiros da Rede 2W">
+    <form class="signup-form" id="form" aria-label="Formulário de cadastro de parceiro">
+      <label class="hp" for="trade_name">Nome da borracharia</label>
+      <input class="field trade" id="trade_name" name="trade_name" required maxlength="120" placeholder="Ex: Borracharia do Zé" autocomplete="organization" />
 
-      <form id="form">
-        <label>Nome da borracharia <span class="req">*</span></label>
-        <input name="trade_name" required maxlength="120" placeholder="Ex: Borracharia do Zé" />
+      <label class="hp" for="responsible_name">Seu nome</label>
+      <input class="field name" id="responsible_name" name="responsible_name" maxlength="120" placeholder="Quem fala com a gente" autocomplete="name" />
 
-        <label>Seu nome</label>
-        <input name="responsible_name" maxlength="120" placeholder="Quem fala com a gente" />
+      <label class="hp" for="whatsapp_phone">WhatsApp</label>
+      <input class="field phone" id="whatsapp_phone" name="whatsapp_phone" maxlength="40" placeholder="(21) 9..." autocomplete="tel" inputmode="tel" />
 
-        <label>WhatsApp</label>
-        <input name="whatsapp_phone" maxlength="40" placeholder="(21) 9...." />
+      <label class="hp" for="email">E-mail</label>
+      <input class="field email" id="email" name="email" type="text" maxlength="160" placeholder="opcional" autocomplete="email" inputmode="email" />
 
-        <label>E-mail</label>
-        <input name="email" type="email" maxlength="160" placeholder="opcional" />
+      <label class="hp" for="municipios">Cidade(s) que você atende</label>
+      <input class="field cities" id="municipios" name="municipios" maxlength="200" placeholder="Ex: Niterói, São Gonçalo" autocomplete="address-level2" />
 
-        <label>Cidade(s) que você atende</label>
-        <input name="municipios" maxlength="200" placeholder="Ex: Niterói, São Gonçalo" />
+      <label class="hp" for="address">Endereço da borracharia</label>
+      <input class="field address" id="address" name="address" maxlength="200" placeholder="Rua, número, bairro" autocomplete="street-address" />
 
-        <label>Endereço da borracharia</label>
-        <input name="address" maxlength="200" placeholder="Rua, número, bairro" />
+      <label class="hp" for="message">Mensagem</label>
+      <textarea class="message" id="message" name="message" maxlength="1000" placeholder="Conte um pouco da sua loja (opcional)"></textarea>
 
-        <label>Mensagem</label>
-        <textarea name="message" maxlength="1000" placeholder="Conte um pouco da sua loja (opcional)"></textarea>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+      <button class="submit-hit" type="submit" id="btn">Quero ser parceiro</button>
+    </form>
 
-        <!-- honeypot anti-spam: humano não vê, bot preenche -->
-        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+    <section class="status" id="okCard" role="status" aria-live="polite">
+      <div>
+        <h1>Candidatura enviada!</h1>
+        <p>Recebemos seus dados. Em breve a gente entra em contato pelo WhatsApp.</p>
+      </div>
+    </section>
 
-        <button type="submit" id="btn">Quero ser parceiro</button>
-        <div class="msg err" id="errMsg"></div>
-      </form>
-    </div>
-
-    <div class="card ok-screen" id="okCard" style="display:none;">
-      <div class="big">✅</div>
-      <h1>Candidatura enviada!</h1>
-      <p class="sub">Recebemos seus dados. Em breve a gente entra em contato pelo WhatsApp. Obrigado! 🧡</p>
-    </div>
-
-    <div class="foot">Farejador · Rede de parceiros</div>
-  </div>
+    <section class="status err" id="errCard" role="alert" aria-live="assertive">
+      <div>
+        <h1>Não consegui enviar</h1>
+        <p id="errMsg">Tenta de novo?</p>
+      </div>
+    </section>
+  </main>
 
   <script>
     const form = document.getElementById('form');
     const btn = document.getElementById('btn');
+    const okCard = document.getElementById('okCard');
+    const errCard = document.getElementById('errCard');
     const errMsg = document.getElementById('errMsg');
+
+    function payloadFromForm(formEl) {
+      const data = Object.fromEntries(new FormData(formEl).entries());
+      for (const key of Object.keys(data)) {
+        if (typeof data[key] === 'string') {
+          data[key] = data[key].trim();
+          if (data[key] === '' && key !== 'trade_name' && key !== 'website') {
+            delete data[key];
+          }
+        }
+      }
+      return data;
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      errMsg.style.display = 'none';
+      okCard.style.display = 'none';
+      errCard.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = 'Enviando...';
-      const data = Object.fromEntries(new FormData(form).entries());
+
       try {
         const res = await fetch('/api/seja-parceiro', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: JSON.stringify(payloadFromForm(form)),
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
           throw new Error(payload.error || ('erro_' + res.status));
         }
-        document.getElementById('formCard').style.display = 'none';
-        document.getElementById('okCard').style.display = 'block';
+        form.style.display = 'none';
+        okCard.style.display = 'grid';
       } catch (err) {
-        errMsg.textContent = 'Não consegui enviar (' + (err.message || err) + '). Tenta de novo?';
-        errMsg.style.display = 'block';
+        errMsg.textContent = 'Tenta de novo? Detalhe: ' + (err.message || err);
+        errCard.style.display = 'grid';
         btn.disabled = false;
-        btn.textContent = 'Quero ser parceiro';
       }
     });
   </script>
