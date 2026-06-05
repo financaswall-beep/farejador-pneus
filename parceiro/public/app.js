@@ -18,7 +18,10 @@ function parceiroApp() {
     slug,
     tokenKey,
     apiToken: localStorage.getItem(tokenKey) || '',
-    tokenInput: localStorage.getItem(tokenKey) || '',
+    tokenInput: '',              // P1: código de acesso (só no primeiro acesso do dono)
+    loginMode: 'login',          // 'login' (usuário+senha) | 'firstAccess' (dono cola código)
+    loginUsername: '',
+    loginPassword: '',
     authed: false,
     loading: false,
     saving: false,
@@ -33,8 +36,7 @@ function parceiroApp() {
     currentSection: 'resumo',
     role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
     funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
-    funcionarioForm: { label: '' },
-    createdFuncToken: '',        // token em texto, mostrado UMA vez após criar
+    funcionarioForm: { label: '', username: '', password: '' },
     sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
@@ -203,7 +205,19 @@ function parceiroApp() {
       this.$nextTick(() => lucide.createIcons());
       if (this.apiToken) {
         this.authed = true;
-        this.$nextTick(() => this.loadData());
+        // Sessão pode ter expirado/sido revogada (validade de 30d). Se a carga
+        // falhar com 401, volta pro login limpo em vez de travar numa tela vazia.
+        this.$nextTick(async () => {
+          try {
+            await this.loadData();
+          } catch (err) {
+            if (err && err.status === 401) {
+              this.apiToken = '';
+              localStorage.removeItem(this.tokenKey);
+              this.authed = false;
+            }
+          }
+        });
       }
 
       // Ordem da rota de entrega — salva neste aparelho (por unidade).
@@ -264,29 +278,98 @@ function parceiroApp() {
     },
 
     // â”€â”€â”€ AUTH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Guarda o token de SESSÃO (ps_…) emitido pelo login. É o que o navegador
+    // manda como Bearer daqui pra frente (no lugar do código de acesso cru).
+    applySession(token) {
+      this.apiToken = token || '';
+      if (token) localStorage.setItem(this.tokenKey, token);
+    },
+
+    // Login normal: usuário + senha → sessão.
     async login() {
-      const token = this.tokenInput.trim();
-      if (!token) { this.loginError = 'Informe o token do parceiro.'; return; }
-      this.apiToken = token;
-      localStorage.setItem(this.tokenKey, token);
+      const username = (this.loginUsername || '').trim();
+      const password = this.loginPassword || '';
+      if (!username || !password) { this.loginError = 'Informe usuário e senha.'; return; }
       this.loading = true;
       this.loginError = '';
       try {
+        const res = await fetch(`/parceiro/${this.slug}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        if (!res.ok) {
+          if (res.status === 429) this.loginError = 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+          else if (res.status === 401) this.loginError = 'Usuário ou senha incorretos.';
+          else this.loginError = 'Não foi possível entrar agora. Tente de novo.';
+          return;
+        }
+        const data = await res.json();
+        this.applySession(data.session_token);
         await this.loadData();
         this.authed = true;
+        this.loginPassword = '';
       } catch (err) {
         this.loginError = this.errMessage(err);
-        this.apiToken = '';
-        localStorage.removeItem(this.tokenKey);
-        this.authed = false;
+        this.applySession('');
       } finally {
         this.loading = false;
       }
     },
 
-    logout() {
+    // Primeiro acesso do dono: cola o código de acesso (uma vez) e escolhe
+    // usuário+senha. O backend define as credenciais e já devolve uma sessão.
+    async firstAccess() {
+      const token = (this.tokenInput || '').trim();
+      const username = (this.loginUsername || '').trim();
+      const password = this.loginPassword || '';
+      if (!token) { this.loginError = 'Cole o código de acesso que você recebeu.'; return; }
+      if (!username || password.length < 6) {
+        this.loginError = 'Escolha um usuário e uma senha de pelo menos 6 caracteres.';
+        return;
+      }
+      this.loading = true;
+      this.loginError = '';
+      try {
+        const res = await fetch(`/parceiro/${this.slug}/api/set-credentials`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ username, password }),
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          if (res.status === 429) this.loginError = 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+          else if (res.status === 401) this.loginError = 'Código de acesso inválido ou expirado.';
+          else if (payload.error === 'username_taken') this.loginError = 'Esse usuário já existe. Escolha outro.';
+          else if (payload.error === 'credentials_already_set') this.loginError = 'Esse login já tem senha. Entre com usuário e senha.';
+          else this.loginError = 'Não foi possível concluir o primeiro acesso.';
+          return;
+        }
+        const data = await res.json();
+        this.applySession(data.session_token);
+        await this.loadData();
+        this.authed = true;
+        this.loginPassword = '';
+        this.tokenInput = '';
+        this.loginMode = 'login';
+        this.flash('Pronto! Da próxima vez é só usuário e senha.');
+      } catch (err) {
+        this.loginError = this.errMessage(err);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async logout() {
+      // Revoga a sessão no servidor (idempotente; código cru = no-op).
+      try {
+        await fetch(`/parceiro/${this.slug}/api/logout`, { method: 'POST', headers: this.apiHeaders(false) });
+      } catch (e) { /* offline: o front limpa local mesmo assim */ }
       this.apiToken = '';
       this.tokenInput = '';
+      this.loginUsername = '';
+      this.loginPassword = '';
+      this.loginMode = 'login';
       localStorage.removeItem(this.tokenKey);
       this.authed = false;
       this.resumo = null;
@@ -324,9 +407,6 @@ function parceiroApp() {
 
     get isOwner() { return this.role === 'owner'; },
 
-    // URL que o funcionário usa pra logar (mesmo portal, cola o token).
-    get loginUrl() { return `${window.location.origin}/parceiro/${this.slug}`; },
-
     // ─── Etapa 4c: funcionários ───
     async loadFuncionarios() {
       if (!this.isOwner) return;
@@ -340,16 +420,46 @@ function parceiroApp() {
     },
 
     async createFuncionario() {
+      const username = (this.funcionarioForm.username || '').trim();
+      const password = this.funcionarioForm.password || '';
+      if (!username || password.length < 6) {
+        this.flash('Informe usuário e senha (mínimo 6 caracteres).');
+        return;
+      }
       this.saving = true; this.savingAction = 'funcionario';
       try {
-        const res = await this.api('funcionarios', {
+        await this.api('funcionarios', {
           method: 'POST',
-          body: JSON.stringify({ label: (this.funcionarioForm.label || '').trim() || null }),
+          body: JSON.stringify({
+            label: (this.funcionarioForm.label || '').trim() || null,
+            username,
+            password,
+          }),
         });
-        this.createdFuncToken = res.token || '';
-        this.funcionarioForm.label = '';
+        this.funcionarioForm = { label: '', username: '', password: '' };
         await this.loadFuncionarios();
-        this.flash('Login de funcionário criado. Copie o token agora.');
+        this.flash('Funcionário criado. Passe o usuário e a senha pra ele.');
+      } catch (err) {
+        this.flash(err && err.payload && err.payload.error === 'username_taken'
+          ? 'Esse usuário já existe. Escolha outro.'
+          : this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    async resetFuncionarioSenha(f) {
+      const nome = f.label || f.username || 'funcionário';
+      const nova = prompt(`Nova senha para "${nome}" (mínimo 6 caracteres):`);
+      if (nova === null) return; // cancelou
+      if ((nova || '').length < 6) { this.flash('A senha precisa de ao menos 6 caracteres.'); return; }
+      this.saving = true; this.savingAction = 'funcionario';
+      try {
+        await this.api(`funcionarios/${f.id}/reset-senha`, {
+          method: 'POST',
+          body: JSON.stringify({ password: nova }),
+        });
+        this.flash('Senha redefinida. Passe a nova senha pro funcionário.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -368,16 +478,6 @@ function parceiroApp() {
         this.flash(this.errMessage(err));
       } finally {
         this.saving = false; this.savingAction = '';
-      }
-    },
-
-    copyFuncToken() {
-      if (!this.createdFuncToken) return;
-      const done = () => this.flash('Token copiado.');
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(this.createdFuncToken).then(done).catch(() => this.flash('Copie manualmente.'));
-      } else {
-        this.flash('Copie manualmente.');
       }
     },
 
@@ -2029,7 +2129,7 @@ function parceiroApp() {
       // Etapa 4: funcionário não entra em Resumo/Financeiro nem por atalho de
       // teclado. (A trava real é no backend; isto é só pra UI não ir pra uma tela vazia.)
       if (!this.isOwner && ['resumo', 'financeiro', 'config'].includes(id)) return;
-      if (id === 'config') { this.createdFuncToken = ''; this.loadFuncionarios(); }
+      if (id === 'config') { this.loadFuncionarios(); }
       if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
       // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
       if (id === 'batepapo') this.startChatPolling();

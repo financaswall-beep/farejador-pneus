@@ -53,13 +53,18 @@
       </div>
     </div>
 
-    <p class="text-xs text-gray-500 mb-3">O token libera somente os dados desta unidade. Não compartilhe.</p>
-
-    <div class="space-y-3">
-      <input type="password"
-             x-model="tokenInput"
+    <!-- Login normal: usuário + senha -->
+    <div x-show="loginMode === 'login'" class="space-y-3">
+      <input type="text"
+             x-model="loginUsername"
              @keydown.enter="login()"
-             placeholder="Token do parceiro"
+             placeholder="Usuário"
+             autocomplete="username"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
+      <input type="password"
+             x-model="loginPassword"
+             @keydown.enter="login()"
+             placeholder="Senha"
              autocomplete="current-password"
              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
       <button @click="login()"
@@ -67,6 +72,41 @@
               class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span x-text="loading ? 'Entrando...' : 'Entrar no portal'"></span>
+      </button>
+      <button @click="loginMode = 'firstAccess'; loginError = ''"
+              class="w-full text-xs text-gray-500 hover:text-gray-700 underline pt-1">
+        Primeiro acesso do dono (recebi um código)
+      </button>
+    </div>
+
+    <!-- Primeiro acesso do dono: cola o código UMA vez e escolhe usuário+senha -->
+    <div x-show="loginMode === 'firstAccess'" class="space-y-3" style="display:none;">
+      <p class="text-xs text-gray-500">Cole o código de acesso que você recebeu e escolha seu usuário e senha. É só desta vez — depois você entra só com usuário e senha.</p>
+      <input type="password"
+             x-model="tokenInput"
+             placeholder="Código de acesso"
+             autocomplete="off"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
+      <input type="text"
+             x-model="loginUsername"
+             placeholder="Escolha um usuário"
+             autocomplete="off"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
+      <input type="password"
+             x-model="loginPassword"
+             @keydown.enter="firstAccess()"
+             placeholder="Crie uma senha (mín. 6)"
+             autocomplete="new-password"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
+      <button @click="firstAccess()"
+              :disabled="loading"
+              class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+        <i data-lucide="key-round" class="w-4 h-4"></i>
+        <span x-text="loading ? 'Configurando...' : 'Criar meu acesso'"></span>
+      </button>
+      <button @click="loginMode = 'login'; loginError = ''"
+              class="w-full text-xs text-gray-500 hover:text-gray-700 underline pt-1">
+        Já tenho usuário e senha
       </button>
     </div>
 
@@ -1850,27 +1890,34 @@
             </div>
 
             <div class="pos-customer-table">
-              <div class="pos-customer-table-head" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+              <div class="pos-customer-table-head" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr;">
                 <span>Funcionário</span>
-                <span>Criado em</span>
+                <span>Usuário</span>
                 <span>Último acesso</span>
                 <span>Situação</span>
+                <span>Ações</span>
               </div>
               <template x-for="f in funcionarios" :key="f.id">
-                <div class="pos-customer-table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+                <div class="pos-customer-table-row" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr;">
                   <span class="pos-customer-name">
                     <b x-text="f.label || 'Funcionário'"></b>
                   </span>
-                  <span x-text="formatDate(f.created_at)"></span>
+                  <span x-text="f.username || '—'"></span>
                   <span x-text="f.last_used_at ? formatDate(f.last_used_at) : 'nunca'"></span>
                   <span>
+                    <template x-if="!f.revoked_at"><span class="pos-muted">Ativo</span></template>
+                    <template x-if="f.revoked_at"><span class="pos-muted">Desativado</span></template>
+                  </span>
+                  <span style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <template x-if="!f.revoked_at">
+                      <button @click="resetFuncionarioSenha(f)" :disabled="saving" class="pos-outline-action compact">
+                        <i data-lucide="key-round"></i> Resetar senha
+                      </button>
+                    </template>
                     <template x-if="!f.revoked_at">
                       <button @click="revokeFuncionario(f)" :disabled="saving" class="pos-outline-action compact">
                         <i data-lucide="user-x"></i> Desativar
                       </button>
-                    </template>
-                    <template x-if="f.revoked_at">
-                      <span class="pos-muted">Desativado</span>
                     </template>
                   </span>
                 </div>
@@ -1887,22 +1934,17 @@
               <label>Nome do funcionário (opcional)
                 <input x-model="funcionarioForm.label" placeholder="Ex: João do balcão" maxlength="120" />
               </label>
+              <label>Usuário
+                <input x-model="funcionarioForm.username" placeholder="Ex: joao" maxlength="60" autocomplete="off" />
+              </label>
+              <label>Senha (mín. 6)
+                <input type="password" x-model="funcionarioForm.password" placeholder="Senha inicial" maxlength="200" autocomplete="new-password" />
+              </label>
               <button @click="createFuncionario()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="user-plus"></i>
                 <span x-text="isSaving('funcionario') ? 'Criando...' : 'Criar login de funcionário'"></span>
               </button>
-            </div>
-
-            <!-- Token mostrado UMA vez após criar -->
-            <div x-show="createdFuncToken" class="pos-token-reveal" style="margin-top:14px;padding:14px;border:1px solid var(--pos-accent,#10b981);border-radius:10px;background:rgba(16,185,129,.08);">
-              <h3 style="margin:0 0 6px;">Login criado ✅</h3>
-              <p style="margin:0 0 8px;font-size:13px;">Copie e entregue ao funcionário <b>agora</b> — por segurança, não mostramos de novo.</p>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <input :value="createdFuncToken" readonly style="flex:1;font-family:monospace;font-size:12px;" @focus="$event.target.select()" />
-                <button @click="copyFuncToken()" class="pos-outline-action compact"><i data-lucide="copy"></i> Copiar</button>
-              </div>
-              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">Link de acesso: <span x-text="loginUrl"></span></p>
-              <button @click="createdFuncToken = ''" class="pos-mini-clear" style="margin-top:8px;">Fechar</button>
+              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">Passe o usuário e a senha ao funcionário. Esqueceu? Use "Resetar senha" na lista.</p>
             </div>
 
             <div class="pos-divider"></div>

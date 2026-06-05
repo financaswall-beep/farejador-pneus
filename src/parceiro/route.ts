@@ -2,7 +2,13 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, requireOwner, getPartnerContext, authenticatePartnerToken, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, requireOwner, getPartnerContext, authenticatePartner, type PartnerAuthedRequest } from './auth.js';
+import { isSessionToken } from './password.js';
+import { rateLimitHit } from './rate-limit.js';
+
+// Login/1º acesso: até 10 tentativas por IP+slug a cada 5 min (anti-brute-force).
+const LOGIN_MAX_ATTEMPTS = 10;
+const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
 // Etapa 4: encadeamento padrão pros endpoints SÓ-DONO (financeiro + resumo).
 // Funcionário (role!='owner') leva 403 no requireOwner. Operacional (estoque,
@@ -56,13 +62,29 @@ import {
   updatePartnerReceivable,
   updatePartnerDeliveryStatus,
   upsertPartnerStock,
-  createPartnerFuncionarioToken,
+  createPartnerFuncionario,
+  resetPartnerFuncionarioPassword,
   listPartnerFuncionarios,
   revokePartnerFuncionario,
+  authenticatePartnerLogin,
+  setOwnPartnerCredentials,
+  revokePartnerSession,
+  PartnerUsernameConflictError,
+  PartnerCredentialsAlreadySetError,
 } from './queries.js';
+import { env } from '../shared/config/env.js';
 import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
 
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
+
+// Extrai o bearer cru (Authorization: Bearer … ou x-partner-token). Usado pra
+// distinguir token de sessão (ps_) de token de acesso cru no set-credentials/logout.
+function bearerFrom(request: { headers: Record<string, unknown> }): string {
+  const auth = request.headers.authorization;
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  const x = request.headers['x-partner-token'];
+  return typeof x === 'string' ? x.trim() : '';
+}
 
 const paramsSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),
@@ -203,11 +225,31 @@ const chatConversationParamsSchema = paramsSchema.extend({
 });
 
 // Etapa 4c: criar/revogar login de funcionário
+// P1: credenciais de login. Usuário 3-60 (letras/números/. _ -); senha 6-200.
+const usernameField = z.string().trim().min(3).max(60).regex(/^[a-zA-Z0-9._-]+$/, 'usuario_invalido');
+const passwordField = z.string().min(6).max(200);
+
 const funcionarioSchema = z.object({
   label: z.string().trim().max(120).nullable().optional(),
+  username: usernameField,
+  password: passwordField,
 });
 const funcionarioParamsSchema = paramsSchema.extend({
   tokenId: z.string().uuid(),
+});
+const resetSenhaSchema = z.object({
+  password: passwordField,
+});
+
+// Login por usuário+senha (público — é a porta de entrada).
+const loginSchema = z.object({
+  username: usernameField,
+  password: passwordField,
+});
+// Primeiro acesso do dono: define o próprio usuário+senha (autenticado pelo token cru).
+const setCredentialsSchema = z.object({
+  username: usernameField,
+  password: passwordField,
 });
 
 const chatSendBodySchema = z.object({
@@ -372,6 +414,56 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
+  // P1 — Login por usuário+senha (PÚBLICO; é a porta de entrada). Devolve um
+  // token de SESSÃO que o front guarda e usa como Bearer. Resposta única pra
+  // usuário inexistente e senha errada (não revela qual).
+  fastify.post('/parceiro/:slug/api/login', async (request, reply) => {
+    const params = paramsSchema.safeParse(request.params);
+    // Slug malformado/inexistente devolve a MESMA resposta de credencial inválida
+    // (não revela quais slugs existem).
+    if (!params.success) return reply.status(401).send({ error: 'invalid_credentials' });
+    if (rateLimitHit(`login:${request.ip}:${params.data.slug}`, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) {
+      return reply.status(429).send({ error: 'too_many_attempts' });
+    }
+    const parsed = loginSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return reply.status(401).send({ error: 'invalid_credentials' });
+    const result = await authenticatePartnerLogin(env.FAREJADOR_ENV, params.data.slug, parsed.data.username, parsed.data.password);
+    if (!result) return reply.status(401).send({ error: 'invalid_credentials' });
+    return reply.status(200).send(result);
+  });
+
+  // P1 — Primeiro acesso do DONO: autenticado pelo TOKEN cru que ele colou, define
+  // o próprio usuário+senha e já recebe uma sessão. Posse do token (não-sessão)
+  // permite re(definir) — é a recuperação do dono. Funcionário não usa isto.
+  fastify.post('/parceiro/:slug/api/set-credentials', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const ctxSlug = (request.params as { slug?: string }).slug ?? '';
+    if (rateLimitHit(`setcred:${request.ip}:${ctxSlug}`, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) {
+      return reply.status(429).send({ error: 'too_many_attempts' });
+    }
+    const parsed = setCredentialsSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    const allowOverwrite = !isSessionToken(bearerFrom(request));
+    try {
+      return reply.status(200).send(await setOwnPartnerCredentials(getPartnerContext(request), parsed.data.username, parsed.data.password, allowOverwrite));
+    } catch (err) {
+      if (err instanceof PartnerUsernameConflictError) return reply.status(409).send({ error: 'username_taken' });
+      if (err instanceof PartnerCredentialsAlreadySetError) return reply.status(409).send({ error: 'credentials_already_set' });
+      throw err;
+    }
+  });
+
+  // P1 — Logout: revoga a sessão atual no servidor. Idempotente (token cru = no-op).
+  fastify.post('/parceiro/:slug/api/logout', async (request, reply) => {
+    const bearer = bearerFrom(request);
+    if (bearer && isSessionToken(bearer)) {
+      await revokePartnerSession(env.FAREJADOR_ENV, bearer);
+    }
+    return reply.status(200).send({ ok: true });
+  });
+
   // Etapa 4: identidade do login atual. Liberado pros dois papéis — o front usa
   // o `role` pra montar o menu (esconder Financeiro/Resumo/Config do funcionário).
   // É só apoio de UI; a trava de verdade são os requireOwner acima.
@@ -397,8 +489,31 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       const issue = parsed.error.issues[0];
       return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
     }
-    // Devolve o token em texto UMA vez — o dono copia e entrega ao funcionário.
-    return reply.status(200).send(await createPartnerFuncionarioToken(getPartnerContext(request), parsed.data.label ?? null));
+    // O dono cria o login com usuário+senha; entrega ao funcionário. Sem token.
+    try {
+      return reply.status(200).send(
+        await createPartnerFuncionario(getPartnerContext(request), parsed.data.label ?? null, parsed.data.username, parsed.data.password),
+      );
+    } catch (err) {
+      if (err instanceof PartnerUsernameConflictError) {
+        return reply.status(409).send({ error: 'username_taken' });
+      }
+      throw err;
+    }
+  });
+
+  // Dono reseta a senha de um funcionário (o "esqueci a senha" — sem e-mail).
+  fastify.post('/parceiro/:slug/api/funcionarios/:tokenId/reset-senha', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const params = funcionarioParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    const body = resetSenhaSchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      const issue = body.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    const result = await resetPartnerFuncionarioPassword(getPartnerContext(request), params.data.tokenId, body.data.password);
+    if (!result.reset) return reply.status(404).send({ error: 'funcionario_not_found' });
+    return reply.status(200).send(result);
   });
 
   fastify.delete('/parceiro/:slug/api/funcionarios/:tokenId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
@@ -572,7 +687,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const { slug } = request.params as { slug: string };
     const { token } = request.query as { token?: string };
     if (!slug || !token) return reply.code(401).send({ error: 'partner_unauthorized' });
-    const ctx = await authenticatePartnerToken(slug.trim(), token);
+    const ctx = await authenticatePartner(slug.trim(), token);
     if (!ctx) return reply.code(401).send({ error: 'partner_unauthorized' });
 
     // Assume o controle da resposta crua (stream que nao fecha).

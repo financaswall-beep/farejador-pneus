@@ -92,6 +92,8 @@ export async function resolveUnitForOrder(
     unitName: row.unit_name,
     // O bot age como ator de sistema (cria pedido em nome da loja): autoridade total.
     role: 'owner',
+    // Ator de sistema: não tem login/token real (nunca chama set-credentials).
+    tokenId: '',
   };
 }
 
@@ -144,6 +146,8 @@ export async function resolveUnitForMunicipio(
     unitName: row.unit_name,
     // O bot age como ator de sistema (cria pedido em nome da loja): autoridade total.
     role: 'owner',
+    // Ator de sistema: não tem login/token real (nunca chama set-credentials).
+    tokenId: '',
   };
 }
 

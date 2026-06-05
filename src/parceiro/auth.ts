@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { partnerPool } from './db.js';
 import { env } from '../shared/config/env.js';
+import { isSessionToken } from './password.js';
 
 export type PartnerRole = 'owner' | 'funcionario';
 
@@ -13,6 +14,9 @@ export interface PartnerContext {
   partnerName: string;
   unitName: string;
   role: PartnerRole;
+  // ID do login (linha em network.partner_access_tokens) deste contexto.
+  // Usado pra amarrar credenciais (set-credentials no 1º acesso) ao login certo.
+  tokenId: string;
 }
 
 export interface PartnerAuthedRequest extends FastifyRequest {
@@ -53,20 +57,7 @@ function extractBearerToken(header: unknown): string | null {
  * Reusavel fora do preHandler — ex.: SSE, onde o token vem por query string
  * porque EventSource nao manda header Authorization.
  */
-export async function authenticatePartnerToken(
-  slug: string,
-  token: string,
-): Promise<PartnerContext | null> {
-  // A function e SECURITY DEFINER, entao roda com privilegios do owner e nao
-  // depende da policy aplicada a role 'farejador_partner_app'.
-  const result = await partnerPool.query<PartnerAuthRow>(
-    'SELECT * FROM network.validate_partner_token($1, $2, $3)',
-    [env.FAREJADOR_ENV, slug, token],
-  );
-
-  if (result.rowCount !== 1) return null;
-
-  const row = result.rows[0]!;
+function rowToContext(row: PartnerAuthRow): PartnerContext {
   // Fail-safe: qualquer valor inesperado de role é tratado como 'funcionario'
   // (o menos privilegiado). Só 'owner' explícito libera tudo.
   const role: PartnerRole = row.role === 'owner' ? 'owner' : 'funcionario';
@@ -79,7 +70,57 @@ export async function authenticatePartnerToken(
     partnerName: row.partner_name,
     unitName: row.unit_name,
     role,
+    tokenId: row.token_id,
   };
+}
+
+export async function authenticatePartnerToken(
+  slug: string,
+  token: string,
+): Promise<PartnerContext | null> {
+  // A function e SECURITY DEFINER, entao roda com privilegios do owner e nao
+  // depende da policy aplicada a role 'farejador_partner_app'.
+  const result = await partnerPool.query<PartnerAuthRow>(
+    'SELECT * FROM network.validate_partner_token($1, $2, $3)',
+    [env.FAREJADOR_ENV, slug, token],
+  );
+
+  if (result.rowCount !== 1) return null;
+  return rowToContext(result.rows[0]!);
+}
+
+/**
+ * Valida um TOKEN DE SESSÃO (emitido no login por usuário+senha). Mesma forma de
+ * retorno de validate_partner_token, também SECURITY DEFINER (o pool restrito não
+ * lê partner_sessions diretamente). Sessão expirada/revogada, ou login revogado,
+ * devolve null.
+ */
+export async function authenticatePartnerSession(
+  slug: string,
+  sessionToken: string,
+): Promise<PartnerContext | null> {
+  const result = await partnerPool.query<PartnerAuthRow>(
+    'SELECT * FROM network.validate_partner_session($1, $2, $3)',
+    [env.FAREJADOR_ENV, slug, sessionToken],
+  );
+
+  if (result.rowCount !== 1) return null;
+  return rowToContext(result.rows[0]!);
+}
+
+/**
+ * Entrada única de autenticação: roteia pelo prefixo do bearer.
+ *   - `ps_…`  → token de sessão (caminho novo, login por usuário+senha)
+ *   - resto   → token de acesso legado (bootstrap do dono / fallback)
+ * Um roundtrip só no banco em cada caso.
+ */
+export async function authenticatePartner(
+  slug: string,
+  bearer: string,
+): Promise<PartnerContext | null> {
+  return isSessionToken(bearer)
+    ? authenticatePartnerSession(slug, bearer)
+    : authenticatePartnerToken(slug, bearer);
 }
 
 export async function requirePartnerAuth(request: PartnerAuthedRequest, reply: FastifyReply): Promise<void> {
@@ -94,7 +135,7 @@ export async function requirePartnerAuth(request: PartnerAuthedRequest, reply: F
     return;
   }
 
-  const context = await authenticatePartnerToken(slug, token);
+  const context = await authenticatePartner(slug, token);
   if (!context) {
     void reply.status(401).send({ error: 'partner_unauthorized' });
     return;

@@ -26,6 +26,7 @@
 import { randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { withPartnerContext } from './db.js';
+import { hashPassword, verifyPassword, fakeVerify, newSessionToken, hashSessionToken } from './password.js';
 import { pool } from '../persistence/db.js';
 import { logger } from '../shared/logger.js';
 import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
@@ -2652,41 +2653,89 @@ export async function markPartnerChatRead(
 export interface PartnerTokenRow {
   id: string;
   label: string | null;
+  username: string | null;
   role: string;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
 }
 
-export interface CreatedFuncionarioToken {
+export interface CreatedFuncionario {
   id: string;
   label: string | null;
-  token: string; // texto puro — devolvido UMA vez; o banco guarda só o hash
+  username: string;
   created_at: string;
 }
 
-/** Cria um login de funcionário pra unidade do dono. Devolve o token em texto UMA vez. */
-export async function createPartnerFuncionarioToken(
-  ctx: PartnerContext,
-  label: string | null,
-): Promise<CreatedFuncionarioToken> {
-  const token = randomBytes(32).toString('hex');
-  const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
-  const res = await pool.query<{ id: string; created_at: string }>(
-    `INSERT INTO network.partner_access_tokens
-       (environment, partner_unit_id, token_hash, label, created_by, role)
-     VALUES ($1, $2, network.hash_partner_token($3), $4, $5, 'funcionario')
-     RETURNING id, created_at`,
-    [ctx.environment, ctx.partnerUnitId, token, cleanLabel, `owner:${ctx.slug}`],
-  );
-  const row = res.rows[0]!;
-  return { id: row.id, label: cleanLabel, token, created_at: row.created_at };
+/** Login (usuário) já em uso nesta unidade — 23505 no índice único de username. */
+export class PartnerUsernameConflictError extends Error {
+  readonly code = 'username_taken';
+  constructor() {
+    super('username_taken');
+  }
 }
 
-/** Lista os logins de funcionário da unidade do dono (sem expor o hash). */
+function isUsernameConflict(err: unknown): boolean {
+  return (err as { code?: string })?.code === '23505'
+    && String((err as { constraint?: string })?.constraint ?? '').includes('username');
+}
+
+/**
+ * Cria um login de funcionário (usuário+senha) pra unidade do dono. O funcionário
+ * NUNCA toca em token: recebe usuário+senha do dono e entra pela tela de login.
+ * Um token_hash aleatório é gerado só pra satisfazer o NOT NULL da coluna (a conta
+ * é a própria linha) — ele nunca é revelado a ninguém.
+ */
+export async function createPartnerFuncionario(
+  ctx: PartnerContext,
+  label: string | null,
+  username: string,
+  password: string,
+): Promise<CreatedFuncionario> {
+  const fillerToken = randomBytes(32).toString('hex');
+  const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
+  const cleanUsername = username.trim();
+  const passwordHash = await hashPassword(password);
+  let res;
+  try {
+    res = await pool.query<{ id: string; created_at: string }>(
+      `INSERT INTO network.partner_access_tokens
+         (environment, partner_unit_id, token_hash, label, created_by, role,
+          login_username, login_password_hash, login_password_set_at)
+       VALUES ($1, $2, network.hash_partner_token($3), $4, $5, 'funcionario',
+               $6, $7, now())
+       RETURNING id, created_at`,
+      [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash],
+    );
+  } catch (err) {
+    if (isUsernameConflict(err)) throw new PartnerUsernameConflictError();
+    throw err;
+  }
+  const row = res.rows[0]!;
+  return { id: row.id, label: cleanLabel, username: cleanUsername, created_at: row.created_at };
+}
+
+/** Reseta a senha de um login de funcionário da própria unidade (dono esqueceu = dono reseta). */
+export async function resetPartnerFuncionarioPassword(
+  ctx: PartnerContext,
+  tokenId: string,
+  newPassword: string,
+): Promise<{ reset: boolean }> {
+  const passwordHash = await hashPassword(newPassword);
+  const res = await pool.query(
+    `UPDATE network.partner_access_tokens
+        SET login_password_hash = $4, login_password_set_at = now()
+      WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+        AND role = 'funcionario' AND revoked_at IS NULL`,
+    [tokenId, ctx.environment, ctx.partnerUnitId, passwordHash],
+  );
+  return { reset: (res.rowCount ?? 0) > 0 };
+}
+
+/** Lista os logins de funcionário da unidade do dono (com o usuário; sem hash de senha). */
 export async function listPartnerFuncionarios(ctx: PartnerContext): Promise<PartnerTokenRow[]> {
   const res = await pool.query<PartnerTokenRow>(
-    `SELECT id, label, role, created_at, last_used_at, revoked_at
+    `SELECT id, label, login_username AS username, role, created_at, last_used_at, revoked_at
        FROM network.partner_access_tokens
       WHERE environment = $1 AND partner_unit_id = $2 AND role = 'funcionario'
       ORDER BY revoked_at IS NOT NULL, created_at DESC`,
@@ -2707,5 +2756,137 @@ export async function revokePartnerFuncionario(
         AND role = 'funcionario' AND revoked_at IS NULL`,
     [tokenId, ctx.environment, ctx.partnerUnitId],
   );
+  // Revogar o token já mata as sessões dele (validate_partner_session exige
+  // pat.revoked_at IS NULL), mas marcamos as sessões também por higiene.
+  if ((res.rowCount ?? 0) > 0) {
+    await pool.query(
+      `UPDATE network.partner_sessions
+          SET revoked_at = now()
+        WHERE token_id = $1 AND environment = $2 AND revoked_at IS NULL`,
+      [tokenId, ctx.environment],
+    );
+  }
   return { revoked: (res.rowCount ?? 0) > 0 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// P1 — Login de verdade (usuário + senha) + sessões
+//
+// O token de acesso (~48 chars, hash-only) vira CHAVE DE PRIMEIRO ACESSO do dono.
+// Login confere a senha e emite um token de SESSÃO (descartável, com validade);
+// o navegador usa a sessão no lugar do token cru. Tudo via pool admin — o pool
+// restrito do portal não tem GRANT de leitura/escrita em partner_access_tokens
+// nem partner_sessions (só EXECUTE em validate_partner_session, no auth.ts).
+// ─────────────────────────────────────────────────────────────────────────
+
+const SESSION_TTL_DAYS = 30;
+
+export interface PartnerSessionResult {
+  session_token: string; // texto puro — devolvido UMA vez; o banco guarda só o hash
+  expires_at: string;
+}
+
+/** Emite uma sessão pra um login (token_id). Guarda só o hash; devolve o texto uma vez. */
+async function mintPartnerSession(environment: string, tokenId: string): Promise<PartnerSessionResult> {
+  const { token, hash } = newSessionToken();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  await pool.query(
+    `INSERT INTO network.partner_sessions (environment, token_id, session_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [environment, tokenId, hash, expiresAt],
+  );
+  return { session_token: token, expires_at: expiresAt };
+}
+
+/**
+ * Login por usuário+senha. Acha o login ativo da unidade (slug) com aquele usuário,
+ * confere a senha (scrypt, tempo constante) e emite uma sessão. Devolve null em
+ * usuário inexistente OU senha errada (mesma resposta — não revela qual). Quando o
+ * usuário não existe, queima o mesmo tempo de um verify real (anti-enumeração).
+ */
+export async function authenticatePartnerLogin(
+  environment: string,
+  slug: string,
+  username: string,
+  password: string,
+): Promise<PartnerSessionResult | null> {
+  const res = await pool.query<{ token_id: string; login_password_hash: string | null }>(
+    `SELECT pat.id AS token_id, pat.login_password_hash
+       FROM network.partner_access_tokens pat
+       JOIN network.partner_units pu ON pu.id = pat.partner_unit_id AND pu.environment = pat.environment
+       JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+      WHERE pat.environment = $1
+        AND pu.slug = $2
+        AND lower(pat.login_username) = lower($3)
+        AND pat.revoked_at IS NULL
+        AND pat.login_password_hash IS NOT NULL
+        AND pu.status = 'active' AND p.status = 'active'
+        AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+      LIMIT 1`,
+    [environment, slug, username.trim()],
+  );
+
+  const row = res.rows[0];
+  if (!row) {
+    await fakeVerify(password); // anti-enumeração por timing
+    return null;
+  }
+  const ok = await verifyPassword(password, row.login_password_hash);
+  if (!ok) return null;
+  return mintPartnerSession(environment, row.token_id);
+}
+
+/**
+ * Primeiro acesso do DONO: autenticado pelo TOKEN cru (que ele colou), define
+ * usuário+senha do próprio login e já recebe uma sessão (não precisa redigitar).
+ *
+ * allowOverwrite=true SÓ quando a autenticação veio por token cru (posse do token
+ * de ~48 chars = prova de recuperação do dono → pode re(definir) a senha). Por
+ * sessão, allowOverwrite=false: só funciona se o login ainda não tem senha.
+ */
+export async function setOwnPartnerCredentials(
+  ctx: PartnerContext,
+  username: string,
+  password: string,
+  allowOverwrite: boolean,
+): Promise<PartnerSessionResult> {
+  const passwordHash = await hashPassword(password);
+  const cleanUsername = username.trim();
+  let res;
+  try {
+    res = await pool.query(
+      `UPDATE network.partner_access_tokens
+          SET login_username = $4, login_password_hash = $5, login_password_set_at = now()
+        WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+          AND revoked_at IS NULL
+          AND ($6 OR login_password_hash IS NULL)`,
+      [ctx.tokenId, ctx.environment, ctx.partnerUnitId, cleanUsername, passwordHash, allowOverwrite],
+    );
+  } catch (err) {
+    if (isUsernameConflict(err)) throw new PartnerUsernameConflictError();
+    throw err;
+  }
+  if ((res.rowCount ?? 0) !== 1) {
+    // Login já tinha senha e a chamada veio por sessão (não por token cru).
+    throw new PartnerCredentialsAlreadySetError();
+  }
+  return mintPartnerSession(ctx.environment, ctx.tokenId);
+}
+
+/** Tentou definir credenciais por sessão num login que já tem senha — use o reset. */
+export class PartnerCredentialsAlreadySetError extends Error {
+  readonly code = 'credentials_already_set';
+  constructor() {
+    super('credentials_already_set');
+  }
+}
+
+/** Logout: revoga a sessão atual no servidor (além do front limpar o localStorage). */
+export async function revokePartnerSession(environment: string, sessionToken: string): Promise<void> {
+  await pool.query(
+    `UPDATE network.partner_sessions
+        SET revoked_at = now()
+      WHERE environment = $1 AND session_hash = $2 AND revoked_at IS NULL`,
+    [environment, hashSessionToken(sessionToken)],
+  );
 }

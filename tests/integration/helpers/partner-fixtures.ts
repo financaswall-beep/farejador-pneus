@@ -28,6 +28,7 @@ export interface PartnerFixture {
   slug: string;
   tokenPlain: string;
   tokenHash: string;
+  tokenId: string;
   /**
    * Item de estoque pronto pra venda. quantity_on_hand = initialStockQty (default 10).
    */
@@ -46,6 +47,7 @@ export interface PartnerFixture {
     partnerName: string;
     unitName: string;
     role: 'owner' | 'funcionario';
+    tokenId: string;
   };
 }
 
@@ -101,10 +103,11 @@ export async function createPartnerFixture(
   const tokenPlain = `token-${suffix}-${randomUUID()}`;
   const tokenHash = sha256(tokenPlain);
   const role = opts.role ?? 'owner';
-  await pool.query(
+  const tokenRow = await pool.query<{ id: string }>(
     `INSERT INTO network.partner_access_tokens (
        environment, partner_unit_id, token_hash, label, created_by, revoked_at, role
-     ) VALUES ('test', $1, $2, $3, 'fixture', $4, $5)`,
+     ) VALUES ('test', $1, $2, $3, 'fixture', $4, $5)
+     RETURNING id`,
     [
       partnerUnitId,
       tokenHash,
@@ -113,6 +116,7 @@ export async function createPartnerFixture(
       role,
     ],
   );
+  const tokenId = tokenRow.rows[0]!.id;
 
   // 5. commerce.partner_stock_levels — 1 item rastreado, com saldo
   const stockItemName = `Pneu Teste ${suffix}`;
@@ -135,6 +139,7 @@ export async function createPartnerFixture(
     slug,
     tokenPlain,
     tokenHash,
+    tokenId,
     stockId,
     stockItemName,
     ctx: {
@@ -146,6 +151,7 @@ export async function createPartnerFixture(
       partnerName: `Teste ${suffix}`,
       unitName: `Loja Teste ${suffix}`,
       role,
+      tokenId,
     },
   };
 }
