@@ -67,12 +67,47 @@ Commit `5f75815`:
   - Remover via SQL (`DELETE ... WHERE created_by='teste-etapa4'`) **ou** o dono desativa pela tela (Configurações → Funcionários → Desativar).
 - Pendências antigas ainda de pé: Anderson Tavares fica como **fixture de teste de banco** (decisão do dono). Pedido `df730693` + 2 pneus teste no Anderson.
 
-## Próximos passos (sugeridos, em ordem)
-1. **Limpar o token de teste** do Rio do Ouro (ou deixar o dono desativar pela tela como parte do teste).
-2. **Bate-papo (decisão parada):** definir se funcionário responde o chat. Hoje em standby; o backend do chat ainda é mock.
-3. **Etapa 4 — refinos opcionais:** se quiser, liberar pro funcionário um Resumo "magro" (só cards operacionais, sem dinheiro). Hoje ele não vê Resumo nenhum.
-4. **Roadmap da Rede (bot):** itens cosméticos pendentes do bot — C4 (voz do parceiro), C7 (`editar_pedido` precisa função de re-reserva), C8 (suavizar resumo). Ver `docs/PLANO_FUNDACAO_BOT_REDE_2026-06-02.md`.
-5. **Segurança:** backlog em `docs/SEGURANCA.md` (44 tabelas com RLS desabilitado nos dados centrais; partner_* já têm RLS).
+## Próximos passos / backlog (prioritizado)
+
+### 🔴 Prioridade 1 — Login de verdade (dono E funcionário) — O MAIOR BURACO
+**Problema:** hoje dono e funcionário entram do MESMO jeito — colando um token (hex de ~48 chars) no campo de login em `/parceiro/{slug}`. Não tem usuário+senha. O token é que carrega o papel (owner/funcionario).
+- Pro **dono** "funciona" (colou uma vez, o navegador lembrou).
+- Pro **funcionário** é tosco: alguém entrega o token na mão, ele cola na primeira vez, troca de celular = cola de novo. Sem "esqueci a senha", sem nada familiar.
+
+**O conserto é UM só, serve os dois:** trocar "cole esse código" por algo humano. O token continua existindo por baixo (é o que segura a segurança) — só fica escondido atrás de uma tela amigável.
+
+**DECISÃO DO DONO (pendente) — define o tamanho do trabalho:**
+- **(a) Usuário + senha** — mais tradicional; o dono escolhe a senha de cada login. Mais campos, "esqueci a senha" etc.
+- **(b) PIN/código curto** — mais rápido de digitar no balcão; o dono define um PIN por funcionário.
+
+Sem essa decisão não dá pra começar o #1.
+
+### 🟠 Prioridade 2 — Tela de Configurações da loja (hoje só tem Funcionários)
+A aba **Configurações** (4c) só gerencia funcionários. Falta o resto do que o dono vai querer ajustar sozinho, sem pedir pro dev: **dados da loja** (nome, endereço, horário), **frete**, **cobertura de bairros/municípios**. Hoje isso é hardcoded/via tabela sem UI.
+
+### 🟡 Prioridade 3 — Entregar o login sem ser na mão ("enviar convite")
+Hoje o dono copia o token e manda no WhatsApp do funcionário no braço. Um botão "enviar convite" (gera link/PIN e facilita o repasse) tira o atrito. Pequeno; depende de como o #1 ficar.
+
+### ⚪ Decisões paradas (do dono)
+- **Bate-papo do funcionário:** ele responde o chat do cliente ou não? Hoje **standby** (o backend do chat ainda é mock).
+- **Resumo "magro" pro funcionário:** hoje o funcionário **não vê Resumo nenhum**. Opcional liberar só os cards operacionais (sem dinheiro).
+
+### 🧹 Limpeza
+- **Token de teste** no Rio do Ouro (`created_by='teste-etapa4'`) — remover via SQL ou o dono desativa pela tela.
+- Pendências antigas: Anderson (fixture de teste), pedido `df730693`, 2 pneus teste.
+
+### 🔵 Roadmap da Rede (bot) — cosmético, não trava uso
+C4 (voz do parceiro), C7 (`editar_pedido` precisa função de re-reserva), C8 (suavizar resumo). Ver `docs/PLANO_FUNDACAO_BOT_REDE_2026-06-02.md`.
+
+### 🔒 Segurança (backlog)
+`docs/SEGURANCA.md` — 44 tabelas com RLS desabilitado nos dados centrais (partner_* já têm RLS).
+
+---
+
+## Veredito honesto (estado do produto)
+- **Régua dono/funcionário + recrutamento: ACABOU e está no ar, sólido** (trava no backend, não é teatro de UI).
+- **Produto "redondo" pra entregar a parceiro de verdade: NÃO.** O gargalo é o **login** (P1) — é o que o funcionário toca todo dia e hoje é colar token. Depois dele, Configurações da loja (P2).
+- Se o alvo é só o dono validando o conceito: **já dá pra usar como está**, é só limpar os dados de teste.
 
 ---
 
