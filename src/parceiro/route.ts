@@ -2,7 +2,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, getPartnerContext, authenticatePartnerToken, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, requireOwner, getPartnerContext, authenticatePartnerToken, type PartnerAuthedRequest } from './auth.js';
+
+// Etapa 4: encadeamento padrão pros endpoints SÓ-DONO (financeiro + resumo).
+// Funcionário (role!='owner') leva 403 no requireOwner. Operacional (estoque,
+// vendas/PDV, clientes, entregas, pedidos) continua só com requirePartnerAuth.
+const ownerOnly = [requirePartnerAuth, requireOwner];
 import {
   cancelPartnerSale,
   cancelPartnerPayable,
@@ -51,6 +56,9 @@ import {
   updatePartnerReceivable,
   updatePartnerDeliveryStatus,
   upsertPartnerStock,
+  createPartnerFuncionarioToken,
+  listPartnerFuncionarios,
+  revokePartnerFuncionario,
 } from './queries.js';
 import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
 
@@ -192,6 +200,14 @@ const customerIdParamsSchema = paramsSchema.extend({
 
 const chatConversationParamsSchema = paramsSchema.extend({
   conversationId: z.string().uuid(),
+});
+
+// Etapa 4c: criar/revogar login de funcionário
+const funcionarioSchema = z.object({
+  label: z.string().trim().max(120).nullable().optional(),
+});
+const funcionarioParamsSchema = paramsSchema.extend({
+  tokenId: z.string().uuid(),
 });
 
 const chatSendBodySchema = z.object({
@@ -356,11 +372,48 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.get('/parceiro/:slug/api/resumo', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  // Etapa 4: identidade do login atual. Liberado pros dois papéis — o front usa
+  // o `role` pra montar o menu (esconder Financeiro/Resumo/Config do funcionário).
+  // É só apoio de UI; a trava de verdade são os requireOwner acima.
+  fastify.get('/parceiro/:slug/api/me', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const ctx = getPartnerContext(request);
+    return reply.status(200).send({
+      role: ctx.role,
+      slug: ctx.slug,
+      partner_name: ctx.partnerName,
+      unit_name: ctx.unitName,
+    });
+  });
+
+  // Etapa 4c: o DONO gerencia logins de funcionário (criar/listar/revogar).
+  // Tudo SÓ-DONO (ownerOnly) e escopado à própria unidade dentro das queries.
+  fastify.get('/parceiro/:slug/api/funcionarios', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await listPartnerFuncionarios(getPartnerContext(request)) });
+  });
+
+  fastify.post('/parceiro/:slug/api/funcionarios', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = funcionarioSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    // Devolve o token em texto UMA vez — o dono copia e entrega ao funcionário.
+    return reply.status(200).send(await createPartnerFuncionarioToken(getPartnerContext(request), parsed.data.label ?? null));
+  });
+
+  fastify.delete('/parceiro/:slug/api/funcionarios/:tokenId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = funcionarioParamsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    const result = await revokePartnerFuncionario(getPartnerContext(request), parsed.data.tokenId);
+    if (!result.revoked) return reply.status(404).send({ error: 'funcionario_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  fastify.get('/parceiro/:slug/api/resumo', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });
   });
 
-  fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerFluxoCaixa(getPartnerContext(request))].filter(Boolean) });
   });
 
@@ -564,19 +617,19 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: await searchPartnerCatalog(getPartnerContext(request), q) });
   });
 
-  fastify.get('/parceiro/:slug/api/despesas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/despesas', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerDespesas(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/compras', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerCompras(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerPayables(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerReceivables(getPartnerContext(request)) });
   });
 
@@ -700,7 +753,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/compras', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -710,7 +763,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerPurchase(getPartnerContext(request), parsed.data));
   });
 
-  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'purchase_not_found' });
 
@@ -740,7 +793,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/despesas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/despesas', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = expenseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -750,7 +803,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerExpense(getPartnerContext(request), parsed.data));
   });
 
-  fastify.delete('/parceiro/:slug/api/despesas/:expenseId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/despesas/:expenseId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = expenseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'expense_not_found' });
 
@@ -759,7 +812,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = payableSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -777,7 +830,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.patch('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.patch('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const params = payableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -793,7 +846,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const params = payableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -816,7 +869,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = payableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -825,7 +878,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -835,7 +888,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
   });
 
-  fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -851,7 +904,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -867,7 +920,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -876,7 +929,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableInstallmentParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'installment_not_found' });
 

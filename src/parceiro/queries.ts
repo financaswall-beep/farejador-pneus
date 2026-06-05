@@ -23,6 +23,7 @@
  * (futuro helper de teste).
  */
 
+import { randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { withPartnerContext } from './db.js';
 import { pool } from '../persistence/db.js';
@@ -2629,4 +2630,82 @@ export async function markPartnerChatRead(
     [conversationId, ctx.environment, ctx.unitId],
   );
   return (exists.rowCount ?? 0) > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Etapa 4c — funcionários (logins de funcionário do parceiro)
+//
+// O DONO cria/lista/revoga logins de funcionário. Tudo escopado ao
+// ctx.partnerUnitId (a própria unidade do dono autenticado) e gateado por
+// requireOwner na rota. Usa o pool admin (mesmo padrão do chat acima e do
+// cadastro de parceiro no admin) — o pool restrito do portal não tem GRANT
+// em network.partner_access_tokens de propósito.
+//
+// Segurança embutida:
+//   - role é SEMPRE 'funcionario' (dono não cria outro dono por aqui → sem
+//     escalonamento de privilégio).
+//   - criar/listar/revogar só mexem em partner_unit_id = ctx.partnerUnitId.
+//   - revogar só pega tokens role='funcionario' → o dono nunca revoga (nem se
+//     trava fora) o próprio login de dono por esta tela.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface PartnerTokenRow {
+  id: string;
+  label: string | null;
+  role: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface CreatedFuncionarioToken {
+  id: string;
+  label: string | null;
+  token: string; // texto puro — devolvido UMA vez; o banco guarda só o hash
+  created_at: string;
+}
+
+/** Cria um login de funcionário pra unidade do dono. Devolve o token em texto UMA vez. */
+export async function createPartnerFuncionarioToken(
+  ctx: PartnerContext,
+  label: string | null,
+): Promise<CreatedFuncionarioToken> {
+  const token = randomBytes(32).toString('hex');
+  const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
+  const res = await pool.query<{ id: string; created_at: string }>(
+    `INSERT INTO network.partner_access_tokens
+       (environment, partner_unit_id, token_hash, label, created_by, role)
+     VALUES ($1, $2, network.hash_partner_token($3), $4, $5, 'funcionario')
+     RETURNING id, created_at`,
+    [ctx.environment, ctx.partnerUnitId, token, cleanLabel, `owner:${ctx.slug}`],
+  );
+  const row = res.rows[0]!;
+  return { id: row.id, label: cleanLabel, token, created_at: row.created_at };
+}
+
+/** Lista os logins de funcionário da unidade do dono (sem expor o hash). */
+export async function listPartnerFuncionarios(ctx: PartnerContext): Promise<PartnerTokenRow[]> {
+  const res = await pool.query<PartnerTokenRow>(
+    `SELECT id, label, role, created_at, last_used_at, revoked_at
+       FROM network.partner_access_tokens
+      WHERE environment = $1 AND partner_unit_id = $2 AND role = 'funcionario'
+      ORDER BY revoked_at IS NOT NULL, created_at DESC`,
+    [ctx.environment, ctx.partnerUnitId],
+  );
+  return res.rows;
+}
+
+/** Revoga (desativa) um login de funcionário da própria unidade. */
+export async function revokePartnerFuncionario(
+  ctx: PartnerContext,
+  tokenId: string,
+): Promise<{ revoked: boolean }> {
+  const res = await pool.query(
+    `UPDATE network.partner_access_tokens
+        SET revoked_at = now()
+      WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+        AND role = 'funcionario' AND revoked_at IS NULL`,
+    [tokenId, ctx.environment, ctx.partnerUnitId],
+  );
+  return { revoked: (res.rowCount ?? 0) > 0 };
 }

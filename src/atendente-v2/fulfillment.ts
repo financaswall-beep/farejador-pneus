@@ -90,6 +90,8 @@ export async function resolveUnitForOrder(
     slug: row.slug,
     partnerName: row.partner_name,
     unitName: row.unit_name,
+    // O bot age como ator de sistema (cria pedido em nome da loja): autoridade total.
+    role: 'owner',
   };
 }
 
@@ -140,6 +142,8 @@ export async function resolveUnitForMunicipio(
     slug: row.slug,
     partnerName: row.partner_name,
     unitName: row.unit_name,
+    // O bot age como ator de sistema (cria pedido em nome da loja): autoridade total.
+    role: 'owner',
   };
 }
 

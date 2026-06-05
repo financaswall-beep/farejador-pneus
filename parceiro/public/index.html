@@ -91,7 +91,7 @@
       </div>
 
       <nav class="pos-nav">
-        <button @click="goToSection('resumo')" class="pos-nav-item" :class="currentSection === 'resumo' && 'active'">
+        <button x-show="isOwner" @click="goToSection('resumo')" class="pos-nav-item" :class="currentSection === 'resumo' && 'active'">
           <i data-lucide="layout-dashboard"></i>
           <span>Resumo</span>
           <kbd>F1</kbd>
@@ -121,7 +121,7 @@
           <span>Pedidos</span>
           <kbd>F6</kbd>
         </button>
-        <button @click="goToSection('financeiro')" class="pos-nav-item" :class="currentSection === 'financeiro' && 'active'">
+        <button x-show="isOwner" @click="goToSection('financeiro')" class="pos-nav-item" :class="currentSection === 'financeiro' && 'active'">
           <i data-lucide="chart-no-axes-combined"></i>
           <span>Financeiro</span>
           <kbd>F8</kbd>
@@ -144,7 +144,7 @@
         <svg class="pos-toggle-chevron" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
         <span x-text="sidebarCollapsed ? 'Expandir' : 'Recolher'"></span>
       </button>
-      <button class="pos-nav-item pos-settings">
+      <button x-show="isOwner" @click="goToSection('config')" class="pos-nav-item pos-settings" :class="currentSection === 'config' && 'active'">
         <i data-lucide="settings"></i>
         <span>Configurações</span>
         <kbd>F9</kbd>
@@ -1835,6 +1835,84 @@
 
           </aside>
 
+        </div>
+      </section>
+
+      <!-- Configurações (Etapa 4c) — só o dono enxerga; gestão de logins de funcionário -->
+      <section x-show="currentSection === 'config'" class="pos-workspace">
+        <div class="pos-page-grid customers">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head">
+              <div>
+                <h3>Funcionários</h3>
+                <p>Logins de funcionário acessam venda, estoque, pedidos e clientes — nunca o financeiro.</p>
+              </div>
+            </div>
+
+            <div class="pos-customer-table">
+              <div class="pos-customer-table-head" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+                <span>Funcionário</span>
+                <span>Criado em</span>
+                <span>Último acesso</span>
+                <span>Situação</span>
+              </div>
+              <template x-for="f in funcionarios" :key="f.id">
+                <div class="pos-customer-table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+                  <span class="pos-customer-name">
+                    <b x-text="f.label || 'Funcionário'"></b>
+                  </span>
+                  <span x-text="formatDate(f.created_at)"></span>
+                  <span x-text="f.last_used_at ? formatDate(f.last_used_at) : 'nunca'"></span>
+                  <span>
+                    <template x-if="!f.revoked_at">
+                      <button @click="revokeFuncionario(f)" :disabled="saving" class="pos-outline-action compact">
+                        <i data-lucide="user-x"></i> Desativar
+                      </button>
+                    </template>
+                    <template x-if="f.revoked_at">
+                      <span class="pos-muted">Desativado</span>
+                    </template>
+                  </span>
+                </div>
+              </template>
+              <div x-show="!funcionarios.length" class="pos-empty">
+                Nenhum funcionário cadastrado ainda.
+              </div>
+            </div>
+          </section>
+
+          <aside class="pos-panel pos-side-panel">
+            <h3>Adicionar funcionário</h3>
+            <div class="pos-stock-side-form">
+              <label>Nome do funcionário (opcional)
+                <input x-model="funcionarioForm.label" placeholder="Ex: João do balcão" maxlength="120" />
+              </label>
+              <button @click="createFuncionario()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="user-plus"></i>
+                <span x-text="isSaving('funcionario') ? 'Criando...' : 'Criar login de funcionário'"></span>
+              </button>
+            </div>
+
+            <!-- Token mostrado UMA vez após criar -->
+            <div x-show="createdFuncToken" class="pos-token-reveal" style="margin-top:14px;padding:14px;border:1px solid var(--pos-accent,#10b981);border-radius:10px;background:rgba(16,185,129,.08);">
+              <h3 style="margin:0 0 6px;">Login criado ✅</h3>
+              <p style="margin:0 0 8px;font-size:13px;">Copie e entregue ao funcionário <b>agora</b> — por segurança, não mostramos de novo.</p>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input :value="createdFuncToken" readonly style="flex:1;font-family:monospace;font-size:12px;" @focus="$event.target.select()" />
+                <button @click="copyFuncToken()" class="pos-outline-action compact"><i data-lucide="copy"></i> Copiar</button>
+              </div>
+              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">Link de acesso: <span x-text="loginUrl"></span></p>
+              <button @click="createdFuncToken = ''" class="pos-mini-clear" style="margin-top:8px;">Fechar</button>
+            </div>
+
+            <div class="pos-divider"></div>
+            <h3>Como funciona</h3>
+            <div class="pos-tip-list">
+              <div><i data-lucide="shield-check"></i><span>O funcionário vê venda, estoque, pedidos, clientes e entrega.</span></div>
+              <div><i data-lucide="lock"></i><span>Financeiro, Resumo e Configurações ficam só com você.</span></div>
+              <div><i data-lucide="user-x"></i><span>Saiu da loja? É só desativar o login dele aqui.</span></div>
+            </div>
+          </aside>
         </div>
       </section>
 
