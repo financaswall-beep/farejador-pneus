@@ -32,6 +32,9 @@ function parceiroApp() {
     lastUpdatedAt: null,
     currentSection: 'resumo',
     role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
+    funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
+    funcionarioForm: { label: '' },
+    createdFuncToken: '',        // token em texto, mostrado UMA vez após criar
     sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
@@ -320,6 +323,63 @@ function parceiroApp() {
     },
 
     get isOwner() { return this.role === 'owner'; },
+
+    // URL que o funcionário usa pra logar (mesmo portal, cola o token).
+    get loginUrl() { return `${window.location.origin}/parceiro/${this.slug}`; },
+
+    // ─── Etapa 4c: funcionários ───
+    async loadFuncionarios() {
+      if (!this.isOwner) return;
+      try {
+        const res = await this.api('funcionarios');
+        this.funcionarios = res.rows || [];
+      } catch (err) {
+        console.warn('funcionarios_unavailable', err);
+        this.funcionarios = [];
+      }
+    },
+
+    async createFuncionario() {
+      this.saving = true; this.savingAction = 'funcionario';
+      try {
+        const res = await this.api('funcionarios', {
+          method: 'POST',
+          body: JSON.stringify({ label: (this.funcionarioForm.label || '').trim() || null }),
+        });
+        this.createdFuncToken = res.token || '';
+        this.funcionarioForm.label = '';
+        await this.loadFuncionarios();
+        this.flash('Login de funcionário criado. Copie o token agora.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    async revokeFuncionario(f) {
+      if (!confirm(`Desativar o login "${f.label || 'Funcionário'}"? Ele perde o acesso na hora.`)) return;
+      this.saving = true; this.savingAction = 'funcionario';
+      try {
+        await this.api(`funcionarios/${f.id}`, { method: 'DELETE' });
+        await this.loadFuncionarios();
+        this.flash('Login desativado.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    copyFuncToken() {
+      if (!this.createdFuncToken) return;
+      const done = () => this.flash('Token copiado.');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(this.createdFuncToken).then(done).catch(() => this.flash('Copie manualmente.'));
+      } else {
+        this.flash('Copie manualmente.');
+      }
+    },
 
     async loadData() {
       if (!this.apiToken) return;
@@ -1968,7 +2028,8 @@ function parceiroApp() {
     goToSection(id) {
       // Etapa 4: funcionário não entra em Resumo/Financeiro nem por atalho de
       // teclado. (A trava real é no backend; isto é só pra UI não ir pra uma tela vazia.)
-      if (!this.isOwner && ['resumo', 'financeiro'].includes(id)) return;
+      if (!this.isOwner && ['resumo', 'financeiro', 'config'].includes(id)) return;
+      if (id === 'config') { this.createdFuncToken = ''; this.loadFuncionarios(); }
       if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
       // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
       if (id === 'batepapo') this.startChatPolling();
