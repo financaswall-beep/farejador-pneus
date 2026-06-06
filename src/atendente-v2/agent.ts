@@ -83,7 +83,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   try {
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
     const [history, chatwootConvId, customerContext] = await Promise.all([
-      loadHistory(client, conversationId),
+      loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO }),
       lookupChatwootConversationId(client, conversationId),
       loadCustomerContext(client, conversationId),
     ]);

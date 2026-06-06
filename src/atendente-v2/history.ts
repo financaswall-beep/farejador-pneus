@@ -3,6 +3,16 @@ import type { ChatMessage } from './types.js';
 
 const HISTORY_LIMIT = 30;
 
+/**
+ * Marcador injetado quando o cliente compartilhou um pino de localização. O
+ * anexo de localização chega SEM texto, então a query principal (que exige
+ * content não-vazio) o descarta e o LLM nunca saberia que veio um pino. Com a
+ * camada GEO ligada, este marcador aparece como turn do cliente pra o bot poder
+ * prosseguir pela proximidade (a coordenada crua é resolvida server-side por
+ * getLatestCustomerLocation — o LLM nunca vê lat/lng).
+ */
+export const LOCATION_MARKER = '[O cliente compartilhou a localização dele 📍]';
+
 interface MessageRow {
   id: string;
   sender_type: string;
@@ -26,6 +36,7 @@ interface TurnActionsRow {
 export async function loadHistory(
   client: PoolClient,
   conversationId: string,
+  opts: { includeLocationMarkers?: boolean } = {},
 ): Promise<ChatMessage[]> {
   const [msgResult, turnsResult] = await Promise.all([
     client.query<MessageRow>(
@@ -67,6 +78,40 @@ export async function loadHistory(
   // Para cada mensagem do cliente, se houver tool events disparados por ela,
   // injeta esses events ANTES da próxima mensagem do bot.
   const messages = msgResult.rows.reverse();
+
+  // Camada GEO: traz os pinos de localização (que a query principal descarta por
+  // não terem texto) e injeta um marcador na posição cronológica certa. Só roda
+  // com a flag ligada → com a flag OFF o histórico é byte a byte o de hoje.
+  if (opts.includeLocationMarkers) {
+    const locResult = await client.query<{ id: string; sent_at: Date }>(
+      `SELECT DISTINCT a.message_id AS id, m.sent_at
+         FROM core.message_attachments a
+         JOIN core.messages m ON m.id = a.message_id
+        WHERE a.conversation_id = $1
+          AND a.file_type = 'location'
+          AND a.coordinates_lat IS NOT NULL
+          AND m.is_private = false
+          AND m.deleted_at IS NULL
+        ORDER BY m.sent_at DESC, a.message_id DESC
+        LIMIT $2`,
+      [conversationId, HISTORY_LIMIT],
+    );
+
+    const seen = new Set(messages.map((m) => m.id));
+    for (const loc of locResult.rows) {
+      // Se o pino já veio com legenda (raro), ele já está no histórico — não duplica.
+      if (!seen.has(loc.id)) {
+        messages.push({ id: loc.id, sender_type: 'contact', content: LOCATION_MARKER, sent_at: loc.sent_at });
+      }
+    }
+    // Reordena cronologicamente (asc), igual ao reverse do SELECT principal.
+    messages.sort((a, b) => {
+      const t = a.sent_at.getTime() - b.sent_at.getTime();
+      if (t !== 0) return t;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+  }
+
   const history: ChatMessage[] = [];
 
   for (let i = 0; i < messages.length; i++) {
