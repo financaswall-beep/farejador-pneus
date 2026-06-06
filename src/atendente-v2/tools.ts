@@ -14,13 +14,80 @@ import {
   resolveMunicipioFromGeo,
   resolveMunicipioFromBairro,
   decideStoreForItems,
+  decideStoreForItemsGeo,
   getPartnerStockMap,
   materializePartnerOrder,
   getUnitMapsUrl,
+  normalizeRegion,
   FRETE_PADRAO_BRL,
   type PartnerOrderRouting,
 } from './fulfillment.js';
+import { env } from '../shared/config/env.js';
+import { getLatestCustomerLocation } from './customer-location.js';
+import { geocodeAddress } from '../shared/geo/google-maps.js';
+import type { GeoPoint } from '../shared/geo/haversine.js';
 import { createHash } from 'node:crypto';
+
+// ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
+// FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
+// pra a cotação e o registro nunca divergirem (invariante §5.7). Com ROUTING_GEO on
+// e coordenada do cliente → motor de proximidade (anel); senão → caminho de hoje
+// (por cidade). A coordenada vem do pino (mais recente da conversa) ou, na falta,
+// do geocode do bairro (precedência §5.4); sem nenhuma → fallback por cidade (caso F).
+
+/** Coordenada do cliente: pino da conversa → senão geocode do bairro → senão null. */
+async function resolveCustomerLocation(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  bairro: string | null | undefined,
+  municipio: string | null,
+): Promise<GeoPoint | null> {
+  const pin = await getLatestCustomerLocation(client, environment, conversationId);
+  if (pin) return pin;
+  if (env.GOOGLE_MAPS_API_KEY && bairro) {
+    const g = await geocodeAddress([bairro, municipio, 'Brasil'].filter(Boolean).join(', '), env.GOOGLE_MAPS_API_KEY);
+    if (g) return { lat: g.lat, lng: g.lng };
+  }
+  return null;
+}
+
+interface GeoOnlyFar {
+  unitName: string;
+  distanceKm: number;
+}
+
+/**
+ * Decide a loja (entrega) por proximidade quando ROUTING_GEO está on e há coordenada;
+ * senão cai no caminho de hoje (decideStoreForItems por cidade). Retorna o routing
+ * (loja escolhida ou null=matriz) e, no caso E (só tem longe), o onlyFar pra o bot
+ * dar a resposta honesta (D3). Os DOIS tools chamam isto com as MESMAS entradas.
+ */
+async function decideStoreGeoOrFallback(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  input: { municipio: string | null; items: { product_id: string; quantity: number }[]; bairro: string | null | undefined },
+): Promise<{ routing: PartnerOrderRouting | null; onlyFar?: GeoOnlyFar }> {
+  if (env.ROUTING_GEO && input.municipio) {
+    const customerLocation = await resolveCustomerLocation(client, environment, conversationId, input.bairro, input.municipio);
+    if (customerLocation) {
+      const geo = await decideStoreForItemsGeo(client, environment, {
+        municipio: input.municipio,
+        items: input.items,
+        modalidade: 'delivery', // calcular_frete e o roteamento de pedido do bot são entrega
+        customerLocation,
+        clientNeighborhoodCanonical: input.bairro ? normalizeRegion(input.bairro) : null,
+      });
+      if (geo.kind === 'partner') return { routing: geo.routing };
+      if (geo.kind === 'only_far') return { routing: null, onlyFar: { unitName: geo.unitName, distanceKm: geo.distanceKm } };
+      return { routing: null }; // matriz
+    }
+    // sem coordenada → cai no fallback por cidade (caso F)
+  }
+  const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items });
+  return { routing };
+}
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 
@@ -171,6 +238,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
+          bairro: { type: 'string', description: 'Bairro do cliente — passe o MESMO usado no calcular_frete (necessário pro roteamento por proximidade escolher a mesma loja).' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
@@ -346,21 +414,34 @@ export async function executeTool(
         });
         // C3b: se a entrega cai num parceiro (MESMA decisão do criar_pedido), o frete é
         // o fixo do parceiro (FRETE_PADRAO_BRL), não o da matriz — pra a cotação bater
-        // com o que o pedido vai cobrar. Sem produtos / fora de cobertura / parceiro sem
-        // o pneu → frete da matriz (o backstop). decideStoreForItems é a fonte única.
+        // com o que o pedido vai cobrar. Com ROUTING_GEO, a decisão é por PROXIMIDADE
+        // (anel) e pode devolver "só tem longe" (caso E) → o bot responde com honestidade
+        // (D3). decideStoreGeoOrFallback é a fonte única (mesma decisão do criar_pedido).
         const produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
         if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
           const municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
-          const partner = await decideStoreForItems(client, environment, {
+          const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
             municipio,
             items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
+            bairro: args.bairro as string | undefined,
           });
-          if (partner) {
+          if (decision.routing) {
             return JSON.stringify({
               ...result,
               disponivel: true,
               valor: FRETE_PADRAO_BRL.toFixed(2),
               motivo: undefined,
+            });
+          }
+          if (decision.onlyFar) {
+            return JSON.stringify({
+              ...result,
+              disponivel: false,
+              apenas_longe: true,
+              distancia_km: Math.round(decision.onlyFar.distanceKm),
+              nome_loja_distante: decision.onlyFar.unitName,
+              orientacao:
+                'Esse pneu só tem numa loja mais distante. Seja honesto: avise a distância e ofereça opções (entregar mesmo assim / medida equivalente mais perto / reservar e avisar). NÃO finja que é entrega normal.',
             });
           }
         }
@@ -559,10 +640,25 @@ async function criarPedido(
 
   if (modalidade === 'delivery' && geoResolutionId) {
     const municipio = await resolveMunicipioFromGeo(client, environment, geoResolutionId);
-    partner = await decideStoreForItems(client, environment, {
+    const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
       municipio,
       items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
+      bairro: args.bairro as string | undefined,
     });
+    // Caso E (só tem longe): NÃO cria o pedido caladamente — devolve estruturado pro bot
+    // confirmar a opção com o cliente antes (D3). Salvaguarda: o bot só deve chamar
+    // criar_pedido depois que o cliente escolher.
+    if (decision.onlyFar) {
+      return JSON.stringify({
+        erro: 'apenas_longe',
+        apenas_longe: true,
+        distancia_km: Math.round(decision.onlyFar.distanceKm),
+        nome_loja_distante: decision.onlyFar.unitName,
+        mensagem:
+          'Esse item só tem numa loja mais distante. Confirme a opção com o cliente (entregar mesmo assim / equivalente perto / reservar) ANTES de criar o pedido.',
+      });
+    }
+    partner = decision.routing;
   }
 
   let order: { id: string; order_number: string };

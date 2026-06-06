@@ -5,7 +5,7 @@ import { logger } from '../shared/logger.js';
 import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { TOOL_DEFINITIONS, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
-import { SYSTEM_PROMPT } from './prompt.js';
+import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK } from './prompt.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 
@@ -93,10 +93,12 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       return;
     }
 
-    // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver
+    // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver.
+    // Bloco GEO só entra com ROUTING_GEO on (flag OFF = prompt byte a byte o de hoje).
+    const basePrompt = env.ROUTING_GEO ? SYSTEM_PROMPT + GEO_PROMPT_BLOCK : SYSTEM_PROMPT;
     const systemPromptWithContext = customerContext
-      ? SYSTEM_PROMPT + customerContext
-      : SYSTEM_PROMPT;
+      ? basePrompt + customerContext
+      : basePrompt;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },

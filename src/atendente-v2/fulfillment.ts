@@ -382,7 +382,7 @@ export interface StoreDecision {
 /** Frete fixo da rede (decisão Wallace 2026-06-02): R$ 9,90 pra todos. */
 export const FRETE_PADRAO_BRL = 9.9;
 
-function normalizeRegion(s: string | null | undefined): string {
+export function normalizeRegion(s: string | null | undefined): string {
   return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
 
