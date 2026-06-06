@@ -199,7 +199,7 @@
       </div>
     </aside>
 
-    <main class="pos-main" :class="currentSection === 'batepapo' && 'chat-mode'">
+    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config' }">
       <header class="pos-topbar">
         <div class="pos-company">
           <div class="font-bold">Pneus Max Moto Center</div>

@@ -1265,6 +1265,12 @@ html, body {
    e colapsa o chat). */
 .pos-main.chat-mode { grid-template-rows: 80px 1fr 46px; }
 
+/* Aba Configuracoes: tambem sem faixa de KPIs (so header, workspace, footer = 3
+   filhos visiveis no .pos-main). Mesmo motivo do chat: sem este override o
+   workspace cai na linha de 88px (a faixa de KPIs) e o conteudo some atras da
+   rolagem (tela "preta"). Reescreve pra 3 linhas com o workspace no 1fr. */
+.pos-main.config-mode { grid-template-rows: 80px 1fr 46px; }
+
 .pos-kpis article,
 .pos-panel {
   border: 1px solid var(--pos-line);
