@@ -136,27 +136,27 @@
           <span>Resumo</span>
           <kbd>F1</kbd>
         </button>
-        <button @click="goToSection('vendas')" class="pos-nav-item" :class="currentSection === 'vendas' && 'active'">
+        <button x-show="canSee('vendas')" @click="goToSection('vendas')" class="pos-nav-item" :class="currentSection === 'vendas' && 'active'">
           <i data-lucide="shopping-cart"></i>
           <span>Frente de caixa</span>
           <kbd>F2</kbd>
         </button>
-        <button @click="goToSection('entrega')" class="pos-nav-item" :class="currentSection === 'entrega' && 'active'">
+        <button x-show="canSee('entrega')" @click="goToSection('entrega')" class="pos-nav-item" :class="currentSection === 'entrega' && 'active'">
           <i data-lucide="truck"></i>
           <span>Entrega</span>
           <kbd>F4</kbd>
         </button>
-        <button @click="goToSection('clientes')" class="pos-nav-item" :class="currentSection === 'clientes' && 'active'">
+        <button x-show="canSee('clientes')" @click="goToSection('clientes')" class="pos-nav-item" :class="currentSection === 'clientes' && 'active'">
           <i data-lucide="user"></i>
           <span>Clientes</span>
           <kbd>F3</kbd>
         </button>
-        <button @click="goToSection('estoque')" class="pos-nav-item" :class="currentSection === 'estoque' && 'active'">
+        <button x-show="canSee('estoque')" @click="goToSection('estoque')" class="pos-nav-item" :class="currentSection === 'estoque' && 'active'">
           <i data-lucide="package"></i>
           <span>Estoque</span>
           <kbd>F5</kbd>
         </button>
-        <button @click="goToSection('pedidos')" class="pos-nav-item" :class="currentSection === 'pedidos' && 'active'">
+        <button x-show="canSee('pedidos')" @click="goToSection('pedidos')" class="pos-nav-item" :class="currentSection === 'pedidos' && 'active'">
           <i data-lucide="clipboard-list"></i>
           <span>Pedidos</span>
           <kbd>F6</kbd>
@@ -166,7 +166,7 @@
           <span>Financeiro</span>
           <kbd>F8</kbd>
         </button>
-        <button @click="goToSection('batepapo')" class="pos-nav-item" :class="currentSection === 'batepapo' && 'active'">
+        <button x-show="canSee('batepapo')" @click="goToSection('batepapo')" class="pos-nav-item" :class="currentSection === 'batepapo' && 'active'">
           <i data-lucide="message-circle"></i>
           <span>Bate-papo</span>
           <kbd>F7</kbd>
@@ -2168,6 +2168,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260601-chat-direita-6"></script>
+<script src="./app.js?v=20260606-perm-menu"></script>
 </body>
 </html>

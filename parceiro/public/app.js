@@ -429,7 +429,9 @@ function parceiroApp() {
     // a trava de verdade é o requireScreen/requireOwner no backend.
     canSee(tela) {
       if (this.isOwner) return true;
-      return !!(this.permissions && this.permissions[tela]);
+      // Seção 'entrega' usa a permissão 'entregas' (chave do backend/DB allow_entregas).
+      const key = tela === 'entrega' ? 'entregas' : tela;
+      return !!(this.permissions && this.permissions[key]);
     },
 
     // ─── Etapa 4c: funcionários ───
@@ -509,7 +511,7 @@ function parceiroApp() {
     // ─── Configurações da Loja (Fase 1) ───
     // Primeira tela que o funcionário pode ver (fallback de navegação).
     firstAllowedSection() {
-      const order = ['vendas', 'pedidos', 'estoque', 'clientes', 'entregas', 'batepapo', 'resumo', 'financeiro'];
+      const order = ['vendas', 'pedidos', 'estoque', 'clientes', 'entrega', 'batepapo', 'resumo', 'financeiro'];
       return order.find((s) => this.canSee(s)) || null;
     },
 
