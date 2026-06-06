@@ -31,7 +31,7 @@ import { pool } from '../persistence/db.js';
 import { logger } from '../shared/logger.js';
 import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
-import type { PartnerContext } from './auth.js';
+import { resolvePartnerPermissions, PARTNER_SCREENS, type PartnerContext, type PartnerPermissions } from './auth.js';
 
 export interface PartnerOrderItemInput {
   partner_stock_id: string;
@@ -2889,4 +2889,386 @@ export async function revokePartnerSession(environment: string, sessionToken: st
       WHERE environment = $1 AND session_hash = $2 AND revoked_at IS NULL`,
     [environment, hashSessionToken(sessionToken)],
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CONFIGURAÇÕES DA LOJA (PLANO_CONFIG_LOJA_E_ROTEAMENTO_REDE — Fase 1)
+//
+// Tudo usa o pool ADMIN (role 'postgres'), NÃO o withPartnerContext/partnerPool:
+//   - network.partner_units: o pool restrito só tem GRANT SELECT (não UPDATE).
+//   - network.unit_coverage: o pool restrito NÃO tem GRANT nenhum (tabela de
+//     roteamento que o bot lê com a role admin).
+//   - network.partner_unit_permissions: idem (tabela de autorização).
+// Toda query é ESCOPADA por ctx.partnerUnitId (partner_units/permissions) ou
+// ctx.unitId (unit_coverage, que é chaveada por core.units.id) + ctx.environment.
+// Isolamento entre parceiros = o WHERE escopado (gate §5.4). Os endpoints são
+// requireOwner cru (Configurações é cadeado duro), então só o dono chega aqui.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type PartnerServiceMode = 'delivery' | 'pickup' | 'both';
+
+export interface PartnerLojaInput {
+  display_name: string;
+  address_street?: string | null;
+  address_number?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_complement?: string | null;
+  cep?: string | null;
+  opening_hours_text?: string | null;
+}
+
+export interface PartnerAreaInput {
+  // true = cobre a cidade inteira (1 linha, bairro NULL, kind='city' = hoje).
+  // false = cobre só os bairros listados (N linhas kind='neighborhood').
+  city_wide: boolean;
+  municipio: string;
+  // Bairros canônicos (lower(unaccent)) — só usados quando city_wide=false.
+  neighborhoods?: string[];
+}
+
+export interface PartnerConfiguracoes {
+  loja: {
+    display_name: string | null;
+    address_street: string | null;
+    address_number: string | null;
+    address_neighborhood: string | null;
+    address_city: string | null;
+    address_complement: string | null;
+    cep: string | null;
+    opening_hours_text: string | null;
+    address_confirmed_at: string | null;
+    service_mode: PartnerServiceMode;
+    // Derivados do enum pra a UI dos 2 checkboxes (arbitragem B).
+    faz_entrega: boolean;
+    tem_retirada: boolean;
+  } | null;
+  // Cobertura agrupada por município: cidade inteira OU lista de bairros.
+  coverage: Array<{
+    municipio: string;
+    city_wide: boolean;
+    neighborhoods: string[];
+  }>;
+  permissions: PartnerPermissions;
+}
+
+const VALID_SERVICE_MODES: ReadonlySet<string> = new Set(['delivery', 'pickup', 'both']);
+
+/** Normaliza bairro pro formato canônico (lower + trim). O unaccent fica a cargo
+ *  da busca/resolve_neighborhood; aqui só padronizamos caixa e espaços. */
+function canonicalNeighborhood(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+/**
+ * Lê TUDO da tela Configurações: dados da loja + modo + cobertura/área +
+ * permissões efetivas. Escopado por ctx.partnerUnitId/ctx.unitId + environment.
+ */
+export async function getPartnerConfiguracoes(ctx: PartnerContext): Promise<PartnerConfiguracoes> {
+  const unitRes = await pool.query<{
+    display_name: string | null;
+    address_street: string | null;
+    address_number: string | null;
+    address_neighborhood: string | null;
+    address_city: string | null;
+    address_complement: string | null;
+    cep: string | null;
+    opening_hours_text: string | null;
+    address_confirmed_at: string | null;
+    service_mode: string;
+  }>(
+    `SELECT display_name, address_street, address_number, address_neighborhood,
+            address_city, address_complement, cep, opening_hours_text,
+            address_confirmed_at, service_mode
+       FROM network.partner_units
+      WHERE id = $1 AND environment = $2`,
+    [ctx.partnerUnitId, ctx.environment],
+  );
+
+  const u = unitRes.rows[0];
+  const serviceMode: PartnerServiceMode = u && VALID_SERVICE_MODES.has(u.service_mode)
+    ? (u.service_mode as PartnerServiceMode)
+    : 'both';
+
+  const loja = u
+    ? {
+        display_name: u.display_name,
+        address_street: u.address_street,
+        address_number: u.address_number,
+        address_neighborhood: u.address_neighborhood,
+        address_city: u.address_city,
+        address_complement: u.address_complement,
+        cep: u.cep,
+        opening_hours_text: u.opening_hours_text,
+        address_confirmed_at: u.address_confirmed_at,
+        service_mode: serviceMode,
+        faz_entrega: serviceMode === 'delivery' || serviceMode === 'both',
+        tem_retirada: serviceMode === 'pickup' || serviceMode === 'both',
+      }
+    : null;
+
+  // Cobertura: chaveada por unit_id (= core.units.id). Agrupa por município.
+  const covRes = await pool.query<{
+    municipio: string;
+    neighborhood_canonical: string | null;
+    coverage_kind: string;
+  }>(
+    `SELECT municipio, neighborhood_canonical, coverage_kind
+       FROM network.unit_coverage
+      WHERE unit_id = $1 AND environment = $2
+      ORDER BY municipio, neighborhood_canonical NULLS FIRST`,
+    [ctx.unitId, ctx.environment],
+  );
+
+  const byMunicipio = new Map<string, { municipio: string; city_wide: boolean; neighborhoods: string[] }>();
+  for (const row of covRes.rows) {
+    let entry = byMunicipio.get(row.municipio);
+    if (!entry) {
+      entry = { municipio: row.municipio, city_wide: false, neighborhoods: [] };
+      byMunicipio.set(row.municipio, entry);
+    }
+    if (row.coverage_kind === 'city' || row.neighborhood_canonical === null) {
+      entry.city_wide = true;
+    } else {
+      entry.neighborhoods.push(row.neighborhood_canonical);
+    }
+  }
+
+  const permissions = await resolvePartnerPermissions(ctx);
+
+  return {
+    loja,
+    coverage: Array.from(byMunicipio.values()),
+    permissions,
+  };
+}
+
+/**
+ * Atualiza dados da loja: nome de exibição, endereço estruturado, horário (texto).
+ * Carimba address_confirmed_at = now() (auditoria leve: o dono revisou o endereço).
+ * Escopado por ctx.partnerUnitId + environment. Retorna {updated:false} se a
+ * unidade não existe nesse escopo (não deveria acontecer pós-requireOwner).
+ */
+export async function updatePartnerLoja(
+  ctx: PartnerContext,
+  input: PartnerLojaInput,
+): Promise<{ updated: boolean }> {
+  const clean = (v: string | null | undefined): string | null => {
+    if (v === null || v === undefined) return null;
+    const t = v.trim();
+    return t.length ? t : null;
+  };
+  const res = await pool.query(
+    `UPDATE network.partner_units
+        SET display_name         = $3,
+            address_street        = $4,
+            address_number        = $5,
+            address_neighborhood  = $6,
+            address_city          = $7,
+            address_complement    = $8,
+            cep                   = $9,
+            opening_hours_text    = $10,
+            address_confirmed_at  = now()
+      WHERE id = $1 AND environment = $2`,
+    [
+      ctx.partnerUnitId,
+      ctx.environment,
+      input.display_name.trim(),
+      clean(input.address_street),
+      clean(input.address_number),
+      clean(input.address_neighborhood),
+      clean(input.address_city),
+      clean(input.address_complement),
+      clean(input.cep),
+      clean(input.opening_hours_text),
+    ],
+  );
+  return { updated: (res.rowCount ?? 0) > 0 };
+}
+
+/**
+ * Atualiza o MODO de atendimento (enum service_mode). A UI manda 2 checkboxes
+ * (faz_entrega / tem_retirada); o ROUTE mapeia pro enum e valida "pelo menos um".
+ * Aqui recebemos o enum já resolvido. Escopado por ctx.partnerUnitId + environment.
+ */
+export async function updatePartnerAtendimento(
+  ctx: PartnerContext,
+  serviceMode: PartnerServiceMode,
+): Promise<{ updated: boolean }> {
+  const res = await pool.query(
+    `UPDATE network.partner_units
+        SET service_mode = $3
+      WHERE id = $1 AND environment = $2`,
+    [ctx.partnerUnitId, ctx.environment, serviceMode],
+  );
+  return { updated: (res.rowCount ?? 0) > 0 };
+}
+
+/**
+ * Reescreve a ÁREA de entrega de UM município (PLANO §2.2, Fase 1 = DECLARATIVO).
+ *
+ *   - city_wide=true  → apaga as linhas de bairro daquele município e garante 1
+ *                       linha de cidade inteira (bairro NULL, kind='city' = hoje).
+ *   - city_wide=false → apaga a linha de cidade e regrava as N linhas de bairro
+ *                       (kind='neighborhood', bairro NOT NULL) — respeitando o
+ *                       CHECK casado e o UNIQUE de 4 colunas da 0087.
+ *
+ * Chaveado por ctx.unitId (= core.units.id, igual createPartnerUnit). Transação:
+ * o "limpa + regrava" é atômico. NÃO mexe em coberturas de OUTROS municípios.
+ *
+ * ⚠️ Fase 1 declarativo: grava/exibe; o bot ainda NÃO filtra por bairro (Fase 2).
+ */
+export async function updatePartnerArea(
+  ctx: PartnerContext,
+  input: PartnerAreaInput,
+): Promise<{ updated: boolean; municipio: string; city_wide: boolean; neighborhoods: string[] }> {
+  const municipio = input.municipio.trim().toLowerCase();
+  if (!municipio) throw new Error('municipio_required');
+
+  // Dedup + normaliza bairros (só quando não é cidade inteira).
+  const neighborhoods = input.city_wide
+    ? []
+    : Array.from(new Set((input.neighborhoods ?? []).map(canonicalNeighborhood).filter((n) => n.length > 0)));
+
+  if (!input.city_wide && neighborhoods.length === 0) {
+    // "Bairros específicos" sem nenhum bairro não faz sentido — o caller (route)
+    // deveria barrar; aqui é a guarda final.
+    throw new Error('neighborhoods_required');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Apaga TODA a cobertura atual daquele município (cidade + bairros) e regrava
+    // do zero — simples e idempotente. Escopo: unit_id + environment + municipio.
+    await client.query(
+      `DELETE FROM network.unit_coverage
+        WHERE unit_id = $1 AND environment = $2 AND municipio = $3`,
+      [ctx.unitId, ctx.environment, municipio],
+    );
+
+    if (input.city_wide) {
+      await client.query(
+        `INSERT INTO network.unit_coverage
+           (environment, unit_id, municipio, neighborhood_canonical, coverage_kind)
+         VALUES ($1, $2, $3, NULL, 'city')`,
+        [ctx.environment, ctx.unitId, municipio],
+      );
+    } else {
+      for (const bairro of neighborhoods) {
+        await client.query(
+          `INSERT INTO network.unit_coverage
+             (environment, unit_id, municipio, neighborhood_canonical, coverage_kind)
+           VALUES ($1, $2, $3, $4, 'neighborhood')`,
+          [ctx.environment, ctx.unitId, municipio, bairro],
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return { updated: true, municipio, city_wide: input.city_wide, neighborhoods };
+}
+
+/**
+ * Busca de bairros pra a UI da área de entrega ("copa" → Copacabana). Usa
+ * commerce.resolve_neighborhood (PLANO §2.2; assinatura confirmada na 0048 e no
+ * banco: (p_environment env_t, p_input text, p_city text, p_min_similarity numeric)).
+ *
+ * Pool ADMIN: resolve_neighborhood é SECURITY INVOKER e lê commerce.geo_resolutions,
+ * onde o pool restrito do portal NÃO tem SELECT — então roda com a role admin.
+ * É leitura de dado geográfico público, sem dado de parceiro (sem risco de vazamento
+ * entre parceiros). O endpoint que chama é requireOwner.
+ */
+export async function searchPartnerBairros(
+  environment: string,
+  municipio: string | null,
+  q: string,
+): Promise<Array<{ neighborhood_canonical: string; city_name: string; match_type: string }>> {
+  const query = (q ?? '').trim();
+  if (query.length < 2) return [];
+  const res = await pool.query<{
+    neighborhood_canonical: string;
+    city_name: string;
+    match_type: string;
+  }>(
+    `SELECT neighborhood_canonical, city_name, match_type
+       FROM commerce.resolve_neighborhood($1::env_t, $2, $3)`,
+    [environment, query, municipio && municipio.trim() ? municipio.trim() : null],
+  );
+  return res.rows;
+}
+
+export interface PartnerPermissionsInput {
+  // Chaves livres vindas do cliente — passam pela allowlist antes de gravar.
+  [key: string]: unknown;
+}
+
+/**
+ * Upsert 1:1 das permissões de tela do funcionário (PLANO §2.3, gate §5.2).
+ *
+ * 🔒 ALLOWLIST FIXA NO SERVIDOR: só as 8 telas de PARTNER_SCREENS são consideradas.
+ * Qualquer chave fora da lista (notadamente `config`) é IGNORADA — defesa em
+ * profundidade. Configurações NUNCA é liberável por permissão (cadeado duro: a
+ * trava real é requireOwner cru nos endpoints de Configurações).
+ *
+ * Chave ausente no input ⇒ default da Etapa 4 daquela tela (operacional true;
+ * Resumo/Financeiro false). Escopado por ctx.partnerUnitId + environment.
+ */
+export async function upsertPartnerPermissions(
+  ctx: PartnerContext,
+  input: PartnerPermissionsInput,
+): Promise<PartnerPermissions> {
+  // Defaults da Etapa 4 — qualquer chave não enviada/ inválida cai aqui.
+  const defaults: PartnerPermissions = {
+    vendas: true, estoque: true, pedidos: true, clientes: true,
+    entregas: true, batepapo: true, resumo: false, financeiro: false,
+  };
+
+  const resolved = { ...defaults };
+  for (const screen of PARTNER_SCREENS) {
+    const v = input[screen];
+    if (typeof v === 'boolean') {
+      resolved[screen] = v;
+    }
+    // Chave fora de PARTNER_SCREENS (ex.: 'config') nunca é lida → ignorada.
+  }
+
+  await pool.query(
+    `INSERT INTO network.partner_unit_permissions
+       (partner_unit_id, environment,
+        allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
+        allow_entregas, allow_batepapo, allow_resumo, allow_financeiro)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (partner_unit_id) DO UPDATE SET
+        allow_vendas     = EXCLUDED.allow_vendas,
+        allow_estoque    = EXCLUDED.allow_estoque,
+        allow_pedidos    = EXCLUDED.allow_pedidos,
+        allow_clientes   = EXCLUDED.allow_clientes,
+        allow_entregas   = EXCLUDED.allow_entregas,
+        allow_batepapo   = EXCLUDED.allow_batepapo,
+        allow_resumo     = EXCLUDED.allow_resumo,
+        allow_financeiro = EXCLUDED.allow_financeiro,
+        updated_at       = now()`,
+    [
+      ctx.partnerUnitId,
+      ctx.environment,
+      resolved.vendas,
+      resolved.estoque,
+      resolved.pedidos,
+      resolved.clientes,
+      resolved.entregas,
+      resolved.batepapo,
+      resolved.resumo,
+      resolved.financeiro,
+    ],
+  );
+
+  return resolved;
 }

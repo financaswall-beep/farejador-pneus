@@ -120,7 +120,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro', 'batepapo'].includes(currentSection)" :data-theme="theme" :class="sidebarCollapsed && 'sidebar-collapsed'" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'clientes', 'estoque', 'financeiro', 'batepapo', 'config'].includes(currentSection)" :data-theme="theme" :class="sidebarCollapsed && 'sidebar-collapsed'" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -131,7 +131,7 @@
       </div>
 
       <nav class="pos-nav">
-        <button x-show="isOwner" @click="goToSection('resumo')" class="pos-nav-item" :class="currentSection === 'resumo' && 'active'">
+        <button x-show="canSee('resumo')" @click="goToSection('resumo')" class="pos-nav-item" :class="currentSection === 'resumo' && 'active'">
           <i data-lucide="layout-dashboard"></i>
           <span>Resumo</span>
           <kbd>F1</kbd>
@@ -161,7 +161,7 @@
           <span>Pedidos</span>
           <kbd>F6</kbd>
         </button>
-        <button x-show="isOwner" @click="goToSection('financeiro')" class="pos-nav-item" :class="currentSection === 'financeiro' && 'active'">
+        <button x-show="canSee('financeiro')" @click="goToSection('financeiro')" class="pos-nav-item" :class="currentSection === 'financeiro' && 'active'">
           <i data-lucide="chart-no-axes-combined"></i>
           <span>Financeiro</span>
           <kbd>F8</kbd>
@@ -1885,14 +1885,172 @@
         </div>
       </section>
 
-      <!-- Configurações (Etapa 4c) — só o dono enxerga; gestão de logins de funcionário -->
+      <!-- Configurações da Loja (Fase 1) — só o dono enxerga (cadeado duro). 4 abas internas. -->
       <section x-show="currentSection === 'config'" class="pos-workspace">
-        <div class="pos-page-grid customers">
+
+        <!-- Barra de abas internas -->
+        <div class="pos-config-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="pos-outline-action" :class="configTab === 'loja' && 'active'" @click="configTab = 'loja'; $nextTick(() => lucide.createIcons())">
+            <i data-lucide="store"></i> Dados da loja
+          </button>
+          <button class="pos-outline-action" :class="configTab === 'atendimento' && 'active'" @click="configTab = 'atendimento'; $nextTick(() => lucide.createIcons())">
+            <i data-lucide="bike"></i> Atendimento
+          </button>
+          <button class="pos-outline-action" :class="configTab === 'area' && 'active'" @click="configTab = 'area'; $nextTick(() => lucide.createIcons())">
+            <i data-lucide="map-pin"></i> Área de entrega
+          </button>
+          <button class="pos-outline-action" :class="configTab === 'equipe' && 'active'" @click="configTab = 'equipe'; $nextTick(() => lucide.createIcons())">
+            <i data-lucide="users"></i> Equipe
+          </button>
+        </div>
+
+        <!-- ABA 1: Dados da loja -->
+        <div x-show="configTab === 'loja'" class="pos-page-grid customers">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head"><div>
+              <h3>Dados da loja</h3>
+              <p>Nome, endereço e horário que o robô usa pra responder o cliente.</p>
+            </div></div>
+            <div class="pos-stock-side-form" style="max-width:640px;">
+              <label>Nome de exibição
+                <input x-model="lojaForm.display_name" placeholder="Ex: Pneus Max Niterói" maxlength="200" />
+              </label>
+              <div class="cx-pick-row" style="grid-template-columns:3fr 1fr">
+                <label>Rua <input x-model="lojaForm.address_street" placeholder="Ex: Av. Brasil" maxlength="240" /></label>
+                <label>Nº <input x-model="lojaForm.address_number" placeholder="123" maxlength="40" /></label>
+              </div>
+              <div class="cx-pick-row" style="grid-template-columns:1fr 1fr">
+                <label>Bairro <input x-model="lojaForm.address_neighborhood" placeholder="Centro" maxlength="160" /></label>
+                <label>Município <input x-model="lojaForm.address_city" placeholder="Ex: Niterói" maxlength="160" /></label>
+              </div>
+              <div class="cx-pick-row" style="grid-template-columns:1fr 1fr">
+                <label>Complemento <input x-model="lojaForm.address_complement" placeholder="Loja 2, ponto de referência" maxlength="240" /></label>
+                <label>CEP <input x-model="lojaForm.cep" placeholder="00000-000" maxlength="20" /></label>
+              </div>
+              <label>Horário de funcionamento (texto livre)
+                <input x-model="lojaForm.opening_hours_text" placeholder="Ex: Seg–Sex 8h–18h, Sáb 8h–12h" maxlength="500" />
+              </label>
+              <button @click="saveLoja()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="save"></i>
+                <span x-text="isSaving('loja') ? 'Salvando...' : 'Salvar dados da loja'"></span>
+              </button>
+            </div>
+          </section>
+          <aside class="pos-panel pos-side-panel">
+            <h3>Por que isso importa</h3>
+            <div class="pos-tip-list">
+              <div><i data-lucide="bot"></i><span>O robô responde o endereço e o horário ao cliente a partir daqui.</span></div>
+              <div><i data-lucide="map-pin"></i><span>O endereço estruturado prepara a localização da sua loja na Rede.</span></div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- ABA 2: Atendimento (2 checkboxes → enum service_mode) -->
+        <div x-show="configTab === 'atendimento'" class="pos-page-grid customers">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head"><div>
+              <h3>Como você atende</h3>
+              <p>Marque pelo menos uma opção. O robô usa isso pra falar com o cliente.</p>
+            </div></div>
+            <div class="pos-stock-side-form" style="max-width:560px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" x-model="atendimentoForm.faz_entrega" style="width:auto;" />
+                <span><b>Faço entrega</b> — levo o pneu até o cliente.</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" x-model="atendimentoForm.tem_retirada" style="width:auto;" />
+                <span><b>Tem retirada na loja</b> — o cliente vem buscar/montar aqui.</span>
+              </label>
+              <p x-show="!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada"
+                 style="color:#fb7185;font-size:13px;margin:4px 0 0;">Marque ao menos uma opção.</p>
+              <button @click="saveAtendimento()" :disabled="saving || (!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada)" class="pos-form-submit success">
+                <i data-lucide="save"></i>
+                <span x-text="isSaving('atendimento') ? 'Salvando...' : 'Salvar atendimento'"></span>
+              </button>
+            </div>
+          </section>
+          <aside class="pos-panel pos-side-panel">
+            <h3>Como funciona</h3>
+            <div class="pos-tip-list">
+              <div><i data-lucide="bike"></i><span>Só entrega, só retirada, ou os dois — você decide.</span></div>
+              <div><i data-lucide="info"></i><span>Na Fase 1 isto orienta a conversa; o roteamento por modo entra depois.</span></div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- ABA 3: Área de entrega (cidade inteira vs bairros) — DECLARATIVO na Fase 1 -->
+        <div x-show="configTab === 'area'" class="pos-page-grid customers">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head"><div>
+              <h3>Onde você entrega</h3>
+              <p>Município e, se quiser, os bairros que você atende.</p>
+            </div></div>
+            <div class="pos-stock-side-form" style="max-width:640px;">
+              <label>Município
+                <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="radio" name="area_kind" :checked="areaForm.city_wide" @change="areaForm.city_wide = true" style="width:auto;" />
+                <span><b>Atendo a cidade inteira</b></span>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="radio" name="area_kind" :checked="!areaForm.city_wide" @change="areaForm.city_wide = false" style="width:auto;" />
+                <span><b>Atendo bairros específicos</b></span>
+              </label>
+
+              <div x-show="!areaForm.city_wide" style="margin-top:6px;">
+                <label>Buscar bairro
+                  <input x-model="bairroQuery" @input.debounce.350ms="searchBairros()" placeholder="Digite: copa → Copacabana" maxlength="160" />
+                </label>
+                <div x-show="bairroSearching" class="pos-muted" style="font-size:12px;">Buscando…</div>
+                <div x-show="bairroResults.length" style="display:flex;flex-direction:column;gap:4px;margin:6px 0;">
+                  <template x-for="b in bairroResults" :key="b.neighborhood_canonical + b.city_name">
+                    <button class="pos-outline-action compact" @click="addBairro(b)" style="justify-content:flex-start;">
+                      <i data-lucide="plus"></i>
+                      <span x-text="b.neighborhood_canonical + (b.city_name ? ' — ' + b.city_name : '')"></span>
+                    </button>
+                  </template>
+                </div>
+                <!-- Chips removíveis dos bairros escolhidos -->
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                  <template x-for="n in areaForm.neighborhoods" :key="n">
+                    <span class="pos-chip" style="display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);border-radius:999px;padding:4px 10px;font-size:13px;">
+                      <span x-text="n"></span>
+                      <button @click="removeBairro(n)" style="background:none;border:none;color:inherit;cursor:pointer;line-height:1;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+                    </span>
+                  </template>
+                  <span x-show="!areaForm.neighborhoods.length" class="pos-muted" style="font-size:13px;">Nenhum bairro escolhido ainda.</span>
+                </div>
+              </div>
+
+              <button @click="saveArea()" :disabled="saving" class="pos-form-submit success">
+                <i data-lucide="save"></i>
+                <span x-text="isSaving('area') ? 'Salvando...' : 'Salvar área de entrega'"></span>
+              </button>
+              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i>
+                Por enquanto isto é só um cadastro: o robô ainda <b>não</b> filtra por bairro (entra numa próxima fase).
+              </p>
+            </div>
+          </section>
+          <aside class="pos-panel pos-side-panel">
+            <h3>Cobertura atual</h3>
+            <div class="pos-tip-list">
+              <template x-for="c in coverageList" :key="c.municipio">
+                <div><i data-lucide="map-pin"></i><span><b x-text="c.municipio"></b> — <span x-text="c.city_wide ? 'cidade inteira' : (c.neighborhoods.length + ' bairro(s)')"></span></span></div>
+              </template>
+              <div x-show="!coverageList.length"><i data-lucide="info"></i><span>Sem cobertura cadastrada ainda.</span></div>
+            </div>
+          </aside>
+        </div>
+
+        <!-- ABA 4: Equipe (funcionários + permissões de tela) -->
+        <div x-show="configTab === 'equipe'" class="pos-page-grid customers">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
                 <h3>Funcionários</h3>
-                <p>Logins de funcionário acessam venda, estoque, pedidos e clientes — nunca o financeiro.</p>
+                <p>Logins de funcionário acessam o que você liberar abaixo — nunca as Configurações.</p>
               </div>
             </div>
 
@@ -1933,6 +2091,27 @@
                 Nenhum funcionário cadastrado ainda.
               </div>
             </div>
+
+            <!-- Sub-seção: permissões de tela do funcionário (8 telas; 'config' NUNCA aparece) -->
+            <div class="pos-divider"></div>
+            <div class="pos-panel-head"><div>
+              <h3>O que o funcionário pode ver</h3>
+              <p>Vale pra todos os funcionários da loja ("um perfil só"). Configurações fica sempre só com você.</p>
+            </div></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.vendas" style="width:auto;"> Frente de caixa (vendas)</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.estoque" style="width:auto;"> Estoque</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.pedidos" style="width:auto;"> Pedidos</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.clientes" style="width:auto;"> Clientes</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.entregas" style="width:auto;"> Entrega</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.batepapo" style="width:auto;"> Bate-papo</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.resumo" style="width:auto;"> Resumo</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
+            </div>
+            <button @click="savePermissoes()" :disabled="saving" class="pos-form-submit success" style="margin-top:12px;max-width:280px;">
+              <i data-lucide="shield-check"></i>
+              <span x-text="isSaving('permissoes') ? 'Salvando...' : 'Salvar permissões'"></span>
+            </button>
           </section>
 
           <aside class="pos-panel pos-side-panel">
@@ -1957,8 +2136,8 @@
             <div class="pos-divider"></div>
             <h3>Como funciona</h3>
             <div class="pos-tip-list">
-              <div><i data-lucide="shield-check"></i><span>O funcionário vê venda, estoque, pedidos, clientes e entrega.</span></div>
-              <div><i data-lucide="lock"></i><span>Financeiro, Resumo e Configurações ficam só com você.</span></div>
+              <div><i data-lucide="shield-check"></i><span>Você escolhe quais telas o funcionário enxerga.</span></div>
+              <div><i data-lucide="lock"></i><span>Configurações é só sua — nunca dá pra liberar.</span></div>
               <div><i data-lucide="user-x"></i><span>Saiu da loja? É só desativar o login dele aqui.</span></div>
             </div>
           </aside>

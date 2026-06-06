@@ -719,8 +719,12 @@ export async function createPartnerUnit(
       const mn = normalizeMunicipio(m);
       if (!mn) continue;
       await client.query(
+        // ON CONFLICT casa com o índice funcional de 4 colunas da 0087
+        // (environment, unit_id, municipio, coalesce(neighborhood_canonical,'')).
+        // Cadastro insere cobertura de cidade inteira (bairro NULL → coalesce '').
         `INSERT INTO network.unit_coverage (environment, unit_id, municipio)
-         VALUES ($1, $2, $3) ON CONFLICT (environment, unit_id, municipio) DO NOTHING`,
+         VALUES ($1, $2, $3)
+         ON CONFLICT (environment, unit_id, municipio, coalesce(neighborhood_canonical, '')) DO NOTHING`,
         [environment, unitId, mn],
       );
     }

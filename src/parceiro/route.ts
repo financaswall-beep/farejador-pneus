@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, requireOwner, getPartnerContext, authenticatePartner, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, requireOwner, requireScreen, resolvePartnerPermissions, getPartnerContext, authenticatePartner, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
 import { rateLimitHit } from './rate-limit.js';
 
@@ -10,10 +10,16 @@ import { rateLimitHit } from './rate-limit.js';
 const LOGIN_MAX_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
-// Etapa 4: encadeamento padrão pros endpoints SÓ-DONO (financeiro + resumo).
-// Funcionário (role!='owner') leva 403 no requireOwner. Operacional (estoque,
-// vendas/PDV, clientes, entregas, pedidos) continua só com requirePartnerAuth.
+// Etapa 4: encadeamento padrão pros endpoints SÓ-DONO. Pós-Fase 1 (Config), o uso
+// fica RESERVADO ao CADEADO DURO: gestão de funcionários e TODOS os /configuracoes*.
+// Aqui requireOwner é CRU (funcionário sempre 403; nunca liberável por permissão).
 const ownerOnly = [requirePartnerAuth, requireOwner];
+
+// Fase 1 (Config/permissões): a tela Financeiro vira liberável ao funcionário pelo
+// dono. As rotas de dinheiro (resumo já usa requireScreen('resumo')) passam de
+// ownerOnly → requireScreen('financeiro'). Sem linha de permissão = OFF pro
+// funcionário = comportamento de hoje; pro owner, requireScreen passa sempre.
+const financeiroScreen = [requirePartnerAuth, requireScreen('financeiro')];
 import {
   cancelPartnerSale,
   cancelPartnerPayable,
@@ -71,6 +77,13 @@ import {
   revokePartnerSession,
   PartnerUsernameConflictError,
   PartnerCredentialsAlreadySetError,
+  getPartnerConfiguracoes,
+  updatePartnerLoja,
+  updatePartnerAtendimento,
+  updatePartnerArea,
+  searchPartnerBairros,
+  upsertPartnerPermissions,
+  type PartnerServiceMode,
 } from './queries.js';
 import { env } from '../shared/config/env.js';
 import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
@@ -250,6 +263,56 @@ const loginSchema = z.object({
 const setCredentialsSchema = z.object({
   username: usernameField,
   password: passwordField,
+});
+
+// ─── Configurações da Loja (Fase 1) ───
+// Dados da loja: nome de exibição obrigatório; endereço estruturado + horário (texto livre).
+const configLojaSchema = z.object({
+  display_name: z.string().trim().min(1).max(200),
+  address_street: z.string().trim().max(240).nullable().optional(),
+  address_number: z.string().trim().max(40).nullable().optional(),
+  address_neighborhood: z.string().trim().max(160).nullable().optional(),
+  address_city: z.string().trim().max(160).nullable().optional(),
+  address_complement: z.string().trim().max(240).nullable().optional(),
+  cep: z.string().trim().max(20).nullable().optional(),
+  opening_hours_text: z.string().trim().max(500).nullable().optional(),
+});
+
+// Atendimento: 2 booleans (arbitragem B). Pelo menos um obrigatório → senão 400.
+const configAtendimentoSchema = z.object({
+  faz_entrega: z.boolean(),
+  tem_retirada: z.boolean(),
+}).refine((d) => d.faz_entrega || d.tem_retirada, {
+  message: 'Marque pelo menos uma opção (entrega ou retirada).',
+  path: ['faz_entrega'],
+});
+
+// Área de entrega: cidade inteira vs bairros específicos (Fase 1 = declarativo).
+const configAreaSchema = z.object({
+  municipio: z.string().trim().min(1).max(160),
+  city_wide: z.boolean(),
+  neighborhoods: z.array(z.string().trim().min(1).max(160)).max(200).optional(),
+}).refine((d) => d.city_wide || (Array.isArray(d.neighborhoods) && d.neighborhoods.length > 0), {
+  message: 'Liste ao menos um bairro quando não for a cidade inteira.',
+  path: ['neighborhoods'],
+});
+
+// Permissões: as 8 telas. 'config' NÃO está aqui (cadeado duro) — e mesmo se vier
+// no corpo, a query (upsertPartnerPermissions) ignora qualquer chave fora da allowlist.
+const configPermissoesSchema = z.object({
+  vendas: z.boolean().optional(),
+  estoque: z.boolean().optional(),
+  pedidos: z.boolean().optional(),
+  clientes: z.boolean().optional(),
+  entregas: z.boolean().optional(),
+  batepapo: z.boolean().optional(),
+  resumo: z.boolean().optional(),
+  financeiro: z.boolean().optional(),
+}).passthrough(); // tolera chaves extras no corpo; a allowlist do servidor as descarta.
+
+const bairrosQuerySchema = z.object({
+  municipio: z.string().trim().max(160).optional(),
+  q: z.string().trim().max(160).optional(),
 });
 
 const chatSendBodySchema = z.object({
@@ -465,15 +528,21 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   // Etapa 4: identidade do login atual. Liberado pros dois papéis — o front usa
-  // o `role` pra montar o menu (esconder Financeiro/Resumo/Config do funcionário).
-  // É só apoio de UI; a trava de verdade são os requireOwner acima.
+  // o `role` + `permissions` pra montar o menu (canSee). É só apoio de UI; a trava
+  // de verdade são os requireOwner/requireScreen nos endpoints.
+  //
+  // `permissions` é o mapa EFETIVO das 8 telas, resolvido NO SERVIDOR (gate §5.5):
+  // owner → tudo true; funcionário → lê a tabela (ou defaults da Etapa 4 se não há
+  // linha). Nunca aceito do cliente. Configurações NÃO está aqui (segue isOwner).
   fastify.get('/parceiro/:slug/api/me', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const ctx = getPartnerContext(request);
+    const permissions = await resolvePartnerPermissions(ctx);
     return reply.status(200).send({
       role: ctx.role,
       slug: ctx.slug,
       partner_name: ctx.partnerName,
       unit_name: ctx.unitName,
+      permissions,
     });
   });
 
@@ -524,37 +593,133 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.get('/parceiro/:slug/api/resumo', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONFIGURAÇÕES DA LOJA (Fase 1). 🔒 CADEADO DURO: TODOS estes endpoints usam
+  // requireOwner CRU (ownerOnly), NUNCA requireScreen. Configurações nunca é
+  // liberável por permissão; funcionário leva 403 aqui (gate §5.2). Tudo escopado
+  // por ctx.partnerUnitId/ctx.unitId nas queries (isolamento entre parceiros, §5.4).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Lê TUDO: dados da loja + service_mode + cobertura/área + permissões efetivas.
+  fastify.get('/parceiro/:slug/api/configuracoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send(await getPartnerConfiguracoes(getPartnerContext(request)));
+  });
+
+  // Dados da loja: nome de exibição, endereço estruturado, horário (texto).
+  fastify.put('/parceiro/:slug/api/configuracoes/loja', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = configLojaSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    const result = await updatePartnerLoja(getPartnerContext(request), parsed.data);
+    if (!result.updated) return reply.status(404).send({ error: 'unit_not_found' });
+    return reply.status(200).send(result);
+  });
+
+  // Atendimento: 2 booleans → enum service_mode (arbitragem B). Pelo menos um (senão 400).
+  fastify.put('/parceiro/:slug/api/configuracoes/atendimento', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = configAtendimentoSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    // Mapeia os 2 checkboxes pro enum: ambos→both, só entrega→delivery, só retirada→pickup.
+    const { faz_entrega, tem_retirada } = parsed.data;
+    const serviceMode: PartnerServiceMode = faz_entrega && tem_retirada
+      ? 'both'
+      : (faz_entrega ? 'delivery' : 'pickup');
+    const result = await updatePartnerAtendimento(getPartnerContext(request), serviceMode);
+    if (!result.updated) return reply.status(404).send({ error: 'unit_not_found' });
+    return reply.status(200).send({ ...result, service_mode: serviceMode });
+  });
+
+  // Área de entrega: cidade inteira vs bairros específicos (Fase 1 = declarativo).
+  fastify.put('/parceiro/:slug/api/configuracoes/area', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = configAreaSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    try {
+      return reply.status(200).send(await updatePartnerArea(getPartnerContext(request), {
+        municipio: parsed.data.municipio,
+        city_wide: parsed.data.city_wide,
+        neighborhoods: parsed.data.neighborhoods ?? [],
+      }));
+    } catch (err) {
+      if (err instanceof Error && (err.message === 'neighborhoods_required' || err.message === 'municipio_required')) {
+        return reply.status(400).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  // Busca de bairros pra a UI da área ("copa" → Copacabana). Read-only, owner-only.
+  fastify.get('/parceiro/:slug/api/configuracoes/bairros', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = bairrosQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(200).send({ rows: [] });
+    const ctx = getPartnerContext(request);
+    const rows = await searchPartnerBairros(ctx.environment, parsed.data.municipio ?? null, parsed.data.q ?? '');
+    return reply.status(200).send({ rows });
+  });
+
+  // Permissões de tela do funcionário (upsert 1:1). A allowlist do servidor
+  // descarta qualquer chave fora das 8 telas (inclusive 'config') — gate §5.2.
+  fastify.put('/parceiro/:slug/api/configuracoes/permissoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = configPermissoesSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    const permissions = await upsertPartnerPermissions(getPartnerContext(request), parsed.data);
+    return reply.status(200).send({ permissions });
+  });
+
+  // SWAP de guard (ownerOnly → requireScreen): Resumo e Financeiro passam a depender
+  // de permissão, pra o dono poder liberá-los ao funcionário (PLANO §2.3). Default
+  // (sem linha de permissão) = Resumo/Financeiro OFF pro funcionário = comportamento
+  // de hoje. Pro owner, requireScreen ≡ passa sempre (equivalente ao requireOwner).
+  fastify.get('/parceiro/:slug/api/resumo', { preHandler: [requirePartnerAuth, requireScreen('resumo')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerResumo(getPartnerContext(request))].filter(Boolean) });
   });
 
-  fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  // fluxo-caixa = projeção de caixa (tela Financeiro) → requireScreen('financeiro').
+  fastify.get('/parceiro/:slug/api/fluxo-caixa', { preHandler: [requirePartnerAuth, requireScreen('financeiro')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: [await getPartnerFluxoCaixa(getPartnerContext(request))].filter(Boolean) });
   });
 
-  fastify.get('/parceiro/:slug/api/vendas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  // SWAP de guard (requirePartnerAuth → requireScreen): as telas operacionais
+  // também ficam liberáveis/bloqueáveis pelo dono (PLANO §2.3 lista as 8). Default
+  // (sem linha de permissão) = todas ON pro funcionário = comportamento de hoje.
+  // Feeds de APOIO que servem VÁRIAS telas (produtos, catalogo/busca, clientes/buscar)
+  // continuam só requirePartnerAuth: não são "telas" e o PDV/chat dependem deles
+  // mesmo quando a tela-dona está desligada.
+  fastify.get('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerVendas(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/estoque', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerEstoque(getPartnerContext(request)) });
   });
 
+  // produtos: feed de catálogo do PDV/estoque — apoio, não tela. Segue requirePartnerAuth.
   fastify.get('/parceiro/:slug/api/produtos', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerProdutos(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/clientes', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/clientes', { preHandler: [requirePartnerAuth, requireScreen('clientes')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerCustomers(getPartnerContext(request)) });
   });
 
+  // clientes/buscar: usado pelo PDV e pelo chat (apoio). Segue requirePartnerAuth.
   fastify.get('/parceiro/:slug/api/clientes/buscar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = customerSearchSchema.safeParse(request.query);
     if (!parsed.success) return reply.status(200).send({ rows: [] });
     return reply.status(200).send({ rows: await searchPartnerCustomers(getPartnerContext(request), parsed.data.q) });
   });
 
-  fastify.post('/parceiro/:slug/api/clientes', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/clientes', { preHandler: [requirePartnerAuth, requireScreen('clientes')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = customerSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -564,7 +729,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await createPartnerCustomer(getPartnerContext(request), parsed.data));
   });
 
-  fastify.put('/parceiro/:slug/api/clientes/:customerId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.put('/parceiro/:slug/api/clientes/:customerId', { preHandler: [requirePartnerAuth, requireScreen('clientes')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = customerIdParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'invalid_customer_id' });
     const parsed = customerSchema.safeParse(request.body);
@@ -586,7 +751,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/clientes/:customerId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/clientes/:customerId', { preHandler: [requirePartnerAuth, requireScreen('clientes')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = customerIdParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'invalid_customer_id' });
     try {
@@ -601,11 +766,11 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   // Chat unificado (Fatia 1.3) — leitura. Conversas e mensagens espelhadas
   // pelo fan-out do Chatwoot. Só leitura; o envio (POST) é Fatia 2.
-  fastify.get('/parceiro/:slug/api/chat/conversations', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/chat/conversations', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerChatConversations(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/messages', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/messages', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = chatConversationParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
 
@@ -616,7 +781,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   // Fase 2a — cliente vinculado à conversa (por telefone) + métricas de compra.
   // Read-only. 404 se a conversa não existe/não é da unidade.
-  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/customer', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/chat/conversations/:conversationId/customer', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = chatConversationParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
 
@@ -627,7 +792,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   // Fatia 2 — envio. O parceiro responde o cliente; grava otimista + manda pro
   // Chatwoot (echo_id = client_token); o eco do webhook preenche o id depois.
-  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/send', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/send', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = chatConversationParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
 
@@ -649,7 +814,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   // Marca a conversa como lida (zera unread_count) quando o parceiro a abre.
-  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/read', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/read', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = chatConversationParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
 
@@ -661,7 +826,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // Vincula um cliente à conversa de forma DURÁVEL (grava customer_id).
   // Resolve IG/FB, cujo identificador não é telefone — o vínculo persiste
   // em qualquer canal e sobrevive a reload/troca de conversa.
-  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/link-customer', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/chat/conversations/:conversationId/link-customer', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = chatConversationParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'conversation_not_found' });
 
@@ -689,6 +854,13 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (!slug || !token) return reply.code(401).send({ error: 'partner_unauthorized' });
     const ctx = await authenticatePartner(slug.trim(), token);
     if (!ctx) return reply.code(401).send({ error: 'partner_unauthorized' });
+
+    // Tela Bate-papo desligada pro funcionário → 403 (espelha requireScreen, que
+    // este endpoint não usa por autenticar via query string). Owner passa sempre.
+    if (ctx.role !== 'owner') {
+      const permissions = await resolvePartnerPermissions(ctx);
+      if (!permissions.batepapo) return reply.code(403).send({ error: 'partner_forbidden_screen', screen: 'batepapo' });
+    }
 
     // Assume o controle da resposta crua (stream que nao fecha).
     reply.hijack();
@@ -732,23 +904,23 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: await searchPartnerCatalog(getPartnerContext(request), q) });
   });
 
-  fastify.get('/parceiro/:slug/api/despesas', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/despesas', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerDespesas(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/compras', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerCompras(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerPayables(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerReceivables(getPartnerContext(request)) });
   });
 
-  fastify.post('/parceiro/:slug/api/vendas', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = saleSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -788,7 +960,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/vendas/:orderId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/vendas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = saleParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'order_not_found' });
 
@@ -798,7 +970,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   // Entrega: atualiza status (pendente/saiu/entregue) e entregador de uma venda delivery.
-  fastify.post('/parceiro/:slug/api/entregas/:orderId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/entregas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('entregas')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = saleParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'order_not_found' });
     const parsed = deliverySchema.safeParse(request.body);
@@ -828,7 +1000,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/estoque', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = stockSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -848,7 +1020,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = stockParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'stock_not_found' });
 
@@ -868,7 +1040,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/compras', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -878,7 +1050,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerPurchase(getPartnerContext(request), parsed.data));
   });
 
-  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'purchase_not_found' });
 
@@ -908,7 +1080,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/despesas', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/despesas', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = expenseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -918,7 +1090,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerExpense(getPartnerContext(request), parsed.data));
   });
 
-  fastify.delete('/parceiro/:slug/api/despesas/:expenseId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/despesas/:expenseId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = expenseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'expense_not_found' });
 
@@ -927,7 +1099,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-pagar', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = payableSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -945,7 +1117,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.patch('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.patch('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const params = payableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -961,7 +1133,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const params = payableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -984,7 +1156,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/contas-a-pagar/:payableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = payableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'payable_not_found' });
 
@@ -993,7 +1165,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -1003,7 +1175,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
   });
 
-  fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -1019,7 +1191,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -1035,7 +1207,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = receivableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'receivable_not_found' });
 
@@ -1044,7 +1216,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/parcelas/:installmentId/receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
     const params = receivableInstallmentParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'installment_not_found' });
 

@@ -35,8 +35,24 @@ function parceiroApp() {
     lastUpdatedAt: null,
     currentSection: 'resumo',
     role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
+    // Mapa EFETIVO das 8 telas, resolvido no servidor (/api/me.permissions). Default
+    // conservador (tudo false) até resolver — o menu só aparece depois do /api/me.
+    permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, batepapo: false, resumo: false, financeiro: false },
     funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
     funcionarioForm: { label: '', username: '', password: '' },
+    // ─── Configurações da Loja (Fase 1) ───
+    configTab: 'loja',           // 'loja' | 'atendimento' | 'area' | 'equipe'
+    configLoaded: false,
+    lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '' },
+    atendimentoForm: { faz_entrega: true, tem_retirada: true },
+    // Área de entrega: por município. Fase 1 edita 1 município por vez (o da loja).
+    areaForm: { municipio: '', city_wide: true, neighborhoods: [] },
+    bairroQuery: '',
+    bairroResults: [],
+    bairroSearching: false,
+    coverageList: [],            // cobertura atual (lida do GET), só pra exibir o resumo
+    // Permissões de tela do funcionário (toggles). 'config' NUNCA aparece aqui.
+    permForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, batepapo: true, resumo: false, financeiro: false },
     sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
@@ -407,6 +423,15 @@ function parceiroApp() {
 
     get isOwner() { return this.role === 'owner'; },
 
+    // Pode VER a tela? Dono vê tudo; funcionário depende da permissão efetiva
+    // (resolvida no servidor em /api/me.permissions). Usado no menu pra Resumo e
+    // Financeiro (Configurações segue isOwner — cadeado duro). É só pintura de UI;
+    // a trava de verdade é o requireScreen/requireOwner no backend.
+    canSee(tela) {
+      if (this.isOwner) return true;
+      return !!(this.permissions && this.permissions[tela]);
+    },
+
     // ─── Etapa 4c: funcionários ───
     async loadFuncionarios() {
       if (!this.isOwner) return;
@@ -481,6 +506,168 @@ function parceiroApp() {
       }
     },
 
+    // ─── Configurações da Loja (Fase 1) ───
+    // Primeira tela que o funcionário pode ver (fallback de navegação).
+    firstAllowedSection() {
+      const order = ['vendas', 'pedidos', 'estoque', 'clientes', 'entregas', 'batepapo', 'resumo', 'financeiro'];
+      return order.find((s) => this.canSee(s)) || null;
+    },
+
+    // Carrega TUDO da tela Configurações (dados da loja + atendimento + área +
+    // permissões + funcionários). Só o dono chega aqui (backend é requireOwner cru).
+    async loadConfiguracoes() {
+      if (!this.isOwner) return;
+      await this.loadFuncionarios();
+      try {
+        const cfg = await this.api('configuracoes');
+        const loja = cfg.loja || {};
+        this.lojaForm = {
+          display_name: loja.display_name || '',
+          address_street: loja.address_street || '',
+          address_number: loja.address_number || '',
+          address_neighborhood: loja.address_neighborhood || '',
+          address_city: loja.address_city || '',
+          address_complement: loja.address_complement || '',
+          cep: loja.cep || '',
+          opening_hours_text: loja.opening_hours_text || '',
+        };
+        this.atendimentoForm = {
+          faz_entrega: loja.faz_entrega !== undefined ? !!loja.faz_entrega : true,
+          tem_retirada: loja.tem_retirada !== undefined ? !!loja.tem_retirada : true,
+        };
+        this.coverageList = Array.isArray(cfg.coverage) ? cfg.coverage : [];
+        // Área: edita o município da loja (ou o 1º coberto). Fase 1 = 1 município.
+        const baseMunicipio = (loja.address_city || (this.coverageList[0] && this.coverageList[0].municipio) || '').toString();
+        const covEntry = this.coverageList.find((c) => c.municipio === baseMunicipio.trim().toLowerCase());
+        this.areaForm = {
+          municipio: baseMunicipio,
+          city_wide: covEntry ? covEntry.city_wide : true,
+          neighborhoods: covEntry && Array.isArray(covEntry.neighborhoods) ? [...covEntry.neighborhoods] : [],
+        };
+        // Permissões: preenche os toggles com o efetivo do servidor.
+        if (cfg.permissions && typeof cfg.permissions === 'object') {
+          this.permForm = { ...this.permForm, ...cfg.permissions };
+        }
+        this.configLoaded = true;
+        this.$nextTick(() => lucide.createIcons());
+      } catch (err) {
+        console.warn('configuracoes_unavailable', err);
+        this.flash(this.errMessage(err));
+      }
+    },
+
+    async saveLoja() {
+      if (!this.lojaForm.display_name.trim()) { this.flash('Informe o nome de exibição da loja.'); return; }
+      this.saving = true; this.savingAction = 'loja';
+      try {
+        await this.api('configuracoes/loja', { method: 'PUT', body: JSON.stringify(this.lojaForm) });
+        this.flash('Dados da loja salvos.', 'success');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    async saveAtendimento() {
+      if (!this.atendimentoForm.faz_entrega && !this.atendimentoForm.tem_retirada) {
+        this.flash('Marque pelo menos uma opção: entrega ou retirada.'); return;
+      }
+      this.saving = true; this.savingAction = 'atendimento';
+      try {
+        await this.api('configuracoes/atendimento', {
+          method: 'PUT',
+          body: JSON.stringify({ faz_entrega: !!this.atendimentoForm.faz_entrega, tem_retirada: !!this.atendimentoForm.tem_retirada }),
+        });
+        this.flash('Modo de atendimento salvo.', 'success');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    // Busca de bairros ("copa" → Copacabana) — read-only, escopada ao município.
+    async searchBairros() {
+      const q = (this.bairroQuery || '').trim();
+      if (q.length < 2) { this.bairroResults = []; return; }
+      this.bairroSearching = true;
+      try {
+        const params = new URLSearchParams({ q });
+        if (this.areaForm.municipio.trim()) params.set('municipio', this.areaForm.municipio.trim());
+        const res = await this.api(`configuracoes/bairros?${params.toString()}`);
+        this.bairroResults = res.rows || [];
+      } catch (err) {
+        console.warn('bairros_unavailable', err);
+        this.bairroResults = [];
+      } finally {
+        this.bairroSearching = false;
+      }
+    },
+
+    addBairro(b) {
+      const nome = (b && b.neighborhood_canonical ? b.neighborhood_canonical : String(b || '')).trim().toLowerCase();
+      if (!nome) return;
+      if (!this.areaForm.neighborhoods.includes(nome)) this.areaForm.neighborhoods.push(nome);
+      this.bairroQuery = '';
+      this.bairroResults = [];
+    },
+
+    removeBairro(nome) {
+      this.areaForm.neighborhoods = this.areaForm.neighborhoods.filter((n) => n !== nome);
+    },
+
+    async saveArea() {
+      if (!this.areaForm.municipio.trim()) { this.flash('Informe o município da área de entrega.'); return; }
+      if (!this.areaForm.city_wide && this.areaForm.neighborhoods.length === 0) {
+        this.flash('Liste ao menos um bairro, ou marque "Atendo a cidade inteira".'); return;
+      }
+      this.saving = true; this.savingAction = 'area';
+      try {
+        await this.api('configuracoes/area', {
+          method: 'PUT',
+          body: JSON.stringify({
+            municipio: this.areaForm.municipio.trim(),
+            city_wide: !!this.areaForm.city_wide,
+            neighborhoods: this.areaForm.city_wide ? [] : this.areaForm.neighborhoods,
+          }),
+        });
+        this.flash('Área de entrega salva. (Por ora é declarativa — o robô ainda não filtra por bairro.)', 'success');
+        await this.loadConfiguracoes();
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    async savePermissoes() {
+      this.saving = true; this.savingAction = 'permissoes';
+      try {
+        // Envia só as 8 telas; 'config' nunca existe aqui (cadeado duro). O servidor
+        // ainda descarta qualquer chave fora da allowlist (defesa em profundidade).
+        const body = {
+          vendas: !!this.permForm.vendas,
+          estoque: !!this.permForm.estoque,
+          pedidos: !!this.permForm.pedidos,
+          clientes: !!this.permForm.clientes,
+          entregas: !!this.permForm.entregas,
+          batepapo: !!this.permForm.batepapo,
+          resumo: !!this.permForm.resumo,
+          financeiro: !!this.permForm.financeiro,
+        };
+        const res = await this.api('configuracoes/permissoes', { method: 'PUT', body: JSON.stringify(body) });
+        if (res.permissions && typeof res.permissions === 'object') {
+          this.permForm = { ...this.permForm, ...res.permissions };
+        }
+        this.flash('Permissões do funcionário salvas.', 'success');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
     async loadData() {
       if (!this.apiToken) return;
       this.loading = true;
@@ -489,44 +676,58 @@ function parceiroApp() {
         // bater nos endpoints de financeiro (403) — /api/me é liberado pros dois.
         const me = await this.api('me');
         this.role = me.role === 'owner' ? 'owner' : 'funcionario';
-        // Se um funcionário cair logado numa seção que não é dele, manda pra Frente de caixa.
-        if (!this.isOwner && ['resumo', 'financeiro'].includes(this.currentSection)) {
-          this.currentSection = 'vendas';
+        // permissions efetivo vem do servidor (gate §5.5); guardamos pra pintar o menu.
+        if (me.permissions && typeof me.permissions === 'object') {
+          this.permissions = { ...this.permissions, ...me.permissions };
+        }
+        // Se cair logado numa seção que não pode ver, manda pra uma tela permitida.
+        if (!this.canSee(this.currentSection) && !['config'].includes(this.currentSection)) {
+          this.currentSection = this.canSee('vendas') ? 'vendas' : (this.firstAllowedSection() || 'vendas');
         }
 
-        // Operacional: os dois papéis carregam.
-        const [vendas, estoque, produtos] = await Promise.all([
-          this.api('vendas'),
-          this.api('estoque'),
-          this.api('produtos'),
+        // Carrega cada feed só se a tela é permitida (canSee), e tolera falha
+        // individual: com requireScreen no backend, um feed proibido devolve 403 —
+        // não pode derrubar o resto da tela. produtos é feed de APOIO (não-tela),
+        // sempre carrega. Helper: pega .rows e engole erro pra não travar loadData.
+        const safeRows = async (path) => {
+          try { return (await this.api(path)).rows || []; }
+          catch (err) { console.warn(`${path}_unavailable`, err); return []; }
+        };
+        const safeRow = async (path) => {
+          try { const r = await this.api(path); return (r.rows && r.rows[0]) || null; }
+          catch (err) { console.warn(`${path}_unavailable`, err); return null; }
+        };
+
+        const [produtos, vendas, estoque, clientes] = await Promise.all([
+          safeRows('produtos'),
+          this.canSee('vendas') ? safeRows('vendas') : Promise.resolve([]),
+          this.canSee('estoque') ? safeRows('estoque') : Promise.resolve([]),
+          this.canSee('clientes') ? safeRows('clientes') : Promise.resolve([]),
         ]);
-        this.vendas = vendas.rows || [];
-        this.estoque = estoque.rows || [];
-        this.produtos = produtos.rows || [];
+        this.produtos = produtos;
+        this.vendas = vendas;
+        this.estoque = estoque;
+        this.clientes = clientes;
 
-        // Financeiro: SÓ o dono. Funcionário nem chama (evita o 403).
-        if (this.isOwner) {
-          const [resumo, compras, despesas, payables, receivables, fluxo] = await Promise.all([
-            this.api('resumo'),
-            this.api('compras'),
-            this.api('despesas'),
-            this.api('contas-a-pagar'),
-            this.api('contas-a-receber'),
-            this.api('fluxo-caixa'),
-          ]);
-          this.resumo = (resumo.rows && resumo.rows[0]) || null;
-          this.compras = compras.rows || [];
-          this.despesas = despesas.rows || [];
-          this.payables = payables.rows || [];
-          this.receivables = receivables.rows || [];
-          this.fluxoCaixa = (fluxo.rows && fluxo.rows[0]) || null;
+        // Resumo (tela Resumo) e Financeiro (caixa/contas) seguem a permissão
+        // efetiva — o dono PODE ter liberado ao funcionário (PLANO §2.3). O resumo
+        // alimenta KPIs das DUAS telas, então carrega pra qualquer uma das duas.
+        if (this.canSee('resumo') || this.canSee('financeiro')) {
+          this.resumo = await safeRow('resumo');
         }
-        try {
-          const clientes = await this.api('clientes');
-          this.clientes = clientes.rows || [];
-        } catch (err) {
-          console.warn('clientes_unavailable', err);
-          this.clientes = [];
+        if (this.canSee('financeiro')) {
+          const [compras, despesas, payables, receivables, fluxo] = await Promise.all([
+            safeRows('compras'),
+            safeRows('despesas'),
+            safeRows('contas-a-pagar'),
+            safeRows('contas-a-receber'),
+            safeRow('fluxo-caixa'),
+          ]);
+          this.compras = compras;
+          this.despesas = despesas;
+          this.payables = payables;
+          this.receivables = receivables;
+          this.fluxoCaixa = fluxo;
         }
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {
@@ -2126,10 +2327,12 @@ function parceiroApp() {
 
     // â”€â”€â”€ NAVEGAÃ‡ÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     goToSection(id) {
-      // Etapa 4: funcionário não entra em Resumo/Financeiro nem por atalho de
-      // teclado. (A trava real é no backend; isto é só pra UI não ir pra uma tela vazia.)
-      if (!this.isOwner && ['resumo', 'financeiro', 'config'].includes(id)) return;
-      if (id === 'config') { this.loadFuncionarios(); }
+      // Fase 1: Configurações segue só-dono (cadeado duro). Resumo/Financeiro e as
+      // demais telas seguem a permissão efetiva (canSee). A trava real é o backend;
+      // isto é só pra UI não ir pra uma tela vazia/proibida.
+      if (id === 'config' && !this.isOwner) return;
+      if (id !== 'config' && !this.canSee(id)) return;
+      if (id === 'config') { this.loadConfiguracoes(); }
       if (id === 'pedidos') { this.resetOrderForm(); this.orderMobileStep = 'list'; }
       // Chat: liga o polling so quando a aba esta aberta; desliga ao sair (economiza requests).
       if (id === 'batepapo') this.startChatPolling();

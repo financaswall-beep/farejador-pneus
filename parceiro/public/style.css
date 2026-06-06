@@ -614,6 +614,31 @@ html, body {
 }
 
 .pos-outline-action svg { width: 17px; }
+
+/* Abas internas da tela Configurações (Fase 1): pílulas compactas em linha.
+   Sobrescreve o width:100%/margin-top do .pos-outline-action base, que é pensado
+   pra botões empilhados em painel lateral. Tema branco+azul (sem amarelo). */
+.pos-config-tabs .pos-outline-action {
+  width: auto;
+  margin-top: 0;
+  height: 40px;
+  padding: 0 16px;
+  border-color: rgba(59,130,246,.45);
+  color: #93c5fd;
+  font-weight: 700;
+}
+.pos-config-tabs .pos-outline-action.active {
+  background: rgba(59,130,246,.16);
+  border-color: rgba(59,130,246,.9);
+  color: #bfdbfe;
+}
+.pos-shell[data-theme="light"] .pos-config-tabs .pos-outline-action { color: #1e40af; }
+.pos-shell[data-theme="light"] .pos-config-tabs .pos-outline-action.active {
+  background: rgba(30,64,175,.10);
+  border-color: #1e40af;
+  color: #1e3a8a;
+}
+
 .pos-empty {
   padding: 22px;
   color: #9ca3af;
