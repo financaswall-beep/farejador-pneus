@@ -11,11 +11,11 @@ commit.
 
 ## Abertos
 
-### SEC-001 — Bot vaza dados de pedido de outro cliente (consulta por número)
+### SEC-001 — Bot vaza dados de pedido de outro cliente (consulta por número) — ✅ RESOLVIDO
 
 **Severidade:** Alta (vazamento de dado pessoal de terceiros)
 **Identificado em:** 2026-05-30
-**Status:** Aberto — não corrigir agora, fazer depois.
+**Status:** ✅ **RESOLVIDO** em 2026-06-04 (commit `1d79735`). Verificado por auditoria de código em 2026-06-06: a busca por número exige `o.contact_id = $3` ([tools.ts:761](../src/atendente-v2/tools.ts:761)) e recusa quando a conversa não tem contato ([tools.ts:748](../src/atendente-v2/tools.ts:748)). Resumo na seção Resolvidos.
 
 **Onde:**
 [`src/atendente-v2/tools.ts`](../src/atendente-v2/tools.ts), função `consultarPedido`,
@@ -64,7 +64,7 @@ ou se precisa de uma regra mais fina (ex: travar por número de telefone do dono
 
 **Severidade:** Média (remoção de defesa-em-profundidade numa tabela de AUTORIZAÇÃO; **não é vazamento hoje**)
 **Identificado em:** 2026-06-05 (gate `seguranca` da Fase 1 do `PLANO_CONFIG_LOJA_E_ROTEAMENTO_REDE_2026-06-05.md`)
-**Status:** Aberto — dívida aceita conscientemente pra a Fase 1; blindar antes de a Rede crescer.
+**Status:** Aberto — dívida aceita conscientemente pra a Fase 1; blindar antes de a Rede crescer. **Reauditado em 2026-06-06** (gate da Fase 2): confirmado que NÃO vaza dado de cliente/financeiro hoje; evidência e veredito no bloco "Auditoria 2026-06-06" abaixo. **Não corrigir às pressas** — o fix mexe no caminho quente de autorização em produção.
 
 **Onde:**
 - Tabela `network.partner_unit_permissions` (criada na migration `0087`, ainda não aplicada quando isto foi escrito).
@@ -83,6 +83,50 @@ Criar a tabela com `ENABLE ROW LEVEL SECURITY` + policy `partner_unit_id = netwo
 **Observações relacionadas (mesmo gate, severidade baixa, não bloqueiam o deploy):**
 - **R2** — `pedidos` está na allowlist de telas (`PARTNER_SCREENS`) mas não há rota backend própria; `requireScreen('pedidos')` nunca é exercido (a tela Pedidos consome dados de `vendas`/`entregas`). A permissão `pedidos` é cosmética hoje. Amarrar a um guard real quando a tela ganhar endpoint próprio.
 - **R3** — `updatePartnerArea` chaveia cobertura por `unit_id`, seguro porque hoje `core.units.id` é 1:1 com `partner_units`. Se a expansão da Rede criar 2 `partner_units` sobre o mesmo `unit_id`, isso reescreveria cobertura compartilhada. Re-verificar antes de mudar o modelo de unidades.
+
+**Auditoria 2026-06-06 (gate de segurança da Fase 2 — evidência tirada direto do Postgres de produção):**
+
+Mapa real do RLS pra TODA a superfície que a role restrita do parceiro (`farejador_partner_app`, sem BYPASSRLS) alcança:
+
+| Tabela | RLS | Grant à role restrita | Veredito |
+| --- | --- | --- | --- |
+| `commerce.partner_*` (orders, order_items, customers, messages, conversations, stock_levels, purchases…) | ✅ on + policy | SELECT/escrita | isolado por parceiro — **OK** |
+| `finance.partner_*` (receivables, payables, expenses, installments) | ✅ on + policy | SELECT/escrita | isolado — **OK** |
+| `network.partners`, `network.partner_units` | ✅ on + policy | SELECT | isolado — **OK** |
+| `network.partner_unit_permissions` | ❌ off | só `postgres` | **SEC-002** — sem defesa em profundidade |
+| `network.partner_sessions`, `network.partner_applications`, `network.unit_coverage` | ❌ off | só `postgres` | mesma classe do SEC-002 (só o pool admin toca) |
+| `core.units` | ❌ off | `farejador_partner_app` **SELECT-only** | ⚠️ **achado novo** — role restrita lê id/slug/nome/**endereço/telefone** de TODAS as lojas. Sem escrita. Baixa severidade (metadado de loja, não dado de cliente/financeiro) |
+| `commerce.products` | ❌ off | `farejador_partner_app` **SELECT-only** | catálogo CENTRAL, compartilhado por design (sem dono por linha). Aceitável |
+
+**Conclusão do gate:** nenhuma tabela com dado de CLIENTE ou FINANCEIRO vaza entre parceiros — todas têm RLS + policy. As exceções sem RLS são (a) tabelas de grant só-`postgres`, acessadas apenas pelo pool admin (BYPASSRLS) → o vetor é "um novo call site esquece o `WHERE`", não acesso direto do parceiro; (b) `core.units`/`commerce.products`, lidas SELECT-only pela role restrita → defesa em profundidade ausente; `core.units` expõe metadado de loja a concorrentes (baixa severidade). **Nada disso bloqueia a Fase 2.** O `core.units` deve entrar no MESMO lote de blindagem do SEC-002.
+
+**Por que NÃO apliquei o fix nesta sessão:** o conserto real (ENABLE RLS + policy + mover `resolvePartnerPermissions`/escrita pro pool restrito `farejador_partner_app` com o grant devido) mexe no caminho QUENTE de autorização em produção — risco de regressão (derrubar o acesso de funcionário). E meia-medida não serve: habilitar RLS sem o resto ou é inerte (tabelas só-`postgres`: BYPASSRLS ignora a policy) ou **quebra a role restrita** (em `core.units`/`products`, RLS sem policy = deny → painel do parceiro lê 0 linhas). Logo é refactor cirúrgico que pede sessão dedicada + validação no env `test` antes de prod. **Recomendação:** fazer como bloco próprio, com teste, não no fim de outra frente.
+
+---
+
+## Revisões de segurança registradas
+
+### 2026-06-06 — Motor de distribuição (Fase 2): gate antes de ligar a flag
+
+**Veredito: LIBERADO** do ponto de vista de isolamento de dados. Auditado o código novo
+que fica atrás das flags `ROUTING_MULTI_CANDIDATE` / `ROUTING_FAIRNESS`
+([`fulfillment.ts`](../src/atendente-v2/fulfillment.ts), [`fairness.ts`](../src/atendente-v2/fairness.ts)):
+
+- `resolveUnitCandidates` usa os MESMOS filtros do `resolveUnitForMunicipio` que já roda
+  hoje (`environment`, `status='active'`, `deleted_at IS NULL`); só removeu o `LIMIT 1` e
+  passou a trazer `service_mode`. Não amplia a superfície de dados.
+- O `PartnerContext` que ele fabrica (`role:'owner'`, `tokenId:''`) é **idêntico** ao que o
+  `resolveUnitForMunicipio` já fabrica em produção (o bot é ator de sistema). E
+  `materializePartnerOrder` usa só `ctx.environment/unitId/slug`, **nunca `ctx.role`** — então
+  o `role:'owner'` fabricado não concede autoridade nova.
+- `rankUnitsByFairnessFromDb` só faz `COUNT` agregado de `partner_orders` por unidade
+  candidata; não expõe linha de pedido nem dado de cliente.
+- O bot roda no pool admin (BYPASSRLS) e **não toca** `partner_unit_permissions` — o motor
+  não interage com o SEC-002.
+
+**Condição:** SEC-002 e o `core.units` sem RLS seguem como dívida de defesa-em-profundidade,
+sem bloquear o motor. Ligar a flag em prod continua valendo só quando houver 2º parceiro real
+na mesma cidade (ver `docs/SESSAO_2026-06-06_FASE2_MOTOR_PROGRESSO.md`).
 
 ---
 
@@ -107,4 +151,11 @@ Criar a tabela com `ENABLE ROW LEVEL SECURITY` + policy `partner_unit_id = netwo
 
 ## Resolvidos
 
-*(nenhum ainda)*
+### SEC-001 — Bot vazava pedido de outro cliente por número
+
+**Resolvido em 2026-06-04** (commit `1d79735`), confirmado por auditoria de código em
+2026-06-06. A tool `consultar_pedido` passou a amarrar a busca por número ao `contact_id` da
+conversa (`... AND o.contact_id = $3`) e a recusar quando não há contato identificado. Antes,
+números sequenciais (`PED-0001`, `PED-0002`, …) deixavam enumerar nome/endereço/itens de
+terceiros. Detalhe completo do furo na entrada SEC-001 (seção Abertos, marcada ✅).
+⚠️ Vale só após o deploy que levou o commit a prod — já live.
