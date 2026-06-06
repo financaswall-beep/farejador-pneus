@@ -26,6 +26,10 @@ import { upsertPartnerCustomerWithClient } from '../parceiro/queries.js';
 import { logger } from '../shared/logger.js';
 import { env } from '../shared/config/env.js';
 import { rankUnitsByFairnessFromDb } from './fairness.js';
+import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
+import { GEO_PICKUP_RADIUS_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
+import { roadDistanceKm } from '../shared/geo/google-maps.js';
+import { filterByModeAndCoverage, ringsForModalidade, type GeoRoutingCandidate } from './geo-routing.js';
 
 interface RoutedUnitRow {
   partner_unit_id: string;
@@ -157,6 +161,12 @@ export interface UnitCandidate {
   ctx: PartnerContext;
   /** Modo de atendimento da loja (network.partner_units.service_mode). */
   serviceMode: 'delivery' | 'pickup' | 'both';
+  /** Coordenada da loja (network.partner_units lat/long); null = não cadastrada. */
+  location: GeoPoint | null;
+  /** Cobre a CIDADE inteira? (alguma linha de cobertura kind='city' p/ o município). */
+  hasCityCoverage: boolean;
+  /** Bairros declarados (unit_coverage kind='neighborhood'). */
+  neighborhoods: string[];
 }
 
 /**
@@ -177,15 +187,29 @@ export async function resolveUnitCandidates(
 ): Promise<UnitCandidate[]> {
   const m = normalizeRegion(municipio);
   if (!m) return [];
-  const result = await client.query<RoutedUnitRow & { service_mode: string }>(
-    `SELECT DISTINCT ON (pu.id)
-            pu.id            AS partner_unit_id,
+  // GROUP BY pelas PKs (pu.id/p.id/u.id) → dependência funcional cobre as demais
+  // colunas. Agrega a cobertura DO MUNICÍPIO casado: has_city_coverage (alguma linha
+  // city) + neighborhoods (bairros declarados). lat/long vêm da unidade (0088).
+  const result = await client.query<
+    RoutedUnitRow & {
+      service_mode: string;
+      latitude: string | null;
+      longitude: string | null;
+      has_city_coverage: boolean;
+      neighborhoods: (string | null)[] | null;
+    }
+  >(
+    `SELECT pu.id            AS partner_unit_id,
             pu.unit_id       AS unit_id,
             p.id             AS partner_id,
             pu.slug          AS slug,
             p.trade_name     AS partner_name,
             COALESCE(pu.display_name, u.name) AS unit_name,
-            pu.service_mode  AS service_mode
+            pu.service_mode  AS service_mode,
+            pu.latitude      AS latitude,
+            pu.longitude     AS longitude,
+            bool_or(uc.coverage_kind = 'city')                  AS has_city_coverage,
+            array_remove(array_agg(uc.neighborhood_canonical), NULL) AS neighborhoods
      FROM network.unit_coverage uc
      JOIN network.partner_units pu ON pu.unit_id = uc.unit_id AND pu.environment = uc.environment
      JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
@@ -196,7 +220,8 @@ export async function resolveUnitCandidates(
        AND p.status = 'active'
        AND pu.deleted_at IS NULL
        AND p.deleted_at IS NULL
-     ORDER BY pu.id, length(uc.municipio) DESC`,
+     GROUP BY pu.id, p.id, u.id
+     ORDER BY pu.id`,
     [environment, m],
   );
 
@@ -213,6 +238,12 @@ export async function resolveUnitCandidates(
       tokenId: '',
     },
     serviceMode: (row.service_mode as UnitCandidate['serviceMode']) ?? 'both',
+    location:
+      row.latitude != null && row.longitude != null
+        ? { lat: Number(row.latitude), lng: Number(row.longitude) }
+        : null,
+    hasCityCoverage: row.has_city_coverage ?? false,
+    neighborhoods: (row.neighborhoods ?? []).filter((n): n is string => typeof n === 'string' && n.length > 0),
   }));
 }
 
@@ -641,6 +672,161 @@ async function decideStoreForItemsMulti(
     // candidato sem todos os itens → tenta o próximo (decisão #1)
   }
   return null; // nenhum candidato da área tem o pedido completo → matriz
+}
+
+// ─── CAMADA GEO (proximidade) ────────────────────────────────────────────────
+// Ver docs/PLANO_CAMADA_GEO_PROXIMIDADE_REDE_2026-06-06.md §5.6.
+// Versão do motor multi-parceiro com FILTRO DE ANEL (km que cresce) antes da régua
+// de justiça. ADITIVA: não altera decideStoreForItems/Multi de hoje — as tools
+// chamam esta função só quando ROUTING_GEO está ligada E há coordenada do cliente
+// (Fase 4). Sem coordenada o caminho de hoje (por cidade) continua valendo (caso F).
+
+export interface GeoDecisionInput {
+  municipio: string;
+  items: ItemForDecision[];
+  modalidade: 'delivery' | 'pickup';
+  /** Coordenada do cliente (pino ou endereço geocodado). */
+  customerLocation: GeoPoint;
+  /** Bairro canônico do cliente (p/ a cobertura 4a na entrega); null = desconhecido. */
+  clientNeighborhoodCanonical: string | null;
+}
+
+export type GeoStoreDecision =
+  | { kind: 'partner'; routing: PartnerOrderRouting; ringKm: number | null; distanceKm: number }
+  | { kind: 'only_far'; unitId: string; unitName: string; distanceKm: number }
+  | { kind: 'matriz' };
+
+function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
+  return {
+    unitId: c.ctx.unitId,
+    serviceMode: c.serviceMode,
+    location: c.location,
+    hasCityCoverage: c.hasCityCoverage,
+    neighborhoods: c.neighborhoods,
+  };
+}
+
+/**
+ * Distância (km) do cliente a cada loja. Linha reta (haversine) SEMPRE como base e
+ * rede de segurança; se ROUTING_GEO_ROAD_DISTANCE + chave, sobrepõe com a distância
+ * de RUA do Google por loja (null daquele trecho → mantém o haversine — caso H/D5).
+ */
+async function resolveDistances(
+  origin: GeoPoint,
+  units: { unitId: string; location: GeoPoint }[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  for (const u of units) map.set(u.unitId, haversineKm(origin, u.location));
+
+  if (env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY && units.length > 0) {
+    const road = await roadDistanceKm(origin, units.map((u) => u.location), env.GOOGLE_MAPS_API_KEY);
+    if (road) {
+      road.forEach((km, i) => {
+        if (km != null) map.set(units[i]!.unitId, km);
+      });
+    }
+  }
+  return map;
+}
+
+/**
+ * Decisão de loja por PROXIMIDADE. Pipeline (§3):
+ *  ② modo + ④a cobertura (puro) → ③ estoque completo (DB) → ④b/④c anel que cresce
+ *  → ⑤ régua de justiça entre o pool. Reusa mapProductToPartnerStock (mesma régua de
+ *  estoque de hoje) e rankUnitsByFairnessFromDb (a régua, intocada).
+ *
+ * Retorna:
+ *  - partner   → loja escolhida dentro do anel (com o pedido completo);
+ *  - only_far  → ninguém no anel, mas EXISTE loja com o pedido completo além do maior
+ *                anel (caso E, honestidade D3) — a mais perto dos longes;
+ *  - matriz    → ninguém cobre / ninguém tem o pedido completo (backstop).
+ */
+export async function decideStoreForItemsGeo(
+  client: PoolClient,
+  environment: Environment,
+  input: GeoDecisionInput,
+): Promise<GeoStoreDecision> {
+  if (input.items.length === 0) return { kind: 'matriz' };
+
+  const candidates = await resolveUnitCandidates(client, environment, input.municipio);
+  if (candidates.length === 0) return { kind: 'matriz' };
+
+  // ② modo + ④a cobertura (puro, de graça) — reduz as checagens de estoque.
+  const servableIds = new Set(
+    filterByModeAndCoverage(
+      candidates.map(toGeoRoutingCandidate),
+      input.modalidade,
+      input.clientNeighborhoodCanonical,
+    ).map((c) => c.unitId),
+  );
+
+  // ③ estoque: só entra no anel quem tem TODOS os itens disponíveis E tem coordenada.
+  const fulfillable: { cand: UnitCandidate; mappings: PartnerStockMapping[]; distanceKm: number }[] = [];
+  const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
+  if (eligible.length === 0) return { kind: 'matriz' };
+
+  const distanceByUnit = await resolveDistances(
+    input.customerLocation,
+    eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
+  );
+
+  for (const cand of eligible) {
+    const mappings = await Promise.all(
+      input.items.map((i) => mapProductToPartnerStock(client, environment, cand.ctx.unitId, i.product_id, i.quantity)),
+    );
+    if (mappings.every((m) => m != null)) {
+      fulfillable.push({
+        cand,
+        mappings: mappings as PartnerStockMapping[],
+        distanceKm: distanceByUnit.get(cand.ctx.unitId)!,
+      });
+    }
+  }
+  if (fulfillable.length === 0) return { kind: 'matriz' };
+
+  // ④b/④c anel que cresce (D1/D2) sobre os que têm o pedido completo.
+  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RADIUS_KM);
+  const selection = selectWithinExpandingRing(fulfillable, (f) => f.distanceKm, rings);
+
+  // ⑤ régua de justiça entre o pool (D4) — entre os perto o bastante, decide a justiça.
+  if (selection.pool.length > 0) {
+    const poolByUnit = new Map(selection.pool.map((f) => [f.cand.ctx.unitId, f]));
+    const ordered = await rankUnitsByFairnessFromDb(client, environment, [...poolByUnit.keys()]);
+    const winnerId = ordered.find((id) => poolByUnit.has(id)) ?? selection.pool[0]!.cand.ctx.unitId;
+    const win = poolByUnit.get(winnerId)!;
+    logger.info(
+      { environment, unit_id: winnerId, ring_km: selection.ringKm, pool: selection.pool.length, modalidade: input.modalidade, road: env.ROUTING_GEO_ROAD_DISTANCE },
+      'decideStoreForItemsGeo: loja escolhida no anel pela régua',
+    );
+    return {
+      kind: 'partner',
+      ringKm: selection.ringKm,
+      distanceKm: win.distanceKm,
+      routing: {
+        ctx: win.cand.ctx,
+        unitId: win.cand.ctx.unitId,
+        items: input.items.map((i, idx) => ({
+          product_id: i.product_id,
+          partner_stock_id: win.mappings[idx]!.partner_stock_id,
+          quantity: i.quantity,
+          central_price: win.mappings[idx]!.central_price,
+        })),
+      },
+    };
+  }
+
+  // caso E — só tem LONGE: existe loja com o pedido completo, mas além do maior anel.
+  // onlyFar já vem ASC por km → a mais perto dos longes.
+  const nearestFar = selection.onlyFar[0];
+  if (nearestFar) {
+    logger.info(
+      { environment, unit_id: nearestFar.cand.ctx.unitId, distancia_km: Math.round(nearestFar.distanceKm), modalidade: input.modalidade },
+      'decideStoreForItemsGeo: só tem longe (caso E)',
+    );
+    return { kind: 'only_far', unitId: nearestFar.cand.ctx.unitId, unitName: nearestFar.cand.ctx.unitName, distanceKm: nearestFar.distanceKm };
+  }
+
+  return { kind: 'matriz' };
 }
 
 export interface BotPartnerOrderItem {
