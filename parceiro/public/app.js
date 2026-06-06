@@ -43,7 +43,7 @@ function parceiroApp() {
     // ─── Configurações da Loja (Fase 1) ───
     configTab: 'loja',           // 'loja' | 'atendimento' | 'area' | 'equipe'
     configLoaded: false,
-    lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '' },
+    lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '', maps_url: '' },
     atendimentoForm: { faz_entrega: true, tem_retirada: true },
     // Área de entrega: por município. Fase 1 edita 1 município por vez (o da loja).
     areaForm: { municipio: '', city_wide: true, neighborhoods: [] },
@@ -532,6 +532,7 @@ function parceiroApp() {
           address_complement: loja.address_complement || '',
           cep: loja.cep || '',
           opening_hours_text: loja.opening_hours_text || '',
+          maps_url: loja.maps_url || '',
         };
         this.atendimentoForm = {
           faz_entrega: loja.faz_entrega !== undefined ? !!loja.faz_entrega : true,

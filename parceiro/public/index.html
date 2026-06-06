@@ -1930,6 +1930,10 @@
               <label>Horário de funcionamento (texto livre)
                 <input x-model="lojaForm.opening_hours_text" placeholder="Ex: Seg–Sex 8h–18h, Sáb 8h–12h" maxlength="500" />
               </label>
+              <label>Link da localização no Google Maps
+                <input x-model="lojaForm.maps_url" placeholder="Cole o link do Google Maps da sua loja" maxlength="600" />
+                <small style="color:var(--pos-muted,#94a3b8);font-size:11px;">O robô manda este link pro cliente na retirada / quando perguntam onde fica.</small>
+              </label>
               <button @click="saveLoja()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="save"></i>
                 <span x-text="isSaving('loja') ? 'Salvando...' : 'Salvar dados da loja'"></span>
@@ -2168,6 +2172,6 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.js?v=20260606-perm-menu"></script>
+<script src="./app.js?v=20260606-gps"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ import {
   decideStoreForItems,
   getPartnerStockMap,
   materializePartnerOrder,
+  getUnitMapsUrl,
   FRETE_PADRAO_BRL,
   type PartnerOrderRouting,
 } from './fulfillment.js';
@@ -121,6 +122,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             items: { type: 'string' },
             description: 'Chaves de política (opcional). Se omitido, retorna todas.',
           },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'localizacao_loja',
+      description: 'Retorna o link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA (pra mandar a localização da loja). NUNCA invente um link — só mande o maps_url retornado aqui.',
+      parameters: {
+        type: 'object',
+        properties: {
+          bairro: { type: 'string', description: 'Bairro do cliente, se informado (ajuda a achar a loja que atende).' },
+          municipio: { type: 'string', description: 'Cidade do cliente, se informada.' },
         },
         required: [],
         additionalProperties: false,
@@ -366,6 +383,15 @@ export async function executeTool(
           policy_keys: args.policy_keys as string[] | undefined,
         });
         return JSON.stringify({ politicas: result });
+      }
+
+      case 'localizacao_loja': {
+        const loc = await getUnitMapsUrl(client, environment, {
+          bairro: args.bairro as string | undefined,
+          municipio: args.municipio as string | undefined,
+        });
+        if (!loc || !loc.maps_url) return JSON.stringify({ encontrado: false });
+        return JSON.stringify({ encontrado: true, nome_loja: loc.nome_loja, maps_url: loc.maps_url });
       }
 
       case 'criar_pedido': {

@@ -2916,6 +2916,7 @@ export interface PartnerLojaInput {
   address_complement?: string | null;
   cep?: string | null;
   opening_hours_text?: string | null;
+  maps_url?: string | null;
 }
 
 export interface PartnerAreaInput {
@@ -2937,6 +2938,7 @@ export interface PartnerConfiguracoes {
     address_complement: string | null;
     cep: string | null;
     opening_hours_text: string | null;
+    maps_url: string | null;
     address_confirmed_at: string | null;
     service_mode: PartnerServiceMode;
     // Derivados do enum pra a UI dos 2 checkboxes (arbitragem B).
@@ -2974,11 +2976,12 @@ export async function getPartnerConfiguracoes(ctx: PartnerContext): Promise<Part
     address_complement: string | null;
     cep: string | null;
     opening_hours_text: string | null;
+    maps_url: string | null;
     address_confirmed_at: string | null;
     service_mode: string;
   }>(
     `SELECT display_name, address_street, address_number, address_neighborhood,
-            address_city, address_complement, cep, opening_hours_text,
+            address_city, address_complement, cep, opening_hours_text, maps_url,
             address_confirmed_at, service_mode
        FROM network.partner_units
       WHERE id = $1 AND environment = $2`,
@@ -3000,6 +3003,7 @@ export async function getPartnerConfiguracoes(ctx: PartnerContext): Promise<Part
         address_complement: u.address_complement,
         cep: u.cep,
         opening_hours_text: u.opening_hours_text,
+        maps_url: u.maps_url,
         address_confirmed_at: u.address_confirmed_at,
         service_mode: serviceMode,
         faz_entrega: serviceMode === 'delivery' || serviceMode === 'both',
@@ -3068,6 +3072,7 @@ export async function updatePartnerLoja(
             address_complement    = $8,
             cep                   = $9,
             opening_hours_text    = $10,
+            maps_url              = $11,
             address_confirmed_at  = now()
       WHERE id = $1 AND environment = $2`,
     [
@@ -3081,6 +3086,7 @@ export async function updatePartnerLoja(
       clean(input.address_complement),
       clean(input.cep),
       clean(input.opening_hours_text),
+      clean(input.maps_url),
     ],
   );
   return { updated: (res.rowCount ?? 0) > 0 };

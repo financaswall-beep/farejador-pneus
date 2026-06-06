@@ -276,6 +276,7 @@ const configLojaSchema = z.object({
   address_complement: z.string().trim().max(240).nullable().optional(),
   cep: z.string().trim().max(20).nullable().optional(),
   opening_hours_text: z.string().trim().max(500).nullable().optional(),
+  maps_url: z.string().trim().max(600).nullable().optional(),
 });
 
 // Atendimento: 2 booleans (arbitragem B). Pelo menos um obrigatório → senão 400.

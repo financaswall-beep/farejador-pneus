@@ -308,6 +308,60 @@ export async function resolveMunicipioFromBairro(
 }
 
 /**
+ * Localização da loja que atende o cliente: link do Google Maps (network.partner_units.maps_url,
+ * editado pelo dono na tela Dados da loja). Resolve a unidade pelo município (do bairro, se preciso),
+ * caindo na unidade ativa mais antiga se não houver município — mesma régua de resolveUnitForMunicipio
+ * / resolveUnitForOrder. Aditivo: NÃO substitui o endereço/horário do buscar_politica; só traz o LINK.
+ * Retorna null se não há unidade ativa; maps_url pode ser null (dono ainda não colou o link).
+ */
+export async function getUnitMapsUrl(
+  client: PoolClient,
+  environment: Environment,
+  opts: { bairro?: string | null; municipio?: string | null },
+): Promise<{ nome_loja: string; maps_url: string | null } | null> {
+  let municipio = opts.municipio ?? null;
+  if (!municipio && opts.bairro) {
+    municipio = await resolveMunicipioFromBairro(client, environment, opts.bairro);
+  }
+  const m = normalizeRegion(municipio);
+  const cols = 'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url';
+  let row: { nome_loja: string; maps_url: string | null } | undefined;
+  if (m) {
+    const r = await client.query<{ nome_loja: string; maps_url: string | null }>(
+      `SELECT ${cols}
+         FROM network.unit_coverage uc
+         JOIN network.partner_units pu ON pu.unit_id = uc.unit_id AND pu.environment = uc.environment
+         JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+         JOIN core.units u ON u.id = pu.unit_id
+        WHERE uc.environment = $1
+          AND $2 LIKE '%' || uc.municipio || '%'
+          AND pu.status = 'active' AND p.status = 'active'
+          AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        ORDER BY length(uc.municipio) DESC, pu.created_at ASC
+        LIMIT 1`,
+      [environment, m],
+    );
+    row = r.rows[0];
+  }
+  if (!row) {
+    const r = await client.query<{ nome_loja: string; maps_url: string | null }>(
+      `SELECT ${cols}
+         FROM network.partner_units pu
+         JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+         JOIN core.units u ON u.id = pu.unit_id
+        WHERE pu.environment = $1
+          AND pu.status = 'active' AND p.status = 'active'
+          AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        ORDER BY pu.created_at ASC
+        LIMIT 1`,
+      [environment],
+    );
+    row = r.rows[0];
+  }
+  return row ?? null;
+}
+
+/**
  * Mapa product_id → quantidade DISPONÍVEL no parceiro que cobre `municipio`
  * (vazio se não há parceiro/cobertura). Mesma régua de disponível do roteamento
  * (H5: rastreado + on_hand−reserved). Usado pelo C2 pra as buscas mostrarem o
