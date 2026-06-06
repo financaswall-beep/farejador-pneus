@@ -41,6 +41,16 @@ const envSchema = z.object({
   // commerce.partner_messages durante a normalizacao. Defensivo e isolado por SAVEPOINT
   // — nunca quebra a normalizacao core. Desligado por padrao.
   PARTNER_CHAT_FANOUT_ENABLED: booleanStringSchema,
+  // Fase 2 — Motor de distribuição da Rede (roteamento multi-parceiro). Cada flag
+  // DESLIGADA = comportamento de hoje (1 loja por município, LIMIT 1). Liga-se uma
+  // por vez, provada no env `test`. Ver docs/FASE2_MOTOR_DISTRIBUICAO_2026-06-06.md.
+  //
+  // Considera TODOS os parceiros que cobrem a região (não só o mais antigo) e tenta
+  // o 2º antes de cair na matriz. Off = decideStoreForItems de hoje, intocado.
+  ROUTING_MULTI_CANDIDATE: booleanStringSchema,
+  // Ordena os candidatos pela régua de justiça (quem recebeu menos lead em 7d).
+  // Só tem efeito com ROUTING_MULTI_CANDIDATE ligada. Off = ordem da query.
+  ROUTING_FAIRNESS: booleanStringSchema,
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   // Coalescing window: segundos de pausa do cliente antes do bot responder.
   // A cada nova mensagem o timer RESETA. So responde quando o cliente para

@@ -24,6 +24,8 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import type { PartnerContext } from '../parceiro/auth.js';
 import { upsertPartnerCustomerWithClient } from '../parceiro/queries.js';
 import { logger } from '../shared/logger.js';
+import { env } from '../shared/config/env.js';
+import { rankUnitsByFairnessFromDb } from './fairness.js';
 
 interface RoutedUnitRow {
   partner_unit_id: string;
@@ -149,6 +151,69 @@ export async function resolveUnitForMunicipio(
     // Ator de sistema: não tem login/token real (nunca chama set-credentials).
     tokenId: '',
   };
+}
+
+export interface UnitCandidate {
+  ctx: PartnerContext;
+  /** Modo de atendimento da loja (network.partner_units.service_mode). */
+  serviceMode: 'delivery' | 'pickup' | 'both';
+}
+
+/**
+ * Fase 2: lista TODAS as unidades parceiras que cobrem o município — sem `LIMIT 1`,
+ * ao contrário de `resolveUnitForMunicipio`. Cada candidato traz o `service_mode`
+ * pro filtro de modalidade. A ORDEM aqui não importa (a régua de justiça reordena
+ * depois); só precisa ser determinística. Dedup por unidade (uma loja pode cobrir
+ * cidade + bairro). Só parceiros/unidades ativos. Retorna [] se ninguém cobre.
+ *
+ * v1 = por MUNICÍPIO (mesma régua de cobertura de hoje). Cobertura por BAIRRO
+ * (`neighborhood_canonical`, bairro vence cidade) é a flag ROUTING_NEIGHBORHOOD,
+ * peça separada da Fase 2.
+ */
+export async function resolveUnitCandidates(
+  client: PoolClient,
+  environment: Environment,
+  municipio: string | null | undefined,
+): Promise<UnitCandidate[]> {
+  const m = normalizeRegion(municipio);
+  if (!m) return [];
+  const result = await client.query<RoutedUnitRow & { service_mode: string }>(
+    `SELECT DISTINCT ON (pu.id)
+            pu.id            AS partner_unit_id,
+            pu.unit_id       AS unit_id,
+            p.id             AS partner_id,
+            pu.slug          AS slug,
+            p.trade_name     AS partner_name,
+            COALESCE(pu.display_name, u.name) AS unit_name,
+            pu.service_mode  AS service_mode
+     FROM network.unit_coverage uc
+     JOIN network.partner_units pu ON pu.unit_id = uc.unit_id AND pu.environment = uc.environment
+     JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+     JOIN core.units u ON u.id = pu.unit_id
+     WHERE uc.environment = $1
+       AND $2 LIKE '%' || uc.municipio || '%'
+       AND pu.status = 'active'
+       AND p.status = 'active'
+       AND pu.deleted_at IS NULL
+       AND p.deleted_at IS NULL
+     ORDER BY pu.id, length(uc.municipio) DESC`,
+    [environment, m],
+  );
+
+  return result.rows.map((row) => ({
+    ctx: {
+      environment,
+      partnerId: row.partner_id,
+      partnerUnitId: row.partner_unit_id,
+      unitId: row.unit_id,
+      slug: row.slug,
+      partnerName: row.partner_name,
+      unitName: row.unit_name,
+      role: 'owner',
+      tokenId: '',
+    },
+    serviceMode: (row.service_mode as UnitCandidate['serviceMode']) ?? 'both',
+  }));
 }
 
 /**
@@ -483,6 +548,14 @@ export async function decideStoreForItems(
 ): Promise<PartnerOrderRouting | null> {
   if (!input.municipio || input.items.length === 0) return null;
 
+  // Fase 2: motor multi-parceiro (flag). DESLIGADA = caminho de hoje (abaixo), intocado.
+  if (env.ROUTING_MULTI_CANDIDATE) {
+    return decideStoreForItemsMulti(client, environment, {
+      municipio: input.municipio,
+      items: input.items,
+    });
+  }
+
   const decisions = await Promise.all(
     input.items.map((i) =>
       decideStoreForOrder(client, environment, {
@@ -509,6 +582,65 @@ export async function decideStoreForItems(
       central_price: decisions[idx]!.central_price!,
     })),
   };
+}
+
+/**
+ * Fase 2 — motor multi-parceiro (atrás de ROUTING_MULTI_CANDIDATE). Considera
+ * TODOS os parceiros que cobrem o município (`resolveUnitCandidates`, sem LIMIT 1),
+ * ordena pela régua de justiça (se ROUTING_FAIRNESS ligada) e tenta cada um na
+ * ordem: o 1º que tem TODOS os itens em estoque vence. Se nenhum tem → null
+ * (matriz). Implementa a decisão #1 (tenta o 2º antes da matriz).
+ *
+ * Determinístico, sem escrita. Reusa `mapProductToPartnerStock` (mesma régua de
+ * estoque disponível do caminho de hoje), então a decisão de estoque é idêntica.
+ */
+async function decideStoreForItemsMulti(
+  client: PoolClient,
+  environment: Environment,
+  input: { municipio: string; items: ItemForDecision[] },
+): Promise<PartnerOrderRouting | null> {
+  const candidates = await resolveUnitCandidates(client, environment, input.municipio);
+  if (candidates.length === 0) return null; // ninguém cobre → matriz
+
+  // v1: este caminho é sempre contexto de ENTREGA (calcular_frete / criar_pedido
+  // delivery — pickup ainda cai na matriz antes daqui). Loja só-retirada não atende
+  // entrega → filtra. O fio do `intent` genérico + a flag ROUTING_MODE_FILTER vêm
+  // no próximo tijolo; este filtro é o default seguro pra não escolher pickup-only.
+  const eligible = candidates.filter((c) => c.serviceMode !== 'pickup');
+  if (eligible.length === 0) return null;
+
+  const byUnit = new Map(eligible.map((c) => [c.ctx.unitId, c]));
+  const orderedUnitIds = env.ROUTING_FAIRNESS
+    ? await rankUnitsByFairnessFromDb(client, environment, eligible.map((c) => c.ctx.unitId))
+    : eligible.map((c) => c.ctx.unitId);
+
+  for (const unitId of orderedUnitIds) {
+    const cand = byUnit.get(unitId);
+    if (!cand) continue;
+    const mappings = await Promise.all(
+      input.items.map((i) =>
+        mapProductToPartnerStock(client, environment, cand.ctx.unitId, i.product_id, i.quantity),
+      ),
+    );
+    if (mappings.every((m) => m != null)) {
+      logger.info(
+        { environment, unit_id: cand.ctx.unitId, candidatos: orderedUnitIds.length, fairness: env.ROUTING_FAIRNESS },
+        'decideStoreForItemsMulti: parceiro escolhido pela régua (Fase 2)',
+      );
+      return {
+        ctx: cand.ctx,
+        unitId: cand.ctx.unitId,
+        items: input.items.map((i, idx) => ({
+          product_id: i.product_id,
+          partner_stock_id: mappings[idx]!.partner_stock_id,
+          quantity: i.quantity,
+          central_price: mappings[idx]!.central_price,
+        })),
+      };
+    }
+    // candidato sem todos os itens → tenta o próximo (decisão #1)
+  }
+  return null; // nenhum candidato da área tem o pedido completo → matriz
 }
 
 export interface BotPartnerOrderItem {
