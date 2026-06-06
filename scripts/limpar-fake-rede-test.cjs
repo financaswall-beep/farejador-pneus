@@ -10,7 +10,13 @@ const fs = require('fs');
 const { Client } = require('pg');
 
 const ENV = 'test';
-const FAKE_SLUGS = ['fake-rede-a', 'fake-rede-b', 'fake-rede-c', 'fake-rede-d'];
+// Fakes da prova da justiça (por município) + fakes GEO (por coordenada/anel).
+const FAKE_SLUGS_BASE = ['fake-rede-a', 'fake-rede-b', 'fake-rede-c', 'fake-rede-d'];
+const GEO_SLUGS = [
+  'geo-leme', 'geo-tijuca', 'geo-meier', 'geo-niteroi',
+  'geo-madureira', 'geo-barra', 'geo-itaborai', 'geo-bairro',
+];
+const FAKE_SLUGS = [...FAKE_SLUGS_BASE, ...GEO_SLUGS];
 const FAKE_PRODUCT_CODE = 'FAKE-REDE-PNEU';
 
 function loadDatabaseUrl() {
@@ -66,7 +72,7 @@ async function limpar(client) {
   return { partner_units: puIds.length, units: unitIds.length, partners: partnerIds.length, produtos: prodIds.length };
 }
 
-module.exports = { limpar, loadDatabaseUrl, assertTest, ENV, FAKE_SLUGS, FAKE_PRODUCT_CODE };
+module.exports = { limpar, loadDatabaseUrl, assertTest, ENV, FAKE_SLUGS, GEO_SLUGS, FAKE_PRODUCT_CODE };
 
 if (require.main === module) {
   (async () => {
