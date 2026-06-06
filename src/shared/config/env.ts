@@ -51,6 +51,17 @@ const envSchema = z.object({
   // Ordena os candidatos pela régua de justiça (quem recebeu menos lead em 7d).
   // Só tem efeito com ROUTING_MULTI_CANDIDATE ligada. Off = ordem da query.
   ROUTING_FAIRNESS: booleanStringSchema,
+  // Camada GEO — escolhe a loja por PROXIMIDADE real (anel em km que cresce),
+  // não por cidade inteira. Ver docs/PLANO_CAMADA_GEO_PROXIMIDADE_REDE_2026-06-06.md.
+  // DESLIGADA = roteamento de hoje, byte a byte. Só tem efeito com candidato +
+  // coordenada do cliente; sem coordenada cai no caminho atual (fallback por cidade).
+  ROUTING_GEO: booleanStringSchema,
+  // Usa a distância de RUA do Google (Distance Matrix) em vez de linha reta.
+  // Só efeito com ROUTING_GEO on. Off = haversine (linha reta). Liga-se DEPOIS, sozinha.
+  ROUTING_GEO_ROAD_DISTANCE: booleanStringSchema,
+  // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
+  // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
+  GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   // Coalescing window: segundos de pausa do cliente antes do bot responder.
   // A cada nova mensagem o timer RESETA. So responde quando o cliente para
