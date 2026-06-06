@@ -72,3 +72,6 @@ poll-atendente.*
 test-chatwoot-conn.*
 tmp-describe.*
 cenario-*.json
+
+# Backup local da limpeza 2026-06-06 (recuperação; não commitar)
+_backup-untracked-limpeza-2026-06-06.tgz
