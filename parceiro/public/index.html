@@ -1240,6 +1240,7 @@
                     <span class="pos-route-num" x-show="!deliveryShowDone" x-text="i + 1"></span>
                     <span class="pos-route-bairro"><i data-lucide="map-pin"></i> <span x-text="deliveryZone(d)"></span></span>
                     <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
+                    <span x-show="isTwoW(d)" title="Pedido trazido pela Rede (bot)" style="background:#047857;color:#fff;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700">2W</span>
                     <div class="pos-route-move" x-show="!deliveryShowDone">
                       <button @click="moveRoute(d, -1)" :disabled="i === 0" title="Subir na rota"><i data-lucide="chevron-up"></i></button>
                       <button @click="moveRoute(d, 1)" :disabled="i === routeList.length - 1" title="Descer na rota"><i data-lucide="chevron-down"></i></button>
@@ -1296,6 +1297,67 @@
               <div x-show="!routeList.length" class="pos-empty">
                 Nenhuma entrega <span x-text="deliveryShowDone ? 'finalizada' : 'em aberto'"></span>.
               </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- Retiradas aguardando: pedidos do bot pra o cliente retirar na loja (pneu reservado) -->
+      <section x-show="currentSection === 'entrega' && pickupAwaitingCount > 0" class="pos-workspace">
+        <div class="pos-page-grid">
+          <section class="pos-panel pos-data-panel">
+            <div class="pos-panel-head">
+              <div>
+                <h3>Retiradas aguardando <em x-text="pickupAwaitingCount"></em></h3>
+                <p>Pedidos do bot pra retirar na loja — o pneu está reservado até o cliente vir</p>
+              </div>
+            </div>
+            <div class="pos-route-list">
+              <template x-for="d in pickupAwaiting" :key="d.order_id">
+                <article class="pos-route-card">
+                  <header class="pos-route-card-top">
+                    <span class="pos-route-bairro"><i data-lucide="store"></i> <span>Retirada na loja</span></span>
+                    <span x-show="isTwoW(d)" title="Pedido trazido pela Rede (bot)" style="background:#047857;color:#fff;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700">2W</span>
+                  </header>
+                  <div class="pos-route-who">
+                    <strong x-text="d.customer_name || 'Cliente'"></strong>
+                    <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')"><i data-lucide="phone"></i> <span x-text="formatPhoneDisplay(d.customer_phone)"></span></a>
+                  </div>
+                  <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
+                  <div class="pos-route-money">
+                    <div class="pos-route-total">
+                      <small>Total a receber</small>
+                      <strong x-text="money(d.total_amount)"></strong>
+                    </div>
+                  </div>
+                  <!-- Forma que o cliente pagou no balcão ao retirar -->
+                  <div class="pos-route-pay">
+                    <span>Recebeu em</span>
+                    <div class="pos-seg">
+                      <button :class="(pickupPayDrafts[d.order_id] || 'Pix') === 'Pix' && 'on'" @click="pickupPayDrafts[d.order_id] = 'Pix'">Pix</button>
+                      <button :class="pickupPayDrafts[d.order_id] === 'Dinheiro' && 'on'" @click="pickupPayDrafts[d.order_id] = 'Dinheiro'">Dinheiro</button>
+                      <button :class="pickupPayDrafts[d.order_id] === 'Cartão' && 'on'" @click="pickupPayDrafts[d.order_id] = 'Cartão'">Cartão</button>
+                    </div>
+                  </div>
+                  <footer class="pos-route-actions" x-show="cancelOpenId !== d.order_id">
+                    <button class="act-primary done" @click="markRetrieved(d)" :disabled="isSaving('retrieve-' + d.order_id)">
+                      <i data-lucide="check"></i> Marcar retirado
+                    </button>
+                    <button class="act-icon failed" @click="openCancelOrder(d)" :disabled="isSaving('cancel-' + d.order_id)" title="Cliente não veio / cancelar">
+                      <i data-lucide="x"></i>
+                    </button>
+                  </footer>
+                  <!-- Cancelar com motivo (obrigatório no 2W) -->
+                  <div x-show="cancelOpenId === d.order_id" style="margin-top:8px">
+                    <label style="display:block;font-size:12px;margin-bottom:4px">Motivo do cancelamento <span x-show="isTwoW(d)" style="color:#ef4444">*</span></label>
+                    <textarea x-model="cancelReasonText" rows="2" placeholder="Ex.: cliente não apareceu" style="width:100%"></textarea>
+                    <div style="display:flex;gap:8px;margin-top:6px">
+                      <button class="act-primary failed" @click="confirmCancelOrder(d)" :disabled="isSaving('cancel-' + d.order_id)">Confirmar cancelamento</button>
+                      <button class="act-icon" @click="closeCancelOrder()" title="Voltar"><i data-lucide="rotate-ccw"></i></button>
+                    </div>
+                  </div>
+                </article>
+              </template>
             </div>
           </section>
         </div>

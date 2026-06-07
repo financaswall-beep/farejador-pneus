@@ -238,7 +238,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'] },
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
-          bairro: { type: 'string', description: 'Bairro do cliente — passe o MESMO usado no calcular_frete (necessário pro roteamento por proximidade escolher a mesma loja).' },
+          bairro: { type: 'string', description: 'Bairro do cliente. Na ENTREGA, passe o MESMO usado no calcular_frete. Na RETIRADA, passe o bairro que o cliente informou — é o que permite achar a loja mais perto pra ele retirar.' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
@@ -633,9 +633,10 @@ async function criarPedido(
   const formaPagamento = (args.forma_pagamento as string | undefined) ?? null;
 
   // ── ROTEAMENTO (Tijolo 3.2): decidir matriz vs parceiro ───────────────────
-  // Só ENTREGA com região conhecida pode ir pro parceiro (H4: pickup → matriz,
-  // senão recebível COD fantasma). O pedido só vai pro parceiro se TODOS os itens
-  // caem no MESMO parceiro com estoque rastreado e disponível (H5); senão matriz.
+  // ENTREGA com região conhecida → parceiro (H5: todos os itens no MESMO parceiro com
+  // estoque rastreado/disponível; senão matriz). RETIRADA: por padrão vai pra matriz,
+  // mas com PICKUP_TO_PARTNER on + proximidade (ROUTING_GEO + coordenada) vai pro
+  // parceiro mais perto RESERVANDO o pneu (decisão Wallace 2026-06-07).
   let partner: PartnerOrderRouting | null = null;
 
   if (modalidade === 'delivery' && geoResolutionId) {
@@ -659,6 +660,43 @@ async function criarPedido(
       });
     }
     partner = decision.routing;
+  } else if (modalidade === 'pickup' && env.PICKUP_TO_PARTNER) {
+    // RETIRADA pelos MESMOS critérios da entrega: proximidade (anel de retirada) + régua
+    // de justiça. Município vem do geo (se houver) ou do bairro; coordenada vem do pino
+    // ou do geocode do bairro. Sem município/coordenada → cai na matriz (como hoje).
+    const municipio = geoResolutionId
+      ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
+      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
+    if (env.ROUTING_GEO && municipio) {
+      const customerLocation = await resolveCustomerLocation(
+        client,
+        environment,
+        conversationId,
+        args.bairro as string | undefined,
+        municipio,
+      );
+      if (customerLocation) {
+        const geo = await decideStoreForItemsGeo(client, environment, {
+          municipio,
+          items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
+          modalidade: 'pickup',
+          customerLocation,
+          clientNeighborhoodCanonical: args.bairro ? normalizeRegion(args.bairro as string) : null,
+        });
+        // Caso E (só tem longe): pergunta antes de criar, igual à entrega.
+        if (geo.kind === 'only_far') {
+          return JSON.stringify({
+            erro: 'apenas_longe',
+            apenas_longe: true,
+            distancia_km: Math.round(geo.distanceKm),
+            nome_loja_distante: geo.unitName,
+            mensagem:
+              'Esse item só tem numa loja mais distante pra retirar. Confirme com o cliente (retirar lá mesmo / equivalente mais perto) ANTES de criar o pedido.',
+          });
+        }
+        if (geo.kind === 'partner') partner = geo.routing;
+      }
+    }
   }
 
   let order: { id: string; order_number: string };
@@ -683,10 +721,12 @@ async function criarPedido(
         quantity: it.quantity,
         unit_price: it.central_price,
       })),
-      fulfillment_mode: 'delivery',
+      fulfillment_mode: modalidade as 'delivery' | 'pickup',
       delivery_address: deliveryAddress,
-      freight_amount: FRETE_PADRAO_BRL,
+      freight_amount: modalidade === 'delivery' ? FRETE_PADRAO_BRL : 0,
       idempotency_key: idempotencyKey,
+      // RETIRADA → reserva o pneu (segura até retirar), sem recebível. Entrega segue COD.
+      reserve_for_pickup: modalidade === 'pickup',
     });
 
     // H1: o total do espelho é LIDO DE VOLTA do partner_order (uma fonte de número,
@@ -695,7 +735,7 @@ async function criarPedido(
       contactId,
       conversationId,
       totalAmount: mat.total_amount,
-      fulfillmentMode: 'delivery',
+      fulfillmentMode: modalidade,
       paymentMethod: 'A receber',
       deliveryAddress,
       geoResolutionId,
@@ -711,7 +751,7 @@ async function criarPedido(
     });
 
     respSubtotal = partner.items.reduce((s, it) => s + it.central_price * it.quantity, 0);
-    respFrete = FRETE_PADRAO_BRL;
+    respFrete = modalidade === 'delivery' ? FRETE_PADRAO_BRL : 0;
     respTotal = Number(mat.total_amount);
 
     logger.info(

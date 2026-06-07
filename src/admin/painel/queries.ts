@@ -134,10 +134,12 @@ export async function getPainelRede(
   // 0077: venda do parceiro SÓ "realiza" na entrega (delivery → delivered_at) ou no fechamento
   // no balcão (pickup → created_at). Pedido de entrega aberto/em separação NÃO é venda realizada
   // (mesma regra da view network.partner_unit_summary). Fragmentos reusados nos laterais de venda.
-  const realizedWhere = `po.status <> 'cancelled' AND po.deleted_at IS NULL AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')`;
-  const realizedDate = `(CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE po.created_at END)`;
-  // Pedido de ENTREGA ainda não entregue NÃO é venda — no feed ele aparece com o status atual.
-  const isRealizedExpr = `NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')`;
+  // 0090: retirada reservada do bot (awaiting_pickup) ainda NÃO é venda; vira venda na retirada
+  // (retrieved_at). Balcão segue por created_at. Mesma régua da view network.partner_unit_summary.
+  const realizedWhere = `po.status <> 'cancelled' AND po.deleted_at IS NULL AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered') AND NOT po.awaiting_pickup`;
+  const realizedDate = `(CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE COALESCE(po.retrieved_at, po.created_at) END)`;
+  // Pedido de ENTREGA ainda não entregue (ou retirada aguardando) NÃO é venda — no feed aparece com o status atual.
+  const isRealizedExpr = `NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered') AND NOT po.awaiting_pickup`;
   // Data do evento no feed: venda realizada usa a data de realização; pedido em curso usa a criação.
   const eventDateExpr = `(CASE WHEN ${isRealizedExpr} THEN ${realizedDate} ELSE po.created_at END)`;
   const result = await dbPool.query(

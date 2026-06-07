@@ -25,6 +25,8 @@ import {
   cancelPartnerPayable,
   cancelPartnerReceivable,
   DeliveryAlreadyFinalizedError,
+  PickupAlreadyRetrievedError,
+  markPartnerPickupRetrieved,
   deletePartnerPurchase,
   deletePartnerStock,
   deletePartnerExpense,
@@ -120,6 +122,18 @@ const deliverySchema = z.object({
   delivery_courier: z.string().max(120).nullable().optional(),
   // Metodo recebido na entrega (COD). So tem efeito quando delivery_status='delivered'.
   payment_method: z.string().max(80).nullable().optional(),
+  // Motivo (free-text) quando delivery_status='failed' (não entregue). Vira audit + antifraude.
+  reason: z.string().max(500).nullable().optional(),
+});
+
+// Marcar retirado (retirada reservada do bot): forma de pagamento recebida no balcão.
+const retrieveSchema = z.object({
+  payment_method: z.string().max(80).nullable().optional(),
+});
+
+// Cancelar pedido: motivo (free-text) — vira audit + insumo do antifraude da matriz.
+const cancelSchema = z.object({
+  reason: z.string().max(500).nullable().optional(),
 });
 
 const purchaseParamsSchema = paramsSchema.extend({
@@ -965,7 +979,11 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const parsed = saleParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'order_not_found' });
 
-    const result = await cancelPartnerSale(getPartnerContext(request), parsed.data.orderId);
+    // Motivo opcional no corpo (free-text). Pedido 2w: o front exige o motivo (anti-trapaça).
+    const body = cancelSchema.safeParse(request.body ?? {});
+    const reason = body.success ? (body.data.reason ?? null) : null;
+
+    const result = await cancelPartnerSale(getPartnerContext(request), parsed.data.orderId, reason);
     if (!result.cancelled) return reply.status(404).send({ error: 'order_not_found' });
     return reply.status(200).send(result);
   });
@@ -996,6 +1014,33 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       }
       if (err instanceof Error && err.message.includes('Entrega ja finalizada')) {
         return reply.status(409).send({ error: 'delivery_already_finalized', message: 'Esta entrega ja foi finalizada.' });
+      }
+      throw err;
+    }
+  });
+
+  // Retirada: marca como RETIRADO (cliente veio e pagou no balcão) — converte a reserva
+  // em baixa física + lança o caixa. Espelha o "marcar entregue" da entrega.
+  fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('entregas')] }, async (request: PartnerAuthedRequest, reply) => {
+    const params = saleParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'order_not_found' });
+    const parsed = retrieveSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.join('.') || 'body';
+      return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
+    }
+    try {
+      return reply.status(200).send(await markPartnerPickupRetrieved(getPartnerContext(request), params.data.orderId, parsed.data));
+    } catch (err) {
+      if (err instanceof PickupAlreadyRetrievedError) {
+        return reply.status(409).send({ error: err.code, message: 'Esta retirada ja foi finalizada.' });
+      }
+      if (err instanceof Error && err.message === 'pickup_not_found') {
+        return reply.status(404).send({ error: 'pickup_not_found' });
+      }
+      if (err instanceof Error && err.message.includes('Reserva insuficiente')) {
+        return reply.status(409).send({ error: 'reserva_insuficiente', message: err.message });
       }
       throw err;
     }

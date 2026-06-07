@@ -125,6 +125,11 @@ function parceiroApp() {
     // Como o cliente pagou na entrega (COD), por pedido. Default Pix; vira o
     // metodo da conta a receber ao finalizar, pra o caixa registrar a forma.
     deliveryPayDrafts: {},
+    // Retirada (pickup do bot): forma de pagamento recebida no balcão, por pedido.
+    pickupPayDrafts: {},
+    // Cancelar com motivo: qual pedido está com o form de cancelamento aberto + o texto.
+    cancelOpenId: null,
+    cancelReasonText: '',
     posDiscountAmount: 0,
     posFreightAmount: 0,
     posReceivedAmount: null,
@@ -1430,11 +1435,13 @@ function parceiroApp() {
     confirmDeliveryFailed(sale) {
       if (!sale || !sale.order_id) return;
       const who = sale.customer_name || 'este pedido';
-      if (!confirm(`Marcar a entrega de ${who} como NÃO entregue?\n\nO estoque volta pro disponível e nada entra no caixa.`)) return;
-      this.setDeliveryStatus(sale, 'failed');
+      const reason = prompt(`Marcar a entrega de ${who} como NÃO entregue?\n\nEscreva o motivo (o estoque volta e nada entra no caixa):`);
+      if (reason === null) return; // cancelou o prompt
+      if (this.isTwoW(sale) && !reason.trim()) { this.flash('Escreva o motivo (pedido da Rede 2W).'); return; }
+      this.setDeliveryStatus(sale, 'failed', reason.trim());
     },
 
-    async setDeliveryStatus(sale, status) {
+    async setDeliveryStatus(sale, status, reason) {
       if (!sale || !sale.order_id) return;
       const courier = (this.deliveryDrafts[sale.order_id] ?? sale.delivery_courier ?? '').trim();
       const action = `delivery-${sale.order_id}`;
@@ -1447,7 +1454,7 @@ function parceiroApp() {
       try {
         await this.api(`entregas/${sale.order_id}`, {
           method: 'POST',
-          body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null, payment_method }),
+          body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null, payment_method, reason: reason ?? null }),
         });
         await this.loadData();
         const flashes = {
@@ -1457,6 +1464,54 @@ function parceiroApp() {
           pending: 'Entrega reaberta.',
         };
         this.flash(flashes[status] || 'Entrega atualizada.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    // ─── Retirada reservada do bot (pickup): card "aguardando retirada" ───
+    get pickupAwaiting() {
+      return this.vendas.filter((o) => o.fulfillment_mode === 'pickup' && o.awaiting_pickup && o.status !== 'cancelled');
+    },
+    get pickupAwaitingCount() { return this.pickupAwaiting.length; },
+    get pickupAwaitingAmount() { return this.pickupAwaiting.reduce((s, o) => s + this.num(o.total_amount), 0); },
+    isTwoW(sale) { return this.normalizeSource(sale && (sale.source_tag || sale.source)) === '2w'; },
+
+    async markRetrieved(sale) {
+      if (!sale || !sale.order_id) return;
+      const action = `retrieve-${sale.order_id}`;
+      const payment_method = this.pickupPayDrafts[sale.order_id] || 'Pix';
+      this.saving = true; this.savingAction = action;
+      try {
+        await this.api(`retiradas/${sale.order_id}`, { method: 'POST', body: JSON.stringify({ payment_method }) });
+        await this.loadData();
+        this.flash('Retirada finalizada — pneu baixado e dinheiro no caixa.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    // Cancelar pedido com motivo (ex.: cliente reservou e não veio). 2W exige motivo (anti-trapaça).
+    openCancelOrder(sale) { this.cancelOpenId = sale.order_id; this.cancelReasonText = ''; },
+    closeCancelOrder() { this.cancelOpenId = null; this.cancelReasonText = ''; },
+    async confirmCancelOrder(sale) {
+      if (!sale || !sale.order_id) return;
+      const reason = (this.cancelReasonText || '').trim();
+      if (this.isTwoW(sale) && !reason) {
+        this.flash('Escreva o motivo do cancelamento (pedido da Rede 2W).');
+        return;
+      }
+      const action = `cancel-${sale.order_id}`;
+      this.saving = true; this.savingAction = action;
+      try {
+        await this.api(`vendas/${sale.order_id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
+        await this.loadData();
+        this.flash('Pedido cancelado — reserva liberada.');
+        this.cancelOpenId = null; this.cancelReasonText = '';
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {

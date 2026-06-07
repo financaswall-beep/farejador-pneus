@@ -844,6 +844,12 @@ export interface BotPartnerOrderInput {
   freight_amount: number;
   /** Chave idempotente estável por pedido do bot (evita duplicar em retry). */
   idempotency_key: string;
+  /**
+   * RETIRADA com reserva (decisão Wallace 2026-06-07): em vez de dar baixa física
+   * no estoque (venda de balcão), RESERVA o pneu até o cliente retirar e NÃO abre
+   * recebível (o dinheiro entra no "marcar retirado" do painel). Só no pickup do bot.
+   */
+  reserve_for_pickup?: boolean;
 }
 
 /**
@@ -873,7 +879,7 @@ export async function materializePartnerOrder(
 
   const reg = await client.query<{ id: string }>(
     `SELECT commerce.register_partner_local_order(
-       $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13
+       $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14
      ) AS id`,
     [
       ctx.environment,
@@ -881,7 +887,7 @@ export async function materializePartnerOrder(
       input.customer_name,
       input.customer_phone,
       JSON.stringify(input.items),
-      'A receber', // COD — pago na entrega
+      'A receber', // COD — pago na entrega (ou no balcão, na retirada reservada)
       input.fulfillment_mode,
       input.delivery_address,
       `bot:${ctx.slug}`,
@@ -889,9 +895,21 @@ export async function materializePartnerOrder(
       '2w', // source_tag — venda trazida pelo bot
       0, // discount
       input.freight_amount,
+      input.reserve_for_pickup ?? false, // retirada reservada → reserva em vez de baixar
     ],
   );
   const orderId = reg.rows[0]!.id;
+
+  // RETIRADA RESERVADA: marca "aguardando retirada" — o pneu fica segurado e o pedido
+  // NÃO conta como venda realizada até o parceiro marcar retirado (mesma régua da
+  // entrega não-entregue). Vira venda na data em que ele marcar (retrieved_at).
+  if (input.reserve_for_pickup) {
+    await client.query(
+      `UPDATE commerce.partner_orders SET awaiting_pickup = true, updated_at = now()
+       WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [orderId, ctx.environment, ctx.unitId],
+    );
+  }
 
   if (customerId) {
     await client.query(
@@ -901,34 +919,36 @@ export async function materializePartnerOrder(
     );
   }
 
-  // COD: conta a receber aberta (só pra delivery; pickup paga na hora seria 'received',
-  // mas no fluxo do bot a entrega é o padrão e o pagamento é sempre na entrega).
+  // COD: conta a receber aberta. Na RETIRADA RESERVADA (reserve_for_pickup) NÃO abre
+  // recebível — o pneu só fica segurado; o dinheiro entra no "marcar retirado" do painel.
   const o = await client.query<{ total_amount: string; customer_name: string | null }>(
     `SELECT total_amount, customer_name FROM commerce.partner_orders
      WHERE id = $1 AND environment = $2 AND unit_id = $3 LIMIT 1`,
     [orderId, ctx.environment, ctx.unitId],
   );
   const row = o.rows[0]!;
-  await client.query(
-    `INSERT INTO finance.partner_receivables (
-       environment, unit_id, customer_id, customer_name, description, source_tag, amount,
-       due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
-     ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'open', NULL, NULL, $7, $8, $9, $10)
-     ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-     DO NOTHING`,
-    [
-      ctx.environment,
-      ctx.unitId,
-      customerId,
-      input.customer_name ?? row.customer_name ?? null,
-      `Venda a receber ${orderId.slice(0, 8)}`,
-      row.total_amount,
-      `Gerada pelo bot (2w) — pedido ${orderId.slice(0, 8)}`,
-      `bot:${ctx.slug}`,
-      `order:${orderId}:receivable`,
-      orderId,
-    ],
-  );
+  if (!input.reserve_for_pickup) {
+    await client.query(
+      `INSERT INTO finance.partner_receivables (
+         environment, unit_id, customer_id, customer_name, description, source_tag, amount,
+         due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
+       ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'open', NULL, NULL, $7, $8, $9, $10)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       DO NOTHING`,
+      [
+        ctx.environment,
+        ctx.unitId,
+        customerId,
+        input.customer_name ?? row.customer_name ?? null,
+        `Venda a receber ${orderId.slice(0, 8)}`,
+        row.total_amount,
+        `Gerada pelo bot (2w) — pedido ${orderId.slice(0, 8)}`,
+        `bot:${ctx.slug}`,
+        `order:${orderId}:receivable`,
+        orderId,
+      ],
+    );
+  }
 
   logger.info({ environment: ctx.environment, unit_id: ctx.unitId, partner_order_id: orderId }, 'bot: partner_order materializado (2w)');
   return { partner_order_id: orderId, total_amount: row.total_amount };

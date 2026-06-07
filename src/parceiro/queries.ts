@@ -290,6 +290,7 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
               source_tag,
               status, payment_method, fulfillment_mode, delivery_address,
               delivery_status, delivery_courier, dispatched_at, delivered_at,
+              awaiting_pickup, retrieved_at,
               total_amount, received_amount, notes, items
        FROM commerce.partner_orders_full
        WHERE environment = $1 AND unit_id = $2
@@ -757,6 +758,7 @@ export async function registerPartnerSale(
 export async function cancelPartnerSale(
   ctx: PartnerContext,
   orderId: string,
+  reason?: string | null,
 ): Promise<{ order_id: string; cancelled: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const exists = await client.query<{ id: string }>(
@@ -773,10 +775,13 @@ export async function cancelPartnerSale(
 
     if (exists.rowCount !== 1) return { order_id: orderId, cancelled: false };
 
+    // Motivo do cancelamento (free-text do parceiro). Fica gravado no audit e alimenta
+    // o antifraude da matriz (2w cancelado + venda porta do mesmo cliente).
+    const motivo = (reason ?? '').trim().slice(0, 500) || 'cancelado pelo portal parceiro';
     await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
       orderId,
       `partner:${ctx.slug}`,
-      'cancelado pelo portal parceiro',
+      motivo,
     ]);
 
     return { order_id: orderId, cancelled: true };
@@ -789,6 +794,8 @@ export interface UpdatePartnerDeliveryInput {
   // Metodo recebido na entrega (pix/dinheiro/cartao). So usado quando delivery_status='delivered':
   // dispara o recebimento da conta a receber vinculada (COD).
   payment_method?: string | null;
+  // Motivo (free-text) do "não entregue" (failed). Vai pro cancel + audit.
+  reason?: string | null;
 }
 
 export class DeliveryAlreadyFinalizedError extends Error {
@@ -796,6 +803,98 @@ export class DeliveryAlreadyFinalizedError extends Error {
   constructor() {
     super('delivery_already_finalized');
   }
+}
+
+export class PickupAlreadyRetrievedError extends Error {
+  readonly code = 'pickup_already_retrieved';
+  constructor() {
+    super('pickup_already_retrieved');
+  }
+}
+
+export interface MarkPickupRetrievedInput {
+  // Forma de pagamento recebida no balcão na hora da retirada (pix/dinheiro/cartao).
+  payment_method?: string | null;
+}
+
+// Marca uma RETIRADA RESERVADA como retirada (cliente veio e pagou no balcão):
+//  - converte a RESERVA em baixa física (complete_partner_pickup);
+//  - marca o pedido como pago + carimba retrieved_at (vira venda realizada NA RETIRADA);
+//  - lança o caixa: conta a receber já 'received' (espelha o COD entregue), source 2w.
+// Só age em pickup com awaiting_pickup=true e não cancelado. Idempotente (re-clique seguro).
+export async function markPartnerPickupRetrieved(
+  ctx: PartnerContext,
+  orderId: string,
+  input: MarkPickupRetrievedInput,
+): Promise<{ order_id: string; retrieved: boolean }> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const existing = await client.query<{
+      awaiting_pickup: boolean; status: string; total_amount: string;
+      customer_id: string | null; customer_name: string | null;
+    }>(
+      `SELECT awaiting_pickup, status, total_amount, customer_id, customer_name
+       FROM commerce.partner_orders
+       WHERE id = $1 AND environment = $2 AND unit_id = $3
+         AND fulfillment_mode = 'pickup' AND deleted_at IS NULL
+       LIMIT 1`,
+      [orderId, ctx.environment, ctx.unitId],
+    );
+    if (existing.rowCount !== 1) throw new Error('pickup_not_found');
+    const row = existing.rows[0]!;
+    if (row.status === 'cancelled') throw new Error('pickup_not_found');
+    if (!row.awaiting_pickup) throw new PickupAlreadyRetrievedError();
+
+    // 1) reserva → baixa física (a função SQL levanta erro se não estiver aguardando).
+    await client.query('SELECT commerce.complete_partner_pickup($1, $2)', [
+      orderId,
+      `partner:${ctx.slug}`,
+    ]);
+
+    // 2) marca retirado: pago + data de realização da venda (retrieved_at).
+    await client.query(
+      `UPDATE commerce.partner_orders
+       SET awaiting_pickup = false, retrieved_at = now(), status = 'paid', updated_at = now()
+       WHERE id = $1 AND environment = $2 AND unit_id = $3`,
+      [orderId, ctx.environment, ctx.unitId],
+    );
+
+    // 3) caixa: cliente pagou no balcão → conta a receber já recebida (source 2w).
+    await client.query(
+      `INSERT INTO finance.partner_receivables (
+         environment, unit_id, customer_id, customer_name, description, source_tag, amount,
+         due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
+       ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'received', now(), $7, $8, $9, $10, $11)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
+      [
+        ctx.environment,
+        ctx.unitId,
+        row.customer_id,
+        row.customer_name,
+        `Retirada ${orderId.slice(0, 8)}`,
+        row.total_amount,
+        normalizeText(input.payment_method),
+        `Retirada paga no balcão — pedido ${orderId.slice(0, 8)}`,
+        `partner:${ctx.slug}`,
+        `order:${orderId}:pickup-receivable`,
+        orderId,
+      ],
+    );
+
+    await client.query(
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type, actor_label, payload_after
+       ) VALUES ($1, 'partner_orders', 'commerce.partner_orders', $2,
+                 'partner_pickup_retrieved', $3, $4::jsonb)`,
+      [
+        ctx.environment,
+        orderId,
+        `partner:${ctx.slug}`,
+        JSON.stringify({ unit_id: ctx.unitId, payment_method: normalizeText(input.payment_method) }),
+      ],
+    );
+
+    return { order_id: orderId, retrieved: true };
+  });
 }
 
 // Atualiza o estado operacional da entrega de um pedido (fulfillment_mode=delivery).
@@ -838,10 +937,11 @@ export async function updatePartnerDeliveryStatus(
     // ── Nao entregue / devolvido: estorna estoque + cancela a receber ──
     if (input.delivery_status === 'failed') {
       if (existing.rows[0]!.status !== 'cancelled') {
+        const motivoFalha = (input.reason ?? '').trim().slice(0, 500) || 'entrega nao realizada (nao entregue/devolvido)';
         await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
           orderId,
           `partner:${ctx.slug}`,
-          'entrega nao realizada (nao entregue/devolvido)',
+          motivoFalha,
         ]);
       }
       await client.query(
@@ -2416,7 +2516,8 @@ export async function getPartnerChatCustomer(
     // ainda não finalizada (a venda só se realiza na entrega — regra do 0069).
     // Pickup (delivery_status NULL) e entrega 'delivered' contam; o resto não.
     const REALIZED_SALE = `status <> 'cancelled'
-        AND NOT (fulfillment_mode = 'delivery' AND delivery_status IS DISTINCT FROM 'delivered')`;
+        AND NOT (fulfillment_mode = 'delivery' AND delivery_status IS DISTINCT FROM 'delivered')
+        AND NOT awaiting_pickup`;
     const buildLinked = async (customer: { id: string }): Promise<unknown> => {
       const agg = await client.query(
         `SELECT COUNT(*)::int AS purchase_count,

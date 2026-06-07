@@ -59,6 +59,11 @@ const envSchema = z.object({
   // Usa a distância de RUA do Google (Distance Matrix) em vez de linha reta.
   // Só efeito com ROUTING_GEO on. Off = haversine (linha reta). Liga-se DEPOIS, sozinha.
   ROUTING_GEO_ROAD_DISTANCE: booleanStringSchema,
+  // Retirada (pickup) roteada pro PARCEIRO pelos mesmos critérios da entrega
+  // (proximidade + régua de justiça), RESERVANDO o pneu até o cliente retirar — em vez
+  // de cair na matriz sem segurar nada. Default OFF = retirada vai pra matriz (hoje).
+  // Só tem efeito com ROUTING_GEO on + coordenada do cliente (pino ou geocode do bairro).
+  PICKUP_TO_PARTNER: booleanStringSchema,
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
