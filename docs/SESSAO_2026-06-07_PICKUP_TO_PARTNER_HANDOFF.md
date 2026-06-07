@@ -5,6 +5,10 @@
 > detalhes: decisões do dono, migrations, arquivos, contrato financeiro, como provar
 > e o que falta. Sessão conduzida em Opus.
 
+> ## ⚡ STATUS 2026-06-07: ✅ DEPLOYADO E LIVE — ENTRAMOS NA FASE DE TESTE AO VIVO.
+> Wallace fez o redeploy no Coolify. Flag `PICKUP_TO_PARTNER=true` ligada. **Próxima IA: começar
+> pela §11 (roteiro de validação ao vivo).** O recurso está VALENDO em produção agora.
+
 ---
 
 ## 0. TL;DR (estado atual)
@@ -16,16 +20,16 @@
 - **Etapa 1 (bot + reserva):** FEITA, PROVADA, **commitada** na branch.
 - **Etapa 2 (painel: marcar retirado + cancelar c/ motivo + selo 2W + origem imutável):**
   FEITA, PROVADA, **commitada** na branch.
-- **Branch:** `feat/pickup-to-partner` · commit **`0a0cea7`** (11 arquivos). **NÃO está no `main`,
-  NÃO foi deployada.**
-- **Migrations 0089 + 0090 (+2 fixes) JÁ APLICADAS no banco de prod** (são aditivas e
-  **dormentes**: só agem com a flag `PICKUP_TO_PARTNER` ligada, que está **desligada**).
-- **Flag mestra:** `PICKUP_TO_PARTNER` (default OFF). Só tem efeito com `ROUTING_GEO=true` +
-  coordenada do cliente (pino do WhatsApp OU geocode do bairro, que exige `GOOGLE_MAPS_API_KEY`).
-- **Falta:** (1) deploy = merge `feat/pickup-to-partner` → `main` (Coolify auto-deploya);
-  (2) ligar `PICKUP_TO_PARTNER=true` no Coolify; (3) validar ao vivo;
-  (4) antifraude "cancelar+recriar como porta" (item à parte da matriz);
-  (5) documentar o contrato 0089/0090 em `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`.
+- **Branch:** `feat/pickup-to-partner` → **MERGEADA NO `main`** (push `59bf4eb`→`bb06eac`, 2026-06-07).
+- **STATUS: ✅ DEPLOYADO e LIVE.** Wallace fez o redeploy no Coolify (2026-06-07). Flag
+  `PICKUP_TO_PARTNER=true` ligada, migrations aplicadas, `GOOGLE_MAPS_API_KEY` preenchida.
+  **➡️ AGORA: FASE DE TESTE AO VIVO — ver §11.**
+- **Migrations 0089 + 0090 (+2 fixes) APLICADAS no banco de prod** (aditivas).
+- **Flag mestra:** `PICKUP_TO_PARTNER` (agora **ON**). Só age com `ROUTING_GEO=true` (ON) +
+  coordenada do cliente (pino do WhatsApp OU geocode do bairro via `GOOGLE_MAPS_API_KEY`, preenchida).
+- **Falta:** (1) **validar ao vivo** (§11); (2) antifraude "cancelar+recriar como porta"
+  (item à parte da matriz); (3) documentar o contrato 0089/0090 em
+  `docs/CONTRATO_ESTOQUE_FINANCEIRO_0076_0077.md`.
 
 ---
 
@@ -188,9 +192,8 @@ Prova de proximidade da entrega (já existia): `scripts/prova-geo-rede-test.ts`.
 
 ## 7. O que falta (próximos passos)
 
-1. **Deploy (decisão do Wallace):** ligar `PICKUP_TO_PARTNER=true` no Coolify + merge
-   `feat/pickup-to-partner` → `main` (Coolify auto-deploya no push pro main, ~2-3 min, lendo a flag).
-   Migrations já estão no banco. Validar ao vivo (ver §2 do resumo ao Wallace).
+1. ✅ ~~Deploy~~ **FEITO (2026-06-07):** flag `PICKUP_TO_PARTNER=true` ligada + merge no `main`
+   (`bb06eac`) + redeploy no Coolify (Wallace). **Agora: validar AO VIVO — ver §11.**
 2. **Antifraude "cancelar + recriar como porta"** (item à parte da MATRIZ): o borracheiro pode
    cancelar o 2w e relançar como "porta" pra fugir da comissão. Não tem bloqueio hard; precisa de
    DETECÇÃO na matriz (ex.: 2w cancelado + venda porta do mesmo cliente logo depois). O **motivo do
@@ -240,5 +243,70 @@ Prova de proximidade da entrega (já existia): `scripts/prova-geo-rede-test.ts`.
 - `project_regra_distribuicao_rede.md` / `project_config_loja_fase1.md` — regras da Rede.
 - `project_estoque_reservado_0076.md` / `project_financeiro_0077.md` — contrato estoque/financeiro base.
 - `parceiro_arquitetura.md` — DB é do parceiro; matriz agrega; prod = projeto Farejador.
+
+---
+
+## 11. ➡️ FASE DE TESTE AO VIVO (próxima IA: COMEÇAR AQUI)
+
+**Estamos LIVE em produção** (deploy + flag feitos 2026-06-07). O combinado com o Wallace é
+**validar a retirada de ponta a ponta ao vivo**. Banco: Supabase ref `aoqtgwzeyznycuakrdhp`;
+dados de produção = `environment='prod'`. **Use `execute_sql` (read-only) pra confirmar.**
+
+### Roteiro (Wallace faz no WhatsApp; a IA lê o banco)
+1. Apagar a conversa no Chatwoot (senão o webhook ressuscita a antiga e suja o teste).
+2. Mandar mensagem NOVA pedindo um pneu **pra RETIRAR**, informando o **bairro** (ou mandando pino).
+3. Avisar a IA pra ler o banco e confirmar os pontos A–F.
+
+### A) Pedido de retirada: reservado, na loja mais perto, 2W
+```sql
+SELECT po.id, po.fulfillment_mode, po.awaiting_pickup, po.source_tag, po.status,
+       pu.slug AS loja, po.total_amount, po.created_at
+FROM commerce.partner_orders po
+JOIN network.partner_units pu ON pu.unit_id = po.unit_id AND pu.environment = po.environment
+WHERE po.environment='prod' AND po.fulfillment_mode='pickup'
+ORDER BY po.created_at DESC LIMIT 5;
+```
+Esperar: `fulfillment_mode='pickup'`, `awaiting_pickup=true`, `source_tag='2w'`, `status='confirmed'`,
+`loja` = a borracharia **mais perto** do bairro (não a mais antiga/arbitrária).
+
+### B) Estoque RESERVADO (não baixado) + SEM recebível
+```sql
+SELECT item_name, quantity_on_hand, quantity_reserved
+FROM commerce.partner_stock_levels
+WHERE environment='prod' AND unit_id='<unit_id>' AND product_id='<product_id>';
+SELECT count(*) FROM finance.partner_receivables WHERE source_order_id='<order_id>';
+```
+Esperar: `quantity_reserved` subiu, `quantity_on_hand` intacto; recebíveis = **0**.
+
+### C) Proximidade de verdade (geo)
+No log do bot aparece `decideStoreForItemsGeo: loja escolhida no anel` com `unit_id`, `ring_km`, `road`.
+Com `ROUTING_GEO_ROAD_DISTANCE=true` + chave, a distância é de RUA (Distance Matrix) — dá pra cruzar
+no Google Cloud (métrica de uso da Distance Matrix) que a chave está sendo chamada.
+
+### D) Marcar retirado (Wallace clica no painel → "Retiradas aguardando")
+```sql
+SELECT awaiting_pickup, retrieved_at, status FROM commerce.partner_orders WHERE id='<order_id>';
+SELECT status, received_at, payment_method, amount FROM finance.partner_receivables WHERE source_order_id='<order_id>';
+```
+Esperar: `awaiting_pickup=false`, `retrieved_at` setado, `status='paid'`; recebível `received` (caixa
+entrou). Estoque: `quantity_on_hand` baixou, `quantity_reserved` voltou.
+
+### E) Cancelar com motivo (reserva volta + motivo gravado)
+```sql
+SELECT event_type, payload_after->>'reason' AS motivo, occurred_at
+FROM audit.events WHERE entity_id='<order_id>' AND event_type='partner_order_cancelled'
+ORDER BY occurred_at DESC LIMIT 3;
+```
+
+### F) Anti-trapaça 2W (origem imutável)
+`UPDATE commerce.partner_orders SET source_tag='porta' WHERE id='<order_id>'` deve dar **erro 23514**.
+
+### Cuidados
+- Cada conversa de teste gera ~50 linhas de `analytics.fact_evidence` (append-only, imutável) em prod.
+  Testar com parcimônia; pra muitos testes, usar o env `test`.
+- Dado de teste em prod (pedido/reserva) limpa-se com o próprio **cancelar** (libera a reserva).
+- O guardrail bloqueia DDL/escrita em prod sem ok do Wallace; leitura (`execute_sql` SELECT) é livre.
+
+---
 
 — Escrito por Claude Opus 4.8 (sessão 2026-06-07). 🐽
