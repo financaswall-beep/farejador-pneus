@@ -1,7 +1,10 @@
 # PLANO — Camada de Proximidade (GEO) do Motor de Distribuição da Rede
 
 > **Versão:** 2026-06-06 · **Autor:** Claude Opus 4.8 (orquestrador, domínio matriz/bot), a pedido do Wallace.
-> **Status:** spec aprovada pelo dono nas decisões-chave; pronta pra implementar **test-first, atrás de flag**.
+> **Status:** ✅ **IMPLEMENTADO E DEPLOYADO** (2026-06-07, flag OFF→sendo ligada em prod). 6 fases
+> feitas, 314 testes verdes, provado no env `test`. **Estado atual, próximos passos e armadilhas:
+> ver `docs/SESSAO_2026-06-07_CAMADA_GEO_HANDOFF.md`** (handoff p/ continuar). Esta spec continua
+> sendo a fonte das DECISÕES (§2) e da LÓGICA (§3).
 > **Para quem implementa:** este documento é **auto-contido**. Leia inteiro antes de codar. Tudo que é
 > decisão de negócio já está travado (§2). Tudo que é código tem pointer de arquivo/linha (§5).
 > **NÃO** ligar nada em produção sem passar pelos portões do §9.
