@@ -13,8 +13,10 @@
  * Princípio: proximidade FILTRA quem pode disputar; a justiça DECIDE quem ganha.
  */
 
-/** Anéis de ENTREGA em km, crescentes (decisão D1: 10 → 20 → 30). */
-export const GEO_RING_KM = [10, 20, 30] as const;
+/** Anéis de ENTREGA em km, crescentes (decisão D1: 10 → 20 → 30 → 40).
+ *  Teto subiu de 30 → 40 km em 2026-06-08 (decisão Wallace): a Rede busca a loja
+ *  mais perto que TEM o pneu até 40 km; acima disso cai na matriz (backstop). */
+export const GEO_RING_KM = [10, 20, 30, 40] as const;
 
 /** Raio único de RETIRADA em km (decisão D2: o cliente vai até a loja). */
 export const GEO_PICKUP_RADIUS_KM = 15;

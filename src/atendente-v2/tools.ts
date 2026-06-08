@@ -16,6 +16,7 @@ import {
   decideStoreForItems,
   decideStoreForItemsGeo,
   getPartnerStockMap,
+  resolveProductAvailabilityByProximity,
   materializePartnerOrder,
   getUnitMapsUrl,
   normalizeRegion,
@@ -360,11 +361,35 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
-        // C2: na região de parceiro, o estoque mostrado é o da loja que VAI atender.
+        // C2 (corrigido 2026-06-08): mesmo conserto do buscar_produto — estoque da loja
+        // que VAI ATENDER, por PROXIMIDADE (anel que cresce até 40 km). Loja perto sem o
+        // produto não vaza o número da matriz: anda pra a próxima loja que tem; nenhuma em
+        // alcance → mantém a matriz (backstop — decisão Wallace 2026-06-08).
         {
           const bairro = args.bairro as string | undefined;
-          if (bairro) {
-            const municipio = await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined);
+          const municipio = bairro
+            ? await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined)
+            : ((args.municipio as string | undefined) ?? null);
+          const customerLocation =
+            env.ROUTING_GEO && municipio
+              ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
+              : null;
+          if (customerLocation && municipio) {
+            const productIds = result.flatMap((v) => v.produtos.map((p) => p.product_id));
+            const avail = await resolveProductAvailabilityByProximity(client, environment, {
+              municipio,
+              customerLocation,
+              clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+              productIds,
+            });
+            for (const v of result) {
+              for (const p of v.produtos) {
+                const a = avail.get(p.product_id);
+                if (a) p.total_stock = a.available;
+              }
+            }
+          } else if (bairro && municipio) {
+            // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
             if (partnerStock.size > 0) {
               for (const v of result) {
@@ -389,11 +414,33 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
-        // C2: na região de parceiro, o estoque mostrado é o da loja que VAI atender.
+        // C2 (corrigido 2026-06-08): a busca mostra o estoque da loja que VAI ATENDER,
+        // achada por PROXIMIDADE — anel que cresce, MESMA régua do pedido (Madureira sem
+        // o pneu → Méier → … até 40 km). Loja perto sem o produto NÃO vaza o número da
+        // matriz: cai pra a próxima loja mais perto que tem; nenhuma em alcance → mantém
+        // a matriz (backstop, "acima do raio cai na matriz" — decisão Wallace 2026-06-08).
         {
           const bairro = args.bairro as string | undefined;
-          if (bairro) {
-            const municipio = await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined);
+          const municipio = bairro
+            ? await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined)
+            : ((args.municipio as string | undefined) ?? null);
+          const customerLocation =
+            env.ROUTING_GEO && municipio
+              ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
+              : null;
+          if (customerLocation && municipio) {
+            const avail = await resolveProductAvailabilityByProximity(client, environment, {
+              municipio,
+              customerLocation,
+              clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+              productIds: result.map((p) => p.product_id),
+            });
+            for (const p of result) {
+              const a = avail.get(p.product_id);
+              if (a) p.total_stock_available = a.available;
+            }
+          } else if (bairro && municipio) {
+            // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
             if (partnerStock.size > 0) {
               for (const p of result) {

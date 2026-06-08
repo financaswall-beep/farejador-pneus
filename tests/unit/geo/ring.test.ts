@@ -41,11 +41,11 @@ describe('selectWithinExpandingRing', () => {
   });
 
   it('só tem LONGE (além do maior anel) → pool vazio, onlyFar ASC por km', () => {
-    const lojas = [{ id: 'X', km: 40 }, { id: 'Y', km: 35 }];
+    const lojas = [{ id: 'X', km: 55 }, { id: 'Y', km: 45 }];
     const r = selectWithinExpandingRing(lojas, dist, GEO_RING_KM);
     expect(r.pool).toEqual([]);
     expect(r.ringKm).toBeNull();
-    expect(r.onlyFar.map((l) => l.id)).toEqual(['Y', 'X']); // 35 antes de 40
+    expect(r.onlyFar.map((l) => l.id)).toEqual(['Y', 'X']); // 45 antes de 55
   });
 
   it('retirada: anel único de 15 km', () => {
@@ -76,7 +76,7 @@ describe('selectWithinExpandingRing', () => {
   });
 
   it('constantes de negócio (D1/D2)', () => {
-    expect([...GEO_RING_KM]).toEqual([10, 20, 30]);
+    expect([...GEO_RING_KM]).toEqual([10, 20, 30, 40]);
     expect(GEO_PICKUP_RADIUS_KM).toBe(15);
   });
 });

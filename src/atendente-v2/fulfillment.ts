@@ -858,6 +858,104 @@ export async function decideStoreForItemsGeo(
   return { kind: 'matriz' };
 }
 
+/** Loja que vai atender um produto + quanto ela tem disponível. */
+export interface ProductAvailability {
+  unitId: string;
+  available: number;
+}
+
+/**
+ * Disponibilidade por PROXIMIDADE pra a BUSCA (buscar_produto / C2). Pra cada
+ * `product_id`, acha a loja parceira MAIS PERTO do cliente — dentro do maior anel
+ * de ENTREGA (régua D1, hoje 40 km) — que TEM o produto disponível, e devolve a
+ * loja + a quantidade DELA.
+ *
+ * MESMA régua do `decideStoreForItemsGeo` (candidatos → modo+cobertura de entrega
+ * → estoque → anel), só SEM a régua de justiça: a busca só responde "tem? quantos?"
+ * e não materializa pedido, então basta a loja mais perto que tem (Madureira sem o
+ * pneu → Méier → … até o teto).
+ *
+ * Produto SEM nenhuma loja em alcance NÃO entra no mapa → o chamador mantém o
+ * estoque da MATRIZ (backstop: "acima do raio cai na matriz", decisão Wallace
+ * 2026-06-08). Assim a busca nunca diverge do que o pedido vai fazer.
+ */
+export async function resolveProductAvailabilityByProximity(
+  client: PoolClient,
+  environment: Environment,
+  input: {
+    municipio: string | null;
+    customerLocation: GeoPoint;
+    clientNeighborhoodCanonical: string | null;
+    productIds: string[];
+  },
+): Promise<Map<string, ProductAvailability>> {
+  const out = new Map<string, ProductAvailability>();
+  if (input.productIds.length === 0) return out;
+
+  const candidates = await resolveUnitCandidates(client, environment, input.municipio);
+  if (candidates.length === 0) return out;
+
+  // modo (entrega) + cobertura declarada — MESMA porta do pedido de entrega.
+  const servableIds = new Set(
+    filterByModeAndCoverage(
+      candidates.map(toGeoRoutingCandidate),
+      'delivery',
+      input.clientNeighborhoodCanonical,
+    ).map((c) => c.unitId),
+  );
+  const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
+  if (eligible.length === 0) return out;
+
+  // Distância em LINHA RETA (haversine) de propósito: a busca é caminho QUENTE (roda a
+  // cada "tem o pneu?") — não gasta Google Distance Matrix por pergunta. A distância de
+  // RUA (precisa, paga) fica pro PEDIDO, que roda uma vez. "Tem? / não tem?" não muda
+  // com isso: se a loja perto estiver no limite, a matriz é backstop (acima do raio cai
+  // na matriz — decisão Wallace 2026-06-08).
+  const distanceByUnit = new Map(
+    eligible.map((c) => [c.ctx.unitId, haversineKm(input.customerLocation, c.location!)] as const),
+  );
+  const maxRing = Math.max(...GEO_RING_KM);
+
+  // lojas dentro do teto, da MAIS PERTO pra mais longe.
+  const inRange = eligible
+    .filter((c) => (distanceByUnit.get(c.ctx.unitId) ?? Infinity) <= maxRing)
+    .sort((a, b) => distanceByUnit.get(a.ctx.unitId)! - distanceByUnit.get(b.ctx.unitId)!);
+  if (inRange.length === 0) return out;
+
+  // estoque disponível por (unidade, produto) numa tacada (mesma régua do mapProductToPartnerStock).
+  const stock = await client.query<{ unit_id: string; product_id: string; disponivel: string }>(
+    `SELECT unit_id, product_id, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
+     FROM commerce.partner_stock_levels
+     WHERE environment = $1
+       AND unit_id = ANY($2)
+       AND product_id = ANY($3)
+       AND is_tracked = true
+       AND quantity_on_hand IS NOT NULL
+       AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0`,
+    [environment, inRange.map((c) => c.ctx.unitId), input.productIds],
+  );
+  const byUnit = new Map<string, Map<string, number>>();
+  for (const r of stock.rows) {
+    let m = byUnit.get(r.unit_id);
+    if (!m) byUnit.set(r.unit_id, (m = new Map()));
+    // unidade pode ter +1 linha pro mesmo produto → fica com o MAIOR disponível
+    // (mesma escolha do mapProductToPartnerStock: ORDER BY disponivel DESC LIMIT 1).
+    m.set(r.product_id, Math.max(m.get(r.product_id) ?? 0, Number(r.disponivel)));
+  }
+
+  // pra cada produto, a 1ª loja em alcance (mais perto) que tem ganha.
+  for (const productId of input.productIds) {
+    for (const c of inRange) {
+      const q = byUnit.get(c.ctx.unitId)?.get(productId);
+      if (q != null && q > 0) {
+        out.set(productId, { unitId: c.ctx.unitId, available: q });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export interface BotPartnerOrderItem {
   partner_stock_id: string;
   quantity: number;
