@@ -26,6 +26,7 @@ import {
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
 import { getLatestCustomerLocation } from './customer-location.js';
+import { getRecentProductIds } from './conversation-products.js';
 import { geocodeAddress } from '../shared/geo/google-maps.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
 import { createHash } from 'node:crypto';
@@ -466,7 +467,13 @@ export async function executeTool(
         // com o que o pedido vai cobrar. Com ROUTING_GEO, a decisão é por PROXIMIDADE
         // (anel) e pode devolver "só tem longe" (caso E) → o bot responde com honestidade
         // (D3). decideStoreGeoOrFallback é a fonte única (mesma decisão do criar_pedido).
-        const produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
+        let produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
+        // Memória do produto (furo raiz): se o LLM não passou os produtos, usa o que o
+        // bot já buscou na conversa — pra a cotação rotear pelo MESMO produto do pedido.
+        if (produtos.length === 0) {
+          const ids = await getRecentProductIds(client, conversationId);
+          produtos = ids.map((id) => ({ product_id: id, quantidade: 1 }));
+        }
         if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
           const municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
           const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
@@ -521,9 +528,15 @@ export async function executeTool(
         if (!municipio && bairro) {
           municipio = await resolveMunicipioFromBairro(client, environment, bairro, null);
         }
-        const productIds = Array.isArray(args.product_ids)
+        let productIds = Array.isArray(args.product_ids)
           ? (args.product_ids as unknown[]).filter((x): x is string => typeof x === 'string')
           : [];
+        // Memória do produto (furo raiz): se o LLM não passou product_ids, usa o pneu que o
+        // bot já buscou na conversa → a loja indicada passa a ser a MESMA do pedido (régua +
+        // estoque + anel de retirada), em vez de cair no getUnitMapsUrl sem régua.
+        if (productIds.length === 0) {
+          productIds = await getRecentProductIds(client, conversationId);
+        }
         // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
         // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
         const customerLocation = await resolveCustomerLocation(client, environment, conversationId, bairro, municipio);
