@@ -547,7 +547,9 @@ export async function executeTool(
             }
           } else if (geo.kind === 'only_far') {
             // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada (15 km).
-            return JSON.stringify({ encontrado: false, motivo: 'retirada_so_longe', nome_loja_distante: geo.unitName, distancia_km: Math.round(geo.distanceKm) });
+            // sem distancia_km de proposito: o "longe" é gatilho negativo (decisão Wallace) —
+            // o bot só nomeia a loja e oferece a entrega como solução positiva.
+            return JSON.stringify({ encontrado: false, motivo: 'retirada_so_longe', nome_loja_distante: geo.unitName });
           } else {
             // matriz: nenhum parceiro perto tem o pneu pra retirar.
             return JSON.stringify({ encontrado: false, motivo: 'sem_loja_com_estoque_perto' });
