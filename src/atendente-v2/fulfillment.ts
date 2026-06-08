@@ -906,13 +906,13 @@ export async function resolveProductAvailabilityByProximity(
   const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
   if (eligible.length === 0) return out;
 
-  // Distância em LINHA RETA (haversine) de propósito: a busca é caminho QUENTE (roda a
-  // cada "tem o pneu?") — não gasta Google Distance Matrix por pergunta. A distância de
-  // RUA (precisa, paga) fica pro PEDIDO, que roda uma vez. "Tem? / não tem?" não muda
-  // com isso: se a loja perto estiver no limite, a matriz é backstop (acima do raio cai
-  // na matriz — decisão Wallace 2026-06-08).
-  const distanceByUnit = new Map(
-    eligible.map((c) => [c.ctx.unitId, haversineKm(input.customerLocation, c.location!)] as const),
+  // Distância de RUA (Google Distance Matrix) — a MESMA do pedido. Decisão Wallace
+  // 2026-06-08: a busca usa o cálculo CORRETO (precisão acima de custo), pra a busca e o
+  // pedido NUNCA divergirem. resolveDistances usa rua quando ROUTING_GEO_ROAD_DISTANCE +
+  // chave (prod); sem isso degrada pra linha reta (haversine).
+  const distanceByUnit = await resolveDistances(
+    input.customerLocation,
+    eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
   );
   const maxRing = Math.max(...GEO_RING_KM);
 
