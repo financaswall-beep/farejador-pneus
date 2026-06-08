@@ -318,6 +318,7 @@ export async function mapProductToPartnerStock(
      WHERE environment = $1
        AND unit_id = $2
        AND product_id = $3
+       AND deleted_at IS NULL
        AND is_tracked = true
        AND quantity_on_hand IS NOT NULL
        AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) >= $4
@@ -507,6 +508,7 @@ export async function getPartnerStockMap(
      WHERE environment = $1
        AND unit_id = $2
        AND product_id IS NOT NULL
+       AND deleted_at IS NULL
        AND is_tracked = true
        AND quantity_on_hand IS NOT NULL
        AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0`,
@@ -929,6 +931,7 @@ export async function resolveProductAvailabilityByProximity(
      WHERE environment = $1
        AND unit_id = ANY($2)
        AND product_id = ANY($3)
+       AND deleted_at IS NULL
        AND is_tracked = true
        AND quantity_on_hand IS NOT NULL
        AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0`,

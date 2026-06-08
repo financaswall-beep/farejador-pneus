@@ -68,6 +68,14 @@ async function main(): Promise<void> {
     const maisPerto = inRange[0]!;
     const segunda = inRange[1]!;
 
+    // normaliza DENTRO da transação: restaura qualquer linha em alcance que esteja
+    // soft-deleted (a Madureira está apagada no prod agora) → baseline determinístico.
+    await client.query(
+      `UPDATE commerce.partner_stock_levels SET deleted_at = NULL
+       WHERE environment = $1 AND unit_id = ANY($2) AND product_id = $3 AND deleted_at IS NOT NULL`,
+      [ENV, inRange.map((e) => e.unitId), PRODUTO],
+    );
+
     // ── 1) BASELINE: a busca devolve a loja MAIS PERTO que tem ──
     const a1 = await resolveProductAvailabilityByProximity(client, ENV, {
       municipio: MUNICIPIO, customerLocation: IRAJA, clientNeighborhoodCanonical: null, productIds: [PRODUTO],
@@ -75,22 +83,24 @@ async function main(): Promise<void> {
     check('1.baseline: achou o produto numa loja', a1.has(PRODUTO), JSON.stringify(a1.get(PRODUTO)));
     check('1.baseline: é a loja MAIS PERTO', a1.get(PRODUTO)?.unitId === maisPerto.unitId, `${a1.get(PRODUTO)?.unitId} esperado ${maisPerto.nome}`);
 
-    // ── 2) zera a MAIS PERTO → busca anda pra a 2ª mais perto (o bug do Wallace) ──
+    // ── 2) APAGA a MAIS PERTO pelo PAINEL (soft-delete = deleted_at) → busca anda pra a
+    //       2ª mais perto. Reproduz EXATO o caso do Wallace: ele apagou pelo painel da
+    //       Madureira (deleted_at marcado, quantity_on_hand fica 10) e o bot ia pra lá. ──
     await client.query(
-      `UPDATE commerce.partner_stock_levels SET quantity_on_hand = 0
+      `UPDATE commerce.partner_stock_levels SET deleted_at = now()
        WHERE environment = $1 AND unit_id = $2 AND product_id = $3`,
       [ENV, maisPerto.unitId, PRODUTO],
     );
     const a2 = await resolveProductAvailabilityByProximity(client, ENV, {
       municipio: MUNICIPIO, customerLocation: IRAJA, clientNeighborhoodCanonical: null, productIds: [PRODUTO],
     });
-    check('2.com a mais perto ZERADA: ainda acha o produto', a2.has(PRODUTO), JSON.stringify(a2.get(PRODUTO)));
-    check('2.NÃO indica mais a loja zerada', a2.get(PRODUTO)?.unitId !== maisPerto.unitId, `indicou ${a2.get(PRODUTO)?.unitId}`);
+    check('2.com a mais perto APAGADA no painel: ainda acha o produto', a2.has(PRODUTO), JSON.stringify(a2.get(PRODUTO)));
+    check('2.NÃO indica mais a loja apagada (respeita deleted_at)', a2.get(PRODUTO)?.unitId !== maisPerto.unitId, `indicou ${a2.get(PRODUTO)?.unitId}`);
     check('2.andou pra a 2ª mais perto', a2.get(PRODUTO)?.unitId === segunda.unitId, `${a2.get(PRODUTO)?.unitId} esperado ${segunda.nome}`);
 
-    // ── 3) zera TODAS em alcance → cai na matriz (função não devolve nada p/ o produto) ──
+    // ── 3) APAGA TODAS em alcance → cai na matriz (função não devolve nada p/ o produto) ──
     await client.query(
-      `UPDATE commerce.partner_stock_levels SET quantity_on_hand = 0
+      `UPDATE commerce.partner_stock_levels SET deleted_at = now()
        WHERE environment = $1 AND unit_id = ANY($2) AND product_id = $3`,
       [ENV, inRange.map((e) => e.unitId), PRODUTO],
     );
