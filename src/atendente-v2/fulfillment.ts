@@ -469,20 +469,24 @@ export async function getUnitMapsUrl(
     }
     if (rows.length === 1) return strip(rows[0]!);
     if (rows.length > 1) {
-      // VÁRIAS lojas cobrem o município → a MAIS PERTO do cliente (não a mais antiga).
-      // Sem coordenada do cliente não dá pra saber a mais perto → null (o bot pergunta bairro/pino).
+      // VÁRIAS lojas cobrem o município → a MAIS PERTO do cliente por ESTRADA (igual ao
+      // pedido/busca — decisão Wallace 2026-06-08: cálculo de rua, não linha reta. De Bangu
+      // a Barra é perto em reta mas LONGE de carro; o Méier é o mais perto de rua). Sem
+      // coordenada do cliente → null (o bot pergunta o bairro/pino).
       const origin = opts.customerLocation;
       if (!origin) return null;
-      const ranked = rows
+      const withCoords = rows
         .map((row) => {
           const lat = row.latitude == null ? NaN : Number(row.latitude);
           const lng = row.longitude == null ? NaN : Number(row.longitude);
-          const dist = Number.isFinite(lat) && Number.isFinite(lng) ? haversineKm(origin, { lat, lng }) : Infinity;
-          return { row, dist };
+          return Number.isFinite(lat) && Number.isFinite(lng) ? { row, location: { lat, lng } as GeoPoint } : null;
         })
-        .filter((x) => Number.isFinite(x.dist))
-        .sort((a, b) => a.dist - b.dist);
-      if (ranked.length === 0) return null; // nenhuma loja com coordenada → não chuta
+        .filter((x): x is { row: MapsRow; location: GeoPoint } => x != null);
+      if (withCoords.length === 0) return null; // nenhuma loja com coordenada → não chuta
+      const dist = await resolveDistances(origin, withCoords.map((x) => ({ unitId: x.row.unit_id, location: x.location })));
+      const ranked = withCoords
+        .map((x) => ({ row: x.row, km: dist.get(x.row.unit_id) ?? Infinity }))
+        .sort((a, b) => a.km - b.km);
       return strip(ranked[0]!.row);
     }
     // rows.length === 0 → cai pro fallback de mono-loja abaixo.
