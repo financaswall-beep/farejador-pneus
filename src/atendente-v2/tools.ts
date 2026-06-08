@@ -752,8 +752,13 @@ async function criarPedido(
   // parceiro mais perto RESERVANDO o pneu (decisão Wallace 2026-06-07).
   let partner: PartnerOrderRouting | null = null;
 
-  if (modalidade === 'delivery' && geoResolutionId) {
-    const municipio = await resolveMunicipioFromGeo(client, environment, geoResolutionId);
+  if (modalidade === 'delivery') {
+    // Município do geo (se cotou frete) OU do bairro. Sem este OR, entrega SEM
+    // geo_resolution_id caía 100% na matriz mesmo havendo parceiro com estoque na cidade
+    // (furo #3 da auditoria) → parceiro perdia a venda e a régua não contava o lead.
+    const municipio = geoResolutionId
+      ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
+      : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
     const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
       municipio,
       items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
