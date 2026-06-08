@@ -68,13 +68,16 @@ export function filterByModeAndCoverage<T extends GeoRoutingCandidate>(
   });
 }
 
-/** Anel de entrega vs retirada — a régua de raio por modalidade (D1/D2). */
+/** Anéis de entrega vs retirada — a régua de raio por modalidade (D1/D2).
+ *  Ambas as modalidades usam ANÉIS crescentes (faixas): a loja na faixa mais perto
+ *  ganha; lojas na mesma faixa revezam pela régua. (Retirada deixou de ser raio único
+ *  pra ter faixas de ~5 km — decisão Wallace 2026-06-08.) */
 export function ringsForModalidade(
   modalidade: Modalidade,
   deliveryRings: readonly number[],
-  pickupRadiusKm: number,
+  pickupRings: readonly number[],
 ): readonly number[] {
-  return modalidade === 'pickup' ? [pickupRadiusKm] : deliveryRings;
+  return modalidade === 'pickup' ? pickupRings : deliveryRings;
 }
 
 // Re-export pra o chamador montar o anel sobre o resultado destes filtros.

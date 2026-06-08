@@ -27,7 +27,7 @@ import { logger } from '../shared/logger.js';
 import { env } from '../shared/config/env.js';
 import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
-import { GEO_PICKUP_RADIUS_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
+import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { roadDistanceKm } from '../shared/geo/google-maps.js';
 import { filterByModeAndCoverage, ringsForModalidade, type GeoRoutingCandidate } from './geo-routing.js';
 
@@ -860,7 +860,7 @@ export async function decideStoreForItemsGeo(
   if (fulfillable.length === 0) return { kind: 'matriz' };
 
   // ④b/④c anel que cresce (D1/D2) sobre os que têm o pedido completo.
-  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RADIUS_KM);
+  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
   const selection = selectWithinExpandingRing(fulfillable, (f) => f.distanceKm, rings);
 
   // ⑤ régua de justiça entre o pool (D4) — entre os perto o bastante, decide a justiça.

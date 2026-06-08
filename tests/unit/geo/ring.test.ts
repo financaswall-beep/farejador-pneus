@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GEO_PICKUP_RADIUS_KM,
+  GEO_PICKUP_RING_KM,
   GEO_RING_KM,
   selectWithinExpandingRing,
 } from '../../../src/shared/geo/ring.js';
@@ -78,5 +79,23 @@ describe('selectWithinExpandingRing', () => {
   it('constantes de negócio (D1/D2)', () => {
     expect([...GEO_RING_KM]).toEqual([10, 20, 30, 40]);
     expect(GEO_PICKUP_RADIUS_KM).toBe(15);
+    expect([...GEO_PICKUP_RING_KM]).toEqual([5, 10, 15]);
+  });
+
+  it('retirada em faixas: loja na faixa mais perto ganha; mesma faixa reveza', () => {
+    // Méier a 2 km (faixa ≤5) ganha sozinho; Tijuca a 9 km (faixa 10) nem entra no pool.
+    const cachambi = selectWithinExpandingRing(
+      [{ id: 'Méier', km: 2 }, { id: 'Tijuca', km: 9 }], dist, GEO_PICKUP_RING_KM);
+    expect(cachambi.ringKm).toBe(5);
+    expect(cachambi.pool.map((l) => l.id)).toEqual(['Méier']);
+    // Duas lojas coladas (mesma faixa ≤5) → as duas no pool (régua desempata fora daqui).
+    const coladas = selectWithinExpandingRing(
+      [{ id: 'Méier-1', km: 1 }, { id: 'Méier-2', km: 2 }], dist, GEO_PICKUP_RING_KM);
+    expect(coladas.ringKm).toBe(5);
+    expect(coladas.pool.map((l) => l.id)).toEqual(['Méier-1', 'Méier-2']);
+    // Acima de 15 km → só longe (cai na matriz).
+    const longe = selectWithinExpandingRing([{ id: 'X', km: 20 }], dist, GEO_PICKUP_RING_KM);
+    expect(longe.pool).toEqual([]);
+    expect(longe.onlyFar.map((l) => l.id)).toEqual(['X']);
   });
 });

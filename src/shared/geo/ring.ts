@@ -18,8 +18,14 @@
  *  mais perto que TEM o pneu até 40 km; acima disso cai na matriz (backstop). */
 export const GEO_RING_KM = [10, 20, 30, 40] as const;
 
-/** Raio único de RETIRADA em km (decisão D2: o cliente vai até a loja). */
+/** Raio MÁXIMO de RETIRADA em km (decisão D2: o cliente vai até a loja). Acima → matriz. */
 export const GEO_PICKUP_RADIUS_KM = 15;
+
+/** Anéis de RETIRADA, crescentes (decisão Wallace 2026-06-08: faixas de ~5 km).
+ *  Igual à entrega, mas passo menor: a loja numa faixa MAIS PERTO ganha direto; lojas
+ *  na MESMA faixa (~5 km) revezam pela régua. Resolve o "manda longe por justiça"
+ *  (Cachambi: Méier a 2 km ganha; Méier-1/Méier-2 na mesma esquina revezam). Teto 15 km. */
+export const GEO_PICKUP_RING_KM = [5, 10, 15] as const;
 
 export interface RingSelection<T> {
   /** Elegíveis dentro do menor anel não-vazio (entram na régua de justiça). */

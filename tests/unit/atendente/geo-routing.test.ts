@@ -76,8 +76,8 @@ describe('filterByModeAndCoverage', () => {
 });
 
 describe('ringsForModalidade', () => {
-  it('entrega usa os anéis crescentes; retirada usa o raio único', () => {
-    expect(ringsForModalidade('delivery', [10, 20, 30], 15)).toEqual([10, 20, 30]);
-    expect(ringsForModalidade('pickup', [10, 20, 30], 15)).toEqual([15]);
+  it('entrega usa os anéis de entrega; retirada usa os anéis de retirada (faixas)', () => {
+    expect(ringsForModalidade('delivery', [10, 20, 30], [5, 10, 15])).toEqual([10, 20, 30]);
+    expect(ringsForModalidade('pickup', [10, 20, 30], [5, 10, 15])).toEqual([5, 10, 15]);
   });
 });
