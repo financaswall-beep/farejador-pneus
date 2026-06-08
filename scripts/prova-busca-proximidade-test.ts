@@ -12,7 +12,7 @@
  *   npx tsx --env-file=.env scripts/prova-busca-proximidade-test.ts
  */
 import { pool } from '../src/persistence/db.js';
-import { resolveProductAvailabilityByProximity, resolveUnitCandidates } from '../src/atendente-v2/fulfillment.js';
+import { resolveProductAvailabilityByProximity, resolveUnitCandidates, getUnitMapsUrl } from '../src/atendente-v2/fulfillment.js';
 import { filterByModeAndCoverage } from '../src/atendente-v2/geo-routing.js';
 import { haversineKm } from '../src/shared/geo/haversine.js';
 import { env } from '../src/shared/config/env.js';
@@ -82,6 +82,9 @@ async function main(): Promise<void> {
     });
     check('1.baseline: achou o produto numa loja', a1.has(PRODUTO), JSON.stringify(a1.get(PRODUTO)));
     check('1.baseline: é a loja MAIS PERTO', a1.get(PRODUTO)?.unitId === maisPerto.unitId, `${a1.get(PRODUTO)?.unitId} esperado ${maisPerto.nome}`);
+    // localizacao_loja (getUnitMapsUrl) com product_ids → nome da loja que TEM o pneu
+    const loja1 = await getUnitMapsUrl(client, ENV, { municipio: MUNICIPIO, customerLocation: IRAJA, productIds: [PRODUTO] });
+    check('1.localizacao_loja indica a MAIS PERTO que tem', loja1?.nome_loja === maisPerto.nome, `${loja1?.nome_loja} esperado ${maisPerto.nome}`);
 
     // ── 2) APAGA a MAIS PERTO pelo PAINEL (soft-delete = deleted_at) → busca anda pra a
     //       2ª mais perto. Reproduz EXATO o caso do Wallace: ele apagou pelo painel da
@@ -97,6 +100,10 @@ async function main(): Promise<void> {
     check('2.com a mais perto APAGADA no painel: ainda acha o produto', a2.has(PRODUTO), JSON.stringify(a2.get(PRODUTO)));
     check('2.NÃO indica mais a loja apagada (respeita deleted_at)', a2.get(PRODUTO)?.unitId !== maisPerto.unitId, `indicou ${a2.get(PRODUTO)?.unitId}`);
     check('2.andou pra a 2ª mais perto', a2.get(PRODUTO)?.unitId === segunda.unitId, `${a2.get(PRODUTO)?.unitId} esperado ${segunda.nome}`);
+    // localizacao_loja: o NOME indicado pro cliente NÃO pode ser a loja apagada (o furo do transcript)
+    const loja2 = await getUnitMapsUrl(client, ENV, { municipio: MUNICIPIO, customerLocation: IRAJA, productIds: [PRODUTO] });
+    check('2.localizacao_loja NÃO indica a loja apagada', loja2?.nome_loja !== maisPerto.nome, `indicou ${loja2?.nome_loja}`);
+    check('2.localizacao_loja indica a 2ª mais perto (que tem)', loja2?.nome_loja === segunda.nome, `${loja2?.nome_loja} esperado ${segunda.nome}`);
 
     // ── 3) APAGA TODAS em alcance → cai na matriz (função não devolve nada p/ o produto) ──
     await client.query(
@@ -108,6 +115,9 @@ async function main(): Promise<void> {
       municipio: MUNICIPIO, customerLocation: IRAJA, clientNeighborhoodCanonical: null, productIds: [PRODUTO],
     });
     check('3.TODAS em alcance zeradas: nenhuma loja → cai na matriz (sem override)', !a3.has(PRODUTO), JSON.stringify([...a3]));
+    // localizacao_loja: nenhuma loja perto tem → null (bot não chuta loja; responde honesto)
+    const loja3 = await getUnitMapsUrl(client, ENV, { municipio: MUNICIPIO, customerLocation: IRAJA, productIds: [PRODUTO] });
+    check('3.localizacao_loja não indica loja (null) quando ninguém tem', loja3 === null, JSON.stringify(loja3));
   } catch (e) {
     console.error('\nERRO NA PROVA:', e instanceof Error ? e.stack : e);
     falhas++;

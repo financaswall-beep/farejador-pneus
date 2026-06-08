@@ -200,12 +200,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'localizacao_loja',
-      description: 'Retorna nome, endereço escrito, horário e link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA. SEMPRE passe o bairro do cliente — é o que acha a loja MAIS PERTO dele; sem o bairro pode vir a loja errada. Se voltar encontrado:false (motivo sem_localizacao_pergunte_bairro), PERGUNTE o bairro antes de indicar qualquer loja. NUNCA invente um link — só mande o maps_url retornado aqui.',
+      description: 'Retorna nome, endereço escrito, horário e link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA. SEMPRE passe o bairro do cliente — é o que acha a loja MAIS PERTO dele. Se o cliente já escolheu um pneu, SEMPRE passe product_ids (os product_id vindos de buscar_produto/buscar_compatibilidade) — assim a loja indicada é a que REALMENTE TEM o produto, não só a mais perto. encontrado:false motivo sem_localizacao_pergunte_bairro → PERGUNTE o bairro. encontrado:false motivo sem_loja_com_estoque_perto → a loja mais perto NÃO tem esse pneu: seja honesto e ofereça alternativa (entrega de uma loja que tem / medida equivalente / avisar quando chegar), NÃO indique loja. NUNCA invente um link — só mande o maps_url retornado aqui.',
       parameters: {
         type: 'object',
         properties: {
           bairro: { type: 'string', description: 'Bairro do cliente, se informado (ajuda a achar a loja que atende).' },
           municipio: { type: 'string', description: 'Cidade do cliente, se informada.' },
+          product_ids: { type: 'array', items: { type: 'string' }, description: 'product_id dos pneus que o cliente quer (de buscar_produto/buscar_compatibilidade). Passe SEMPRE que houver pneu escolhido — a loja indicada passa a ser a que TEM o item em estoque.' },
         },
         required: [],
         additionalProperties: false,
@@ -519,13 +520,22 @@ export async function executeTool(
         if (!municipio && bairro) {
           municipio = await resolveMunicipioFromBairro(client, environment, bairro, null);
         }
+        const productIds = Array.isArray(args.product_ids)
+          ? (args.product_ids as unknown[]).filter((x): x is string => typeof x === 'string')
+          : [];
         // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
         // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
         const customerLocation = await resolveCustomerLocation(client, environment, conversationId, bairro, municipio);
-        const loc = await getUnitMapsUrl(client, environment, { bairro, municipio, customerLocation });
-        // Sem loja resolvida (várias lojas + bairro desconhecido) → o bot tem que PERGUNTAR
-        // o bairro antes de indicar qualquer loja (nunca chutar a mais antiga = Itaboraí).
-        if (!loc) return JSON.stringify({ encontrado: false, motivo: 'sem_localizacao_pergunte_bairro' });
+        const loc = await getUnitMapsUrl(client, environment, { bairro, municipio, customerLocation, productIds });
+        if (!loc) {
+          // Com produto + coordenada: null = nenhuma loja PERTO tem o item em estoque (ativo).
+          // Seja honesto, NÃO chute a loja mais perto sem estoque (caso Madureira apagada).
+          if (productIds.length > 0 && customerLocation) {
+            return JSON.stringify({ encontrado: false, motivo: 'sem_loja_com_estoque_perto' });
+          }
+          // Senão (várias lojas + bairro desconhecido) → o bot PERGUNTA o bairro antes de indicar.
+          return JSON.stringify({ encontrado: false, motivo: 'sem_localizacao_pergunte_bairro' });
+        }
         return JSON.stringify({
           encontrado: true,
           nome_loja: loc.nome_loja,

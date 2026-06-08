@@ -417,7 +417,7 @@ export async function resolveMunicipioFromBairro(
 export async function getUnitMapsUrl(
   client: PoolClient,
   environment: Environment,
-  opts: { bairro?: string | null; municipio?: string | null; customerLocation?: GeoPoint | null },
+  opts: { bairro?: string | null; municipio?: string | null; customerLocation?: GeoPoint | null; productIds?: string[] },
 ): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null } | null> {
   let municipio = opts.municipio ?? null;
   if (!municipio && opts.bairro) {
@@ -425,8 +425,9 @@ export async function getUnitMapsUrl(
   }
   const m = normalizeRegion(municipio);
   const cols =
-    'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours, pu.latitude, pu.longitude';
+    'pu.unit_id AS unit_id, COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours, pu.latitude, pu.longitude';
   type MapsRow = {
+    unit_id: string;
     nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null;
     latitude: string | number | null; longitude: string | number | null;
   };
@@ -447,7 +448,25 @@ export async function getUnitMapsUrl(
         ORDER BY length(uc.municipio) DESC, pu.created_at ASC`,
       [environment, m],
     );
-    const rows = r.rows;
+    let rows = r.rows;
+    // Ciente de ESTOQUE (decisão Wallace 2026-06-08): com produto conhecido, só indica
+    // loja que TEM o(s) item(ns) ATIVO(s) — respeita deleted_at, igual ao pedido. Nenhuma
+    // loja perto com o produto → null (o bot é honesto, não chuta a mais perto sem estoque).
+    if (opts.productIds && opts.productIds.length > 0) {
+      const st = await client.query<{ unit_id: string }>(
+        `SELECT unit_id
+           FROM commerce.partner_stock_levels
+          WHERE environment = $1 AND unit_id = ANY($2) AND product_id = ANY($3)
+            AND deleted_at IS NULL AND is_tracked = true AND quantity_on_hand IS NOT NULL
+            AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0
+          GROUP BY unit_id
+          HAVING COUNT(DISTINCT product_id) = $4`,
+        [environment, rows.map((x) => x.unit_id), opts.productIds, opts.productIds.length],
+      );
+      const inStock = new Set(st.rows.map((x) => x.unit_id));
+      rows = rows.filter((x) => inStock.has(x.unit_id));
+      if (rows.length === 0) return null;
+    }
     if (rows.length === 1) return strip(rows[0]!);
     if (rows.length > 1) {
       // VÁRIAS lojas cobrem o município → a MAIS PERTO do cliente (não a mais antiga).
