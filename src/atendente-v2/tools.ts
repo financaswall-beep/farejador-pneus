@@ -199,7 +199,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'localizacao_loja',
-      description: 'Retorna o link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA (pra mandar a localização da loja). NUNCA invente um link — só mande o maps_url retornado aqui.',
+      description: 'Retorna nome, endereço escrito, horário e link do Google Maps da loja que atende o cliente. Use quando o cliente perguntar onde fica / como chegar / o endereço, ou quando escolher RETIRADA. SEMPRE passe o bairro do cliente — é o que acha a loja MAIS PERTO dele; sem o bairro pode vir a loja errada. Se voltar encontrado:false (motivo sem_localizacao_pergunte_bairro), PERGUNTE o bairro antes de indicar qualquer loja. NUNCA invente um link — só mande o maps_url retornado aqui.',
       parameters: {
         type: 'object',
         properties: {
@@ -471,8 +471,16 @@ export async function executeTool(
           bairro: args.bairro as string | undefined,
           municipio: args.municipio as string | undefined,
         });
-        if (!loc || !loc.maps_url) return JSON.stringify({ encontrado: false });
-        return JSON.stringify({ encontrado: true, nome_loja: loc.nome_loja, maps_url: loc.maps_url });
+        // Sem loja resolvida (várias lojas + bairro desconhecido) → o bot tem que PERGUNTAR
+        // o bairro antes de indicar qualquer loja (nunca chutar a mais antiga = Itaboraí).
+        if (!loc) return JSON.stringify({ encontrado: false, motivo: 'sem_localizacao_pergunte_bairro' });
+        return JSON.stringify({
+          encontrado: true,
+          nome_loja: loc.nome_loja,
+          maps_url: loc.maps_url,
+          endereco: loc.address,
+          horario: loc.opening_hours,
+        });
       }
 
       case 'criar_pedido': {

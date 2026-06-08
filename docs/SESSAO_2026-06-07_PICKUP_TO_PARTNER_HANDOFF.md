@@ -5,9 +5,11 @@
 > detalhes: decisões do dono, migrations, arquivos, contrato financeiro, como provar
 > e o que falta. Sessão conduzida em Opus.
 
-> ## ⚡ STATUS 2026-06-07: ✅ DEPLOYADO E LIVE — ENTRAMOS NA FASE DE TESTE AO VIVO.
-> Wallace fez o redeploy no Coolify. Flag `PICKUP_TO_PARTNER=true` ligada. **Próxima IA: começar
-> pela §11 (roteiro de validação ao vivo).** O recurso está VALENDO em produção agora.
+> ## ⚡ STATUS 2026-06-07 (sessão 2): teste ao vivo RODADO → achou 3 bugs → CORRIGIDOS. Aguarda re-deploy + re-teste.
+> A 1ª retirada ao vivo (cliente "José") expôs: bot indicou loja errada (Itaboraí) sem saber o bairro;
+> resumo sem modelo de retirada; e a reserva NÃO disparou (caiu na matriz). Tudo corrigido nesta sessão +
+> saudação reformada (bairro-first) + prompt auditado por 2 agentes. **Próxima IA: leia
+> `docs/SESSAO_2026-06-07b_BOT_PROMPT_FIXES.md` e a §12 abaixo ANTES da §11.** Mudanças commitadas; deploy do Wallace.
 
 ---
 
@@ -140,12 +142,16 @@ Mesma régua da entrega (que só conta em `delivered_at`). Lugares ajustados:
 
 | Flag | Papel | Estado |
 |---|---|---|
-| `PICKUP_TO_PARTNER` | **NOVA.** Liga a retirada→parceiro. Só age com ROUTING_GEO + coordenada. | OFF (a ligar) |
+| `PICKUP_TO_PARTNER` | **NOVA.** Liga a retirada→parceiro. Só age com ROUTING_GEO + coordenada. | **ON** (Wallace ligou 06-07) |
 | `ROUTING_GEO` | escolhe loja por proximidade (anel) | Coolify=true |
 | `ROUTING_GEO_ROAD_DISTANCE` | distância de rua (Google) em vez de linha reta | Coolify=true |
 | `ROUTING_MULTI_CANDIDATE` | considera vários parceiros na cidade | Coolify=true |
 | `ROUTING_FAIRNESS` | régua de justiça (quem recebeu menos lead) | Coolify=true |
 | `GOOGLE_MAPS_API_KEY` | geocode do bairro + Distance Matrix. **Sem ela, endereço digitado não vira coordenada** (só pino). | Wallace disse que **preencheu** (2026-06-07) |
+
+> ⚠️ Os estados "Coolify=true" acima são o que DEVIA estar — NÃO confirmados. O teste do José (retirada) caiu
+> na matriz sem reservar, sinal de que a corrente do geo (ROUTING_GEO + coordenada/Maps) não disparou.
+> CONFIRMAR no Coolify: `ROUTING_GEO`, `GOOGLE_MAPS_API_KEY` e `OPENAI_MODEL=gpt-5.5` (default do código = gpt-4o-mini).
 
 Anéis (`src/shared/geo/ring.ts`): entrega `GEO_RING_KM=[10,20,30]`, retirada `GEO_PICKUP_RADIUS_KM=15`.
 Princípio (ring.ts): *"proximidade FILTRA quem pode disputar; a justiça DECIDE quem ganha."*
@@ -228,10 +234,11 @@ Prova de proximidade da entrega (já existia): `scripts/prova-geo-rede-test.ts`.
 ## 9. Git
 
 - Branch: `feat/pickup-to-partner` (criada de `feat/camada-geo-rede` que = `main` no início).
-- Commit desta entrega: **`0a0cea7`** — "feat(rede): retirada vai pro parceiro mais perto e reserva o pneu (Etapa 1+2)" (11 arquivos).
-- **NÃO está no `main`.** Há arquivos pré-existentes não-commitados na branch (docs/scripts de
-  sessões antigas + `dashboard.html` + `src/app/preview-matriz-server.ts` + doc CONTRATO modificado)
-  — NÃO fazem parte desta entrega; foram deixados de fora do commit de propósito.
+- Commits: **`0a0cea7`** (feature Etapa 1+2, 11 arquivos) + **`bb06eac`** (este handoff) → **MERGEADOS NO `main`**
+  (push 59bf4eb→bb06eac, 06-07). A **sessão 2** acrescenta os fixes do bot/prompt num commit novo
+  (`prompt.ts`/`tools.ts`/`fulfillment.ts` + `docs/SESSAO_2026-06-07b_BOT_PROMPT_FIXES.md`).
+- Continuam **FORA** dos commits (de propósito): arquivos pré-existentes não-commitados na branch
+  (docs/scripts de sessões antigas + `dashboard.html` + `src/app/preview-matriz-server.ts` + doc CONTRATO modificado).
 
 ---
 
@@ -306,6 +313,22 @@ ORDER BY occurred_at DESC LIMIT 3;
   Testar com parcimônia; pra muitos testes, usar o env `test`.
 - Dado de teste em prod (pedido/reserva) limpa-se com o próprio **cancelar** (libera a reserva).
 - O guardrail bloqueia DDL/escrita em prod sem ok do Wallace; leitura (`execute_sql` SELECT) é livre.
+
+## 12. ➡️ SESSÃO 2 (2026-06-07, pós teste ao vivo) — LEIA ISTO ANTES DA §11
+
+Detalhe completo em **`docs/SESSAO_2026-06-07b_BOT_PROMPT_FIXES.md`**. Resumo do que mudou:
+- **"Indicou Itaboraí" (bot mandou loja sem saber o bairro):** `getUnitMapsUrl` não chuta mais a loja mais
+  antiga (só devolve loja se houver 1 unidade ativa; com várias → null) + `localizacao_loja` sinaliza
+  `sem_localizacao_pergunte_bairro` + prompt exige o bairro antes de indicar loja.
+- **Resumo de RETIRADA** (endereço escrito + horário + "na retirada") — antes só tinha template de entrega.
+- **Bot pergunta o horário** do cliente (retirada/entrega) e ecoa no resumo (🕐 opcional).
+- **Saudação → BAIRRO-FIRST** ("pra te atender da loja mais perto de ti"); segura o "tenho sim" até saber o bairro.
+- **Prompt auditado por 2 agentes:** 6 contradições reais corrigidas; redundâncias mantidas de propósito.
+- **A reserva do José NÃO disparou** (matriz) — confirmar `ROUTING_GEO` + `GOOGLE_MAPS_API_KEY` no Coolify;
+  o fix da saudação (força capturar o bairro) aumenta a chance de reservar no re-teste.
+- ⚠️ confirmar `OPENAI_MODEL=gpt-5.5` (default do código = gpt-4o-mini). Reasoning effort → `medium` (não baixar pra low).
+
+Verificação: typecheck + 314 testes. **A §11 (roteiro ao vivo) continua válida pro re-teste.**
 
 ---
 

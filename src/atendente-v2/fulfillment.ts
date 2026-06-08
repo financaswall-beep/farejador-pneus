@@ -404,26 +404,29 @@ export async function resolveMunicipioFromBairro(
 }
 
 /**
- * Localização da loja que atende o cliente: link do Google Maps (network.partner_units.maps_url,
- * editado pelo dono na tela Dados da loja). Resolve a unidade pelo município (do bairro, se preciso),
- * caindo na unidade ativa mais antiga se não houver município — mesma régua de resolveUnitForMunicipio
- * / resolveUnitForOrder. Aditivo: NÃO substitui o endereço/horário do buscar_politica; só traz o LINK.
- * Retorna null se não há unidade ativa; maps_url pode ser null (dono ainda não colou o link).
+ * Localização da loja que atende o cliente: nome + endereço escrito + horário + link do Google Maps
+ * (network.partner_units, editado pelo dono na tela Dados da loja). Resolve a unidade pelo município
+ * (do bairro, se preciso). SEM município (localização do cliente desconhecida) só devolve loja se houver
+ * UMA única unidade ativa (mono-loja); com VÁRIAS lojas devolve null pra o bot perguntar o bairro —
+ * NUNCA chuta a mais antiga (senão indicaria a loja errada, ex.: Itaboraí pra quem é de Copacabana).
+ * endereço/horário/maps_url podem ser null (dono ainda não preencheu). Retorna null se não há loja resolvível.
  */
 export async function getUnitMapsUrl(
   client: PoolClient,
   environment: Environment,
   opts: { bairro?: string | null; municipio?: string | null },
-): Promise<{ nome_loja: string; maps_url: string | null } | null> {
+): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null } | null> {
   let municipio = opts.municipio ?? null;
   if (!municipio && opts.bairro) {
     municipio = await resolveMunicipioFromBairro(client, environment, opts.bairro);
   }
   const m = normalizeRegion(municipio);
-  const cols = 'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url';
-  let row: { nome_loja: string; maps_url: string | null } | undefined;
+  const cols =
+    'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours';
+  type MapsRow = { nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null };
+  let row: MapsRow | undefined;
   if (m) {
-    const r = await client.query<{ nome_loja: string; maps_url: string | null }>(
+    const r = await client.query<MapsRow>(
       `SELECT ${cols}
          FROM network.unit_coverage uc
          JOIN network.partner_units pu ON pu.unit_id = uc.unit_id AND pu.environment = uc.environment
@@ -439,8 +442,12 @@ export async function getUnitMapsUrl(
     );
     row = r.rows[0];
   }
+  // SEM cobertura casada (ou sem município → localização do cliente desconhecida): só cai
+  // pra "a loja" se houver EXATAMENTE UMA unidade ativa (mono-loja). Com várias lojas NÃO se
+  // chuta — devolve null pra o bot perguntar o bairro e achar a mais perto (senão mandaria
+  // sempre a loja mais antiga, ex.: indicar Itaboraí pra um cliente de Copacabana).
   if (!row) {
-    const r = await client.query<{ nome_loja: string; maps_url: string | null }>(
+    const r = await client.query<MapsRow>(
       `SELECT ${cols}
          FROM network.partner_units pu
          JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
@@ -449,10 +456,10 @@ export async function getUnitMapsUrl(
           AND pu.status = 'active' AND p.status = 'active'
           AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
         ORDER BY pu.created_at ASC
-        LIMIT 1`,
+        LIMIT 2`,
       [environment],
     );
-    row = r.rows[0];
+    if (r.rowCount === 1) row = r.rows[0];
   }
   return row ?? null;
 }
