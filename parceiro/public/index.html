@@ -146,6 +146,11 @@
           <span>Entrega</span>
           <kbd>F4</kbd>
         </button>
+        <button x-show="canSee('retiradas')" @click="goToSection('retiradas')" class="pos-nav-item" :class="currentSection === 'retiradas' && 'active'">
+          <i data-lucide="store"></i>
+          <span>Retiradas</span>
+          <b class="pos-nav-badge" x-show="pickupAwaitingCount > 0" x-text="pickupAwaitingCount"></b>
+        </button>
         <button x-show="canSee('clientes')" @click="goToSection('clientes')" class="pos-nav-item" :class="currentSection === 'clientes' && 'active'">
           <i data-lucide="user"></i>
           <span>Clientes</span>
@@ -1302,8 +1307,8 @@
         </div>
       </section>
 
-      <!-- Retiradas aguardando: pedidos do bot pra o cliente retirar na loja (pneu reservado) -->
-      <section x-show="currentSection === 'entrega' && pickupAwaitingCount > 0" class="pos-workspace">
+      <!-- Tela Retiradas (balcão): pedidos do bot pra o cliente retirar na loja (pneu reservado) -->
+      <section x-show="currentSection === 'retiradas'" class="pos-workspace">
         <div class="pos-page-grid">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
@@ -1358,6 +1363,9 @@
                   </div>
                 </article>
               </template>
+              <div x-show="!pickupAwaitingCount" class="pos-empty">
+                Nenhuma retirada aguardando. Quando o bot reservar um pneu pra retirada na loja, ele aparece aqui.
+              </div>
             </div>
           </section>
         </div>
@@ -2170,6 +2178,7 @@
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.pedidos" style="width:auto;"> Pedidos</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.clientes" style="width:auto;"> Clientes</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.entregas" style="width:auto;"> Entrega</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.retiradas" style="width:auto;"> Retiradas</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.batepapo" style="width:auto;"> Bate-papo</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.resumo" style="width:auto;"> Resumo</label>
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>

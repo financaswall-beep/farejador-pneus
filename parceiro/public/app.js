@@ -37,7 +37,7 @@ function parceiroApp() {
     role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
     // Mapa EFETIVO das 8 telas, resolvido no servidor (/api/me.permissions). Default
     // conservador (tudo false) até resolver — o menu só aparece depois do /api/me.
-    permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, batepapo: false, resumo: false, financeiro: false },
+    permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false },
     funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
     funcionarioForm: { label: '', username: '', password: '' },
     // ─── Configurações da Loja (Fase 1) ───
@@ -52,7 +52,7 @@ function parceiroApp() {
     bairroSearching: false,
     coverageList: [],            // cobertura atual (lida do GET), só pra exibir o resumo
     // Permissões de tela do funcionário (toggles). 'config' NUNCA aparece aqui.
-    permForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, batepapo: true, resumo: false, financeiro: false },
+    permForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false },
     sidebarCollapsed: localStorage.getItem(`farejador_sidebar_collapsed_${slug}`) === '1',  // menu recolhido (só ícones), salvo neste aparelho
     theme: localStorage.getItem(`farejador_theme_${slug}`) || 'dark',  // 'dark' (padrão) | 'light' — tema do portal, salvo neste aparelho
     currentTab: 'sale',
@@ -145,6 +145,7 @@ function parceiroApp() {
 
     resumo: null,
     vendas: [],
+    retiradas: [],   // tela Retiradas: feed próprio (pickup aguardando), guard requireScreen('retiradas')
     estoque: [],
     compras: [],
     despesas: [],
@@ -516,7 +517,7 @@ function parceiroApp() {
     // ─── Configurações da Loja (Fase 1) ───
     // Primeira tela que o funcionário pode ver (fallback de navegação).
     firstAllowedSection() {
-      const order = ['vendas', 'pedidos', 'estoque', 'clientes', 'entrega', 'batepapo', 'resumo', 'financeiro'];
+      const order = ['vendas', 'pedidos', 'estoque', 'clientes', 'entrega', 'retiradas', 'batepapo', 'resumo', 'financeiro'];
       return order.find((s) => this.canSee(s)) || null;
     },
 
@@ -660,6 +661,7 @@ function parceiroApp() {
           pedidos: !!this.permForm.pedidos,
           clientes: !!this.permForm.clientes,
           entregas: !!this.permForm.entregas,
+          retiradas: !!this.permForm.retiradas,
           batepapo: !!this.permForm.batepapo,
           resumo: !!this.permForm.resumo,
           financeiro: !!this.permForm.financeiro,
@@ -706,14 +708,18 @@ function parceiroApp() {
           catch (err) { console.warn(`${path}_unavailable`, err); return null; }
         };
 
-        const [produtos, vendas, estoque, clientes] = await Promise.all([
+        const [produtos, vendas, retiradas, estoque, clientes] = await Promise.all([
           safeRows('produtos'),
           this.canSee('vendas') ? safeRows('vendas') : Promise.resolve([]),
+          // Tela Retiradas tem feed próprio (guard requireScreen('retiradas')): o balconista
+          // que só vê Retiradas carrega a fila SEM precisar da permissão de vendas.
+          this.canSee('retiradas') ? safeRows('retiradas') : Promise.resolve([]),
           this.canSee('estoque') ? safeRows('estoque') : Promise.resolve([]),
           this.canSee('clientes') ? safeRows('clientes') : Promise.resolve([]),
         ]);
         this.produtos = produtos;
         this.vendas = vendas;
+        this.retiradas = retiradas;
         this.estoque = estoque;
         this.clientes = clientes;
 
@@ -1471,9 +1477,12 @@ function parceiroApp() {
       }
     },
 
-    // ─── Retirada reservada do bot (pickup): card "aguardando retirada" ───
+    // ─── Retirada reservada do bot (pickup): tela Retiradas ───
+    // Deriva do feed PRÓPRIO this.retiradas (GET /api/retiradas, já filtrado no
+    // servidor pra pickup aguardando) — não de this.vendas — pra o balconista que
+    // só tem permissão 'retiradas' ver a fila sem precisar de 'vendas'.
     get pickupAwaiting() {
-      return this.vendas.filter((o) => o.fulfillment_mode === 'pickup' && o.awaiting_pickup && o.status !== 'cancelled');
+      return this.retiradas.filter((o) => o.fulfillment_mode === 'pickup' && o.awaiting_pickup && o.status !== 'cancelled');
     },
     get pickupAwaitingCount() { return this.pickupAwaiting.length; },
     get pickupAwaitingAmount() { return this.pickupAwaiting.reduce((s, o) => s + this.num(o.total_amount), 0); },
@@ -1495,7 +1504,8 @@ function parceiroApp() {
       }
     },
 
-    // Cancelar pedido com motivo (ex.: cliente reservou e não veio). 2W exige motivo (anti-trapaça).
+    // Cancelar retirada com motivo (ex.: cliente reservou e não veio). 2W exige motivo (anti-trapaça).
+    // Usa o endpoint de RETIRADAS (não vendas) pra o balconista que só tem 'retiradas' poder cancelar.
     openCancelOrder(sale) { this.cancelOpenId = sale.order_id; this.cancelReasonText = ''; },
     closeCancelOrder() { this.cancelOpenId = null; this.cancelReasonText = ''; },
     async confirmCancelOrder(sale) {
@@ -1508,7 +1518,7 @@ function parceiroApp() {
       const action = `cancel-${sale.order_id}`;
       this.saving = true; this.savingAction = action;
       try {
-        await this.api(`vendas/${sale.order_id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
+        await this.api(`retiradas/${sale.order_id}`, { method: 'DELETE', body: JSON.stringify({ reason }) });
         await this.loadData();
         this.flash('Pedido cancelado — reserva liberada.');
         this.cancelOpenId = null; this.cancelReasonText = '';

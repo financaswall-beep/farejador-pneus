@@ -302,6 +302,22 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
   });
 }
 
+/**
+ * Fila da tela RETIRADAS: só os pedidos de retirada (pickup) RESERVADOS aguardando
+ * o cliente vir buscar — a fila de ação do balcão. Deriva de getPartnerVendas e
+ * filtra no servidor pra que a tela Retiradas tenha um feed PRÓPRIO (guard
+ * requireScreen('retiradas')): o balconista vê só a fila de retirada, sem precisar
+ * da permissão 'vendas' (que escancararia o histórico inteiro). Mesma forma de
+ * linha das vendas — o front reusa os mesmos campos.
+ */
+export async function getPartnerRetiradas(ctx: PartnerContext): Promise<unknown[]> {
+  const all = await getPartnerVendas(ctx);
+  return all.filter((row) => {
+    const o = row as { fulfillment_mode?: string; awaiting_pickup?: boolean; status?: string };
+    return o.fulfillment_mode === 'pickup' && o.awaiting_pickup === true && o.status !== 'cancelled';
+  });
+}
+
 export async function getPartnerEstoque(ctx: PartnerContext): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
@@ -3335,7 +3351,7 @@ export async function upsertPartnerPermissions(
   // Defaults da Etapa 4 — qualquer chave não enviada/ inválida cai aqui.
   const defaults: PartnerPermissions = {
     vendas: true, estoque: true, pedidos: true, clientes: true,
-    entregas: true, batepapo: true, resumo: false, financeiro: false,
+    entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false,
   };
 
   const resolved = { ...defaults };
@@ -3351,14 +3367,15 @@ export async function upsertPartnerPermissions(
     `INSERT INTO network.partner_unit_permissions
        (partner_unit_id, environment,
         allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-        allow_entregas, allow_batepapo, allow_resumo, allow_financeiro)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (partner_unit_id) DO UPDATE SET
         allow_vendas     = EXCLUDED.allow_vendas,
         allow_estoque    = EXCLUDED.allow_estoque,
         allow_pedidos    = EXCLUDED.allow_pedidos,
         allow_clientes   = EXCLUDED.allow_clientes,
         allow_entregas   = EXCLUDED.allow_entregas,
+        allow_retiradas  = EXCLUDED.allow_retiradas,
         allow_batepapo   = EXCLUDED.allow_batepapo,
         allow_resumo     = EXCLUDED.allow_resumo,
         allow_financeiro = EXCLUDED.allow_financeiro,
@@ -3371,6 +3388,7 @@ export async function upsertPartnerPermissions(
       resolved.pedidos,
       resolved.clientes,
       resolved.entregas,
+      resolved.retiradas,
       resolved.batepapo,
       resolved.resumo,
       resolved.financeiro,

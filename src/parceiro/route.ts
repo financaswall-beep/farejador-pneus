@@ -56,6 +56,7 @@ import {
   getPartnerFluxoCaixa,
   getPartnerResumo,
   getPartnerVendas,
+  getPartnerRetiradas,
   registerPartnerExpense,
   registerPartnerPayable,
   registerPartnerPurchase,
@@ -320,6 +321,7 @@ const configPermissoesSchema = z.object({
   pedidos: z.boolean().optional(),
   clientes: z.boolean().optional(),
   entregas: z.boolean().optional(),
+  retiradas: z.boolean().optional(),
   batepapo: z.boolean().optional(),
   resumo: z.boolean().optional(),
   financeiro: z.boolean().optional(),
@@ -714,6 +716,13 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: await getPartnerVendas(getPartnerContext(request)) });
   });
 
+  // Tela Retiradas (balcão): feed PRÓPRIO da fila de retirada reservada. Guard
+  // requireScreen('retiradas') — o balconista vê só esta fila, sem precisar de
+  // 'vendas'. Server-side filtra pra só pickup aguardando (getPartnerRetiradas).
+  fastify.get('/parceiro/:slug/api/retiradas', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send({ rows: await getPartnerRetiradas(getPartnerContext(request)) });
+  });
+
   fastify.get('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerEstoque(getPartnerContext(request)) });
   });
@@ -1021,7 +1030,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   // Retirada: marca como RETIRADO (cliente veio e pagou no balcão) — converte a reserva
   // em baixa física + lança o caixa. Espelha o "marcar entregue" da entrega.
-  fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('entregas')] }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
     const params = saleParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(404).send({ error: 'order_not_found' });
     const parsed = retrieveSchema.safeParse(request.body ?? {});
@@ -1044,6 +1053,21 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       }
       throw err;
     }
+  });
+
+  // Cancelar uma RETIRADA (cliente reservou e não veio): libera a reserva, não baixa
+  // estoque, não lança caixa. Mesmo motor do cancelamento de venda (cancelPartnerSale),
+  // mas sob a permissão 'retiradas' — o balconista cancela sem precisar de 'vendas'.
+  fastify.delete('/parceiro/:slug/api/retiradas/:orderId', { preHandler: [requirePartnerAuth, requireScreen('retiradas')] }, async (request: PartnerAuthedRequest, reply) => {
+    const parsed = saleParamsSchema.safeParse(request.params);
+    if (!parsed.success) return reply.status(404).send({ error: 'order_not_found' });
+
+    const body = cancelSchema.safeParse(request.body ?? {});
+    const reason = body.success ? (body.data.reason ?? null) : null;
+
+    const result = await cancelPartnerSale(getPartnerContext(request), parsed.data.orderId, reason);
+    if (!result.cancelled) return reply.status(404).send({ error: 'order_not_found' });
+    return reply.status(200).send(result);
   });
 
   fastify.post('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
