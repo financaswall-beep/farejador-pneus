@@ -948,36 +948,18 @@ export async function materializePartnerOrder(
     );
   }
 
-  // COD: conta a receber aberta. Na RETIRADA RESERVADA (reserve_for_pickup) NÃO abre
-  // recebível — o pneu só fica segurado; o dinheiro entra no "marcar retirado" do painel.
+  // O pedido do bot (entrega OU retirada) NÃO abre conta a receber no nascimento: o
+  // cliente só paga quando o produto chega na mão dele (entrega) ou quando vem buscar
+  // (retirada). Conta a receber é dívida (fiado), e aqui não há dívida — o dinheiro
+  // entra no caixa só no "marcar entregue"/"marcar retirado" do painel (já como
+  // recebível 'received'). Decisão Wallace 2026-06-08. Antes a entrega abria recebível
+  // 'open' aqui, o que inflava o "a receber" com pedido que nem saiu.
   const o = await client.query<{ total_amount: string; customer_name: string | null }>(
     `SELECT total_amount, customer_name FROM commerce.partner_orders
      WHERE id = $1 AND environment = $2 AND unit_id = $3 LIMIT 1`,
     [orderId, ctx.environment, ctx.unitId],
   );
   const row = o.rows[0]!;
-  if (!input.reserve_for_pickup) {
-    await client.query(
-      `INSERT INTO finance.partner_receivables (
-         environment, unit_id, customer_id, customer_name, description, source_tag, amount,
-         due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
-       ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'open', NULL, NULL, $7, $8, $9, $10)
-       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-       DO NOTHING`,
-      [
-        ctx.environment,
-        ctx.unitId,
-        customerId,
-        input.customer_name ?? row.customer_name ?? null,
-        `Venda a receber ${orderId.slice(0, 8)}`,
-        row.total_amount,
-        `Gerada pelo bot (2w) — pedido ${orderId.slice(0, 8)}`,
-        `bot:${ctx.slug}`,
-        `order:${orderId}:receivable`,
-        orderId,
-      ],
-    );
-  }
 
   logger.info({ environment: ctx.environment, unit_id: ctx.unitId, partner_order_id: orderId }, 'bot: partner_order materializado (2w)');
   return { partner_order_id: orderId, total_amount: row.total_amount };

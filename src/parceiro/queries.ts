@@ -661,7 +661,10 @@ export async function registerPartnerSale(
         );
       }
 
-      if (input.payment_status === 'receivable') {
+      // Conta a receber (fiado) só pra venda que NÃO é entrega. A entrega (COD) é paga
+      // quando o cliente recebe — não é dívida; o caixa entra no "marcar entregue".
+      // Sem este recorte, todo pedido de entrega inflava o "a receber". (Wallace 06-08)
+      if (input.payment_status === 'receivable' && input.fulfillment_mode !== 'delivery') {
         const order = await client.query<{
           total_amount: string;
           customer_name: string | null;
@@ -934,8 +937,11 @@ export async function updatePartnerDeliveryStatus(
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const courier = normalizeText(input.delivery_courier);
 
-    const existing = await client.query<{ status: string; delivery_status: string }>(
-      `SELECT status, delivery_status
+    const existing = await client.query<{
+      status: string; delivery_status: string;
+      total_amount: string; customer_id: string | null; customer_name: string | null;
+    }>(
+      `SELECT status, delivery_status, total_amount, customer_id, customer_name
        FROM commerce.partner_orders
        WHERE id = $1 AND environment = $2 AND unit_id = $3
          AND fulfillment_mode = 'delivery' AND deleted_at IS NULL
@@ -1030,15 +1036,27 @@ export async function updatePartnerDeliveryStatus(
 
     if (result.rowCount !== 1) throw new Error('delivery_not_found');
 
-    // Finalizada: recebe a conta a receber vinculada (COD) -> entra no caixa.
+    // Finalizada: AQUI o dinheiro entra no caixa — cria a conta a receber já 'received'
+    // (não existe mais 'open' no nascimento; espelha o "marcar retirado" da retirada).
+    // ON CONFLICT cobre o pedido LEGADO que ainda tinha 'open' (flipa pra received, sem
+    // duplicar) — mesma idempotency_key da venda.
     if (input.delivery_status === 'delivered') {
+      const od = existing.rows[0]!;
       await client.query(
-        `UPDATE finance.partner_receivables
-         SET status = 'received', received_at = now(),
-             payment_method = COALESCE($4, payment_method)
-         WHERE source_order_id = $1 AND environment = $2 AND unit_id = $3
-           AND status = 'open' AND deleted_at IS NULL`,
-        [orderId, ctx.environment, ctx.unitId, normalizeText(input.payment_method)],
+        `INSERT INTO finance.partner_receivables (
+           environment, unit_id, customer_id, customer_name, description, source_tag, amount,
+           due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
+         ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'received', now(), $7, $8, $9, $10, $11)
+         ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+         DO UPDATE SET status = 'received', received_at = now(),
+                       payment_method = COALESCE(EXCLUDED.payment_method, finance.partner_receivables.payment_method)`,
+        [
+          ctx.environment, ctx.unitId, od.customer_id, od.customer_name,
+          `Entrega ${orderId.slice(0, 8)}`, od.total_amount,
+          normalizeText(input.payment_method),
+          `Entrega paga no recebimento — pedido ${orderId.slice(0, 8)}`,
+          `partner:${ctx.slug}`, `order:${orderId}:receivable`, orderId,
+        ],
       );
     }
 
