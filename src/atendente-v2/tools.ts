@@ -467,10 +467,15 @@ export async function executeTool(
       }
 
       case 'localizacao_loja': {
-        const loc = await getUnitMapsUrl(client, environment, {
-          bairro: args.bairro as string | undefined,
-          municipio: args.municipio as string | undefined,
-        });
+        const bairro = args.bairro as string | undefined;
+        let municipio = (args.municipio as string | undefined) ?? null;
+        if (!municipio && bairro) {
+          municipio = await resolveMunicipioFromBairro(client, environment, bairro, null);
+        }
+        // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
+        // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
+        const customerLocation = await resolveCustomerLocation(client, environment, conversationId, bairro, municipio);
+        const loc = await getUnitMapsUrl(client, environment, { bairro, municipio, customerLocation });
         // Sem loja resolvida (várias lojas + bairro desconhecido) → o bot tem que PERGUNTAR
         // o bairro antes de indicar qualquer loja (nunca chutar a mais antiga = Itaboraí).
         if (!loc) return JSON.stringify({ encontrado: false, motivo: 'sem_localizacao_pergunte_bairro' });

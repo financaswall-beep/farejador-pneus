@@ -406,15 +406,17 @@ export async function resolveMunicipioFromBairro(
 /**
  * Localização da loja que atende o cliente: nome + endereço escrito + horário + link do Google Maps
  * (network.partner_units, editado pelo dono na tela Dados da loja). Resolve a unidade pelo município
- * (do bairro, se preciso). SEM município (localização do cliente desconhecida) só devolve loja se houver
- * UMA única unidade ativa (mono-loja); com VÁRIAS lojas devolve null pra o bot perguntar o bairro —
- * NUNCA chuta a mais antiga (senão indicaria a loja errada, ex.: Itaboraí pra quem é de Copacabana).
+ * (do bairro, se preciso). Quando VÁRIAS lojas cobrem o município, escolhe a MAIS PERTO do cliente
+ * (haversine sobre a coordenada do cliente — pino ou geocode do bairro), NÃO a mais antiga. Sem
+ * coordenada e com várias lojas → null (o bot pergunta o bairro/pino). SEM município só devolve loja
+ * se houver UMA única unidade ativa (mono-loja); com várias → null. NUNCA chuta a mais antiga (senão
+ * indicaria a loja errada, ex.: Copacabana pra quem é de Bangu, ou Itaboraí pra quem é de Copacabana).
  * endereço/horário/maps_url podem ser null (dono ainda não preencheu). Retorna null se não há loja resolvível.
  */
 export async function getUnitMapsUrl(
   client: PoolClient,
   environment: Environment,
-  opts: { bairro?: string | null; municipio?: string | null },
+  opts: { bairro?: string | null; municipio?: string | null; customerLocation?: GeoPoint | null },
 ): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null } | null> {
   let municipio = opts.municipio ?? null;
   if (!municipio && opts.bairro) {
@@ -422,10 +424,15 @@ export async function getUnitMapsUrl(
   }
   const m = normalizeRegion(municipio);
   const cols =
-    'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours';
-  type MapsRow = { nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null };
-  let row: MapsRow | undefined;
+    'COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours, pu.latitude, pu.longitude';
+  type MapsRow = {
+    nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null;
+    latitude: string | number | null; longitude: string | number | null;
+  };
+  const strip = (r: MapsRow) => ({ nome_loja: r.nome_loja, maps_url: r.maps_url, address: r.address, opening_hours: r.opening_hours });
+
   if (m) {
+    // TODAS as lojas ativas que cobrem o município (não LIMIT 1 pela mais antiga).
     const r = await client.query<MapsRow>(
       `SELECT ${cols}
          FROM network.unit_coverage uc
@@ -436,32 +443,47 @@ export async function getUnitMapsUrl(
           AND $2 LIKE '%' || uc.municipio || '%'
           AND pu.status = 'active' AND p.status = 'active'
           AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
-        ORDER BY length(uc.municipio) DESC, pu.created_at ASC
-        LIMIT 1`,
+        ORDER BY length(uc.municipio) DESC, pu.created_at ASC`,
       [environment, m],
     );
-    row = r.rows[0];
+    const rows = r.rows;
+    if (rows.length === 1) return strip(rows[0]!);
+    if (rows.length > 1) {
+      // VÁRIAS lojas cobrem o município → a MAIS PERTO do cliente (não a mais antiga).
+      // Sem coordenada do cliente não dá pra saber a mais perto → null (o bot pergunta bairro/pino).
+      const origin = opts.customerLocation;
+      if (!origin) return null;
+      const ranked = rows
+        .map((row) => {
+          const lat = row.latitude == null ? NaN : Number(row.latitude);
+          const lng = row.longitude == null ? NaN : Number(row.longitude);
+          const dist = Number.isFinite(lat) && Number.isFinite(lng) ? haversineKm(origin, { lat, lng }) : Infinity;
+          return { row, dist };
+        })
+        .filter((x) => Number.isFinite(x.dist))
+        .sort((a, b) => a.dist - b.dist);
+      if (ranked.length === 0) return null; // nenhuma loja com coordenada → não chuta
+      return strip(ranked[0]!.row);
+    }
+    // rows.length === 0 → cai pro fallback de mono-loja abaixo.
   }
-  // SEM cobertura casada (ou sem município → localização do cliente desconhecida): só cai
-  // pra "a loja" se houver EXATAMENTE UMA unidade ativa (mono-loja). Com várias lojas NÃO se
-  // chuta — devolve null pra o bot perguntar o bairro e achar a mais perto (senão mandaria
-  // sempre a loja mais antiga, ex.: indicar Itaboraí pra um cliente de Copacabana).
-  if (!row) {
-    const r = await client.query<MapsRow>(
-      `SELECT ${cols}
-         FROM network.partner_units pu
-         JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
-         JOIN core.units u ON u.id = pu.unit_id
-        WHERE pu.environment = $1
-          AND pu.status = 'active' AND p.status = 'active'
-          AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
-        ORDER BY pu.created_at ASC
-        LIMIT 2`,
-      [environment],
-    );
-    if (r.rowCount === 1) row = r.rows[0];
-  }
-  return row ?? null;
+
+  // SEM município (ou sem cobertura casada): só cai pra "a loja" se houver EXATAMENTE UMA unidade
+  // ativa (mono-loja). Com várias lojas NÃO se chuta — null pra o bot perguntar o bairro.
+  const r = await client.query<MapsRow>(
+    `SELECT ${cols}
+       FROM network.partner_units pu
+       JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+       JOIN core.units u ON u.id = pu.unit_id
+      WHERE pu.environment = $1
+        AND pu.status = 'active' AND p.status = 'active'
+        AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+      ORDER BY pu.created_at ASC
+      LIMIT 2`,
+    [environment],
+  );
+  if (r.rowCount === 1) return strip(r.rows[0]!);
+  return null;
 }
 
 /**
