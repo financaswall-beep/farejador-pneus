@@ -1271,6 +1271,12 @@ html, body {
    rolagem (tela "preta"). Reescreve pra 3 linhas com o workspace no 1fr. */
 .pos-main.config-mode { grid-template-rows: 80px 1fr 46px; }
 
+/* Aba Retiradas: tela de balcao sem faixa de KPIs (so header, workspace, footer =
+   3 filhos visiveis no .pos-main). Mesmo motivo do chat/config: sem este override o
+   workspace cai na linha de 88px e o rodape (46px) escorrega pro 1fr, ficando
+   gigante e tapando o card. Reescreve pra 3 linhas com o workspace no 1fr. */
+.pos-main.retiradas-mode { grid-template-rows: 80px 1fr 46px; }
+
 .pos-kpis article,
 .pos-panel {
   border: 1px solid var(--pos-line);
