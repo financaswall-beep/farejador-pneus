@@ -19,6 +19,7 @@ import {
   resolveProductAvailabilityByProximity,
   materializePartnerOrder,
   getUnitMapsUrl,
+  getUnitDisplayById,
   normalizeRegion,
   FRETE_PADRAO_BRL,
   type PartnerOrderRouting,
@@ -526,6 +527,33 @@ export async function executeTool(
         // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
         // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
         const customerLocation = await resolveCustomerLocation(client, environment, conversationId, bairro, municipio);
+
+        // RETIRADA com pneu escolhido: usa a MESMA decisão do pedido de retirada
+        // (decideStoreForItemsGeo pickup) — respeita estoque, deleted_at, anel de retirada
+        // de 15 km E a régua de justiça. Assim a loja indicada = a loja que o pedido vai
+        // reservar (nunca diverge). Fora do raio → apenas_longe (bot honesto, oferece entrega).
+        if (productIds.length > 0 && customerLocation && env.ROUTING_GEO && municipio) {
+          const geo = await decideStoreForItemsGeo(client, environment, {
+            municipio,
+            items: productIds.map((id) => ({ product_id: id, quantity: 1 })),
+            modalidade: 'pickup',
+            customerLocation,
+            clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+          });
+          if (geo.kind === 'partner') {
+            const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
+            if (disp) {
+              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours });
+            }
+          } else if (geo.kind === 'only_far') {
+            // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada (15 km).
+            return JSON.stringify({ encontrado: false, motivo: 'retirada_so_longe', nome_loja_distante: geo.unitName, distancia_km: Math.round(geo.distanceKm) });
+          } else {
+            // matriz: nenhum parceiro perto tem o pneu pra retirar.
+            return JSON.stringify({ encontrado: false, motivo: 'sem_loja_com_estoque_perto' });
+          }
+        }
+
         const loc = await getUnitMapsUrl(client, environment, { bairro, municipio, customerLocation, productIds });
         if (!loc) {
           // Com produto + coordenada: null = nenhuma loja PERTO tem o item em estoque (ativo).

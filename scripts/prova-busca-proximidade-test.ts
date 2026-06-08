@@ -12,7 +12,7 @@
  *   npx tsx --env-file=.env scripts/prova-busca-proximidade-test.ts
  */
 import { pool } from '../src/persistence/db.js';
-import { resolveProductAvailabilityByProximity, resolveUnitCandidates, getUnitMapsUrl } from '../src/atendente-v2/fulfillment.js';
+import { resolveProductAvailabilityByProximity, resolveUnitCandidates, getUnitMapsUrl, decideStoreForItemsGeo } from '../src/atendente-v2/fulfillment.js';
 import { filterByModeAndCoverage } from '../src/atendente-v2/geo-routing.js';
 import { haversineKm } from '../src/shared/geo/haversine.js';
 import { env } from '../src/shared/config/env.js';
@@ -104,6 +104,29 @@ async function main(): Promise<void> {
     const loja2 = await getUnitMapsUrl(client, ENV, { municipio: MUNICIPIO, customerLocation: IRAJA, productIds: [PRODUTO] });
     check('2.localizacao_loja NÃO indica a loja apagada', loja2?.nome_loja !== maisPerto.nome, `indicou ${loja2?.nome_loja}`);
     check('2.localizacao_loja indica a 2ª mais perto (que tem)', loja2?.nome_loja === segunda.nome, `${loja2?.nome_loja} esperado ${segunda.nome}`);
+
+    // ── 2b) RETIRADA (pickup, raio 15 km): com Madureira apagada, o pedido de retirada
+    //        cai numa loja DENTRO de 15 km que tem (Méier/Tijuca), nunca na apagada. ──
+    const within15 = new Set(inRange.filter((e) => e.km <= 15).map((e) => e.unitId));
+    const pick2 = await decideStoreForItemsGeo(client, ENV, {
+      municipio: MUNICIPIO, items: [{ product_id: PRODUTO, quantity: 1 }],
+      modalidade: 'pickup', customerLocation: IRAJA, clientNeighborhoodCanonical: null,
+    });
+    check('2b.retirada cai numa loja (partner) dentro do raio', pick2.kind === 'partner', `kind=${pick2.kind}`);
+    check('2b.retirada NÃO é a apagada e está dentro de 15km', pick2.kind === 'partner' && pick2.routing.unitId !== maisPerto.unitId && within15.has(pick2.routing.unitId), `unit=${pick2.kind === 'partner' ? pick2.routing.unitId : '-'}`);
+
+    // ── 2c) apaga TODAS as lojas dentro de 15 km → a que tem fica FORA do raio →
+    //        retirada devolve 'only_far' (respeita o limite de 15 km, não retira longe calado). ──
+    await client.query(
+      `UPDATE commerce.partner_stock_levels SET deleted_at = now()
+       WHERE environment = $1 AND unit_id = ANY($2) AND product_id = $3`,
+      [ENV, [...within15], PRODUTO],
+    );
+    const pick3 = await decideStoreForItemsGeo(client, ENV, {
+      municipio: MUNICIPIO, items: [{ product_id: PRODUTO, quantity: 1 }],
+      modalidade: 'pickup', customerLocation: IRAJA, clientNeighborhoodCanonical: null,
+    });
+    check('2c.só tem fora de 15km → retirada = only_far (respeita o limite de 15km)', pick3.kind === 'only_far', `kind=${pick3.kind}`);
 
     // ── 3) APAGA TODAS em alcance → cai na matriz (função não devolve nada p/ o produto) ──
     await client.query(

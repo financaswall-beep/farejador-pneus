@@ -511,6 +511,27 @@ export async function getUnitMapsUrl(
 }
 
 /**
+ * Dados de exibição (nome, link do mapa, endereço, horário) de UMA unidade pelo id.
+ * Usado quando a loja já foi escolhida por decisão (ex.: localizacao_loja de RETIRADA
+ * reusa o decideStoreForItemsGeo do pedido e só precisa montar o cartão da loja).
+ */
+export async function getUnitDisplayById(
+  client: PoolClient,
+  environment: Environment,
+  unitId: string,
+): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null } | null> {
+  const r = await client.query<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null }>(
+    `SELECT COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours
+       FROM network.partner_units pu
+       JOIN core.units u ON u.id = pu.unit_id
+      WHERE pu.environment = $1 AND pu.unit_id = $2 AND pu.deleted_at IS NULL
+      LIMIT 1`,
+    [environment, unitId],
+  );
+  return r.rows[0] ?? null;
+}
+
+/**
  * Mapa product_id → quantidade DISPONÍVEL no parceiro que cobre `municipio`
  * (vazio se não há parceiro/cobertura). Mesma régua de disponível do roteamento
  * (H5: rastreado + on_hand−reserved). Usado pelo C2 pra as buscas mostrarem o
