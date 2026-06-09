@@ -55,8 +55,13 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 - **Pino-first** funciona ponta-a-ponta: cliente manda o pino → bot resolve cidade (reverseGeocode) → acha a loja → reserva. Validado ao vivo (PED-0034). O nudge determinístico (`agent.ts`) força o bot a usar a tool quando há pino.
 - **Saudação-espelho:** só cumprimentou → "Como posso te ajudar?"; chegou com pedido → cumprimenta + pede localização. ("borracharia mais perto de você").
 - **Gatilhos de conversão:** proximidade ("tá a ~X km", ≤5/5-10/>10), escassez (estoque 1-3 → reserva), imediatismo (horário se preenchido + "reservado").
-- **Pickup-to-partner** (retirada reserva no parceiro), **camada GEO**, **consentimento de retirada longe**, **gancho de instalação** (taxa à parte) — tudo live. Migrations 0089-0092 aplicadas.
-- ⚠️ A fazer (dono): preencher horário das 6 lojas vazias; limpar PED-0034 de teste.
+- **Pickup-to-partner** (retirada reserva no parceiro), **camada GEO**, **consentimento de retirada longe**, **gancho de instalação** (taxa à parte) — tudo live. Migrations 0089-0093 aplicadas.
+- **Proximidade-primeiro Fase 0-2 LIVE** (ver §8): retirada por distância (sem muro de cidade) ligada; raio de entrega coletado no painel do parceiro E na matriz (ainda NÃO usado no roteamento — isso é a Fase 3).
+- **O QUE VAMOS FAZER (roadmap, do mais próximo ao maior):**
+  1. Dono preencher o **raio dos 7 parceiros** na matriz (e validar que "Salvar raio" persiste).
+  2. **Fase 3 — entrega por proximidade**: a entrega passa a usar o raio (loja entra só se raio preenchido E dist ≤ raio); **junto, simplificar a aba "Área de entrega"** (vira redundante com o raio). Atrás da flag `ROUTING_PROXIMITY_FIRST`.
+  3. Fase 2 menor: aviso no login forte; cadastro "Novo parceiro" coletar o raio.
+  4. Antigos: preencher **horário das 6 lojas** vazias; limpar dado de teste (PED-0034, zz-teste-*, trocar senha temp do zz-teste-copacabana); **SEC-002** (autorização sem RLS, sessão dedicada — §9).
 
 ## 8. Proximidade-primeiro (derruba o "muro da cidade") — Fase 0-2 FEITAS, Fase 3 aberta
 **Furo:** o roteamento filtrava por CIDADE antes da distância → cliente de Caxias a 9 km de Madureira caía na matriz. **Virada:** com coordenada, rotear por DISTÂNCIA (anel+estoque+régua decidem); cidade vira plano B + teto de raio por loja. Tudo atrás da flag **`ROUTING_PROXIMITY_FIRST`** (default OFF no código; **o dono já ligou =true no Coolify**).
