@@ -19,6 +19,7 @@ import {
   registerManualOrder,
   registerWalkinOrder,
   rejectPartnerApplication,
+  setPartnerUnitDeliveryRadius,
 } from './queries.js';
 
 const publicDir = path.join(process.cwd(), 'painel', 'public');
@@ -51,6 +52,16 @@ const createPartnerSchema = z.object({
   monthly_fee: z.number().min(0).nullable().optional(),
   municipios: z.array(z.string().min(1)).default([]),
   slug: z.string().min(1).nullable().optional(),
+});
+
+// Raio de entrega que a MATRIZ define pra um parceiro (proximidade-primeiro Fase 2).
+// km livre > 0, ≤ 9999,99 (NUMERIC(6,2)); null = limpar (parceiro sai da entrega).
+const setDeliveryRadiusParamsSchema = z.object({
+  partnerUnitId: z.string().uuid(),
+});
+const setDeliveryRadiusBodySchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  delivery_radius_km: z.number().positive().max(9999.99).nullable(),
 });
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
@@ -240,6 +251,31 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel create partner failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ADMIN: matriz define o raio de entrega de um parceiro (proximidade-primeiro Fase 2).
+  // Só preenche o raio de quem JÁ faz entrega (não força entrega em quem é só retirada).
+  fastify.put('/admin/api/partners/:partnerUnitId/delivery-radius', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const params = setDeliveryRadiusParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_partner_unit_id' });
+    const body = setDeliveryRadiusBodySchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    const environment = body.data.environment ?? env.FAREJADOR_ENV;
+    try {
+      const result = await setPartnerUnitDeliveryRadius(environment, params.data.partnerUnitId, body.data.delivery_radius_km);
+      if (!result.updated) {
+        if (result.reason === 'not_found') return reply.status(404).send({ error: 'partner_not_found' });
+        if (result.reason === 'pickup_only') return reply.status(409).send({ error: 'partner_pickup_only' });
+        return reply.status(404).send({ error: 'partner_not_found' });
+      }
+      return reply.status(200).send({ updated: true, delivery_radius_km: body.data.delivery_radius_km });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel set delivery radius failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

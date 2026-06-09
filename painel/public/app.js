@@ -117,6 +117,10 @@ function painelApp() {
 
     parceirosRede: [],
 
+    // Raio de entrega (proximidade-primeiro Fase 2): estado do editor na matriz.
+    savingRaio: false,
+    raioSalvoMsg: '',
+
     // 2026-06-01: alertas fake removidos — os alertas reais saem de redeAlertasOperacionais (computa de parceirosRede).
     alertasRede: [],
 
@@ -551,6 +555,48 @@ function painelApp() {
       return response.json();
     },
 
+    async apiPut(path, body) {
+      if (!this.apiToken) throw new Error('missing_admin_token');
+      const response = await fetch(path, {
+        method: 'PUT',
+        headers: this.apiHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `api_${response.status}`);
+      }
+      return response.json();
+    },
+
+    // Matriz define o raio de entrega do parceiro selecionado (proximidade-primeiro Fase 2).
+    async salvarRaioEntrega() {
+      const p = this.selectedParceiro();
+      if (!p) return;
+      if (!p.fazEntrega) { alert('Este parceiro está como só retirada — peça pra ele ligar a entrega no painel antes de definir o raio.'); return; }
+      let km = p.deliveryRadiusKm;
+      if (km === '' || km === undefined) km = null;
+      if (km !== null) {
+        km = Number(km);
+        if (!Number.isFinite(km) || km <= 0) { alert('Informe um raio válido (km maior que zero).'); return; }
+        if (km > 9999.99) { alert('Raio muito grande.'); return; }
+      }
+      this.savingRaio = true;
+      try {
+        await this.apiPut(`/admin/api/partners/${encodeURIComponent(p.id)}/delivery-radius`, { delivery_radius_km: km });
+        p.deliveryRadiusKm = km;
+        this.raioSalvoMsg = km === null ? 'Raio limpo.' : 'Raio salvo.';
+        setTimeout(() => { this.raioSalvoMsg = ''; }, 2500);
+      } catch (err) {
+        const msg = String(err && err.message || err);
+        alert(msg === 'partner_pickup_only'
+          ? 'Esse parceiro está como só retirada — não dá pra definir raio.'
+          : 'Não consegui salvar o raio: ' + msg);
+      } finally {
+        this.savingRaio = false;
+      }
+    },
+
     formatCurrency(value) {
       return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
@@ -808,6 +854,10 @@ function painelApp() {
           funilPediu: Number((row.funil && row.funil.pediu) || 0),
           funilEfetivou: Number((row.funil && row.funil.efetivou) || 0),
           commercialModel: modeloComercialRaw,
+          serviceMode: row.service_mode || 'both',
+          fazEntrega: (row.service_mode || 'both') === 'delivery' || (row.service_mode || 'both') === 'both',
+          deliveryRadiusKm: (row.delivery_radius_km === null || row.delivery_radius_km === undefined)
+            ? null : Number(row.delivery_radius_km),
           comissaoPercent,
           mensalidadeValor,
           comissaoDevida,
