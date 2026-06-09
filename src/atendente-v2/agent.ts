@@ -3,6 +3,7 @@ import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { loadHistory, lookupChatwootConversationId } from './history.js';
+import { getLatestCustomerLocation } from './customer-location.js';
 import { TOOL_DEFINITIONS, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK } from './prompt.js';
@@ -82,10 +83,14 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const client = await pool.connect();
   try {
     // 1. Load context (history + chatwoot id + customer journey em paralelo)
-    const [history, chatwootConvId, customerContext] = await Promise.all([
+    const [history, chatwootConvId, customerContext, customerPin] = await Promise.all([
       loadHistory(client, conversationId, { includeLocationMarkers: env.ROUTING_GEO }),
       lookupChatwootConversationId(client, conversationId),
       loadCustomerContext(client, conversationId),
+      // Determinístico: o cliente JÁ mandou o pino? Se sim, o nudge abaixo FORÇA o bot a
+      // usar a tool (em vez de pedir o bairro). Pedir no prompt sozinho não bastava — o
+      // LLM ignorava (não re-chamava a tool no turno do pino). Ver agent nudge abaixo.
+      env.ROUTING_GEO ? getLatestCustomerLocation(client, environment as Environment, conversationId) : Promise.resolve(null),
     ]);
 
     if (!chatwootConvId) {
@@ -96,9 +101,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver.
     // Bloco GEO só entra com ROUTING_GEO on (flag OFF = prompt byte a byte o de hoje).
     const basePrompt = env.ROUTING_GEO ? SYSTEM_PROMPT + GEO_PROMPT_BLOCK : SYSTEM_PROMPT;
-    const systemPromptWithContext = customerContext
-      ? basePrompt + customerContext
-      : basePrompt;
+    // Nudge determinístico do PINO: só entra quando o cliente JÁ compartilhou a localização.
+    // É uma ordem forte e contextual (alta autoridade, sem diluir) que vence as linhas do
+    // prompt que mandam "pegue o bairro" — pra o bot CHAMAR a tool em vez de re-perguntar.
+    const pinNudge = customerPin
+      ? `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Você TEM a localização — NÃO peça o bairro, NÃO pergunte "qual bairro aparece na localização" e NÃO peça pra mandar de novo. Para QUALQUER pergunta sobre estoque, preço na loja, frete, retirada ou "qual a loja/borracharia mais perto", CHAME a ferramenta correspondente AGORA (buscar_produto / buscar_compatibilidade / calcular_frete / localizacao_loja), SEM passar "bairro" — o sistema resolve a cidade e a loja mais perto pela localização. Só volte a pedir o bairro se a ferramenta retornar precisa_localizacao=true.`
+      : '';
+    const systemPromptWithContext = basePrompt + (customerContext ?? '') + pinNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },
