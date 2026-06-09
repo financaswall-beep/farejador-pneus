@@ -364,10 +364,10 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
-        // C2 (corrigido 2026-06-08): mesmo conserto do buscar_produto — estoque da loja
-        // que VAI ATENDER, por PROXIMIDADE (anel que cresce até 40 km). Loja perto sem o
-        // produto não vaza o número da matriz: anda pra a próxima loja que tem; nenhuma em
-        // alcance → mantém a matriz (backstop — decisão Wallace 2026-06-08).
+        // C2: estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM bairro/localização não
+        // há loja resolvida → marca precisa_localizacao (furo #4): o bot pede o bairro antes
+        // de prometer estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
+        let lojaResolvidaCompat = false;
         {
           const bairro = args.bairro as string | undefined;
           const municipio = bairro
@@ -391,6 +391,7 @@ export async function executeTool(
                 if (a) p.total_stock = a.available;
               }
             }
+            lojaResolvidaCompat = true;
           } else if (bairro && municipio) {
             // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
@@ -402,9 +403,10 @@ export async function executeTool(
                 }
               }
             }
+            lojaResolvidaCompat = true;
           }
         }
-        return JSON.stringify({ encontrado: true, veiculos: result });
+        return JSON.stringify({ encontrado: true, veiculos: result, ...(lojaResolvidaCompat ? {} : { precisa_localizacao: true }) });
       }
 
       case 'buscar_produto': {
@@ -417,11 +419,11 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
-        // C2 (corrigido 2026-06-08): a busca mostra o estoque da loja que VAI ATENDER,
-        // achada por PROXIMIDADE — anel que cresce, MESMA régua do pedido (Madureira sem
-        // o pneu → Méier → … até 40 km). Loja perto sem o produto NÃO vaza o número da
-        // matriz: cai pra a próxima loja mais perto que tem; nenhuma em alcance → mantém
-        // a matriz (backstop, "acima do raio cai na matriz" — decisão Wallace 2026-06-08).
+        // C2: a busca mostra o estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM
+        // bairro/localização não há loja resolvida → o estoque é o da matriz (genérico) e
+        // marcamos precisa_localizacao (furo #4): o bot pede o bairro antes de prometer
+        // estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
+        let lojaResolvida = false;
         {
           const bairro = args.bairro as string | undefined;
           const municipio = bairro
@@ -442,6 +444,7 @@ export async function executeTool(
               const a = avail.get(p.product_id);
               if (a) p.total_stock_available = a.available;
             }
+            lojaResolvida = true;
           } else if (bairro && municipio) {
             // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
@@ -451,9 +454,10 @@ export async function executeTool(
                 if (q != null) p.total_stock_available = q;
               }
             }
+            lojaResolvida = true;
           }
         }
-        return JSON.stringify({ encontrado: true, produtos: result });
+        return JSON.stringify({ encontrado: true, produtos: result, ...(lojaResolvida ? {} : { precisa_localizacao: true }) });
       }
 
       case 'calcular_frete': {
