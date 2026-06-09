@@ -25,10 +25,25 @@ export interface GeocodeResult extends GeoPoint {
   confidence: string;
 }
 
+/** Coordenada → endereço: o que o pino do cliente revela pra casar com a cobertura. */
+export interface ReverseGeocodeResult {
+  /** Município (administrative_area_level_2) — a CIDADE que casa com unit_coverage. */
+  municipio: string | null;
+  /** Bairro (sublocality_level_1 / sublocality / neighborhood), quando o Google trouxer. */
+  neighborhood: string | null;
+}
+
 interface GeocodeResponse {
   status: string;
   results?: Array<{
     geometry?: { location?: { lat: number; lng: number }; location_type?: string };
+  }>;
+}
+
+interface ReverseGeocodeResponse {
+  status: string;
+  results?: Array<{
+    address_components?: Array<{ long_name: string; short_name?: string; types: string[] }>;
   }>;
 }
 
@@ -90,6 +105,63 @@ export async function geocodeAddress(
     lng: loc.lng,
     confidence: json.results?.[0]?.geometry?.location_type ?? 'APPROXIMATE',
   };
+}
+
+/**
+ * Coordenada (o pino do WhatsApp) → cidade + bairro (reverse geocoding). Existe pro
+ * caso "cliente mandou SÓ o pino": o bairro escrito resolve a cidade hoje; o pino não
+ * resolvia nada além da distância. `null` quando: sem chave, ZERO_RESULTS, ou qualquer
+ * falha — mesmo padrão tolerante do `geocodeAddress` (o chamador cai no "pede o bairro"
+ * de hoje). Lê `address_components` (o Google pode espalhar cidade e bairro em results
+ * diferentes, então varre todos):
+ *  - município = `administrative_area_level_2` (a cidade que casa com `unit_coverage`);
+ *  - bairro    = `sublocality_level_1` → `sublocality` → `neighborhood` (o 1º que vier).
+ */
+export async function reverseGeocode(
+  point: GeoPoint,
+  apiKey: string | undefined,
+): Promise<ReverseGeocodeResult | null> {
+  if (!apiKey) return null;
+
+  const params = new URLSearchParams({
+    latlng: `${point.lat},${point.lng}`,
+    key: apiKey,
+    language: 'pt-BR',
+    region: 'br',
+  });
+
+  const json = (await fetchJson(
+    `${GEOCODE_URL}?${params.toString()}`,
+  )) as ReverseGeocodeResponse | null;
+  if (!json || json.status !== 'OK') {
+    if (json && json.status && json.status !== 'ZERO_RESULTS') {
+      logger.warn({ status: json.status }, 'google-maps: reverse geocode status não-OK');
+    }
+    return null;
+  }
+
+  let municipio: string | null = null;
+  let neighborhood: string | null = null;
+  for (const result of json.results ?? []) {
+    for (const comp of result.address_components ?? []) {
+      const types = comp.types ?? [];
+      if (!municipio && types.includes('administrative_area_level_2')) {
+        municipio = comp.long_name;
+      }
+      if (
+        !neighborhood &&
+        (types.includes('sublocality_level_1') ||
+          types.includes('sublocality') ||
+          types.includes('neighborhood'))
+      ) {
+        neighborhood = comp.long_name;
+      }
+    }
+    if (municipio && neighborhood) break;
+  }
+
+  if (!municipio && !neighborhood) return null;
+  return { municipio, neighborhood };
 }
 
 /**

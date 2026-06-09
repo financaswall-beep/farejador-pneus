@@ -27,7 +27,7 @@ import {
 import { env } from '../shared/config/env.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
-import { geocodeAddress } from '../shared/geo/google-maps.js';
+import { geocodeAddress, reverseGeocode } from '../shared/geo/google-maps.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
 import { createHash } from 'node:crypto';
 
@@ -53,6 +53,34 @@ async function resolveCustomerLocation(
     if (g) return { lat: g.lat, lng: g.lng };
   }
   return null;
+}
+
+/**
+ * Pino-first (decisão Wallace 2026-06-09): quando o caminho do BAIRRO DIGITADO não
+ * resolveu a CIDADE (`municipio == null`) e há um pino na conversa, reverse-geocoda o
+ * pino → cidade (e bairro, se o cliente não digitou). É ADITIVO e NÃO toca a busca por
+ * bairro escrito: se a cidade já veio do bairro, devolve a entrada intacta (early
+ * return) — o bairro SEMPRE vence e nem chega aqui. Degrada elegante: ROUTING_GEO off /
+ * sem chave / sem pino / Google falhou → devolve o que entrou (o bot volta a pedir o
+ * bairro, como hoje). O bairro digitado, quando há, mantém prioridade no canônico.
+ */
+async function fillCityFromPin(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  current: { municipio: string | null; neighborhoodCanonical: string | null },
+): Promise<{ municipio: string | null; neighborhoodCanonical: string | null }> {
+  if (current.municipio) return current;
+  if (!env.ROUTING_GEO || !env.GOOGLE_MAPS_API_KEY) return current;
+  const pin = await getLatestCustomerLocation(client, environment, conversationId);
+  if (!pin) return current;
+  const rev = await reverseGeocode(pin, env.GOOGLE_MAPS_API_KEY);
+  if (!rev?.municipio) return current;
+  return {
+    municipio: rev.municipio,
+    neighborhoodCanonical:
+      current.neighborhoodCanonical ?? (rev.neighborhood ? normalizeRegion(rev.neighborhood) : null),
+  };
 }
 
 interface GeoOnlyFar {
@@ -371,9 +399,15 @@ export async function executeTool(
         let lojaResolvidaCompat = false;
         {
           const bairro = args.bairro as string | undefined;
-          const municipio = bairro
+          let municipio = bairro
             ? await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined)
             : ((args.municipio as string | undefined) ?? null);
+          let clientNeighborhoodCanonical = bairro ? normalizeRegion(bairro) : null;
+          // Pino-first: SÓ pino (sem bairro) → reverse-geocode preenche a cidade. Aditivo
+          // (no-op quando o bairro já resolveu a cidade — ele sempre vence).
+          ({ municipio, neighborhoodCanonical: clientNeighborhoodCanonical } = await fillCityFromPin(
+            client, environment, conversationId, { municipio, neighborhoodCanonical: clientNeighborhoodCanonical },
+          ));
           const customerLocation =
             env.ROUTING_GEO && municipio
               ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
@@ -383,7 +417,7 @@ export async function executeTool(
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
               municipio,
               customerLocation,
-              clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+              clientNeighborhoodCanonical,
               productIds,
             });
             for (const v of result) {
@@ -427,9 +461,15 @@ export async function executeTool(
         let lojaResolvida = false;
         {
           const bairro = args.bairro as string | undefined;
-          const municipio = bairro
+          let municipio = bairro
             ? await resolveMunicipioFromBairro(client, environment, bairro, args.municipio as string | undefined)
             : ((args.municipio as string | undefined) ?? null);
+          let clientNeighborhoodCanonical = bairro ? normalizeRegion(bairro) : null;
+          // Pino-first: SÓ pino (sem bairro) → reverse-geocode preenche a cidade. Aditivo
+          // (no-op quando o bairro já resolveu a cidade — ele sempre vence).
+          ({ municipio, neighborhoodCanonical: clientNeighborhoodCanonical } = await fillCityFromPin(
+            client, environment, conversationId, { municipio, neighborhoodCanonical: clientNeighborhoodCanonical },
+          ));
           const customerLocation =
             env.ROUTING_GEO && municipio
               ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
@@ -438,7 +478,7 @@ export async function executeTool(
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
               municipio,
               customerLocation,
-              clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+              clientNeighborhoodCanonical,
               productIds: result.map((p) => p.product_id),
             });
             for (const p of result) {
@@ -480,7 +520,9 @@ export async function executeTool(
           produtos = ids.map((id) => ({ product_id: id, quantidade: 1 }));
         }
         if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
-          const municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
+          let municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
+          // Pino-first: geo órfão e sem cidade → reverse-geocode do pino preenche. Aditivo.
+          ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
           const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
             municipio,
             items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
@@ -533,6 +575,12 @@ export async function executeTool(
         if (!municipio && bairro) {
           municipio = await resolveMunicipioFromBairro(client, environment, bairro, null);
         }
+        let clientNeighborhoodCanonical = bairro ? normalizeRegion(bairro) : null;
+        // Pino-first: só pino (sem bairro) → reverse-geocode preenche a cidade. Aditivo
+        // (no-op quando o bairro já resolveu a cidade — ele sempre vence).
+        ({ municipio, neighborhoodCanonical: clientNeighborhoodCanonical } = await fillCityFromPin(
+          client, environment, conversationId, { municipio, neighborhoodCanonical: clientNeighborhoodCanonical },
+        ));
         let productIds = Array.isArray(args.product_ids)
           ? (args.product_ids as unknown[]).filter((x): x is string => typeof x === 'string')
           : [];
@@ -556,7 +604,7 @@ export async function executeTool(
             items: productIds.map((id) => ({ product_id: id, quantity: 1 })),
             modalidade: 'pickup',
             customerLocation,
-            clientNeighborhoodCanonical: bairro ? normalizeRegion(bairro) : null,
+            clientNeighborhoodCanonical,
           });
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
@@ -776,9 +824,11 @@ async function criarPedido(
     // Município do geo (se cotou frete) OU do bairro. Sem este OR, entrega SEM
     // geo_resolution_id caía 100% na matriz mesmo havendo parceiro com estoque na cidade
     // (furo #3 da auditoria) → parceiro perdia a venda e a régua não contava o lead.
-    const municipio = geoResolutionId
+    let municipio = geoResolutionId
       ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
       : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
+    // Pino-first: sem geo e sem bairro → reverse-geocode do pino preenche a cidade. Aditivo.
+    ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
     const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
       municipio,
       items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
@@ -802,9 +852,11 @@ async function criarPedido(
     // RETIRADA pelos MESMOS critérios da entrega: proximidade (anel de retirada) + régua
     // de justiça. Município vem do geo (se houver) ou do bairro; coordenada vem do pino
     // ou do geocode do bairro. Sem município/coordenada → cai na matriz (como hoje).
-    const municipio = geoResolutionId
+    let municipio = geoResolutionId
       ? await resolveMunicipioFromGeo(client, environment, geoResolutionId)
       : await resolveMunicipioFromBairro(client, environment, (args.bairro as string | undefined) ?? '', null);
+    // Pino-first: sem geo e sem bairro → reverse-geocode do pino preenche a cidade. Aditivo.
+    ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
     if (env.ROUTING_GEO && municipio) {
       const customerLocation = await resolveCustomerLocation(
         client,
