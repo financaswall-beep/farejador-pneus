@@ -16,7 +16,13 @@ const GEO_SLUGS = [
   'geo-leme', 'geo-tijuca', 'geo-meier', 'geo-niteroi',
   'geo-madureira', 'geo-barra', 'geo-itaborai', 'geo-bairro',
 ];
-const FAKE_SLUGS = [...FAKE_SLUGS_BASE, ...GEO_SLUGS];
+// Fakes da PROXIMIDADE-PRIMEIRO (prova de 30 lojas + divisa). prox-madureira = a loja
+// de "Rio" que atende um cliente de "Caxias" a ~9 km quando o muro de cidade cai.
+const PROX_SLUGS = [
+  'prox-madureira',
+  ...Array.from({ length: 29 }, (_, i) => `prox-${String(i + 1).padStart(2, '0')}`),
+];
+const FAKE_SLUGS = [...FAKE_SLUGS_BASE, ...GEO_SLUGS, ...PROX_SLUGS];
 const FAKE_PRODUCT_CODE = 'FAKE-REDE-PNEU';
 
 function loadDatabaseUrl() {
@@ -72,7 +78,7 @@ async function limpar(client) {
   return { partner_units: puIds.length, units: unitIds.length, partners: partnerIds.length, produtos: prodIds.length };
 }
 
-module.exports = { limpar, loadDatabaseUrl, assertTest, ENV, FAKE_SLUGS, GEO_SLUGS, FAKE_PRODUCT_CODE };
+module.exports = { limpar, loadDatabaseUrl, assertTest, ENV, FAKE_SLUGS, GEO_SLUGS, PROX_SLUGS, FAKE_PRODUCT_CODE };
 
 if (require.main === module) {
   (async () => {

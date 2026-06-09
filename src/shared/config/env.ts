@@ -64,6 +64,14 @@ const envSchema = z.object({
   // de cair na matriz sem segurar nada. Default OFF = retirada vai pra matriz (hoje).
   // Só tem efeito com ROUTING_GEO on + coordenada do cliente (pino ou geocode do bairro).
   PICKUP_TO_PARTNER: booleanStringSchema,
+  // PROXIMIDADE-PRIMEIRO — derruba o "muro da cidade": com a flag on + coordenada do
+  // cliente, os candidatos passam a ser TODAS as lojas ativas com coordenada (sem gate
+  // de município), e o anel/estoque/régua decidem por DISTÂNCIA. Resolve a divisa
+  // (Caxias a 9 km de Madureira deixava de cair na matriz). Ver
+  // docs/SESSAO_2026-06-09b_PROXIMIDADE_HANDOFF.md §2. DESLIGADA = roteamento por cidade
+  // de hoje, byte a byte. Nesta leva só age na RETIRADA (modalidade='pickup'); a entrega
+  // segue por cidade até a Fase 3 (precisa do raio por loja).
+  ROUTING_PROXIMITY_FIRST: booleanStringSchema,
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),

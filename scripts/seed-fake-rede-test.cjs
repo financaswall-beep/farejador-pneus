@@ -41,7 +41,42 @@ const GEO_FAKES = [
   { slug: 'geo-bairro',    tradeName: 'GEO BAIRRO',    lat: -22.985000, lng: -43.198000, serviceMode: 'delivery', coverage: ['tijuca'],   stockQty: 10 },
 ];
 
+// ── Fakes PROXIMIDADE-PRIMEIRO: ~30 lojas pra provar que o motor ESCALA e que o "muro
+// da cidade" cai. Município isolado (PROX_MUNI) pra NÃO casar no LIKE com cidade real:
+//   - prox-madureira: coordenada de Madureira (-22.873,-43.338). Cliente da prova fica
+//     em DUQUE DE CAXIAS (-22.800,-43.320), ~8 km dela, mas em CIDADE diferente. Pelo
+//     resolver de cidade, Caxias não casa a cobertura → matriz (o muro). Pela proximidade,
+//     8 km ≤ 15 (anel de retirada) → prox-madureira atende (o muro caiu).
+//   - prox-01..prox-29: aglomerado na Zona Sul (~ -22.97,-43.22), 1–5 km entre si, todas
+//     >15 km de Caxias (não competem no caso da divisa). Provam a ESCALA: a partir de um
+//     cliente no meio do aglomerado, o motor ranqueia 30 candidatos de forma determinística.
+//     1 em cada 6 é só-entrega (prova o filtro de modo: fora do pool de retirada).
+const PROX_MUNI = 'proximidade-prox';
+const PROX_CLUSTER = { lat: -22.97, lng: -43.22 };
+const PROX_FAKES = [
+  { slug: 'prox-madureira', tradeName: 'PROX MADUREIRA', lat: -22.873217, lng: -43.338000, serviceMode: 'both', muni: PROX_MUNI, coverage: 'city', stockQty: 10 },
+];
+for (let i = 1; i <= 29; i++) {
+  const angle = (i * 2 * Math.PI) / 29;
+  const r = 0.012 + (i % 5) * 0.007; // raio ~1.3 km .. ~4.5 km do centro do aglomerado
+  const lat = Number((PROX_CLUSTER.lat + r * Math.cos(angle)).toFixed(6));
+  const lng = Number((PROX_CLUSTER.lng + r * Math.sin(angle)).toFixed(6));
+  const slug = `prox-${String(i).padStart(2, '0')}`;
+  PROX_FAKES.push({
+    slug,
+    tradeName: `PROX ${String(i).padStart(2, '0')}`,
+    lat,
+    lng,
+    serviceMode: i % 6 === 0 ? 'delivery' : 'both', // ~1 em 6 só-entrega (fora do pickup)
+    muni: PROX_MUNI,
+    coverage: 'city',
+    stockQty: 10,
+  });
+}
+
 async function createFakeGeo(client, productId, f) {
+  // Município da cobertura: GEO_MUNI por padrão; um fake pode escolher o seu (PROX_MUNI).
+  const muni = f.muni || GEO_MUNI;
   const unit = await client.query(
     `INSERT INTO core.units (environment, slug, name) VALUES ($1,$2,$3) RETURNING id`,
     [ENV, f.slug, f.tradeName],
@@ -65,7 +100,7 @@ async function createFakeGeo(client, productId, f) {
     await client.query(
       `INSERT INTO network.unit_coverage (environment, unit_id, municipio) VALUES ($1,$2,$3)
        ON CONFLICT (environment, unit_id, municipio, coalesce(neighborhood_canonical,'')) DO NOTHING`,
-      [ENV, unitId, GEO_MUNI],
+      [ENV, unitId, muni],
     );
   } else {
     for (const bairro of f.coverage) {
@@ -73,7 +108,7 @@ async function createFakeGeo(client, productId, f) {
         `INSERT INTO network.unit_coverage (environment, unit_id, municipio, neighborhood_canonical, coverage_kind)
          VALUES ($1,$2,$3,$4,'neighborhood')
          ON CONFLICT (environment, unit_id, municipio, coalesce(neighborhood_canonical,'')) DO NOTHING`,
-        [ENV, unitId, GEO_MUNI, bairro],
+        [ENV, unitId, muni, bairro],
       );
     }
   }
@@ -155,6 +190,9 @@ async function main() {
     const createdGeo = [];
     for (const f of GEO_FAKES) createdGeo.push(await createFakeGeo(client, productId, f));
 
+    const createdProx = [];
+    for (const f of PROX_FAKES) createdProx.push(await createFakeGeo(client, productId, f));
+
     await client.query('COMMIT');
     console.log('=== SEED FAKE REDE (test) ===');
     console.log(`produto: ${productId}  (${FAKE_PRODUCT_CODE}, preço central R$ 200,00)`);
@@ -167,7 +205,10 @@ async function main() {
       const cov = c.coverage === 'city' ? 'cidade' : `bairro[${c.coverage.join(',')}]`;
       console.log(`  ${c.slug.padEnd(14)} unit_id=${c.unitId}  (${c.lat},${c.lng})  modo=${c.serviceMode}  cobertura=${cov}  estoque=${c.stockQty}`);
     }
-    console.log('\nPronto. Próximo: prova-regua-rede-test.ts (justiça) + prova-geo-rede-test.ts (proximidade).');
+    console.log(`— fakes PROXIMIDADE (${createdProx.length} lojas, prova de escala + divisa, municipio="${PROX_MUNI}"):`);
+    console.log(`  prox-madureira em (-22.873,-43.338); aglomerado prox-01..29 ~ (${PROX_CLUSTER.lat},${PROX_CLUSTER.lng}); cliente da prova em Caxias (-22.800,-43.320).`);
+
+    console.log('\nPronto. Próximo: prova-geo-rede-test.ts (cidade, flag OFF = 9/9) + prova-proximidade-rede-test.ts (proximidade, flag ON).');
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

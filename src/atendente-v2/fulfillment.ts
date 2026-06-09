@@ -169,6 +169,42 @@ export interface UnitCandidate {
   neighborhoods: string[];
 }
 
+/** Linha crua de candidato (resolveUnitCandidates* → mapRowToUnitCandidate). */
+type UnitCandidateRow = RoutedUnitRow & {
+  service_mode: string;
+  latitude: string | null;
+  longitude: string | null;
+  has_city_coverage: boolean;
+  neighborhoods: (string | null)[] | null;
+};
+
+/**
+ * Converte a linha crua em UnitCandidate. FONTE ÚNICA do mapeamento pros dois
+ * resolvedores (por cidade e por proximidade) NUNCA divergirem na forma do candidato.
+ */
+function mapRowToUnitCandidate(environment: Environment, row: UnitCandidateRow): UnitCandidate {
+  return {
+    ctx: {
+      environment,
+      partnerId: row.partner_id,
+      partnerUnitId: row.partner_unit_id,
+      unitId: row.unit_id,
+      slug: row.slug,
+      partnerName: row.partner_name,
+      unitName: row.unit_name,
+      role: 'owner',
+      tokenId: '',
+    },
+    serviceMode: (row.service_mode as UnitCandidate['serviceMode']) ?? 'both',
+    location:
+      row.latitude != null && row.longitude != null
+        ? { lat: Number(row.latitude), lng: Number(row.longitude) }
+        : null,
+    hasCityCoverage: row.has_city_coverage ?? false,
+    neighborhoods: (row.neighborhoods ?? []).filter((n): n is string => typeof n === 'string' && n.length > 0),
+  };
+}
+
 /**
  * Fase 2: lista TODAS as unidades parceiras que cobrem o município — sem `LIMIT 1`,
  * ao contrário de `resolveUnitForMunicipio`. Cada candidato traz o `service_mode`
@@ -190,15 +226,7 @@ export async function resolveUnitCandidates(
   // GROUP BY pelas PKs (pu.id/p.id/u.id) → dependência funcional cobre as demais
   // colunas. Agrega a cobertura DO MUNICÍPIO casado: has_city_coverage (alguma linha
   // city) + neighborhoods (bairros declarados). lat/long vêm da unidade (0088).
-  const result = await client.query<
-    RoutedUnitRow & {
-      service_mode: string;
-      latitude: string | null;
-      longitude: string | null;
-      has_city_coverage: boolean;
-      neighborhoods: (string | null)[] | null;
-    }
-  >(
+  const result = await client.query<UnitCandidateRow>(
     `SELECT pu.id            AS partner_unit_id,
             pu.unit_id       AS unit_id,
             p.id             AS partner_id,
@@ -225,26 +253,59 @@ export async function resolveUnitCandidates(
     [environment, m],
   );
 
-  return result.rows.map((row) => ({
-    ctx: {
-      environment,
-      partnerId: row.partner_id,
-      partnerUnitId: row.partner_unit_id,
-      unitId: row.unit_id,
-      slug: row.slug,
-      partnerName: row.partner_name,
-      unitName: row.unit_name,
-      role: 'owner',
-      tokenId: '',
-    },
-    serviceMode: (row.service_mode as UnitCandidate['serviceMode']) ?? 'both',
-    location:
-      row.latitude != null && row.longitude != null
-        ? { lat: Number(row.latitude), lng: Number(row.longitude) }
-        : null,
-    hasCityCoverage: row.has_city_coverage ?? false,
-    neighborhoods: (row.neighborhoods ?? []).filter((n): n is string => typeof n === 'string' && n.length > 0),
-  }));
+  return result.rows.map((row) => mapRowToUnitCandidate(environment, row));
+}
+
+/**
+ * PROXIMIDADE-PRIMEIRO (Fase 0): lista TODAS as unidades parceiras ATIVAS que têm
+ * coordenada cadastrada, SEM o gate de município de `resolveUnitCandidates` — o "muro
+ * da cidade" cai aqui. Quem decide passa a ser a DISTÂNCIA (anel) ∩ estoque ∩ régua,
+ * lá no `decideStoreForItemsGeo`. Usada SÓ com `ROUTING_PROXIMITY_FIRST` on + coordenada
+ * do cliente (nesta leva, só na RETIRADA).
+ *
+ * Diferenças vs resolveUnitCandidates:
+ *  - SEM `$muni LIKE '%' || uc.municipio || '%'` (sem muro de cidade);
+ *  - `LEFT JOIN unit_coverage` (a loja entra mesmo sem linha de cobertura) — a cobertura
+ *    só DESCREVE (has_city_coverage/neighborhoods da PRÓPRIA loja), não filtra. Irrelevante
+ *    pra pickup (que ignora cobertura) e pronta pra a Fase 3 (entrega);
+ *  - exige `latitude/longitude NOT NULL`: sem coordenada não há como medir distância (a
+ *    loja cairia no caminho de cidade, não na proximidade).
+ *
+ * Dedup por unidade (GROUP BY PKs). Ordem determinística (`pu.id`); a régua reordena depois.
+ */
+export async function resolveUnitCandidatesByProximity(
+  client: PoolClient,
+  environment: Environment,
+): Promise<UnitCandidate[]> {
+  const result = await client.query<UnitCandidateRow>(
+    `SELECT pu.id            AS partner_unit_id,
+            pu.unit_id       AS unit_id,
+            p.id             AS partner_id,
+            pu.slug          AS slug,
+            p.trade_name     AS partner_name,
+            COALESCE(pu.display_name, u.name) AS unit_name,
+            pu.service_mode  AS service_mode,
+            pu.latitude      AS latitude,
+            pu.longitude     AS longitude,
+            bool_or(uc.coverage_kind = 'city')                  AS has_city_coverage,
+            array_remove(array_agg(uc.neighborhood_canonical), NULL) AS neighborhoods
+     FROM network.partner_units pu
+     JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+     JOIN core.units u ON u.id = pu.unit_id
+     LEFT JOIN network.unit_coverage uc ON uc.unit_id = pu.unit_id AND uc.environment = pu.environment
+     WHERE pu.environment = $1
+       AND pu.status = 'active'
+       AND p.status = 'active'
+       AND pu.deleted_at IS NULL
+       AND p.deleted_at IS NULL
+       AND pu.latitude IS NOT NULL
+       AND pu.longitude IS NOT NULL
+     GROUP BY pu.id, p.id, u.id
+     ORDER BY pu.id`,
+    [environment],
+  );
+
+  return result.rows.map((row) => mapRowToUnitCandidate(environment, row));
 }
 
 /**
@@ -799,20 +860,32 @@ function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
  * Distância (km) do cliente a cada loja. Linha reta (haversine) SEMPRE como base e
  * rede de segurança; se ROUTING_GEO_ROAD_DISTANCE + chave, sobrepõe com a distância
  * de RUA do Google por loja (null daquele trecho → mantém o haversine — caso H/D5).
+ *
+ * `capKm` (proximidade-primeiro): trava de custo. Sem o muro de cidade o pool pode ir a
+ * dezenas de lojas, e o Distance Matrix cobra por elemento (e limita destinos/req). Como
+ * a distância de RUA é SEMPRE ≥ a linha reta, uma loja com haversine acima do maior anel
+ * (capKm) JAMAIS cabe em anel nenhum → medir a rua dela seria gastar à toa. Então só
+ * chamamos o Google para quem tem `haversine ≤ capKm`; as demais ficam com o haversine
+ * (que só alimenta o caso "só tem longe", onde a precisão de rua não muda a oferta de
+ * consentimento). `capKm` undefined = mede todas (conjunto pequeno, ex.: getUnitMapsUrl).
  */
 async function resolveDistances(
   origin: GeoPoint,
   units: { unitId: string; location: GeoPoint }[],
+  capKm?: number,
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   for (const u of units) map.set(u.unitId, haversineKm(origin, u.location));
 
   if (env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY && units.length > 0) {
-    const road = await roadDistanceKm(origin, units.map((u) => u.location), env.GOOGLE_MAPS_API_KEY);
-    if (road) {
-      road.forEach((km, i) => {
-        if (km != null) map.set(units[i]!.unitId, km);
-      });
+    const measured = capKm == null ? units : units.filter((u) => map.get(u.unitId)! <= capKm);
+    if (measured.length > 0) {
+      const road = await roadDistanceKm(origin, measured.map((u) => u.location), env.GOOGLE_MAPS_API_KEY);
+      if (road) {
+        road.forEach((km, i) => {
+          if (km != null) map.set(measured[i]!.unitId, km);
+        });
+      }
     }
   }
   return map;
@@ -837,7 +910,14 @@ export async function decideStoreForItemsGeo(
 ): Promise<GeoStoreDecision> {
   if (input.items.length === 0) return { kind: 'matriz' };
 
-  const candidates = await resolveUnitCandidates(client, environment, input.municipio);
+  // PROXIMIDADE-PRIMEIRO (Fase 1): na RETIRADA, com a flag on, os candidatos passam a ser
+  // TODAS as lojas ativas com coordenada (sem o "muro de cidade") — o anel/estoque/régua
+  // abaixo decidem por DISTÂNCIA. Sem a flag (ou na entrega, até a Fase 3): caminho de
+  // cidade de hoje, intocado. O `municipio` segue no input e só é usado por este último.
+  const useProximity = env.ROUTING_PROXIMITY_FIRST && input.modalidade === 'pickup';
+  const candidates = useProximity
+    ? await resolveUnitCandidatesByProximity(client, environment)
+    : await resolveUnitCandidates(client, environment, input.municipio);
   if (candidates.length === 0) return { kind: 'matriz' };
 
   // ② modo + ④a cobertura (puro, de graça) — reduz as checagens de estoque.
@@ -854,9 +934,13 @@ export async function decideStoreForItemsGeo(
   const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
   if (eligible.length === 0) return { kind: 'matriz' };
 
+  // Anéis da modalidade (④b/④c) computados aqui pra também travar o custo do Google:
+  // mede a distância de RUA só de quem cabe no maior anel (resolveDistances capKm).
+  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
   const distanceByUnit = await resolveDistances(
     input.customerLocation,
     eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
+    Math.max(...rings),
   );
 
   for (const cand of eligible) {
@@ -873,8 +957,7 @@ export async function decideStoreForItemsGeo(
   }
   if (fulfillable.length === 0) return { kind: 'matriz' };
 
-  // ④b/④c anel que cresce (D1/D2) sobre os que têm o pedido completo.
-  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
+  // ④b/④c anel que cresce (D1/D2) sobre os que têm o pedido completo (rings já calculado).
   const selection = selectWithinExpandingRing(fulfillable, (f) => f.distanceKm, rings);
 
   // ⑤ régua de justiça entre o pool (D4) — entre os perto o bastante, decide a justiça.
@@ -986,12 +1069,14 @@ export async function resolveProductAvailabilityByProximity(
   // Distância de RUA (Google Distance Matrix) — a MESMA do pedido. Decisão Wallace
   // 2026-06-08: a busca usa o cálculo CORRETO (precisão acima de custo), pra a busca e o
   // pedido NUNCA divergirem. resolveDistances usa rua quando ROUTING_GEO_ROAD_DISTANCE +
-  // chave (prod); sem isso degrada pra linha reta (haversine).
+  // chave (prod); sem isso degrada pra linha reta (haversine). capKm=maxRing trava o custo
+  // do Google (mede só quem cabe no teto; quem está além já sairia no filtro inRange abaixo).
+  const maxRing = Math.max(...GEO_RING_KM);
   const distanceByUnit = await resolveDistances(
     input.customerLocation,
     eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
+    maxRing,
   );
-  const maxRing = Math.max(...GEO_RING_KM);
 
   // lojas dentro do teto, da MAIS PERTO pra mais longe.
   const inRange = eligible
