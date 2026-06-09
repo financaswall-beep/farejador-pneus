@@ -479,3 +479,30 @@ describe('Portal Parceiro — isolamento entre parceiros', () => {
     expect(ordersA.rows[0]?.c).toBe('0');
   });
 });
+
+// --------------------------------------------------------------
+// 6. Raio de entrega (proximidade-primeiro, Fase 2) — round-trip
+// --------------------------------------------------------------
+describe('Portal Parceiro — raio de entrega (Fase 2)', () => {
+  it('grava e relê delivery_radius_km; pickup zera o raio (NULL)', async () => {
+    const q = await importQueries();
+    const fx = await createPartnerFixture(db.pool, { slugSuffix: 'raio' + randomUUID().slice(0, 6) });
+
+    // Faz entrega com raio → persiste o número.
+    await q.updatePartnerAtendimento(fx.ctx, 'delivery', 8.5);
+    let cfg = await q.getPartnerConfiguracoes(fx.ctx);
+    expect(cfg.loja?.delivery_radius_km).toBe(8.5);
+    expect(cfg.loja?.faz_entrega).toBe(true);
+
+    // Both com outro raio → sobrescreve.
+    await q.updatePartnerAtendimento(fx.ctx, 'both', 12);
+    cfg = await q.getPartnerConfiguracoes(fx.ctx);
+    expect(cfg.loja?.delivery_radius_km).toBe(12);
+
+    // Não faz entrega (pickup) → raio NULL (não há o que limitar).
+    await q.updatePartnerAtendimento(fx.ctx, 'pickup', null);
+    cfg = await q.getPartnerConfiguracoes(fx.ctx);
+    expect(cfg.loja?.delivery_radius_km).toBeNull();
+    expect(cfg.loja?.faz_entrega).toBe(false);
+  });
+});

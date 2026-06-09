@@ -3079,6 +3079,9 @@ export interface PartnerConfiguracoes {
     // Derivados do enum pra a UI dos 2 checkboxes (arbitragem B).
     faz_entrega: boolean;
     tem_retirada: boolean;
+    // Raio máximo de ENTREGA em km (proximidade-primeiro Fase 2/3). NULL = não
+    // preenchido → fora da entrega quando a flag ROUTING_PROXIMITY_FIRST ligar.
+    delivery_radius_km: number | null;
   } | null;
   // Cobertura agrupada por município: cidade inteira OU lista de bairros.
   coverage: Array<{
@@ -3114,10 +3117,11 @@ export async function getPartnerConfiguracoes(ctx: PartnerContext): Promise<Part
     maps_url: string | null;
     address_confirmed_at: string | null;
     service_mode: string;
+    delivery_radius_km: string | null;
   }>(
     `SELECT display_name, address_street, address_number, address_neighborhood,
             address_city, address_complement, cep, opening_hours_text, maps_url,
-            address_confirmed_at, service_mode
+            address_confirmed_at, service_mode, delivery_radius_km
        FROM network.partner_units
       WHERE id = $1 AND environment = $2`,
     [ctx.partnerUnitId, ctx.environment],
@@ -3143,6 +3147,8 @@ export async function getPartnerConfiguracoes(ctx: PartnerContext): Promise<Part
         service_mode: serviceMode,
         faz_entrega: serviceMode === 'delivery' || serviceMode === 'both',
         tem_retirada: serviceMode === 'pickup' || serviceMode === 'both',
+        // NUMERIC volta como string do pg → coage pra number (ou null).
+        delivery_radius_km: u.delivery_radius_km != null ? Number(u.delivery_radius_km) : null,
       }
     : null;
 
@@ -3228,19 +3234,26 @@ export async function updatePartnerLoja(
 }
 
 /**
- * Atualiza o MODO de atendimento (enum service_mode). A UI manda 2 checkboxes
- * (faz_entrega / tem_retirada); o ROUTE mapeia pro enum e valida "pelo menos um".
- * Aqui recebemos o enum já resolvido. Escopado por ctx.partnerUnitId + environment.
+ * Atualiza o MODO de atendimento (enum service_mode) + o raio de ENTREGA. A UI
+ * manda 2 checkboxes (faz_entrega / tem_retirada) + o raio em km; o ROUTE mapeia
+ * pro enum, valida "pelo menos um" e ZERA o raio quando não faz entrega (raio só
+ * existe quando entrega). Aqui recebemos o enum e o raio já resolvidos.
+ * Escopado por ctx.partnerUnitId + environment.
+ *
+ * deliveryRadiusKm: km máximo de entrega (proximidade-primeiro Fase 3). NULL =
+ * não preenchido = fora da entrega quando a flag ligar. A retirada nunca usa raio.
  */
 export async function updatePartnerAtendimento(
   ctx: PartnerContext,
   serviceMode: PartnerServiceMode,
+  deliveryRadiusKm: number | null,
 ): Promise<{ updated: boolean }> {
   const res = await pool.query(
     `UPDATE network.partner_units
-        SET service_mode = $3
+        SET service_mode       = $3,
+            delivery_radius_km = $4
       WHERE id = $1 AND environment = $2`,
-    [ctx.partnerUnitId, ctx.environment, serviceMode],
+    [ctx.partnerUnitId, ctx.environment, serviceMode, deliveryRadiusKm],
   );
   return { updated: (res.rowCount ?? 0) > 0 };
 }

@@ -44,7 +44,7 @@ function parceiroApp() {
     configTab: 'loja',           // 'loja' | 'atendimento' | 'area' | 'equipe'
     configLoaded: false,
     lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '', maps_url: '' },
-    atendimentoForm: { faz_entrega: true, tem_retirada: true },
+    atendimentoForm: { faz_entrega: true, tem_retirada: true, delivery_radius_km: null },
     // Área de entrega: por município. Fase 1 edita 1 município por vez (o da loja).
     areaForm: { municipio: '', city_wide: true, neighborhoods: [] },
     bairroQuery: '',
@@ -543,6 +543,8 @@ function parceiroApp() {
         this.atendimentoForm = {
           faz_entrega: loja.faz_entrega !== undefined ? !!loja.faz_entrega : true,
           tem_retirada: loja.tem_retirada !== undefined ? !!loja.tem_retirada : true,
+          delivery_radius_km: (loja.delivery_radius_km !== undefined && loja.delivery_radius_km !== null)
+            ? Number(loja.delivery_radius_km) : null,
         };
         this.coverageList = Array.isArray(cfg.coverage) ? cfg.coverage : [];
         // Área: edita o município da loja (ou o 1º coberto). Fase 1 = 1 município.
@@ -582,12 +584,31 @@ function parceiroApp() {
       if (!this.atendimentoForm.faz_entrega && !this.atendimentoForm.tem_retirada) {
         this.flash('Marque pelo menos uma opção: entrega ou retirada.'); return;
       }
+      // Raio só vale quando faz entrega. Vazio = null (não preenchido → fora da
+      // entrega quando a Rede ligar o roteamento por proximidade). > 0 e ≤ 9999,99.
+      let radius = null;
+      if (this.atendimentoForm.faz_entrega) {
+        const raw = this.atendimentoForm.delivery_radius_km;
+        if (raw !== null && raw !== '' && raw !== undefined) {
+          radius = Number(raw);
+          if (!Number.isFinite(radius) || radius <= 0) {
+            this.flash('Informe um raio de entrega válido (km maior que zero).'); return;
+          }
+          if (radius > 9999.99) { this.flash('Raio de entrega muito grande.'); return; }
+        }
+      }
       this.saving = true; this.savingAction = 'atendimento';
       try {
         await this.api('configuracoes/atendimento', {
           method: 'PUT',
-          body: JSON.stringify({ faz_entrega: !!this.atendimentoForm.faz_entrega, tem_retirada: !!this.atendimentoForm.tem_retirada }),
+          body: JSON.stringify({
+            faz_entrega: !!this.atendimentoForm.faz_entrega,
+            tem_retirada: !!this.atendimentoForm.tem_retirada,
+            delivery_radius_km: radius,
+          }),
         });
+        // Reflete o que o backend gravou (zera o raio quando não faz entrega).
+        this.atendimentoForm.delivery_radius_km = radius;
         this.flash('Modo de atendimento salvo.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));

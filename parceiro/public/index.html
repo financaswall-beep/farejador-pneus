@@ -2031,6 +2031,24 @@
                 <input type="checkbox" x-model="atendimentoForm.faz_entrega" style="width:auto;" />
                 <span><b>Faço entrega</b> — levo o pneu até o cliente.</span>
               </label>
+              <!-- Raio de entrega (proximidade-primeiro Fase 2): só quando faz entrega. -->
+              <div x-show="atendimentoForm.faz_entrega" style="margin:2px 0 6px 28px;padding-left:12px;border-left:2px solid #e2e8f0;">
+                <label style="display:block;">Até quantos km você entrega?
+                  <span style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                    <input type="number" min="0" step="0.5" inputmode="decimal"
+                           x-model.number="atendimentoForm.delivery_radius_km"
+                           placeholder="Ex: 8" style="max-width:120px;" />
+                    <span>km</span>
+                  </span>
+                </label>
+                <p style="color:#64748b;font-size:12px;margin:6px 0 0;">
+                  A Rede só te manda entrega dentro desse raio. A retirada não tem limite. Pode mudar quando quiser.
+                </p>
+                <p x-show="atendimentoForm.delivery_radius_km === null || atendimentoForm.delivery_radius_km === '' || atendimentoForm.delivery_radius_km === undefined"
+                   style="color:#f59e0b;font-size:12px;margin:6px 0 0;">
+                  ⚠️ Sem o raio preenchido você fica de fora das entregas da Rede (a retirada continua normal).
+                </p>
+              </div>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                 <input type="checkbox" x-model="atendimentoForm.tem_retirada" style="width:auto;" />
                 <span><b>Tem retirada na loja</b> — o cliente vem buscar/montar aqui.</span>
@@ -2047,7 +2065,8 @@
             <h3>Como funciona</h3>
             <div class="pos-tip-list">
               <div><i data-lucide="bike"></i><span>Só entrega, só retirada, ou os dois — você decide.</span></div>
-              <div><i data-lucide="info"></i><span>Na Fase 1 isto orienta a conversa; o roteamento por modo entra depois.</span></div>
+              <div><i data-lucide="ruler"></i><span>O raio de entrega é em km: a Rede só te manda entrega dentro dele. Sem raio = só retirada.</span></div>
+              <div><i data-lucide="info"></i><span>A retirada não tem limite de distância — quem vem buscar, vem de onde quiser.</span></div>
             </div>
           </aside>
         </div>

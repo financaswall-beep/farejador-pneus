@@ -295,9 +295,13 @@ const configLojaSchema = z.object({
 });
 
 // Atendimento: 2 booleans (arbitragem B). Pelo menos um obrigatório → senão 400.
+// delivery_radius_km = raio de entrega em km (proximidade-primeiro Fase 2). Número
+// livre > 0; NULL/ausente = não preenchido. Só vale quando faz_entrega (o handler
+// zera quando não entrega). NUMERIC(6,2) no banco → teto 9999.99.
 const configAtendimentoSchema = z.object({
   faz_entrega: z.boolean(),
   tem_retirada: z.boolean(),
+  delivery_radius_km: z.number().positive().max(9999.99).nullable().optional(),
 }).refine((d) => d.faz_entrega || d.tem_retirada, {
   message: 'Marque pelo menos uma opção (entrega ou retirada).',
   path: ['faz_entrega'],
@@ -646,9 +650,11 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const serviceMode: PartnerServiceMode = faz_entrega && tem_retirada
       ? 'both'
       : (faz_entrega ? 'delivery' : 'pickup');
-    const result = await updatePartnerAtendimento(getPartnerContext(request), serviceMode);
+    // Raio só existe quando entrega: quem não faz entrega tem raio NULL (não há o que limitar).
+    const deliveryRadiusKm = faz_entrega ? (parsed.data.delivery_radius_km ?? null) : null;
+    const result = await updatePartnerAtendimento(getPartnerContext(request), serviceMode, deliveryRadiusKm);
     if (!result.updated) return reply.status(404).send({ error: 'unit_not_found' });
-    return reply.status(200).send({ ...result, service_mode: serviceMode });
+    return reply.status(200).send({ ...result, service_mode: serviceMode, delivery_radius_km: deliveryRadiusKm });
   });
 
   // Área de entrega: cidade inteira vs bairros específicos (Fase 1 = declarativo).
