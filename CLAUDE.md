@@ -51,19 +51,19 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 - `commerce.geo_resolutions` = dicionário bairro→cidade (624 bairros, 15 cidades; `resolve_neighborhood`). Cobertura: 7 lojas — rio(5)/niteroi(1)/itaborai(1), todas por cidade.
 - Matriz = backstop universal quando nenhum parceiro atende.
 
-## 7. Estado atual (LIVE em prod — main `0e621b2`)
+## 7. Estado atual (LIVE em prod — main `b4cec2b`)
 - **Pino-first** funciona ponta-a-ponta: cliente manda o pino → bot resolve cidade (reverseGeocode) → acha a loja → reserva. Validado ao vivo (PED-0034). O nudge determinístico (`agent.ts`) força o bot a usar a tool quando há pino.
 - **Saudação-espelho:** só cumprimentou → "Como posso te ajudar?"; chegou com pedido → cumprimenta + pede localização. ("borracharia mais perto de você").
 - **Gatilhos de conversão:** proximidade ("tá a ~X km", ≤5/5-10/>10), escassez (estoque 1-3 → reserva), imediatismo (horário se preenchido + "reservado").
 - **Pickup-to-partner** (retirada reserva no parceiro), **camada GEO**, **consentimento de retirada longe**, **gancho de instalação** (taxa à parte) — tudo live. Migrations 0089-0092 aplicadas.
 - ⚠️ A fazer (dono): preencher horário das 6 lojas vazias; limpar PED-0034 de teste.
 
-## 8. TRABALHO ABERTO GRANDE: Proximidade-primeiro (PLANO, não construído)
-**Furo:** o roteamento filtra por CIDADE antes da distância → cliente de Caxias a 9 km da loja de Madureira é recusado (Caxias fora da cobertura) → cai na matriz. Repete em toda divisa (Nova Iguaçu, Itaipuaçu, Meriti).
-**Virada:** com coordenada, derrubar o "muro da cidade" e rotear por DISTÂNCIA (anel+estoque+régua decidem). Cidade vira plano B (sem coordenada) + teto de raio por loja.
-**Decisões travadas (dono):** Retirada = mantém lógica atual + remove muro + sem teto. Entrega = quem não preenche o raio fica FORA (só retirada); raio = número livre + alerta na matriz.
-**Plano 4 fases (atrás de flag `ROUTING_PROXIMITY_FIRST`):** Fase 0 fundação (migration `delivery_radius_km` + função `resolveUnitCandidatesByProximity` + teste de 30 lojas fake) → Fase 1 retirada → Fase 2 coleta do raio no painel → Fase 3 entrega.
-**Detalhe completo:** `docs/SESSAO_2026-06-09b_PROXIMIDADE_HANDOFF.md`.
+## 8. Proximidade-primeiro (derruba o "muro da cidade") — Fase 0-2 FEITAS, Fase 3 aberta
+**Furo:** o roteamento filtrava por CIDADE antes da distância → cliente de Caxias a 9 km de Madureira caía na matriz. **Virada:** com coordenada, rotear por DISTÂNCIA (anel+estoque+régua decidem); cidade vira plano B + teto de raio por loja. Tudo atrás da flag **`ROUTING_PROXIMITY_FIRST`** (default OFF no código; **o dono já ligou =true no Coolify**).
+- **Fase 0+1 (fundação + RETIRADA) — LIVE em prod.** Migration 0093 `delivery_radius_km`; `resolveUnitCandidatesByProximity` (sem muro de cidade); retirada por proximidade ligada. Rollback = flag false no Coolify.
+- **Fase 2 (coleta do raio) — FEITA e LIVE** (2026-06-09): campo "até quantos km você entrega?" no **painel do parceiro** (aba Atendimento) + editor "Raio de entrega (Rede)" na **matriz** (detalhe do parceiro, página 'unidade'). Os dois gravam `network.partner_units.delivery_radius_km` (fonte única; matriz só edita quem faz entrega — trava de autonomia). Provas: `scripts/prova-raio-entrega-test.ts` + `prova-raio-matriz-test.ts` (6/6 cada).
+- **Fase 3 (ENTREGA por proximidade) — ABERTA:** entrega passa a usar o raio (loja entra só se `delivery_radius_km` preenchido E dist ≤ raio); hoje o raio só é COLETADO, o motor ainda NÃO lê — a entrega ainda usa cobertura de bairro (`passesDeliveryCoverage`). **Junto da Fase 3: simplificar a aba "Área de entrega"** (fica redundante com o raio).
+**Detalhe:** `docs/SESSAO_2026-06-09c_FASE2_PAINEL_MATRIZ_HANDOFF.md` (Fase 2) + `..._09b_PROXIMIDADE_HANDOFF.md` (plano/Fase 0-1).
 
 ## 9. Segurança
 - **SEC-001 RESOLVIDO** (bot não vaza pedido de outro cliente — amarra contact_id).
