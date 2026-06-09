@@ -56,19 +56,19 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 - **Saudação-espelho:** só cumprimentou → "Como posso te ajudar?"; chegou com pedido → cumprimenta + pede localização. ("borracharia mais perto de você").
 - **Gatilhos de conversão:** proximidade ("tá a ~X km", ≤5/5-10/>10), escassez (estoque 1-3 → reserva), imediatismo (horário se preenchido + "reservado").
 - **Pickup-to-partner** (retirada reserva no parceiro), **camada GEO**, **consentimento de retirada longe**, **gancho de instalação** (taxa à parte) — tudo live. Migrations 0089-0093 aplicadas.
-- **Proximidade-primeiro Fase 0-2 LIVE** (ver §8): retirada por distância (sem muro de cidade) ligada; raio de entrega coletado no painel do parceiro E na matriz (ainda NÃO usado no roteamento — isso é a Fase 3).
+- **Proximidade-primeiro Fase 0-2 LIVE; Fase 3 CONSTRUÍDA+PROVADA, NÃO deployada** (ver §8): retirada por distância ligada; raio coletado; entrega pelo raio pronta na branch `feat/proximidade-primeiro` esperando o gate do deploy.
 - **O QUE VAMOS FAZER (roadmap, do mais próximo ao maior):**
-  1. Dono preencher o **raio dos 7 parceiros** na matriz (e validar que "Salvar raio" persiste).
-  2. **Fase 3 — entrega por proximidade**: a entrega passa a usar o raio (loja entra só se raio preenchido E dist ≤ raio); **junto, simplificar a aba "Área de entrega"** (vira redundante com o raio). Atrás da flag `ROUTING_PROXIMITY_FIRST`.
-  3. Fase 2 menor: aviso no login forte; cadastro "Novo parceiro" coletar o raio.
+  1. **GATE da Fase 3:** dono preencher o **raio dos 7 parceiros** na matriz (`node scripts/checar-raio-prod.cjs` mostra o estado; em 06-09 só zz-teste-copacabana tinha) → **push da Fase 3 pro main**. A flag já está ON em prod: subir sem os raios preenchidos tira a loja da ENTREGA (retirada segue normal; matriz pega).
+  2. Fase 2 menor: aviso no login forte; cadastro "Novo parceiro" coletar o raio.
+  3. Alerta na matriz pra pedido acima do raio no caminho SEM coordenada (decisão 2 do dono — ficou de fora da Fase 3).
   4. Antigos: preencher **horário das 6 lojas** vazias; limpar dado de teste (PED-0034, zz-teste-*, trocar senha temp do zz-teste-copacabana); **SEC-002** (autorização sem RLS, sessão dedicada — §9).
 
-## 8. Proximidade-primeiro (derruba o "muro da cidade") — Fase 0-2 FEITAS, Fase 3 aberta
+## 8. Proximidade-primeiro (derruba o "muro da cidade") — Fase 0-3 FEITAS (3 não deployada)
 **Furo:** o roteamento filtrava por CIDADE antes da distância → cliente de Caxias a 9 km de Madureira caía na matriz. **Virada:** com coordenada, rotear por DISTÂNCIA (anel+estoque+régua decidem); cidade vira plano B + teto de raio por loja. Tudo atrás da flag **`ROUTING_PROXIMITY_FIRST`** (default OFF no código; **o dono já ligou =true no Coolify**).
 - **Fase 0+1 (fundação + RETIRADA) — LIVE em prod.** Migration 0093 `delivery_radius_km`; `resolveUnitCandidatesByProximity` (sem muro de cidade); retirada por proximidade ligada. Rollback = flag false no Coolify.
 - **Fase 2 (coleta do raio) — FEITA e LIVE** (2026-06-09): campo "até quantos km você entrega?" no **painel do parceiro** (aba Atendimento) + editor "Raio de entrega (Rede)" na **matriz** (detalhe do parceiro, página 'unidade'). Os dois gravam `network.partner_units.delivery_radius_km` (fonte única; matriz só edita quem faz entrega — trava de autonomia). Provas: `scripts/prova-raio-entrega-test.ts` + `prova-raio-matriz-test.ts` (6/6 cada).
-- **Fase 3 (ENTREGA por proximidade) — ABERTA:** entrega passa a usar o raio (loja entra só se `delivery_radius_km` preenchido E dist ≤ raio); hoje o raio só é COLETADO, o motor ainda NÃO lê — a entrega ainda usa cobertura de bairro (`passesDeliveryCoverage`). **Junto da Fase 3: simplificar a aba "Área de entrega"** (fica redundante com o raio).
-**Detalhe:** `docs/SESSAO_2026-06-09c_FASE2_PAINEL_MATRIZ_HANDOFF.md` (Fase 2) + `..._09b_PROXIMIDADE_HANDOFF.md` (plano/Fase 0-1).
+- **Fase 3 (ENTREGA por proximidade) — CONSTRUÍDA+PROVADA (2026-06-09), aguardando deploy:** com a flag on, a entrega usa o pool por proximidade e a loja só entra se `delivery_radius_km` preenchido E dist ≤ raio (`filterByModeAndRadiusPresence` + `passesDeliveryRadius` em `geo-routing.ts`); a cobertura de bairro só vale no caminho por cidade (flag off). A BUSCA segue a mesma régua (nunca diverge do pedido). Aba "Área de entrega" do painel SIMPLIFICADA (só município/plano B; bairros saíram). Provas: prova-proximidade 11/11, prova-geo 9/9, 337 unit. **GATE:** preencher o raio dos 7 ANTES do push (§7.1).
+**Detalhe:** `docs/SESSAO_2026-06-09d_FASE3_ENTREGA_RAIO_HANDOFF.md` (Fase 3) + `..._09c_FASE2_PAINEL_MATRIZ_HANDOFF.md` (Fase 2) + `..._09b_PROXIMIDADE_HANDOFF.md` (plano/Fase 0-1).
 
 ## 9. Segurança
 - **SEC-001 RESOLVIDO** (bot não vaza pedido de outro cliente — amarra contact_id).

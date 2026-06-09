@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   filterByModeAndCoverage,
+  filterByModeAndRadiusPresence,
   passesDeliveryCoverage,
+  passesDeliveryRadius,
   ringsForModalidade,
   servesModalidade,
   type GeoRoutingCandidate,
@@ -13,6 +15,7 @@ function cand(over: Partial<GeoRoutingCandidate> & { unitId: string }): GeoRouti
     location: { lat: -22.9, lng: -43.1 },
     hasCityCoverage: true,
     neighborhoods: [],
+    deliveryRadiusKm: null,
     ...over,
   };
 }
@@ -71,6 +74,56 @@ describe('filterByModeAndCoverage', () => {
     const cands = [cand({ unitId: 'A' }), cand({ unitId: 'B' })];
     const snap = cands.map((c) => c.unitId);
     filterByModeAndCoverage(cands, 'delivery', null);
+    expect(cands.map((c) => c.unitId)).toEqual(snap);
+  });
+});
+
+describe('passesDeliveryRadius (Fase 3 — ④a\')', () => {
+  it('raio não preenchido (null) → fora da entrega, mesmo coladinho', () => {
+    expect(passesDeliveryRadius(null, 0.5)).toBe(false);
+  });
+  it('distância dentro do raio → entra; limite é INCLUSIVO (igual ao anel)', () => {
+    expect(passesDeliveryRadius(10, 8)).toBe(true);
+    expect(passesDeliveryRadius(10, 10)).toBe(true);
+  });
+  it('distância acima do raio → fora (o raio é o consentimento do borracheiro)', () => {
+    expect(passesDeliveryRadius(10, 10.1)).toBe(false);
+  });
+});
+
+describe('filterByModeAndRadiusPresence (proximidade — ②\')', () => {
+  it('entrega: tira pickup-only e quem NÃO declarou raio (silêncio ≠ consentimento)', () => {
+    const cands = [
+      cand({ unitId: 'com-raio', serviceMode: 'both', deliveryRadiusKm: 12 }),
+      cand({ unitId: 'sem-raio', serviceMode: 'delivery', deliveryRadiusKm: null }),
+      cand({ unitId: 'so-retira', serviceMode: 'pickup', deliveryRadiusKm: 12 }),
+    ];
+    const out = filterByModeAndRadiusPresence(cands, 'delivery').map((c) => c.unitId);
+    expect(out).toEqual(['com-raio']);
+  });
+  it('entrega: a cobertura de bairro NÃO se aplica na proximidade (raio substitui)', () => {
+    const semCobertura = cand({
+      unitId: 'A',
+      serviceMode: 'delivery',
+      hasCityCoverage: false,
+      neighborhoods: [],
+      deliveryRadiusKm: 8,
+    });
+    expect(filterByModeAndRadiusPresence([semCobertura], 'delivery').map((c) => c.unitId)).toEqual(['A']);
+  });
+  it('retirada: ignora o raio (o cliente vai à loja) e tira delivery-only', () => {
+    const cands = [
+      cand({ unitId: 'sem-raio-retira', serviceMode: 'pickup', deliveryRadiusKm: null }),
+      cand({ unitId: 'so-entrega', serviceMode: 'delivery', deliveryRadiusKm: 30 }),
+      cand({ unitId: 'both', serviceMode: 'both', deliveryRadiusKm: null }),
+    ];
+    const out = filterByModeAndRadiusPresence(cands, 'pickup').map((c) => c.unitId);
+    expect(out).toEqual(['sem-raio-retira', 'both']);
+  });
+  it('não muta a entrada', () => {
+    const cands = [cand({ unitId: 'A' }), cand({ unitId: 'B', deliveryRadiusKm: 5 })];
+    const snap = cands.map((c) => c.unitId);
+    filterByModeAndRadiusPresence(cands, 'delivery');
     expect(cands.map((c) => c.unitId)).toEqual(snap);
   });
 });

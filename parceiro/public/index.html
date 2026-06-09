@@ -2071,58 +2071,30 @@
           </aside>
         </div>
 
-        <!-- ABA 3: Área de entrega (cidade inteira vs bairros) — DECLARATIVO na Fase 1 -->
+        <!-- ABA 3: Área de entrega — SIMPLIFICADA na Fase 3 (proximidade-primeiro):
+             quem manda na entrega agora é o RAIO em km (aba Atendimento). Aqui fica só
+             o MUNICÍPIO base, o plano B de quando o cliente não manda a localização.
+             A parte de bairros saiu (o raio aposentou). -->
         <div x-show="configTab === 'area'" class="pos-page-grid customers">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head"><div>
               <h3>Onde você entrega</h3>
-              <p>Município e, se quiser, os bairros que você atende.</p>
+              <p>O município base da sua loja. Quem decide a entrega é o <b>raio em km</b> (aba Atendimento).</p>
             </div></div>
             <div class="pos-stock-side-form" style="max-width:640px;">
               <label>Município
                 <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
               </label>
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                <input type="radio" name="area_kind" :checked="areaForm.city_wide" @change="areaForm.city_wide = true" style="width:auto;" />
-                <span><b>Atendo a cidade inteira</b></span>
-              </label>
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                <input type="radio" name="area_kind" :checked="!areaForm.city_wide" @change="areaForm.city_wide = false" style="width:auto;" />
-                <span><b>Atendo bairros específicos</b></span>
-              </label>
-
-              <div x-show="!areaForm.city_wide" style="margin-top:6px;">
-                <label>Buscar bairro
-                  <input x-model="bairroQuery" @input.debounce.350ms="searchBairros()" placeholder="Digite: copa → Copacabana" maxlength="160" />
-                </label>
-                <div x-show="bairroSearching" class="pos-muted" style="font-size:12px;">Buscando…</div>
-                <div x-show="bairroResults.length" style="display:flex;flex-direction:column;gap:4px;margin:6px 0;">
-                  <template x-for="b in bairroResults" :key="b.neighborhood_canonical + b.city_name">
-                    <button class="pos-outline-action compact" @click="addBairro(b)" style="justify-content:flex-start;">
-                      <i data-lucide="plus"></i>
-                      <span x-text="b.neighborhood_canonical + (b.city_name ? ' — ' + b.city_name : '')"></span>
-                    </button>
-                  </template>
-                </div>
-                <!-- Chips removíveis dos bairros escolhidos -->
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-                  <template x-for="n in areaForm.neighborhoods" :key="n">
-                    <span class="pos-chip" style="display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.4);border-radius:999px;padding:4px 10px;font-size:13px;">
-                      <span x-text="n"></span>
-                      <button @click="removeBairro(n)" style="background:none;border:none;color:inherit;cursor:pointer;line-height:1;"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
-                    </span>
-                  </template>
-                  <span x-show="!areaForm.neighborhoods.length" class="pos-muted" style="font-size:13px;">Nenhum bairro escolhido ainda.</span>
-                </div>
-              </div>
-
               <button @click="saveArea()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="save"></i>
                 <span x-text="isSaving('area') ? 'Salvando...' : 'Salvar área de entrega'"></span>
               </button>
               <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">
                 <i data-lucide="info" style="width:13px;height:13px;"></i>
-                Por enquanto isto é só um cadastro: o robô ainda <b>não</b> filtra por bairro (entra numa próxima fase).
+                A lista de bairros saiu daqui: a entrega agora funciona pelo <b>raio em km</b> que você
+                define na aba <b>Atendimento</b> — o robô mede a distância até o cliente e só te manda
+                entrega dentro do seu raio. O município fica como referência quando o cliente ainda
+                não mandou a localização.
               </p>
             </div>
           </section>
@@ -2130,7 +2102,7 @@
             <h3>Cobertura atual</h3>
             <div class="pos-tip-list">
               <template x-for="c in coverageList" :key="c.municipio">
-                <div><i data-lucide="map-pin"></i><span><b x-text="c.municipio"></b> — <span x-text="c.city_wide ? 'cidade inteira' : (c.neighborhoods.length + ' bairro(s)')"></span></span></div>
+                <div><i data-lucide="map-pin"></i><span><b x-text="c.municipio"></b> — <span x-text="c.city_wide ? 'cidade inteira' : (c.neighborhoods.length + ' bairro(s) (modelo antigo — o raio substitui)')"></span></span></div>
               </template>
               <div x-show="!coverageList.length"><i data-lucide="info"></i><span>Sem cobertura cadastrada ainda.</span></div>
             </div>

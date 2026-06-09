@@ -29,7 +29,13 @@ import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { roadDistanceKm } from '../shared/geo/google-maps.js';
-import { filterByModeAndCoverage, ringsForModalidade, type GeoRoutingCandidate } from './geo-routing.js';
+import {
+  filterByModeAndCoverage,
+  filterByModeAndRadiusPresence,
+  passesDeliveryRadius,
+  ringsForModalidade,
+  type GeoRoutingCandidate,
+} from './geo-routing.js';
 
 interface RoutedUnitRow {
   partner_unit_id: string;
@@ -167,6 +173,8 @@ export interface UnitCandidate {
   hasCityCoverage: boolean;
   /** Bairros declarados (unit_coverage kind='neighborhood'). */
   neighborhoods: string[];
+  /** Raio máximo de ENTREGA declarado (partner_units.delivery_radius_km, km); null = não preenchido. */
+  deliveryRadiusKm: number | null;
 }
 
 /** Linha crua de candidato (resolveUnitCandidates* → mapRowToUnitCandidate). */
@@ -174,6 +182,7 @@ type UnitCandidateRow = RoutedUnitRow & {
   service_mode: string;
   latitude: string | null;
   longitude: string | null;
+  delivery_radius_km: string | null;
   has_city_coverage: boolean;
   neighborhoods: (string | null)[] | null;
 };
@@ -202,6 +211,8 @@ function mapRowToUnitCandidate(environment: Environment, row: UnitCandidateRow):
         : null,
     hasCityCoverage: row.has_city_coverage ?? false,
     neighborhoods: (row.neighborhoods ?? []).filter((n): n is string => typeof n === 'string' && n.length > 0),
+    // NUMERIC volta como string do pg → number (ou null = raio não preenchido).
+    deliveryRadiusKm: row.delivery_radius_km != null ? Number(row.delivery_radius_km) : null,
   };
 }
 
@@ -236,6 +247,7 @@ export async function resolveUnitCandidates(
             pu.service_mode  AS service_mode,
             pu.latitude      AS latitude,
             pu.longitude     AS longitude,
+            pu.delivery_radius_km AS delivery_radius_km,
             bool_or(uc.coverage_kind = 'city')                  AS has_city_coverage,
             array_remove(array_agg(uc.neighborhood_canonical), NULL) AS neighborhoods
      FROM network.unit_coverage uc
@@ -261,13 +273,13 @@ export async function resolveUnitCandidates(
  * coordenada cadastrada, SEM o gate de município de `resolveUnitCandidates` — o "muro
  * da cidade" cai aqui. Quem decide passa a ser a DISTÂNCIA (anel) ∩ estoque ∩ régua,
  * lá no `decideStoreForItemsGeo`. Usada SÓ com `ROUTING_PROXIMITY_FIRST` on + coordenada
- * do cliente (nesta leva, só na RETIRADA).
+ * do cliente (Fase 1 = retirada; Fase 3 = entrega também, com o corte do raio).
  *
  * Diferenças vs resolveUnitCandidates:
  *  - SEM `$muni LIKE '%' || uc.municipio || '%'` (sem muro de cidade);
  *  - `LEFT JOIN unit_coverage` (a loja entra mesmo sem linha de cobertura) — a cobertura
  *    só DESCREVE (has_city_coverage/neighborhoods da PRÓPRIA loja), não filtra. Irrelevante
- *    pra pickup (que ignora cobertura) e pronta pra a Fase 3 (entrega);
+ *    pra pickup (que ignora cobertura) e pra entrega na Fase 3 (quem filtra é o RAIO);
  *  - exige `latitude/longitude NOT NULL`: sem coordenada não há como medir distância (a
  *    loja cairia no caminho de cidade, não na proximidade).
  *
@@ -287,6 +299,7 @@ export async function resolveUnitCandidatesByProximity(
             pu.service_mode  AS service_mode,
             pu.latitude      AS latitude,
             pu.longitude     AS longitude,
+            pu.delivery_radius_km AS delivery_radius_km,
             bool_or(uc.coverage_kind = 'city')                  AS has_city_coverage,
             array_remove(array_agg(uc.neighborhood_canonical), NULL) AS neighborhoods
      FROM network.partner_units pu
@@ -853,6 +866,7 @@ function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
     location: c.location,
     hasCityCoverage: c.hasCityCoverage,
     neighborhoods: c.neighborhoods,
+    deliveryRadiusKm: c.deliveryRadiusKm,
   };
 }
 
@@ -910,22 +924,29 @@ export async function decideStoreForItemsGeo(
 ): Promise<GeoStoreDecision> {
   if (input.items.length === 0) return { kind: 'matriz' };
 
-  // PROXIMIDADE-PRIMEIRO (Fase 1): na RETIRADA, com a flag on, os candidatos passam a ser
-  // TODAS as lojas ativas com coordenada (sem o "muro de cidade") — o anel/estoque/régua
-  // abaixo decidem por DISTÂNCIA. Sem a flag (ou na entrega, até a Fase 3): caminho de
-  // cidade de hoje, intocado. O `municipio` segue no input e só é usado por este último.
-  const useProximity = env.ROUTING_PROXIMITY_FIRST && input.modalidade === 'pickup';
+  // PROXIMIDADE-PRIMEIRO (Fase 1 retirada + Fase 3 entrega): com a flag on, os candidatos
+  // passam a ser TODAS as lojas ativas com coordenada (sem o "muro de cidade") — o
+  // anel/estoque/régua abaixo decidem por DISTÂNCIA. Na ENTREGA a cobertura de bairro sai
+  // de cena e entra o RAIO declarado pela loja (delivery_radius_km): sem raio = fora da
+  // entrega; com raio = entra só se distância ≤ raio (corte fino mais abaixo, pós-medição).
+  // Sem a flag: caminho de cidade de hoje, intocado (o `municipio` só é usado por ele).
+  const useProximity = env.ROUTING_PROXIMITY_FIRST;
   const candidates = useProximity
     ? await resolveUnitCandidatesByProximity(client, environment)
     : await resolveUnitCandidates(client, environment, input.municipio);
   if (candidates.length === 0) return { kind: 'matriz' };
 
-  // ② modo + ④a cobertura (puro, de graça) — reduz as checagens de estoque.
+  // ② modo + ④a (puro, de graça) — reduz as checagens de estoque. Proximidade: na
+  // entrega, o "④a" vira presença de raio (a cobertura de bairro não se aplica);
+  // cidade (sem flag): cobertura declarada de bairro, como sempre.
   const servableIds = new Set(
-    filterByModeAndCoverage(
-      candidates.map(toGeoRoutingCandidate),
-      input.modalidade,
-      input.clientNeighborhoodCanonical,
+    (useProximity
+      ? filterByModeAndRadiusPresence(candidates.map(toGeoRoutingCandidate), input.modalidade)
+      : filterByModeAndCoverage(
+          candidates.map(toGeoRoutingCandidate),
+          input.modalidade,
+          input.clientNeighborhoodCanonical,
+        )
     ).map((c) => c.unitId),
   );
 
@@ -943,7 +964,17 @@ export async function decideStoreForItemsGeo(
     Math.max(...rings),
   );
 
-  for (const cand of eligible) {
+  // ④a' — Fase 3 (ENTREGA por proximidade): corte fino do raio com a distância já
+  // medida — a loja só disputa (anel, estoque, only_far) se distância ≤ raio DELA.
+  // Aplicado ANTES do estoque (corta query de quem já está fora por vontade própria).
+  // Retirada não tem raio (o cliente vai à loja).
+  const inRadius =
+    useProximity && input.modalidade === 'delivery'
+      ? eligible.filter((c) => passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))
+      : eligible;
+  if (inRadius.length === 0) return { kind: 'matriz' };
+
+  for (const cand of inRadius) {
     const mappings = await Promise.all(
       input.items.map((i) => mapProductToPartnerStock(client, environment, cand.ctx.unitId, i.product_id, i.quantity)),
     );
@@ -1052,15 +1083,25 @@ export async function resolveProductAvailabilityByProximity(
   const out = new Map<string, ProductAvailability>();
   if (input.productIds.length === 0) return out;
 
-  const candidates = await resolveUnitCandidates(client, environment, input.municipio);
+  // PROXIMIDADE-PRIMEIRO (Fase 3): a BUSCA segue a MESMA régua do pedido de entrega —
+  // pool sem muro de cidade + raio declarado — senão a busca prometeria estoque de loja
+  // que o pedido depois recusaria (a fala e o registro nunca podem divergir).
+  const useProximity = env.ROUTING_PROXIMITY_FIRST;
+  const candidates = useProximity
+    ? await resolveUnitCandidatesByProximity(client, environment)
+    : await resolveUnitCandidates(client, environment, input.municipio);
   if (candidates.length === 0) return out;
 
-  // modo (entrega) + cobertura declarada — MESMA porta do pedido de entrega.
+  // modo (entrega) + ④a — MESMA porta do pedido de entrega: proximidade = presença de
+  // raio (corte fino dist ≤ raio mais abaixo, pós-medição); cidade = cobertura de bairro.
   const servableIds = new Set(
-    filterByModeAndCoverage(
-      candidates.map(toGeoRoutingCandidate),
-      'delivery',
-      input.clientNeighborhoodCanonical,
+    (useProximity
+      ? filterByModeAndRadiusPresence(candidates.map(toGeoRoutingCandidate), 'delivery')
+      : filterByModeAndCoverage(
+          candidates.map(toGeoRoutingCandidate),
+          'delivery',
+          input.clientNeighborhoodCanonical,
+        )
     ).map((c) => c.unitId),
   );
   const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
@@ -1078,9 +1119,16 @@ export async function resolveProductAvailabilityByProximity(
     maxRing,
   );
 
-  // lojas dentro do teto, da MAIS PERTO pra mais longe.
+  // lojas dentro do teto, da MAIS PERTO pra mais longe. Na proximidade (Fase 3) o
+  // corte fino do raio entra aqui também: dist ≤ raio DECLARADO da loja (mesma régua
+  // do decideStoreForItemsGeo de entrega).
   const inRange = eligible
-    .filter((c) => (distanceByUnit.get(c.ctx.unitId) ?? Infinity) <= maxRing)
+    .filter((c) => {
+      const d = distanceByUnit.get(c.ctx.unitId) ?? Infinity;
+      if (d > maxRing) return false;
+      if (useProximity && !passesDeliveryRadius(c.deliveryRadiusKm, d)) return false;
+      return true;
+    })
     .sort((a, b) => distanceByUnit.get(a.ctx.unitId)! - distanceByUnit.get(b.ctx.unitId)!);
   if (inRange.length === 0) return out;
 
