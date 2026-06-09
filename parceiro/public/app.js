@@ -46,10 +46,10 @@ function parceiroApp() {
     lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '', maps_url: '' },
     atendimentoForm: { faz_entrega: true, tem_retirada: true, delivery_radius_km: null },
     // Área de entrega: por município. Fase 1 edita 1 município por vez (o da loja).
-    areaForm: { municipio: '', city_wide: true, neighborhoods: [] },
-    bairroQuery: '',
-    bairroResults: [],
-    bairroSearching: false,
+    // Fase 3 (proximidade-primeiro): a aba Área encolheu pra só o MUNICÍPIO (plano B
+    // de quando o cliente não manda localização) — a entrega é decidida pelo RAIO em km
+    // (aba Atendimento). A parte de bairros saiu da UI (o raio aposentou).
+    areaForm: { municipio: '' },
     coverageList: [],            // cobertura atual (lida do GET), só pra exibir o resumo
     // Permissões de tela do funcionário (toggles). 'config' NUNCA aparece aqui.
     permForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false },
@@ -547,14 +547,10 @@ function parceiroApp() {
             ? Number(loja.delivery_radius_km) : null,
         };
         this.coverageList = Array.isArray(cfg.coverage) ? cfg.coverage : [];
-        // Área: edita o município da loja (ou o 1º coberto). Fase 1 = 1 município.
+        // Área: edita o município da loja (ou o 1º coberto). Só o município — a
+        // entrega é decidida pelo raio (aba Atendimento), não por bairros.
         const baseMunicipio = (loja.address_city || (this.coverageList[0] && this.coverageList[0].municipio) || '').toString();
-        const covEntry = this.coverageList.find((c) => c.municipio === baseMunicipio.trim().toLowerCase());
-        this.areaForm = {
-          municipio: baseMunicipio,
-          city_wide: covEntry ? covEntry.city_wide : true,
-          neighborhoods: covEntry && Array.isArray(covEntry.neighborhoods) ? [...covEntry.neighborhoods] : [],
-        };
+        this.areaForm = { municipio: baseMunicipio };
         // Permissões: preenche os toggles com o efetivo do servidor.
         if (cfg.permissions && typeof cfg.permissions === 'object') {
           this.permForm = { ...this.permForm, ...cfg.permissions };
@@ -617,52 +613,22 @@ function parceiroApp() {
       }
     },
 
-    // Busca de bairros ("copa" → Copacabana) — read-only, escopada ao município.
-    async searchBairros() {
-      const q = (this.bairroQuery || '').trim();
-      if (q.length < 2) { this.bairroResults = []; return; }
-      this.bairroSearching = true;
-      try {
-        const params = new URLSearchParams({ q });
-        if (this.areaForm.municipio.trim()) params.set('municipio', this.areaForm.municipio.trim());
-        const res = await this.api(`configuracoes/bairros?${params.toString()}`);
-        this.bairroResults = res.rows || [];
-      } catch (err) {
-        console.warn('bairros_unavailable', err);
-        this.bairroResults = [];
-      } finally {
-        this.bairroSearching = false;
-      }
-    },
-
-    addBairro(b) {
-      const nome = (b && b.neighborhood_canonical ? b.neighborhood_canonical : String(b || '')).trim().toLowerCase();
-      if (!nome) return;
-      if (!this.areaForm.neighborhoods.includes(nome)) this.areaForm.neighborhoods.push(nome);
-      this.bairroQuery = '';
-      this.bairroResults = [];
-    },
-
-    removeBairro(nome) {
-      this.areaForm.neighborhoods = this.areaForm.neighborhoods.filter((n) => n !== nome);
-    },
-
+    // A busca/escolha de bairros saiu da UI (Fase 3): a entrega é decidida pelo
+    // raio em km (aba Atendimento). Salvar a área = declarar o município (cidade
+    // inteira), o plano B de quando o cliente não manda a localização.
     async saveArea() {
       if (!this.areaForm.municipio.trim()) { this.flash('Informe o município da área de entrega.'); return; }
-      if (!this.areaForm.city_wide && this.areaForm.neighborhoods.length === 0) {
-        this.flash('Liste ao menos um bairro, ou marque "Atendo a cidade inteira".'); return;
-      }
       this.saving = true; this.savingAction = 'area';
       try {
         await this.api('configuracoes/area', {
           method: 'PUT',
           body: JSON.stringify({
             municipio: this.areaForm.municipio.trim(),
-            city_wide: !!this.areaForm.city_wide,
-            neighborhoods: this.areaForm.city_wide ? [] : this.areaForm.neighborhoods,
+            city_wide: true,
+            neighborhoods: [],
           }),
         });
-        this.flash('Área de entrega salva. (Por ora é declarativa — o robô ainda não filtra por bairro.)', 'success');
+        this.flash('Área de entrega salva.', 'success');
         await this.loadConfiguracoes();
       } catch (err) {
         this.flash(this.errMessage(err));

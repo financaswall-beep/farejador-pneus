@@ -26,6 +26,9 @@ export interface GeoRoutingCandidate {
   hasCityCoverage: boolean;
   /** Bairros canônicos declarados (unit_coverage kind='neighborhood'). */
   neighborhoods: string[];
+  /** Raio máximo de ENTREGA declarado pela loja (partner_units.delivery_radius_km, em km).
+   *  null = não preenchido → FORA da entrega por proximidade (Fase 3). Retirada nunca usa. */
+  deliveryRadiusKm: number | null;
 }
 
 /** A loja atende a modalidade pedida? (`both` atende as duas.) */
@@ -66,6 +69,39 @@ export function filterByModeAndCoverage<T extends GeoRoutingCandidate>(
     if (modalidade === 'delivery' && !passesDeliveryCoverage(c, clientNeighborhoodCanonical)) return false;
     return true;
   });
+}
+
+// ─── PROXIMIDADE-PRIMEIRO (Fase 3 — ENTREGA pelo raio) ──────────────────────
+// No caminho por proximidade a cobertura de bairro (④a) NÃO se aplica: quem diz
+// se a loja entrega ali é o RAIO que ELA declarou (delivery_radius_km). Decisões
+// do dono (handoff 2026-06-09b §2.3): raio não preenchido = FORA da entrega
+// (silêncio ≠ consentimento — o borracheiro é quem dirige); preenchido = entra
+// só se a distância do cliente ≤ o raio. A retirada NUNCA usa raio (o cliente
+// é quem vai à loja — Fase 1, intocada).
+
+/**
+ * ②' — filtro barato do caminho por PROXIMIDADE (antes de medir distância e de
+ * consultar estoque): modo + (na entrega) raio PREENCHIDO. O corte fino
+ * "distância ≤ raio" só existe depois de medir → `passesDeliveryRadius`.
+ */
+export function filterByModeAndRadiusPresence<T extends GeoRoutingCandidate>(
+  candidates: T[],
+  modalidade: Modalidade,
+): T[] {
+  return candidates.filter((c) => {
+    if (!servesModalidade(c.serviceMode, modalidade)) return false;
+    if (modalidade === 'delivery' && c.deliveryRadiusKm == null) return false;
+    return true;
+  });
+}
+
+/**
+ * ④a' — corte fino do raio (Fase 3, ENTREGA por proximidade): a loja só disputa
+ * se a distância MEDIDA do cliente cabe no raio DECLARADO por ela. Inclusivo
+ * (distância ≤ raio), igual ao limite do anel. Raio null = fora.
+ */
+export function passesDeliveryRadius(deliveryRadiusKm: number | null, distanceKm: number): boolean {
+  return deliveryRadiusKm != null && distanceKm <= deliveryRadiusKm;
 }
 
 /** Anéis de entrega vs retirada — a régua de raio por modalidade (D1/D2).
