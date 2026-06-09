@@ -519,16 +519,26 @@ export async function getUnitDisplayById(
   client: PoolClient,
   environment: Environment,
   unitId: string,
-): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null } | null> {
-  const r = await client.query<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null }>(
-    `SELECT COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours
+): Promise<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null; installation_fee: number | null } | null> {
+  const r = await client.query<{ nome_loja: string; maps_url: string | null; address: string | null; opening_hours: string | null; installation_fee_brl: string | null }>(
+    `SELECT COALESCE(pu.display_name, u.name) AS nome_loja, pu.maps_url, pu.address, pu.opening_hours_text AS opening_hours,
+            pu.installation_fee_brl
        FROM network.partner_units pu
        JOIN core.units u ON u.id = pu.unit_id
       WHERE pu.environment = $1 AND pu.unit_id = $2 AND pu.deleted_at IS NULL
       LIMIT 1`,
     [environment, unitId],
   );
-  return r.rows[0] ?? null;
+  const row = r.rows[0];
+  if (!row) return null;
+  // NUMERIC volta como string do pg → Number; NULL (não configurado) fica null.
+  return {
+    nome_loja: row.nome_loja,
+    maps_url: row.maps_url,
+    address: row.address,
+    opening_hours: row.opening_hours,
+    installation_fee: row.installation_fee_brl == null ? null : Number(row.installation_fee_brl),
+  };
 }
 
 /**
@@ -768,7 +778,11 @@ export interface GeoDecisionInput {
 
 export type GeoStoreDecision =
   | { kind: 'partner'; routing: PartnerOrderRouting; ringKm: number | null; distanceKm: number }
-  | { kind: 'only_far'; unitId: string; unitName: string; distanceKm: number }
+  // only_far CARREGA a rota da loja mais perto dos longes: existe loja com o pedido
+  // completo, mas além do maior anel. O chamador NÃO materializa por conta própria — só
+  // com consentimento explícito do cliente ("vou buscar mesmo assim", decisão Wallace
+  // 2026-06-08). A rota fica pronta pra esse caso, sem reabrir a busca.
+  | { kind: 'only_far'; unitId: string; unitName: string; distanceKm: number; routing: PartnerOrderRouting }
   | { kind: 'matriz' };
 
 function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
@@ -898,7 +912,24 @@ export async function decideStoreForItemsGeo(
       { environment, unit_id: nearestFar.cand.ctx.unitId, distancia_km: Math.round(nearestFar.distanceKm), modalidade: input.modalidade },
       'decideStoreForItemsGeo: só tem longe (caso E)',
     );
-    return { kind: 'only_far', unitId: nearestFar.cand.ctx.unitId, unitName: nearestFar.cand.ctx.unitName, distanceKm: nearestFar.distanceKm };
+    return {
+      kind: 'only_far',
+      unitId: nearestFar.cand.ctx.unitId,
+      unitName: nearestFar.cand.ctx.unitName,
+      distanceKm: nearestFar.distanceKm,
+      // Rota pronta (mesma montagem do caso 'partner') pro consentimento: se o cliente
+      // bancar ir buscar, o chamador reserva na loja mais perto que tem, sem rebuscar.
+      routing: {
+        ctx: nearestFar.cand.ctx,
+        unitId: nearestFar.cand.ctx.unitId,
+        items: input.items.map((i, idx) => ({
+          product_id: i.product_id,
+          partner_stock_id: nearestFar.mappings[idx]!.partner_stock_id,
+          quantity: i.quantity,
+          central_price: nearestFar.mappings[idx]!.central_price,
+        })),
+      },
+    };
   }
 
   return { kind: 'matriz' };

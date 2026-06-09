@@ -101,15 +101,15 @@ async function main(): Promise<void> {
     );
     await client.query('ROLLBACK');
 
-    // C — retirada 15 km (ignora cobertura de bairro): pool ≤15 = {leme,tijuca,meier,niteroi};
-    // geo-bairro é delivery-only → fora; madureira ~19km → fora.
+    // C — retirada em FAIXAS [5,10,15] (ignora cobertura de bairro): a banda MAIS PERTO ganha.
+    // geo-leme ~4km cai na faixa 5 e é o único nela → ganha direto (não revezа com os de 7-13km).
+    // geo-bairro é delivery-only → fora de qualquer forma. (Antes era anel único de 15km; virou
+    // faixas em c31e436 — esta prova estava defasada nessa mudança.)
     await client.query('BEGIN');
     const C = await decide('pickup', 'copacabana');
     check(
-      'C retirada: anel 15 km, sem filtro de bairro, sem delivery-only',
-      C.kind === 'partner' && C.ringKm === 15 &&
-        ['geo-leme', 'geo-tijuca', 'geo-meier', 'geo-niteroi'].includes(slugOf(C.routing.unitId)) &&
-        slugOf(C.routing.unitId) !== 'geo-bairro',
+      'C retirada: faixas [5,10,15], banda mais perto ganha (geo-leme @~4km → anel 5)',
+      C.kind === 'partner' && C.ringKm === 5 && slugOf(C.routing.unitId) === 'geo-leme',
       C.kind === 'partner' ? `${slugOf(C.routing.unitId)} @${Math.round(C.distanceKm)}km anel${C.ringKm}` : C.kind,
     );
     await client.query('ROLLBACK');
@@ -135,6 +135,18 @@ async function main(): Promise<void> {
       'E só tem longe → only_far (geo-itaborai ~44km, além do anel)',
       E.kind === 'only_far' && E.unitName.toUpperCase().includes('ITABORAI') && E.distanceKm > 30,
       E.kind === 'only_far' ? `${Math.round(E.distanceKm)}km ${E.unitName}` : E.kind,
+    );
+    // E2 — consentimento: o only_far CARREGA a rota da loja mais perto dos longes (geo-itaborai)
+    // com o item completo, pronta pra reservar SE o cliente bancar ir buscar. Sem isso o
+    // criar_pedido não teria como materializar o pedido longe.
+    check(
+      'E2 only_far carrega a rota pronta (consentimento) → geo-itaborai + item',
+      E.kind === 'only_far' &&
+        slugOf(E.routing.unitId) === 'geo-itaborai' &&
+        E.routing.items.length === 1 &&
+        E.routing.items[0]!.product_id === productId &&
+        !!E.routing.items[0]!.partner_stock_id,
+      E.kind === 'only_far' ? `${slugOf(E.routing.unitId)} itens=${E.routing.items.length}` : E.kind,
     );
     await client.query('ROLLBACK');
 

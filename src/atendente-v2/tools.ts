@@ -243,6 +243,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           valor_frete: { type: 'number', description: 'Valor do frete em reais. OBRIGATÓRIO quando modalidade=delivery — passe o valor retornado por calcular_frete. Em pickup, omita ou 0.' },
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
           bairro: { type: 'string', description: 'Bairro do cliente. Na ENTREGA, passe o MESMO usado no calcular_frete. Na RETIRADA, passe o bairro que o cliente informou — é o que permite achar a loja mais perto pra ele retirar.' },
+          confirma_retirada_distante: { type: 'boolean', description: 'Use SOMENTE na RETIRADA e SOMENTE depois que o cliente, avisado de que a loja mais perto que tem o pneu fica longe, disser EXPLICITAMENTE que vai buscar mesmo assim ("não tem problema, eu passo aí", "eu vou aí pegar"). true = reserva o pneu na loja mais perto que tem, mesmo fora do raio normal de retirada. NUNCA marque sozinho: só com a confirmação do cliente.' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
@@ -560,13 +561,25 @@ export async function executeTool(
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
             if (disp) {
-              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours });
+              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
             }
           } else if (geo.kind === 'only_far') {
-            // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada (15 km).
+            // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada.
             // sem distancia_km de proposito: o "longe" é gatilho negativo (decisão Wallace) —
-            // o bot só nomeia a loja e oferece a entrega como solução positiva.
-            return JSON.stringify({ encontrado: false, motivo: 'retirada_so_longe', nome_loja_distante: geo.unitName });
+            // o bot nomeia a loja e oferece a entrega como solução positiva. Mas devolve TAMBÉM
+            // o cartão da loja (endereço/mapa): se o cliente bancar ir buscar (consentimento), o
+            // bot já tem o que passar e fecha com criar_pedido(confirma_retirada_distante=true).
+            const disp = await getUnitDisplayById(client, environment, geo.unitId);
+            return JSON.stringify({
+              encontrado: false,
+              motivo: 'retirada_so_longe',
+              nome_loja_distante: geo.unitName,
+              nome_loja: disp?.nome_loja ?? geo.unitName,
+              maps_url: disp?.maps_url ?? null,
+              endereco: disp?.address ?? null,
+              horario: disp?.opening_hours ?? null,
+              taxa_instalacao: disp?.installation_fee ?? null,
+            });
           } else {
             // matriz: nenhum parceiro perto tem o pneu pra retirar.
             return JSON.stringify({ encontrado: false, motivo: 'sem_loja_com_estoque_perto' });
@@ -720,6 +733,9 @@ async function criarPedido(
   const subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
   const valorFrete = Number(args.valor_frete ?? 0) || 0;
+  // Consentimento de retirada longe (decisão Wallace 2026-06-08): o bot só marca true
+  // depois que o cliente confirma que vai buscar mesmo a loja ficando longe.
+  const confirmaRetiradaDistante = args.confirma_retirada_distante === true;
 
   // Guard: delivery sem frete é provavelmente o LLM esquecendo o campo.
   // Retorna erro estruturado pra ele rechamar com valor_frete.
@@ -805,18 +821,28 @@ async function criarPedido(
           customerLocation,
           clientNeighborhoodCanonical: args.bairro ? normalizeRegion(args.bairro as string) : null,
         });
-        // Caso E (só tem longe): pergunta antes de criar, igual à entrega.
+        // Caso E (só tem longe): por padrão pergunta antes de criar (igual à entrega).
+        // EXCEÇÃO — consentimento (decisão Wallace 2026-06-08): se o cliente já bancou ir
+        // buscar mesmo longe (o bot marcou confirma_retirada_distante), reserva o pneu na
+        // loja mais perto que tem, mesmo fora do raio. NÃO é regra: dispara só com a
+        // confirmação do cliente nesta conversa; nada é persistido sobre a região (nasceu
+        // loja perto → ela ganha sozinha no anel, e este caminho nem é alcançado).
         if (geo.kind === 'only_far') {
-          return JSON.stringify({
-            erro: 'apenas_longe',
-            apenas_longe: true,
-            distancia_km: Math.round(geo.distanceKm),
-            nome_loja_distante: geo.unitName,
-            mensagem:
-              'Esse item só tem numa loja mais distante pra retirar. Confirme com o cliente (retirar lá mesmo / equivalente mais perto) ANTES de criar o pedido.',
-          });
+          if (confirmaRetiradaDistante) {
+            partner = geo.routing;
+          } else {
+            return JSON.stringify({
+              erro: 'apenas_longe',
+              apenas_longe: true,
+              distancia_km: Math.round(geo.distanceKm),
+              nome_loja_distante: geo.unitName,
+              mensagem:
+                'Esse item só tem numa loja mais distante pra retirar. Confirme com o cliente (retirar lá mesmo / equivalente mais perto) ANTES de criar o pedido. Se ele disser que vai buscar mesmo assim, chame de novo com confirma_retirada_distante=true.',
+            });
+          }
+        } else if (geo.kind === 'partner') {
+          partner = geo.routing;
         }
-        if (geo.kind === 'partner') partner = geo.routing;
       }
     }
   }
