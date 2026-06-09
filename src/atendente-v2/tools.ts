@@ -397,6 +397,7 @@ export async function executeTool(
         // há loja resolvida → marca precisa_localizacao (furo #4): o bot pede o bairro antes
         // de prometer estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
         let lojaResolvidaCompat = false;
+        let estoqueLojaPertoCompat = false; // ≥1 produto com estoque de loja perto/parceira (não central)
         {
           const bairro = args.bairro as string | undefined;
           let municipio = bairro
@@ -423,7 +424,7 @@ export async function executeTool(
             for (const v of result) {
               for (const p of v.produtos) {
                 const a = avail.get(p.product_id);
-                if (a) p.total_stock = a.available;
+                if (a) { p.total_stock = a.available; estoqueLojaPertoCompat = true; }
               }
             }
             lojaResolvidaCompat = true;
@@ -434,14 +435,23 @@ export async function executeTool(
               for (const v of result) {
                 for (const p of v.produtos) {
                   const q = partnerStock.get(p.product_id);
-                  if (q != null) p.total_stock = q;
+                  if (q != null) { p.total_stock = q; estoqueLojaPertoCompat = true; }
                 }
               }
             }
             lojaResolvidaCompat = true;
           }
         }
-        return JSON.stringify({ encontrado: true, veiculos: result, ...(lojaResolvidaCompat ? {} : { precisa_localizacao: true }) });
+        // sem_estoque_loja_perto: sei a localização, mas NENHUMA loja perto tem o item — o
+        // total_stock mostrado é o da REDE/matriz (backstop), não de uma loja perto confirmada.
+        // O bot NÃO pode cravar "tenho na tua loja" nesse caso (furo: confirmava estoque local
+        // baseado no estoque central). A retirada se resolve depois no localizacao_loja.
+        return JSON.stringify({
+          encontrado: true,
+          veiculos: result,
+          ...(lojaResolvidaCompat ? {} : { precisa_localizacao: true }),
+          ...(lojaResolvidaCompat && !estoqueLojaPertoCompat ? { sem_estoque_loja_perto: true } : {}),
+        });
       }
 
       case 'buscar_produto': {
@@ -459,6 +469,7 @@ export async function executeTool(
         // marcamos precisa_localizacao (furo #4): o bot pede o bairro antes de prometer
         // estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
         let lojaResolvida = false;
+        let estoqueLojaPerto = false; // ≥1 produto com estoque de loja perto/parceira (não central)
         {
           const bairro = args.bairro as string | undefined;
           let municipio = bairro
@@ -483,7 +494,7 @@ export async function executeTool(
             });
             for (const p of result) {
               const a = avail.get(p.product_id);
-              if (a) p.total_stock_available = a.available;
+              if (a) { p.total_stock_available = a.available; estoqueLojaPerto = true; }
             }
             lojaResolvida = true;
           } else if (bairro && municipio) {
@@ -492,13 +503,20 @@ export async function executeTool(
             if (partnerStock.size > 0) {
               for (const p of result) {
                 const q = partnerStock.get(p.product_id);
-                if (q != null) p.total_stock_available = q;
+                if (q != null) { p.total_stock_available = q; estoqueLojaPerto = true; }
               }
             }
             lojaResolvida = true;
           }
         }
-        return JSON.stringify({ encontrado: true, produtos: result, ...(lojaResolvida ? {} : { precisa_localizacao: true }) });
+        // sem_estoque_loja_perto: ver buscar_compatibilidade — sei a localização, mas nenhuma
+        // loja perto tem o item; o estoque exibido é o da REDE/matriz, não de loja perto.
+        return JSON.stringify({
+          encontrado: true,
+          produtos: result,
+          ...(lojaResolvida ? {} : { precisa_localizacao: true }),
+          ...(lojaResolvida && !estoqueLojaPerto ? { sem_estoque_loja_perto: true } : {}),
+        });
       }
 
       case 'calcular_frete': {
