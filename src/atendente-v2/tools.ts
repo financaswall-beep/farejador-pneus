@@ -609,7 +609,7 @@ export async function executeTool(
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
             if (disp) {
-              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
+              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, distancia_km: Math.round(geo.distanceKm), maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
             }
           } else if (geo.kind === 'only_far') {
             // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada.

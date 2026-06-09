@@ -4,6 +4,7 @@ import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
+import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { TOOL_DEFINITIONS, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK } from './prompt.js';
@@ -75,6 +76,37 @@ async function loadCustomerContext(
   }
 }
 
+/**
+ * Distância em LINHA RETA (haversine) do cliente até a loja ATIVA mais perto, em km.
+ * Produto-agnóstico, barato e OFFLINE (não chama o Google) — é só pro gancho de calor
+ * "você tá a ~X km". O roteamento real continua usando distância de RUA; aqui aproxima.
+ * null se não há loja com coordenada.
+ */
+async function nearestStoreKm(
+  client: PoolClient,
+  environment: Environment,
+  pin: GeoPoint,
+): Promise<number | null> {
+  const r = await client.query<{ latitude: string | null; longitude: string | null }>(
+    `SELECT pu.latitude, pu.longitude
+       FROM network.partner_units pu
+       JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
+      WHERE pu.environment = $1 AND pu.status = 'active' AND p.status = 'active'
+        AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        AND pu.latitude IS NOT NULL AND pu.longitude IS NOT NULL`,
+    [environment],
+  );
+  let min: number | null = null;
+  for (const row of r.rows) {
+    const lat = Number(row.latitude);
+    const lng = Number(row.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const km = haversineKm(pin, { lat, lng });
+    if (min === null || km < min) min = km;
+  }
+  return min;
+}
+
 export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
   const start = Date.now();
   const { conversationId, environment, jobId } = job;
@@ -100,12 +132,22 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
 
     // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver.
     // Bloco GEO só entra com ROUTING_GEO on (flag OFF = prompt byte a byte o de hoje).
+    // Distância (linha reta) até a loja mais perto — só pro gancho de calor (perto/longe).
+    const nearestKm = customerPin
+      ? await nearestStoreKm(client, environment as Environment, customerPin)
+      : null;
+    const kmRounded = nearestKm != null ? Math.round(nearestKm) : null;
+
     const basePrompt = env.ROUTING_GEO ? SYSTEM_PROMPT + GEO_PROMPT_BLOCK : SYSTEM_PROMPT;
     // Nudge determinístico do PINO: só entra quando o cliente JÁ compartilhou a localização.
     // É uma ordem forte e contextual (alta autoridade, sem diluir) que vence as linhas do
     // prompt que mandam "pegue o bairro" — pra o bot CHAMAR a tool em vez de re-perguntar.
+    const proximidadeHook =
+      kmRounded != null
+        ? `\nGANCHO DE PROXIMIDADE (calor, sempre aproximado com "~", NUNCA o número cravado): o cliente está a ~${kmRounded} km da loja mais perto. Use assim: até 5 km → "tá colado / pertíssimo"; 5 a 10 km → "tá pertinho (uns ${kmRounded} km)"; ACIMA de 10 km → NÃO cite o km (longe vira atrito), siga normal. Encaixe leve antes da próxima pergunta e siga a conversa — não trave nisso.`
+        : '';
     const pinNudge = customerPin
-      ? `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Você TEM a localização — NÃO peça o bairro, NÃO pergunte "qual bairro aparece na localização" e NÃO peça pra mandar de novo. Para QUALQUER pergunta sobre estoque, preço na loja, frete, retirada ou "qual a loja/borracharia mais perto", CHAME a ferramenta correspondente AGORA (buscar_produto / buscar_compatibilidade / calcular_frete / localizacao_loja), SEM passar "bairro" — o sistema resolve a cidade e a loja mais perto pela localização. Só volte a pedir o bairro se a ferramenta retornar precisa_localizacao=true.`
+      ? `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Você TEM a localização — NÃO peça o bairro, NÃO pergunte "qual bairro aparece na localização" e NÃO peça pra mandar de novo. Para QUALQUER pergunta sobre estoque, preço na loja, frete, retirada ou "qual a loja/borracharia mais perto", CHAME a ferramenta correspondente AGORA (buscar_produto / buscar_compatibilidade / calcular_frete / localizacao_loja), SEM passar "bairro" — o sistema resolve a cidade e a loja mais perto pela localização. Só volte a pedir o bairro se a ferramenta retornar precisa_localizacao=true.${proximidadeHook}`
       : '';
     const systemPromptWithContext = basePrompt + (customerContext ?? '') + pinNudge;
 
