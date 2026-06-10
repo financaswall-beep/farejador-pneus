@@ -25,35 +25,17 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getLatestCustomerLocation } from './customer-location.js';
+import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
-import { geocodeAddress, reverseGeocode } from '../shared/geo/google-maps.js';
-import type { GeoPoint } from '../shared/geo/haversine.js';
+import { reverseGeocode } from '../shared/geo/google-maps.js';
 import { createHash } from 'node:crypto';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
 // pra a cotação e o registro nunca divergirem (invariante §5.7). Com ROUTING_GEO on
 // e coordenada do cliente → motor de proximidade (anel); senão → caminho de hoje
-// (por cidade). A coordenada vem do pino (mais recente da conversa) ou, na falta,
-// do geocode do bairro (precedência §5.4); sem nenhuma → fallback por cidade (caso F).
-
-/** Coordenada do cliente: pino da conversa → senão geocode do bairro → senão null. */
-async function resolveCustomerLocation(
-  client: PoolClient,
-  environment: Environment,
-  conversationId: string,
-  bairro: string | null | undefined,
-  municipio: string | null,
-): Promise<GeoPoint | null> {
-  const pin = await getLatestCustomerLocation(client, environment, conversationId);
-  if (pin) return pin;
-  if (env.GOOGLE_MAPS_API_KEY && bairro) {
-    const g = await geocodeAddress([bairro, municipio, 'Brasil'].filter(Boolean).join(', '), env.GOOGLE_MAPS_API_KEY);
-    if (g) return { lat: g.lat, lng: g.lng };
-  }
-  return null;
-}
+// (por cidade). A coordenada vem em camadas (resolveCustomerLocation, customer-location.ts):
+// pino → endereço completo (rua+número via Google) → bairro; sem nenhuma → cidade (caso F).
 
 /**
  * Pino-first (decisão Wallace 2026-06-09): quando o caminho do BAIRRO DIGITADO não
@@ -98,10 +80,21 @@ async function decideStoreGeoOrFallback(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
-  input: { municipio: string | null; items: { product_id: string; quantity: number }[]; bairro: string | null | undefined },
+  input: {
+    municipio: string | null;
+    items: { product_id: string; quantity: number }[];
+    bairro: string | null | undefined;
+    /** Endereço completo (rua+número) digitado pelo cliente na ENTREGA — geocodifica fino. */
+    fullAddress?: string | null;
+  },
 ): Promise<{ routing: PartnerOrderRouting | null; onlyFar?: GeoOnlyFar }> {
   if (env.ROUTING_GEO && input.municipio) {
-    const customerLocation = await resolveCustomerLocation(client, environment, conversationId, input.bairro, input.municipio);
+    const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
+      municipio: input.municipio,
+      bairro: input.bairro,
+      fullAddress: input.fullAddress,
+      apiKey: env.GOOGLE_MAPS_API_KEY,
+    });
     if (customerLocation) {
       const geo = await decideStoreForItemsGeo(client, environment, {
         municipio: input.municipio,
@@ -411,7 +404,11 @@ export async function executeTool(
           ));
           const customerLocation =
             env.ROUTING_GEO && municipio
-              ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
+              ? await resolveCustomerLocation(client, environment, conversationId, {
+                  municipio,
+                  bairro,
+                  apiKey: env.GOOGLE_MAPS_API_KEY,
+                })
               : null;
           if (customerLocation && municipio) {
             const productIds = result.flatMap((v) => v.produtos.map((p) => p.product_id));
@@ -483,7 +480,11 @@ export async function executeTool(
           ));
           const customerLocation =
             env.ROUTING_GEO && municipio
-              ? await resolveCustomerLocation(client, environment, conversationId, bairro, municipio)
+              ? await resolveCustomerLocation(client, environment, conversationId, {
+                  municipio,
+                  bairro,
+                  apiKey: env.GOOGLE_MAPS_API_KEY,
+                })
               : null;
           if (customerLocation && municipio) {
             const avail = await resolveProductAvailabilityByProximity(client, environment, {
@@ -610,7 +611,11 @@ export async function executeTool(
         }
         // Coordenada do cliente (pino → geocode do bairro), MESMA fonte do criar_pedido,
         // pra escolher a loja MAIS PERTO entre as que cobrem o município (não a mais antiga).
-        const customerLocation = await resolveCustomerLocation(client, environment, conversationId, bairro, municipio);
+        const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
+          municipio,
+          bairro,
+          apiKey: env.GOOGLE_MAPS_API_KEY,
+        });
 
         // RETIRADA com pneu escolhido: usa a MESMA decisão do pedido de retirada
         // (decideStoreForItemsGeo pickup) — respeita estoque, deleted_at, anel de retirada
@@ -851,6 +856,8 @@ async function criarPedido(
       municipio,
       items: itens.map((i) => ({ product_id: i.product_id, quantity: i.quantidade })),
       bairro: args.bairro as string | undefined,
+      // Endereço digitado (rua+número) → geocodificação fina da casa; bairro é paraquedas.
+      fullAddress: deliveryAddress,
     });
     // Caso E (só tem longe): NÃO cria o pedido caladamente — devolve estruturado pro bot
     // confirmar a opção com o cliente antes (D3). Salvaguarda: o bot só deve chamar
@@ -876,13 +883,11 @@ async function criarPedido(
     // Pino-first: sem geo e sem bairro → reverse-geocode do pino preenche a cidade. Aditivo.
     ({ municipio } = await fillCityFromPin(client, environment, conversationId, { municipio, neighborhoodCanonical: null }));
     if (env.ROUTING_GEO && municipio) {
-      const customerLocation = await resolveCustomerLocation(
-        client,
-        environment,
-        conversationId,
-        args.bairro as string | undefined,
+      const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
         municipio,
-      );
+        bairro: args.bairro as string | undefined,
+        apiKey: env.GOOGLE_MAPS_API_KEY,
+      });
       if (customerLocation) {
         const geo = await decideStoreForItemsGeo(client, environment, {
           municipio,

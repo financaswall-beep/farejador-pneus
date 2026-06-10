@@ -1,6 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
-import { getLatestCustomerLocation } from '../../../src/atendente-v2/customer-location.js';
+import {
+  getLatestCustomerLocation,
+  resolveCustomerLocation,
+  isPreciseGeocode,
+} from '../../../src/atendente-v2/customer-location.js';
+import { geocodeAddress } from '../../../src/shared/geo/google-maps.js';
+
+vi.mock('../../../src/shared/geo/google-maps.js', () => ({
+  geocodeAddress: vi.fn(),
+}));
+
+const geocodeMock = vi.mocked(geocodeAddress);
 
 interface QueryCall {
   text: string;
@@ -47,5 +58,109 @@ describe('getLatestCustomerLocation', () => {
   it('coordenada não-numérica → null (defensivo)', async () => {
     const client = clientWithRows([[{ coordinates_lat: 'abc', coordinates_lng: '-43.1' }]]);
     expect(await getLatestCustomerLocation(client, 'test', 'conv1')).toBeNull();
+  });
+});
+
+describe('isPreciseGeocode', () => {
+  it('ROOFTOP e RANGE_INTERPOLATED = nível de casa/rua → preciso', () => {
+    expect(isPreciseGeocode({ lat: 0, lng: 0, confidence: 'ROOFTOP' })).toBe(true);
+    expect(isPreciseGeocode({ lat: 0, lng: 0, confidence: 'RANGE_INTERPOLATED' })).toBe(true);
+  });
+  it('GEOMETRIC_CENTER, APPROXIMATE e null = vago → NÃO preciso', () => {
+    expect(isPreciseGeocode({ lat: 0, lng: 0, confidence: 'GEOMETRIC_CENTER' })).toBe(false);
+    expect(isPreciseGeocode({ lat: 0, lng: 0, confidence: 'APPROXIMATE' })).toBe(false);
+    expect(isPreciseGeocode(null)).toBe(false);
+  });
+});
+
+describe('resolveCustomerLocation (camadas: pino → endereço → bairro)', () => {
+  it('1) PINO vence — nem chama a Google', async () => {
+    geocodeMock.mockReset();
+    const client = clientWithRows([[{ coordinates_lat: '-22.9', coordinates_lng: '-43.1' }]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      fullAddress: 'Rua Teotônio Regadas, 26',
+      apiKey: 'KEY',
+    });
+    expect(loc).toEqual({ lat: -22.9, lng: -43.1 });
+    expect(geocodeMock).not.toHaveBeenCalled();
+  });
+
+  it('2) sem pino e sem chave → null (não inventa coordenada)', async () => {
+    geocodeMock.mockReset();
+    const client = clientWithRows([[]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      fullAddress: 'Rua Teotônio Regadas, 26',
+      apiKey: undefined,
+    });
+    expect(loc).toBeNull();
+    expect(geocodeMock).not.toHaveBeenCalled();
+  });
+
+  it('3) endereço completo PRECISO (ROOFTOP) → usa a casa; não cai no bairro', async () => {
+    geocodeMock.mockReset();
+    geocodeMock.mockResolvedValueOnce({ lat: -22.9135, lng: -43.1791, confidence: 'ROOFTOP' });
+    const client = clientWithRows([[]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      fullAddress: 'Rua Teotônio Regadas, 26',
+      apiKey: 'KEY',
+    });
+    expect(loc).toEqual({ lat: -22.9135, lng: -43.1791 });
+    expect(geocodeMock).toHaveBeenCalledTimes(1);
+    // a rua+número entrou na busca (precisão de verdade, não só o bairro)
+    expect(geocodeMock.mock.calls[0]![0]).toContain('Rua Teotônio Regadas, 26');
+  });
+
+  it('4) endereço completo VAGO (APPROXIMATE) → cai no paraquedas do bairro', async () => {
+    geocodeMock.mockReset();
+    geocodeMock
+      .mockResolvedValueOnce({ lat: -22.91, lng: -43.18, confidence: 'APPROXIMATE' }) // rua não resolveu fino
+      .mockResolvedValueOnce({ lat: -22.9131, lng: -43.1765, confidence: 'APPROXIMATE' }); // centro do bairro
+    const client = clientWithRows([[]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      fullAddress: 'Rua Inexistente, 99999',
+      apiKey: 'KEY',
+    });
+    expect(loc).toEqual({ lat: -22.9131, lng: -43.1765 });
+    expect(geocodeMock).toHaveBeenCalledTimes(2);
+    // a 2ª busca (paraquedas) é só bairro/cidade — sem a rua
+    expect(geocodeMock.mock.calls[1]![0]).not.toContain('Rua Inexistente');
+    expect(geocodeMock.mock.calls[1]![0]).toContain('Lapa');
+  });
+
+  it('5) sem endereço completo, só bairro → geocoda o bairro (comportamento de hoje)', async () => {
+    geocodeMock.mockReset();
+    geocodeMock.mockResolvedValueOnce({ lat: -22.9131, lng: -43.1765, confidence: 'APPROXIMATE' });
+    const client = clientWithRows([[]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      apiKey: 'KEY',
+    });
+    expect(loc).toEqual({ lat: -22.9131, lng: -43.1765 });
+    expect(geocodeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('6) endereço vago e bairro não resolve → null', async () => {
+    geocodeMock.mockReset();
+    geocodeMock
+      .mockResolvedValueOnce({ lat: 0, lng: 0, confidence: 'APPROXIMATE' })
+      .mockResolvedValueOnce(null);
+    const client = clientWithRows([[]]);
+    const loc = await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro',
+      bairro: 'Lapa',
+      fullAddress: 'Rua X',
+      apiKey: 'KEY',
+    });
+    expect(loc).toBeNull();
+    expect(geocodeMock).toHaveBeenCalledTimes(2);
   });
 });
