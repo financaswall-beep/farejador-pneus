@@ -60,12 +60,14 @@
              @keydown.enter="login()"
              placeholder="Usuário"
              autocomplete="username"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
       <input type="password"
              x-model="loginPassword"
              @keydown.enter="login()"
              placeholder="Senha"
              autocomplete="current-password"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
       <button @click="login()"
               :disabled="loading"
@@ -91,12 +93,14 @@
              x-model="loginUsername"
              placeholder="Escolha um usuário"
              autocomplete="off"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
       <input type="password"
              x-model="loginPassword"
              @keydown.enter="firstAccess()"
              placeholder="Crie uma senha (mín. 6)"
              autocomplete="new-password"
+             autocapitalize="none" autocorrect="off" spellcheck="false"
              class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-300" />
       <button @click="firstAccess()"
               :disabled="loading"
