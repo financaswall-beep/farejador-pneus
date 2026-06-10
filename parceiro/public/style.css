@@ -3283,16 +3283,17 @@ html, body {
    medida GIGANTE, countdown verde→laranja→vermelho (tema sem amarelo).
    ============================================================ */
 
-/* Banner global (qualquer aba): impossível não ver. */
+/* Banner global (qualquer aba): barra FINA — avisa forte sem comer espaço.
+   Só aparece quando há pedido de foto pendente (x-show no HTML). */
 .photo-alert-banner {
-  display: flex; align-items: center; gap: 10px;
-  width: calc(100% - 32px); margin: 10px 16px 0;
-  padding: 14px 18px; border: 0; border-radius: 12px; cursor: pointer;
-  background: #1e40af; color: #fff; font-size: 15px; text-align: left;
-  animation: photoPulse 1.6s ease-in-out infinite;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: calc(100% - 32px); margin: 6px 16px 0;
+  padding: 6px 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: #1e40af; color: #fff; font-size: 13px; line-height: 1.2; text-align: left;
+  animation: photoPulse 1.8s ease-in-out infinite;
 }
-.photo-alert-banner i { width: 22px; height: 22px; flex: none; }
-.photo-alert-banner u { text-underline-offset: 3px; }
+.photo-alert-banner i { width: 16px; height: 16px; flex: none; }
+.photo-alert-banner u { text-underline-offset: 2px; }
 @keyframes photoPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(30, 64, 175, .55); }
   50% { box-shadow: 0 0 0 10px rgba(30, 64, 175, 0); }
