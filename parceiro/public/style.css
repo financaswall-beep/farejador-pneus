@@ -2655,19 +2655,24 @@ html, body {
 
 .pos-chat {
   display: grid; grid-template-columns: 330px 1fr 560px; gap: 14px;
-  grid-template-rows: auto 1fr;
+  /* Linha 1 = fila de FOTOS (0094; colapsa pra 0 quando vazia — display:none),
+     linha 2 = KPIs, linha 3 = lista+conversa. */
+  grid-template-rows: auto auto 1fr;
   height: 100%; min-height: 0;
 }
 [x-cloak] { display: none !important; }
 .pos-chat .pos-panel { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
 
-/* KPIs do chat ocupam a faixa de cima (linha 1) da lista+conversa; o painel
-   "Detalhes" sobe ate o topo (coluna 3, linhas 1-2) ao lado deles. */
-.pos-chat .chat-kpis { grid-column: 1 / 3; grid-row: 1; padding: 0; }
-.pos-chat-list { grid-column: 1; grid-row: 2; }
-.pos-chat-thread { grid-column: 2; grid-row: 2; }
-.pos-chat-right { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
-.pos-chat-placeholder { grid-row: 2; }
+/* Fila de pedidos de foto: faixa de cima, largura toda (acima dos KPIs). */
+.pos-chat .photo-queue { grid-column: 1 / -1; grid-row: 1; }
+
+/* KPIs do chat ocupam a faixa seguinte (linha 2) da lista+conversa; o painel
+   "Detalhes" sobe ate o topo (coluna 3, linhas 1-3) ao lado deles. */
+.pos-chat .chat-kpis { grid-column: 1 / 3; grid-row: 2; padding: 0; }
+.pos-chat-list { grid-column: 1; grid-row: 3; }
+.pos-chat-thread { grid-column: 2; grid-row: 3; }
+.pos-chat-right { grid-column: 3; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+.pos-chat-placeholder { grid-row: 3; }
 /* Sem conversa aberta: nao ha "Detalhes" pra subir, entao os KPIs ocupam a largura toda. */
 .pos-chat:not(.has-active) .chat-kpis { grid-column: 1 / -1; }
 
@@ -3271,3 +3276,117 @@ html, body {
 @media (max-width: 1100px) {
   .pos-stock-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   FOTO SOB DEMANDA (0094) — cards de pedido de foto + alerta global.
+   Usuário-alvo: borracheiro de mão suja no celular → botões ≥56px,
+   medida GIGANTE, countdown verde→laranja→vermelho (tema sem amarelo).
+   ============================================================ */
+
+/* Banner global (qualquer aba): impossível não ver. */
+.photo-alert-banner {
+  display: flex; align-items: center; gap: 10px;
+  width: calc(100% - 32px); margin: 10px 16px 0;
+  padding: 14px 18px; border: 0; border-radius: 12px; cursor: pointer;
+  background: #1e40af; color: #fff; font-size: 15px; text-align: left;
+  animation: photoPulse 1.6s ease-in-out infinite;
+}
+.photo-alert-banner i { width: 22px; height: 22px; flex: none; }
+.photo-alert-banner u { text-underline-offset: 3px; }
+@keyframes photoPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 64, 175, .55); }
+  50% { box-shadow: 0 0 0 10px rgba(30, 64, 175, 0); }
+}
+
+/* Badge de foto no menu (ao lado do badge do chat). */
+.photo-nav-badge { background: #1e40af; right: 34px; }
+
+/* Fila de cards no topo do Bate-papo. */
+.photo-queue {
+  grid-column: 1 / -1;
+  display: flex; gap: 12px; align-items: stretch;
+  overflow-x: auto; padding: 4px 2px 8px;
+  scroll-snap-type: x proximity;
+}
+.photo-card {
+  flex: 0 0 300px; scroll-snap-align: start;
+  background: #0f172a; border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 14px; padding: 14px;
+}
+.photo-card.is-pending { border-color: #16a34a; }
+.photo-card.urgency-warn { border-color: #ea580c; }
+.photo-card.urgency-late { border-color: #b91c1c; animation: photoPulse 1.2s ease-in-out infinite; }
+.photo-card.is-expired { opacity: .75; }
+
+.photo-card-body header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.photo-card-tag { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #94a3b8; }
+.photo-card-clock { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: #16a34a; }
+.photo-card.urgency-warn .photo-card-clock { color: #ea580c; }
+.photo-card.urgency-late .photo-card-clock { color: #ef4444; }
+
+/* A MEDIDA é o herói do card: o separador lê de longe. */
+.photo-card-size {
+  font-size: 26px; font-weight: 900; line-height: 1.15; color: #fff;
+  letter-spacing: .02em; margin: 2px 0 6px; word-break: break-word;
+}
+.photo-card-size.small { font-size: 17px; color: #cbd5e1; }
+.photo-card-meta { display: flex; gap: 10px; font-size: 13px; color: #94a3b8; margin-bottom: 10px; }
+
+/* Botão da câmera: dedo grande, luva, pressa. */
+.photo-card-shoot {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 56px; border-radius: 12px; cursor: pointer;
+  background: #1e40af; color: #fff; font-size: 16px; font-weight: 800;
+  letter-spacing: .04em; user-select: none;
+}
+.photo-card-shoot:active { transform: scale(.98); }
+.photo-card-shoot.late { background: #475569; margin-top: 8px; }
+.photo-card-shoot i { width: 22px; height: 22px; }
+
+.photo-card-preview img {
+  width: 100%; max-height: 180px; object-fit: cover;
+  border-radius: 10px; border: 1px solid rgba(148, 163, 184, .25);
+}
+.photo-card-preview-actions { display: flex; gap: 8px; margin-top: 8px; }
+.photo-btn-retake, .photo-btn-send {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 50px; border-radius: 10px; border: 0; cursor: pointer;
+  font-size: 14px; font-weight: 800;
+}
+.photo-btn-retake { background: #334155; color: #e2e8f0; }
+.photo-btn-send { background: #16a34a; color: #fff; }
+.photo-btn-send:disabled { opacity: .6; cursor: wait; }
+.photo-btn-send span { display: flex; align-items: center; gap: 8px; }
+.photo-btn-send i, .photo-btn-retake i { width: 18px; height: 18px; }
+
+.photo-card-done { display: flex; align-items: center; gap: 12px; min-height: 84px; }
+.photo-done-icon { font-size: 26px; }
+.photo-card-done strong { display: block; color: #4ade80; font-size: 15px; }
+.photo-card-done small { color: #94a3b8; }
+.photo-gone-note { display: block; color: #94a3b8; font-size: 12px; margin-bottom: 6px; }
+
+.photo-sound-toggle {
+  flex: 0 0 44px; align-self: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid rgba(148, 163, 184, .3); background: transparent;
+  color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.photo-sound-toggle i { width: 20px; height: 20px; }
+
+/* Mobile: cards em coluna cheia (sem scroll lateral apertado). */
+@media (max-width: 768px) {
+  .photo-queue { flex-direction: column; }
+  .photo-card { flex: 1 1 auto; }
+  .photo-alert-banner { width: calc(100% - 20px); margin: 8px 10px 0; }
+}
+
+/* Tema claro. */
+.pos-shell[data-theme="light"] .photo-card { background: #fff; border-color: rgba(15, 23, 42, .12); }
+.pos-shell[data-theme="light"] .photo-card.is-pending { border-color: #16a34a; }
+.pos-shell[data-theme="light"] .photo-card.urgency-warn { border-color: #ea580c; }
+.pos-shell[data-theme="light"] .photo-card.urgency-late { border-color: #b91c1c; }
+.pos-shell[data-theme="light"] .photo-card-size { color: #0f172a; }
+.pos-shell[data-theme="light"] .photo-card-tag { color: #64748b; }
+.pos-shell[data-theme="light"] .photo-btn-retake { background: #e2e8f0; color: #0f172a; }
+.pos-shell[data-theme="light"] .photo-card-done strong { color: #15803d; }
+.pos-shell[data-theme="light"] .photo-sound-toggle { border-color: rgba(15, 23, 42, .2); color: #475569; }

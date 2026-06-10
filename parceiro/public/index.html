@@ -180,6 +180,7 @@
           <span>Bate-papo</span>
           <kbd>F7</kbd>
           <b class="pos-nav-badge" x-show="chatUnreadTotal > 0" x-text="chatUnreadTotal"></b>
+          <b class="pos-nav-badge photo-nav-badge" x-show="photoPendingCount > 0" x-text="'📷' + photoPendingCount"></b>
         </button>
       </nav>
 
@@ -227,8 +228,13 @@
           </div>
         </div>
         <div class="pos-top-icons">
-          <button><i data-lucide="bell"></i><b>3</b></button>
-          <button><i data-lucide="messages-square"></i><b>1</b></button>
+          <!-- Sino REAL: pedidos de foto pendentes (antes era número fake hardcoded). -->
+          <button @click="goToSection('batepapo')" :title="photoPendingCount > 0 ? 'Pedidos de foto esperando' : 'Sem alertas'">
+            <i data-lucide="bell"></i><b x-show="photoPendingCount > 0" x-text="photoPendingCount"></b>
+          </button>
+          <button @click="goToSection('batepapo')" title="Bate-papo">
+            <i data-lucide="messages-square"></i><b x-show="chatUnreadTotal > 0" x-text="chatUnreadTotal"></b>
+          </button>
         </div>
         <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
                 :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
@@ -243,6 +249,19 @@
           <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
         </div>
       </header>
+
+      <!-- FOTO SOB DEMANDA: banner GLOBAL — o borracheiro pode estar em qualquer
+           aba quando o pedido de foto cai. Some dentro do próprio Bate-papo
+           (lá os cards já estão à vista). Toca → vai direto pra fila. -->
+      <button type="button" class="photo-alert-banner"
+              x-show="photoPendingCount > 0 && currentSection !== 'batepapo'"
+              x-cloak
+              @click="goToSection('batepapo')">
+        <i data-lucide="camera"></i>
+        <span><strong x-text="photoPendingCount"></strong>
+          <span x-text="photoPendingCount === 1 ? 'cliente esperando FOTO de pneu' : 'clientes esperando FOTO de pneu'"></span>
+          — <u>TOCA AQUI pra atender</u></span>
+      </button>
 
       <section x-show="currentSection === 'resumo'" class="pos-kpis">
         <article>
@@ -1638,6 +1657,114 @@
       <!-- â•â•â•â•â•  BATE-PAPO (F7)  â•â•â•â•â• -->
       <section x-show="currentSection === 'batepapo'" class="pos-workspace">
         <div class="pos-chat" :class="chatActive && 'has-active'">
+
+          <!-- ═══ FOTO SOB DEMANDA: fila de cards (0094) ═══
+               O bot pediu uma foto do pneu USADO → o card aparece aqui com a
+               MEDIDA GIGANTE + bairro + relógio. Botão único abre a câmera
+               (capture=environment), preview, envia. SEM nome/telefone do
+               cliente (anti-bypass de comissão — decisão do dono). -->
+          <section class="photo-queue" x-show="photoRequests.length > 0" x-cloak>
+            <template x-for="pr in photoRequests" :key="pr.id">
+              <article class="photo-card" :class="{
+                  'is-pending': pr.status === 'pending',
+                  'is-answered': pr.status === 'answered' || pr.status === 'sent',
+                  'is-expired': pr.status === 'expired' || pr.status === 'expired_after_answer' || pr.status === 'cancelled',
+                  'urgency-warn': pr.status === 'pending' && photoUrgency(pr) === 'warn',
+                  'urgency-late': pr.status === 'pending' && photoUrgency(pr) === 'late',
+                }">
+
+                <!-- PENDENTE: medida gigante + relógio + botão câmera -->
+                <template x-if="pr.status === 'pending'">
+                  <div class="photo-card-body">
+                    <header>
+                      <span class="photo-card-tag">📷 PEDIDO DE FOTO</span>
+                      <span class="photo-card-clock" x-text="'⏱ ' + photoCountdown(pr)"></span>
+                    </header>
+                    <div class="photo-card-size" x-text="pr.tire_size"></div>
+                    <div class="photo-card-meta">
+                      <span x-show="pr.brand" x-text="pr.brand"></span>
+                      <span x-show="pr.note" x-text="pr.note"></span>
+                    </div>
+
+                    <!-- sem preview ainda: botão GIGANTE que abre a câmera -->
+                    <template x-if="photoPreview.id !== pr.id">
+                      <label class="photo-card-shoot">
+                        <i data-lucide="camera"></i> TIRAR FOTO
+                        <input type="file" accept="image/*" capture="environment"
+                               @change="photoPickFile(pr, $event)" hidden />
+                      </label>
+                    </template>
+
+                    <!-- preview tirada: confere → envia ou tira outra -->
+                    <template x-if="photoPreview.id === pr.id">
+                      <div class="photo-card-preview">
+                        <img :src="photoPreview.dataUrl" alt="Prévia da foto do pneu" />
+                        <div class="photo-card-preview-actions">
+                          <label class="photo-btn-retake">
+                            <i data-lucide="refresh-cw"></i> Tirar outra
+                            <input type="file" accept="image/*" capture="environment"
+                                   @change="photoPickFile(pr, $event)" hidden />
+                          </label>
+                          <button type="button" class="photo-btn-send"
+                                  :disabled="photoSending[pr.id]"
+                                  @click="photoSend(pr)">
+                            <template x-if="!photoSending[pr.id]"><span><i data-lucide="send"></i> ENVIAR</span></template>
+                            <template x-if="photoSending[pr.id]"><span>Enviando…</span></template>
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+
+                <!-- RESPONDIDA/ENVIADA -->
+                <template x-if="pr.status === 'answered' || pr.status === 'sent'">
+                  <div class="photo-card-body photo-card-done">
+                    <span class="photo-done-icon">✅</span>
+                    <div>
+                      <strong x-text="pr.status === 'sent' ? 'Foto enviada pro cliente' : 'Foto recebida — enviando…'"></strong>
+                      <small x-text="pr.tire_size"></small>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- EXPIRADA/CANCELADA -->
+                <template x-if="pr.status === 'expired' || pr.status === 'expired_after_answer' || pr.status === 'cancelled'">
+                  <div class="photo-card-body photo-card-gone">
+                    <header>
+                      <span class="photo-card-tag">⌛ <span x-text="pr.status === 'cancelled' ? 'CANCELADO' : 'EXPIROU'"></span></span>
+                    </header>
+                    <div class="photo-card-size small" x-text="pr.tire_size"></div>
+                    <template x-if="pr.status === 'expired'">
+                      <div>
+                        <small class="photo-gone-note">O cliente já foi avisado — mas se o pneu tá aí, manda mesmo assim que a gente entrega a foto:</small>
+                        <label class="photo-card-shoot late">
+                          <i data-lucide="camera"></i> TIRAR MESMO ASSIM
+                          <input type="file" accept="image/*" capture="environment"
+                                 @change="photoPickFile(pr, $event)" hidden />
+                        </label>
+                        <!-- preview também funciona no atrasado -->
+                        <template x-if="photoPreview.id === pr.id">
+                          <div class="photo-card-preview">
+                            <img :src="photoPreview.dataUrl" alt="Prévia da foto do pneu" />
+                            <div class="photo-card-preview-actions">
+                              <button type="button" class="photo-btn-send" :disabled="photoSending[pr.id]" @click="photoSend(pr)">
+                                <span><i data-lucide="send"></i> ENVIAR</span>
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </article>
+            </template>
+            <button type="button" class="photo-sound-toggle" @click="togglePhotoSound()"
+                    :title="photoSoundOn ? 'Desligar o som do alerta' : 'Ligar o som do alerta'">
+              <i :data-lucide="photoSoundOn ? 'volume-2' : 'volume-x'"></i>
+            </button>
+          </section>
 
           <!-- KPIs do chat: faixa de cima sobre lista+conversa; coluna direita sobe ao lado -->
           <section class="pos-kpis chat-kpis">
