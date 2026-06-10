@@ -5,9 +5,9 @@ import { logger } from '../shared/logger.js';
 import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
-import { TOOL_DEFINITIONS, executeTool } from './tools.js';
+import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
-import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK } from './prompt.js';
+import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 
@@ -138,7 +138,10 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       : null;
     const kmRounded = nearestKm != null ? Math.round(nearestKm) : null;
 
-    const basePrompt = env.ROUTING_GEO ? SYSTEM_PROMPT + GEO_PROMPT_BLOCK : SYSTEM_PROMPT;
+    let basePrompt = env.ROUTING_GEO ? SYSTEM_PROMPT + GEO_PROMPT_BLOCK : SYSTEM_PROMPT;
+    // Foto sob demanda: bloco só com a flag on (off = prompt byte a byte o de hoje,
+    // preserva o prompt caching; a tool pedir_foto também some — activeToolDefinitions).
+    if (env.PHOTO_REQUESTS) basePrompt += PHOTO_PROMPT_BLOCK;
     // Nudge determinístico do PINO: só entra quando o cliente JÁ compartilhou a localização.
     // É uma ordem forte e contextual (alta autoridade, sem diluir) que vence as linhas do
     // prompt que mandam "pegue o bairro" — pra o bot CHAMAR a tool em vez de re-perguntar.
@@ -314,7 +317,7 @@ async function callOpenAIWithTools(messages: ChatMessage[]): Promise<{
   const body = JSON.stringify({
     model: env.OPENAI_MODEL,
     messages,
-    tools: TOOL_DEFINITIONS,
+    tools: activeToolDefinitions(),
     tool_choice: 'auto',
     max_completion_tokens: 1000,
     // Garante TTL de 24h no prompt caching. gpt-5.5+ ja usa 24h por

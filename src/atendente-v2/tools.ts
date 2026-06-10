@@ -30,6 +30,8 @@ import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-l
 import { getRecentProductIds } from './conversation-products.js';
 import { reverseGeocode } from '../shared/geo/google-maps.js';
 import { createHash } from 'node:crypto';
+import { createPhotoRequest } from './photo-requests.js';
+import { lookupChatwootConversationId } from './history.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
@@ -115,6 +117,15 @@ async function decideStoreGeoOrFallback(
 }
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
+
+/**
+ * Definições ATIVAS pro LLM: a tool pedir_foto só aparece com PHOTO_REQUESTS on
+ * (flag off = o bot nem sabe que foto existe; o prompt também é condicional).
+ */
+export function activeToolDefinitions(): ToolDefinition[] {
+  if (env.PHOTO_REQUESTS) return TOOL_DEFINITIONS;
+  return TOOL_DEFINITIONS.filter((t) => t.function.name !== 'pedir_foto');
+}
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -231,6 +242,27 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           bairro: { type: 'string', description: 'Bairro do cliente, se informado (ajuda a achar a loja que atende).' },
           municipio: { type: 'string', description: 'Cidade do cliente, se informada.' },
           product_ids: { type: 'array', items: { type: 'string' }, description: 'product_id dos pneus que o cliente quer (de buscar_produto/buscar_compatibilidade). Passe SEMPRE que houver pneu escolhido — a loja indicada passa a ser a que TEM o item em estoque.' },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'pedir_foto',
+      description:
+        'Pede pra LOJA tirar uma foto AO VIVO do pneu USADO em estoque e mandar pro cliente. Use SÓ quando o cliente PEDIR pra ver foto/estado/conservação do pneu — NUNCA ofereça foto por conta própria. Exige pneu já buscado (product_id de buscar_produto/buscar_compatibilidade) e localização do cliente (bairro ou pino) pra achar a loja certa. Retorno foto_solicitada → avise "vou pedir pra loja te mandar a foto, 1 minutinho 📸" e SIGA a conversa normalmente (a foto chega sozinha depois, você não precisa esperar nem confirmar). Retorno precisa_produto → pergunte qual pneu. Retorno sem_loja → peça o bairro/localização (sem isso não dá pra achar a loja que tem o pneu). Retorno limite_fotos → já tem foto a caminho, avise que chega já.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_id: {
+            type: 'string',
+            description: 'UUID do pneu que o cliente quer ver (de buscar_produto/buscar_compatibilidade). Se omitir, uso o último pneu buscado na conversa.',
+          },
+          bairro: { type: 'string', description: 'Bairro do cliente, se informado — acha a loja que TEM o pneu.' },
+          municipio: { type: 'string', description: 'Cidade (opcional).' },
         },
         required: [],
         additionalProperties: false,
@@ -675,6 +707,94 @@ export async function executeTool(
           maps_url: loc.maps_url,
           endereco: loc.address,
           horario: loc.opening_hours,
+        });
+      }
+
+      case 'pedir_foto': {
+        // FOTO SOB DEMANDA (0094). Guards por CÓDIGO (E18): a tool resolve a
+        // loja pela MESMA régua do pedido (decideStoreForItemsGeo pickup, igual
+        // localizacao_loja) e o createPhotoRequest trava dedup + máx 2 ativos.
+        if (!env.PHOTO_REQUESTS) {
+          return JSON.stringify({ status: 'indisponivel' });
+        }
+
+        // Produto: o que o LLM passou, senão o último pneu buscado na conversa.
+        let productId = typeof args.product_id === 'string' ? args.product_id : null;
+        if (!productId) {
+          const ids = await getRecentProductIds(client, conversationId);
+          productId = ids[0] ?? null;
+        }
+        if (!productId) {
+          return JSON.stringify({ status: 'precisa_produto' });
+        }
+
+        // Localização: mesma cadeia do localizacao_loja (bairro → cidade; pino preenche).
+        const bairro = args.bairro as string | undefined;
+        let municipio = (args.municipio as string | undefined) ?? null;
+        if (!municipio && bairro) {
+          municipio = await resolveMunicipioFromBairro(client, environment, bairro, null);
+        }
+        let clientNeighborhoodCanonical = bairro ? normalizeRegion(bairro) : null;
+        ({ municipio, neighborhoodCanonical: clientNeighborhoodCanonical } = await fillCityFromPin(
+          client, environment, conversationId, { municipio, neighborhoodCanonical: clientNeighborhoodCanonical },
+        ));
+        const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
+          municipio,
+          bairro,
+          apiKey: env.GOOGLE_MAPS_API_KEY,
+        });
+        if (!env.ROUTING_GEO || !municipio || !customerLocation) {
+          return JSON.stringify({ status: 'sem_loja' });
+        }
+
+        // A loja que fotografa = a loja que TEM o pneu e atenderia o cliente
+        // (anel pickup + estoque + régua — fonte única; nunca diverge da indicada).
+        const geo = await decideStoreForItemsGeo(client, environment, {
+          municipio,
+          items: [{ product_id: productId, quantity: 1 }],
+          modalidade: 'pickup',
+          customerLocation,
+          clientNeighborhoodCanonical,
+        });
+        // partner = atende perto; only_far = TEM o pneu (longe, mas a foto ajuda
+        // a fechar por entrega). matriz = ninguém da rede tem → sem foto.
+        const unitId = geo.kind === 'partner' ? geo.routing.unitId : geo.kind === 'only_far' ? geo.unitId : null;
+        if (!unitId) {
+          return JSON.stringify({ status: 'sem_loja' });
+        }
+
+        // Rótulo do card (medida em destaque) — snapshot do produto.
+        const prod = await client.query<{ product_name: string; brand: string | null }>(
+          'SELECT product_name, brand FROM commerce.products WHERE id = $1 LIMIT 1',
+          [productId],
+        );
+        const nomePneu = prod.rows[0]?.product_name ?? 'pneu';
+        const marca = prod.rows[0]?.brand ?? null;
+
+        // Endereço de volta = id da conversa NO CHATWOOT (o dispatcher só lê daqui).
+        const chatwootConvId = await lookupChatwootConversationId(client, conversationId);
+        if (!chatwootConvId) {
+          logger.warn({ conversationId }, 'pedir_foto: conversa sem chatwoot_conversation_id');
+          return JSON.stringify({ status: 'sem_loja' });
+        }
+
+        const created = await createPhotoRequest(client, environment, {
+          unitId,
+          chatwootConversationId: chatwootConvId,
+          tireSize: nomePneu,
+          brand: marca,
+        });
+        if (created.status === 'limit') {
+          return JSON.stringify({
+            status: 'limite_fotos',
+            mensagem: 'Já tem pedido de foto em andamento pra essa conversa — assim que chegar eu mando.',
+          });
+        }
+        return JSON.stringify({
+          status: 'foto_solicitada',
+          prazo_min: created.prazoMin,
+          nome_pneu: nomePneu,
+          ja_pedida: created.status === 'dedup',
         });
       }
 

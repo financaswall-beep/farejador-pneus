@@ -7,6 +7,7 @@ import { startWorker } from '../normalization/worker.js';
 import { startPartnerChatReconciler } from '../normalization/partner-chat.reconcile.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
+import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -15,6 +16,7 @@ const fastify = Fastify({
 let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
+let stopPhotoExpirer: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -38,6 +40,8 @@ async function start(): Promise<void> {
   stopPartnerChatReconciler = startPartnerChatReconciler();
   // Hub de tempo real do chat (LISTEN partner_chat -> SSE). Fatia 3.
   startPartnerChatNotifyHub();
+  // Foto sob demanda (0094): expira pendentes + fallback. No-op com a flag off.
+  stopPhotoExpirer = startPhotoRequestExpirer();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -49,6 +53,7 @@ async function shutdown(signal: string): Promise<void> {
   stopWorker?.();
   stopAgentV2?.();
   stopPartnerChatReconciler?.();
+  stopPhotoExpirer?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');

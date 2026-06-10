@@ -6,6 +6,7 @@ import { requirePartnerAuth, requireOwner, requireScreen, resolvePartnerPermissi
 import { isSessionToken } from './password.js';
 import { rateLimitHit } from './rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
+import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 
 // Login/1º acesso: até 10 tentativas por IP+slug a cada 5 min (anti-brute-force).
 const LOGIN_MAX_ATTEMPTS = 10;
@@ -950,8 +951,20 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (result.status === 'not_found') return reply.status(404).send({ error: 'photo_request_not_found' });
     if (result.status === 'rejected') return reply.status(415).send({ error: 'not_an_image' });
 
-    // TODO(Tijolo 3): se result.attached, disparar dispatchPhotoToCustomer
-    // (determinístico, lado bot) — a foto segue pro cliente via Chatwoot.
+    // Despacho pro cliente: fire-and-forget DETERMINÍSTICO (lado bot). A resposta
+    // do upload não espera o Chatwoot — o borracheiro vê "enviada" rápido; se o
+    // envio falhar, o card fica 'answered' (foto guardada) e o erro vai pro log.
+    // O destino vem do PRÓPRIO registro (E5): aqui só passa o id + bytes.
+    if (result.attached) {
+      void dispatchPhotoToCustomer(
+        params.data.photoRequestId,
+        { bytes: photo.bytes, mime: photo.mime },
+        result.was_late === true,
+      ).catch((err) => {
+        request.log.error({ err, photoRequestId: params.data.photoRequestId }, 'photo dispatch falhou');
+      });
+    }
+
     return reply.status(200).send({
       ok: true,
       state: result.state,
