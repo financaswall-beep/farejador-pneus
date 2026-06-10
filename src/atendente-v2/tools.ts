@@ -818,12 +818,18 @@ async function criarPedido(
 
   const totalAmount = subtotal + valorFrete;
 
-  // Busca contact_id direto da conversa
-  const convResult = await client.query<{ contact_id: string | null }>(
-    `SELECT contact_id FROM core.conversations WHERE id = $1 LIMIT 1`,
+  // Busca contact_id + telefone (phone_e164) direto da conversa/contato.
+  const convResult = await client.query<{ contact_id: string | null; phone_e164: string | null }>(
+    `SELECT cv.contact_id, ct.phone_e164
+       FROM core.conversations cv
+       LEFT JOIN core.contacts ct ON ct.id = cv.contact_id
+      WHERE cv.id = $1 LIMIT 1`,
     [conversationId],
   );
   const contactId = convResult.rows[0]?.contact_id ?? null;
+  // Número do WhatsApp do cliente → grava no pedido pra habilitar Ligar/WhatsApp
+  // no card do parceiro. Antes ia null (o botão nascia morto).
+  const contactPhone = convResult.rows[0]?.phone_e164 ?? null;
 
   if (!contactId) {
     return JSON.stringify({ erro: 'Contato não encontrado para esta conversa.' });
@@ -938,7 +944,7 @@ async function criarPedido(
 
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,
-      customer_phone: null,
+      customer_phone: contactPhone,
       items: partner.items.map((it) => ({
         partner_stock_id: it.partner_stock_id,
         quantity: it.quantity,
