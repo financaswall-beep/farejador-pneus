@@ -383,14 +383,16 @@ audioUnlocked: false,         // desbloqueio do som (gesto do login)
 ```
 Countdown usa o `nowTick`/`nowTimer` que JÁ existe (app.js:28) — zero timer novo.
 
-### Endpoints (padrão requirePartnerAuth + requireScreen('batepapo') + withPartnerContext)
+### Endpoints — ✅ CONSTRUÍDOS 2026-06-10 (Tijolo 2; código em src/parceiro/route.ts + queries.ts + photo-upload.ts)
 ```
-GET  /parceiro/:slug/api/photo-requests              -> view partner_photo_queue (~2h). Payload WHITELIST (E16).
-POST /parceiro/:slug/api/photo-requests/:id/photo    (multipart) -> magic bytes + sharp re-encode + attach_partner_photo + dispatchPhotoToCustomer. client_token (idempotência), rate limit, valida unit_id==sessão.
-GET  /parceiro/:slug/api/photo-requests/:id/image    -> bytes via RLS (§A leitura).
-GET  /parceiro/:slug/api/order-items/:id/photo       (fase 2) -> thumb/lightbox no card de separação.
+GET  /parceiro/:slug/api/photo-requests                       -> fila (vivos + terminais 2h). WHITELIST (E16). Flag off = lista vazia.
+POST /parceiro/:slug/api/photo-requests/:photoRequestId/photo -> RAW IMAGE BODY (não multipart!): bodyLimit 8MB nativo,
+     rate limit 15/5min por unit+IP, magic bytes, re-encode sharp (JPEG 1600px EXIF-stripped), attach via function.
+     TODO(Tijolo 3) ligado no handler: dispatchPhotoToCustomer quando attached.
+GET  /parceiro/:slug/api/photo-requests/:photoRequestId/image -> bytes via RLS, Cache-Control private.
+GET  /parceiro/:slug/api/order-items/:id/photo                (Tijolo 5) -> thumb/lightbox na separação.
 ```
-Deps NOVAS: `@fastify/multipart` (limits fileSize 8MB, files 1) + `sharp` (re-encode; fallback `jimp` se build nativo brigar). Funcionário responde foto via tela `batepapo` (MVP).
+**DESVIO do desenho original (decisão do Orquestrador na implementação):** upload por **raw image body** (front manda o blob via fetch com Content-Type image/jpeg) em vez de `@fastify/multipart` → 1 dependência a menos (parser de boundary = superfície de CVE), `bodyLimit` nativo cobre E9, e a **idempotência é do banco** (attach FOR UPDATE; retry/duplo-clique = no-op; sem client_token). Deps novas: só `sharp`. Parser `image/*`→Buffer registrado em registerParceiroRoute (hasContentTypeParser guard). Funcionário responde foto via tela `batepapo` (MVP). Provas: 10 testes novos em tests/unit/parceiro/photo-upload.test.ts (355/355 total).
 
 ### SSE global + alerta (4 camadas) — reusa `pg_notify('partner_chat')` com `kind:'photo_request'`
 - EventSource conecta no boot (após `/api/me`) e fica vivo SEMPRE (hoje só conecta na aba Bate-papo, app.js:2393) — senão o alerta não é global. `loadChat()` pesado continua só na aba. Poll de segurança da fila: 20-30s.

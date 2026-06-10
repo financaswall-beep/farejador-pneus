@@ -3428,3 +3428,104 @@ export async function upsertPartnerPermissions(
 
   return resolved;
 }
+
+// ============================================================
+// FOTO SOB DEMANDA (0094) — fila de pedidos de foto + upload.
+// Cliente pede foto do pneu usado → bot cria photo_request → card no painel →
+// borracheiro fotografa → sistema manda pro cliente (dispatcher, lado bot).
+// Tudo via withPartnerContext: RLS isola por unidade; a view partner_photo_queue
+// é WHITELIST (sem conversation_id/contact_id — anti-bypass de comissão, E2/E16).
+// Plano: docs/PLANO_FOTO_SOB_DEMANDA_2026-06-10.md
+// ============================================================
+
+export interface PartnerPhotoQueueItem {
+  id: string;
+  tire_size: string;
+  brand: string | null;
+  note: string | null;
+  status: string;
+  was_late: boolean;
+  has_photo: boolean;
+  expires_at: string;
+  answered_at: string | null;
+  created_at: string;
+}
+
+/**
+ * Fila de pedidos de foto da unidade: cards VIVOS (pending/answered) sempre +
+ * terminais recentes (últimas 2h) pra UI mostrar "enviada ✅"/"expirou" antes
+ * de sumirem. Nunca projeta o blob nem o endereço de volta (a view garante).
+ */
+export async function getPartnerPhotoQueue(ctx: PartnerContext): Promise<PartnerPhotoQueueItem[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const res = await client.query<PartnerPhotoQueueItem>(
+      `SELECT id, tire_size, brand, note, status, was_late, has_photo,
+              expires_at, answered_at, created_at
+         FROM commerce.partner_photo_queue
+        WHERE status IN ('pending', 'answered')
+           OR created_at > now() - interval '2 hours'
+        ORDER BY created_at DESC
+        LIMIT 50`,
+    );
+    return res.rows;
+  });
+}
+
+export interface AttachPartnerPhotoResult {
+  status: 'ok' | 'not_found' | 'rejected';
+  // Estado do pedido após a chamada (quando ok): answered/sent/cancelled...
+  state?: string;
+  was_late?: boolean;
+  // false = no-op idempotente (duplo-clique/2 aparelhos: já tinha foto).
+  attached?: boolean;
+}
+
+/**
+ * Anexa a foto (já re-encodada pelo route — sempre image/jpeg) ao pedido, via
+ * commerce.attach_partner_photo: FOR UPDATE + idempotência no banco. RLS faz
+ * pedido de outra unidade parecer inexistente (não vaza existência).
+ */
+export async function attachPartnerPhoto(
+  ctx: PartnerContext,
+  photoRequestId: string,
+  photo: { bytes: Buffer; mime: string; sizeBytes: number },
+): Promise<AttachPartnerPhotoResult> {
+  try {
+    return await withPartnerContext(ctx.partnerUnitId, async (client) => {
+      const res = await client.query<{ out_status: string; out_was_late: boolean; out_attached: boolean }>(
+        'SELECT out_status, out_was_late, out_attached FROM commerce.attach_partner_photo($1, $2, $3, $4)',
+        [photoRequestId, photo.bytes, photo.mime, photo.sizeBytes],
+      );
+      const row = res.rows[0];
+      if (!row) return { status: 'not_found' };
+      return { status: 'ok', state: row.out_status, was_late: row.out_was_late, attached: row.out_attached };
+    });
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    // 42501 = "nao encontrado (ou de outra unidade)" — RLS escondeu a linha.
+    if (code === '42501') return { status: 'not_found' };
+    // 23514 = bytes vazios/MIME fora da allowlist (não deve ocorrer pós re-encode).
+    if (code === '23514') return { status: 'rejected' };
+    throw err;
+  }
+}
+
+/**
+ * Bytes da foto pro painel exibir (preview no card + lightbox da separação).
+ * RLS: só a foto da própria unidade. null = não existe/não é desta unidade.
+ */
+export async function getPartnerPhotoImage(
+  ctx: PartnerContext,
+  photoRequestId: string,
+): Promise<{ bytes: Buffer; mime: string } | null> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const res = await client.query<{ photo_bytes: Buffer; photo_mime: string }>(
+      `SELECT photo_bytes, photo_mime
+         FROM commerce.photo_request_blobs
+        WHERE photo_request_id = $1`,
+      [photoRequestId],
+    );
+    if (res.rowCount !== 1) return null;
+    return { bytes: res.rows[0]!.photo_bytes, mime: res.rows[0]!.photo_mime };
+  });
+}

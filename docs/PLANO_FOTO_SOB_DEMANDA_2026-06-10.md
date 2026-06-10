@@ -157,7 +157,7 @@ GET  /parceiro/:slug/api/order-items/:id/photo       (fase 2, card separação �
 | Tijolo | O quê | Prova | Deps novas |
 |--------|-------|-------|------------|
 | 1 ✅ **FEITO 2026-06-10** | Migration **0094** APLICADA EM PROD (dormente; 3 furos do rascunho consertados — ver anexo §A) | dry-run→commit + smoke 16/16 (RLS 2 sentidos, E2/E4 físicas, was_late, guard) + typecheck + 345/345 | — |
-| 2 | Backend painel (GET fila, POST foto c/ re-encode, GET imagem) — flag off | vitest das rotas + guards (mime, estado, RLS) | @fastify/multipart, sharp |
+| 2 ✅ **FEITO 2026-06-10** | Backend painel: GET fila, POST foto (re-encode sharp), GET imagem — flag off. **DESVIO bom: upload = RAW IMAGE BODY (fetch+blob), NÃO multipart** → -1 dependência (@fastify/multipart cortada), bodyLimit nativo 8MB (E9), idempotência é do banco (FOR UPDATE; sem client_token). Flag PHOTO_REQUESTS no env (default false). | typecheck + 10 testes novos (sniff magic bytes, SVG/GIF/polyglot rejeitados, EXIF aplicado+strippado, resize 1600) + 355/355 total | sharp (só) |
 | 3 | Bot (tool `pedir_foto`, `sendAttachment`, dispatcher, expirador, prompt) — flag off | vitest + **smoke `sendAttachment` AO VIVO no env test** (multipart não validado contra nosso Chatwoot!) + checar Node ≥18 no Coolify | — |
 | 4 | UI painel (cards, SSE global, banner, badge, som, title flash) | preview parceiro-prod + teste no celular real | — |
 | 5 | Amarração ao pedido (migração da foto pro item + sticky-loja SE aprovado + thumb/lightbox na separação) | prova de integração env test (BEGIN/ROLLBACK) | — |

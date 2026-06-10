@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { requirePartnerAuth, requireOwner, requireScreen, resolvePartnerPermissions, getPartnerContext, authenticatePartner, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
 import { rateLimitHit } from './rate-limit.js';
+import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 
 // Login/1º acesso: até 10 tentativas por IP+slug a cada 5 min (anti-brute-force).
 const LOGIN_MAX_ATTEMPTS = 10;
@@ -44,6 +45,9 @@ import {
   sendPartnerChatMessage,
   markPartnerChatRead,
   linkPartnerChatCustomer,
+  getPartnerPhotoQueue,
+  attachPartnerPhoto,
+  getPartnerPhotoImage,
   getPartnerCompras,
   getPartnerCustomers,
   getPartnerDespesas,
@@ -871,6 +875,106 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (status === 'conversation_not_found') return reply.status(404).send({ error: 'conversation_not_found' });
     if (status === 'customer_not_found') return reply.status(404).send({ error: 'customer_not_found' });
     return reply.status(200).send({ ok: true });
+  });
+
+  // ============================================================
+  // FOTO SOB DEMANDA (0094) — fila de cards + upload + imagem.
+  // Flag PHOTO_REQUESTS off = dormente (fila vazia, upload/imagem 404).
+  // Upload é RAW IMAGE BODY (fetch com blob, Content-Type: image/jpeg) em vez
+  // de multipart: -1 dependência (sem parser de boundary), bodyLimit nativo
+  // cobre o teto de 8MB (E9), e a idempotência é do BANCO (attach_partner_photo
+  // FOR UPDATE: retry/duplo-clique = no-op). Magic bytes + re-encode sharp no
+  // photo-upload.ts (E7/E8/E12). Plano: docs/PLANO_FOTO_SOB_DEMANDA_2026-06-10.md
+  // ============================================================
+
+  // Parser de imagem: entrega o corpo cru como Buffer pro handler (uma vez por instância).
+  for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
+    if (!fastify.hasContentTypeParser(mime)) {
+      fastify.addContentTypeParser(mime, { parseAs: 'buffer' }, (_req, body, done) => {
+        done(null, body);
+      });
+    }
+  }
+
+  const photoRequestParamsSchema = z.object({
+    slug: z.string(),
+    photoRequestId: z.string().uuid(),
+  });
+
+  // Fila de pedidos de foto da unidade (cards vivos + terminais recentes).
+  fastify.get('/parceiro/:slug/api/photo-requests', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
+    if (!env.PHOTO_REQUESTS) return reply.status(200).send({ photo_requests: [] });
+    const items = await getPartnerPhotoQueue(getPartnerContext(request));
+    return reply.status(200).send({ photo_requests: items });
+  });
+
+  // Upload da foto do borracheiro. Corpo = bytes da imagem (image/jpeg|png|webp).
+  // Valida tipo REAL (magic bytes), re-encoda (sharp: JPEG 1600px, EXIF aplicado
+  // e descartado) e anexa via function do banco (trava + idempotência).
+  fastify.post('/parceiro/:slug/api/photo-requests/:photoRequestId/photo', {
+    preHandler: [requirePartnerAuth, requireScreen('batepapo')],
+    bodyLimit: PHOTO_MAX_UPLOAD_BYTES,
+  }, async (request: PartnerAuthedRequest, reply) => {
+    if (!env.PHOTO_REQUESTS) return reply.status(404).send({ error: 'feature_off' });
+
+    const params = photoRequestParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'photo_request_not_found' });
+
+    // Anti-flood por unidade+IP (E10): 15 uploads a cada 5 min cobre o uso real
+    // (1 foto por card, poucos cards) e barra abuso de token vazado.
+    const ctx = getPartnerContext(request);
+    if (rateLimitHit(`photo:${ctx.partnerUnitId}:${request.ip}`, 15, 5 * 60 * 1000)) {
+      return reply.status(429).send({ error: 'rate_limited' });
+    }
+
+    const body = request.body;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      return reply.status(415).send({ error: 'not_an_image' });
+    }
+
+    let photo;
+    try {
+      photo = await reencodePhoto(body);
+    } catch (err) {
+      if (err instanceof PhotoRejectedError) {
+        return reply.status(415).send({ error: err.reason });
+      }
+      throw err;
+    }
+
+    const result = await attachPartnerPhoto(ctx, params.data.photoRequestId, {
+      bytes: photo.bytes,
+      mime: photo.mime,
+      sizeBytes: photo.bytes.length,
+    });
+    if (result.status === 'not_found') return reply.status(404).send({ error: 'photo_request_not_found' });
+    if (result.status === 'rejected') return reply.status(415).send({ error: 'not_an_image' });
+
+    // TODO(Tijolo 3): se result.attached, disparar dispatchPhotoToCustomer
+    // (determinístico, lado bot) — a foto segue pro cliente via Chatwoot.
+    return reply.status(200).send({
+      ok: true,
+      state: result.state,
+      attached: result.attached,
+      was_late: result.was_late,
+    });
+  });
+
+  // Bytes da foto pro painel (preview do card + lightbox da separação).
+  fastify.get('/parceiro/:slug/api/photo-requests/:photoRequestId/image', { preHandler: [requirePartnerAuth, requireScreen('batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
+    if (!env.PHOTO_REQUESTS) return reply.status(404).send({ error: 'feature_off' });
+
+    const params = photoRequestParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'photo_request_not_found' });
+
+    const img = await getPartnerPhotoImage(getPartnerContext(request), params.data.photoRequestId);
+    if (!img) return reply.status(404).send({ error: 'photo_not_found' });
+
+    return reply
+      .status(200)
+      .header('Content-Type', img.mime)
+      .header('Cache-Control', 'private, max-age=300')
+      .send(img.bytes);
   });
 
   // Tempo real (Fatia 3): SSE que empurra um evento quando chega mensagem nova,

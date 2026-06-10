@@ -72,6 +72,12 @@ const envSchema = z.object({
   // de hoje, byte a byte. Nesta leva só age na RETIRADA (modalidade='pickup'); a entrega
   // segue por cidade até a Fase 3 (precisa do raio por loja).
   ROUTING_PROXIMITY_FIRST: booleanStringSchema,
+  // FOTO SOB DEMANDA — cliente pede foto do pneu usado, bot cria pedido de foto
+  // (commerce.photo_requests, 0094), card aparece no painel do parceiro, borracheiro
+  // fotografa e o sistema manda a foto pro cliente sozinho (Chatwoot). Default OFF =
+  // dormente: bot não cria pedido, expirador não roda, endpoints do painel respondem
+  // vazio/404. Ver docs/PLANO_FOTO_SOB_DEMANDA_2026-06-10.md.
+  PHOTO_REQUESTS: booleanStringSchema,
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
