@@ -1730,7 +1730,7 @@
                                    @change="photoPickFile(pr, $event)" hidden />
                           </label>
                           <button type="button" class="photo-btn-send"
-                                  :disabled="photoSending[pr.id]"
+                                  :disabled="!!photoSending[pr.id]"
                                   @click="photoSend(pr)">
                             <template x-if="!photoSending[pr.id]"><span><i data-lucide="send"></i> ENVIAR</span></template>
                             <template x-if="photoSending[pr.id]"><span>Enviando…</span></template>
@@ -1772,7 +1772,7 @@
                           <div class="photo-card-preview">
                             <img :src="photoPreview.dataUrl" alt="Prévia da foto do pneu" />
                             <div class="photo-card-preview-actions">
-                              <button type="button" class="photo-btn-send" :disabled="photoSending[pr.id]" @click="photoSend(pr)">
+                              <button type="button" class="photo-btn-send" :disabled="!!photoSending[pr.id]" @click="photoSend(pr)">
                                 <span><i data-lucide="send"></i> ENVIAR</span>
                               </button>
                             </div>
