@@ -1954,6 +1954,23 @@ html, body {
 .pos-route-items { color: #9ca3af; }
 .pos-route-addr svg, .pos-route-items svg { width: 14px; flex: 0 0 auto; color: #8b949e; margin-top: 2px; }
 
+/* Botoes de contato direto no card (WhatsApp / Waze / Maps) — deep-links custo zero */
+.pos-route-contact { display: flex; flex-wrap: wrap; gap: 7px; }
+.pos-contact-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  text-decoration: none; border: 1px solid transparent; line-height: 1;
+  transition: filter .12s ease;
+}
+.pos-contact-btn svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.pos-contact-btn:active { transform: translateY(1px); }
+.pos-contact-btn.wa { color: #22c55e; background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.32); }
+.pos-contact-btn.waze { color: #38bdf8; background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.32); }
+.pos-contact-btn.maps { color: #f87171; background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.32); }
+.pos-shell[data-theme="light"] .pos-contact-btn.wa { color: #15803d; background: rgba(34,197,94,.1); border-color: rgba(21,128,61,.3); }
+.pos-shell[data-theme="light"] .pos-contact-btn.waze { color: #0369a1; background: rgba(56,189,248,.1); border-color: rgba(3,105,161,.3); }
+.pos-shell[data-theme="light"] .pos-contact-btn.maps { color: #b91c1c; background: rgba(248,113,113,.1); border-color: rgba(185,28,28,.3); }
+
 .pos-route-money {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
   padding-top: 11px; border-top: 1px solid rgba(255,255,255,.07);

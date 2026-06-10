@@ -1257,6 +1257,12 @@
                     <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')"><i data-lucide="phone"></i> <span x-text="formatPhoneDisplay(d.customer_phone)"></span></a>
                   </div>
                   <p class="pos-route-addr"><i data-lucide="map-pin"></i> <span x-text="d.delivery_address || 'Sem endereço informado'"></span></p>
+                  <!-- Contato direto do entregador: WhatsApp dele + navegacao no endereco (custo zero, fora da API Meta) -->
+                  <div class="pos-route-contact" x-show="d.customer_phone || d.delivery_address">
+                    <a class="pos-contact-btn wa" x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido. 🛵')" target="_blank" rel="noopener"><i data-lucide="message-circle"></i> WhatsApp</a>
+                    <a class="pos-contact-btn waze" x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="navigation"></i> Waze</a>
+                    <a class="pos-contact-btn maps" x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="map"></i> Maps</a>
+                  </div>
                   <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
 
                   <div class="pos-route-money">
@@ -1327,6 +1333,10 @@
                   <div class="pos-route-who">
                     <strong x-text="d.customer_name || 'Cliente'"></strong>
                     <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')"><i data-lucide="phone"></i> <span x-text="formatPhoneDisplay(d.customer_phone)"></span></a>
+                  </div>
+                  <!-- Avisar o cliente que o pneu chegou pra retirar (WhatsApp do balcao, custo zero) -->
+                  <div class="pos-route-contact" x-show="d.customer_phone">
+                    <a class="pos-contact-btn wa" :href="waLink(d.customer_phone, 'Olá! Seu pedido está reservado e pronto pra retirar na loja. 👍')" target="_blank" rel="noopener"><i data-lucide="message-circle"></i> WhatsApp</a>
                   </div>
                   <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
                   <div class="pos-route-money">

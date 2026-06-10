@@ -4086,6 +4086,31 @@ function parceiroApp() {
       return `+${d}`;
     },
 
+    // ── Contato direto no card (entrega/retirada) — deep-links, custo ZERO ──
+    // O entregador fala pelo WhatsApp/discador DELE (fora da API oficial da Meta),
+    // entao nao gasta janela/modelo. waLink monta o wa.me; os de mapa abrem
+    // navegacao no endereco do cliente (Waze ou Google Maps), sem chave/cota.
+    waLink(rawPhone, text) {
+      const e164 = this.toE164Phone(rawPhone);
+      if (!e164) return '#';
+      const digits = e164.replace(/\D/g, '');
+      const t = text ? `?text=${encodeURIComponent(text)}` : '';
+      return `https://wa.me/${digits}${t}`;
+    },
+    deliveryAddr(sale) {
+      return String(sale?.delivery_address || '').trim();
+    },
+    wazeNavUrl(sale) {
+      const addr = this.deliveryAddr(sale);
+      if (!addr) return '#';
+      return `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`;
+    },
+    mapsNavUrl(sale) {
+      const addr = this.deliveryAddr(sale);
+      if (!addr) return '#';
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
+    },
+
     cpfDigits(value) {
       return String(value || '').replace(/\D/g, '').slice(0, 11);
     },
