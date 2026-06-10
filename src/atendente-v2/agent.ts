@@ -8,6 +8,7 @@ import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
+import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 
@@ -152,7 +153,18 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     const pinNudge = customerPin
       ? `\n\n[LOCALIZAÇÃO JÁ RECEBIDA 📍] O cliente JÁ compartilhou a localização dele nesta conversa. Você TEM a localização — NÃO peça o bairro, NÃO pergunte "qual bairro aparece na localização" e NÃO peça pra mandar de novo. Para QUALQUER pergunta sobre estoque, preço na loja, frete, retirada ou "qual a loja/borracharia mais perto", CHAME a ferramenta correspondente AGORA (buscar_produto / buscar_compatibilidade / calcular_frete / localizacao_loja), SEM passar "bairro" — o sistema resolve a cidade e a loja mais perto pela localização. Só volte a pedir o bairro se a ferramenta retornar precisa_localizacao=true.${proximidadeHook}`
       : '';
-    const systemPromptWithContext = basePrompt + (customerContext ?? '') + pinNudge;
+    // Empurrão determinístico da FOTO (gêmeo do pino): quando o cliente PEDE pra
+    // ver o pneu, o bot às vezes confabula ("já pedi pro pessoal") sem chamar a
+    // tool pedir_foto — aí nenhum photo_request nasce. Detecta por código e injeta
+    // a ordem que proíbe a promessa-sem-chamada. Só com a flag on (off = prompt
+    // byte a byte o de hoje, preserva o caching). Ver photo-nudge.ts.
+    const reversedHistory = [...history].reverse();
+    const latestCustomerText = reversedHistory.find((m) => m.role === 'user')?.content ?? null;
+    const lastAssistantText =
+      reversedHistory.find((m) => m.role === 'assistant' && m.content)?.content ?? null;
+    const photoNudge =
+      env.PHOTO_REQUESTS && customerWantsPhoto(latestCustomerText, lastAssistantText) ? PHOTO_NUDGE : '';
+    const systemPromptWithContext = basePrompt + (customerContext ?? '') + pinNudge + photoNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },
