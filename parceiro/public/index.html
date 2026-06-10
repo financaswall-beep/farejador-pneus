@@ -209,7 +209,7 @@
       </div>
     </aside>
 
-    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas' }">
+    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-company">
           <div class="font-bold">Pneus Max Moto Center</div>

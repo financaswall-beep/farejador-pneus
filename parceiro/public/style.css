@@ -1277,6 +1277,16 @@ html, body {
    gigante e tapando o card. Reescreve pra 3 linhas com o workspace no 1fr. */
 .pos-main.retiradas-mode { grid-template-rows: 80px 1fr 46px; }
 
+/* FOTO SOB DEMANDA: a barra fina de alerta e um filho a MAIS do .pos-main (logo
+   apos o header). Sem uma linha propria, ela roubava a linha de 88px (KPIs) e
+   empurrava todo o resto pra baixo (layout bagunçado). Com a classe (so quando ha
+   foto pendente), insere uma linha 'auto' na posicao 2 SO pra ela — o resto das
+   linhas segue intacto. Cobre o grid padrao E os 3 modos de 3 linhas. */
+.pos-main.photo-alert-on { grid-template-rows: 80px auto 88px 1fr 46px; }
+.pos-main.photo-alert-on.chat-mode,
+.pos-main.photo-alert-on.config-mode,
+.pos-main.photo-alert-on.retiradas-mode { grid-template-rows: 80px auto 1fr 46px; }
+
 .pos-kpis article,
 .pos-panel {
   border: 1px solid var(--pos-line);
