@@ -7,6 +7,7 @@ import {
   buscarPoliticaComercial,
 } from '../atendente/tools/commerce-tools.js';
 import { logger } from '../shared/logger.js';
+import { normalizeBrazilianPhone } from '../shared/phone.js';
 import type { ToolDefinition } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import {
@@ -265,6 +266,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           geo_resolution_id: { type: 'string', description: 'UUID da geo_resolution (opcional, do calcular_frete)' },
           bairro: { type: 'string', description: 'Bairro do cliente. Na ENTREGA, passe o MESMO usado no calcular_frete. Na RETIRADA, passe o bairro que o cliente informou — é o que permite achar a loja mais perto pra ele retirar.' },
           confirma_retirada_distante: { type: 'boolean', description: 'Use SOMENTE na RETIRADA e SOMENTE depois que o cliente, avisado de que a loja mais perto que tem o pneu fica longe, disser EXPLICITAMENTE que vai buscar mesmo assim ("não tem problema, eu passo aí", "eu vou aí pegar"). true = reserva o pneu na loja mais perto que tem, mesmo fora do raio normal de retirada. NUNCA marque sozinho: só com a confirmação do cliente.' },
+          telefone_cliente: { type: 'string', description: 'Telefone/WhatsApp do cliente (com DDD). Passe SÓ quando o contato não tem número — Instagram e Facebook não trazem telefone. Sem ele, o pedido é recusado (entrega E retirada — todo pedido precisa de número). Em conversa de WhatsApp, OMITA: o número já vem do contato.' },
         },
         required: ['itens', 'nome_cliente', 'modalidade', 'forma_pagamento'],
         additionalProperties: false,
@@ -835,6 +837,26 @@ async function criarPedido(
     return JSON.stringify({ erro: 'Contato não encontrado para esta conversa.' });
   }
 
+  // Telefone efetivo do pedido: o que o BOT coletou (contato sem número — Insta/FB)
+  // tem prioridade; senão usa o do contato (WhatsApp). Reusa o normalizador E164
+  // compartilhado e testado (normalizeBrazilianPhone).
+  const telefoneInformado =
+    typeof args.telefone_cliente === 'string' ? normalizeBrazilianPhone(args.telefone_cliente) : null;
+  const effectivePhone = telefoneInformado ?? contactPhone;
+
+  // Guard: TODO pedido precisa de telefone — entrega (entregador alcança o cliente)
+  // e retirada (loja avisa "seu pneu chegou"). Contato de Instagram/Facebook não traz
+  // número (phone_e164 null); nesse caso o bot PEDE o WhatsApp e rechama com
+  // telefone_cliente. Garantido por código (decisão Wallace 2026-06-10), não por prompt.
+  if (!effectivePhone) {
+    return JSON.stringify({
+      erro: 'telefone_obrigatorio',
+      telefone_obrigatorio: true,
+      mensagem:
+        'Este contato não tem telefone (provavelmente Instagram/Facebook). Peça o WhatsApp/telefone do cliente e rechame criar_pedido com telefone_cliente — todo pedido precisa do número (entrega ou retirada).',
+    });
+  }
+
   // Dados comuns aos dois caminhos.
   const customerName = (args.nome_cliente as string | undefined)?.slice(0, 200) ?? null;
   const deliveryAddress =
@@ -944,7 +966,7 @@ async function criarPedido(
 
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,
-      customer_phone: contactPhone,
+      customer_phone: effectivePhone,
       items: partner.items.map((it) => ({
         partner_stock_id: it.partner_stock_id,
         quantity: it.quantity,
