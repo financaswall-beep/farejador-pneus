@@ -30,7 +30,7 @@ import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-l
 import { getRecentProductIds } from './conversation-products.js';
 import { reverseGeocode } from '../shared/geo/google-maps.js';
 import { createHash } from 'node:crypto';
-import { createPhotoRequest } from './photo-requests.js';
+import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
@@ -1099,6 +1099,16 @@ async function criarPedido(
       // RETIRADA → reserva o pneu (segura até retirar), sem recebível. Entrega segue COD.
       reserve_for_pickup: modalidade === 'pickup',
     });
+
+    // FOTO SOB DEMANDA: o pedido fechou → gruda as fotos respondidas desta
+    // conversa nos itens (card "Em separação" mostra a foto; guard de
+    // re-roteamento na query) e cancela pendentes (sem fallback pós-compra).
+    if (env.PHOTO_REQUESTS) {
+      const cwConvId = await lookupChatwootConversationId(client, conversationId);
+      if (cwConvId) {
+        await linkPhotoRequestsToOrder(client, environment, cwConvId, mat.partner_order_id);
+      }
+    }
 
     // H1: o total do espelho é LIDO DE VOLTA do partner_order (uma fonte de número,
     // nunca o que o LLM cotou) — e os itens vão a preço CENTRAL.

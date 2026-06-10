@@ -298,7 +298,25 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
        LIMIT 500`,
       [ctx.environment, ctx.unitId],
     );
-    return result.rows;
+
+    // FOTO SOB DEMANDA (0094): pedido que nasceu de uma foto aprovada ganha o
+    // id da foto — o card "Em separação" mostra o thumb (o separador pega o
+    // pneu CERTO). Uma query só (mapa order→foto), SEM tocar os bytes; a RLS
+    // de photo_requests já isola por unidade. Pedido sem foto = campo ausente.
+    const photos = await client.query<{ order_id: string; photo_request_id: string }>(
+      `SELECT poi.order_id, pr.id AS photo_request_id
+         FROM commerce.photo_requests pr
+         JOIN commerce.partner_order_items poi ON poi.id = pr.order_item_id
+        WHERE pr.environment = $1 AND pr.order_item_id IS NOT NULL`,
+      [ctx.environment],
+    );
+    if (photos.rowCount === 0) return result.rows;
+    const photoByOrder = new Map(photos.rows.map((p) => [p.order_id, p.photo_request_id]));
+    return result.rows.map((row) => {
+      const orderId = (row as { order_id?: string }).order_id;
+      const photoRequestId = orderId ? photoByOrder.get(orderId) : undefined;
+      return photoRequestId ? { ...row, photo_request_id: photoRequestId } : row;
+    });
   });
 }
 

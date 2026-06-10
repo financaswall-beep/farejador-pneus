@@ -114,6 +114,52 @@ export async function createPhotoRequest(
   return { status: 'created', photoRequestId, prazoMin: PHOTO_REQUEST_TTL_MINUTES };
 }
 
+// ─── Amarração ao pedido (chamada pelo criar_pedido, pós-materialização) ─────
+
+/**
+ * O cliente FECHOU o pedido: (1) gruda as fotos respondidas desta conversa nos
+ * itens do pedido — o card "Em separação" passa a mostrar a foto e o separador
+ * pega o pneu CERTO; (2) cancela os pedidos de foto ainda pendentes da conversa
+ * (senão o expirador mandaria "a loja não conseguiu a foto" pra quem JÁ comprou).
+ *
+ * Guards na própria query: a foto só migra se a loja do pedido == loja da foto
+ * (re-roteou no meio do caminho → NÃO migra: é peça física de outra loja) e o
+ * casamento é por product_name do CATÁLOGO (pr.tire_size nasceu exatamente de
+ * commerce.products.product_name na tool — mesmo campo, casamento confiável;
+ * divergiu → não liga e degrada honesto, sem foto errada na separação).
+ */
+export async function linkPhotoRequestsToOrder(
+  client: PoolClient,
+  environment: Environment,
+  chatwootConversationId: number,
+  partnerOrderId: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE commerce.photo_requests pr
+        SET order_item_id = poi.id
+       FROM commerce.partner_orders po
+       JOIN commerce.partner_order_items poi ON poi.order_id = po.id
+       JOIN commerce.partner_stock_levels ps ON ps.id = poi.partner_stock_id
+       JOIN commerce.products p ON p.id = ps.product_id AND p.environment = po.environment
+      WHERE po.id = $1
+        AND pr.environment = $2
+        AND pr.conversation_id = $3
+        AND pr.status IN ('answered', 'sent')
+        AND pr.order_item_id IS NULL
+        AND po.environment = pr.environment
+        AND po.unit_id = pr.unit_id
+        AND p.product_name = pr.tire_size`,
+    [partnerOrderId, environment, chatwootConversationId],
+  );
+
+  await client.query(
+    `UPDATE commerce.photo_requests
+        SET status = 'cancelled'
+      WHERE environment = $1 AND conversation_id = $2 AND status = 'pending'`,
+    [environment, chatwootConversationId],
+  );
+}
+
 // ─── Despacho da foto (chamado pelo upload do painel, pós-attach) ────────────
 
 /**

@@ -107,6 +107,8 @@ function parceiroApp() {
     photoLastPendingCount: 0,   // detecta card NOVO → bip + flash
     audioUnlocked: false,       // política de autoplay: destrava no 1º toque
     photoSoundOn: localStorage.getItem(`farejador_photo_sound_${slug}`) !== '0', // bip ligado por padrão
+    photoThumbUrls: {},         // cache { photo_request_id: objectURL } (img não manda Bearer → fetch+blob)
+    photoLightbox: { open: false, url: null }, // foto ampliada (card de separação)
     // ─── BATE-PAPO (Tela 4): UI do painel direito ───
     chatPanelPedido: false,   // painel "Criar pedido" expandido? (acordeão exclusivo: começa fechado)
     chatPanelCliente: true,   // painel "Cliente" expandido? (contexto do atendimento — abre primeiro)
@@ -2530,6 +2532,30 @@ function parceiroApp() {
       this.photoSoundOn = !this.photoSoundOn;
       try { localStorage.setItem(`farejador_photo_sound_${this.slug}`, this.photoSoundOn ? '1' : '0'); }
       catch (e) { /* localStorage indisponível */ }
+    },
+
+    // Thumb da foto no card de separação: <img> não manda Bearer → busca os
+    // bytes autenticado e vira objectURL (cacheado por id; poucos cards ativos).
+    async photoLoadThumb(photoRequestId) {
+      if (!photoRequestId || this.photoThumbUrls[photoRequestId]) return;
+      try {
+        const res = await fetch(`/parceiro/${this.slug}/api/photo-requests/${photoRequestId}/image`, {
+          headers: { Authorization: `Bearer ${this.apiToken}` },
+        });
+        if (!res.ok) return; // sem foto/sem permissão: thumb simplesmente não aparece
+        const blob = await res.blob();
+        this.photoThumbUrls = { ...this.photoThumbUrls, [photoRequestId]: URL.createObjectURL(blob) };
+      } catch (err) {
+        console.warn('photo_thumb_failed', err);
+      }
+    },
+    openPhotoLightbox(photoRequestId) {
+      const url = this.photoThumbUrls[photoRequestId];
+      if (!url) return;
+      this.photoLightbox = { open: true, url };
+    },
+    closePhotoLightbox() {
+      this.photoLightbox = { open: false, url: null };
     },
 
     selectChat(id) {

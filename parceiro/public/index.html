@@ -263,6 +263,12 @@
           — <u>TOCA AQUI pra atender</u></span>
       </button>
 
+      <!-- Lightbox da foto do pneu (card de separação): amplia pro separador conferir. -->
+      <div class="photo-lightbox" x-show="photoLightbox.open" x-cloak @click="closePhotoLightbox()">
+        <img :src="photoLightbox.url" alt="Foto do pneu aprovado pelo cliente" />
+        <span>toca pra fechar</span>
+      </div>
+
       <section x-show="currentSection === 'resumo'" class="pos-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
@@ -1287,6 +1293,15 @@
                     <a class="pos-contact-btn maps" x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="map"></i> Maps</a>
                   </div>
                   <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
+                  <!-- FOTO SOB DEMANDA: o pneu que o cliente APROVOU na conversa.
+                       O separador confere e pega ESTA peça (não qualquer uma da medida). -->
+                  <button type="button" class="pos-route-photo" x-show="d.photo_request_id" x-cloak
+                          x-init="d.photo_request_id && photoLoadThumb(d.photo_request_id)"
+                          @click="openPhotoLightbox(d.photo_request_id)"
+                          title="Foto do pneu que o cliente aprovou — toca pra ampliar">
+                    <img x-show="photoThumbUrls[d.photo_request_id]" :src="photoThumbUrls[d.photo_request_id]" alt="Foto do pneu aprovado" />
+                    <span>📸 pneu da foto — <u>conferir</u></span>
+                  </button>
 
                   <div class="pos-route-money">
                     <div class="pos-route-courier">
@@ -1362,6 +1377,15 @@
                     <a class="pos-contact-btn wa" :href="waLink(d.customer_phone, 'Olá! Seu pedido está reservado e pronto pra retirar na loja. 👍')" target="_blank" rel="noopener"><i data-lucide="message-circle"></i> WhatsApp</a>
                   </div>
                   <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
+                  <!-- FOTO SOB DEMANDA: o pneu que o cliente APROVOU na conversa.
+                       O separador confere e pega ESTA peça (não qualquer uma da medida). -->
+                  <button type="button" class="pos-route-photo" x-show="d.photo_request_id" x-cloak
+                          x-init="d.photo_request_id && photoLoadThumb(d.photo_request_id)"
+                          @click="openPhotoLightbox(d.photo_request_id)"
+                          title="Foto do pneu que o cliente aprovou — toca pra ampliar">
+                    <img x-show="photoThumbUrls[d.photo_request_id]" :src="photoThumbUrls[d.photo_request_id]" alt="Foto do pneu aprovado" />
+                    <span>📸 pneu da foto — <u>conferir</u></span>
+                  </button>
                   <div class="pos-route-money">
                     <div class="pos-route-total">
                       <small>Total a receber</small>
