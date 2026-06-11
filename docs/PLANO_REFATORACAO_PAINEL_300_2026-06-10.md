@@ -1,10 +1,11 @@
 # PLANO — Refatoração do painel do parceiro (app.js 4.755 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **ONDA A (passos 0–3
-> + F7/M1/M4) COMPLETA, AUTORIZADA pelo dono e MERGEADA no main em 2026-06-11** (push =
-> deploy automático Coolify). Validação final do dono no celular = pós-deploy, no site
-> real. Próximo: **Onda B (passos 4–6)**. Progresso na tabela §6.
+> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **ONDAS A e B
+> MERGEADAS no main e LIVE em prod (2026-06-11)**: A (passos 0–3 + F7/M1/M4) e B
+> (passos 4–6, merge `9d0f989`, deploy CONFERIDO byte-idêntico no site real, sha
+> `9ae355f4…`). Validação de negócio do dono (foto/chat com dado real no celular) =
+> pós-deploy. Próximo: **Onda C (passos 7–10, contrato 0076/0077)**. Progresso na tabela §6.
 > Handoffs: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md` (passos 0–2) +
 > `docs/SESSAO_2026-06-11_OBRA_PAINEL_PASSO3_MERGE_ONDA_A_HANDOFF.md` (passo 3 + merge).
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
@@ -103,10 +104,11 @@ Coolify) em **3 ondas**, cada uma validada ao vivo pelo dono antes da próxima:
   no main em 2026-06-11** (M4 `?v=20260611-onda-a`; autorizada pelo dono após validar a
   interface; giro fino no celular dele = pós-deploy). Deploy CONFERIDO no site real
   (arquivos novos 200, app.js byte-idêntico).
-- **Onda B (médio):** Passos 4–6 (foto, chat, config). ✅ **COMPLETA NA BRANCH em
-  2026-06-11** (commits `29b2ec6`+`f2f8322`+`60a14d5`; M4 `?v=20260611-onda-b`; goldens
-  64+72+40 verdes; app.js 3995→3071). **AGUARDANDO validação do dono + autorização pra
-  mergear no main** (regra do §5: o main só recebe onda validada).
+- **Onda B (médio):** Passos 4–6 (foto, chat, config). ✅ **MERGEADA no main e LIVE em
+  prod (2026-06-11)** — merge `9d0f989` (autorizada pelo dono: "confio nas provas, pode
+  subir"); deploy CONFERIDO no site real (10 arquivos 200, `app.js` byte-idêntico sha
+  `9ae355f4…`, `?v=20260611-onda-b`); goldens 64+72+40 + 471 props + 69 contratos + 379
+  vitest verdes; app.js 3995→3071. Rollback = `git revert -m 1 9d0f989` (Coolify redeploya).
 - **Onda C (contrato):** Passos 7–10 (estoque, PDV, financeiro, raiz fina).
 
 Rollback: passo = `git revert` do commit; onda = revert do merge; Coolify redeploya
