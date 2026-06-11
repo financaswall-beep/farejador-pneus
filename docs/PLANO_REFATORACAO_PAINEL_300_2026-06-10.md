@@ -130,6 +130,8 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 | F4 | **Etiqueta de cache `?v=20260606-gps` parada desde 06/06** — inofensiva hoje (servidor manda no-store), mas vira armadilha se o no-store cair um dia. | index.html:2402 | Melhoria M4: versionar a cada onda. |
 | F5 | **Gráficos guardados em globais `window._xxxChart`** — funciona, mas é estado solto fora do Alpine. | 3835+ | NÃO mexer (regra 7). Anotado pra obra futura. |
 | F6 | Lição permanente: **`:disabled` do Alpine com valor `undefined` trava botão** — origem do bug da foto. | — | Checklist do passo 4 verifica o `!!` preservado; regra já vai pro CLAUDE.md no passo 11. |
+| F7 | **Warns de Alpine em TODA carga da página** (pré-existentes, achados no passo 1): `stockOpItem.quantity_on_hand` (mini-modal de entrada avalia x-text com item null) e `chatActive.avatar=null` (img @error com chat fechado). Não quebram nada visível; poluem o console. | index.html (expressões dos modais) | NÃO mexer na obra (regra 7). Anotado pra fix fora da obra (guarda `stockOpItem &&` / `chatActive &&`). |
+| F8 | **Backend servia estático por rota EXPLÍCITA por arquivo** — módulo novo daria 404 em prod. Desvio do §1 EXECUTADO no passo 1: rota genérica `/parceiro/:slug/:script` com whitelist `app.<nome>.js` (basename + regex, fora do padrão = 404), no padrão da rota de assets. | route.ts:483 | Resolvido no commit do passo 1 (444ffbe). Vale pros 15 módulos seguintes — backend não precisa ser tocado de novo. |
 
 ## 8. MELHORIAS SEM MUDAR LÓGICA (cada uma = commit próprio, aprovadas pelo dono)
 
