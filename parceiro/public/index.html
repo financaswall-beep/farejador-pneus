@@ -1189,7 +1189,7 @@
                 <input type="number" min="1" step="1" x-model.number="stockEntryQty" placeholder="Ex: 10" @keydown.enter="saveStockEntry()" />
               </label>
               <p class="pos-modal-sub" x-show="num(stockEntryQty) > 0 && stockOpItem">
-                Novo saldo: <b x-text="(num(stockOpItem.quantity_on_hand) + num(stockEntryQty)) + ' un.'"></b>
+                Novo saldo: <b x-text="stockOpItem ? ((num(stockOpItem.quantity_on_hand) + num(stockEntryQty)) + ' un.') : ''"></b>
               </p>
               <button @click="saveStockEntry()" :disabled="saving" class="pos-form-submit success">
                 <i data-lucide="download"></i>
@@ -1864,7 +1864,7 @@
             <header class="pos-chat-thread-head">
               <div class="pos-chat-thread-who">
                 <span class="pos-chat-avatar" :data-channel="chatActive?.channel">
-                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive && (chatActive.avatar=null)" />
                   <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
                 </span>
                 <div>
@@ -1993,7 +1993,7 @@
                   <div class="cx-hero-wheel"></div>
                   <div class="cx-hero-top">
                     <span class="cx-hero-photo pos-chat-avatar" :data-channel="chatActive?.channel">
-                      <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                      <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive && (chatActive.avatar=null)" />
                       <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
                     </span>
                     <div class="cx-hero-info">
@@ -2104,7 +2104,7 @@
               <div class="cx-idle-head"><i data-lucide="headphones"></i> Atendimento em foco</div>
               <div class="cx-idle-top">
                 <span class="cx-idle-av pos-chat-avatar" :data-channel="chatActive?.channel">
-                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive.avatar=null" />
+                  <img x-show="chatActive?.avatar" :src="chatActive?.avatar" alt="" loading="lazy" @error="chatActive && (chatActive.avatar=null)" />
                   <span x-show="!chatActive?.avatar" x-text="chatActive?.initials"></span>
                 </span>
                 <div><b x-text="chatActive?.name"></b><small x-text="chatActive?.channelLabel"></small></div>
