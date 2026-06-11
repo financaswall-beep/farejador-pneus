@@ -12,16 +12,18 @@ import { Pool, type PoolClient } from 'pg';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 
-// Se PARTNER_DATABASE_URL nao estiver setado, faz fallback no DATABASE_URL
-// principal. Em prod isso e log de warning — Etapa 5 nao esta efetivamente
-// enforced. Em dev/test/staging e OK pra nao quebrar ambientes antigos.
-const partnerDatabaseUrl = env.PARTNER_DATABASE_URL ?? env.DATABASE_URL;
-
+// FAIL-CLOSED em prod (auditoria 2026-06-11, achado S1): sem PARTNER_DATABASE_URL,
+// o portal cairia no DATABASE_URL principal (role postgres, BYPASSRLS) e o RLS
+// viraria decoração — o isolamento entre parceiros dependeria só do WHERE de cada
+// query. Melhor o painel fora do ar que vazando entre parceiros, então em prod o
+// boot DERRUBA. Em dev/test o fallback continua valendo pro ambiente local.
 if (!env.PARTNER_DATABASE_URL && env.FAREJADOR_ENV === 'prod') {
-  logger.warn(
-    'PARTNER_DATABASE_URL nao configurado em prod — Etapa 5 RLS nao esta enforced!',
+  throw new Error(
+    'PARTNER_DATABASE_URL ausente com FAREJADOR_ENV=prod — o portal do parceiro NAO sobe sem a role restrita (farejador_partner_app), senao o RLS fica bypassado. Configure a env (Coolify ou .env.preview).',
   );
 }
+
+const partnerDatabaseUrl = env.PARTNER_DATABASE_URL ?? env.DATABASE_URL;
 
 const usesSupabase =
   partnerDatabaseUrl.includes('supabase.co') || partnerDatabaseUrl.includes('supabase.com');
