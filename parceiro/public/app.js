@@ -3155,7 +3155,6 @@ function parceiroApp() {
           source_tag: this.saleForm.source_tag || 'porta',
           idempotency_key: this.uuid(),
         };
-        console.log('[venda] enviando:', body);  // Pra diagnÃ³stico â€” abrir DevTools console
         await this.api('vendas', {
           method: 'POST',
           body: JSON.stringify(body),
