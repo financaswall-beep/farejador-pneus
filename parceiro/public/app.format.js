@@ -1,8 +1,10 @@
 /**
  * app.format.js - fabrica `format` do painel do parceiro (obra <=300, passo 1/11).
  * MORA AQUI: mascaras (telefone/CPF/moeda), medida de pneu, datas e deep-links de
- * contato (WhatsApp/Waze/Maps) + helpers puros (num/money/uuid/isSaving/dateKey).
- * VEIO DE: app.js linhas 4306-4443 (commit c0d7913), movido VERBATIM.
+ * contato (WhatsApp/Waze/Maps) + helpers puros (num/money/uuid/isSaving/dateKey)
+ * + isCurrentMonth (passo 10: veio da raiz; familia do dateKeySaoPaulo).
+ * VEIO DE: app.js linhas 4306-4443 (commit c0d7913), movido VERBATIM;
+ * isCurrentMonth do app.js commit 29e9817 (range 963-977).
  * REGRA: teto de 300 linhas (npm run checar-tamanho). Sem estado proprio: `this`
  * e o objeto UNICO montado por montarParceiroApp() no app.js. NUNCA usar spread
  * pra juntar modulos (executa getter e congela valor) - so getOwnPropertyDescriptors.
@@ -136,6 +138,22 @@ window.PARCEIRO_MODULES.format = () => ({
         month: '2-digit',
         day: '2-digit',
       }).format(new Date(value));
+    },
+
+    // Compara em America/Sao_Paulo para alinhar com a view SQL
+    // (network.partner_unit_summary usa date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')).
+    // Sem isso, nas primeiras horas do dia 1 o navegador (em outro fuso)
+    // pode considerar o registro como "mes anterior" e desalinhar dos cards.
+    isCurrentMonth(value) {
+      if (!value) return false;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return false;
+      const fmt = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+      });
+      return fmt.format(date) === fmt.format(new Date());
     },
 
     formatDate(value) {

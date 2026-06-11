@@ -111,3 +111,28 @@ MESMO commit). ESTADO continua TODO na raiz (sai só no passo 10). F2 PRESERVADO
    snapshot de rollback, validação extra (regra 6 do plano). Reler `SECOES/ESTOQUE.md` antes.
 4. Na fila fora da obra: porta única de login (`project_porta_unica_login`), faxina
    docs/scripts, F9 (canvas órfãos), M2 (declarar chatSending — pedir aprovação).
+
+---
+
+## 8. FECHAMENTO — MERGE + DEPLOY (mesma sessão, atualização)
+
+Apresentei ao dono um **checkbox visual de status** (onde paramos / feito / falta) +
+ofereci o preview pra validar. Conferi o preview 4101 saudável (10 scripts `?v=onda-b`,
+logado como dono, console limpo) e fui transparente: a **loja de teste tem 0 conversa e
+0 pedido de foto** — foto/chat com dado real só no site de verdade. O dono escolheu
+**"confio nas provas, pode subir"**.
+
+- **Merge:** `git stash` do doc do contrato (fora da obra) → `git checkout main` →
+  `git merge --no-ff feat/refatoracao-painel-300` = **merge commit `9d0f989`** → `git push
+  origin main` (`2089903..9d0f989`) → voltei pra branch + `stash pop` (doc restaurado).
+  Espelhei a Onda A: merge commit por onda pra "desfazer a onda = `git revert -m 1 9d0f989`".
+- **Pré-checagem:** origin/main era ancestral direto (FF possível, 8 commits à frente, 0
+  atrás); doc do contrato idêntico no commit (carrega seguro). Merge entrou cirúrgica: só
+  os 4 módulos + app.js (3071) + index.html + teto json. Doc e goldens ficaram de fora.
+- **Deploy CONFERIDO no site real** (`farejador.smarttecsolutions.com.br/parceiro/
+  zz-teste-copacabana/`): vigia em background pegou a virada em **~1,5 min** (try1 onda-a →
+  try2 onda-b). Final: **10 arquivos 200**, `?v=20260611-onda-b`, `app.js` 3071 linhas e
+  **sha256 byte-idêntico ao repo** (`9ae355f4…`). Registros atualizados (plano §5/§6 +
+  memória + MEMORY.md).
+- **Pendência do dono:** validação de NEGÓCIO (foto/chat com dado real no celular, loja com
+  movimento). **Próximo da obra:** Onda C (passos 7–10, contrato 0076/0077).

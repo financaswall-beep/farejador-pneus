@@ -165,4 +165,16 @@ window.PARCEIRO_MODULES.labels = () => ({
       }
       return 'neutral';
     },
+
+    itemTypeLabel(type) {
+      if (type === 'insumo') return 'Insumo';
+      if (type === 'servico') return 'Serviço';
+      return 'Pneu';
+    },
+
+    // Linha principal do card/lista: pneu mostra a medida; insumo/serviço mostram o nome.
+    itemPrimaryLabel(item) {
+      if ((item.item_type || 'pneu') === 'pneu') return item.tire_size || item.item_name || 'Pneu';
+      return item.item_name || this.itemTypeLabel(item.item_type);
+    },
 });

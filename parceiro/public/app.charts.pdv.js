@@ -4,8 +4,8 @@
  * 30d (RevenuePos) e donut de custos (CostsPos); os 3 reagem ao tema claro/escuro
  * (this.theme). Charts leem `this.*` e pintam no canvas; instancias vivem em
  * window._xxxChart (F5 - NAO mexer).
- * NAO MORA AQUI: graficos do Resumo/Estoque (app.charts.resumo.js) nem do Financeiro
- * (app.charts.financeiro.js). VEIO DE: app.js commit 8445d42, blocos VERBATIM por linha.
+ * NAO MORA AQUI: o maestro renderAllCharts (app.charts.resumo.js). Estes 3 sao os
+ * unicos renders vivos (F9 apagou os 8 orfaos). VEIO DE: app.js commit 8445d42, VERBATIM.
  * REGRA: teto 300 (npm run checar-tamanho); `this` e o objeto unico de app.js.
  */
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};

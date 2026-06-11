@@ -11,7 +11,7 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 
 - **Repo:** github.com/financaswall-beep/farejador-pneus
 - **Supabase:** projeto **Farejador** (`aoqtgwzeyznycuakrdhp`), envs `prod` e `test`.
-- **Deploy:** **push pro `main` → Coolify faz deploy automático** (~2-10 min). Não precisa redeploy manual.
+- **Deploy:** push pro `main` → **Wallace aperta Deploy no Coolify** (palavra do dono 06-11: NÃO sobe sozinho; registros antigos diziam "automático" — não confiar). Pós-deploy, conferir DE FORA que subiu: `curl` no painel (`farejador.smarttecsolutions.com.br/parceiro/<slug>/`) e comparar etiqueta `?v=`/hash com o main (provado 06-11: prod == main byte a byte).
 
 ## 2. Arquitetura (camadas)
 - **Parceiro** — painel + banco do parceiro (vendas, estoque, clientes, financeiro/caixa, chat, entregas, retiradas). O DB é do PARCEIRO (tabelas próprias). `src/parceiro/`, `parceiro/public/`.
@@ -27,6 +27,7 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 - **Comportamento crítico do bot se garante por CÓDIGO, não por prompt.** Pedir no prompt é probabilístico e falha; quando precisar garantir, force no código (ex.: o nudge determinístico do pino em `agent.ts`).
 - `.env` tem FAREJADOR_ENV=test → `checar-naoregressao` SEM `--env-file` dá falso "regressão".
 - **Dinheiro/estoque é contrato** (migrations 0076 reservado, 0077 financeiro): mexer com cuidado, snapshot de rollback, auditoria. Ver `SECOES/ESTOQUE.md`.
+- **Painel do parceiro: teto de 300 linhas por arquivo** (`parceiro/public/app*.js`). A obra 2026-06 fatiou o `app.js` (4.755→263) em 24 módulos (fábricas em `window.PARCEIRO_MODULES`, montadas via `getOwnPropertyDescriptors` — NUNCA spread, que congela getter). Fiscal: `npm run checar-tamanho` (falha >300). Ao tocar o painel: manter ≤300 e rodar `npm run prova-painel` (paridade de interface + contratos de rede + tamanho). Plano/handoffs: `docs/PLANO_REFATORACAO_PAINEL_300_2026-06-10.md`.
 
 ## 4. Como trabalhar com o Wallace (estilo — SEGUIR)
 - Fala **pt-BR carioca**, direto. Ele é dono de loja, visão arquitetural clara, mas **leigo em código**.
