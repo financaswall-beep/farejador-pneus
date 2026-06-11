@@ -18,8 +18,11 @@
 2. **Passo 11 FEITO DE CÓDIGO** (`98c7a5c`): obra do painel ≤300 **completa na branch**.
 3. **2 auditorias de segurança (Opus, em paralelo):** a refatoração **não introduziu
    regressão**; achados são pré-existentes (hardening). Detalhe na §3.
-4. **FALTA (do dono):** validar o painel no celular → autorizar o merge da Onda C →
-   apertar Deploy. Depois: gatilho da **porta única de login**.
+4. **✅ SHIPADO no mesmo dia (2026-06-11):** dono autorizou ("pode subir") → merge
+   `cb55ed1` (`--no-ff`, zero conflito) → push → dono apertou Deploy no Coolify (13:20) →
+   **deploy CONFERIDO byte a byte no ar** (app.js prod sha `67a5e1ba…` == main, `?v=onda-c`,
+   263 linhas, 7 módulos novos 200). **Onda C LIVE em prod.** Resta só o dono rodar o
+   dia-a-dia real no celular (validação de negócio) → gatilho da **porta única de login**.
 
 ---
 

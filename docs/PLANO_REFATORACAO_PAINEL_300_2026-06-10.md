@@ -1,15 +1,16 @@
 # PLANO — Refatoração do painel do parceiro (app.js 4.755 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **OBRA COMPLETA DE CÓDIGO — aguardando validação do dono no celular + merge da
-> Onda C.** Branch `feat/refatoracao-painel-300`. **ONDAS A e B LIVE em prod** (merge
-> `9d0f989`, deploy conferido byte-idêntico). **ONDA C (passos 7–11) COMPLETA na branch:**
-> 7+8+9+10 feitos (contrato 0076/0077 provado no banco real) + **passo 11 encerramento
-> `98c7a5c`** (etiqueta `?v=onda-c` provada ao vivo na 4101, regra do teto 300 no CLAUDE.md,
-> teto json apagado, faxina; bateria 508 goldens + 379 vitest + paridade 465 verde; 2
-> auditorias de segurança Opus SEM regressão da obra). **FALTA: dono valida no celular →
-> autoriza merge → Deploy (botão do dono no Coolify) → eu confiro o ar → gatilho porta
-> única (§5).** Progresso na tabela §6.
+> Status: **🎉 ONDA C LIVE EM PROD — obra COMPLETA (2026-06-11).** Branch
+> `feat/refatoracao-painel-300` mergeada no `main` (merge `cb55ed1`, `--no-ff`, zero conflito)
+> e **deployada** (Coolify, dono apertou Deploy 13:20). **Deploy CONFERIDO byte a byte no site
+> real:** `app.js` em prod sha `67a5e1ba…` == `main`, etiqueta `?v=onda-c` (24 tags, 0 onda-b),
+> 7 módulos novos da onda C = 200, app.js = 263 linhas. As 3 ondas (A+B+C) no ar. Passos 7+8+9+10
+> (contrato 0076/0077 provado no banco real) + passo 11 encerramento `98c7a5c`; bateria 508
+> goldens + 379 vitest + paridade 465 verde; 2 auditorias de segurança Opus SEM regressão.
+> **Resta só:** dono rodar o dia-a-dia real no celular (validação de negócio, pós-deploy por
+> natureza) → 🔔 **GATILHO porta única de login** (§5, tarefa #1 agora). Rollback = `git revert
+> -m 1 cb55ed1` + Deploy. Progresso na tabela §6.
 > Handoffs: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md` (passos 0–2) +
 > `docs/SESSAO_2026-06-11_OBRA_PAINEL_PASSO3_MERGE_ONDA_A_HANDOFF.md` (passo 3 + merge).
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
@@ -120,8 +121,9 @@ Coolify) em **3 ondas**, cada uma validada ao vivo pelo dono antes da próxima:
   200, painel boota, console limpo), regra do teto 300 no CLAUDE.md §3, `obra-painel-teto.json`
   apagado (vale o teto universal; app.js=263), faxina dos 10 goldens (arquivados em
   `_backup-goldens-painel-onda-c-2026-06-11.tgz`); bateria 508+379+paridade 465+typecheck 0
-  verde; 2 auditorias de segurança (Opus) sem regressão. **ONDA C COMPLETA na branch —
-  aguardando dono validar no celular + autorizar o merge.**
+  verde; 2 auditorias de segurança (Opus) sem regressão. **✅ MERGEADA no `main` (`cb55ed1`,
+  `--no-ff`, zero conflito) + DEPLOYADA + CONFERIDA no ar (app.js prod sha `67a5e1ba…` ==
+  main, `?v=onda-c`, 263 linhas). LIVE EM PROD 2026-06-11.** Rollback = `git revert -m 1 cb55ed1`.
 
 Rollback: passo = `git revert` do commit; onda = revert do merge; Coolify redeploya
 sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
