@@ -1,7 +1,9 @@
 # PLANO — Refatoração do painel do parceiro (app.js 4.756 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **APROVADO PELO DONO — aguardando início da execução (Passo 0)**
+> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **Passos 0, 1 e 2 FEITOS**
+> (+ fixes autorizados F7/M1). Falta o Passo 3 pra fechar a Onda A. Progresso na tabela §6.
+> Handoff detalhado: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md`.
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
 
 ---
@@ -107,9 +109,9 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 
 | # | Passo | O que extrai (de onde) | Arquivo(s) novo(s) | Risco | Teste específico |
 |---|---|---|---|---|---|
-| 0 | **Fundação** | — | branch + 3 scripts de prova + baselines + `npm run checar-tamanho` + launch preview 4101 | 🟢 | Baselines gerados e commitados; paridade roda VERDE contra o app.js intacto (auto-teste da ferramenta) |
-| 1 | **Formato** | Máscaras/moeda/telefone/medida/datas/deep-links (4306–4443) + helpers puros `num/uuid/dateKeySaoPaulo/isSaving` (4410–4433) | `app.format.js` (~250) | 🟢 | Estoque: medida "90/90-18" compõe e parseia; telefone exibe (21) 9...; moeda formata; card de entrega: links WhatsApp/Waze/Maps montam URL certa |
-| 2 | **Rótulos/avisos** | `categoryLabel`→`sourceClass`, `stockStatus*`, `flash/inferStatusKind/errMessage` (4445–4753) | `app.labels.js` (~200) | 🟢 | Toast verde em ação ok e vermelho em erro; chips de status do estoque com cor certa |
+| 0 | **Fundação ✅ FEITO** (`fd1b2a5`) | — | branch + 3 scripts de prova + baselines + `npm run checar-tamanho` + launch preview 4101 | 🟢 | ✅ Baselines: **471 propriedades** (não ~346) e **69 contratos**; verde no intacto; sabotagem A/B reprovou cada prova SÓ no seu domínio |
+| 1 | **Formato ✅ FEITO** (`444ffbe`) | Máscaras/moeda/telefone/medida/datas/deep-links (4306–4443) + helpers puros `num/uuid/dateKeySaoPaulo/isSaving` (4410–4433) | `app.format.js` (150 linhas) | 🟢 | ✅ 138 linhas byte a byte = HEAD; golden 27/27; browser ok. Nasceu junto o `montarParceiroApp` + rota genérica de módulos no backend (F8) |
+| 2 | **Rótulos/avisos ✅ FEITO** (`654e9a4`) | `categoryLabel`→`sourceClass`, `stockStatus*`, `flash/inferStatusKind/errMessage` (4445–4753) | `app.labels.js` (168 linhas) | 🟢 | ✅ 153 linhas byte a byte (4 sub-blocos); golden 31/31; toast e chips ao vivo no browser. RECORTE FINO: `stockAvailable`/`stockItemValue`/ações de saldo NÃO são rótulo → ficaram pro passo 7; `customer*`/`purchaseItemsLabel` → passos 8/9 |
 | 3 | **Gráficos** | `renderAllCharts` + 11 render* (3820–4304), fatiado: resumo/estoque vs financeiro/PDV | `app.charts.resumo.js` (~240) + `app.charts.financeiro.js` (~240) | 🟢 | Resumo e Financeiro nos DOIS temas (dark/claro): 11 gráficos pintam; trocar tema repinta |
 | 4 | **Foto** | Bloco FOTO inteiro (2346–2560) | `app.foto.js` (~250) | 🟠 SSE + upload | Na unidade de TESTE: criar card de foto, countdown vivo, **botão ENVIAR nasce HABILITADO** (lição do `!!` — c0d7913), envio anexa, limpar card |
 | 5 | **Chat** | Bate-papo: getters/labels/SSE/polling/send (1938–2344, 2561–2626) e cliente-do-chat + carrinho do chat | `app.chat.js` (~260) + `app.chat.cliente.js` (~260) | 🟠 SSE/Chatwoot | Abrir conversa real (leitura), mandar 1 msg na conversa de TESTE, bolha otimista → persistida; vincular cliente na conversa de teste |
@@ -130,12 +132,12 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 | F4 | **Etiqueta de cache `?v=20260606-gps` parada desde 06/06** — inofensiva hoje (servidor manda no-store), mas vira armadilha se o no-store cair um dia. | index.html:2402 | Melhoria M4: versionar a cada onda. |
 | F5 | **Gráficos guardados em globais `window._xxxChart`** — funciona, mas é estado solto fora do Alpine. | 3835+ | NÃO mexer (regra 7). Anotado pra obra futura. |
 | F6 | Lição permanente: **`:disabled` do Alpine com valor `undefined` trava botão** — origem do bug da foto. | — | Checklist do passo 4 verifica o `!!` preservado; regra já vai pro CLAUDE.md no passo 11. |
-| F7 | **Warns de Alpine em TODA carga da página** (pré-existentes, achados no passo 1): `stockOpItem.quantity_on_hand` (mini-modal de entrada avalia x-text com item null) e `chatActive.avatar=null` (img @error com chat fechado). Não quebram nada visível; poluem o console. | index.html (expressões dos modais) | NÃO mexer na obra (regra 7). Anotado pra fix fora da obra (guarda `stockOpItem &&` / `chatActive &&`). |
+| F7 | **Warns de Alpine em TODA carga da página** (pré-existentes, achados no passo 1): `stockOpItem.quantity_on_hand` (mini-modal de entrada avalia x-text com item null) e `chatActive.avatar=null` (img @error com chat fechado). Não quebram nada visível; poluem o console. | index.html (expressões dos modais) | ✅ **RESOLVIDO** (fix `2a9406b`, autorizado pelo dono 06-10): a linha 1192 era a ÚNICA expressão de stockOpItem SEM o guard que as vizinhas já usavam; @error do avatar ganhou `chatActive &&` (×3). Carga nova = zero warn de Alpine (provado no preview). |
 | F8 | **Backend servia estático por rota EXPLÍCITA por arquivo** — módulo novo daria 404 em prod. Desvio do §1 EXECUTADO no passo 1: rota genérica `/parceiro/:slug/:script` com whitelist `app.<nome>.js` (basename + regex, fora do padrão = 404), no padrão da rota de assets. | route.ts:483 | Resolvido no commit do passo 1 (444ffbe). Vale pros 15 módulos seguintes — backend não precisa ser tocado de novo. |
 
 ## 8. MELHORIAS SEM MUDAR LÓGICA (cada uma = commit próprio, aprovadas pelo dono)
 
-- **M1** Remover o `console.log` da venda (F3). Risco zero, recomendo JÁ na onda C.
+- **M1 ✅ FEITA** (`7f6e7ee`, autorizada pelo dono 06-10, antecipada da onda C) — `console.log` da venda removido (F3); provas verdes pós-remoção.
 - **M2** Declarar `chatSending: false` e `orderCustomerTimer: null` no estado (F2).
   Inicialização explícita, sem efeito visível. Recomendo na onda B.
 - **M3** Resolver a duplicata `isCurrentMonth` mantendo a vigente (F1). Obrigatória
