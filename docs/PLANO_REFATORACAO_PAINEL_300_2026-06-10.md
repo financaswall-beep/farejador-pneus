@@ -1,11 +1,15 @@
 # PLANO — Refatoração do painel do parceiro (app.js 4.755 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **ONDAS A e B
-> MERGEADAS no main e LIVE em prod (2026-06-11)**: A (passos 0–3 + F7/M1/M4) e B
-> (passos 4–6, merge `9d0f989`, deploy CONFERIDO byte-idêntico no site real, sha
-> `9ae355f4…`). Validação de negócio do dono (foto/chat com dado real no celular) =
-> pós-deploy. Próximo: **Onda C (passos 7–10, contrato 0076/0077)**. Progresso na tabela §6.
+> Status: **OBRA COMPLETA DE CÓDIGO — aguardando validação do dono no celular + merge da
+> Onda C.** Branch `feat/refatoracao-painel-300`. **ONDAS A e B LIVE em prod** (merge
+> `9d0f989`, deploy conferido byte-idêntico). **ONDA C (passos 7–11) COMPLETA na branch:**
+> 7+8+9+10 feitos (contrato 0076/0077 provado no banco real) + **passo 11 encerramento
+> `98c7a5c`** (etiqueta `?v=onda-c` provada ao vivo na 4101, regra do teto 300 no CLAUDE.md,
+> teto json apagado, faxina; bateria 508 goldens + 379 vitest + paridade 465 verde; 2
+> auditorias de segurança Opus SEM regressão da obra). **FALTA: dono valida no celular →
+> autoriza merge → Deploy (botão do dono no Coolify) → eu confiro o ar → gatilho porta
+> única (§5).** Progresso na tabela §6.
 > Handoffs: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md` (passos 0–2) +
 > `docs/SESSAO_2026-06-11_OBRA_PAINEL_PASSO3_MERGE_ONDA_A_HANDOFF.md` (passo 3 + merge).
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
@@ -109,10 +113,15 @@ Coolify) em **3 ondas**, cada uma validada ao vivo pelo dono antes da próxima:
   subir"); deploy CONFERIDO no site real (10 arquivos 200, `app.js` byte-idêntico sha
   `9ae355f4…`, `?v=20260611-onda-b`); goldens 64+72+40 + 471 props + 69 contratos + 379
   vitest verdes; app.js 3995→3071. Rollback = `git revert -m 1 9d0f989` (Coolify redeploya).
-- **Onda C (contrato):** Passos 7–10 (estoque, PDV, financeiro, raiz fina). **7+8+9 FEITOS
-  (2026-06-12)** com contrato 0076/0077 provado no banco real; **10 FEITO (2026-06-11,
-  `098b4f0`)** — login/logout/firstAccess/401/funcionário parcial AO VIVO na zz-teste-meier
-  (credencial wallace/123456 informada pelo dono). **Falta SÓ o 11 (encerramento).**
+- **Onda C (contrato):** Passos 7–11. **7+8+9 FEITOS** com contrato 0076/0077 provado no
+  banco real; **10 FEITO (`098b4f0`)** — espinha (login/logout/firstAccess/401/funcionário
+  parcial) AO VIVO na zz-teste-meier (credencial wallace/123456 informada pelo dono);
+  **11 FEITO (`98c7a5c`, 2026-06-11)** — etiqueta `?v=onda-c` (provada ao vivo: 24 scripts
+  200, painel boota, console limpo), regra do teto 300 no CLAUDE.md §3, `obra-painel-teto.json`
+  apagado (vale o teto universal; app.js=263), faxina dos 10 goldens (arquivados em
+  `_backup-goldens-painel-onda-c-2026-06-11.tgz`); bateria 508+379+paridade 465+typecheck 0
+  verde; 2 auditorias de segurança (Opus) sem regressão. **ONDA C COMPLETA na branch —
+  aguardando dono validar no celular + autorizar o merge.**
 
 Rollback: passo = `git revert` do commit; onda = revert do merge; Coolify redeploya
 sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
@@ -141,7 +150,7 @@ feature à parte. Desenho completo: memória `project_porta_unica_login` + hando
 | 8 | **PDV/Vendas ✅ FEITO** (`d1236bc`) | Getters pos* + caixa do dia + rótulos de produto (1315–1444, 1528–1549 no d04768b) → kpis; carrinho/checkout/finalizar/saveSale/cancelSale (1518–1526, 1563–1642, 1854–2042) → pdv; cliente na venda + CRUD + VIP (1644–1852, 2532–2568) → clientes. **DESVIOS registrados:** (a) 3 arquivos, não 2 — o bloco de vender tinha 441 linhas (>300); recorte por função (leitura/fluxo/cliente); (b) `itemTypeLabel`/`itemPrimaryLabel` foram pro **labels** (rótulo compartilhado: estoque usa 6×, PDV 2×; labels 168→180). `salesTodayCount` (Resumo) e rótulos de COMPRA ficaram na raiz (passo 9) | `app.pdv.kpis.js` (167) + `app.pdv.js` (294) + `app.pdv.clientes.js` (261) | 🔴 dinheiro+estoque | ✅ Golden 56/56 (0076: carrinho barra além do disponível físico−reservado; 0077: caixa do dia sem dupla contagem, customerSales SÓ venda realizada — delivery aberto/cancelada FORA; **idempotency_key ESTÁVEL na re-tentativa** (não duplica venda) e zerada no sucesso; installments SEMPRE 1; validações barram antes do POST; byte a byte vs d04768b). Tela real na loja de TESTE: **venda Pix R$ 99 via F2 REAL → estoque 10→9 + caixa 0→99 → cancelSale → estoque 10 + caixa 0 + snapshot idêntico**; Esc limpa carrinho (tecla real); giro 8 seções; console zero erro |
 | 9 | **Financeiro ✅ FEITO** (`29e9817`; M3 antes em `ea22ea3`) | KPIs (totalCusts/margem/séries/totais+details de contas, 583–742 no ea22ea3) + score (1092–1255) + compras/despesa (1376–1549) + conta a PAGAR (1551–1603, 1660–1684, 1752–1805) + conta a RECEBER (1605–1658, 1686–1750, 1807–1862). **DESVIOS:** (a) **5 arquivos, não 2** — CRUD tinha 487 linhas e getters+score 330 (>300); recorte por assunto; (b) helpers 0076/0077 (`isPhysicalExitSale`/`saleRealizedAt`/`salesUnitsFor`) moram no **financeiro.kpis** (a regra de venda realizada é do contrato financeiro); raiz mantém `salesTodayCount`/`completedSales`/`salesSeries7d` (Resumo, passo 10). **M3 FEITA** (`ea22ea3`): cópia sombreada de `isCurrentMonth` apagada (F1 RESOLVIDA; a vigente única fica na raiz) | `app.financeiro.kpis.js` (191) + `.score.js` (177) + `.compras.js` (188) + `.contas.js` (148) + `.receber.js` (190) | 🔴 dinheiro | ✅ Golden 64/64 (totalCusts = CMV+despesas, COMPRAS FORA — 0077/0078; totais só de aberta; pagos/recebidos SÓ do mês; score cenários bom/ruim+clamp+ângulo+cor por tema; validações barram antes do POST; PATCH na edição; **dedupe 409 duplicate_expense nos 2 desfechos** (recusa/força); byte a byte vs ea22ea3). Tela real na loja de TESTE: conta a pagar **criar→PAGAR (servidor GEROU a despesa via dedupe)→limpa**; conta a receber A criar→cancelar; conta B **criar→RECEBER → caixa do dia 0→120 (0077!)→limpa** (recebida/paga não se cancela pelo sistema — regra correta do servidor `status='open'`; limpeza via soft-delete cirúrgico com dry-run); **score 815/Ótimo/326,7° IDÊNTICO antes/depois**; zero resíduo; console zero erro |
 | 10 | **Raiz fina ✅ FEITO** (`098b4f0`) | AUTH (340–449 no 29e9817) → auth; INIT+relógio+API/loadData+navegação (237–338, 451–547, 979–1038) → core; derivadas do Resumo (549–621, 932–961) → resumo; aba Pedidos+status de entrega (715–878) → pedidos; tela Entrega+Retiradas (623–713, 880–930) → entregas; `isCurrentMonth` (963–977) → **format** (família do dateKeySaoPaulo; vigente ÚNICA pós-M3). **DESVIOS:** (a) **5 arquivos, não 2** — pedidos/entregas/resumo nunca tiveram passo próprio no desenho e sobraram na raiz (a raiz tinha 1061, não ~530); (b) raiz final = ESTADO + montagem = **263** (abaixo dos ~250+ previstos) | `app.auth.js` (123) + `app.core.js` (275) + `app.resumo.js` (118) + `app.pedidos.js` (178) + `app.entregas.js` (156); raiz `app.js` **263** | 🟠 espinha | ✅ Golden 78/78 (byte a byte vs 29e9817; login 401/429/500/sucesso + senha limpa; firstAccess valida/username_taken/sucesso; logout limpa tudo sem Content-Type; api() Error com status/payload; loadData /me primeiro + feeds por canSee + redirect de seção proibida; init 401 volta pro login; goToSection barra config/canSee; submitOrder receivable+2w+idempotency; setDeliveryStatus payment_method SÓ no delivered; cancelar 2W exige motivo). **Bateria COMPLETA 1–10 verde (508 asserções)** — achado: goldens 1/2/5/7/8 estavam FURADOS desde M2/M3/p9 (loader hardcoded + asserções de época), consertados. AO VIVO na zz-teste-meier: login errado→mensagem, certo→painel (senha some da memória), logout→token fora+dados zerados, **401 real com token velho→login limpo**, firstAccess com código cru→entrou, **funcionário parcial: menu SÓ vendas+estoque, financeiro/config barrados, redirect automático**; limpeza zero resíduo (token/funcionário revogados); console zero erro |
-| 11 | **Encerramento** | — | CLAUDE.md ganha a regra do teto 300 + fiscal no fluxo; `?v=` final (M4 da onda C); apagar `obra-painel-teto.json` (vale o teto 300 universal); faxina dos goldens one-off; varredura: checklist COMPLETO uma última vez + dono valida no celular. **Ao fechar: dispara o GATILHO da porta única de login (§5)** | 🟢 | Dono roda o dia a dia real (venda, estoque, chat, foto) e dá o OK final |
+| 11 | **Encerramento ✅ FEITO DE CÓDIGO** (`98c7a5c`) | — | M4 etiqueta `?v=20260611-onda-c` nos 24 scripts (provada AO VIVO na 4101: 24 scripts 200, 0 etiqueta velha, painel boota, console só com o nag pré-existente do Tailwind CDN, zero req falha); regra do teto 300 no CLAUDE.md §3; `obra-painel-teto.json` APAGADO (vale o teto universal 300; app.js=263 folgado); faxina dos 10 goldens one-off (arquivados em `_backup-goldens-painel-onda-c-2026-06-11.tgz`, lançador 4101 mantido). **Bateria COMPLETA verde uma última vez: paridade 465 + contratos 69 + 24 arquivos ≤300 + 10 goldens (508 asser.) + 379 vitest + typecheck 0.** 2 revisores de segurança (Opus, paralelos) = **SEM regressão da obra**; achados pré-existentes (PARTNER_DATABASE_URL fail-open, headers/CSP+SRI, token em localStorage, SEC-002) no handoff. **FALTA: dono valida no celular → autoriza merge → Coolify Deploy (botão do dono) → eu confiro o ar. Ao fechar: GATILHO porta única (§5).** | 🟢 | Dono roda o dia a dia real (venda, estoque, chat, foto) + dá o OK final + autoriza o merge |
 
 ## 7. FALHAS PRÉ-EXISTENTES ACHADAS NA LEITURA (sinalizadas — tratamento definido)
 
