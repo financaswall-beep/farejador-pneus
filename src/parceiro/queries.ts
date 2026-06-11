@@ -2849,23 +2849,37 @@ export async function createPartnerFuncionario(
   const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
   const cleanUsername = username.trim();
   const passwordHash = await hashPassword(password);
-  let res;
+  const client = await pool.connect();
   try {
-    res = await pool.query<{ id: string; created_at: string }>(
+    await client.query('BEGIN');
+    // Porta única (0095): o funcionário nasce como PESSOA (username único NA REDE —
+    // antes era por unidade; "caio" da loja A bloqueia "caio" na loja B, igual
+    // Instagram) + o vínculo com a unidade do dono.
+    const person = await client.query<{ id: string }>(
+      `INSERT INTO network.partner_people (environment, username, password_hash, password_set_at)
+       VALUES ($1, $2, $3, now())
+       RETURNING id`,
+      [ctx.environment, cleanUsername, passwordHash],
+    );
+    const res = await client.query<{ id: string; created_at: string }>(
       `INSERT INTO network.partner_access_tokens
          (environment, partner_unit_id, token_hash, label, created_by, role,
-          login_username, login_password_hash, login_password_set_at)
+          login_username, login_password_hash, login_password_set_at, person_id)
        VALUES ($1, $2, network.hash_partner_token($3), $4, $5, 'funcionario',
-               $6, $7, now())
+               $6, $7, now(), $8)
        RETURNING id, created_at`,
-      [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash],
+      [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash, person.rows[0]!.id],
     );
+    await client.query('COMMIT');
+    const row = res.rows[0]!;
+    return { id: row.id, label: cleanLabel, username: cleanUsername, created_at: row.created_at };
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
     if (isUsernameConflict(err)) throw new PartnerUsernameConflictError();
     throw err;
+  } finally {
+    client.release();
   }
-  const row = res.rows[0]!;
-  return { id: row.id, label: cleanLabel, username: cleanUsername, created_at: row.created_at };
 }
 
 /** Reseta a senha de um login de funcionário da própria unidade (dono esqueceu = dono reseta). */
@@ -2875,14 +2889,43 @@ export async function resetPartnerFuncionarioPassword(
   newPassword: string,
 ): Promise<{ reset: boolean }> {
   const passwordHash = await hashPassword(newPassword);
-  const res = await pool.query(
-    `UPDATE network.partner_access_tokens
-        SET login_password_hash = $4, login_password_set_at = now()
-      WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
-        AND role = 'funcionario' AND revoked_at IS NULL`,
-    [tokenId, ctx.environment, ctx.partnerUnitId, passwordHash],
-  );
-  return { reset: (res.rowCount ?? 0) > 0 };
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const res = await client.query<{ person_id: string | null }>(
+      `UPDATE network.partner_access_tokens
+          SET login_password_hash = $4, login_password_set_at = now()
+        WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+          AND role = 'funcionario' AND revoked_at IS NULL
+        RETURNING person_id`,
+      [tokenId, ctx.environment, ctx.partnerUnitId, passwordHash],
+    );
+    // Porta única (0095): a senha é DA PESSOA — atualiza a conta e espelha em
+    // qualquer outro vínculo dela (hoje funcionário tem 1 vínculo; o espelho é
+    // defesa pra quando existir multi-loja).
+    const personId = res.rows[0]?.person_id ?? null;
+    if (personId) {
+      await client.query(
+        `UPDATE network.partner_people
+            SET password_hash = $2, password_set_at = now()
+          WHERE id = $1 AND revoked_at IS NULL`,
+        [personId, passwordHash],
+      );
+      await client.query(
+        `UPDATE network.partner_access_tokens
+            SET login_password_hash = $2, login_password_set_at = now()
+          WHERE person_id = $1 AND id <> $3 AND revoked_at IS NULL`,
+        [personId, passwordHash, tokenId],
+      );
+    }
+    await client.query('COMMIT');
+    return { reset: (res.rowCount ?? 0) > 0 };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Lista os logins de funcionário da unidade do dono (com o usuário; sem hash de senha). */
@@ -2918,6 +2961,19 @@ export async function revokePartnerFuncionario(
         WHERE token_id = $1 AND environment = $2 AND revoked_at IS NULL`,
       [tokenId, ctx.environment],
     );
+    // Porta única (0095): se era o ÚLTIMO vínculo ativo da pessoa, revoga a conta
+    // também — libera o username (funcionário demitido não prende o nome pra sempre).
+    await pool.query(
+      `UPDATE network.partner_people pp
+          SET revoked_at = now()
+        WHERE pp.id = (SELECT person_id FROM network.partner_access_tokens WHERE id = $1)
+          AND pp.revoked_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM network.partner_access_tokens t
+             WHERE t.person_id = pp.id AND t.revoked_at IS NULL
+          )`,
+      [tokenId],
+    );
   }
   return { revoked: (res.rowCount ?? 0) > 0 };
 }
@@ -2939,8 +2995,9 @@ export interface PartnerSessionResult {
   expires_at: string;
 }
 
-/** Emite uma sessão pra um login (token_id). Guarda só o hash; devolve o texto uma vez. */
-async function mintPartnerSession(environment: string, tokenId: string): Promise<PartnerSessionResult> {
+/** Emite uma sessão pra um login (token_id). Guarda só o hash; devolve o texto uma vez.
+ *  Exportada pra porta única (0095): /api/login global emite sessão do vínculo escolhido. */
+export async function mintPartnerSession(environment: string, tokenId: string): Promise<PartnerSessionResult> {
   const { token, hash } = newSessionToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
   await pool.query(
@@ -3005,23 +3062,67 @@ export async function setOwnPartnerCredentials(
 ): Promise<PartnerSessionResult> {
   const passwordHash = await hashPassword(password);
   const cleanUsername = username.trim();
-  let res;
+  const client = await pool.connect();
   try {
-    res = await pool.query(
+    await client.query('BEGIN');
+
+    // 1) O vínculo desta unidade (regra de overwrite intacta: só token cru sobrescreve).
+    const res = await client.query<{ person_id: string | null }>(
       `UPDATE network.partner_access_tokens
           SET login_username = $4, login_password_hash = $5, login_password_set_at = now()
         WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
           AND revoked_at IS NULL
-          AND ($6 OR login_password_hash IS NULL)`,
+          AND ($6 OR login_password_hash IS NULL)
+        RETURNING person_id`,
       [ctx.tokenId, ctx.environment, ctx.partnerUnitId, cleanUsername, passwordHash, allowOverwrite],
     );
+    if ((res.rowCount ?? 0) !== 1) {
+      // Login já tinha senha e a chamada veio por sessão (não por token cru).
+      await client.query('ROLLBACK');
+      throw new PartnerCredentialsAlreadySetError();
+    }
+
+    // 2) A PESSOA (porta única, 0095): a conta global carrega o username+senha.
+    //    Username já de outra pessoa → 23505 no índice global → username_taken
+    //    (fusão de contas NUNCA acontece em runtime; só no backfill auditado).
+    let personId = res.rows[0]!.person_id;
+    if (personId) {
+      await client.query(
+        `UPDATE network.partner_people
+            SET username = $2, password_hash = $3, password_set_at = now()
+          WHERE id = $1 AND revoked_at IS NULL`,
+        [personId, cleanUsername, passwordHash],
+      );
+    } else {
+      const created = await client.query<{ id: string }>(
+        `INSERT INTO network.partner_people (environment, username, password_hash, password_set_at)
+         VALUES ($1, $2, $3, now())
+         RETURNING id`,
+        [ctx.environment, cleanUsername, passwordHash],
+      );
+      personId = created.rows[0]!.id;
+      await client.query(
+        `UPDATE network.partner_access_tokens SET person_id = $2 WHERE id = $1`,
+        [ctx.tokenId, personId],
+      );
+    }
+
+    // 3) Espelha nos OUTROS vínculos da pessoa: UMA senha/usuário em todas as lojas
+    //    (o login por slug lê a linha — fica coerente com a porta única).
+    await client.query(
+      `UPDATE network.partner_access_tokens
+          SET login_username = $2, login_password_hash = $3, login_password_set_at = now()
+        WHERE person_id = $1 AND id <> $4 AND revoked_at IS NULL`,
+      [personId, cleanUsername, passwordHash, ctx.tokenId],
+    );
+
+    await client.query('COMMIT');
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
     if (isUsernameConflict(err)) throw new PartnerUsernameConflictError();
     throw err;
-  }
-  if ((res.rowCount ?? 0) !== 1) {
-    // Login já tinha senha e a chamada veio por sessão (não por token cru).
-    throw new PartnerCredentialsAlreadySetError();
+  } finally {
+    client.release();
   }
   return mintPartnerSession(ctx.environment, ctx.tokenId);
 }
