@@ -3062,8 +3062,7 @@ function parceiroApp() {
   return montarParceiroApp(estado, [
     window.PARCEIRO_MODULES.format, // passo 1: máscaras/moeda/datas/deep-links/helpers
     window.PARCEIRO_MODULES.labels, // passo 2: rótulos/chips de status/toast/errMessage
-    window.PARCEIRO_MODULES.chartsResumo, // passo 3: maestro renderAllCharts + graficos Resumo/Estoque
-    window.PARCEIRO_MODULES.chartsFinanceiro, // passo 3: graficos da aba Financeiro
+    window.PARCEIRO_MODULES.chartsResumo, // passo 3: maestro renderAllCharts (F9: renders orfaos apagados)
     window.PARCEIRO_MODULES.chartsPdv, // passo 3: graficos da tela PDV (reagem ao tema)
     window.PARCEIRO_MODULES.foto, // passo 4: foto sob demanda (SSE global, countdown, upload, bip)
     window.PARCEIRO_MODULES.chat, // passo 5: nucleo do Bate-papo (SSE/poll, conversas, enviar)
