@@ -1,10 +1,12 @@
 # PLANO — Refatoração do painel do parceiro (app.js 4.755 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **Passos 0–3 FEITOS**
-> (+ fixes autorizados F7/M1) = **ONDA A COMPLETA**. Aguardando validação do dono no
-> celular → merge no main (deploy). Progresso na tabela §6.
-> Handoff detalhado: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md`.
+> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **ONDA A (passos 0–3
+> + F7/M1/M4) COMPLETA, AUTORIZADA pelo dono e MERGEADA no main em 2026-06-11** (push =
+> deploy automático Coolify). Validação final do dono no celular = pós-deploy, no site
+> real. Próximo: **Onda B (passos 4–6)**. Progresso na tabela §6.
+> Handoffs: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md` (passos 0–2) +
+> `docs/SESSAO_2026-06-11_OBRA_PAINEL_PASSO3_MERGE_ONDA_A_HANDOFF.md` (passo 3 + merge).
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
 
 ---
@@ -97,7 +99,9 @@ Passo só está PRONTO com os 8 itens marcados. Reprovou em 2/3/4 → reverter e
 Obra na branch `feat/refatoracao-painel-300`. Merge no main (= deploy automático
 Coolify) em **3 ondas**, cada uma validada ao vivo pelo dono antes da próxima:
 
-- **Onda A (baixo risco):** Passos 0–3 (fundação, format, labels, charts).
+- **Onda A (baixo risco):** Passos 0–3 (fundação, format, labels, charts). ✅ **MERGEADA
+  no main em 2026-06-11** (M4 `?v=20260611-onda-a`; autorizada pelo dono após validar a
+  interface; giro fino no celular dele = pós-deploy).
 - **Onda B (médio):** Passos 4–6 (foto, chat, config).
 - **Onda C (contrato):** Passos 7–10 (estoque, PDV, financeiro, raiz fina).
 
