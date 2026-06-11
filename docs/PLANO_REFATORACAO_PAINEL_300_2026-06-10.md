@@ -1,8 +1,9 @@
-# PLANO — Refatoração do painel do parceiro (app.js 4.756 → ~16 arquivos ≤300 linhas)
+# PLANO — Refatoração do painel do parceiro (app.js 4.755 → ~16 arquivos ≤300 linhas)
 
 > Data: 2026-06-10 · Autor: Orquestrador (Claude Fable 5) · Domínio: `parceiro`
-> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **Passos 0, 1 e 2 FEITOS**
-> (+ fixes autorizados F7/M1). Falta o Passo 3 pra fechar a Onda A. Progresso na tabela §6.
+> Status: **EM EXECUÇÃO** na branch `feat/refatoracao-painel-300` — **Passos 0–3 FEITOS**
+> (+ fixes autorizados F7/M1) = **ONDA A COMPLETA**. Aguardando validação do dono no
+> celular → merge no main (deploy). Progresso na tabela §6.
 > Handoff detalhado: `docs/SESSAO_2026-06-10_OBRA_PAINEL_PASSOS_0_A_2_HANDOFF.md`.
 > Pré-leitura obrigatória: diagnóstico Etapa 1/2 (sessão 2026-06-10) + CLAUDE.md §3 (convenções).
 
@@ -25,7 +26,7 @@
 
 ## 1. Escopo
 
-- **ENTRA:** `parceiro/public/app.js` (4.756 linhas) → ~16 módulos ≤300 linhas;
+- **ENTRA:** `parceiro/public/app.js` (4.755 linhas no c0d7913) → ~16 módulos ≤300 linhas;
   bloco de `<script>` novo no `index.html` (única mudança no HTML); regra do teto
   de 300 escrita no CLAUDE.md; fiscal automático de tamanho.
 - **NÃO ENTRA:** `index.html` (2.405 linhas — fatiar HTML com Alpine é outra técnica,
@@ -112,7 +113,7 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 | 0 | **Fundação ✅ FEITO** (`fd1b2a5`) | — | branch + 3 scripts de prova + baselines + `npm run checar-tamanho` + launch preview 4101 | 🟢 | ✅ Baselines: **471 propriedades** (não ~346) e **69 contratos**; verde no intacto; sabotagem A/B reprovou cada prova SÓ no seu domínio |
 | 1 | **Formato ✅ FEITO** (`444ffbe`) | Máscaras/moeda/telefone/medida/datas/deep-links (4306–4443) + helpers puros `num/uuid/dateKeySaoPaulo/isSaving` (4410–4433) | `app.format.js` (150 linhas) | 🟢 | ✅ 138 linhas byte a byte = HEAD; golden 27/27; browser ok. Nasceu junto o `montarParceiroApp` + rota genérica de módulos no backend (F8) |
 | 2 | **Rótulos/avisos ✅ FEITO** (`654e9a4`) | `categoryLabel`→`sourceClass`, `stockStatus*`, `flash/inferStatusKind/errMessage` (4445–4753) | `app.labels.js` (168 linhas) | 🟢 | ✅ 153 linhas byte a byte (4 sub-blocos); golden 31/31; toast e chips ao vivo no browser. RECORTE FINO: `stockAvailable`/`stockItemValue`/ações de saldo NÃO são rótulo → ficaram pro passo 7; `customer*`/`purchaseItemsLabel` → passos 8/9 |
-| 3 | **Gráficos** | `renderAllCharts` + 11 render* (3820–4304), fatiado: resumo/estoque vs financeiro/PDV | `app.charts.resumo.js` (~240) + `app.charts.financeiro.js` (~240) | 🟢 | Resumo e Financeiro nos DOIS temas (dark/claro): 11 gráficos pintam; trocar tema repinta |
+| 3 | **Gráficos ✅ FEITO** (`06634e0`) | `renderAllCharts` + 11 render* (3834–4319 no 8445d42), VERBATIM por linha (27 âncoras) | `app.charts.resumo.js` (174) + `app.charts.financeiro.js` (188) + `app.charts.pdv.js` (158) | 🟢 | ✅ Golden 16/16: 11 gráficos pintam nos 2 temas, trocar tema repinta (11 destroys + cores do tema novo), byte a byte vs HEAD; preview 4101 ok (módulos 200, negativos 404, console limpo). **DESVIO registrado: 3 arquivos, não 2** — o lado financeiro+PDV real tem 316 linhas (>300); recorte por TELA (Resumo/Estoque, Financeiro, PDV) mantém coesão e folga. Adendo F8 consertado no mesmo commit |
 | 4 | **Foto** | Bloco FOTO inteiro (2346–2560) | `app.foto.js` (~250) | 🟠 SSE + upload | Na unidade de TESTE: criar card de foto, countdown vivo, **botão ENVIAR nasce HABILITADO** (lição do `!!` — c0d7913), envio anexa, limpar card |
 | 5 | **Chat** | Bate-papo: getters/labels/SSE/polling/send (1938–2344, 2561–2626) e cliente-do-chat + carrinho do chat | `app.chat.js` (~260) + `app.chat.cliente.js` (~260) | 🟠 SSE/Chatwoot | Abrir conversa real (leitura), mandar 1 msg na conversa de TESTE, bolha otimista → persistida; vincular cliente na conversa de teste |
 | 6 | **Config** | Configurações da loja + funcionários (470–693) | `app.config.js` (~300) | 🟡 | Abrir Config (dono), salvar SEM mudar nada (no-op) → toast ok; permissões pintam |
@@ -133,7 +134,7 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 | F5 | **Gráficos guardados em globais `window._xxxChart`** — funciona, mas é estado solto fora do Alpine. | 3835+ | NÃO mexer (regra 7). Anotado pra obra futura. |
 | F6 | Lição permanente: **`:disabled` do Alpine com valor `undefined` trava botão** — origem do bug da foto. | — | Checklist do passo 4 verifica o `!!` preservado; regra já vai pro CLAUDE.md no passo 11. |
 | F7 | **Warns de Alpine em TODA carga da página** (pré-existentes, achados no passo 1): `stockOpItem.quantity_on_hand` (mini-modal de entrada avalia x-text com item null) e `chatActive.avatar=null` (img @error com chat fechado). Não quebram nada visível; poluem o console. | index.html (expressões dos modais) | ✅ **RESOLVIDO** (fix `2a9406b`, autorizado pelo dono 06-10): a linha 1192 era a ÚNICA expressão de stockOpItem SEM o guard que as vizinhas já usavam; @error do avatar ganhou `chatActive &&` (×3). Carga nova = zero warn de Alpine (provado no preview). |
-| F8 | **Backend servia estático por rota EXPLÍCITA por arquivo** — módulo novo daria 404 em prod. Desvio do §1 EXECUTADO no passo 1: rota genérica `/parceiro/:slug/:script` com whitelist `app.<nome>.js` (basename + regex, fora do padrão = 404), no padrão da rota de assets. | route.ts:483 | Resolvido no commit do passo 1 (444ffbe). Vale pros 15 módulos seguintes — backend não precisa ser tocado de novo. |
+| F8 | **Backend servia estático por rota EXPLÍCITA por arquivo** — módulo novo daria 404 em prod. Desvio do §1 EXECUTADO no passo 1: rota genérica `/parceiro/:slug/:script` com whitelist `app.<nome>.js` (basename + regex, fora do padrão = 404), no padrão da rota de assets. | route.ts:483 | Resolvido no commit do passo 1 (444ffbe). **ADENDO (passo 3, `06634e0`):** o regex original `^app\.[\w-]+\.js$` só aceitava UM segmento — os nomes compostos que o PRÓPRIO plano usa (`app.charts.resumo.js`, `app.estoque.forms.js`…) dariam 404 em prod, e o MESMO regex (com `?`) deixava os fiscais `checar-tamanho`/`prova-endpoints` CEGOS pros arquivos novos. Corrigido: rota `^app(\.[\w-]+)+\.js$` (1+ segmentos; `app..js` continua 404) e `(\.[\w-]+)*` nos fiscais. Provado no preview (módulos 200, negativos 404) — vale pros módulos restantes. |
 
 ## 8. MELHORIAS SEM MUDAR LÓGICA (cada uma = commit próprio, aprovadas pelo dono)
 
@@ -148,7 +149,7 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 
 ## 9. Critério de PRONTO da obra inteira
 
-1. `app.js` original (4.756) virou ~16 arquivos, todos ≤300 linhas.
+1. `app.js` original (4.755) virou ~16 arquivos, todos ≤300 linhas.
 2. Manifesto de paridade final idêntico ao baseline (exceto F1 documentada).
 3. Lista de endpoints idêntica ao baseline.
 4. Diff acumulado do `index.html` = só o bloco de `<script>` + `?v=`.
