@@ -483,6 +483,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   fastify.get('/parceiro/:slug/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   fastify.get('/parceiro/:slug/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
 
+  // Módulos do painel (obra ≤300: app.format.js, app.charts.resumo.js, ...). Genérico e
+  // seguro no espírito da rota de assets: basename mata path traversal e SÓ nomes
+  // no formato app.<nome>.js (1+ segmentos: app.charts.resumo.js) saem do disco —
+  // qualquer outro pedido é 404 ("app..js" não casa: todo segmento exige [\w-]).
+  fastify.get('/parceiro/:slug/:script', async (request: PartnerAuthedRequest, reply) => {
+    const script = path.basename(String((request.params as { script?: string }).script || ''));
+    if (!/^app(\.[\w-]+)+\.js$/.test(script)) return reply.status(404).send({ error: 'not_found' });
+    return sendStatic(reply, script, 'text/javascript; charset=utf-8');
+  });
+
   // Assets estáticos (logo, ícones de canal do chat, fundo). Genérico + seguro:
   // basename evita path traversal; só extensões de imagem conhecidas são servidas.
   const assetContentTypes: Record<string, string> = {

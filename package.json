@@ -17,6 +17,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:all": "npm run test && npm run test:integration",
+    "checar-tamanho": "node scripts/checar-tamanho.cjs",
+    "prova-painel": "node scripts/prova-paridade-painel.cjs && node scripts/prova-endpoints-painel.cjs && node scripts/checar-tamanho.cjs",
     "enrich": "tsx --env-file=.env src/enrichment/cli.ts"
   },
   "dependencies": {
