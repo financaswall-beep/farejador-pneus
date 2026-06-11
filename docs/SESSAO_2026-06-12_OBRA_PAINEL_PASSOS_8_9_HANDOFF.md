@@ -94,15 +94,35 @@ fechamento da onda).
   (outra frente) — fora de todos os commits.
 - ⚠️ Lembrete de NEGÓCIO (fora da obra): raios de entrega de TESTE nos 7 parceiros.
 
-## 8. Como retomar (próxima sessão)
+## 8. Como retomar — A FILA TRAVADA (confirmada com o dono em 06-12)
 
 1. **Passo 10 (raiz fina)**: ESTADO (16–218 da raiz atual) fica; extrair `app.auth.js`
    (login/logout/sessão) + `app.core.js` (init/api/loadData/navegação/SSE global?). Teto
-   final da raiz ~250. **Resolver a credencial ANTES (§6).** Teste: login+logout+primeiro
-   acesso na loja de teste; 401 volta pro login; funcionário com permissão parcial.
+   final da raiz ~250. **Resolver a credencial ANTES (§6):** dono informa a senha da
+   zz-teste na hora OU autoriza `scripts/resetar-senha-parceiro.cjs`. Teste:
+   login+logout+primeiro acesso na loja de teste; 401 volta pro login; funcionário com
+   permissão parcial. ⚠️ O passo 10 SÓ MOVE o login de gaveta — comportamento idêntico
+   (regra 1); ele NÃO é a porta única.
 2. **Passo 11 (encerramento)**: CLAUDE.md ganha a regra do teto 300 + fiscal no fluxo;
    `?v=` final (M4 da onda C); apagar `obra-painel-teto.json` (passa a valer o teto 300
    universal); faxina dos goldens; checklist completo; **dono valida o dia a dia no celular**.
-3. Merge da Onda C no main = só com autorização do dono (regra §5; rollback = revert).
-4. Fora da obra: porta única de login; faxina docs/scripts; F5 (charts em window._xxx);
-   raios reais.
+3. **Merge da Onda C no main** = só com autorização do dono (regra §5; rollback = revert).
+4. **🔔 GATILHO PÓS-MERGE — PORTA ÚNICA DE LOGIN (tarefa #1 depois da obra; o dono
+   re-confirmou em 06-12 e exemplificou a URL: `farejador.smarttecsolutions.com.br/login`):**
+   uma URL só de login pra TODOS os parceiros → valida usuário+senha → 1 loja entra
+   direto; multi-loja (wallace existe em 4+) vê "em qual loja você quer entrar?" listando
+   SÓ onde a senha validou; URLs por slug NÃO morrem (API/SSE ancorados nelas + favoritos);
+   rate-limit por IP+username GLOBAL + revisão `seguranca` antes de subir; ~meio dia.
+   Desenho completo: memória `project_porta_unica_login`; gatilho também no plano §5.
+5. Depois, fora da obra: faxina docs/scripts; F5 (charts em `window._xxx`); raios reais
+   de entrega (precisa do dono no WhatsApp + valores reais).
+
+## 9. Conversa pós-handoff (mesma data, registrada)
+
+- Dono perguntou **"o pior já foi?"** → resposta dada: SIM no risco que dói (dinheiro
+  silencioso, passos 7-9, provado no banco real); o passo 10 é a espinha — se errar, o
+  painel não abre (falha ESCANDALOSA, detecção instantânea, rollback 1 comando), e os
+  goldens 1-9 remontam o app inteiro a cada rodada (rede madura).
+- Dono perguntou se o passo 10 já entrega a **porta única** (`/login`) → esclarecido:
+  NÃO (passo 10 = mover, zero comportamento novo); a porta única é o GATILHO pós-merge
+  (item 4 acima). Dono confirmou a fila.

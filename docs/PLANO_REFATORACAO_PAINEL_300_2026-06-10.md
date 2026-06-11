@@ -109,10 +109,19 @@ Coolify) em **3 ondas**, cada uma validada ao vivo pelo dono antes da próxima:
   subir"); deploy CONFERIDO no site real (10 arquivos 200, `app.js` byte-idêntico sha
   `9ae355f4…`, `?v=20260611-onda-b`); goldens 64+72+40 + 471 props + 69 contratos + 379
   vitest verdes; app.js 3995→3071. Rollback = `git revert -m 1 9d0f989` (Coolify redeploya).
-- **Onda C (contrato):** Passos 7–10 (estoque, PDV, financeiro, raiz fina).
+- **Onda C (contrato):** Passos 7–10 (estoque, PDV, financeiro, raiz fina). **7+8+9 FEITOS
+  na branch (2026-06-12)** com contrato 0076/0077 provado no banco real; falta 10 (raiz —
+  ⚠️ teste de login precisa da senha, que está SÓ com o dono) e 11 (encerramento).
 
 Rollback: passo = `git revert` do commit; onda = revert do merge; Coolify redeploya
 sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
+
+**🔔 GATILHO PÓS-OBRA (travado com o dono em 2026-06-12):** assim que a Onda C for
+mergeada e validada, a **tarefa #1 seguinte é a PORTA ÚNICA DE LOGIN** (uma URL só de
+login — dono exemplificou `/login`; multi-loja escolhe a unidade; URLs por slug NÃO
+morrem; rate-limit global + revisão `seguranca`; ~meio dia). O passo 10 prepara o
+terreno (login isolado em `app.auth.js`), mas NÃO muda comportamento — a porta única é
+feature à parte. Desenho completo: memória `project_porta_unica_login` + handoff 06-12 §8.
 
 ## 6. OS PASSOS (ordem do mais seguro pro mais sensível)
 
@@ -131,7 +140,7 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 | 8 | **PDV/Vendas ✅ FEITO** (`d1236bc`) | Getters pos* + caixa do dia + rótulos de produto (1315–1444, 1528–1549 no d04768b) → kpis; carrinho/checkout/finalizar/saveSale/cancelSale (1518–1526, 1563–1642, 1854–2042) → pdv; cliente na venda + CRUD + VIP (1644–1852, 2532–2568) → clientes. **DESVIOS registrados:** (a) 3 arquivos, não 2 — o bloco de vender tinha 441 linhas (>300); recorte por função (leitura/fluxo/cliente); (b) `itemTypeLabel`/`itemPrimaryLabel` foram pro **labels** (rótulo compartilhado: estoque usa 6×, PDV 2×; labels 168→180). `salesTodayCount` (Resumo) e rótulos de COMPRA ficaram na raiz (passo 9) | `app.pdv.kpis.js` (167) + `app.pdv.js` (294) + `app.pdv.clientes.js` (261) | 🔴 dinheiro+estoque | ✅ Golden 56/56 (0076: carrinho barra além do disponível físico−reservado; 0077: caixa do dia sem dupla contagem, customerSales SÓ venda realizada — delivery aberto/cancelada FORA; **idempotency_key ESTÁVEL na re-tentativa** (não duplica venda) e zerada no sucesso; installments SEMPRE 1; validações barram antes do POST; byte a byte vs d04768b). Tela real na loja de TESTE: **venda Pix R$ 99 via F2 REAL → estoque 10→9 + caixa 0→99 → cancelSale → estoque 10 + caixa 0 + snapshot idêntico**; Esc limpa carrinho (tecla real); giro 8 seções; console zero erro |
 | 9 | **Financeiro ✅ FEITO** (`29e9817`; M3 antes em `ea22ea3`) | KPIs (totalCusts/margem/séries/totais+details de contas, 583–742 no ea22ea3) + score (1092–1255) + compras/despesa (1376–1549) + conta a PAGAR (1551–1603, 1660–1684, 1752–1805) + conta a RECEBER (1605–1658, 1686–1750, 1807–1862). **DESVIOS:** (a) **5 arquivos, não 2** — CRUD tinha 487 linhas e getters+score 330 (>300); recorte por assunto; (b) helpers 0076/0077 (`isPhysicalExitSale`/`saleRealizedAt`/`salesUnitsFor`) moram no **financeiro.kpis** (a regra de venda realizada é do contrato financeiro); raiz mantém `salesTodayCount`/`completedSales`/`salesSeries7d` (Resumo, passo 10). **M3 FEITA** (`ea22ea3`): cópia sombreada de `isCurrentMonth` apagada (F1 RESOLVIDA; a vigente única fica na raiz) | `app.financeiro.kpis.js` (191) + `.score.js` (177) + `.compras.js` (188) + `.contas.js` (148) + `.receber.js` (190) | 🔴 dinheiro | ✅ Golden 64/64 (totalCusts = CMV+despesas, COMPRAS FORA — 0077/0078; totais só de aberta; pagos/recebidos SÓ do mês; score cenários bom/ruim+clamp+ângulo+cor por tema; validações barram antes do POST; PATCH na edição; **dedupe 409 duplicate_expense nos 2 desfechos** (recusa/força); byte a byte vs ea22ea3). Tela real na loja de TESTE: conta a pagar **criar→PAGAR (servidor GEROU a despesa via dedupe)→limpa**; conta a receber A criar→cancelar; conta B **criar→RECEBER → caixa do dia 0→120 (0077!)→limpa** (recebida/paga não se cancela pelo sistema — regra correta do servidor `status='open'`; limpeza via soft-delete cirúrgico com dry-run); **score 815/Ótimo/326,7° IDÊNTICO antes/depois**; zero resíduo; console zero erro |
 | 10 | **Raiz fina** | O que sobra: ESTADO (16–218) + montagem; auth (323–432) sai pra arquivo próprio; init/api/loadData/navegação (220–301, 434–468, 695–768, 2628–2657) | `app.js` (~250, raiz) + `app.auth.js` (~180) + `app.core.js` (~280) | 🟠 espinha | Login+logout+primeiro acesso na unidade de teste; sessão 401 volta pro login; funcionário com permissão parcial vê só as telas dele |
-| 11 | **Encerramento** | — | CLAUDE.md ganha a regra do teto 300 + fiscal no fluxo; `?v=` final; varredura: checklist COMPLETO uma última vez + dono valida no celular | 🟢 | Dono roda o dia a dia real (venda, estoque, chat, foto) e dá o OK final |
+| 11 | **Encerramento** | — | CLAUDE.md ganha a regra do teto 300 + fiscal no fluxo; `?v=` final (M4 da onda C); apagar `obra-painel-teto.json` (vale o teto 300 universal); faxina dos goldens one-off; varredura: checklist COMPLETO uma última vez + dono valida no celular. **Ao fechar: dispara o GATILHO da porta única de login (§5)** | 🟢 | Dono roda o dia a dia real (venda, estoque, chat, foto) e dá o OK final |
 
 ## 7. FALHAS PRÉ-EXISTENTES ACHADAS NA LEITURA (sinalizadas — tratamento definido)
 
