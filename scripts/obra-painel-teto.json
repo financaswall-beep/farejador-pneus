@@ -1,7 +1,8 @@
 {
   "_oQueE": "Teto TEMPORARIO de linhas durante a obra de refatoracao do painel (PLANO_REFATORACAO_PAINEL_300_2026-06-10.md).",
   "_regra": "O teto do app.js SO PODE DIMINUIR: cada passo que extrai um modulo atualiza este numero no MESMO commit. Ninguem re-engorda o arquivo entre passos. No passo 11, apagar este arquivo: passa a valer o teto universal de 300 do scripts/checar-tamanho.cjs.",
+  "_excecoes": "2026-06-11 M2 (aprovada pelo dono): +2 linhas no app.js (declara chatSending/orderCustomerTimer que nasciam por atribuicao em runtime) -> teto 3071->3073.",
   "tetos": {
-    "app.js": 3071
+    "app.js": 3073
   }
 }

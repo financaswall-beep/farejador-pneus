@@ -110,6 +110,7 @@ function parceiroApp() {
     chatTimer: null,
     chatES: null,
     chatFastTimer: null,
+    chatSending: false, // trava de envio em andamento (sendChat nao aceita duplo clique)
     // ─── FOTO SOB DEMANDA (0094) ─ cards de pedido de foto + alerta global.
     //     O bot pede uma foto do pneu → card aparece AQUI (topo do Bate-papo) e
     //     o alerta toca em QUALQUER aba (banner + badge + título + bip).
@@ -194,6 +195,7 @@ function parceiroApp() {
     orderCart: [],
     orderAddressMissing: false,
     orderCustomerResults: [], // resultados da busca de cliente no form de pedido
+    orderCustomerTimer: null, // debounce da busca de cliente (onOrderCustomerSearch)
 
     // Ordem da rota de entrega (aba Entrega). Salva neste aparelho, por unidade.
     routeOrder: [],

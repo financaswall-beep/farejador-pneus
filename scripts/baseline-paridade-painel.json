@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-11T01:25:19.325Z",
+  "geradoEm": "2026-06-11T05:31:57.627Z",
   "commitBase": "c0d7913",
-  "total": 471,
+  "total": 473,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -62,6 +62,7 @@
     "chatPanelCliente": "value:boolean",
     "chatPanelPedido": "value:boolean",
     "chatResetOrder": "function",
+    "chatSending": "value:boolean",
     "chatTagMenu": "value:boolean",
     "chatTagPalette": "value:array",
     "chatTags": "value:object",
@@ -233,6 +234,7 @@
     "orderCart": "value:array",
     "orderCartTotal": "getter",
     "orderCustomerResults": "value:array",
+    "orderCustomerTimer": "value:null",
     "orderFilter": "value:string",
     "orderForm": "value:object",
     "orderItemForm": "value:object",
