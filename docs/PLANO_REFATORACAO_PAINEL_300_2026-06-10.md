@@ -160,8 +160,9 @@ sozinho (~2-3 min). A cada onda, trocar a etiqueta `?v=` do script tag (M4).
 ## 10. Estimativa e pendências
 
 - **Esforço:** Onda A ~1 dia · Onda B ~1-1,5 dia · Onda C ~1,5-2 dias → **3,5–5 dias úteis**.
-- **Pendência de ambiente:** confirmar credencial da unidade de teste
-  (zz-teste-copacabana tem senha temp a trocar — CLAUDE.md §7.4) ANTES da onda B/C.
+- **Pendência de ambiente ✅ RESOLVIDA (06-10):** senha da zz-teste-copacabana
+  trocada (login `wallace`, owner) e provada ao vivo (login 200 via preview→prod).
+  Valor está com o dono; perdeu = rodar `scripts/resetar-senha-parceiro.cjs` de novo.
 - **Fora desta obra (anotado, não esquecido):** faxina de docs/scripts velhos
   (branch `chore/limpeza-projeto-2026-06-06` parada aguardando decisão de merge do
   dono + nova varredura); fatiamento do `index.html`; backend gordo via bom escoteiro.

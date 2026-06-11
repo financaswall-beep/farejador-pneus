@@ -61,7 +61,7 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
   1. **Validar a Fase 3 ao vivo:** apagar as conversas no Chatwoot (senão o webhook recria) → rodar o roteiro de 6 pinos que estressa o raio (Centro→Méier, Barra→matriz, Barra retirada→atende, Caxias→entrega fora da cidade, etc.) → depois **trocar os raios de teste pelos REAIS** de cada parceiro.
   2. Fase 2 menor: aviso no login forte; cadastro "Novo parceiro" coletar o raio.
   3. Alerta na matriz pra pedido acima do raio no caminho SEM coordenada (decisão 2 do dono — ficou de fora da Fase 3).
-  4. Antigos: preencher **horário das 6 lojas** vazias; trocar senha temp do zz-teste-copacabana; **SEC-002** (autorização sem RLS, sessão dedicada — §9).
+  4. Antigos: preencher **horário das 6 lojas** vazias; **SEC-002** (autorização sem RLS, sessão dedicada — §9). (Senha temp da zz-teste-copacabana: trocada em 06-10, com o dono; resetar = `scripts/resetar-senha-parceiro.cjs`.)
 
 ## 8. Proximidade-primeiro (derruba o "muro da cidade") — COMPLETA, Fases 0/1/2/3 LIVE
 **Furo:** o roteamento filtrava por CIDADE antes da distância → cliente de Caxias a 9 km de Madureira caía na matriz. **Virada:** com coordenada, rotear por DISTÂNCIA (anel+estoque+régua decidem); cidade vira plano B; na entrega, o RAIO declarado por loja é o teto. Tudo atrás da flag **`ROUTING_PROXIMITY_FIRST`** (default OFF no código; **o dono ligou =true no Coolify**). Rollback = flag false (desliga entrega+retirada por proximidade juntas).
