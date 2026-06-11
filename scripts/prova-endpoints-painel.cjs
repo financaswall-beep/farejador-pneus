@@ -143,7 +143,7 @@ function extrairLiteraisApi(src) {
 function gerarLista(publicDir) {
   const doIndex = listarScriptsDoIndex(publicDir);
   // Arquivo app*.js na pasta mas FORA do index.html = orfao (codigo morto perigoso) -> reprova.
-  const naPasta = fs.readdirSync(publicDir).filter((f) => /^app(\.[\w-]+)?\.js$/.test(f));
+  const naPasta = fs.readdirSync(publicDir).filter((f) => /^app(\.[\w-]+)*\.js$/.test(f)); // * = segmentos compostos
   const orfaos = naPasta.filter((f) => !doIndex.includes(f));
   if (orfaos.length > 0) throw new Error(`app*.js fora do index.html (orfao): ${orfaos.join(', ')}`);
 

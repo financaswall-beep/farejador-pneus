@@ -44,7 +44,7 @@ function main() {
   const excecoes = lerExcecoes();
   const arquivos = fs
     .readdirSync(PUBLIC_DIR)
-    .filter((f) => /^app(\.[\w-]+)?\.js$/.test(f))
+    .filter((f) => /^app(\.[\w-]+)*\.js$/.test(f)) // * = segmentos compostos (app.charts.resumo.js)
     .sort();
 
   if (arquivos.length === 0) {
