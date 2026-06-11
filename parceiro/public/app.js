@@ -624,17 +624,6 @@ function parceiroApp() {
       ];
     },
 
-    // True se a data cai no mês corrente (fuso de São Paulo). Usado pelos KPIs "do mês".
-    isCurrentMonth(dateValue) {
-      if (!dateValue) return false;
-      const d = new Date(dateValue);
-      if (Number.isNaN(d.getTime())) return false;
-      const fmt = (date) => new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
-      }).format(date);
-      return fmt(d) === fmt(new Date());
-    },
-
     salesUnitsFor(sales) {
       return sales.reduce((sum, sale) => {
         const items = Array.isArray(sale.items) ? sale.items : [];
