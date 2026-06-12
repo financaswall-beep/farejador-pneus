@@ -37,10 +37,12 @@ window.PARCEIRO_MODULES.config = () => ({
     },
 
     // Bloco 1: abre o painel de um funcionário. Limpa senha/confirmação pendentes.
+    // Bloco 2: carrega telas+comissão DESTE funcionário (loadFuncConfig, configEquipe).
     selectFuncionario(f) {
       this.selectedFuncionario = f;
       this.resetSenhaValue = '';
       this.revokeConfirmId = null;
+      this.loadFuncConfig(f);
       this.$nextTick(() => lucide.createIcons());
     },
 

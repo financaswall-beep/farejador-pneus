@@ -2267,7 +2267,7 @@
                   <span style="flex:1;min-width:0;">
                     <b x-text="f.label || 'Funcionário'"></b>
                     <small style="display:block;color:var(--pos-muted,#94a3b8);"
-                           x-text="(f.username || '—') + ' · ' + (f.revoked_at ? 'desativado' : ('vê ' + permCount + ' de 9 telas'))"></small>
+                           x-text="(f.username || '—') + ' · ' + (f.revoked_at ? 'desativado' : 'ativo')"></small>
                   </span>
                   <i data-lucide="chevron-right" style="flex:none;color:var(--pos-muted,#94a3b8);"></i>
                 </button>
@@ -2299,27 +2299,62 @@
                   </div>
                 </div>
 
-                <div class="pos-divider"></div>
-                <h3 style="margin:0 0 2px;">O que o funcionário pode ver</h3>
-                <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                  <i data-lucide="info" style="width:13px;height:13px;"></i>
-                  Vale pra <b>todos os funcionários</b> por enquanto (um perfil só). O acesso separado por pessoa vem no próximo passo.
-                </p>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:4px;">
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.vendas" style="width:auto;"> Vendas</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.estoque" style="width:auto;"> Estoque</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.pedidos" style="width:auto;"> Pedidos</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.clientes" style="width:auto;"> Clientes</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.entregas" style="width:auto;"> Entrega</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.retiradas" style="width:auto;"> Retiradas</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.batepapo" style="width:auto;"> Bate-papo</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.resumo" style="width:auto;"> Resumo</label>
-                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
+                <!-- Bloco 2 (0100): ACESSO + COMISSÃO por pessoa. Carrega ao abrir (funcConfigLoaded). -->
+                <div x-show="!funcConfigLoaded" style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
+                  <i data-lucide="loader" style="width:14px;height:14px;"></i> Carregando o acesso desta pessoa…
                 </div>
-                <button @click="savePermissoes()" :disabled="saving" class="pos-form-submit success" style="margin-top:12px;">
-                  <i data-lucide="shield-check"></i>
-                  <span x-text="isSaving('permissoes') ? 'Salvando...' : 'Salvar permissões'"></span>
-                </button>
+
+                <template x-if="funcConfigLoaded">
+                  <div>
+                    <div class="pos-divider"></div>
+                    <h3 style="margin:0 0 2px;">O que <span x-text="selectedFuncionario.label || 'o funcionário'"></span> pode ver</h3>
+                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                      <i data-lucide="info" style="width:13px;height:13px;"></i>
+                      Vale só pra <b>esta pessoa</b> — cada funcionário tem o próprio acesso.
+                      <span x-text="'Vê ' + funcPermCount + ' de 9 telas.'"></span>
+                    </p>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:4px;">
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.vendas" style="width:auto;"> Vendas</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.estoque" style="width:auto;"> Estoque</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.pedidos" style="width:auto;"> Pedidos</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.clientes" style="width:auto;"> Clientes</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.entregas" style="width:auto;"> Entrega</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.retiradas" style="width:auto;"> Retiradas</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.batepapo" style="width:auto;"> Bate-papo</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.resumo" style="width:auto;"> Resumo</label>
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
+                    </div>
+
+                    <!-- Comissão por pessoa -->
+                    <div class="pos-divider"></div>
+                    <h3 style="margin:0 0 2px;">Comissão</h3>
+                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                      <i data-lucide="info" style="width:13px;height:13px;"></i>
+                      Sobre o valor cheio das vendas que <b>esta pessoa finaliza</b> no mês. Vira conta a pagar no Financeiro.
+                    </p>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
+                      <input type="checkbox" x-model="funcCommForm.active" style="width:auto;"> Pagar comissão a esta pessoa
+                    </label>
+                    <div x-show="funcCommForm.active" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+                      <label style="flex:1;min-width:130px;">Tipo
+                        <select x-model="funcCommForm.kind">
+                          <option value="percent">Porcentagem (%)</option>
+                          <option value="fixed">Valor fixo (R$)</option>
+                        </select>
+                      </label>
+                      <label style="flex:1;min-width:130px;">
+                        <span x-text="funcCommForm.kind === 'fixed' ? 'R$ por venda' : '% por venda'"></span>
+                        <input type="number" min="0" step="0.01" x-model.number="funcCommForm.value"
+                               :placeholder="funcCommForm.kind === 'fixed' ? 'Ex: 10' : 'Ex: 5'" />
+                      </label>
+                    </div>
+
+                    <button @click="saveFuncConfig(selectedFuncionario)" :disabled="saving" class="pos-form-submit success" style="margin-top:14px;">
+                      <i data-lucide="shield-check"></i>
+                      <span x-text="isSaving('funcConfig') ? 'Salvando...' : 'Salvar acesso e comissão'"></span>
+                    </button>
+                  </div>
+                </template>
 
                 <!-- Ações do login (só ativo): resetar senha inline + desativar inline -->
                 <template x-if="!selectedFuncionario.revoked_at">
@@ -2424,7 +2459,8 @@
 <script src="./app.foto.js?v=20260611-onda-c"></script>
 <script src="./app.chat.js?v=20260611-onda-c"></script>
 <script src="./app.chat.cliente.js?v=20260611-onda-c"></script>
-<script src="./app.config.js?v=20260611-onda-c"></script>
+<script src="./app.config.js?v=20260612-bloco2"></script>
+<script src="./app.config.equipe.js?v=20260612-bloco2"></script>
 <script src="./app.estoque.kpis.js?v=20260611-onda-c"></script>
 <script src="./app.estoque.forms.js?v=20260611-onda-c"></script>
 <script src="./app.pdv.kpis.js?v=20260611-onda-c"></script>
@@ -2440,6 +2476,6 @@
 <script src="./app.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260611-onda-c"></script>
-<script src="./app.js?v=20260611-onda-c"></script>
+<script src="./app.js?v=20260612-bloco2"></script>
 </body>
 </html>

@@ -3172,7 +3172,12 @@ export async function upsertPartnerTokenCommission(
 ): Promise<PartnerCommissionConfig> {
   await assertUnitFuncionario(ctx, tokenId);
   const kind: 'percent' | 'fixed' = input.kind === 'fixed' ? 'fixed' : 'percent';
-  const value = Number.isFinite(input.value) && input.value > 0 ? Math.round(input.value * 100) / 100 : 0;
+  // SEC (M1): teto também AQUI (fonte única de escrita) — defesa em profundidade,
+  // mesmo se algum caminho futuro pular o schema. % nunca passa de 100.
+  const cap = kind === 'percent' ? 100 : 1_000_000;
+  const value = Number.isFinite(input.value) && input.value > 0
+    ? Math.min(Math.round(input.value * 100) / 100, cap)
+    : 0;
   const active = !!input.active;
   await pool.query(
     `INSERT INTO network.partner_token_commission
@@ -3825,7 +3830,7 @@ export interface PartnerPermissionsInput {
 /**
  * Upsert 1:1 das permissões de tela do funcionário (PLANO §2.3, gate §5.2).
  *
- * 🔒 ALLOWLIST FIXA NO SERVIDOR: só as 8 telas de PARTNER_SCREENS são consideradas.
+ * 🔒 ALLOWLIST FIXA NO SERVIDOR: só as 9 telas de PARTNER_SCREENS são consideradas.
  * Qualquer chave fora da lista (notadamente `config`) é IGNORADA — defesa em
  * profundidade. Configurações NUNCA é liberável por permissão (cadeado duro: a
  * trava real é requireOwner cru nos endpoints de Configurações).

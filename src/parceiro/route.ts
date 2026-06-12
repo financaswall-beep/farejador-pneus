@@ -286,6 +286,11 @@ const comissaoSchema = z.object({
   kind: z.enum(['percent', 'fixed']),
   value: z.number().nonnegative().max(1_000_000),
   active: z.boolean(),
+}).refine((d) => !(d.kind === 'percent' && d.value > 100), {
+  // SEC (M1): o teto de % é trava de SERVIDOR, não só do front — % > 100 viraria
+  // comissão maior que o faturamento e, ao fechar o mês, conta a pagar errada.
+  message: 'Comissão em porcentagem não pode passar de 100%.',
+  path: ['value'],
 });
 
 // Login por usuário+senha (público — é a porta de entrada).
@@ -336,7 +341,7 @@ const configAreaSchema = z.object({
   path: ['neighborhoods'],
 });
 
-// Permissões: as 8 telas. 'config' NÃO está aqui (cadeado duro) — e mesmo se vier
+// Permissões: as 9 telas. 'config' NÃO está aqui (cadeado duro) — e mesmo se vier
 // no corpo, a query (upsertPartnerPermissions) ignora qualquer chave fora da allowlist.
 const configPermissoesSchema = z.object({
   vendas: z.boolean().optional(),
@@ -581,7 +586,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // o `role` + `permissions` pra montar o menu (canSee). É só apoio de UI; a trava
   // de verdade são os requireOwner/requireScreen nos endpoints.
   //
-  // `permissions` é o mapa EFETIVO das 8 telas, resolvido NO SERVIDOR (gate §5.5):
+  // `permissions` é o mapa EFETIVO das 9 telas, resolvido NO SERVIDOR (gate §5.5):
   // owner → tudo true; funcionário → lê a tabela (ou defaults da Etapa 4 se não há
   // linha). Nunca aceito do cliente. Configurações NÃO está aqui (segue isOwner).
   fastify.get('/parceiro/:slug/api/me', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
@@ -784,7 +789,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   // Permissões de tela do funcionário (upsert 1:1). A allowlist do servidor
-  // descarta qualquer chave fora das 8 telas (inclusive 'config') — gate §5.2.
+  // descarta qualquer chave fora das 9 telas (inclusive 'config') — gate §5.2.
   fastify.put('/parceiro/:slug/api/configuracoes/permissoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = configPermissoesSchema.safeParse(request.body ?? {});
     if (!parsed.success) {

@@ -60,6 +60,10 @@ function parceiroApp() {
     selectedFuncionario: null,   // Bloco 1: funcionário aberto no painel da Equipe (null = mostra "adicionar")
     resetSenhaValue: '',         // Bloco 1: senha nova digitada no painel (sem prompt do navegador)
     revokeConfirmId: null,       // Bloco 1: id do funcionário aguardando confirmação inline de desativar
+    // ─── Bloco 2 (2026-06-12): acesso + comissão POR PESSOA do funcionário aberto ───
+    funcConfigLoaded: false,     // o config (telas+comissão) do funcionário selecionado carregou?
+    funcPermForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false },
+    funcCommForm: { kind: 'percent', value: 0, active: false }, // kind 'percent'(% por venda) | 'fixed'(R$ por venda)
     // ─── Configurações da Loja (Fase 1) ───
     // Bloco 1 (2026-06-12): a aba 'area' morreu — o município virou parte de 'atendimento'.
     configTab: 'loja',           // 'loja' | 'atendimento' | 'equipe'
@@ -250,6 +254,7 @@ function parceiroApp() {
     window.PARCEIRO_MODULES.chat, // passo 5: nucleo do Bate-papo (SSE/poll, conversas, enviar)
     window.PARCEIRO_MODULES.chatCliente, // passo 5: cliente vinculado + carrinho do chat
     window.PARCEIRO_MODULES.config, // passo 6: isOwner/canSee + funcionarios + configuracoes da loja
+    window.PARCEIRO_MODULES.configEquipe, // passo 6: Bloco 2 — acesso + comissão POR PESSOA (drawer Equipe)
     window.PARCEIRO_MODULES.estoqueKpis, // passo 7: KPIs/filtros/series de estoque + stockAvailable 0076
     window.PARCEIRO_MODULES.estoqueForms, // passo 7: form/inativar/catalogo + entrada/ajuste de saldo
     window.PARCEIRO_MODULES.pdvKpis, // passo 8: leitura do PDV (carrinho/caixa do dia/produtos/rotulos)

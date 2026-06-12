@@ -10,7 +10,7 @@ import { logger } from '../shared/logger.js';
 
 export type PartnerRole = 'owner' | 'funcionario';
 
-// As 8 telas que o dono pode ligar/desligar pro funcionário (PLANO §2.3). NÃO
+// As 9 telas que o dono pode ligar/desligar pro funcionário (PLANO §2.3). NÃO
 // existe 'config': Configurações é cadeado duro (nunca via permissão; trava no
 // backend com requireOwner cru). Esta é a ALLOWLIST canônica — qualquer chave
 // fora daqui é ignorada na escrita (defesa em profundidade, gate §5.2).

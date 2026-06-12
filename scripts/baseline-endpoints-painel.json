@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-12T12:48:53.721Z",
+  "geradoEm": "2026-06-12T15:36:40.059Z",
   "commitBase": "c0d7913",
-  "total": 69,
+  "total": 72,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -57,6 +57,9 @@
     "call:this.api(`despesas/${expenseId}`, { method: 'DELETE' })",
     "call:this.api(`entregas/${sale.order_id}`, { method: 'POST', body: JSON.stringify({ delivery_status: status, delivery_courier: courier || null, payment_method, reason: reason ?? null }), })",
     "call:this.api(`estoque/${stockId}`, { method: 'DELETE' })",
+    "call:this.api(`funcionarios/${f.id}/comissao`, { method: 'PUT', body: JSON.stringify({ kind: this.funcCommForm.kind === 'fixed' ? 'fixed' : 'percent', value: this.funcCommForm.active ? Number(this.funcCommForm.value) : 0, active: !!this.funcCommForm.active, }), })",
+    "call:this.api(`funcionarios/${f.id}/config`)",
+    "call:this.api(`funcionarios/${f.id}/permissoes`, { method: 'PUT', body: JSON.stringify({ vendas: !!this.funcPermForm.vendas, estoque: !!this.funcPermForm.estoque, pedidos: !!this.funcPermForm.pedidos, clientes: !!this.funcPermForm.clientes, entregas: !!this.funcPermForm.entregas, retiradas: !!this.funcPermForm.retiradas, batepapo: !!this.funcPermForm.batepapo, resumo: !!this.funcPermForm.resumo, financeiro: !!this.funcPermForm.financeiro, }), })",
     "call:this.api(`funcionarios/${f.id}/reset-senha`, { method: 'POST', body: JSON.stringify({ password: nova }), })",
     "call:this.api(`funcionarios/${f.id}`, { method: 'DELETE' })",
     "call:this.api(`photo-requests/${item.id}/photo`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: preview.blob, })",
