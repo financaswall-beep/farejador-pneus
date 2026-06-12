@@ -8,6 +8,10 @@
 > - `3f832e9` - Frente de caixa mostra disponivel.
 > - `7ffcb3f` - cliente/VIP conta so venda concluida.
 > - `d2b772c` - financeiro alinhado a venda realizada 0077.
+> - `35c044a` - visual/otimizacao dos cards de estoque.
+> - `45ed44c` - custos de resultado usam CMV; compras ficam separadas.
+> - `bf8a30c` - contas a pagar de despesa entram por competencia 0078.
+> - `5280190` - indicadores em linguagem de loja.
 
 Este documento e leitura obrigatoria antes de qualquer mudanca em Estoque,
 Frente de caixa, Pedidos/Entrega, Clientes, Compras ou Financeiro do parceiro.
@@ -98,6 +102,21 @@ Responsabilidades:
 - delivery/COD usa `delivered_at`;
 - preserva `security_invoker = true`;
 - preserva `GRANT SELECT` para `farejador_partner_app`.
+
+### Migration 0078
+
+Arquivo: `db/migrations/0078_partner_expenses_competence.sql`.
+Snapshot/rollback: `docs/SNAPSHOT_VIEW_PRE_0078_2026-05-31.sql`.
+
+Responsabilidades:
+
+- recria somente `network.partner_unit_summary`;
+- muda apenas a lateral `expenses_month`;
+- faz conta a pagar de despesa aberta entrar no lucro por competencia;
+- preserva `cash_in_month` e `cash_out_month` como caixa realizado;
+- preserva `sales_month`, `cogs_month`, `purchases_month`, colunas, ordem,
+  `security_invoker = true` e `GRANT SELECT`;
+- impede compra de pneu/estoque de virar despesa com `source_purchase_id IS NULL`.
 
 ## Funcoes e helpers obrigatorios
 
@@ -195,6 +214,41 @@ Isso inclui COD entregue hoje via recebivel recebido.
 Nao somar COD aberto como caixa.
 
 Nao duplicar venda a vista: venda a vista nao gera recebivel.
+
+### Linguagem de loja
+
+A UI pode traduzir nomes tecnicos para termos que o dono da borracharia entende.
+A matematica nao muda.
+
+Tabela oficial de nomes:
+
+| Nome tecnico | Nome na tela |
+| --- | --- |
+| `avgTicket` / Ticket medio | Media por venda |
+| `estimated_result_month` / Resultado estimado | Lucro do mes |
+| Margem estimada | Margem do lucro, mostrada como texto auxiliar |
+| `cogs_month` / CMV | Custo dos pneus vendidos |
+| Composicao dos custos | Para onde foi o dinheiro |
+| Score financeiro | Saude da loja |
+| Caixa do mes | Caixa do mes |
+
+Card recomendado para resultado:
+
+```text
+Lucro do mes
+R$ X
+margem Y%
+```
+
+Nao trocar esses nomes alterando formula. Se o texto mudar, conferir se continua
+usando as bases abaixo:
+
+- `sales_month`: vendas realizadas no mes;
+- `orders_month`: quantidade de vendas realizadas no mes;
+- `estimated_result_month`: lucro por competencia;
+- `cogs_month`: custo dos pneus vendidos;
+- `expenses_month`: despesas/contas de competencia;
+- `cash_net_month`: caixa realizado.
 
 ## Custo de competencia vs compra/reposicao (Passo 1, 2026-05-31)
 
@@ -301,6 +355,12 @@ legada/desligada.
 14. Confirmar: bloqueia com mensagem, sem erro 500.
 15. Chamar API com `receivable_installments > 1`.
 16. Confirmar: retorna 400 `installments_not_supported`.
+17. Criar conta a pagar de despesa aberta com competencia no mes.
+18. Confirmar: entra no lucro do mes, mas nao muda caixa.
+19. Criar compra de pneu a prazo.
+20. Confirmar: nao entra em despesas/contas; so afetara lucro via CMV quando vender.
+21. Pagar conta de despesa que ja entrou por competencia.
+22. Confirmar: nao duplica despesa; caixa muda no pagamento.
 
 ## Checks tecnicos antes de deploy
 
@@ -324,9 +384,11 @@ Primeiro em dry-run. So depois aplicar com `--commit`.
 - `quantity_reserved` existe em producao.
 - `commerce.partner_stock_status(...)` existe em producao.
 - `network.partner_unit_summary` usa `delivered_at` para delivery realizado.
+- `network.partner_unit_summary` usa `expenses_month` por competencia desde 0078.
 - `delivered_sem_delivered_at = 0` no momento da 0077.
 - `parcelas_ativas = 0` no momento da 0077.
-- 0076 e 0077 aplicadas em producao.
+- 0076, 0077 e 0078 aplicadas em producao.
+- Ultimo deploy informado em producao: commit `5280190` (`farejador-pneus`).
 - Deploy do runtime deve sempre vir depois da migration correspondente.
 
 ## Para proximas LLMs/devs
