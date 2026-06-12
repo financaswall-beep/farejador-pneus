@@ -1,7 +1,8 @@
 import type { PoolClient } from 'pg';
 import type { Environment } from '../shared/types/chatwoot.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
-import { geocodeAddress, type GeocodeResult } from '../shared/geo/google-maps.js';
+import { type GeocodeResult } from '../shared/geo/google-maps.js';
+import { cachedGeocodeAddress } from '../shared/geo/geo-cache.js';
 
 /**
  * Coordenada do CLIENTE a partir do anexo de localização mais recente da
@@ -105,13 +106,13 @@ export async function resolveCustomerLocation(
   //    confia se o location_type vier nível de casa/rua; vago → cai no paraquedas.
   if (fullAddress && fullAddress.trim()) {
     const query = [fullAddress, bairro, municipio, 'Brasil'].filter(Boolean).join(', ');
-    const precise = await geocodeAddress(query, apiKey);
+    const precise = await cachedGeocodeAddress(client, query, apiKey);
     if (isPreciseGeocode(precise)) return { lat: precise!.lat, lng: precise!.lng };
   }
 
   // 3) paraquedas: centro do BAIRRO (mesma busca determinística de hoje).
   if (bairro && bairro.trim()) {
-    const g = await geocodeAddress([bairro, municipio, 'Brasil'].filter(Boolean).join(', '), apiKey);
+    const g = await cachedGeocodeAddress(client, [bairro, municipio, 'Brasil'].filter(Boolean).join(', '), apiKey);
     if (g) return { lat: g.lat, lng: g.lng };
   }
   return null;

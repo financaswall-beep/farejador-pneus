@@ -28,7 +28,7 @@ import {
 import { env } from '../shared/config/env.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
-import { reverseGeocode } from '../shared/geo/google-maps.js';
+import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
 import { createHash } from 'node:crypto';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
@@ -59,7 +59,7 @@ async function fillCityFromPin(
   if (!env.ROUTING_GEO || !env.GOOGLE_MAPS_API_KEY) return current;
   const pin = await getLatestCustomerLocation(client, environment, conversationId);
   if (!pin) return current;
-  const rev = await reverseGeocode(pin, env.GOOGLE_MAPS_API_KEY);
+  const rev = await cachedReverseGeocode(client, pin, env.GOOGLE_MAPS_API_KEY);
   if (!rev?.municipio) return current;
   return {
     municipio: rev.municipio,

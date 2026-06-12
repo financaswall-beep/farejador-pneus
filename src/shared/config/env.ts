@@ -81,6 +81,17 @@ const envSchema = z.object({
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
+  // Cache de geocode/distância (commerce.geo_cache, 0098): read-through sobre o
+  // Google — geocode de bairro/endereço e distância cliente→loja repetem muito e o
+  // Google cobra por chamada. FAIL-OPEN (erro de banco → chama o Google direto) e
+  // NUNCA muda resultado (guarda a resposta que o Google deu). Default LIGADO —
+  // exceção consciente ao "sobe dormente": não é mudança de roteamento, só de
+  // custo/latência. false = sempre Google (comportamento de antes).
+  GEO_CACHE: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+  // Trava de custo do Distance Matrix com MUITAS lojas (escala 100 borracharias):
+  // mede a RUA só das K mais próximas em LINHA RETA dentro do teto (a rua nunca é
+  // menor que a reta). Com ≤K lojas no teto não muda NADA (hoje: 7 lojas, neutro).
+  GEO_ROAD_TOPK: z.string().transform(Number).pipe(z.number().int().min(1)).default('12'),
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   // Coalescing window: segundos de pausa do cliente antes do bot responder.
   // A cada nova mensagem o timer RESETA. So responde quando o cliente para

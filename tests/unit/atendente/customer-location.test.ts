@@ -5,13 +5,15 @@ import {
   resolveCustomerLocation,
   isPreciseGeocode,
 } from '../../../src/atendente-v2/customer-location.js';
-import { geocodeAddress } from '../../../src/shared/geo/google-maps.js';
+import { cachedGeocodeAddress } from '../../../src/shared/geo/geo-cache.js';
 
-vi.mock('../../../src/shared/geo/google-maps.js', () => ({
-  geocodeAddress: vi.fn(),
+// customer-location chama o Google VIA cache (geo-cache.js, 0098); mockar o
+// cache evita carregar env.ts (que exigiria variáveis reais no teste).
+vi.mock('../../../src/shared/geo/geo-cache.js', () => ({
+  cachedGeocodeAddress: vi.fn(),
 }));
 
-const geocodeMock = vi.mocked(geocodeAddress);
+const geocodeMock = vi.mocked(cachedGeocodeAddress);
 
 interface QueryCall {
   text: string;
@@ -113,7 +115,7 @@ describe('resolveCustomerLocation (camadas: pino → endereço → bairro)', () 
     expect(loc).toEqual({ lat: -22.9135, lng: -43.1791 });
     expect(geocodeMock).toHaveBeenCalledTimes(1);
     // a rua+número entrou na busca (precisão de verdade, não só o bairro)
-    expect(geocodeMock.mock.calls[0]![0]).toContain('Rua Teotônio Regadas, 26');
+    expect(geocodeMock.mock.calls[0]![1]).toContain('Rua Teotônio Regadas, 26');
   });
 
   it('4) endereço completo VAGO (APPROXIMATE) → cai no paraquedas do bairro', async () => {
@@ -131,8 +133,8 @@ describe('resolveCustomerLocation (camadas: pino → endereço → bairro)', () 
     expect(loc).toEqual({ lat: -22.9131, lng: -43.1765 });
     expect(geocodeMock).toHaveBeenCalledTimes(2);
     // a 2ª busca (paraquedas) é só bairro/cidade — sem a rua
-    expect(geocodeMock.mock.calls[1]![0]).not.toContain('Rua Inexistente');
-    expect(geocodeMock.mock.calls[1]![0]).toContain('Lapa');
+    expect(geocodeMock.mock.calls[1]![1]).not.toContain('Rua Inexistente');
+    expect(geocodeMock.mock.calls[1]![1]).toContain('Lapa');
   });
 
   it('5) sem endereço completo, só bairro → geocoda o bairro (comportamento de hoje)', async () => {

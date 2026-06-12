@@ -20,8 +20,8 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 - **Ingestão** — Chatwoot → Supabase (webhooks, normalização, persistência). `src/webhooks/`, `src/normalization/`, `src/persistence/`.
 
 ## 3. Como mexer (convenções — IMPORTANTE)
-- **Migration ANTES do push** (o código novo lê a coluna nova; aplicar via apply_migration). Migrations em `db/migrations/` (já aplicadas até 0092).
-- **Test-first** em zona sensível. Provas: `npm run typecheck`, `npm test` (vitest, ~330 testes), e a integração do motor: `npx tsx --env-file=.env scripts/prova-geo-rede-test.ts` (env test, BEGIN/ROLLBACK).
+- **Migration ANTES do push** (o código novo lê a coluna nova; aplicar via apply_migration). Migrations em `db/migrations/` (já aplicadas até 0098).
+- **Test-first** em zona sensível. Provas: `npm run typecheck`, `npm test` (vitest, ~400 testes), e a integração do motor: `npx tsx --env-file=.env scripts/prova-geo-rede-test.ts` (env test, BEGIN/ROLLBACK). Banco direto dá ENOTFOUND em rede sem IPv6 → usar `--env-file=.env.pooler` (pooler IPv4).
 - **Flags** pra mudança arriscada de roteamento (ex.: ROUTING_GEO, PICKUP_TO_PARTNER, ROUTING_GEO_ROAD_DISTANCE, ROUTING_MULTI_CANDIDATE, ROUTING_FAIRNESS). Sobe dormente, liga quando provar.
 - **Chave do Google só vive no Coolify** (não no `.env` local) → reverse-geocode/distância de rua NÃO roda local; testar AO VIVO ou via `scripts/testar-geocode.cjs` (pode dar REQUEST_DENIED local se a chave for restrita por IP).
 - **Comportamento crítico do bot se garante por CÓDIGO, não por prompt.** Pedir no prompt é probabilístico e falha; quando precisar garantir, force no código (ex.: o nudge determinístico do pino em `agent.ts`).
@@ -49,6 +49,7 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 4. **Anel que cresce** (`ring.ts`): retirada FAIXAS [5,10,15] km, entrega [10,20,30,40] km. Banda mais perto ganha.
 5. **Régua de justiça** (`rankUnitsByFairnessFromDb`): entre os do anel, ganha quem recebeu MENOS leads (anti-favorecimento). Nunca pula de banda.
 - Coordenada do cliente: pino do WhatsApp (`getLatestCustomerLocation`) ou bairro geocodado (Google). Distância de RUA (Distance Matrix) com haversine de fallback.
+- **Escala 100 lojas (obra 2026-06-12):** chamadas ao Google passam pelo cache `commerce.geo_cache` (0098; `geo-cache.ts`, read-through FAIL-OPEN, flag `GEO_CACHE` default on); Distance Matrix mede só as `GEO_ROAD_TOPK` (12) mais próximas em linha reta; partições mensais se criam SOZINHAS (0096, pg_cron dia 20) — julho/2026 não derruba mais a ingestão; 24 índices de FK (0097).
 - `commerce.geo_resolutions` = dicionário bairro→cidade (624 bairros, 15 cidades; `resolve_neighborhood`). Cobertura: 7 lojas — rio(5)/niteroi(1)/itaborai(1), todas por cidade.
 - Matriz = backstop universal quando nenhum parceiro atende.
 

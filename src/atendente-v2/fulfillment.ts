@@ -28,7 +28,7 @@ import { env } from '../shared/config/env.js';
 import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
-import { roadDistanceKm } from '../shared/geo/google-maps.js';
+import { cachedRoadDistanceKm } from '../shared/geo/geo-cache.js';
 import {
   filterByModeAndCoverage,
   filterByModeAndRadiusPresence,
@@ -557,7 +557,7 @@ export async function getUnitMapsUrl(
         })
         .filter((x): x is { row: MapsRow; location: GeoPoint } => x != null);
       if (withCoords.length === 0) return null; // nenhuma loja com coordenada → não chuta
-      const dist = await resolveDistances(origin, withCoords.map((x) => ({ unitId: x.row.unit_id, location: x.location })));
+      const dist = await resolveDistances(client, origin, withCoords.map((x) => ({ unitId: x.row.unit_id, location: x.location })));
       const ranked = withCoords
         .map((x) => ({ row: x.row, km: dist.get(x.row.unit_id) ?? Infinity }))
         .sort((a, b) => a.km - b.km);
@@ -884,6 +884,7 @@ function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
  * consentimento). `capKm` undefined = mede todas (conjunto pequeno, ex.: getUnitMapsUrl).
  */
 async function resolveDistances(
+  client: PoolClient,
   origin: GeoPoint,
   units: { unitId: string; location: GeoPoint }[],
   capKm?: number,
@@ -892,9 +893,18 @@ async function resolveDistances(
   for (const u of units) map.set(u.unitId, haversineKm(origin, u.location));
 
   if (env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY && units.length > 0) {
-    const measured = capKm == null ? units : units.filter((u) => map.get(u.unitId)! <= capKm);
+    let measured = capKm == null ? units : units.filter((u) => map.get(u.unitId)! <= capKm);
+    // Trava de escala (GEO_ROAD_TOPK): com MUITAS lojas dentro do teto (100
+    // borracharias na mesma região), mede a rua só das K mais próximas em linha
+    // reta — as demais ficam com o haversine, que já as deixaria atrás na régua.
+    // Com ≤K lojas no teto (hoje: 7 na rede toda) não muda NADA.
+    if (measured.length > env.GEO_ROAD_TOPK) {
+      measured = [...measured]
+        .sort((a, b) => map.get(a.unitId)! - map.get(b.unitId)!)
+        .slice(0, env.GEO_ROAD_TOPK);
+    }
     if (measured.length > 0) {
-      const road = await roadDistanceKm(origin, measured.map((u) => u.location), env.GOOGLE_MAPS_API_KEY);
+      const road = await cachedRoadDistanceKm(client, origin, measured.map((u) => u.location), env.GOOGLE_MAPS_API_KEY);
       if (road) {
         road.forEach((km, i) => {
           if (km != null) map.set(measured[i]!.unitId, km);
@@ -959,6 +969,7 @@ export async function decideStoreForItemsGeo(
   // mede a distância de RUA só de quem cabe no maior anel (resolveDistances capKm).
   const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
   const distanceByUnit = await resolveDistances(
+    client,
     input.customerLocation,
     eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
     Math.max(...rings),
@@ -1114,6 +1125,7 @@ export async function resolveProductAvailabilityByProximity(
   // do Google (mede só quem cabe no teto; quem está além já sairia no filtro inRange abaixo).
   const maxRing = Math.max(...GEO_RING_KM);
   const distanceByUnit = await resolveDistances(
+    client,
     input.customerLocation,
     eligible.map((c) => ({ unitId: c.ctx.unitId, location: c.location! })),
     maxRing,
