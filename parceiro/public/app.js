@@ -57,8 +57,12 @@ function parceiroApp() {
     permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false },
     funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
     funcionarioForm: { label: '', username: '', password: '' },
+    selectedFuncionario: null,   // Bloco 1: funcionário aberto no painel da Equipe (null = mostra "adicionar")
+    resetSenhaValue: '',         // Bloco 1: senha nova digitada no painel (sem prompt do navegador)
+    revokeConfirmId: null,       // Bloco 1: id do funcionário aguardando confirmação inline de desativar
     // ─── Configurações da Loja (Fase 1) ───
-    configTab: 'loja',           // 'loja' | 'atendimento' | 'area' | 'equipe'
+    // Bloco 1 (2026-06-12): a aba 'area' morreu — o município virou parte de 'atendimento'.
+    configTab: 'loja',           // 'loja' | 'atendimento' | 'equipe'
     configLoaded: false,
     lojaForm: { display_name: '', address_street: '', address_number: '', address_neighborhood: '', address_city: '', address_complement: '', cep: '', opening_hours_text: '', maps_url: '' },
     atendimentoForm: { faz_entrega: true, tem_retirada: true, delivery_radius_km: null },

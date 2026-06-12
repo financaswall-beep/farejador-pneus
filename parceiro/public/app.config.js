@@ -36,6 +36,21 @@ window.PARCEIRO_MODULES.config = () => ({
       }
     },
 
+    // Bloco 1: abre o painel de um funcionário. Limpa senha/confirmação pendentes.
+    selectFuncionario(f) {
+      this.selectedFuncionario = f;
+      this.resetSenhaValue = '';
+      this.revokeConfirmId = null;
+      this.$nextTick(() => lucide.createIcons());
+    },
+
+    // Quantas das 9 telas o perfil libera. Hoje é "um perfil só" da loja, então dá o
+    // mesmo número pra todo funcionário; no Bloco 2 (acesso por pessoa) passa a variar.
+    get permCount() {
+      const keys = ['vendas', 'estoque', 'pedidos', 'clientes', 'entregas', 'retiradas', 'batepapo', 'resumo', 'financeiro'];
+      return keys.reduce((n, k) => n + (this.permForm && this.permForm[k] ? 1 : 0), 0);
+    },
+
     async createFuncionario() {
       const username = (this.funcionarioForm.username || '').trim();
       const password = this.funcionarioForm.password || '';
@@ -65,18 +80,19 @@ window.PARCEIRO_MODULES.config = () => ({
       }
     },
 
-    async resetFuncionarioSenha(f) {
-      const nome = f.label || f.username || 'funcionário';
-      const nova = prompt(`Nova senha para "${nome}" (mínimo 6 caracteres):`);
-      if (nova === null) return; // cancelou
-      if ((nova || '').length < 6) { this.flash('A senha precisa de ao menos 6 caracteres.'); return; }
+    // Bloco 1: reseta a senha pelo painel do funcionário (sem o prompt do navegador).
+    // A senha nova vem do input no painel (this.resetSenhaValue).
+    async confirmResetSenha(f) {
+      const nova = this.resetSenhaValue || '';
+      if (nova.length < 6) { this.flash('A senha precisa de ao menos 6 caracteres.'); return; }
       this.saving = true; this.savingAction = 'funcionario';
       try {
         await this.api(`funcionarios/${f.id}/reset-senha`, {
           method: 'POST',
           body: JSON.stringify({ password: nova }),
         });
-        this.flash('Senha redefinida. Passe a nova senha pro funcionário.');
+        this.resetSenhaValue = '';
+        this.flash('Senha redefinida. Passe a nova senha pro funcionário.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -84,13 +100,16 @@ window.PARCEIRO_MODULES.config = () => ({
       }
     },
 
-    async revokeFuncionario(f) {
-      if (!confirm(`Desativar o login "${f.label || 'Funcionário'}"? Ele perde o acesso na hora.`)) return;
+    // Bloco 1: desativa o login. A confirmação é inline no painel (revokeConfirmId),
+    // sem o confirm() do navegador. Re-aponta o funcionário aberto pro estado novo.
+    async doRevoke(f) {
       this.saving = true; this.savingAction = 'funcionario';
       try {
         await this.api(`funcionarios/${f.id}`, { method: 'DELETE' });
         await this.loadFuncionarios();
-        this.flash('Login desativado.');
+        this.revokeConfirmId = null;
+        this.selectedFuncionario = this.funcionarios.find((x) => x.id === f.id) || null;
+        this.flash('Login desativado.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
@@ -189,31 +208,16 @@ window.PARCEIRO_MODULES.config = () => ({
         });
         // Reflete o que o backend gravou (zera o raio quando não faz entrega).
         this.atendimentoForm.delivery_radius_km = radius;
-        this.flash('Modo de atendimento salvo.', 'success');
-      } catch (err) {
-        this.flash(this.errMessage(err));
-      } finally {
-        this.saving = false; this.savingAction = '';
-      }
-    },
-
-    // A busca/escolha de bairros saiu da UI (Fase 3): a entrega é decidida pelo
-    // raio em km (aba Atendimento). Salvar a área = declarar o município (cidade
-    // inteira), o plano B de quando o cliente não manda a localização.
-    async saveArea() {
-      if (!this.areaForm.municipio.trim()) { this.flash('Informe o município da área de entrega.'); return; }
-      this.saving = true; this.savingAction = 'area';
-      try {
-        await this.api('configuracoes/area', {
-          method: 'PUT',
-          body: JSON.stringify({
-            municipio: this.areaForm.municipio.trim(),
-            city_wide: true,
-            neighborhoods: [],
-          }),
-        });
-        this.flash('Área de entrega salva.', 'success');
-        await this.loadConfiguracoes();
+        // Bloco 1: a cidade base (era a aba "Área de entrega") salva junto. Só manda se
+        // preenchida — município vazio não bloqueia salvar o atendimento.
+        const municipio = (this.areaForm.municipio || '').trim();
+        if (municipio) {
+          await this.api('configuracoes/area', {
+            method: 'PUT',
+            body: JSON.stringify({ municipio, city_wide: true, neighborhoods: [] }),
+          });
+        }
+        this.flash('Atendimento salvo.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {

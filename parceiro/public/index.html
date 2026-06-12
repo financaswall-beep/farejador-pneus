@@ -2131,9 +2131,6 @@
           <button class="pos-outline-action" :class="configTab === 'atendimento' && 'active'" @click="configTab = 'atendimento'; $nextTick(() => lucide.createIcons())">
             <i data-lucide="bike"></i> Atendimento
           </button>
-          <button class="pos-outline-action" :class="configTab === 'area' && 'active'" @click="configTab = 'area'; $nextTick(() => lucide.createIcons())">
-            <i data-lucide="map-pin"></i> Área de entrega
-          </button>
           <button class="pos-outline-action" :class="configTab === 'equipe' && 'active'" @click="configTab = 'equipe'; $nextTick(() => lucide.createIcons())">
             <i data-lucide="users"></i> Equipe
           </button>
@@ -2220,6 +2217,16 @@
               </label>
               <p x-show="!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada"
                  style="color:#fb7185;font-size:13px;margin:4px 0 0;">Marque ao menos uma opção.</p>
+
+              <!-- Cidade base (era a aba "Área de entrega", absorvida no Bloco 1).
+                   É o plano B de localização: quando o cliente não manda o pino, a Rede
+                   usa o município. A entrega de verdade é decidida pelo RAIO acima. -->
+              <div class="pos-divider" style="margin:6px 0;"></div>
+              <label>Cidade base da loja
+                <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
+                <small style="color:var(--pos-muted,#94a3b8);font-size:11px;">Referência de quando o cliente ainda não mandou a localização. Quem decide a entrega é o <b>raio em km</b> acima.</small>
+              </label>
+
               <button @click="saveAtendimento()" :disabled="saving || (!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada)" class="pos-form-submit success">
                 <i data-lucide="save"></i>
                 <span x-text="isSaving('atendimento') ? 'Salvando...' : 'Salvar atendimento'"></span>
@@ -2232,145 +2239,156 @@
               <div><i data-lucide="bike"></i><span>Só entrega, só retirada, ou os dois — você decide.</span></div>
               <div><i data-lucide="ruler"></i><span>O raio de entrega é em km: a Rede só te manda entrega dentro dele. Sem raio = só retirada.</span></div>
               <div><i data-lucide="info"></i><span>A retirada não tem limite de distância — quem vem buscar, vem de onde quiser.</span></div>
+              <div><i data-lucide="map-pin"></i><span>A cidade base é o plano B de localização — não limita a entrega, quem limita é o raio.</span></div>
             </div>
           </aside>
         </div>
 
-        <!-- ABA 3: Área de entrega — SIMPLIFICADA na Fase 3 (proximidade-primeiro):
-             quem manda na entrega agora é o RAIO em km (aba Atendimento). Aqui fica só
-             o MUNICÍPIO base, o plano B de quando o cliente não manda a localização.
-             A parte de bairros saiu (o raio aposentou). -->
-        <div x-show="configTab === 'area'" class="pos-page-grid customers">
-          <section class="pos-panel pos-data-panel">
-            <div class="pos-panel-head"><div>
-              <h3>Onde você entrega</h3>
-              <p>O município base da sua loja. Quem decide a entrega é o <b>raio em km</b> (aba Atendimento).</p>
-            </div></div>
-            <div class="pos-stock-side-form" style="max-width:640px;">
-              <label>Município
-                <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
-              </label>
-              <button @click="saveArea()" :disabled="saving" class="pos-form-submit success">
-                <i data-lucide="save"></i>
-                <span x-text="isSaving('area') ? 'Salvando...' : 'Salvar área de entrega'"></span>
-              </button>
-              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                <i data-lucide="info" style="width:13px;height:13px;"></i>
-                A lista de bairros saiu daqui: a entrega agora funciona pelo <b>raio em km</b> que você
-                define na aba <b>Atendimento</b> — o robô mede a distância até o cliente e só te manda
-                entrega dentro do seu raio. O município fica como referência quando o cliente ainda
-                não mandou a localização.
-              </p>
-            </div>
-          </section>
-          <aside class="pos-panel pos-side-panel">
-            <h3>Cobertura atual</h3>
-            <div class="pos-tip-list">
-              <template x-for="c in coverageList" :key="c.municipio">
-                <div><i data-lucide="map-pin"></i><span><b x-text="c.municipio"></b> — <span x-text="c.city_wide ? 'cidade inteira' : (c.neighborhoods.length + ' bairro(s) (modelo antigo — o raio substitui)')"></span></span></div>
-              </template>
-              <div x-show="!coverageList.length"><i data-lucide="info"></i><span>Sem cobertura cadastrada ainda.</span></div>
-            </div>
-          </aside>
-        </div>
-
-        <!-- ABA 4: Equipe (funcionários + permissões de tela) -->
+        <!-- ABA 3: Equipe — Bloco 1 (2026-06-12): lista clicável + painel do funcionário.
+             A permissão ainda é "um perfil só" da loja (permForm); o acesso POR PESSOA
+             é o Bloco 2 (precisa de migration). Aqui o painel já abre por funcionário e
+             deixa claro que o acesso é compartilhado por enquanto. -->
         <div x-show="configTab === 'equipe'" class="pos-page-grid customers">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
                 <h3>Funcionários</h3>
-                <p>Logins de funcionário acessam o que você liberar abaixo — nunca as Configurações.</p>
+                <p>Clique num funcionário pra ver/editar o acesso dele. Configurações fica sempre só com você.</p>
               </div>
             </div>
 
-            <div class="pos-customer-table">
-              <div class="pos-customer-table-head" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr;">
-                <span>Funcionário</span>
-                <span>Usuário</span>
-                <span>Último acesso</span>
-                <span>Situação</span>
-                <span>Ações</span>
-              </div>
+            <div style="margin-top:4px;">
               <template x-for="f in funcionarios" :key="f.id">
-                <div class="pos-customer-table-row" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 1.4fr;">
-                  <span class="pos-customer-name">
+                <button type="button" @click="selectFuncionario(f)"
+                  style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;border-radius:10px;border:1px solid var(--pos-border,#e2e8f0);background:transparent;cursor:pointer;margin-bottom:8px;"
+                  :style="{ boxShadow: (selectedFuncionario && selectedFuncionario.id === f.id) ? 'inset 0 0 0 2px #2563eb' : '', opacity: f.revoked_at ? '0.6' : '1' }">
+                  <span style="width:36px;height:36px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;background:var(--pos-surface-2,#f1f5f9);color:var(--pos-accent,#2563eb);"
+                        x-text="(f.label || f.username || '?').slice(0,2).toUpperCase()"></span>
+                  <span style="flex:1;min-width:0;">
                     <b x-text="f.label || 'Funcionário'"></b>
+                    <small style="display:block;color:var(--pos-muted,#94a3b8);"
+                           x-text="(f.username || '—') + ' · ' + (f.revoked_at ? 'desativado' : ('vê ' + permCount + ' de 9 telas'))"></small>
                   </span>
-                  <span x-text="f.username || '—'"></span>
-                  <span x-text="f.last_used_at ? formatDate(f.last_used_at) : 'nunca'"></span>
-                  <span>
-                    <template x-if="!f.revoked_at"><span class="pos-muted">Ativo</span></template>
-                    <template x-if="f.revoked_at"><span class="pos-muted">Desativado</span></template>
-                  </span>
-                  <span style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <template x-if="!f.revoked_at">
-                      <button @click="resetFuncionarioSenha(f)" :disabled="saving" class="pos-outline-action compact">
-                        <i data-lucide="key-round"></i> Resetar senha
-                      </button>
-                    </template>
-                    <template x-if="!f.revoked_at">
-                      <button @click="revokeFuncionario(f)" :disabled="saving" class="pos-outline-action compact">
-                        <i data-lucide="user-x"></i> Desativar
-                      </button>
-                    </template>
-                  </span>
-                </div>
+                  <i data-lucide="chevron-right" style="flex:none;color:var(--pos-muted,#94a3b8);"></i>
+                </button>
               </template>
               <div x-show="!funcionarios.length" class="pos-empty">
-                Nenhum funcionário cadastrado ainda.
+                Nenhum funcionário cadastrado ainda. Use "Adicionar funcionário" ao lado.
               </div>
             </div>
 
-            <!-- Sub-seção: permissões de tela do funcionário (8 telas; 'config' NUNCA aparece) -->
-            <div class="pos-divider"></div>
-            <div class="pos-panel-head"><div>
-              <h3>O que o funcionário pode ver</h3>
-              <p>Vale pra todos os funcionários da loja ("um perfil só"). Configurações fica sempre só com você.</p>
-            </div></div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.vendas" style="width:auto;"> Frente de caixa (vendas)</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.estoque" style="width:auto;"> Estoque</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.pedidos" style="width:auto;"> Pedidos</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.clientes" style="width:auto;"> Clientes</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.entregas" style="width:auto;"> Entrega</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.retiradas" style="width:auto;"> Retiradas</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.batepapo" style="width:auto;"> Bate-papo</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.resumo" style="width:auto;"> Resumo</label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
-            </div>
-            <button @click="savePermissoes()" :disabled="saving" class="pos-form-submit success" style="margin-top:12px;max-width:280px;">
-              <i data-lucide="shield-check"></i>
-              <span x-text="isSaving('permissoes') ? 'Salvando...' : 'Salvar permissões'"></span>
+            <button @click="selectedFuncionario = null; revokeConfirmId = null; $nextTick(() => lucide.createIcons())"
+                    class="pos-outline-action" style="margin-top:6px;">
+              <i data-lucide="user-plus"></i> Adicionar funcionário
             </button>
           </section>
 
+          <!-- PAINEL DIREITO: funcionário selecionado OU formulário de adicionar -->
           <aside class="pos-panel pos-side-panel">
-            <h3>Adicionar funcionário</h3>
-            <div class="pos-stock-side-form">
-              <label>Nome do funcionário (opcional)
-                <input x-model="funcionarioForm.label" placeholder="Ex: João do balcão" maxlength="120" />
-              </label>
-              <label>Usuário
-                <input x-model="funcionarioForm.username" placeholder="Ex: joao" maxlength="60" autocomplete="off" />
-              </label>
-              <label>Senha (mín. 6)
-                <input type="password" x-model="funcionarioForm.password" placeholder="Senha inicial" maxlength="200" autocomplete="new-password" />
-              </label>
-              <button @click="createFuncionario()" :disabled="saving" class="pos-form-submit success">
-                <i data-lucide="user-plus"></i>
-                <span x-text="isSaving('funcionario') ? 'Criando...' : 'Criar login de funcionário'"></span>
-              </button>
-              <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">Passe o usuário e a senha ao funcionário. Esqueceu? Use "Resetar senha" na lista.</p>
-            </div>
 
-            <div class="pos-divider"></div>
-            <h3>Como funciona</h3>
-            <div class="pos-tip-list">
-              <div><i data-lucide="shield-check"></i><span>Você escolhe quais telas o funcionário enxerga.</span></div>
-              <div><i data-lucide="lock"></i><span>Configurações é só sua — nunca dá pra liberar.</span></div>
-              <div><i data-lucide="user-x"></i><span>Saiu da loja? É só desativar o login dele aqui.</span></div>
-            </div>
+            <!-- Funcionário aberto -->
+            <template x-if="selectedFuncionario">
+              <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                  <span style="width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;background:var(--pos-surface-2,#f1f5f9);color:var(--pos-accent,#2563eb);"
+                        x-text="(selectedFuncionario.label || selectedFuncionario.username || '?').slice(0,2).toUpperCase()"></span>
+                  <div style="min-width:0;">
+                    <b x-text="selectedFuncionario.label || 'Funcionário'"></b>
+                    <small style="display:block;color:var(--pos-muted,#94a3b8);"
+                           x-text="'usuário ' + (selectedFuncionario.username || '—') + ' · último acesso ' + (selectedFuncionario.last_used_at ? formatDate(selectedFuncionario.last_used_at) : 'nunca')"></small>
+                  </div>
+                </div>
+
+                <div class="pos-divider"></div>
+                <h3 style="margin:0 0 2px;">O que o funcionário pode ver</h3>
+                <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                  <i data-lucide="info" style="width:13px;height:13px;"></i>
+                  Vale pra <b>todos os funcionários</b> por enquanto (um perfil só). O acesso separado por pessoa vem no próximo passo.
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:4px;">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.vendas" style="width:auto;"> Vendas</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.estoque" style="width:auto;"> Estoque</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.pedidos" style="width:auto;"> Pedidos</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.clientes" style="width:auto;"> Clientes</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.entregas" style="width:auto;"> Entrega</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.retiradas" style="width:auto;"> Retiradas</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.batepapo" style="width:auto;"> Bate-papo</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.resumo" style="width:auto;"> Resumo</label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="permForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
+                </div>
+                <button @click="savePermissoes()" :disabled="saving" class="pos-form-submit success" style="margin-top:12px;">
+                  <i data-lucide="shield-check"></i>
+                  <span x-text="isSaving('permissoes') ? 'Salvando...' : 'Salvar permissões'"></span>
+                </button>
+
+                <!-- Ações do login (só ativo): resetar senha inline + desativar inline -->
+                <template x-if="!selectedFuncionario.revoked_at">
+                  <div>
+                    <div class="pos-divider"></div>
+                    <h3 style="margin:0 0 6px;">Senha e acesso</h3>
+                    <label>Nova senha (mín. 6)
+                      <input type="password" x-model="resetSenhaValue" autocomplete="new-password" placeholder="Digite a nova senha" maxlength="200" />
+                    </label>
+                    <button @click="confirmResetSenha(selectedFuncionario)" :disabled="saving || resetSenhaValue.length < 6" class="pos-outline-action compact" style="margin-top:6px;">
+                      <i data-lucide="key-round"></i>
+                      <span x-text="isSaving('funcionario') ? 'Salvando...' : 'Salvar nova senha'"></span>
+                    </button>
+
+                    <div style="margin-top:14px;">
+                      <button x-show="revokeConfirmId !== selectedFuncionario.id"
+                              @click="revokeConfirmId = selectedFuncionario.id; $nextTick(() => lucide.createIcons())"
+                              class="pos-outline-action compact">
+                        <i data-lucide="user-x"></i> Desativar login
+                      </button>
+                      <div x-show="revokeConfirmId === selectedFuncionario.id" style="display:flex;flex-direction:column;gap:6px;">
+                        <span style="font-size:13px;color:#fb7185;">Desativar? Ele perde o acesso na hora.</span>
+                        <span style="display:flex;gap:6px;">
+                          <button @click="doRevoke(selectedFuncionario)" :disabled="saving" class="pos-outline-action compact">Sim, desativar</button>
+                          <button @click="revokeConfirmId = null" class="pos-outline-action compact">Cancelar</button>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="selectedFuncionario.revoked_at">
+                  <p style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
+                    <i data-lucide="user-x" style="width:14px;height:14px;"></i> Login desativado — sem acesso ao painel.
+                  </p>
+                </template>
+              </div>
+            </template>
+
+            <!-- Nenhum selecionado → adicionar funcionário -->
+            <template x-if="!selectedFuncionario">
+              <div>
+                <h3>Adicionar funcionário</h3>
+                <div class="pos-stock-side-form">
+                  <label>Nome do funcionário (opcional)
+                    <input x-model="funcionarioForm.label" placeholder="Ex: João do balcão" maxlength="120" />
+                  </label>
+                  <label>Usuário
+                    <input x-model="funcionarioForm.username" placeholder="Ex: joao" maxlength="60" autocomplete="off" />
+                  </label>
+                  <label>Senha (mín. 6)
+                    <input type="password" x-model="funcionarioForm.password" placeholder="Senha inicial" maxlength="200" autocomplete="new-password" />
+                  </label>
+                  <button @click="createFuncionario()" :disabled="saving" class="pos-form-submit success">
+                    <i data-lucide="user-plus"></i>
+                    <span x-text="isSaving('funcionario') ? 'Criando...' : 'Criar login de funcionário'"></span>
+                  </button>
+                  <p style="margin:8px 0 0;font-size:12px;color:var(--pos-muted,#94a3b8);">Passe o usuário e a senha ao funcionário. Depois clique nele na lista pra resetar a senha ou ajustar o acesso.</p>
+                </div>
+
+                <div class="pos-divider"></div>
+                <h3>Como funciona</h3>
+                <div class="pos-tip-list">
+                  <div><i data-lucide="shield-check"></i><span>Você escolhe quais telas o funcionário enxerga.</span></div>
+                  <div><i data-lucide="lock"></i><span>Configurações é só sua — nunca dá pra liberar.</span></div>
+                  <div><i data-lucide="user-x"></i><span>Saiu da loja? Clique nele e desative o login.</span></div>
+                </div>
+              </div>
+            </template>
           </aside>
         </div>
       </section>
