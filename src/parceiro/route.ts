@@ -91,6 +91,13 @@ import {
   updatePartnerArea,
   searchPartnerBairros,
   upsertPartnerPermissions,
+  getPartnerTokenPermissions,
+  upsertPartnerTokenPermissions,
+  getPartnerTokenCommission,
+  upsertPartnerTokenCommission,
+  getPartnerCommissionTeam,
+  getPartnerMyPerformance,
+  FuncionarioNotFoundError,
   type PartnerServiceMode,
 } from './queries.js';
 import { env } from '../shared/config/env.js';
@@ -272,6 +279,13 @@ const funcionarioParamsSchema = paramsSchema.extend({
 });
 const resetSenhaSchema = z.object({
   password: passwordField,
+});
+// Comissão por pessoa (Bloco 2, 0100): % ou valor fixo. O servidor normaliza
+// (value<0 vira 0; kind fora da lista vira 'percent'). active=false desliga.
+const comissaoSchema = z.object({
+  kind: z.enum(['percent', 'fixed']),
+  value: z.number().nonnegative().max(1_000_000),
+  active: z.boolean(),
 });
 
 // Login por usuário+senha (público — é a porta de entrada).
@@ -627,6 +641,73 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const result = await revokePartnerFuncionario(getPartnerContext(request), parsed.data.tokenId);
     if (!result.revoked) return reply.status(404).send({ error: 'funcionario_not_found' });
     return reply.status(200).send(result);
+  });
+
+  // ── Bloco 2 (0100): acesso + comissão POR PESSOA. Tudo ownerOnly e escopado à
+  // própria unidade dentro das queries (assertUnitFuncionario → 404 se não for dele). ──
+
+  // Drawer do funcionário: telas efetivas + comissão configurada (pro dono editar).
+  fastify.get('/parceiro/:slug/api/funcionarios/:tokenId/config', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const params = funcionarioParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    try {
+      const ctx = getPartnerContext(request);
+      const [permissions, commission] = await Promise.all([
+        getPartnerTokenPermissions(ctx, params.data.tokenId),
+        getPartnerTokenCommission(ctx, params.data.tokenId),
+      ]);
+      return reply.status(200).send({ permissions, commission });
+    } catch (err) {
+      if (err instanceof FuncionarioNotFoundError) return reply.status(404).send({ error: 'funcionario_not_found' });
+      throw err;
+    }
+  });
+
+  // Dono grava as telas de UM funcionário (por pessoa). Allowlist no servidor.
+  fastify.put('/parceiro/:slug/api/funcionarios/:tokenId/permissoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const params = funcionarioParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    const body = configPermissoesSchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      const issue = body.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    try {
+      const permissions = await upsertPartnerTokenPermissions(getPartnerContext(request), params.data.tokenId, body.data);
+      return reply.status(200).send({ permissions });
+    } catch (err) {
+      if (err instanceof FuncionarioNotFoundError) return reply.status(404).send({ error: 'funcionario_not_found' });
+      throw err;
+    }
+  });
+
+  // Dono grava a comissão de UM funcionário (% ou fixo).
+  fastify.put('/parceiro/:slug/api/funcionarios/:tokenId/comissao', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const params = funcionarioParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'funcionario_not_found' });
+    const body = comissaoSchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      const issue = body.error.issues[0];
+      return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
+    }
+    try {
+      const commission = await upsertPartnerTokenCommission(getPartnerContext(request), params.data.tokenId, body.data);
+      return reply.status(200).send({ commission });
+    } catch (err) {
+      if (err instanceof FuncionarioNotFoundError) return reply.status(404).send({ error: 'funcionario_not_found' });
+      throw err;
+    }
+  });
+
+  // Card "Comissão da equipe" do dono (no Financeiro): soma do mês por funcionário.
+  fastify.get('/parceiro/:slug/api/comissao/equipe', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send(await getPartnerCommissionTeam(getPartnerContext(request)));
+  });
+
+  // "Meu desempenho": QUALQUER logado, mas a query é amarrada a ctx.tokenId — a
+  // pessoa só vê o PRÓPRIO (dono ou funcionário). Sem :tokenId no caminho de propósito.
+  fastify.get('/parceiro/:slug/api/meu-desempenho', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    return reply.status(200).send(await getPartnerMyPerformance(getPartnerContext(request)));
   });
 
   // ─────────────────────────────────────────────────────────────────────────

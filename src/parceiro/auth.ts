@@ -218,11 +218,11 @@ export async function requireOwner(request: PartnerAuthedRequest, reply: Fastify
 /**
  * Resolve as permissões EFETIVAS de tela do contexto (PLANO §2.3, gate §5.5).
  *
- *   - owner        → todas as 8 telas true (resolvido no código, sem ler tabela).
- *   - funcionário  → lê network.partner_unit_permissions da unidade (pool admin,
- *                    escopado por partner_unit_id + environment). LINHA AUSENTE =
- *                    defaults da Etapa 4 (operacional ON, Resumo/Financeiro OFF) —
- *                    funcionário existente não muda de comportamento.
+ *   - owner        → todas as 9 telas true (resolvido no código, sem ler tabela).
+ *   - funcionário  → POR PESSOA (0100): lê network.partner_token_permissions do
+ *                    vínculo (token_id) → SENÃO partner_unit_permissions da loja
+ *                    (0087, retrocompat) → SENÃO defaults da Etapa 4 (operacional ON,
+ *                    Resumo/Financeiro OFF). SEM linha per-token = comportamento de hoje.
  *
  * 🔒 FAIL-SAFE (gate §5.3): qualquer erro ao LER o perfil → menor privilégio.
  * Aqui isso significa cair nos defaults da Etapa 4 (NÃO concede dinheiro;
@@ -230,45 +230,62 @@ export async function requireOwner(request: PartnerAuthedRequest, reply: Fastify
  *
  * Sempre derivado no servidor; nunca aceito do cliente.
  */
+type PermissionRow = {
+  allow_vendas: boolean;
+  allow_estoque: boolean;
+  allow_pedidos: boolean;
+  allow_clientes: boolean;
+  allow_entregas: boolean;
+  allow_retiradas: boolean;
+  allow_batepapo: boolean;
+  allow_resumo: boolean;
+  allow_financeiro: boolean;
+};
+
+function permissionRowToPermissions(row: PermissionRow): PartnerPermissions {
+  return {
+    vendas: row.allow_vendas,
+    estoque: row.allow_estoque,
+    pedidos: row.allow_pedidos,
+    clientes: row.allow_clientes,
+    entregas: row.allow_entregas,
+    retiradas: row.allow_retiradas,
+    batepapo: row.allow_batepapo,
+    resumo: row.allow_resumo,
+    financeiro: row.allow_financeiro,
+  };
+}
+
 export async function resolvePartnerPermissions(context: PartnerContext): Promise<PartnerPermissions> {
   if (context.role === 'owner') {
     return { ...OWNER_PERMISSIONS };
   }
   try {
-    const result = await pool.query<{
-      allow_vendas: boolean;
-      allow_estoque: boolean;
-      allow_pedidos: boolean;
-      allow_clientes: boolean;
-      allow_entregas: boolean;
-      allow_retiradas: boolean;
-      allow_batepapo: boolean;
-      allow_resumo: boolean;
-      allow_financeiro: boolean;
-    }>(
+    // (1) Perfil POR PESSOA (vínculo = token_id), 0100. Tem prioridade.
+    const perToken = await pool.query<PermissionRow>(
+      `SELECT allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
+              allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro
+         FROM network.partner_token_permissions
+        WHERE token_id = $1 AND environment = $2`,
+      [context.tokenId, context.environment],
+    );
+    if (perToken.rows[0]) return permissionRowToPermissions(perToken.rows[0]);
+
+    // (2) Retrocompat: perfil POR LOJA (0087). Vínculo ainda sem perfil próprio.
+    const perUnit = await pool.query<PermissionRow>(
       `SELECT allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
               allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro
          FROM network.partner_unit_permissions
         WHERE partner_unit_id = $1 AND environment = $2`,
       [context.partnerUnitId, context.environment],
     );
-    const row = result.rows[0];
-    // Linha ausente ⇒ defaults da Etapa 4 (= comportamento de hoje).
-    if (!row) return { ...EMPLOYEE_DEFAULT_PERMISSIONS };
-    return {
-      vendas: row.allow_vendas,
-      estoque: row.allow_estoque,
-      pedidos: row.allow_pedidos,
-      clientes: row.allow_clientes,
-      entregas: row.allow_entregas,
-      retiradas: row.allow_retiradas,
-      batepapo: row.allow_batepapo,
-      resumo: row.allow_resumo,
-      financeiro: row.allow_financeiro,
-    };
+    if (perUnit.rows[0]) return permissionRowToPermissions(perUnit.rows[0]);
+
+    // (3) Nenhum perfil ⇒ defaults da Etapa 4 (= comportamento de hoje).
+    return { ...EMPLOYEE_DEFAULT_PERMISSIONS };
   } catch (err) {
     // Fail-safe: erro de leitura → menor privilégio (defaults; dinheiro NEGADO).
-    logger.error({ err, partnerUnitId: context.partnerUnitId }, 'resolvePartnerPermissions_failed_denying_money');
+    logger.error({ err, tokenId: context.tokenId, partnerUnitId: context.partnerUnitId }, 'resolvePartnerPermissions_failed_denying_money');
     return { ...EMPLOYEE_DEFAULT_PERMISSIONS };
   }
 }
