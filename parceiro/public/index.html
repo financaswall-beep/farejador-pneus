@@ -212,8 +212,8 @@
     <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-company">
-          <div class="font-bold">Pneus Max Moto Center</div>
-          <div class="text-xs text-slate-400">Loja Matriz • São Paulo - SP <i data-lucide="chevron-down" class="inline w-3 h-3"></i></div>
+          <div class="font-bold" x-text="unitName || partnerName || 'Minha loja'">Minha loja</div>
+          <div class="text-xs text-slate-400" x-show="partnerName && partnerName !== unitName" x-text="partnerName"></div>
         </div>
         <div class="pos-global-search">
           <i data-lucide="search"></i>

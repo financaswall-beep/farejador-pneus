@@ -50,6 +50,8 @@ function parceiroApp() {
     lastUpdatedAt: null,
     currentSection: 'resumo',
     role: '',  // Etapa 4: 'owner' | 'funcionario' — vem de /api/me. Default vazio (não-dono) até resolver, pra não piscar menu proibido.
+    unitName: '',     // nome da loja logada (de /api/me) — mostrado no topo p/ saber em qual unidade se está (porta única 0095)
+    partnerName: '',  // nome do parceiro (de /api/me) — 2ª linha do topo quando difere do nome da loja
     // Mapa EFETIVO das 8 telas, resolvido no servidor (/api/me.permissions). Default
     // conservador (tudo false) até resolver — o menu só aparece depois do /api/me.
     permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false },

@@ -145,6 +145,10 @@ window.PARCEIRO_MODULES.core = () => ({
         // bater nos endpoints de financeiro (403) — /api/me é liberado pros dois.
         const me = await this.api('me');
         this.role = me.role === 'owner' ? 'owner' : 'funcionario';
+        // Nome da loja logada (porta única 0095): com 1 conta abrindo N lojas, o topo
+        // PRECISA dizer em qual unidade se está. Vem do servidor (ctx do token validado).
+        this.unitName = me.unit_name || '';
+        this.partnerName = me.partner_name || '';
         // permissions efetivo vem do servidor (gate §5.5); guardamos pra pintar o menu.
         if (me.permissions && typeof me.permissions === 'object') {
           this.permissions = { ...this.permissions, ...me.permissions };

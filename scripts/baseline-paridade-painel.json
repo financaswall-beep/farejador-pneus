@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-11T05:35:24.970Z",
+  "geradoEm": "2026-06-12T05:25:07.687Z",
   "commitBase": "c0d7913",
-  "total": 465,
+  "total": 467,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -245,6 +245,7 @@
     "ordersOpenCount": "getter",
     "ordersOpenList": "getter",
     "parseTireSize": "function",
+    "partnerName": "value:string",
     "partnerSalesShareLabel": "getter",
     "payableCategoryLabel": "function",
     "payableForm": "value:object",
@@ -461,6 +462,7 @@
     "tokenKey": "value:string",
     "totalCusts": "getter",
     "trendBadgeLabel": "getter",
+    "unitName": "value:string",
     "unlockAudio": "function",
     "updateCustomer": "function",
     "uuid": "function",
