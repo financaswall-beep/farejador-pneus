@@ -3322,6 +3322,23 @@ export async function getPartnerMyPerformance(ctx: PartnerContext): Promise<Part
   };
 }
 
+/**
+ * Nome de exibição do login ATUAL (chip do topo). Só o PRÓPRIO (ctx.tokenId) —
+ * não lê de ninguém. Mata o "Caixa 01" chumbado no front.
+ */
+export async function getPartnerSelfIdentity(
+  ctx: PartnerContext,
+): Promise<{ display_name: string | null; username: string | null }> {
+  const res = await pool.query<{ label: string | null; username: string | null }>(
+    `SELECT label, login_username AS username
+       FROM network.partner_access_tokens
+      WHERE id = $1 AND environment = $2`,
+    [ctx.tokenId, ctx.environment],
+  );
+  const row = res.rows[0];
+  return { display_name: row?.label || row?.username || null, username: row?.username || null };
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // P1 — Login de verdade (usuário + senha) + sessões
 //

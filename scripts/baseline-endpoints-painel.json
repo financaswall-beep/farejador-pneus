@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-12T15:36:40.059Z",
+  "geradoEm": "2026-06-12T19:35:34.200Z",
   "commitBase": "c0d7913",
-  "total": 72,
+  "total": 74,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -15,6 +15,7 @@
     "call:this.api('clientes', { method: 'POST', body: JSON.stringify(payload), })",
     "call:this.api('clientes/' + id, { method: 'DELETE' })",
     "call:this.api('clientes/' + this.editingCustomerId, { method: 'PUT', body: JSON.stringify(payload), })",
+    "call:this.api('comissao/equipe')",
     "call:this.api('compras', { method: 'POST', body: JSON.stringify({ supplier_name: this.purchaseForm.supplier_name.trim() || null, payment_status: this.purchaseForm.payment_status || 'paid_now', payable_due_date: this.purchaseForm.payment_status === 'payable' ? (this.purchaseForm.payable_due_date || null) : null, idempotency_key: this.uuid(), items: [{ item_name: this.purchaseForm.item_name.trim(), tire_size: tireSize, tire_width_mm: tireSize ? this.num(this.purchaseForm.tire_width) : null, tire_aspect_ratio: tireSize ? this.num(this.purchaseForm.tire_aspect) : null, tire_rim_diameter: tireSize ? this.num(this.purchaseForm.tire_rim) : null, brand: this.purchaseForm.brand.trim() || null, quantity: this.num(this.purchaseForm.quantity) || 1, unit_cost: this.num(this.purchaseForm.unit_cost) || 0, sale_price: this.purchaseForm.sale_price !== null && this.purchaseForm.sale_price !== '' ? this.num(this.purchaseForm.sale_price) : null, }], }), })",
     "call:this.api('configuracoes')",
     "call:this.api('configuracoes/area', { method: 'PUT', body: JSON.stringify({ municipio, city_wide: true, neighborhoods: [] }), })",
@@ -30,6 +31,7 @@
     "call:this.api('funcionarios')",
     "call:this.api('funcionarios', { method: 'POST', body: JSON.stringify({ label: (this.funcionarioForm.label || '').trim() || null, username, password, }), })",
     "call:this.api('me')",
+    "call:this.api('meu-desempenho')",
     "call:this.api('photo-requests')",
     "call:this.api('vendas', { method: 'POST', body: JSON.stringify(body) })",
     "call:this.api('vendas', { method: 'POST', body: JSON.stringify(body) })",

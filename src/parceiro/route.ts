@@ -97,6 +97,7 @@ import {
   upsertPartnerTokenCommission,
   getPartnerCommissionTeam,
   getPartnerMyPerformance,
+  getPartnerSelfIdentity,
   FuncionarioNotFoundError,
   type PartnerServiceMode,
 } from './queries.js';
@@ -591,12 +592,17 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // linha). Nunca aceito do cliente. Configurações NÃO está aqui (segue isOwner).
   fastify.get('/parceiro/:slug/api/me', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
     const ctx = getPartnerContext(request);
-    const permissions = await resolvePartnerPermissions(ctx);
+    const [permissions, self] = await Promise.all([
+      resolvePartnerPermissions(ctx),
+      getPartnerSelfIdentity(ctx),
+    ]);
     return reply.status(200).send({
       role: ctx.role,
       slug: ctx.slug,
       partner_name: ctx.partnerName,
       unit_name: ctx.unitName,
+      display_name: self.display_name,  // chip do topo (mata o "Caixa 01" chumbado)
+      username: self.username,
       permissions,
     });
   });

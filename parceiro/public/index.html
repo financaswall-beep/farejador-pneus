@@ -243,12 +243,52 @@
         <button class="pos-theme-toggle-mobile" @click="logout()" title="Sair da conta">
           <i data-lucide="log-out"></i>
         </button>
-        <div class="pos-user">
+        <div class="pos-user" @click="openMeuDesempenho()" style="cursor:pointer;" title="Ver meu desempenho">
           <div><i data-lucide="user"></i></div>
-          <span><strong>Caixa 01</strong><small>Operador</small></span>
+          <span><strong x-text="selfName || (isOwner ? 'Dono' : 'Operador')"></strong><small x-text="isOwner ? 'Dono' : 'Funcionário'"></small></span>
           <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
         </div>
       </header>
+
+      <!-- #3 Meu desempenho (modal pelo chip do topo). Self-only: o servidor amarra a
+           ctx.tokenId, então a pessoa só vê o PRÓPRIO. Vive aqui (fora das seções) pra
+           o chip abrir de qualquer aba. -->
+      <div class="pos-modal-overlay" x-show="perfOpen" x-cloak @click.self="closeMeuDesempenho()">
+        <div class="pos-modal">
+          <div class="pos-modal-head">
+            <h3>Meu desempenho — este mês</h3>
+            <button class="pos-modal-close" @click="closeMeuDesempenho()"><i data-lucide="x"></i></button>
+          </div>
+          <div style="padding:4px 2px;">
+            <div x-show="!perf" class="pos-empty">Carregando…</div>
+            <template x-if="perf">
+              <div>
+                <div class="pos-finance-cards pos-finance-cards-flow" style="margin-bottom:12px;">
+                  <article><small>Minhas vendas</small><strong x-text="perf.finalized_sales"></strong><span>finalizadas no mês</span></article>
+                  <article><small>Faturei</small><strong x-text="money(perf.gross_sales)"></strong><span>valor cheio</span></article>
+                  <article><small>Minha comissão</small><strong x-text="money(perf.commission_amount)"></strong>
+                    <span x-text="perf.commission_active ? (perf.commission_kind === 'fixed' ? ('R$ ' + perf.commission_value + '/venda') : (perf.commission_value + '% por venda')) : 'sem comissão'"></span></article>
+                </div>
+                <p style="margin:0 0 6px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                  <i data-lucide="info" style="width:13px;height:13px;"></i>
+                  Suas vendas no mês. O total da comissão acima é a soma desta lista — confere no centavo.
+                </p>
+                <div x-show="!perf.sales.length" class="pos-empty">Nenhuma venda finalizada por você neste mês ainda.</div>
+                <template x-for="s in perf.sales" :key="s.order_id">
+                  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--pos-border,#e2e8f0);">
+                    <span style="flex:1;min-width:0;">
+                      <b x-text="money(s.amount)"></b>
+                      <small style="display:block;color:var(--pos-muted,#94a3b8);"
+                             x-text="perfCanal(s) + ' · ' + perfStatus(s) + ' · ' + formatDate(s.created_at)"></small>
+                    </span>
+                    <strong x-text="money(s.commission_amount)" style="color:var(--pos-accent,#2563eb);"></strong>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
 
       <!-- FOTO SOB DEMANDA: banner GLOBAL — o borracheiro pode estar em qualquer
            aba quando o pedido de foto cai. Some dentro do próprio Bate-papo
@@ -1448,6 +1488,34 @@
               <article><small>Recebido no mês</small><strong x-text="money(receivablesReceivedMonthTotal)"></strong><span>entradas confirmadas</span></article>
             </div>
 
+            <!-- #2 Comissão da equipe (só o dono): o que você deve a cada funcionário no
+                 mês pelas vendas que ELE finalizou. Vira conta a pagar (competência). -->
+            <div x-show="isOwner" style="margin-top:18px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <h4 style="margin:0;">Comissão da equipe — este mês</h4>
+                <strong x-text="money(commissionTeam.total_commission)" style="font-size:18px;color:var(--pos-accent,#2563eb);"></strong>
+              </div>
+              <p style="margin:2px 0 10px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i>
+                O que você deve a cada um pelas vendas que ele finalizou. Configure em Configurações → Equipe.
+              </p>
+              <div x-show="!commissionTeam.rows.length" class="pos-empty">
+                Ninguém com comissão ainda. Defina a comissão de cada funcionário em Configurações → Equipe.
+              </div>
+              <template x-for="r in commissionTeam.rows" :key="r.token_id">
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--pos-border,#e2e8f0);">
+                  <span style="width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;background:var(--pos-surface-2,#f1f5f9);color:var(--pos-accent,#2563eb);"
+                        x-text="(r.label || r.username || '?').slice(0,2).toUpperCase()"></span>
+                  <span style="flex:1;min-width:0;">
+                    <b x-text="r.label || r.username || 'Funcionário'"></b>
+                    <small style="display:block;color:var(--pos-muted,#94a3b8);"
+                           x-text="r.finalized_sales + ' venda(s) · ' + money(r.gross_sales) + ' · ' + commLabel(r)"></small>
+                  </span>
+                  <strong x-text="money(r.commission_amount)"></strong>
+                </div>
+              </template>
+            </div>
+
             <div class="pos-chart-grid">
               <article class="pos-chart-card">
                 <div>
@@ -2461,6 +2529,7 @@
 <script src="./app.chat.cliente.js?v=20260611-onda-c"></script>
 <script src="./app.config.js?v=20260612-bloco2"></script>
 <script src="./app.config.equipe.js?v=20260612-bloco2"></script>
+<script src="./app.comissao.js?v=20260612-bloco2b"></script>
 <script src="./app.estoque.kpis.js?v=20260611-onda-c"></script>
 <script src="./app.estoque.forms.js?v=20260611-onda-c"></script>
 <script src="./app.pdv.kpis.js?v=20260611-onda-c"></script>
@@ -2471,11 +2540,11 @@
 <script src="./app.financeiro.compras.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
-<script src="./app.core.js?v=20260611-onda-c"></script>
+<script src="./app.core.js?v=20260612-bloco2b"></script>
 <script src="./app.auth.js?v=20260611-onda-c"></script>
 <script src="./app.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260611-onda-c"></script>
-<script src="./app.js?v=20260612-bloco2"></script>
+<script src="./app.js?v=20260612-bloco2b"></script>
 </body>
 </html>

@@ -149,6 +149,7 @@ window.PARCEIRO_MODULES.core = () => ({
         // PRECISA dizer em qual unidade se está. Vem do servidor (ctx do token validado).
         this.unitName = me.unit_name || '';
         this.partnerName = me.partner_name || '';
+        this.selfName = me.display_name || '';  // chip do topo (mata o "Caixa 01" chumbado)
         // permissions efetivo vem do servidor (gate §5.5); guardamos pra pintar o menu.
         if (me.permissions && typeof me.permissions === 'object') {
           this.permissions = { ...this.permissions, ...me.permissions };
@@ -205,6 +206,7 @@ window.PARCEIRO_MODULES.core = () => ({
           this.payables = payables;
           this.receivables = receivables;
           this.fluxoCaixa = fluxo;
+          await this.loadCommissionTeam(); // #2 card Comissão da equipe (owner-only por dentro)
         }
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {
