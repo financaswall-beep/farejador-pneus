@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260606-config-fix" />
+  <link rel="stylesheet" href="./style.css?v=20260612-config-padrao" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 </head>
@@ -2212,9 +2212,18 @@
               <p>Nome, endereço e horário que o robô usa pra responder o cliente.</p>
             </div></div>
             <div class="pos-stock-side-form" style="max-width:640px;">
+              <!-- Seção: Identificação -->
+              <div class="pos-config-sec"><i data-lucide="id-card"></i><h3>Identificação</h3></div>
+              <p class="pos-config-hint">O nome que o robô usa ao falar da sua loja.</p>
               <label>Nome de exibição
                 <input x-model="lojaForm.display_name" placeholder="Ex: Pneus Max Niterói" maxlength="200" />
               </label>
+
+              <div class="pos-divider" style="margin:16px 0 12px;"></div>
+
+              <!-- Seção: Endereço -->
+              <div class="pos-config-sec"><i data-lucide="map-pin"></i><h3>Endereço</h3></div>
+              <p class="pos-config-hint">Prepara a localização da sua loja na Rede.</p>
               <div class="cx-pick-row" style="grid-template-columns:3fr 1fr">
                 <label>Rua <input x-model="lojaForm.address_street" placeholder="Ex: Av. Brasil" maxlength="240" /></label>
                 <label>Nº <input x-model="lojaForm.address_number" placeholder="123" maxlength="40" /></label>
@@ -2227,14 +2236,20 @@
                 <label>Complemento <input x-model="lojaForm.address_complement" placeholder="Loja 2, ponto de referência" maxlength="240" /></label>
                 <label>CEP <input x-model="lojaForm.cep" placeholder="00000-000" maxlength="20" /></label>
               </div>
+
+              <div class="pos-divider" style="margin:16px 0 12px;"></div>
+
+              <!-- Seção: Horário e localização -->
+              <div class="pos-config-sec"><i data-lucide="clock"></i><h3>Horário e localização</h3></div>
+              <p class="pos-config-hint">O robô manda isso pro cliente na retirada / quando perguntam onde fica.</p>
               <label>Horário de funcionamento (texto livre)
                 <input x-model="lojaForm.opening_hours_text" placeholder="Ex: Seg–Sex 8h–18h, Sáb 8h–12h" maxlength="500" />
               </label>
               <label>Link da localização no Google Maps
                 <input x-model="lojaForm.maps_url" placeholder="Cole o link do Google Maps da sua loja" maxlength="600" />
-                <small style="color:var(--pos-muted,#94a3b8);font-size:11px;">O robô manda este link pro cliente na retirada / quando perguntam onde fica.</small>
               </label>
-              <button @click="saveLoja()" :disabled="saving" class="pos-form-submit success">
+
+              <button @click="saveLoja()" :disabled="saving" class="pos-form-submit success" style="margin-top:16px;">
                 <i data-lucide="save"></i>
                 <span x-text="isSaving('loja') ? 'Salvando...' : 'Salvar dados da loja'"></span>
               </button>
@@ -2253,16 +2268,19 @@
         <div x-show="configTab === 'atendimento'" class="pos-page-grid customers">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head"><div>
-              <h3>Como você atende</h3>
-              <p>Marque pelo menos uma opção. O robô usa isso pra falar com o cliente.</p>
+              <h3>Atendimento</h3>
+              <p>Como você atende e onde sua loja fica — o robô usa isso pra falar com o cliente.</p>
             </div></div>
             <div class="pos-stock-side-form" style="max-width:560px;">
+              <!-- Seção: Como você atende -->
+              <div class="pos-config-sec"><i data-lucide="bike"></i><h3>Como você atende</h3></div>
+              <p class="pos-config-hint">Marque pelo menos uma opção.</p>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                 <input type="checkbox" x-model="atendimentoForm.faz_entrega" style="width:auto;" />
                 <span><b>Faço entrega</b> — levo o pneu até o cliente.</span>
               </label>
               <!-- Raio de entrega (proximidade-primeiro Fase 2): só quando faz entrega. -->
-              <div x-show="atendimentoForm.faz_entrega" style="margin:2px 0 6px 28px;padding-left:12px;border-left:2px solid #e2e8f0;">
+              <div x-show="atendimentoForm.faz_entrega" style="margin:2px 0 6px 28px;padding-left:12px;border-left:2px solid var(--pos-border,#e2e8f0);">
                 <label style="display:block;">Até quantos km você entrega?
                   <span style="display:flex;align-items:center;gap:8px;margin-top:4px;">
                     <input type="number" min="0" step="0.5" inputmode="decimal"
@@ -2271,7 +2289,7 @@
                     <span>km</span>
                   </span>
                 </label>
-                <p style="color:#64748b;font-size:12px;margin:6px 0 0;">
+                <p style="color:var(--pos-muted,#94a3b8);font-size:12px;margin:6px 0 0;">
                   A Rede só te manda entrega dentro desse raio. A retirada não tem limite. Pode mudar quando quiser.
                 </p>
                 <p x-show="atendimentoForm.delivery_radius_km === null || atendimentoForm.delivery_radius_km === '' || atendimentoForm.delivery_radius_km === undefined"
@@ -2289,10 +2307,11 @@
               <!-- Cidade base (era a aba "Área de entrega", absorvida no Bloco 1).
                    É o plano B de localização: quando o cliente não manda o pino, a Rede
                    usa o município. A entrega de verdade é decidida pelo RAIO acima. -->
-              <div class="pos-divider" style="margin:6px 0;"></div>
+              <div class="pos-divider" style="margin:16px 0 12px;"></div>
+              <div class="pos-config-sec"><i data-lucide="map-pin"></i><h3>Localização base</h3></div>
+              <p class="pos-config-hint">O plano B de quando o cliente não manda a localização. Quem decide a entrega é o <b>raio em km</b> acima.</p>
               <label>Cidade base da loja
                 <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
-                <small style="color:var(--pos-muted,#94a3b8);font-size:11px;">Referência de quando o cliente ainda não mandou a localização. Quem decide a entrega é o <b>raio em km</b> acima.</small>
               </label>
 
               <button @click="saveAtendimento()" :disabled="saving || (!atendimentoForm.faz_entrega && !atendimentoForm.tem_retirada)" class="pos-form-submit success">
@@ -2375,9 +2394,8 @@
                 <template x-if="funcConfigLoaded">
                   <div>
                     <div class="pos-divider"></div>
-                    <h3 style="margin:0 0 2px;">O que <span x-text="selectedFuncionario.label || 'o funcionário'"></span> pode ver</h3>
-                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                      <i data-lucide="info" style="width:13px;height:13px;"></i>
+                    <div class="pos-config-sec"><i data-lucide="eye"></i><h3>O que <span x-text="selectedFuncionario.label || 'o funcionário'"></span> pode ver</h3></div>
+                    <p class="pos-config-hint">
                       Vale só pra <b>esta pessoa</b> — cada funcionário tem o próprio acesso.
                       <span x-text="'Vê ' + funcPermCount + ' de 9 telas.'"></span>
                     </p>
@@ -2395,9 +2413,8 @@
 
                     <!-- Comissão por pessoa -->
                     <div class="pos-divider"></div>
-                    <h3 style="margin:0 0 2px;">Comissão</h3>
-                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                      <i data-lucide="info" style="width:13px;height:13px;"></i>
+                    <div class="pos-config-sec"><i data-lucide="percent"></i><h3>Comissão</h3></div>
+                    <p class="pos-config-hint">
                       Sobre o valor cheio das vendas que <b>esta pessoa finaliza</b> no mês. Vira conta a pagar no Financeiro.
                     </p>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
@@ -2428,7 +2445,7 @@
                 <template x-if="!selectedFuncionario.revoked_at">
                   <div>
                     <div class="pos-divider"></div>
-                    <h3 style="margin:0 0 6px;">Senha e acesso</h3>
+                    <div class="pos-config-sec" style="margin-bottom:6px;"><i data-lucide="lock"></i><h3>Senha e acesso</h3></div>
                     <label>Nova senha (mín. 6)
                       <input type="password" x-model="resetSenhaValue" autocomplete="new-password" placeholder="Digite a nova senha" maxlength="200" />
                     </label>
