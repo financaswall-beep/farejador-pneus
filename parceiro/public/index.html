@@ -33,7 +33,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260612-config-padrao" />
+  <link rel="stylesheet" href="./style.css?v=20260606-config-fix" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 </head>
@@ -2213,8 +2213,10 @@
             </div></div>
             <div class="pos-stock-side-form" style="max-width:640px;">
               <!-- Seção: Identificação -->
-              <div class="pos-config-sec"><i data-lucide="id-card"></i><h3>Identificação</h3></div>
-              <p class="pos-config-hint">O nome que o robô usa ao falar da sua loja.</p>
+              <h3 style="font-size:15px;font-weight:800;margin:0 0 2px;">Identificação</h3>
+              <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> O nome que o robô usa ao falar da sua loja.
+              </p>
               <label>Nome de exibição
                 <input x-model="lojaForm.display_name" placeholder="Ex: Pneus Max Niterói" maxlength="200" />
               </label>
@@ -2222,8 +2224,10 @@
               <div class="pos-divider" style="margin:16px 0 12px;"></div>
 
               <!-- Seção: Endereço -->
-              <div class="pos-config-sec"><i data-lucide="map-pin"></i><h3>Endereço</h3></div>
-              <p class="pos-config-hint">Prepara a localização da sua loja na Rede.</p>
+              <h3 style="font-size:15px;font-weight:800;margin:0 0 2px;">Endereço</h3>
+              <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> Prepara a localização da sua loja na Rede.
+              </p>
               <div class="cx-pick-row" style="grid-template-columns:3fr 1fr">
                 <label>Rua <input x-model="lojaForm.address_street" placeholder="Ex: Av. Brasil" maxlength="240" /></label>
                 <label>Nº <input x-model="lojaForm.address_number" placeholder="123" maxlength="40" /></label>
@@ -2240,8 +2244,10 @@
               <div class="pos-divider" style="margin:16px 0 12px;"></div>
 
               <!-- Seção: Horário e localização -->
-              <div class="pos-config-sec"><i data-lucide="clock"></i><h3>Horário e localização</h3></div>
-              <p class="pos-config-hint">O robô manda isso pro cliente na retirada / quando perguntam onde fica.</p>
+              <h3 style="font-size:15px;font-weight:800;margin:0 0 2px;">Horário e localização</h3>
+              <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> O robô manda isso pro cliente na retirada / quando perguntam onde fica.
+              </p>
               <label>Horário de funcionamento (texto livre)
                 <input x-model="lojaForm.opening_hours_text" placeholder="Ex: Seg–Sex 8h–18h, Sáb 8h–12h" maxlength="500" />
               </label>
@@ -2273,8 +2279,10 @@
             </div></div>
             <div class="pos-stock-side-form" style="max-width:560px;">
               <!-- Seção: Como você atende -->
-              <div class="pos-config-sec"><i data-lucide="bike"></i><h3>Como você atende</h3></div>
-              <p class="pos-config-hint">Marque pelo menos uma opção.</p>
+              <h3 style="font-size:15px;font-weight:800;margin:0 0 2px;">Como você atende</h3>
+              <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> Marque pelo menos uma opção.
+              </p>
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                 <input type="checkbox" x-model="atendimentoForm.faz_entrega" style="width:auto;" />
                 <span><b>Faço entrega</b> — levo o pneu até o cliente.</span>
@@ -2308,8 +2316,10 @@
                    É o plano B de localização: quando o cliente não manda o pino, a Rede
                    usa o município. A entrega de verdade é decidida pelo RAIO acima. -->
               <div class="pos-divider" style="margin:16px 0 12px;"></div>
-              <div class="pos-config-sec"><i data-lucide="map-pin"></i><h3>Localização base</h3></div>
-              <p class="pos-config-hint">O plano B de quando o cliente não manda a localização. Quem decide a entrega é o <b>raio em km</b> acima.</p>
+              <h3 style="font-size:15px;font-weight:800;margin:0 0 2px;">Localização base</h3>
+              <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                <i data-lucide="info" style="width:13px;height:13px;"></i> O plano B de quando o cliente não manda a localização. Quem decide a entrega é o <b>raio em km</b> acima.
+              </p>
               <label>Cidade base da loja
                 <input x-model="areaForm.municipio" placeholder="Ex: Niterói" maxlength="160" />
               </label>
@@ -2394,8 +2404,9 @@
                 <template x-if="funcConfigLoaded">
                   <div>
                     <div class="pos-divider"></div>
-                    <div class="pos-config-sec"><i data-lucide="eye"></i><h3>O que <span x-text="selectedFuncionario.label || 'o funcionário'"></span> pode ver</h3></div>
-                    <p class="pos-config-hint">
+                    <h3 style="margin:0 0 2px;">O que <span x-text="selectedFuncionario.label || 'o funcionário'"></span> pode ver</h3>
+                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                      <i data-lucide="info" style="width:13px;height:13px;"></i>
                       Vale só pra <b>esta pessoa</b> — cada funcionário tem o próprio acesso.
                       <span x-text="'Vê ' + funcPermCount + ' de 9 telas.'"></span>
                     </p>
@@ -2413,8 +2424,9 @@
 
                     <!-- Comissão por pessoa -->
                     <div class="pos-divider"></div>
-                    <div class="pos-config-sec"><i data-lucide="percent"></i><h3>Comissão</h3></div>
-                    <p class="pos-config-hint">
+                    <h3 style="margin:0 0 2px;">Comissão</h3>
+                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
+                      <i data-lucide="info" style="width:13px;height:13px;"></i>
                       Sobre o valor cheio das vendas que <b>esta pessoa finaliza</b> no mês. Vira conta a pagar no Financeiro.
                     </p>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
@@ -2445,7 +2457,7 @@
                 <template x-if="!selectedFuncionario.revoked_at">
                   <div>
                     <div class="pos-divider"></div>
-                    <div class="pos-config-sec" style="margin-bottom:6px;"><i data-lucide="lock"></i><h3>Senha e acesso</h3></div>
+                    <h3 style="margin:0 0 6px;">Senha e acesso</h3>
                     <label>Nova senha (mín. 6)
                       <input type="password" x-model="resetSenhaValue" autocomplete="new-password" placeholder="Digite a nova senha" maxlength="200" />
                     </label>

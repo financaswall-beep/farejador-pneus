@@ -639,34 +639,6 @@ html, body {
   color: #1e3a8a;
 }
 
-/* Cabeçalho de seção das abas de Configurações (padrão da aba Equipe):
-   ícone azul + título, com uma linha de apoio (hint) logo abaixo. Tema claro/escuro. */
-.pos-config-sec {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 2px;
-}
-.pos-config-sec i,
-.pos-config-sec svg {
-  width: 18px;
-  height: 18px;
-  color: #3b82f6;
-  flex: none;
-}
-.pos-config-sec h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-}
-.pos-config-hint {
-  margin: 0 0 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #94a3b8;
-}
-.pos-shell[data-theme="light"] .pos-config-hint { color: #64748b; }
-
 .pos-empty {
   padding: 22px;
   color: #9ca3af;
