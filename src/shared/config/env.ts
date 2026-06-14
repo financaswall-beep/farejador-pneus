@@ -78,6 +78,11 @@ const envSchema = z.object({
   // dormente: bot não cria pedido, expirador não roda, endpoints do painel respondem
   // vazio/404. Ver docs/PLANO_FOTO_SOB_DEMANDA_2026-06-10.md.
   PHOTO_REQUESTS: booleanStringSchema,
+  // PESQUISA DE SATISFAÇÃO (estrelas) — quando o parceiro marca entregue/retirado, o
+  // sistema pergunta a nota (1-5) ao cliente no WhatsApp (commerce.satisfaction_surveys,
+  // 0105) e guarda por loja (ranking interno/discreto). Default OFF = dormente: não
+  // enfileira, dispatcher não roda, captura inerte. Liga só quando o dono mandar.
+  SATISFACTION_SURVEY: booleanStringSchema,
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
