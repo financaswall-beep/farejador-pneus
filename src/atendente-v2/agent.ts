@@ -9,6 +9,7 @@ import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
+import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 
@@ -129,6 +130,19 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     if (!chatwootConvId) {
       logger.warn(logCtx, 'agent_v2: chatwoot_conversation_id not found, aborting');
       return;
+    }
+
+    // 1b. Pesquisa de satisfação (0105): se há pesquisa pendente nesta conversa e o
+    // cliente respondeu uma NOTA, grava + agradece e PULA o LLM (é resposta de
+    // pesquisa, não pergunta). Dormente com a flag off (tryCaptureSurveyReply retorna
+    // false na hora). NÃO toca o fluxo normal quando a mensagem não é uma nota.
+    if (env.SATISFACTION_SURVEY) {
+      const lastUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? null;
+      const captured = await tryCaptureSurveyReply(client, environment as Environment, chatwootConvId, lastUserText);
+      if (captured) {
+        logger.info(logCtx, 'agent_v2: resposta de pesquisa de satisfacao capturada (skip LLM)');
+        return;
+      }
     }
 
     // 2. Build messages — anexa contexto de cliente recorrente ao system prompt se houver.

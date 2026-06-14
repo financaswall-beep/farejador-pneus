@@ -8,6 +8,7 @@ import { startPartnerChatReconciler } from '../normalization/partner-chat.reconc
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
+import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -17,6 +18,7 @@ let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
+let stopSatisfactionSurvey: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -42,6 +44,8 @@ async function start(): Promise<void> {
   startPartnerChatNotifyHub();
   // Foto sob demanda (0094): expira pendentes + fallback. No-op com a flag off.
   stopPhotoExpirer = startPhotoRequestExpirer();
+  // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.
+  stopSatisfactionSurvey = startSatisfactionSurveyWorker();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -54,6 +58,7 @@ async function shutdown(signal: string): Promise<void> {
   stopAgentV2?.();
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
+  stopSatisfactionSurvey?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');
