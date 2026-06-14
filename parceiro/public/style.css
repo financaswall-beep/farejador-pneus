@@ -2058,7 +2058,7 @@ html, body {
   .pos-shell { grid-template-columns: 1fr; }
   .pos-sidebar {
     position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-    min-height: 0; height: 60px;
+    min-height: 0; height: calc(68px + env(safe-area-inset-bottom, 0px));
     /* respeita a faixa do "home indicator" do iPhone pra barra nao colar na borda */
     padding-bottom: env(safe-area-inset-bottom, 0px);
     flex-direction: row; align-items: stretch;
@@ -2071,21 +2071,32 @@ html, body {
   .pos-sidebar .pos-settings { display: none; }
   /* botao de recolher e conceito de desktop; no celular a sidebar ja e barra de abas */
   .pos-sidebar .pos-sidebar-toggle { display: none; }
+  /* Sair ja existe na topbar. Duplicar na barra inferior ocupa uma aba inteira. */
+  .pos-sidebar .pos-logout { display: none; }
   /* Pedidos ainda e placeholder: fora da barra no celular pra dar respiro as abas reais.
      Especificidade maior que .pos-nav-item (que vem depois) senao ela reexibe. */
   .pos-sidebar .pos-nav-soon { display: none; }
-  .pos-nav { flex: 1; display: flex; flex-direction: row; padding: 0; gap: 0; margin: 0; }
+  .pos-nav {
+    flex: 1; display: flex; flex-direction: row; padding: 0 4px; gap: 2px; margin: 0;
+    min-width: 0; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x proximity; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pos-nav::-webkit-scrollbar { display: none; }
   .pos-nav-item {
-    flex: 1; height: auto; min-width: 0;
+    flex: 0 0 72px; width: 72px; height: 100%; min-width: 72px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    padding: 7px 3px; border-radius: 0; font-size: 10px;
+    padding: 6px 4px; border-radius: 8px; font-size: 10px;
+    scroll-snap-align: center;
   }
   .pos-nav-item kbd { display: none; }
   .pos-nav-item svg { width: 21px; height: 21px; flex: 0 0 auto; }
-  /* label quebra em ate 2 linhas e fica contido na celula (sem encavalar o vizinho) */
+  /* Celulas fixas evitam esmagar 7+ destinos em 390px. A barra rola na horizontal. */
   .pos-nav-item span {
     font-size: 10px; line-height: 1.05; text-align: center;
-    white-space: normal; max-width: 100%; word-break: break-word;
+    white-space: normal; max-width: 64px; min-height: 21px;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden; overflow-wrap: normal; word-break: normal;
   }
   .pos-nav-item.active { box-shadow: none; }
 
@@ -2093,7 +2104,7 @@ html, body {
   .pos-main {
     display: block; height: 100%;
     overflow-y: auto; overflow-x: hidden;
-    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Topbar compacto: nome + status, esconde busca/icones */
@@ -2179,7 +2190,7 @@ html, body {
   /* Botao flutuante amarelo: ir pra finalizar a venda */
   .pos-fab-finalize {
     display: flex; align-items: center; gap: 8px;
-    position: fixed; right: 14px; bottom: calc(74px + env(safe-area-inset-bottom, 0px)); z-index: 55;
+    position: fixed; right: 14px; bottom: calc(82px + env(safe-area-inset-bottom, 0px)); z-index: 55;
     background: linear-gradient(180deg,#ffe100,#ffc400); color: #111;
     font-weight: 900; font-size: 13px; border: 0; border-radius: 999px;
     padding: 11px 16px; box-shadow: 0 10px 24px rgba(255,208,0,.4);

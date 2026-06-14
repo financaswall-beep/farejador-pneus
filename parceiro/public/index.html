@@ -240,6 +240,10 @@
                 :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
           <i data-lucide="sun-moon"></i>
         </button>
+        <button x-show="isOwner" class="pos-theme-toggle-mobile"
+                @click="goToSection('config')" title="Configurações">
+          <i data-lucide="settings"></i>
+        </button>
         <button class="pos-theme-toggle-mobile" @click="logout()" title="Sair da conta">
           <i data-lucide="log-out"></i>
         </button>
