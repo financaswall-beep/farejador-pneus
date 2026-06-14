@@ -2066,6 +2066,12 @@ html, body {
     border-right: 0; border-top: 1px solid var(--pos-line);
     z-index: 60;
   }
+  .pos-sidebar::after {
+    content: '›'; position: absolute; right: 0; top: 0; bottom: env(safe-area-inset-bottom, 0px);
+    width: 24px; display: flex; align-items: center; justify-content: center;
+    color: var(--pos-yellow); font-size: 22px; font-weight: 900; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(8, 11, 14, .96) 72%);
+  }
   .pos-logo, .pos-version { display: none; }
   /* especificidade maior que .pos-nav-item pra de fato esconder Configuracoes no celular */
   .pos-sidebar .pos-settings { display: none; }
@@ -2109,20 +2115,22 @@ html, body {
 
   /* Topbar compacto: nome + status, esconde busca/icones */
   .pos-topbar {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    padding: 10px 14px; position: sticky; top: 0; z-index: 20; background: #0b0f12;
+    display: flex; flex-wrap: nowrap; align-items: center; gap: 6px;
+    min-height: 54px; padding: 8px 10px; position: sticky; top: 0; z-index: 20; background: #0b0f12;
   }
   .pos-global-search, .pos-top-icons, .pos-online small,
   .pos-user small, .pos-user > i { display: none; }
   .pos-company { flex: 1; min-width: 0; }
-  .pos-user > div { width: 34px; height: 34px; }
+  .pos-user { flex: 0 0 auto; }
+  .pos-user > div { width: 32px; height: 32px; }
+  .pos-user > span { display: none; }
 
   /* Toggle de tema sai da barra de abas de baixo (espremia as 7 abas) e aparece
      compacto na topbar (sol/lua). var(--pos-yellow) = ambar no dark, azul no claro. */
   .pos-sidebar .pos-theme-toggle { display: none; }
   .pos-theme-toggle-mobile {
     display: inline-flex; align-items: center; justify-content: center;
-    flex: 0 0 auto; width: 36px; height: 36px;
+    flex: 0 0 auto; width: 32px; height: 32px;
     border-radius: 8px; border: 1px solid var(--pos-line);
     color: var(--pos-yellow); background: transparent;
   }
@@ -2139,6 +2147,9 @@ html, body {
   .pos-kpis strong { font-size: 16px; }
   .pos-kpis small, .pos-kpis span { font-size: 11px; }
   .pos-spark { display: none; }
+  .pos-kpis.stock-kpis article:nth-child(n+5),
+  .customer-kpi-phone,
+  .customer-kpi-address { display: none; }
 
   /* Checkout e workspaces: tudo empilhado em coluna cheia */
   .pos-checkout, .pos-grid {
@@ -2158,11 +2169,19 @@ html, body {
       linear-gradient(rgba(20, 24, 29, .7), rgba(20, 24, 29, .8)),
       url('./assets/pdv-card-carrinho.webp') center / cover no-repeat;
   }
+  .pos-checkout .pos-center {
+    display: block;
+  }
+  .pos-checkout .pos-cart-panel {
+    margin-bottom: 10px;
+  }
   .pos-checkout .pos-client-panel {
     background:
       linear-gradient(rgba(20, 24, 29, .7), rgba(20, 24, 29, .78)),
       url('./assets/pdv-card-cliente.webp') center / cover no-repeat;
+    min-height: 0; padding-bottom: 12px;
   }
+  .pos-checkout .pos-client-data { margin-top: 6px; }
 
   .pos-page-grid, .pos-page-grid.finance, .pos-page-grid.customers,
   .pos-chart-grid, .pos-cadastro-grid, .pos-two-columns {
@@ -2170,6 +2189,36 @@ html, body {
   }
   /* "Alertas principais" do Resumo sai no celular (estoque baixo ja tem KPI + tela Estoque) */
   .pos-resumo-alertas { display: none; }
+
+  .pos-stock-toolbar {
+    display: grid; grid-template-columns: 1fr;
+    gap: 8px; align-items: start;
+  }
+  .pos-stock-toolbar .pos-stock-filters {
+    display: block; grid-column: 1; order: 3;
+    border: 1px solid var(--pos-line); border-radius: 9px;
+    background: rgba(0,0,0,.12);
+  }
+  .pos-stock-toolbar .pos-stock-filters summary {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 12px; color: #cbd5e1; font-size: 13px; font-weight: 750;
+    cursor: pointer; list-style: none;
+  }
+  .pos-stock-filters summary::-webkit-details-marker { display: none; }
+  .pos-stock-filters summary::after { content: '+'; margin-left: auto; color: var(--pos-yellow); font-size: 18px; }
+  .pos-stock-filters[open] summary::after { content: '-'; }
+  .pos-stock-filters summary svg { width: 16px; }
+  .pos-stock-filters .pos-stock-filter-fields {
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+    padding: 0 10px 10px;
+  }
+  .pos-stock-filter-fields .pos-chip-select,
+  .pos-stock-filter-fields .pos-chip-clear { width: 100%; }
+  .pos-stock-toolbar .pos-dark-search { grid-column: 1; width: 100%; }
+  .pos-stock-toolbar .pos-add-product {
+    grid-column: 1; margin: 0; min-height: 42px; width: 100%;
+    padding-inline: 12px; white-space: nowrap;
+  }
 
   /* "Dados do cliente" no celular: tem largura sobrando -> fonte maior e endereco completo (pode quebrar linha) */
   .pos-client-data { font-size: 13px; }
@@ -3310,6 +3359,9 @@ html, body {
 .pos-stock-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px;
 }
+.pos-stock-filters { display: contents; }
+.pos-stock-filters summary { display: none; }
+.pos-stock-filter-fields { display: contents; }
 .pos-chip-select {
   background: var(--pos-panel-2); border: 1px solid var(--pos-line); color: inherit;
   border-radius: 8px; font-size: 12px; padding: 7px 10px; cursor: pointer;

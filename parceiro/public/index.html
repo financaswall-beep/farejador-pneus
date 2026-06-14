@@ -364,11 +364,11 @@
           <div class="pos-kpi-icon"><i data-lucide="users"></i></div>
           <div><small>Clientes cadastrados</small><strong x-text="clientes.length"></strong><span>base da unidade</span></div>
         </article>
-        <article>
+        <article class="customer-kpi-phone" x-show="!isMobile">
           <div class="pos-kpi-icon"><i data-lucide="phone"></i></div>
           <div><small>Com telefone</small><strong x-text="customersWithPhoneCount"></strong><span>prontos para contato</span></div>
         </article>
-        <article>
+        <article class="customer-kpi-address" x-show="!isMobile">
           <div class="pos-kpi-icon"><i data-lucide="map-pin"></i></div>
           <div><small>Com endereço</small><strong x-text="customersWithAddressCount"></strong><span>cadastro completo</span></div>
         </article>
@@ -474,7 +474,7 @@
           <h3>Buscar produtos</h3>
           <div class="pos-product-search">
             <i data-lucide="search"></i>
-            <input x-model="posSearch" placeholder="Digite a medida, marca ou modelo..." />
+            <input x-model="posSearch" :placeholder="isMobile ? 'Buscar medida ou marca' : 'Digite a medida, marca ou modelo...'" />
             <button disabled title="Em breve"><i data-lucide="barcode"></i></button>
           </div>
           <div class="pos-filter-row">
@@ -853,7 +853,7 @@
             <div class="pos-customer-toolbar">
               <div class="pos-product-search">
                 <i data-lucide="search"></i>
-                <input x-model="customerListSearch" placeholder="Buscar por nome, telefone ou endereço..." />
+                <input x-model="customerListSearch" :placeholder="isMobile ? 'Buscar cliente' : 'Buscar por nome, telefone ou endereço...'" />
               </div>
               <button @click="customerListSearch = ''" class="pos-outline-action compact">
                 <i data-lucide="x"></i> Limpar
@@ -959,26 +959,31 @@
             </div>
 
             <div class="pos-stock-toolbar">
-              <select x-model="stockBrandFilter" class="pos-chip-select">
-                <option value="all">Marca: todas</option>
-                <template x-for="b in stockBrandOptions" :key="b"><option :value="b" x-text="b"></option></template>
-              </select>
-              <select x-model="stockPositionFilter" class="pos-chip-select">
-                <option value="all">Posição: todas</option>
-                <option value="Traseiro">Traseiro</option>
-                <option value="Dianteiro">Dianteiro</option>
-              </select>
-              <select x-model="stockStatusFilter" class="pos-chip-select">
-                <option value="all">Status: todos</option>
-                <option value="in_stock">Em estoque</option>
-                <option value="low_stock">Baixo</option>
-                <option value="out_of_stock">Zerado</option>
-              </select>
+              <details class="pos-stock-filters" :open="!isMobile">
+                <summary><i data-lucide="sliders-horizontal"></i> Filtros</summary>
+                <div class="pos-stock-filter-fields">
+                  <select x-model="stockBrandFilter" class="pos-chip-select">
+                    <option value="all">Marca: todas</option>
+                    <template x-for="b in stockBrandOptions" :key="b"><option :value="b" x-text="b"></option></template>
+                  </select>
+                  <select x-model="stockPositionFilter" class="pos-chip-select">
+                    <option value="all">Posição: todas</option>
+                    <option value="Traseiro">Traseiro</option>
+                    <option value="Dianteiro">Dianteiro</option>
+                  </select>
+                  <select x-model="stockStatusFilter" class="pos-chip-select">
+                    <option value="all">Status: todos</option>
+                    <option value="in_stock">Em estoque</option>
+                    <option value="low_stock">Baixo</option>
+                    <option value="out_of_stock">Zerado</option>
+                  </select>
+                  <button class="pos-chip-clear" @click="stockBrandFilter='all'; stockPositionFilter='all'; stockStatusFilter='all'; stockSearch=''; stockPage=1"><i data-lucide="list-filter"></i> Limpar filtros</button>
+                </div>
+              </details>
               <div class="pos-dark-search compact">
                 <i data-lucide="search"></i>
-                <input x-model="stockSearch" placeholder="Buscar na tabela..." />
+                <input x-model="stockSearch" placeholder="Buscar produto..." />
               </div>
-              <button class="pos-chip-clear" @click="stockBrandFilter='all'; stockPositionFilter='all'; stockStatusFilter='all'; stockSearch=''; stockPage=1"><i data-lucide="list-filter"></i> Limpar filtros</button>
               <button class="pos-add-product" @click="openStockModal()"><i data-lucide="plus"></i> Adicionar produto</button>
             </div>
 
