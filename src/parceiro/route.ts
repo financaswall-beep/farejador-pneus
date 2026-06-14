@@ -513,14 +513,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return sendStatic(reply, script, 'text/javascript; charset=utf-8');
   });
 
-  // Assets estáticos (logo, ícones de canal do chat, fundo). Genérico + seguro:
-  // basename evita path traversal; só extensões de imagem conhecidas são servidas.
+  // Assets estáticos (logo, ícones de canal do chat, fundo, som de alerta). Genérico
+  // + seguro: basename evita path traversal; só extensões conhecidas (imagem + mp3)
+  // são servidas.
   const assetContentTypes: Record<string, string> = {
     '.svg': 'image/svg+xml; charset=utf-8',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.webp': 'image/webp',
+    '.mp3': 'audio/mpeg',
   };
   fastify.get('/parceiro/:slug/assets/:asset', async (request: PartnerAuthedRequest, reply) => {
     const asset = path.basename(String((request.params as { asset?: string }).asset || ''));
