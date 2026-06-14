@@ -2251,23 +2251,37 @@ html, body {
 
   .pos-dark-table { overflow-x: hidden; }
   .pos-dark-table-head { display: none; }
-  .pos-dark-table-row {
+  .stock-table .pos-dark-table-row {
     min-width: 0; min-height: 0;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "medida medida venda"
-      "qtd    status acoes";
-    gap: 6px 10px; padding: 10px 12px;
-    font-size: 12px;   /* base menor: encolhe valor (Venda) e Qtd */
+      "medida qtd venda"
+      "marca  qtd venda";
+    gap: 4px 16px; padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px; font-size: 12px;
   }
-  .pos-dark-table-row > :nth-child(1) { grid-area: medida; }   /* Medida + tipo */
-  .pos-dark-table-row > :nth-child(2),                         /* Posicao  */
-  .pos-dark-table-row > :nth-child(3),                         /* Marca    */
-  .pos-dark-table-row > :nth-child(5) { display: none; }       /* Custo    */
-  .pos-dark-table-row > :nth-child(4) { grid-area: qtd; justify-self: start; }
-  .pos-dark-table-row > :nth-child(6) { grid-area: venda; justify-self: end; color: #fff; font-weight: 800; }
-  .pos-dark-table-row > :nth-child(7) { grid-area: status; justify-self: start; }
-  .pos-dark-table-row > :nth-child(8) { grid-area: acoes; justify-self: end; }
+  .stock-table .pos-medida { grid-area: medida; font-size: 15px; font-weight: 800; }
+  .stock-table .stock-col-brand { grid-area: marca; color: #94a3b8; }
+  .stock-table .stock-col-position,
+  .stock-table .stock-col-condition,
+  .stock-table .stock-col-cost,
+  .stock-table .stock-col-location { display: none; }
+  .stock-table .stock-col-qty,
+  .stock-table .stock-col-sale {
+    display: flex; flex-direction: column; justify-content: flex-start; gap: 2px;
+    align-self: start;
+  }
+  .stock-table .stock-col-qty { grid-area: qtd; justify-self: end; text-align: right; }
+  .stock-table .stock-col-sale { grid-area: venda; justify-self: end; text-align: right; color: #fff; font-weight: 800; }
+  .stock-table .stock-col-qty::before,
+  .stock-table .stock-col-sale::before {
+    color: #7f8996; font-size: 9px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .stock-table .stock-col-qty::before { content: 'Quantidade'; }
+  .stock-table .stock-col-sale::before { content: 'Venda'; }
+  .stock-table .stock-col-status { display: none; }
   /* Medida: sem foto, label + selo do tipo lado a lado */
   .pos-product-cell { display: flex; align-items: center; gap: 7px; }
   .pos-product-cell .pos-tire-thumb { display: none; }
@@ -3564,3 +3578,14 @@ html, body {
 .pos-shell[data-theme="light"] .photo-btn-retake { background: #e2e8f0; color: #0f172a; }
 .pos-shell[data-theme="light"] .photo-card-done strong { color: #15803d; }
 .pos-shell[data-theme="light"] .photo-sound-toggle { border-color: rgba(15, 23, 42, .2); color: #475569; }
+
+@media (max-width: 768px) {
+  .pos-shell .stock-table .pos-dark-table-row {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 54px 86px;
+    gap: 10px;
+  }
+  .pos-shell .stock-table .stock-col-qty::before { content: 'Qtd.'; }
+  .pos-shell .stock-table .stock-col-sale::before { content: 'Venda'; }
+  .pos-shell .stock-table .stock-col-sale { font-size: 13px; }
+}

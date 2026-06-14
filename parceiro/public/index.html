@@ -997,14 +997,14 @@
               <template x-for="item in stockPagedRows" :key="item.id">
                 <div class="pos-dark-table-row" :class="stockDetail && stockDetail.id === item.id && 'selected'" @click="selectStock(item)">
                   <span class="pos-medida"><i class="pos-radio"></i><span x-text="item.tire_size || itemPrimaryLabel(item)"></span></span>
-                  <span x-text="item.brand || '-'"></span>
-                  <span x-text="stockPositionLabel(item)"></span>
-                  <span class="pos-cond" x-text="item.tire_condition || '—'"></span>
-                  <span class="pos-green-text" x-text="stockQtyDisplay(item)"></span>
-                  <span x-text="money(item.average_cost)"></span>
-                  <span x-text="money(item.sale_price)"></span>
-                  <span class="pos-loc" x-text="item.shelf_location || '—'"></span>
-                  <span><em class="pos-status-pill" :class="item.stock_status" x-text="stockStatusLabel(item.stock_status)"></em></span>
+                  <span class="stock-col-brand" x-text="item.brand || '-'"></span>
+                  <span class="stock-col-position" x-text="stockPositionLabel(item)"></span>
+                  <span class="pos-cond stock-col-condition" x-text="item.tire_condition || '—'"></span>
+                  <span class="pos-green-text stock-col-qty" x-text="stockQtyDisplay(item)"></span>
+                  <span class="stock-col-cost" x-text="money(item.average_cost)"></span>
+                  <span class="stock-col-sale" x-text="money(item.sale_price)"></span>
+                  <span class="pos-loc stock-col-location" x-text="item.shelf_location || '—'"></span>
+                  <span class="stock-col-status"><em class="pos-status-pill" :class="item.stock_status" x-text="stockStatusLabel(item.stock_status)"></em></span>
                 </div>
               </template>
               <div x-show="!stockFilteredRows.length" class="pos-empty">Nenhum item encontrado.</div>

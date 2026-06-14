@@ -64,6 +64,8 @@ export async function registerLoginGlobalRoute(fastify: FastifyInstance): Promis
     sendStatic(reply, 'assets/login-2w-desktop.webp', 'image/webp'));
   fastify.get('/assets/login-2w-mobile.webp', async (_request, reply) =>
     sendStatic(reply, 'assets/login-2w-mobile.webp', 'image/webp'));
+  fastify.get('/assets/login-2w-mobile-alt.webp', async (_request, reply) =>
+    sendStatic(reply, 'assets/login-2w-mobile-alt.webp', 'image/webp'));
 
   // Passo 1: usuário+senha → sessão direta (1 loja) ou ticket de escolha (N lojas).
   fastify.post('/api/login', async (request, reply) => {
