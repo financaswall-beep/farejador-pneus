@@ -267,9 +267,8 @@
             <div x-show="!perf" class="pos-empty">Carregando…</div>
             <template x-if="perf">
               <div>
-                <div class="pos-finance-cards pos-finance-cards-flow" style="margin-bottom:12px;">
+                <div class="pos-finance-cards" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px;">
                   <article><small>Minhas vendas</small><strong x-text="perf.finalized_sales"></strong><span>finalizadas no mês</span></article>
-                  <article><small>Faturei</small><strong x-text="money(perf.gross_sales)"></strong><span>valor cheio</span></article>
                   <article><small>Minha comissão</small><strong x-text="money(perf.commission_amount)"></strong>
                     <span x-text="perf.commission_active ? (perf.commission_kind === 'fixed' ? ('R$ ' + perf.commission_value + '/venda') : (perf.commission_value + '% por venda')) : 'sem comissão'"></span></article>
                 </div>
@@ -412,6 +411,7 @@
               <article><small>Itens vendidos</small><strong x-text="soldUnitsMonth + ' un.'"></strong><span>saída por venda</span></article>
               <article><small>A receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
               <article><small>A pagar</small><strong x-text="money(payablesOpenTotal)"></strong><span>em aberto</span></article>
+              <article x-show="num(resumo?.satisfaction_count) > 0"><small>Satisfação ⭐</small><strong x-text="num(resumo?.satisfaction_avg).toFixed(1).replace('.', ',')"></strong><span x-text="num(resumo?.satisfaction_count) + (num(resumo?.satisfaction_count) === 1 ? ' avaliação' : ' avaliações')"></span></article>
             </div>
             <div class="pos-two-columns">
               <div>

@@ -263,7 +263,29 @@ export async function getPartnerResumo(ctx: PartnerContext): Promise<unknown> {
        WHERE environment = $1 AND unit_id = $2`,
       [ctx.environment, ctx.unitId],
     );
-    return result.rows[0] ?? null;
+    const base = result.rows[0];
+    if (!base) return null;
+
+    // Pesquisa de satisfação (0105, Tijolo 4): média + nº de notas da PRÓPRIA loja
+    // (RLS isola por unidade). Vazio quando a flag está off / sem respostas — o card
+    // no Resumo só aparece com satisfaction_count > 0. FAIL-SAFE: erro aqui NUNCA
+    // derruba o Resumo do dono — degrada sem o card.
+    let satisfaction_avg: number | null = null;
+    let satisfaction_count = 0;
+    try {
+      const sat = await client.query<{ avg: string | null; n: string }>(
+        `SELECT round(avg(rating)::numeric, 1) AS avg, count(id) AS n
+           FROM commerce.satisfaction_surveys
+          WHERE environment = $1 AND unit_id = $2 AND status = 'answered'`,
+        [ctx.environment, ctx.unitId],
+      );
+      satisfaction_avg = sat.rows[0]?.avg != null ? Number(sat.rows[0].avg) : null;
+      satisfaction_count = Number(sat.rows[0]?.n ?? 0);
+    } catch (err) {
+      logger.warn({ err, unit_id: ctx.unitId }, 'resumo: resumo de satisfacao indisponivel (degrada sem o card)');
+    }
+
+    return { ...base, satisfaction_avg, satisfaction_count };
   });
 }
 
