@@ -3135,6 +3135,117 @@ html, body {
 /* tema claro */
 .pos-shell[data-theme="light"] .pos-donut::after { background: #fff; }
 .pos-shell[data-theme="light"] .pos-bar-track { background: rgba(15, 23, 42, .08); }
+
+/* ════════ Equipe: tiles de permissão + comissão (premium, 2026-06-13) ════════
+   Casam com a linguagem da própria tela (mesmos fallbacks de cor dos cards de
+   funcionário): accent azul do painel, funciona em dark e light. */
+.perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.perm-tile {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 9px 10px; border-radius: 11px; cursor: pointer; color: inherit;
+  border: 1px solid var(--pos-border, #e2e8f0); background: transparent;
+  transition: border-color .12s ease, background .12s ease;
+}
+.perm-tile:hover { border-color: var(--pos-accent, #2563eb); }
+.perm-tile.on { border-color: var(--pos-accent, #2563eb); background: rgba(37, 99, 235, .12); }
+.perm-ic {
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pos-surface-2, #f1f5f9); color: var(--pos-muted, #94a3b8);
+}
+.perm-ic svg { width: 17px; height: 17px; }
+.perm-tile.on .perm-ic { background: rgba(37, 99, 235, .18); color: var(--pos-accent, #2563eb); }
+.perm-lb { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; }
+.perm-ck {
+  width: 19px; height: 19px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--pos-border, #cbd5e1); color: #fff;
+}
+.perm-ck svg { width: 12px; height: 12px; opacity: 0; transition: opacity .12s ease; }
+.perm-tile.on .perm-ck { background: var(--pos-accent, #2563eb); border-color: var(--pos-accent, #2563eb); }
+.perm-tile.on .perm-ck svg { opacity: 1; }
+
+.pos-switch {
+  width: 42px; height: 24px; border-radius: 999px; flex: none; position: relative;
+  border: none; cursor: pointer; padding: 0; background: rgba(148, 163, 184, .45);
+  transition: background .15s ease;
+}
+.pos-switch.on { background: var(--pos-accent, #2563eb); }
+.pos-switch::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: left .15s ease;
+}
+.pos-switch.on::after { left: 21px; }
+
+.pos-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--pos-surface-2, #f1f5f9); }
+.pos-seg button {
+  border: none; background: transparent; cursor: pointer; padding: 7px 15px;
+  border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--pos-muted, #94a3b8);
+  white-space: nowrap;
+}
+.pos-seg button.on { background: var(--pos-accent, #2563eb); color: #fff; }
+.pos-shell[data-theme="light"] .pos-seg { background: rgba(15, 23, 42, .06); }
+.pos-shell[data-theme="light"] .pos-seg button { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-seg button.on { background: #1e40af; color: #fff; }
+/* respiro entre seções do drawer (Comissão e Senha não coladas) */
+.equipe-premium .pos-divider { margin: 22px 0; }
+/* respiro entre rótulo e campo */
+.equipe-premium label > input { margin-top: 8px; }
+
+/* ════════ Equipe: tema ESCURO premium (cards slate elevados) ════════
+   Escopado em .equipe-premium pra não tocar as outras telas ainda. Define os
+   tokens em dark (avatares/chips/tiles flipam de claro->slate sozinhos) e dá
+   superfície elevada com sombra suave. Accent azul um tom mais claro (dark). */
+.pos-shell:not([data-theme="light"]) .equipe-premium {
+  --pos-border: rgba(148, 163, 184, .18);
+  --pos-surface-2: rgba(148, 163, 184, .14);
+  --pos-accent: #3b82f6;
+  --pos-muted: #94a3b8;
+  color: #cbd5e1;
+}
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-panel {
+  background: #141c2e;
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .30), 0 12px 32px rgba(0, 0, 0, .28);
+}
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-panel h3,
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-panel-head h3 { color: #f1f5f9; }
+.pos-shell:not([data-theme="light"]) .equipe-premium .perm-lb { color: #e2e8f0; }
+.pos-shell:not([data-theme="light"]) .equipe-premium .perm-tile { border-color: rgba(148, 163, 184, .16); }
+.pos-shell:not([data-theme="light"]) .equipe-premium .perm-tile.on { border-color: #3b82f6; background: rgba(59, 130, 246, .16); }
+.pos-shell:not([data-theme="light"]) .equipe-premium .perm-tile.on .perm-ic { background: rgba(59, 130, 246, .22); color: #93c5fd; }
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-divider { background: rgba(148, 163, 184, .14); }
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-outline-action {
+  background: rgba(148, 163, 184, .08);
+  border: 1px solid rgba(148, 163, 184, .20);
+  color: #cbd5e1;
+}
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-outline-action:hover { background: rgba(148, 163, 184, .15); }
+.pos-shell:not([data-theme="light"]) .equipe-premium label { color: #cbd5e1; }
+.pos-shell:not([data-theme="light"]) .equipe-premium small { color: #94a3b8; }
+/* Nomes (b) BRANCOS e mais firmes — lista e drawer */
+.pos-shell:not([data-theme="light"]) .equipe-premium b { color: #f1f5f9; }
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-data-panel button b { color: #ffffff; font-weight: 600; font-size: 14.5px; }
+.pos-shell:not([data-theme="light"]) .equipe-premium .pos-data-panel > div > button:hover { background: rgba(148, 163, 184, .07) !important; }
+/* Inputs harmônicos: fundo escuro, borda suave, foco azul, texto branco */
+.pos-shell:not([data-theme="light"]) .equipe-premium input {
+  background: rgba(15, 23, 42, .55);
+  border: 1px solid rgba(148, 163, 184, .22);
+  color: #f1f5f9;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.pos-shell:not([data-theme="light"]) .equipe-premium input::placeholder { color: #64748b; }
+.pos-shell:not([data-theme="light"]) .equipe-premium input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, .22);
+  outline: none;
+}
+/* mata o spinner feio do number (nos dois temas) */
+.equipe-premium input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.equipe-premium input[type="number"]::-webkit-inner-spin-button,
+.equipe-premium input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .pos-shell[data-theme="light"] .pos-bar-label { color: #334155; }
 .pos-shell[data-theme="light"] .pos-donut b,
 .pos-shell[data-theme="light"] .pos-donut { color: #16a34a; }

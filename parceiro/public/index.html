@@ -2345,7 +2345,7 @@
              A permissão ainda é "um perfil só" da loja (permForm); o acesso POR PESSOA
              é o Bloco 2 (precisa de migration). Aqui o painel já abre por funcionário e
              deixa claro que o acesso é compartilhado por enquanto. -->
-        <div x-show="configTab === 'equipe'" class="pos-page-grid customers">
+        <div x-show="configTab === 'equipe'" class="pos-page-grid customers equipe-premium">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
@@ -2410,16 +2410,34 @@
                       Vale só pra <b>esta pessoa</b> — cada funcionário tem o próprio acesso.
                       <span x-text="'Vê ' + funcPermCount + ' de 9 telas.'"></span>
                     </p>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:4px;">
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.vendas" style="width:auto;"> Vendas</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.estoque" style="width:auto;"> Estoque</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.pedidos" style="width:auto;"> Pedidos</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.clientes" style="width:auto;"> Clientes</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.entregas" style="width:auto;"> Entrega</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.retiradas" style="width:auto;"> Retiradas</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.batepapo" style="width:auto;"> Bate-papo</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.resumo" style="width:auto;"> Resumo</label>
-                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" x-model="funcPermForm.financeiro" style="width:auto;"> Financeiro <i data-lucide="wallet" style="width:14px;height:14px;"></i></label>
+                    <div class="perm-grid">
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.vendas }" @click="funcPermForm.vendas = !funcPermForm.vendas">
+                        <span class="perm-ic"><i data-lucide="shopping-cart"></i></span><span class="perm-lb">Vendas</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.estoque }" @click="funcPermForm.estoque = !funcPermForm.estoque">
+                        <span class="perm-ic"><i data-lucide="package"></i></span><span class="perm-lb">Estoque</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.pedidos }" @click="funcPermForm.pedidos = !funcPermForm.pedidos">
+                        <span class="perm-ic"><i data-lucide="clipboard-list"></i></span><span class="perm-lb">Pedidos</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.clientes }" @click="funcPermForm.clientes = !funcPermForm.clientes">
+                        <span class="perm-ic"><i data-lucide="users"></i></span><span class="perm-lb">Clientes</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.entregas }" @click="funcPermForm.entregas = !funcPermForm.entregas">
+                        <span class="perm-ic"><i data-lucide="truck"></i></span><span class="perm-lb">Entrega</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.retiradas }" @click="funcPermForm.retiradas = !funcPermForm.retiradas">
+                        <span class="perm-ic"><i data-lucide="store"></i></span><span class="perm-lb">Retiradas</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.batepapo }" @click="funcPermForm.batepapo = !funcPermForm.batepapo">
+                        <span class="perm-ic"><i data-lucide="message-circle"></i></span><span class="perm-lb">Bate-papo</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.resumo }" @click="funcPermForm.resumo = !funcPermForm.resumo">
+                        <span class="perm-ic"><i data-lucide="bar-chart-3"></i></span><span class="perm-lb">Resumo</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
+                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.financeiro }" @click="funcPermForm.financeiro = !funcPermForm.financeiro">
+                        <span class="perm-ic"><i data-lucide="wallet"></i></span><span class="perm-lb">Financeiro</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                      </button>
                     </div>
 
                     <!-- Comissão por pessoa -->
@@ -2429,21 +2447,20 @@
                       <i data-lucide="info" style="width:13px;height:13px;"></i>
                       Sobre o valor cheio das vendas que <b>esta pessoa finaliza</b> no mês. Vira conta a pagar no Financeiro.
                     </p>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
-                      <input type="checkbox" x-model="funcCommForm.active" style="width:auto;"> Pagar comissão a esta pessoa
-                    </label>
-                    <div x-show="funcCommForm.active" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-                      <label style="flex:1;min-width:130px;">Tipo
-                        <select x-model="funcCommForm.kind">
-                          <option value="percent">Porcentagem (%)</option>
-                          <option value="fixed">Valor fixo (R$)</option>
-                        </select>
-                      </label>
-                      <label style="flex:1;min-width:130px;">
-                        <span x-text="funcCommForm.kind === 'fixed' ? 'R$ por venda' : '% por venda'"></span>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+                      <span style="font-size:13px;font-weight:600;">Pagar comissão a esta pessoa</span>
+                      <button type="button" class="pos-switch" :class="{ on: funcCommForm.active }" @click="funcCommForm.active = !funcCommForm.active" role="switch" :aria-checked="funcCommForm.active" aria-label="Pagar comissão a esta pessoa"></button>
+                    </div>
+                    <div x-show="funcCommForm.active" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+                      <div class="pos-seg" role="group" aria-label="Tipo de comissão">
+                        <button type="button" :class="{ on: funcCommForm.kind === 'fixed' }" @click="funcCommForm.kind = 'fixed'">R$ fixo</button>
+                        <button type="button" :class="{ on: funcCommForm.kind === 'percent' }" @click="funcCommForm.kind = 'percent'">% do valor</button>
+                      </div>
+                      <div style="flex:1;min-width:170px;display:flex;align-items:center;gap:8px;">
                         <input type="number" min="0" step="0.01" x-model.number="funcCommForm.value"
-                               :placeholder="funcCommForm.kind === 'fixed' ? 'Ex: 10' : 'Ex: 5'" />
-                      </label>
+                               :placeholder="funcCommForm.kind === 'fixed' ? 'Ex: 10' : 'Ex: 5'" style="flex:1;min-width:0;" />
+                        <span style="white-space:nowrap;font-size:13px;color:var(--pos-muted,#94a3b8);" x-text="funcCommForm.kind === 'fixed' ? 'R$ por venda' : '% por venda'"></span>
+                      </div>
                     </div>
 
                     <button @click="saveFuncConfig(selectedFuncionario)" :disabled="saving" class="pos-form-submit success" style="margin-top:14px;">
