@@ -666,7 +666,11 @@ export async function executeTool(
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
             if (disp) {
-              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, distancia_km: Math.round(geo.distanceKm), maps_url: disp.maps_url, endereco: disp.address, horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
+              // Opção 1 (decisão Wallace 2026-06-14): ANTES de fechar, o bot recebe só
+              // qual loja + a que distância — SEM endereço/maps_url. Trava por CÓDIGO (§3):
+              // o cliente não força o bot a entregar o endereço pra ir direto sem reservar.
+              // O cartão da loja (endereço+mapa+horário) volta no criar_pedido e entra no resumo.
+              return JSON.stringify({ encontrado: true, nome_loja: disp.nome_loja, distancia_km: Math.round(geo.distanceKm), horario: disp.opening_hours, taxa_instalacao: disp.installation_fee });
             }
           } else if (geo.kind === 'only_far') {
             // Tem o pneu, mas a loja mais perto que tem fica fora do raio de retirada.
@@ -675,13 +679,13 @@ export async function executeTool(
             // o cartão da loja (endereço/mapa): se o cliente bancar ir buscar (consentimento), o
             // bot já tem o que passar e fecha com criar_pedido(confirma_retirada_distante=true).
             const disp = await getUnitDisplayById(client, environment, geo.unitId);
+            // Opção 1: sem endereço/maps aqui também. Se o cliente bancar ir buscar longe,
+            // o endereço sai no resumo do criar_pedido(confirma_retirada_distante=true).
             return JSON.stringify({
               encontrado: false,
               motivo: 'retirada_so_longe',
               nome_loja_distante: geo.unitName,
               nome_loja: disp?.nome_loja ?? geo.unitName,
-              maps_url: disp?.maps_url ?? null,
-              endereco: disp?.address ?? null,
               horario: disp?.opening_hours ?? null,
               taxa_instalacao: disp?.installation_fee ?? null,
             });
@@ -701,11 +705,10 @@ export async function executeTool(
           // Senão (várias lojas + bairro desconhecido) → o bot PERGUNTA o bairro antes de indicar.
           return JSON.stringify({ encontrado: false, motivo: 'sem_localizacao_pergunte_bairro' });
         }
+        // Opção 1: só nome + horário (sem endereço/maps antes de fechar).
         return JSON.stringify({
           encontrado: true,
           nome_loja: loc.nome_loja,
-          maps_url: loc.maps_url,
-          endereco: loc.address,
           horario: loc.opening_hours,
         });
       }
@@ -1074,6 +1077,10 @@ async function criarPedido(
   let respSubtotal: number;
   let respFrete: number;
   let respTotal: number;
+  // Opção 1 (decisão Wallace 2026-06-14): o cartão da loja (endereço/mapa/horário) só é
+  // devolvido AGORA, no fechamento da retirada — entra no resumo do pedido. Antes de fechar
+  // o bot nunca teve esses dados (localizacao_loja só dá nome+distância).
+  let retirada: { nome_loja: string; endereco: string | null; maps_url: string | null; horario: string | null } | null = null;
 
   if (partner) {
     // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
@@ -1135,6 +1142,14 @@ async function criarPedido(
     respFrete = modalidade === 'delivery' ? FRETE_PADRAO_BRL : 0;
     respTotal = Number(mat.total_amount);
 
+    // Cartão da loja que RESERVOU (unit do pedido — NÃO re-roteia, senão pegaria outra loja).
+    if (modalidade === 'pickup') {
+      const disp = await getUnitDisplayById(client, environment, partner.unitId);
+      if (disp) {
+        retirada = { nome_loja: disp.nome_loja, endereco: disp.address, maps_url: disp.maps_url, horario: disp.opening_hours };
+      }
+    }
+
     logger.info(
       {
         environment,
@@ -1188,6 +1203,8 @@ async function criarPedido(
     valor_frete: respFrete.toFixed(2),
     total: respTotal.toFixed(2),
     mensagem: `Pedido ${order.order_number} criado com sucesso.`,
+    // Retirada: cartão da loja pro resumo "como chegar" (só no caminho parceiro+pickup).
+    ...(retirada ? { retirada } : {}),
   });
 }
 
