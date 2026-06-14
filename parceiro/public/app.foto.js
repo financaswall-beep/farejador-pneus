@@ -2,8 +2,9 @@
  * app.foto.js - fabrica `foto` do painel do parceiro (obra <=300, passo 4/11).
  * MORA AQUI: foto sob demanda (0094) - fila de pedidos de foto da Rede, canal
  * GLOBAL de tempo real (SSE + poll de seguranca, vive desde o login), countdown
- * e urgencia do card, captura + compressao (EXIF) + envio do JPEG cru, bip de
- * oficina (unlockAudio/photoBeep/togglePhotoSound), thumb autenticada e lightbox.
+ * e urgencia do card, captura + compressao (EXIF) + envio do JPEG cru, campainha
+ * do Uber (mp3) com bip sintetico de fallback (unlockAudio/photoBeep/_synthBeep/
+ * togglePhotoSound), thumb autenticada e lightbox.
  * NAO MORA AQUI: o ESTADO photo* (fica na raiz ate o passo 10) nem o chat da
  * aba Bate-papo (passo 5) - o SSE do chat continua onde estava.
  * VEIO DE: app.js commit 2089903, linhas 2361-2574 VERBATIM.
@@ -165,20 +166,43 @@ window.PARCEIRO_MODULES.foto = () => ({
       }
     },
 
-    // Bip de oficina (2 tons) via AudioContext — sem asset, atravessa barulho.
-    // Política de autoplay: só funciona depois de UM gesto (destravado no init).
+    // Destrava o áudio no 1º gesto (política de autoplay): prepara a campainha
+    // do Uber (mp3) e o AudioContext do bip de fallback.
     unlockAudio() {
       if (this.audioUnlocked) return;
       try {
+        // Cria e "prima" o mp3 MUDO dentro do gesto, pra furar o autoplay —
+        // depois é só dar play() quando o pedido de foto cair.
+        this._alertAudio = new Audio('assets/som-pedido-novo.mp3?v=20260613-uber');
+        this._alertAudio.preload = 'auto';
+        this._alertAudio.muted = true;
+        const prime = this._alertAudio.play();
+        if (prime && prime.then) {
+          prime.then(() => { this._alertAudio.pause(); this._alertAudio.currentTime = 0; this._alertAudio.muted = false; })
+               .catch(() => { this._alertAudio.muted = false; });
+        } else { this._alertAudio.muted = false; }
+        // AudioContext alimenta o bip sintético (fallback se o mp3 não tocar).
         const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        this._audioCtx = this._audioCtx || new Ctx();
-        void this._audioCtx.resume();
+        if (Ctx) { this._audioCtx = this._audioCtx || new Ctx(); void this._audioCtx.resume(); }
         this.audioUnlocked = true;
       } catch (e) { /* sem áudio: alerta visual segura sozinho */ }
     },
+    // Campainha do Uber (mp3). Se o mp3 falhar (bloqueio/erro), cai no bip.
     photoBeep() {
-      if (!this.photoSoundOn || !this.audioUnlocked || !this._audioCtx) return;
+      if (!this.photoSoundOn || !this.audioUnlocked) return;
+      try {
+        if (this._alertAudio) {
+          this._alertAudio.currentTime = 0;
+          const p = this._alertAudio.play();
+          if (p && p.catch) p.catch(() => this._synthBeep());
+          return;
+        }
+      } catch (e) { /* mp3 falhou: tenta o bip sintético abaixo */ }
+      this._synthBeep();
+    },
+    // Bip de oficina (2 tons) via AudioContext — fallback, atravessa barulho.
+    _synthBeep() {
+      if (!this._audioCtx) return;
       try {
         const ctx = this._audioCtx;
         const beep = (freq, t0, dur) => {
