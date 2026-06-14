@@ -2148,6 +2148,21 @@ html, body {
     width: 100%; max-width: none; margin-bottom: 10px; grid-column: auto;
   }
   .pos-summary { grid-row: auto; }
+  .pos-checkout .pos-products {
+    background:
+      linear-gradient(rgba(20, 24, 29, .72), rgba(20, 24, 29, .8)),
+      url('./assets/pdv-card-produtos.webp') center / cover no-repeat;
+  }
+  .pos-checkout .pos-cart-panel {
+    background:
+      linear-gradient(rgba(20, 24, 29, .7), rgba(20, 24, 29, .8)),
+      url('./assets/pdv-card-carrinho.webp') center / cover no-repeat;
+  }
+  .pos-checkout .pos-client-panel {
+    background:
+      linear-gradient(rgba(20, 24, 29, .7), rgba(20, 24, 29, .78)),
+      url('./assets/pdv-card-cliente.webp') center / cover no-repeat;
+  }
 
   .pos-page-grid, .pos-page-grid.finance, .pos-page-grid.customers,
   .pos-chart-grid, .pos-cadastro-grid, .pos-two-columns {
