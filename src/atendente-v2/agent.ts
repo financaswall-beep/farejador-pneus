@@ -9,6 +9,7 @@ import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
+import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
@@ -255,12 +256,24 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // Salvaguarda: se LLM gerou SO uma linha OPCOES (sem texto principal),
     // o regex deixa o body vazio e o Chatwoot recusa com 'text.body is required'.
     // Fallback humano em vez de quebrar a conversa.
-    const finalBody = textToSend.length > 0
+    let finalBody = textToSend.length > 0
       ? textToSend
       : 'Me passa mais um detalhe pra eu te ajudar?';
 
     if (textToSend.length === 0) {
       logger.warn({ ...logCtx, rawFinalText: finalText }, 'agent_v2: textToSend vazio apos strip OPCOES, usando fallback');
+    }
+
+    // GARANTIA DO MAPA NA RETIRADA (decisão Wallace 2026-06-14): o link do Google Maps
+    // nunca some do resumo. O LLM escreve o resumo seguindo o prompt, mas prompt é
+    // probabilístico (§3) — se o pedido fechou uma RETIRADA com maps_url e o link não
+    // veio no texto, anexamos por CÓDIGO. FAIL-SAFE: qualquer erro mantém o texto original.
+    if (textToSend.length > 0) {
+      try {
+        finalBody = ensurePickupMap(finalBody, extractPickupCardFromActions(turnActions));
+      } catch (err) {
+        logger.warn({ ...logCtx, err }, 'agent_v2: ensurePickupMap falhou, enviando texto original');
+      }
     }
 
     await sendMessage(chatwootConvId, finalBody);
