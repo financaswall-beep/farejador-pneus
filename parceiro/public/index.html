@@ -1847,14 +1847,46 @@
                   </div>
                 </template>
 
-                <!-- RESPONDIDA/ENVIADA -->
+                <!-- RESPONDIDA/ENVIADA — pode mandar ATÉ 3 fotos no mesmo card (ângulos do pneu) -->
                 <template x-if="pr.status === 'answered' || pr.status === 'sent'">
-                  <div class="photo-card-body photo-card-done">
-                    <span class="photo-done-icon">✅</span>
-                    <div>
-                      <strong x-text="pr.status === 'sent' ? 'Foto enviada pro cliente' : 'Foto recebida — enviando…'"></strong>
-                      <small x-text="pr.tire_size"></small>
+                  <div class="photo-card-body">
+                    <div class="photo-card-done">
+                      <span class="photo-done-icon">✅</span>
+                      <div>
+                        <strong x-text="(pr.photo_count || 1) + ' de 3 foto(s) enviada(s)'"></strong>
+                        <small x-text="pr.tire_size"></small>
+                      </div>
                     </div>
+
+                    <!-- ainda cabe foto (até 3): mandar mais um ângulo do pneu -->
+                    <template x-if="(pr.photo_count || 0) < 3">
+                      <div class="photo-more">
+                        <template x-if="photoPreview.id !== pr.id">
+                          <label class="photo-card-shoot late">
+                            <i data-lucide="camera"></i> MANDAR OUTRA FOTO
+                            <input type="file" accept="image/*" capture="environment"
+                                   @change="photoPickFile(pr, $event)" hidden />
+                          </label>
+                        </template>
+                        <template x-if="photoPreview.id === pr.id">
+                          <div class="photo-card-preview">
+                            <img :src="photoPreview.dataUrl" alt="Prévia da foto do pneu" />
+                            <div class="photo-card-preview-actions">
+                              <label class="photo-btn-retake">
+                                <i data-lucide="refresh-cw"></i> Tirar outra
+                                <input type="file" accept="image/*" capture="environment"
+                                       @change="photoPickFile(pr, $event)" hidden />
+                              </label>
+                              <button type="button" class="photo-btn-send"
+                                      :disabled="!!photoSending[pr.id]" @click="photoSend(pr)">
+                                <template x-if="!photoSending[pr.id]"><span><i data-lucide="send"></i> ENVIAR</span></template>
+                                <template x-if="photoSending[pr.id]"><span>Enviando…</span></template>
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
                   </div>
                 </template>
 

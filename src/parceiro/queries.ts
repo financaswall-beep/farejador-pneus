@@ -3948,6 +3948,7 @@ export interface PartnerPhotoQueueItem {
   status: string;
   was_late: boolean;
   has_photo: boolean;
+  photo_count: number;
   expires_at: string;
   answered_at: string | null;
   created_at: string;
@@ -3961,7 +3962,7 @@ export interface PartnerPhotoQueueItem {
 export async function getPartnerPhotoQueue(ctx: PartnerContext): Promise<PartnerPhotoQueueItem[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const res = await client.query<PartnerPhotoQueueItem>(
-      `SELECT id, tire_size, brand, note, status, was_late, has_photo,
+      `SELECT id, tire_size, brand, note, status, was_late, has_photo, photo_count,
               expires_at, answered_at, created_at
          FROM commerce.partner_photo_queue
         WHERE status IN ('pending', 'answered')
@@ -4024,10 +4025,13 @@ export async function getPartnerPhotoImage(
     const res = await client.query<{ photo_bytes: Buffer; photo_mime: string }>(
       `SELECT photo_bytes, photo_mime
          FROM commerce.photo_request_blobs
-        WHERE photo_request_id = $1`,
+        WHERE photo_request_id = $1
+        ORDER BY created_at
+        LIMIT 1`,
       [photoRequestId],
     );
-    if (res.rowCount !== 1) return null;
-    return { bytes: res.rows[0]!.photo_bytes, mime: res.rows[0]!.photo_mime };
+    const row = res.rows[0];
+    if (!row) return null;
+    return { bytes: row.photo_bytes, mime: row.photo_mime };
   });
 }

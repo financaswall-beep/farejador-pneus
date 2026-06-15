@@ -190,8 +190,11 @@ export async function dispatchPhotoToCustomer(
     return;
   }
   const row = res.rows[0]!;
-  if (row.status !== 'answered') {
-    logger.info({ photoRequestId, status: row.status }, 'photo dispatch: estado nao despachavel (no-op)');
+  // Multi-foto (até 3 por card): despacha enquanto o card não estiver cancelado. O
+  // route só chama o dispatch quando uma foto NOVA foi anexada (attached=true), então
+  // cada chamada = uma foto a mandar (o status já pode ser 'sent' das anteriores).
+  if (row.status === 'cancelled') {
+    logger.info({ photoRequestId, status: row.status }, 'photo dispatch: cancelado (no-op)');
     return;
   }
 
