@@ -1499,31 +1499,60 @@
 
             <!-- #2 Comissão da equipe (só o dono): o que você deve a cada funcionário no
                  mês pelas vendas que ELE finalizou. Vira conta a pagar (competência). -->
-            <div x-show="isOwner" style="margin-top:18px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <h4 style="margin:0;">Comissão da equipe — este mês</h4>
-                <strong x-text="money(commissionTeam.total_commission)" style="font-size:18px;color:var(--pos-accent,#2563eb);"></strong>
-              </div>
-              <p style="margin:2px 0 10px;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                <i data-lucide="info" style="width:13px;height:13px;"></i>
-                O que você deve a cada um pelas vendas que ele finalizou. Configure em Configurações → Equipe.
-              </p>
-              <div x-show="!commissionTeam.rows.length" class="pos-empty">
-                Ninguém com comissão ainda. Defina a comissão de cada funcionário em Configurações → Equipe.
-              </div>
-              <template x-for="r in commissionTeam.rows" :key="r.token_id">
-                <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--pos-border,#e2e8f0);">
-                  <span style="width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;background:var(--pos-surface-2,#f1f5f9);color:var(--pos-accent,#2563eb);"
-                        x-text="(r.label || r.username || '?').slice(0,2).toUpperCase()"></span>
-                  <span style="flex:1;min-width:0;">
-                    <b x-text="r.label || r.username || 'Funcionário'"></b>
-                    <small style="display:block;color:var(--pos-muted,#94a3b8);"
-                           x-text="r.finalized_sales + ' venda(s) · ' + money(r.gross_sales) + ' · ' + commLabel(r)"></small>
-                  </span>
-                  <strong x-text="money(r.commission_amount)"></strong>
+            <section x-show="isOwner" class="team-commission">
+              <header class="team-commission-head">
+                <div class="team-commission-title">
+                  <span class="team-commission-icon"><i data-lucide="users-round"></i></span>
+                  <div>
+                    <small>Folha variável</small>
+                    <h4>Comissões da equipe</h4>
+                    <p>Valores gerados pelas vendas finalizadas neste mês</p>
+                  </div>
                 </div>
-              </template>
-            </div>
+                <div class="team-commission-total">
+                  <small>Total a pagar</small>
+                  <strong x-text="money(commissionTeam.total_commission)"></strong>
+                  <span x-text="commissionTeam.rows.length + (commissionTeam.rows.length === 1 ? ' funcionário' : ' funcionários')"></span>
+                </div>
+              </header>
+
+              <div x-show="!commissionTeam.rows.length" class="team-commission-empty">
+                <span><i data-lucide="badge-dollar-sign"></i></span>
+                <div>
+                  <strong>Nenhuma comissão gerada</strong>
+                  <p>Configure a comissão dos funcionários em Configurações → Equipe.</p>
+                </div>
+              </div>
+
+              <div class="team-commission-grid" x-show="commissionTeam.rows.length">
+                <template x-for="r in commissionTeam.rows" :key="r.token_id">
+                  <article class="team-commission-card">
+                    <div class="team-commission-person">
+                      <span class="team-commission-avatar"
+                            x-text="(r.label || r.username || '?').slice(0,2).toUpperCase()"></span>
+                      <div>
+                        <strong x-text="r.label || r.username || 'Funcionário'"></strong>
+                        <span x-text="commLabel(r)"></span>
+                      </div>
+                    </div>
+                    <div class="team-commission-stats">
+                      <div>
+                        <small>Vendas</small>
+                        <strong x-text="r.finalized_sales"></strong>
+                      </div>
+                      <div>
+                        <small>Faturamento</small>
+                        <strong x-text="money(r.gross_sales)"></strong>
+                      </div>
+                      <div class="is-payable">
+                        <small>A pagar</small>
+                        <strong x-text="money(r.commission_amount)"></strong>
+                      </div>
+                    </div>
+                  </article>
+                </template>
+              </div>
+            </section>
 
             <div class="pos-chart-grid">
               <article class="pos-chart-card">
