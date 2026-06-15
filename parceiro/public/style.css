@@ -3833,6 +3833,56 @@ html, body {
   .photo-alert-banner { width: calc(100% - 20px); margin: 8px 10px 0; }
 }
 
+/* ─── CENTRAL DE AVISOS (repaginou a aba Bate-papo) ──────────────────────────
+   .avisos-mode na <section> da aba: esconde TODO o chat (vive dormente no DOM,
+   reversivel = tirar a classe) e transforma a coluna num mural limpo de avisos:
+   cabecalho + fila de foto que quebra linha + estado vazio. Zero mudanca em JS. */
+.avisos-mode .pos-chat { display: block; padding: 4px 16px 28px; }
+.avisos-mode .chat-kpis,
+.avisos-mode .pos-chat-list,
+.avisos-mode .pos-chat-placeholder,
+.avisos-mode .pos-chat-thread,
+.avisos-mode .pos-chat-right,
+.avisos-mode .cx-idle { display: none !important; }
+
+/* Conteudo centralizado, largura de leitura confortavel. */
+.avisos-head,
+.avisos-mode .photo-queue,
+.avisos-empty { max-width: 920px; margin-left: auto; margin-right: auto; }
+
+/* Cabecalho da central. */
+.avisos-head { display: flex; gap: 14px; align-items: center; padding: 16px 4px 18px; }
+.avisos-head-ic {
+  flex: 0 0 auto; width: 52px; height: 52px; border-radius: 14px;
+  display: grid; place-items: center;
+  background: rgba(34, 197, 94, .12); color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, .3);
+}
+.avisos-head-ic svg { width: 26px; height: 26px; }
+.avisos-head h2 { margin: 0; font-size: 20px; font-weight: 800; color: #f1f5f9; }
+.avisos-head p { margin: 3px 0 0; font-size: 13px; color: #94a3b8; max-width: 62ch; }
+
+/* Fila de foto vira MURAL no desktop (quebra linha; sem scroll lateral apertado). */
+@media (min-width: 769px) {
+  .avisos-mode .photo-queue { flex-wrap: wrap; overflow: visible; }
+  .avisos-mode .photo-card { flex: 1 1 280px; max-width: 360px; }
+}
+
+/* Estado vazio: nada pra fazer agora. */
+.avisos-empty { text-align: center; padding: 52px 20px; color: #94a3b8; }
+.avisos-empty-ic { font-size: 44px; line-height: 1; margin-bottom: 10px; opacity: .9; }
+.avisos-empty h3 { margin: 0 0 6px; font-size: 17px; font-weight: 700; color: #e2e8f0; }
+.avisos-empty p { margin: 0 auto; max-width: 46ch; font-size: 13.5px; }
+
+/* Tema claro. */
+.pos-shell[data-theme="light"] .avisos-head h2 { color: #0f172a; }
+.pos-shell[data-theme="light"] .avisos-head p,
+.pos-shell[data-theme="light"] .avisos-empty { color: #475569; }
+.pos-shell[data-theme="light"] .avisos-empty h3 { color: #1e293b; }
+.pos-shell[data-theme="light"] .avisos-head-ic {
+  background: rgba(22, 163, 74, .1); color: #16a34a; border-color: rgba(22, 163, 74, .25);
+}
+
 /* Thumb da foto aprovada no card de separação (entrega E retirada). */
 .pos-route-photo {
   display: flex; align-items: center; gap: 10px;

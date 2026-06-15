@@ -176,11 +176,10 @@
           <kbd>F8</kbd>
         </button>
         <button x-show="canSee('batepapo')" @click="goToSection('batepapo')" class="pos-nav-item" :class="currentSection === 'batepapo' && 'active'">
-          <i data-lucide="message-circle"></i>
-          <span>Bate-papo</span>
+          <i data-lucide="bell"></i>
+          <span>Avisos</span>
           <kbd>F7</kbd>
-          <b class="pos-nav-badge" x-show="chatUnreadTotal > 0" x-text="chatUnreadTotal"></b>
-          <b class="pos-nav-badge photo-nav-badge" x-show="photoPendingCount > 0" x-text="'📷' + photoPendingCount"></b>
+          <b class="pos-nav-badge photo-nav-badge" x-show="photoPendingCount > 0" x-text="photoPendingCount"></b>
         </button>
       </nav>
 
@@ -231,9 +230,6 @@
           <!-- Sino REAL: pedidos de foto pendentes (antes era número fake hardcoded). -->
           <button @click="goToSection('batepapo')" :title="photoPendingCount > 0 ? 'Pedidos de foto esperando' : 'Sem alertas'">
             <i data-lucide="bell"></i><b x-show="photoPendingCount > 0" x-text="photoPendingCount"></b>
-          </button>
-          <button @click="goToSection('batepapo')" title="Bate-papo">
-            <i data-lucide="messages-square"></i><b x-show="chatUnreadTotal > 0" x-text="chatUnreadTotal"></b>
           </button>
         </div>
         <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
@@ -1785,8 +1781,19 @@
       </section>
 
       <!-- â•â•â•â•â•  BATE-PAPO (F7)  â•â•â•â•â• -->
-      <section x-show="currentSection === 'batepapo'" class="pos-workspace">
+      <section x-show="currentSection === 'batepapo'" class="pos-workspace avisos-mode">
         <div class="pos-chat" :class="chatActive && 'has-active'">
+
+          <!-- CENTRAL DE AVISOS (repaginou a antiga aba Bate-papo). O chat continua
+               no DOM mas escondido por CSS (.avisos-mode) — reversível. Aqui mora a
+               fila de pedido de foto; amanhã o aviso de PEDIDO NOVO entra do lado. -->
+          <header class="avisos-head">
+            <span class="avisos-head-ic"><i data-lucide="bell-ring"></i></span>
+            <div>
+              <h2>Avisos da loja</h2>
+              <p>Quando o atendimento pede uma foto do pneu, o pedido cai aqui. Você tira e manda — o cliente recebe na hora.</p>
+            </div>
+          </header>
 
           <!-- ═══ FOTO SOB DEMANDA: fila de cards (0094) ═══
                O bot pediu uma foto do pneu USADO → o card aparece aqui com a
@@ -1923,6 +1930,13 @@
               </article>
             </template>
           </section>
+
+          <!-- VAZIO: nenhum aviso no momento (substitui a tela vazia do chat). -->
+          <div class="avisos-empty" x-show="photoRequests.length === 0" x-cloak>
+            <div class="avisos-empty-ic">🔔</div>
+            <h3>Nenhum aviso agora</h3>
+            <p>Tá tudo em dia. Quando o atendimento pedir uma foto de pneu pra um cliente, o card aparece aqui com a medida e o relógio.</p>
+          </div>
 
           <!-- KPIs do chat: faixa de cima sobre lista+conversa; coluna direita sobe ao lado -->
           <section class="pos-kpis chat-kpis">
@@ -2496,7 +2510,7 @@
                         <span class="perm-ic"><i data-lucide="store"></i></span><span class="perm-lb">Retiradas</span><span class="perm-ck"><i data-lucide="check"></i></span>
                       </button>
                       <button type="button" class="perm-tile" :class="{ on: funcPermForm.batepapo }" @click="funcPermForm.batepapo = !funcPermForm.batepapo">
-                        <span class="perm-ic"><i data-lucide="message-circle"></i></span><span class="perm-lb">Bate-papo</span><span class="perm-ck"><i data-lucide="check"></i></span>
+                        <span class="perm-ic"><i data-lucide="bell"></i></span><span class="perm-lb">Avisos</span><span class="perm-ck"><i data-lucide="check"></i></span>
                       </button>
                       <button type="button" class="perm-tile" :class="{ on: funcPermForm.resumo }" @click="funcPermForm.resumo = !funcPermForm.resumo">
                         <span class="perm-ic"><i data-lucide="bar-chart-3"></i></span><span class="perm-lb">Resumo</span><span class="perm-ck"><i data-lucide="check"></i></span>
