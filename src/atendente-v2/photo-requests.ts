@@ -37,6 +37,12 @@ export interface CreatePhotoRequestInput {
   /** O que o card mostra em destaque (nome/medida do pneu). */
   tireSize: string;
   brand: string | null;
+  /**
+   * Nome do cliente pro card de Avisos (decisão do dono 2026-06-15): SÓ o nome,
+   * pra o borracheiro diferenciar as pessoas. NUNCA telefone/contato (só o nome
+   * não permite contatar fora da Rede). Opcional — caller que não passa = null.
+   */
+  customerLabel?: string | null;
 }
 
 export type CreatePhotoRequestResult =
@@ -85,9 +91,9 @@ export async function createPhotoRequest(
 
   const ins = await client.query<{ id: string }>(
     `INSERT INTO commerce.photo_requests
-       (environment, unit_id, conversation_id, tire_size, brand,
+       (environment, unit_id, conversation_id, tire_size, brand, customer_label,
         expires_at)
-     VALUES ($1, $2, $3, $4, $5, now() + make_interval(mins => $6))
+     VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(mins => $7))
      RETURNING id`,
     [
       environment,
@@ -95,6 +101,7 @@ export async function createPhotoRequest(
       input.chatwootConversationId,
       input.tireSize,
       input.brand,
+      input.customerLabel ?? null,
       PHOTO_REQUEST_TTL_MINUTES,
     ],
   );

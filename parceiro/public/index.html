@@ -1817,10 +1817,23 @@
                       <span class="photo-card-tag">📷 PEDIDO DE FOTO</span>
                       <span class="photo-card-clock" x-text="'⏱ ' + photoCountdown(pr)"></span>
                     </header>
-                    <div class="photo-card-size" x-text="pr.tire_size"></div>
+                    <div class="photo-card-sizerow">
+                      <div class="photo-card-size" x-text="pr.tire_size"></div>
+                      <template x-if="photoUrgency(pr) === 'late'">
+                        <span class="photo-badge is-urgente"><i data-lucide="alert-circle"></i> URGENTE</span>
+                      </template>
+                      <template x-if="photoUrgency(pr) !== 'late'">
+                        <span class="photo-badge is-ativo">ATIVO</span>
+                      </template>
+                    </div>
                     <div class="photo-card-meta">
                       <span x-show="pr.brand" x-text="pr.brand"></span>
                       <span x-show="pr.note" x-text="pr.note"></span>
+                    </div>
+                    <!-- ref + cliente (0107): nome SÓ pra diferenciar a pessoa; sem telefone/contato -->
+                    <div class="photo-card-who">
+                      <span class="photo-who-cell"><i data-lucide="hash"></i> <small>Ref.</small> <b x-text="pr.id.slice(0, 5).toUpperCase()"></b></span>
+                      <span class="photo-who-cell" x-show="pr.customer_name"><i data-lucide="user"></i> <small>Cliente</small> <b x-text="pr.customer_name"></b></span>
                     </div>
 
                     <!-- sem preview ainda: botão GIGANTE que abre a câmera -->
@@ -1863,6 +1876,17 @@
                         <strong x-text="(pr.photo_count || 1) + ' de 3 foto(s) enviada(s)'"></strong>
                         <small x-text="pr.tire_size"></small>
                       </div>
+                    </div>
+                    <!-- ref + cliente (0107) -->
+                    <div class="photo-card-who">
+                      <span class="photo-who-cell"><i data-lucide="hash"></i> <small>Ref.</small> <b x-text="pr.id.slice(0, 5).toUpperCase()"></b></span>
+                      <span class="photo-who-cell" x-show="pr.customer_name"><i data-lucide="user"></i> <small>Cliente</small> <b x-text="pr.customer_name"></b></span>
+                    </div>
+                    <!-- progresso 0..3 fotos -->
+                    <div class="photo-progress" aria-hidden="true">
+                      <span class="photo-progress-seg" :class="(pr.photo_count || 0) >= 1 && 'on'"></span>
+                      <span class="photo-progress-seg" :class="(pr.photo_count || 0) >= 2 && 'on'"></span>
+                      <span class="photo-progress-seg" :class="(pr.photo_count || 0) >= 3 && 'on'"></span>
                     </div>
 
                     <!-- ainda cabe foto (até 3): mandar mais um ângulo do pneu -->

@@ -781,11 +781,25 @@ export async function executeTool(
           return JSON.stringify({ status: 'sem_loja' });
         }
 
+        // Nome do cliente pro card de Avisos (decisão do dono 2026-06-15): SÓ o
+        // nome, pra diferenciar as pessoas. Sem telefone/contato (só o nome não
+        // permite contatar fora da Rede). Best-effort: sem nome = card sem rótulo.
+        const nameRow = await client.query<{ name: string | null }>(
+          `SELECT ct.name
+             FROM core.conversations cv
+             JOIN core.contacts ct ON ct.id = cv.contact_id
+            WHERE cv.chatwoot_conversation_id = $1
+            LIMIT 1`,
+          [chatwootConvId],
+        );
+        const customerLabel = nameRow.rows[0]?.name?.trim().slice(0, 80) || null;
+
         const created = await createPhotoRequest(client, environment, {
           unitId,
           chatwootConversationId: chatwootConvId,
           tireSize: nomePneu,
           brand: marca,
+          customerLabel,
         });
         if (created.status === 'limit') {
           return JSON.stringify({

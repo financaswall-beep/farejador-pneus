@@ -3952,6 +3952,10 @@ export interface PartnerPhotoQueueItem {
   expires_at: string;
   answered_at: string | null;
   created_at: string;
+  // Nome do cliente (0107) — SÓ o nome, pro card diferenciar as pessoas. Sem
+  // telefone/contato (a view nunca projeta conversation_id/contact_id). Pode ser
+  // null (pedido antigo sem rótulo, ou conversa sem nome de contato).
+  customer_name: string | null;
 }
 
 /**
@@ -3963,7 +3967,7 @@ export async function getPartnerPhotoQueue(ctx: PartnerContext): Promise<Partner
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const res = await client.query<PartnerPhotoQueueItem>(
       `SELECT id, tire_size, brand, note, status, was_late, has_photo, photo_count,
-              expires_at, answered_at, created_at
+              expires_at, answered_at, created_at, customer_name
          FROM commerce.partner_photo_queue
         WHERE status IN ('pending', 'answered')
            OR created_at > now() - interval '2 hours'

@@ -3883,6 +3883,40 @@ html, body {
   background: rgba(22, 163, 74, .1); color: #16a34a; border-color: rgba(22, 163, 74, .25);
 }
 
+/* ─── Card de Avisos: selos ATIVO/URGENTE, linha Ref+Cliente, barra de progresso
+   (mockup do dono 2026-06-15). O nome do cliente entra SÓ pra diferenciar a
+   pessoa — sem telefone/contato (0107). ──────────────────────────────────── */
+.photo-card-sizerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.photo-card-sizerow .photo-card-size { margin: 0; }
+.photo-badge {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  font: 700 11px Inter, sans-serif; letter-spacing: .04em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+}
+.photo-badge svg { width: 13px; height: 13px; }
+.photo-badge.is-ativo { color: #22c55e; background: rgba(34, 197, 94, .12); border: 1px solid rgba(34, 197, 94, .35); }
+.photo-badge.is-ativo::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.photo-badge.is-urgente { color: #f87171; background: rgba(248, 113, 113, .12); border: 1px solid rgba(248, 113, 113, .4); }
+
+.photo-card-who {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  margin: 10px 0 2px; padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, .15);
+}
+.photo-who-cell { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #cbd5e1; }
+.photo-who-cell svg { width: 15px; height: 15px; color: #64748b; }
+.photo-who-cell small { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+.photo-who-cell b { font-weight: 600; color: #e2e8f0; }
+
+.photo-progress { display: flex; gap: 6px; margin: 10px 0 4px; }
+.photo-progress-seg { flex: 1; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, .2); }
+.photo-progress-seg.on { background: #22c55e; }
+
+.pos-shell[data-theme="light"] .photo-who-cell { color: #475569; }
+.pos-shell[data-theme="light"] .photo-who-cell b { color: #1e293b; }
+.pos-shell[data-theme="light"] .photo-card-who { border-top-color: rgba(15, 23, 42, .1); }
+.pos-shell[data-theme="light"] .photo-progress-seg { background: rgba(15, 23, 42, .12); }
+
 /* Thumb da foto aprovada no card de separação (entrega E retirada). */
 .pos-route-photo {
   display: flex; align-items: center; gap: 10px;
