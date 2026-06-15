@@ -18,7 +18,14 @@ window.PARCEIRO_MODULES.foto = () => ({
     // stream do chat; eventos kind='photo_request' recarregam a fila e alertam.
 
     get photoPendingCount() {
-      return this.photoRequests.filter((p) => p.status === 'pending').length;
+      // Só conta foto VIVA: pending E ainda não vencida (expires_at no futuro).
+      // Uma foto vencida que o faxineiro ainda não varreu fica 'pending' no banco
+      // por um tempo — se contasse, a campainha tocava no login pra foto MORTA,
+      // sem nada real pra enviar (bug achado com o Wallace 2026-06-14).
+      const agora = Date.now();
+      return this.photoRequests.filter(
+        (p) => p.status === 'pending' && (!p.expires_at || new Date(p.expires_at).getTime() > agora),
+      ).length;
     },
 
     async loadPhotoRequests() {
