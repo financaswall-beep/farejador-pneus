@@ -227,12 +227,6 @@ window.PARCEIRO_MODULES.foto = () => ({
         beep(1320, 0.22, 0.25); // "pá!"
       } catch (e) { /* áudio falhou: visual cobre */ }
     },
-    togglePhotoSound() {
-      this.photoSoundOn = !this.photoSoundOn;
-      try { localStorage.setItem(`farejador_photo_sound_${this.slug}`, this.photoSoundOn ? '1' : '0'); }
-      catch (e) { /* localStorage indisponível */ }
-    },
-
     // Thumb da foto no card de separação: <img> não manda Bearer → busca os
     // bytes autenticado e vira objectURL (cacheado por id; poucos cards ativos).
     async photoLoadThumb(photoRequestId) {

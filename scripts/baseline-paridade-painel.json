@@ -1,7 +1,7 @@
 {
   "geradoEm": "2026-06-14T04:37:47.209Z",
   "commitBase": "c0d7913",
-  "total": 488,
+  "total": 487,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -476,7 +476,6 @@
     "toE164Phone": "function",
     "toggleChatPanel": "function",
     "toggleConvTag": "function",
-    "togglePhotoSound": "function",
     "toggleSidebar": "function",
     "toggleTheme": "function",
     "tokenInput": "value:string",

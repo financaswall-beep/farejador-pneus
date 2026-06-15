@@ -137,7 +137,7 @@ function parceiroApp() {
     photoTickTimer: null,       // tick de 1s pro countdown (só roda com card pendente)
     photoLastPendingCount: 0,   // detecta card NOVO → bip + flash
     audioUnlocked: false,       // política de autoplay: destrava no 1º toque
-    photoSoundOn: localStorage.getItem(`farejador_photo_sound_${slug}`) !== '0', // bip ligado por padrão
+    photoSoundOn: true,         // alerta sonoro SEMPRE ligado (sem mute — pedido de foto não pode passar batido)
     photoThumbUrls: {},         // cache { photo_request_id: objectURL } (img não manda Bearer → fetch+blob)
     photoLightbox: { open: false, url: null }, // foto ampliada (card de separação)
     // ─── BATE-PAPO (Tela 4): UI do painel direito ───
