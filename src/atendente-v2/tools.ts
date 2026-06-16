@@ -29,7 +29,7 @@ import { env } from '../shared/config/env.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
-import { createHash } from 'node:crypto';
+import { buildOrderIdempotencyKey } from './order-idempotency.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
 
@@ -881,9 +881,9 @@ async function insertCommerceOrderMirror(
     items: { product_id: string; quantity: number; unit_price: string }[];
   },
 ): Promise<{ id: string; order_number: string }> {
-  // idempotency_key não-nulo (caminho parceiro) dedup via índice parcial
-  // orders_idempotency_key_uniq; chave NULA (matriz) nunca conflita → INSERT normal,
-  // comportamento idêntico ao de antes.
+  // idempotency_key dedup via índice parcial orders_idempotency_key_uniq — os DOIS
+  // caminhos (parceiro e matriz) passam chave estável; em colisão o ON CONFLICT DO
+  // NOTHING devolve o existente abaixo. Chave NULA (defensivo) nunca conflita → INSERT normal.
   const ins = await client.query<{ id: string; order_number: string }>(
     `INSERT INTO commerce.orders (
        environment, contact_id, source_conversation_id, total_amount, status,
@@ -920,8 +920,8 @@ async function insertCommerceOrderMirror(
     return order;
   }
 
-  // Sem linha = colisão de idempotência (retry do MESMO pedido): devolve o existente
-  // sem reinserir itens. Só ocorre com idempotencyKey não-nulo (caminho parceiro).
+  // Sem linha = colisão de idempotência (retry/dupla-chamada do MESMO pedido): devolve o
+  // existente sem reinserir itens. Vale pros dois caminhos (parceiro e matriz têm chave).
   if (input.idempotencyKey) {
     const ex = await client.query<{ id: string; order_number: string }>(
       `SELECT id, order_number FROM commerce.orders
@@ -1100,10 +1100,7 @@ async function criarPedido(
     // ── CAMINHO PARCEIRO: dono (partner_order 2w + reserva + COD) + espelho ──
     // Impressão digital estável (H2): o MESMO pedido em retry gera a MESMA chave →
     // não duplica o espelho nem o partner_order (register_partner_local_order dedup).
-    const idempotencyKey = `bot:order:${conversationId}:${createHash('sha1')
-      .update(JSON.stringify({ u: partner.unitId, itens, modalidade }))
-      .digest('hex')
-      .slice(0, 16)}`;
+    const idempotencyKey = buildOrderIdempotencyKey(conversationId, partner.unitId, itens, modalidade);
 
     const mat = await materializePartnerOrder(client, partner.ctx, {
       customer_name: customerName,
@@ -1178,8 +1175,11 @@ async function criarPedido(
     );
   } else {
     // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
-    // Idêntico a hoje (idempotencyKey NULL não dedup). Defensivo: unit_id NULL se não achar.
+    // Dedup: chave estável (conversa+loja+itens+modalidade) como no parceiro — em
+    // dupla-chamada do MESMO pedido o ON CONFLICT devolve o existente em vez de duplicar.
+    // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)
     const unitId = await resolveMatrizUnitId(client, environment);
+    const idempotencyKey = buildOrderIdempotencyKey(conversationId, unitId, itens, modalidade);
     order = await insertCommerceOrderMirror(client, environment, {
       contactId,
       conversationId,
@@ -1192,7 +1192,7 @@ async function criarPedido(
       customerName,
       unitId,
       partnerOrderId: null,
-      idempotencyKey: null,
+      idempotencyKey,
       items: itens.map((i) => ({
         product_id: i.product_id,
         quantity: i.quantidade,
