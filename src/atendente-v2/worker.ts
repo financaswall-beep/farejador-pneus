@@ -18,12 +18,14 @@ import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import {
   hasNewerPendingJob,
+  loadStaleTriggerCheck,
   markAtendenteJobFailed,
   markAtendenteJobProcessed,
   markAtendenteJobProcessing,
   markAtendenteJobSuperseded,
   pickAtendenteJob,
 } from '../shared/repositories/ops-atendente.repository.js';
+import { isStaleTrigger } from './stale-trigger.js';
 import {
   createDefaultAtendenteJobReconcileInput,
   reconcileMissingAtendenteJobsWithPool,
@@ -68,6 +70,26 @@ export async function pollAndAttend(): Promise<void> {
       logger.info(
         { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
         'agent_v2: job superseded (newer message arrived)',
+      );
+      return;
+    }
+
+    // Trava anti-requentado: se a conversa JÁ teve resposta nossa DEPOIS do
+    // gatilho, este job é obsoleto (reenfileirado tarde pela rede de 60s) —
+    // responder de novo faria o bot repetir fora de contexto (Vitor 06-15).
+    // Decisão Wallace 06-16: melhor atrasar do que repetir.
+    const staleCheck = await loadStaleTriggerCheck(
+      client,
+      job.environment,
+      job.conversation_id,
+      job.trigger_message_id,
+    );
+    if (isStaleTrigger(staleCheck.triggerCreatedAt, staleCheck.latestOutgoingAt)) {
+      await markAtendenteJobSuperseded(client, job.id, 'superseded:already_replied_after_trigger');
+      await client.query('COMMIT');
+      logger.info(
+        { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
+        'agent_v2: job superseded (already replied after trigger)',
       );
       return;
     }

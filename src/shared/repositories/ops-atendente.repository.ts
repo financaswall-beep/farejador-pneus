@@ -102,14 +102,18 @@ export async function hasNewerPendingJob(
 }
 
 /**
- * Marca job como obsoleto (uma mensagem mais nova chegou antes do debounce
- * expirar). Reusa status='processed' porque o schema atual nao tem
- * 'superseded' no CHECK constraint, mas registra em error_message para
- * auditoria.
+ * Marca job como obsoleto. Reusa status='processed' porque o schema atual nao tem
+ * 'superseded' no CHECK constraint, mas registra o motivo em error_message para
+ * auditoria. Motivos:
+ *  - 'superseded:newer_message_arrived' (default): chegou mensagem mais nova antes
+ *    do debounce expirar.
+ *  - 'superseded:already_replied_after_trigger': a conversa JÁ teve resposta nossa
+ *    depois do gatilho (job requentado pela rede de 60s) — ver isStaleTrigger.
  */
 export async function markAtendenteJobSuperseded(
   client: PoolClient,
   jobId: string,
+  reason = 'superseded:newer_message_arrived',
 ): Promise<void> {
   await client.query(
     `UPDATE ops.atendente_jobs
@@ -117,10 +121,42 @@ export async function markAtendenteJobSuperseded(
          processed_at  = now(),
          locked_at     = NULL,
          locked_by     = NULL,
-         error_message = 'superseded:newer_message_arrived'
+         error_message = $2
      WHERE id = $1`,
-    [jobId],
+    [jobId, reason],
   );
+}
+
+/**
+ * Carrega os dois horários que decidem se um job está "requentado": o horário do
+ * gatilho (a mensagem que criou o job) e o horário da nossa última resposta
+ * (outgoing) na conversa. A comparação fica em isStaleTrigger (testável). Query
+ * burra de propósito — dois SELECTs simples, baixo risco.
+ */
+export async function loadStaleTriggerCheck(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  triggerMessageId: string,
+): Promise<{ triggerCreatedAt: Date | null; latestOutgoingAt: Date | null }> {
+  const result = await client.query<{
+    trigger_created_at: Date | null;
+    latest_outgoing_at: Date | null;
+  }>(
+    `SELECT
+       (SELECT created_at FROM core.messages WHERE id = $3) AS trigger_created_at,
+       (SELECT max(created_at) FROM core.messages
+          WHERE environment = $1
+            AND conversation_id = $2
+            AND is_private = false
+            AND message_type_name = 'outgoing') AS latest_outgoing_at`,
+    [environment, conversationId, triggerMessageId],
+  );
+  const row = result.rows[0];
+  return {
+    triggerCreatedAt: row?.trigger_created_at ?? null,
+    latestOutgoingAt: row?.latest_outgoing_at ?? null,
+  };
 }
 
 export async function pickAtendenteJob(
