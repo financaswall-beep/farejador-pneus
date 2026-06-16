@@ -9,6 +9,7 @@ import { activeToolDefinitions, executeTool } from './tools.js';
 import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
+import { buildLocationReplyNudge } from './location-nudge.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
@@ -179,7 +180,13 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       reversedHistory.find((m) => m.role === 'assistant' && m.content)?.content ?? null;
     const photoNudge =
       env.PHOTO_REQUESTS && customerWantsPhoto(latestCustomerText, lastAssistantText) ? PHOTO_NUDGE : '';
-    const systemPromptWithContext = basePrompt + (customerContext ?? '') + pinNudge + photoNudge;
+    // Empurrão de localização-EM-TEXTO (gêmeo do pino): quando o bot acabou de pedir
+    // a localização e o cliente respondeu em texto (sem pino), o LLM às vezes regride —
+    // recita o pneu de novo em vez de reconhecer a loja e avançar (conversa 668, 06-16).
+    // Permissivo: se o cliente mudou de assunto, manda seguir o cliente (não engessa).
+    const locationNudge = buildLocationReplyNudge(lastAssistantText, customerPin != null);
+    const systemPromptWithContext =
+      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },
