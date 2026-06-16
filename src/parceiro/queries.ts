@@ -301,7 +301,58 @@ export async function getPartnerFluxoCaixa(ctx: PartnerContext): Promise<unknown
   });
 }
 
-export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> {
+/**
+ * Opções das listas de histórico/financeiro (0108+). `includeArchived` = mostra
+ * também os "tirados da tela" (arquivar). NUNCA usar isto em totais/caixa/comissão
+ * nem no Relatório — o filtro de arquivados é SÓ de exibição de lista.
+ */
+export interface PartnerListOpts {
+  includeArchived?: boolean;
+}
+
+// Tipos que o borracheiro pode "tirar da tela" (0108). Allowlist fixa — fora daqui
+// o endpoint recusa (400). 🔒 REGRA DE OURO: só entram tipos cujos TOTAIS vêm do
+// BACKEND (resumo) — arquivar NUNCA pode sumir dinheiro do total. 'payable'/
+// 'receivable' ficam de FORA por enquanto: os totais "em aberto/pago" deles são
+// somados da LISTA no front (app.financeiro.kpis.js), então arquivá-los baixaria
+// o total. Entram quando esses KPIs forem pro backend (fase Relatórios/agregados).
+const DISMISSIBLE_TYPES = ['order', 'expense', 'purchase'] as const;
+export type DismissibleType = (typeof DISMISSIBLE_TYPES)[number];
+export function isDismissibleType(t: string): t is DismissibleType {
+  return (DISMISSIBLE_TYPES as readonly string[]).includes(t);
+}
+
+/**
+ * Arquivar = tirar da tela SEM apagar do banco (0108). Via withPartnerContext: a
+ * RLS (WITH CHECK unit_id = current_partner_core_unit()) garante que só dá pra
+ * arquivar item da PRÓPRIA loja. Idempotente (ON CONFLICT). NÃO valida se o id
+ * existe: arquivar um id que não é seu cria, no máximo, uma linha que nunca casa
+ * com nada que você vê — inofensivo, e a RLS impede arquivar pra outra unidade.
+ */
+export async function archivePartnerItem(ctx: PartnerContext, itemType: DismissibleType, itemId: string): Promise<void> {
+  await withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await client.query(
+      `INSERT INTO commerce.partner_dismissed_items
+         (environment, unit_id, item_type, item_id, dismissed_by)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (environment, unit_id, item_type, item_id) DO NOTHING`,
+      [ctx.environment, ctx.unitId, itemType, itemId, `${ctx.role}:${ctx.tokenId}`],
+    );
+  });
+}
+
+/** Desarquivar = devolve o item pra tela (remove a linha). RLS escopa por unidade. */
+export async function unarchivePartnerItem(ctx: PartnerContext, itemType: DismissibleType, itemId: string): Promise<void> {
+  await withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await client.query(
+      `DELETE FROM commerce.partner_dismissed_items
+        WHERE environment = $1 AND unit_id = $2 AND item_type = $3 AND item_id = $4`,
+      [ctx.environment, ctx.unitId, itemType, itemId],
+    );
+  });
+}
+
+export async function getPartnerVendas(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT order_id, created_at,
@@ -318,9 +369,13 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
               total_amount, received_amount, notes, items
        FROM commerce.partner_orders_full
        WHERE environment = $1 AND unit_id = $2
+         AND ($3 OR NOT EXISTS (
+           SELECT 1 FROM commerce.partner_dismissed_items d
+            WHERE d.environment = $1 AND d.unit_id = $2
+              AND d.item_type = 'order' AND d.item_id = order_id::text))
        ORDER BY created_at DESC
        LIMIT 500`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
 
     // FOTO SOB DEMANDA (0094): pedido que nasceu de uma foto aprovada ganha o
@@ -341,6 +396,37 @@ export async function getPartnerVendas(ctx: PartnerContext): Promise<unknown[]> 
       const photoRequestId = orderId ? photoByOrder.get(orderId) : undefined;
       return photoRequestId ? { ...row, photo_request_id: photoRequestId } : row;
     });
+  });
+}
+
+/**
+ * Relatório de VENDAS (0108): histórico de pedidos por período + status. SEMPRE
+ * mostra TUDO — inclusive os arquivados (flag `arquivado` pra o front oferecer
+ * "desarquivar"). NÃO filtra dismissed (o relatório é o backstop "puxar tudo").
+ * Owner-only no endpoint. RLS isola por unidade.
+ */
+export interface RelatorioVendasOpts { from?: string | null; to?: string | null; status?: string | null; }
+export async function getPartnerRelatorioVendas(ctx: PartnerContext, opts: RelatorioVendasOpts = {}): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const res = await client.query(
+      `SELECT pof.order_id, pof.created_at, pof.contact_name AS customer_name,
+              pof.fulfillment_mode, pof.status, pof.delivery_status, pof.awaiting_pickup,
+              pof.total_amount, pof.source_tag,
+              EXISTS (SELECT 1 FROM commerce.partner_dismissed_items d
+                       WHERE d.environment = $1 AND d.unit_id = $2
+                         AND d.item_type = 'order' AND d.item_id = pof.order_id::text) AS arquivado
+         FROM commerce.partner_orders_full pof
+        WHERE pof.environment = $1 AND pof.unit_id = $2
+          AND ($3::timestamptz IS NULL OR pof.created_at >= $3::timestamptz)
+          AND ($4::timestamptz IS NULL OR pof.created_at <  $4::timestamptz)
+          AND ($5::text IS NULL
+               OR ($5 = 'cancelados' AND pof.status = 'cancelled')
+               OR ($5 = 'ativos'     AND pof.status <> 'cancelled'))
+        ORDER BY pof.created_at DESC
+        LIMIT 1000`,
+      [ctx.environment, ctx.unitId, opts.from ?? null, opts.to ?? null, opts.status ?? null],
+    );
+    return res.rows;
   });
 }
 
@@ -493,21 +579,25 @@ export async function searchPartnerCustomers(ctx: PartnerContext, q: string): Pr
   });
 }
 
-export async function getPartnerDespesas(ctx: PartnerContext): Promise<unknown[]> {
+export async function getPartnerDespesas(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT id, expense_date, category, description, amount, payment_method, created_at
        FROM finance.partner_expenses
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+         AND ($3 OR NOT EXISTS (
+           SELECT 1 FROM commerce.partner_dismissed_items d
+            WHERE d.environment = $1 AND d.unit_id = $2
+              AND d.item_type = 'expense' AND d.item_id = id::text))
        ORDER BY expense_date DESC, created_at DESC
        LIMIT 100`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
     return result.rows;
   });
 }
 
-export async function getPartnerCompras(ctx: PartnerContext): Promise<unknown[]> {
+export async function getPartnerCompras(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT pp.id, pp.supplier_name, pp.purchased_at, pp.total_amount,
@@ -523,34 +613,42 @@ export async function getPartnerCompras(ctx: PartnerContext): Promise<unknown[]>
        LEFT JOIN commerce.partner_purchase_items ppi
          ON ppi.purchase_id = pp.id AND ppi.environment = pp.environment
        WHERE pp.environment = $1 AND pp.unit_id = $2 AND pp.deleted_at IS NULL
+         AND ($3 OR NOT EXISTS (
+           SELECT 1 FROM commerce.partner_dismissed_items d
+            WHERE d.environment = $1 AND d.unit_id = $2
+              AND d.item_type = 'purchase' AND d.item_id = pp.id::text))
        GROUP BY pp.id
        ORDER BY pp.purchased_at DESC, pp.created_at DESC
        LIMIT 100`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
     return result.rows;
   });
 }
 
-export async function getPartnerPayables(ctx: PartnerContext): Promise<unknown[]> {
+export async function getPartnerPayables(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT id, counterparty_name, description, category, amount, due_date,
               status, paid_at, payment_method, notes, created_at, source_purchase_id
        FROM finance.partner_payables
        WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+         AND ($3 OR NOT EXISTS (
+           SELECT 1 FROM commerce.partner_dismissed_items d
+            WHERE d.environment = $1 AND d.unit_id = $2
+              AND d.item_type = 'payable' AND d.item_id = id::text))
        ORDER BY
          CASE status WHEN 'open' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END,
          due_date ASC NULLS LAST,
          created_at DESC
        LIMIT 100`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
     return result.rows;
   });
 }
 
-export async function getPartnerReceivables(ctx: PartnerContext): Promise<unknown[]> {
+export async function getPartnerReceivables(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
       `SELECT pr.id, pr.customer_id, pr.customer_name, pr.description, pr.source_tag, pr.amount, pr.due_date,
@@ -568,13 +666,17 @@ export async function getPartnerReceivables(ctx: PartnerContext): Promise<unknow
        LEFT JOIN finance.partner_receivable_installments pri
          ON pri.receivable_id = pr.id AND pri.deleted_at IS NULL
        WHERE pr.environment = $1 AND pr.unit_id = $2 AND pr.deleted_at IS NULL
+         AND ($3 OR NOT EXISTS (
+           SELECT 1 FROM commerce.partner_dismissed_items d
+            WHERE d.environment = $1 AND d.unit_id = $2
+              AND d.item_type = 'receivable' AND d.item_id = pr.id::text))
        GROUP BY pr.id
        ORDER BY
          CASE pr.status WHEN 'open' THEN 1 WHEN 'received' THEN 2 ELSE 3 END,
          pr.due_date ASC NULLS LAST,
          pr.created_at DESC
        LIMIT 100`,
-      [ctx.environment, ctx.unitId],
+      [ctx.environment, ctx.unitId, opts.includeArchived === true],
     );
     return result.rows;
   });

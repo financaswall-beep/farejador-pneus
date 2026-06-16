@@ -124,7 +124,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'config'].includes(currentSection)" :data-theme="theme" :class="sidebarCollapsed && 'sidebar-collapsed'" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="sidebarCollapsed && 'sidebar-collapsed'" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -192,6 +192,10 @@
               :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
         <svg class="pos-toggle-chevron" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
         <span x-text="sidebarCollapsed ? 'Expandir' : 'Recolher'"></span>
+      </button>
+      <button x-show="isOwner" @click="goToSection('relatorios'); loadRelatorio()" class="pos-nav-item" :class="currentSection === 'relatorios' && 'active'">
+        <i data-lucide="bar-chart-3"></i>
+        <span>Relatórios</span>
       </button>
       <button x-show="isOwner" @click="goToSection('config')" class="pos-nav-item pos-settings" :class="currentSection === 'config' && 'active'">
         <i data-lucide="settings"></i>
@@ -732,6 +736,11 @@
                       <a x-show="o.customer_phone" :href="'tel:' + (o.customer_phone || '')" x-text="formatPhoneDisplay(o.customer_phone)"></a>
                     </div>
                     <span class="pos-delivery-pill" :class="o.status === 'cancelled' ? 'failed' : o.delivery_status" x-text="o.status === 'cancelled' ? 'Cancelado' : deliveryStatusLabel(o.delivery_status)"></span>
+                    <button type="button" class="pos-order-archive" title="Tirar da tela (continua no Relatório)"
+                            :disabled="isSaving('arquivar-order-' + o.order_id)"
+                            @click="arquivarItem('order', o.order_id, { label: o.customer_name || 'pedido', aberto: o.status !== 'cancelled' && (o.delivery_status === 'pending' || o.delivery_status === 'dispatched') })">
+                      <i data-lucide="x"></i>
+                    </button>
                   </div>
                   <p class="pos-order-addr"><i data-lucide="map-pin"></i> <span x-text="o.delivery_address || 'Sem endereço informado'"></span></p>
                   <ul class="pos-order-items">
@@ -2293,6 +2302,70 @@
       </section>
 
       <!-- Configurações da Loja (Fase 1) — só o dono enxerga (cadeado duro). 4 abas internas. -->
+      <!-- ═══════ RELATÓRIOS (0108) — só dono. Histórico de vendas + desarquivar. ═══════ -->
+      <section x-show="currentSection === 'relatorios'" class="pos-workspace">
+        <div class="rel-wrap">
+          <header class="rel-head">
+            <span class="rel-head-ic"><i data-lucide="bar-chart-3"></i></span>
+            <div>
+              <h2>Relatório de vendas</h2>
+              <p>Tudo o que passou — inclusive o que você tirou da tela. Filtra por período e traz de volta se precisar.</p>
+            </div>
+          </header>
+
+          <div class="rel-filters">
+            <div class="rel-chips">
+              <template x-for="r in ['hoje','semana','mes','mes_passado']" :key="r">
+                <button type="button" class="rel-chip" :class="relRange === r && 'on'" @click="setRelRange(r)" x-text="relRangeLabel(r)"></button>
+              </template>
+              <button type="button" class="rel-chip" :class="relRange === 'custom' && 'on'" @click="relRange = 'custom'">Personalizado</button>
+            </div>
+            <div class="rel-controls">
+              <template x-if="relRange === 'custom'">
+                <span class="rel-custom">
+                  <input type="date" x-model="relFrom" class="rel-input" />
+                  <span>até</span>
+                  <input type="date" x-model="relTo" class="rel-input" />
+                </span>
+              </template>
+              <select x-model="relStatus" @change="loadRelatorio()" class="rel-input">
+                <option value="todos">Todos os status</option>
+                <option value="ativos">Só ativos</option>
+                <option value="cancelados">Só cancelados</option>
+              </select>
+              <button type="button" class="rel-go" @click="loadRelatorio()"><i data-lucide="search"></i> Buscar</button>
+            </div>
+          </div>
+
+          <div class="rel-kpis">
+            <div class="rel-kpi"><small>Pedidos</small><strong x-text="relCount"></strong></div>
+            <div class="rel-kpi"><small>Total</small><strong x-text="money(relTotal)"></strong></div>
+            <div class="rel-kpi"><small>Ticket médio</small><strong x-text="money(relTicket)"></strong></div>
+            <div class="rel-kpi" x-show="relArquivadosCount > 0"><small>Arquivados</small><strong x-text="relArquivadosCount"></strong></div>
+          </div>
+
+          <div class="rel-table-wrap">
+            <table class="rel-table">
+              <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Status</th><th class="r">Valor</th><th></th></tr></thead>
+              <tbody>
+                <template x-for="r in relRows" :key="r.order_id">
+                  <tr :class="r.arquivado && 'is-arq'">
+                    <td x-text="formatDateTime(r.created_at)"></td>
+                    <td x-text="r.customer_name || 'Cliente'"></td>
+                    <td x-text="r.fulfillment_mode === 'delivery' ? 'Entrega' : (r.fulfillment_mode === 'pickup' ? 'Retirada' : '—')"></td>
+                    <td><span x-text="relLinhaStatus(r)"></span> <span class="rel-arq-tag" x-show="r.arquivado">arquivado</span></td>
+                    <td class="r" x-text="money(r.total_amount)"></td>
+                    <td class="r"><button type="button" class="rel-undo" x-show="r.arquivado" @click="desarquivarVenda(r)" title="Trazer de volta pra tela"><i data-lucide="undo-2"></i> voltar</button></td>
+                  </tr>
+                </template>
+                <tr x-show="!relRows.length && !relLoading"><td colspan="6" class="rel-empty">Nada nesse período. Tenta outro filtro.</td></tr>
+                <tr x-show="relLoading"><td colspan="6" class="rel-empty">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section x-show="currentSection === 'config'" class="pos-workspace">
 
         <!-- Barra de abas internas -->
@@ -2695,6 +2768,8 @@
 <script src="./app.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260611-onda-c"></script>
+<script src="./app.arquivar.js?v=20260616-arquivar"></script>
+<script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.js?v=20260612-bloco2b"></script>
 </body>
 </html>

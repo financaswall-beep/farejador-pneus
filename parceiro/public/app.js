@@ -201,6 +201,15 @@ function parceiroApp() {
     clientes: [],
     customerListSearch: '',
 
+    // ─── RELATÓRIOS (0108): só dono. Histórico de vendas por período; mostra TUDO
+    //     (inclusive arquivado, com desarquivar). É o backstop "puxar relatório".
+    relRange: 'mes',     // 'hoje' | 'semana' | 'mes' | 'mes_passado' | 'custom'
+    relStatus: 'todos',  // 'ativos' | 'cancelados' | 'todos'
+    relFrom: '',         // custom (yyyy-mm-dd)
+    relTo: '',
+    relRows: [],
+    relLoading: false,
+
     saleForm: { customer_id: null, customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
 
     // Aba Pedidos (entrega/COD) — estado próprio, separado do checkout do balcão.
@@ -276,5 +285,7 @@ function parceiroApp() {
     window.PARCEIRO_MODULES.resumo, // passo 10: derivadas do Resumo (vendas concluidas, serie 7d)
     window.PARCEIRO_MODULES.pedidos, // passo 10: aba Pedidos (criacao/filtros) + status de entrega
     window.PARCEIRO_MODULES.entregas, // passo 10: tela Entrega (rota) + tela Retiradas (pickup)
+    window.PARCEIRO_MODULES.arquivar, // passo 11 (0108): "tirar da tela" (arquivar) — some da lista, fica no Relatório
+    window.PARCEIRO_MODULES.relatorios, // passo 12 (0108): aba Relatórios (só dono) — histórico + desarquivar
   ]);
 }

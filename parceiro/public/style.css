@@ -3917,6 +3917,62 @@ html, body {
 .pos-shell[data-theme="light"] .photo-card-who { border-top-color: rgba(15, 23, 42, .1); }
 .pos-shell[data-theme="light"] .photo-progress-seg { background: rgba(15, 23, 42, .12); }
 
+/* Botão "tirar da tela" (arquivar, 0108) — discreto no canto do card. */
+.pos-order-archive {
+  flex: 0 0 auto; width: 28px; height: 28px; margin-left: 6px; border-radius: 8px;
+  display: grid; place-items: center; cursor: pointer;
+  background: transparent; border: 1px solid rgba(148, 163, 184, .25); color: #94a3b8;
+}
+.pos-order-archive:hover { background: rgba(148, 163, 184, .12); color: #e2e8f0; }
+.pos-order-archive svg { width: 15px; height: 15px; }
+.pos-order-archive:disabled { opacity: .5; cursor: wait; }
+.pos-shell[data-theme="light"] .pos-order-archive { border-color: rgba(15, 23, 42, .15); color: #64748b; }
+
+/* ─── Aba RELATÓRIOS (0108) ─────────────────────────────────────────────── */
+.rel-wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+.rel-head { display: flex; gap: 14px; align-items: center; padding: 6px 4px 16px; }
+.rel-head-ic { flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center;
+  background: rgba(56, 189, 248, .12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, .3); }
+.rel-head-ic svg { width: 25px; height: 25px; }
+.rel-head h2 { margin: 0; font-size: 20px; font-weight: 800; color: #f1f5f9; }
+.rel-head p { margin: 2px 0 0; font-size: 13px; color: #94a3b8; max-width: 64ch; }
+.rel-filters { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.rel-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rel-chip { font: 600 12px Inter, sans-serif; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(148, 163, 184, .25); color: #cbd5e1; }
+.rel-chip.on { background: #2563eb; border-color: #2563eb; color: #fff; }
+.rel-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rel-custom { display: inline-flex; gap: 6px; align-items: center; color: #94a3b8; font-size: 12px; }
+.rel-input { font: 500 13px Inter, sans-serif; padding: 7px 10px; border-radius: 9px;
+  background: #0f172a; border: 1px solid rgba(148, 163, 184, .25); color: #e2e8f0; }
+.rel-go { font: 700 13px Inter, sans-serif; padding: 8px 14px; border-radius: 9px; cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: center; background: #16a34a; border: 0; color: #fff; }
+.rel-go svg { width: 15px; height: 15px; }
+.rel-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; max-width: 1000px; }
+.rel-kpi { background: rgba(148, 163, 184, .07); border: 1px solid rgba(148, 163, 184, .15); border-radius: 12px; padding: 12px 14px; }
+.rel-kpi small { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+.rel-kpi strong { font-size: 22px; font-weight: 800; color: #f1f5f9; }
+.rel-table-wrap { overflow-x: auto; border: 1px solid rgba(148, 163, 184, .15); border-radius: 12px; }
+.rel-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rel-table th, .rel-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(148, 163, 184, .1); color: #cbd5e1; white-space: nowrap; }
+.rel-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; background: rgba(148, 163, 184, .05); }
+.rel-table .r { text-align: right; }
+.rel-table tr.is-arq td { opacity: .6; }
+.rel-arq-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, .4); border-radius: 6px; padding: 1px 5px; margin-left: 4px; }
+.rel-undo { font: 600 12px Inter, sans-serif; display: inline-flex; gap: 5px; align-items: center; cursor: pointer;
+  background: transparent; border: 1px solid rgba(148, 163, 184, .3); color: #93c5fd; border-radius: 8px; padding: 5px 9px; }
+.rel-undo svg { width: 13px; height: 13px; }
+.rel-empty { text-align: center; color: #64748b; padding: 24px; }
+.pos-shell[data-theme="light"] .rel-head h2 { color: #0f172a; }
+.pos-shell[data-theme="light"] .rel-head p,
+.pos-shell[data-theme="light"] .rel-kpi small,
+.pos-shell[data-theme="light"] .rel-table th { color: #64748b; }
+.pos-shell[data-theme="light"] .rel-kpi strong { color: #0f172a; }
+.pos-shell[data-theme="light"] .rel-input { background: #fff; color: #1e293b; border-color: rgba(15, 23, 42, .15); }
+.pos-shell[data-theme="light"] .rel-table td,
+.pos-shell[data-theme="light"] .rel-chip { color: #334155; }
+
 /* Thumb da foto aprovada no card de separação (entrega E retirada). */
 .pos-route-photo {
   display: flex; align-items: center; gap: 10px;

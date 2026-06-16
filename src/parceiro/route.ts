@@ -61,6 +61,10 @@ import {
   getPartnerFluxoCaixa,
   getPartnerResumo,
   getPartnerVendas,
+  getPartnerRelatorioVendas,
+  archivePartnerItem,
+  unarchivePartnerItem,
+  isDismissibleType,
   getPartnerRetiradas,
   registerPartnerExpense,
   registerPartnerPayable,
@@ -828,7 +832,8 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // continuam só requirePartnerAuth: não são "telas" e o PDV/chat dependem deles
   // mesmo quando a tela-dona está desligada.
   fastify.get('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerVendas(getPartnerContext(request)) });
+    const includeArchived = (request.query as { arquivados?: string }).arquivados === '1';
+    return reply.status(200).send({ rows: await getPartnerVendas(getPartnerContext(request), { includeArchived }) });
   });
 
   // Tela Retiradas (balcão): feed PRÓPRIO da fila de retirada reservada. Guard
@@ -1156,19 +1161,51 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   fastify.get('/parceiro/:slug/api/despesas', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerDespesas(getPartnerContext(request)) });
+    const includeArchived = (request.query as { arquivados?: string }).arquivados === '1';
+    return reply.status(200).send({ rows: await getPartnerDespesas(getPartnerContext(request), { includeArchived }) });
   });
 
   fastify.get('/parceiro/:slug/api/compras', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerCompras(getPartnerContext(request)) });
+    const includeArchived = (request.query as { arquivados?: string }).arquivados === '1';
+    return reply.status(200).send({ rows: await getPartnerCompras(getPartnerContext(request), { includeArchived }) });
   });
 
   fastify.get('/parceiro/:slug/api/contas-a-pagar', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerPayables(getPartnerContext(request)) });
+    const includeArchived = (request.query as { arquivados?: string }).arquivados === '1';
+    return reply.status(200).send({ rows: await getPartnerPayables(getPartnerContext(request), { includeArchived }) });
   });
 
   fastify.get('/parceiro/:slug/api/contas-a-receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send({ rows: await getPartnerReceivables(getPartnerContext(request)) });
+    const includeArchived = (request.query as { arquivados?: string }).arquivados === '1';
+    return reply.status(200).send({ rows: await getPartnerReceivables(getPartnerContext(request), { includeArchived }) });
+  });
+
+  // Arquivar / desarquivar (0108): "tirar da tela" qualquer item SEM apagar do banco.
+  // Escopado por ctx.unitId (RLS WITH CHECK). :tipo na allowlist; :id qualquer string curta.
+  // requirePartnerAuth (não é "tela": dono e funcionário arrumam a própria fila).
+  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/arquivar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const { tipo, id } = request.params as { tipo?: string; id?: string };
+    if (!tipo || !isDismissibleType(tipo) || !id || id.length > 64) return reply.status(400).send({ error: 'invalid_item' });
+    await archivePartnerItem(getPartnerContext(request), tipo, id);
+    return reply.status(200).send({ ok: true });
+  });
+
+  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/desarquivar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+    const { tipo, id } = request.params as { tipo?: string; id?: string };
+    if (!tipo || !isDismissibleType(tipo) || !id || id.length > 64) return reply.status(400).send({ error: 'invalid_item' });
+    await unarchivePartnerItem(getPartnerContext(request), tipo, id);
+    return reply.status(200).send({ ok: true });
+  });
+
+  // Relatório de Vendas (0108) — SÓ DONO (dado sensível, igual Config). Mostra TUDO
+  // (inclui arquivados, com flag pra desarquivar). Período + status via query string.
+  fastify.get('/parceiro/:slug/api/relatorios/vendas', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const q = request.query as { from?: string; to?: string; status?: string };
+    return reply.status(200).send({
+      rows: await getPartnerRelatorioVendas(getPartnerContext(request), {
+        from: q.from || null, to: q.to || null, status: q.status || null,
+      }),
+    });
   });
 
   fastify.post('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {

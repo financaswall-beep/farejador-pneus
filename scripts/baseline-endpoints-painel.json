@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-12T19:35:34.200Z",
+  "geradoEm": "2026-06-16T13:03:54.543Z",
   "commitBase": "c0d7913",
-  "total": 74,
+  "total": 77,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -64,7 +64,10 @@
     "call:this.api(`funcionarios/${f.id}/permissoes`, { method: 'PUT', body: JSON.stringify({ vendas: !!this.funcPermForm.vendas, estoque: !!this.funcPermForm.estoque, pedidos: !!this.funcPermForm.pedidos, clientes: !!this.funcPermForm.clientes, entregas: !!this.funcPermForm.entregas, retiradas: !!this.funcPermForm.retiradas, batepapo: !!this.funcPermForm.batepapo, resumo: !!this.funcPermForm.resumo, financeiro: !!this.funcPermForm.financeiro, }), })",
     "call:this.api(`funcionarios/${f.id}/reset-senha`, { method: 'POST', body: JSON.stringify({ password: nova }), })",
     "call:this.api(`funcionarios/${f.id}`, { method: 'DELETE' })",
+    "call:this.api(`itens/${tipo}/${encodeURIComponent(id)}/arquivar`, { method: 'POST' })",
+    "call:this.api(`itens/order/${encodeURIComponent(r.order_id)}/desarquivar`, { method: 'POST' })",
     "call:this.api(`photo-requests/${item.id}/photo`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: preview.blob, })",
+    "call:this.api(`relatorios/vendas?${qs.toString()}`)",
     "call:this.api(`retiradas/${sale.order_id}`, { method: 'DELETE', body: JSON.stringify({ reason }) })",
     "call:this.api(`retiradas/${sale.order_id}`, { method: 'POST', body: JSON.stringify({ payment_method }) })",
     "call:this.api(`vendas/${orderId}`, { method: 'DELETE' })",
