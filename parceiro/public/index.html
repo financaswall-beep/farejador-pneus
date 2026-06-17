@@ -193,7 +193,7 @@
         <svg class="pos-toggle-chevron" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
         <span x-text="sidebarCollapsed ? 'Expandir' : 'Recolher'"></span>
       </button>
-      <button x-show="isOwner" @click="goToSection('relatorios'); loadRelatorio()" class="pos-nav-item" :class="currentSection === 'relatorios' && 'active'">
+      <button x-show="isOwner" @click="goToSection('relatorios'); loadRelAtual()" class="pos-nav-item" :class="currentSection === 'relatorios' && 'active'">
         <i data-lucide="bar-chart-3"></i>
         <span>Relatórios</span>
       </button>
@@ -212,7 +212,7 @@
       </div>
     </aside>
 
-    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
+    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-company">
           <div class="font-bold" x-text="unitName || partnerName || 'Minha loja'">Minha loja</div>
@@ -2308,10 +2308,17 @@
           <header class="rel-head">
             <span class="rel-head-ic"><i data-lucide="bar-chart-3"></i></span>
             <div>
-              <h2>Relatório de vendas</h2>
-              <p>Tudo o que passou — inclusive o que você tirou da tela. Filtra por período e traz de volta se precisar.</p>
+              <h2 x-text="relView === 'pneus' ? 'Pneu mais vendido' : (relView === 'caixa' ? 'Caixa do período' : 'Relatório de vendas')"></h2>
+              <p x-text="relView === 'pneus' ? 'O que mais saiu no período — pra saber o que recomprar e estocar.' : (relView === 'caixa' ? 'Quanto entrou (vendi) × quanto saiu (gastei) no período. É movimento, não lucro.' : 'Tudo o que passou — inclusive o que você tirou da tela. Filtra por período e traz de volta se precisar.')"></p>
             </div>
           </header>
+
+          <!-- Sub-abas: Vendas | Pneu mais vendido | Caixa. O filtro de período é COMPARTILHADO. -->
+          <div class="rel-tabs">
+            <button type="button" class="rel-tab" :class="relView === 'vendas' && 'on'" @click="setRelView('vendas')"><i data-lucide="receipt-text"></i> Vendas</button>
+            <button type="button" class="rel-tab" :class="relView === 'pneus' && 'on'" @click="setRelView('pneus')"><i data-lucide="circle-gauge"></i> Pneu mais vendido</button>
+            <button type="button" class="rel-tab" :class="relView === 'caixa' && 'on'" @click="setRelView('caixa')"><i data-lucide="wallet"></i> Caixa</button>
+          </div>
 
           <div class="rel-filters">
             <div class="rel-chips">
@@ -2328,41 +2335,103 @@
                   <input type="date" x-model="relTo" class="rel-input" />
                 </span>
               </template>
-              <select x-model="relStatus" @change="loadRelatorio()" class="rel-input">
+              <select x-show="relView === 'vendas'" x-model="relStatus" @change="loadRelatorio()" class="rel-input">
                 <option value="todos">Todos os status</option>
                 <option value="ativos">Só ativos</option>
                 <option value="cancelados">Só cancelados</option>
               </select>
-              <button type="button" class="rel-go" @click="loadRelatorio()"><i data-lucide="search"></i> Buscar</button>
+              <button type="button" class="rel-go" @click="loadRelAtual()"><i data-lucide="search"></i> Buscar</button>
             </div>
           </div>
 
-          <div class="rel-kpis">
-            <div class="rel-kpi"><small>Pedidos</small><strong x-text="relCount"></strong></div>
-            <div class="rel-kpi"><small>Total</small><strong x-text="money(relTotal)"></strong></div>
-            <div class="rel-kpi"><small>Ticket médio</small><strong x-text="money(relTicket)"></strong></div>
-            <div class="rel-kpi" x-show="relArquivadosCount > 0"><small>Arquivados</small><strong x-text="relArquivadosCount"></strong></div>
-          </div>
+          <!-- ───────── VENDAS (a aba original) ───────── -->
+          <template x-if="relView === 'vendas'">
+            <div>
+              <div class="rel-kpis">
+                <div class="rel-kpi"><small>Pedidos</small><strong x-text="relCount"></strong></div>
+                <div class="rel-kpi"><small>Total</small><strong x-text="money(relTotal)"></strong></div>
+                <div class="rel-kpi"><small>Ticket médio</small><strong x-text="money(relTicket)"></strong></div>
+                <div class="rel-kpi" x-show="relArquivadosCount > 0"><small>Arquivados</small><strong x-text="relArquivadosCount"></strong></div>
+              </div>
+              <div class="rel-table-wrap">
+                <table class="rel-table">
+                  <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Status</th><th class="r">Valor</th><th></th></tr></thead>
+                  <tbody>
+                    <template x-for="r in relRows" :key="r.order_id">
+                      <tr :class="r.arquivado && 'is-arq'">
+                        <td x-text="formatDateTime(r.created_at)"></td>
+                        <td x-text="r.customer_name || 'Cliente'"></td>
+                        <td x-text="r.fulfillment_mode === 'delivery' ? 'Entrega' : (r.fulfillment_mode === 'pickup' ? 'Retirada' : '—')"></td>
+                        <td><span x-text="relLinhaStatus(r)"></span> <span class="rel-arq-tag" x-show="r.arquivado">arquivado</span></td>
+                        <td class="r" x-text="money(r.total_amount)"></td>
+                        <td class="r"><button type="button" class="rel-undo" x-show="r.arquivado" @click="desarquivarVenda(r)" title="Trazer de volta pra tela"><i data-lucide="undo-2"></i> voltar</button></td>
+                      </tr>
+                    </template>
+                    <tr x-show="!relRows.length && !relLoading"><td colspan="6" class="rel-empty">Nada nesse período. Tenta outro filtro.</td></tr>
+                    <tr x-show="relLoading"><td colspan="6" class="rel-empty">Carregando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
 
-          <div class="rel-table-wrap">
-            <table class="rel-table">
-              <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Status</th><th class="r">Valor</th><th></th></tr></thead>
-              <tbody>
-                <template x-for="r in relRows" :key="r.order_id">
-                  <tr :class="r.arquivado && 'is-arq'">
-                    <td x-text="formatDateTime(r.created_at)"></td>
-                    <td x-text="r.customer_name || 'Cliente'"></td>
-                    <td x-text="r.fulfillment_mode === 'delivery' ? 'Entrega' : (r.fulfillment_mode === 'pickup' ? 'Retirada' : '—')"></td>
-                    <td><span x-text="relLinhaStatus(r)"></span> <span class="rel-arq-tag" x-show="r.arquivado">arquivado</span></td>
-                    <td class="r" x-text="money(r.total_amount)"></td>
-                    <td class="r"><button type="button" class="rel-undo" x-show="r.arquivado" @click="desarquivarVenda(r)" title="Trazer de volta pra tela"><i data-lucide="undo-2"></i> voltar</button></td>
-                  </tr>
-                </template>
-                <tr x-show="!relRows.length && !relLoading"><td colspan="6" class="rel-empty">Nada nesse período. Tenta outro filtro.</td></tr>
-                <tr x-show="relLoading"><td colspan="6" class="rel-empty">Carregando…</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- ───────── PNEU MAIS VENDIDO ───────── -->
+          <template x-if="relView === 'pneus'">
+            <div>
+              <div class="rel-kpis">
+                <div class="rel-kpi"><small>Itens vendidos</small><strong x-text="relPneusUnidades"></strong></div>
+                <div class="rel-kpi"><small>Faturamento</small><strong x-text="money(relPneusFaturamento)"></strong></div>
+                <div class="rel-kpi"><small>Modelos diferentes</small><strong x-text="relPneusRows.length"></strong></div>
+              </div>
+              <div class="rel-table-wrap">
+                <table class="rel-table">
+                  <thead><tr><th>#</th><th>Medida</th><th>Marca</th><th class="r">Qtd</th><th class="r">Faturamento</th></tr></thead>
+                  <tbody>
+                    <template x-for="(p, i) in relPneusRows" :key="(p.medida || '') + '|' + (p.marca || '') + '|' + i">
+                      <tr>
+                        <td x-text="i + 1"></td>
+                        <td x-text="p.medida || '—'"></td>
+                        <td x-text="p.marca || '—'"></td>
+                        <td class="r" x-text="p.qtd"></td>
+                        <td class="r" x-text="money(p.faturamento)"></td>
+                      </tr>
+                    </template>
+                    <tr x-show="!relPneusRows.length && !relPneusLoading"><td colspan="5" class="rel-empty">Nenhuma venda nesse período.</td></tr>
+                    <tr x-show="relPneusLoading"><td colspan="5" class="rel-empty">Carregando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
+
+          <!-- ───────── CAIXA DO PERÍODO (Vendi × gastei) ───────── -->
+          <template x-if="relView === 'caixa'">
+            <div>
+              <div class="rel-cash">
+                <div class="rel-cash-card in">
+                  <small>Entrou (vendi)</small>
+                  <strong x-text="money(relCaixa ? relCaixa.entrou : 0)"></strong>
+                  <span x-text="(relCaixa ? relCaixa.vendas_count : 0) + ' venda(s) no período'"></span>
+                </div>
+                <div class="rel-cash-card out">
+                  <small>Saiu (gastei)</small>
+                  <strong x-text="money(relCaixa ? relCaixa.saiu : 0)"></strong>
+                  <span>despesas + compras</span>
+                </div>
+                <div class="rel-cash-card" :class="(relCaixa && relCaixa.saldo < 0) ? 'neg' : 'pos'">
+                  <small>Saldo</small>
+                  <strong x-text="money(relCaixa ? relCaixa.saldo : 0)"></strong>
+                  <span>entrou − saiu</span>
+                </div>
+              </div>
+              <div class="rel-cash-detail">
+                <div><span>Vendas</span><b x-text="money(relCaixa ? relCaixa.vendas_total : 0)"></b></div>
+                <div><span>Despesas</span><b x-text="money(relCaixa ? relCaixa.despesas_total : 0)"></b></div>
+                <div><span>Compras</span><b x-text="money(relCaixa ? relCaixa.compras_total : 0)"></b></div>
+              </div>
+              <p class="rel-cash-note">É o <b>movimento</b> do período (o que você vendeu × o que gastou), <b>não o lucro</b> — não desconta o custo do pneu.</p>
+            </div>
+          </template>
         </div>
       </section>
 

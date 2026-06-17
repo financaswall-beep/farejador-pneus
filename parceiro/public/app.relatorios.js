@@ -42,7 +42,54 @@ window.PARCEIRO_MODULES.relatorios = () => ({
     }
   },
 
-  setRelRange(r) { this.relRange = r; if (r !== 'custom') this.loadRelatorio(); },
+  setRelRange(r) { this.relRange = r; if (r !== 'custom') this.loadRelAtual(); },
+
+  // Sub-abas (Vendas | Pneu mais vendido | Caixa) compartilham o filtro de período.
+  // Trocar de aba OU de período recarrega a view ATIVA (loadRelAtual dispatcha).
+  setRelView(v) { this.relView = v; this.loadRelAtual(); },
+  loadRelAtual() {
+    if (this.relView === 'pneus') return this.loadRelatorioPneus();
+    if (this.relView === 'caixa') return this.loadRelatorioCaixa();
+    return this.loadRelatorio();
+  },
+
+  async loadRelatorioPneus() {
+    if (!this.isOwner) return;
+    this.relPneusLoading = true;
+    try {
+      const { from, to } = this.relPeriodo();
+      const qs = new URLSearchParams();
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      const data = await this.api(`relatorios/pneus?${qs.toString()}`);
+      this.relPneusRows = data.rows || [];
+      this.$nextTick(() => lucide.createIcons());
+    } catch (err) {
+      this.flash(this.errMessage(err));
+    } finally {
+      this.relPneusLoading = false;
+    }
+  },
+
+  async loadRelatorioCaixa() {
+    if (!this.isOwner) return;
+    this.relCaixaLoading = true;
+    try {
+      const { from, to } = this.relPeriodo();
+      const qs = new URLSearchParams();
+      if (from) qs.set('from', from);
+      if (to) qs.set('to', to);
+      this.relCaixa = await this.api(`relatorios/caixa?${qs.toString()}`);
+      this.$nextTick(() => lucide.createIcons());
+    } catch (err) {
+      this.flash(this.errMessage(err));
+    } finally {
+      this.relCaixaLoading = false;
+    }
+  },
+
+  get relPneusUnidades() { return this.relPneusRows.reduce((s, r) => s + this.num(r.qtd), 0); },
+  get relPneusFaturamento() { return this.relPneusRows.reduce((s, r) => s + this.num(r.faturamento), 0); },
 
   get relTotal() { return this.relRows.reduce((s, r) => s + this.num(r.total_amount), 0); },
   get relCount() { return this.relRows.length; },

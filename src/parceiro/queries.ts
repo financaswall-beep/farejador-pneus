@@ -430,6 +430,108 @@ export async function getPartnerRelatorioVendas(ctx: PartnerContext, opts: Relat
   });
 }
 
+/** Filtro de período dos relatórios (0108+): ISO início inclusivo / fim EXCLUSIVO. */
+export interface RelatorioPeriodoOpts { from?: string | null; to?: string | null; }
+
+/**
+ * Relatório PNEU MAIS VENDIDO (0108, só dono): ranking dos itens vendidos no
+ * período, agrupado por medida (tire_size; fallback item_name) + marca. Conta
+ * UNIDADES (SUM quantity) e faturamento (quantity*unit_price - desconto). Lê o
+ * SNAPSHOT do item na venda (partner_order_items) ⨝ pedido (período + não
+ * cancelado), datado por created_at (igual à aba Vendas). RLS isola por unidade;
+ * o WHERE pof.unit_id reforça. Cancelado não entra.
+ */
+export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: RelatorioPeriodoOpts = {}): Promise<unknown[]> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const res = await client.query(
+      `SELECT COALESCE(NULLIF(TRIM(poi.tire_size), ''), poi.item_name) AS medida,
+              COALESCE(NULLIF(TRIM(poi.brand), ''), '') AS marca,
+              SUM(poi.quantity)::int AS qtd,
+              SUM(poi.quantity * poi.unit_price - poi.discount_amount) AS faturamento
+         FROM commerce.partner_order_items poi
+         JOIN commerce.partner_orders_full pof
+           ON pof.order_id = poi.order_id AND pof.environment = poi.environment
+        WHERE pof.environment = $1 AND pof.unit_id = $2
+          AND pof.status <> 'cancelled'
+          AND ($3::timestamptz IS NULL OR pof.created_at >= $3::timestamptz)
+          AND ($4::timestamptz IS NULL OR pof.created_at <  $4::timestamptz)
+        GROUP BY 1, 2
+        ORDER BY qtd DESC, faturamento DESC
+        LIMIT 100`,
+      [ctx.environment, ctx.unitId, opts.from ?? null, opts.to ?? null],
+    );
+    return res.rows;
+  });
+}
+
+/**
+ * Relatório CAIXA DO PERÍODO (0108, só dono) — lente "Vendi × gastei" (movimento,
+ * NÃO lucro nem caixa-real). Espelha o CONTRATO de dinheiro do painel:
+ *   ENTROU = vendas REALIZADAS no período (isPhysicalExitSale: retirada/balcão
+ *            conta na hora; delivery só 'delivered'), datadas por saleRealizedAt
+ *            (delivery→delivered_at; senão created_at). Soma total_amount.
+ *   SAIU   = despesas (por expense_date) + compras (por purchased_at).
+ * 🔒 Anti-duplo-cômputo: NÃO soma partner_payables (a compra a prazo já gera um
+ *    payable; somar os dois contaria a compra 2×). Contas avulsas = v2.
+ * Datas-tipo-DATE (expense_date/purchased_at) comparadas no fuso de São Paulo pra
+ * casar com o dia local; vendas (timestamptz) comparam direto. Tudo escopado por
+ * unidade (RLS + WHERE).
+ */
+export interface RelatorioCaixa {
+  entrou: number; saiu: number; saldo: number;
+  vendas_total: number; vendas_count: number; despesas_total: number; compras_total: number;
+}
+export async function getPartnerRelatorioCaixa(ctx: PartnerContext, opts: RelatorioPeriodoOpts = {}): Promise<RelatorioCaixa> {
+  return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const res = await client.query<{
+      vendas_total: string; vendas_count: string; despesas_total: string; compras_total: string;
+    }>(
+      `WITH vendas AS (
+         SELECT pof.total_amount,
+                CASE WHEN pof.fulfillment_mode = 'delivery'
+                     THEN COALESCE(pof.delivered_at, pof.created_at)
+                     ELSE pof.created_at END AS realized_at
+           FROM commerce.partner_orders_full pof
+          WHERE pof.environment = $1 AND pof.unit_id = $2
+            AND pof.status <> 'cancelled'
+            AND (pof.fulfillment_mode <> 'delivery' OR pof.delivery_status = 'delivered')
+       ),
+       vendas_periodo AS (
+         SELECT * FROM vendas
+          WHERE ($3::timestamptz IS NULL OR realized_at >= $3::timestamptz)
+            AND ($4::timestamptz IS NULL OR realized_at <  $4::timestamptz)
+       )
+       SELECT
+         (SELECT COALESCE(SUM(total_amount), 0) FROM vendas_periodo)        AS vendas_total,
+         (SELECT COUNT(*)                       FROM vendas_periodo)        AS vendas_count,
+         (SELECT COALESCE(SUM(e.amount), 0)
+            FROM finance.partner_expenses e
+           WHERE e.environment = $1 AND e.unit_id = $2 AND e.deleted_at IS NULL
+             AND ($3::timestamptz IS NULL OR e.expense_date >= ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
+             AND ($4::timestamptz IS NULL OR e.expense_date <  ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
+         )                                                                   AS despesas_total,
+         (SELECT COALESCE(SUM(p.total_amount), 0)
+            FROM commerce.partner_purchases p
+           WHERE p.environment = $1 AND p.unit_id = $2 AND p.deleted_at IS NULL
+             AND ($3::timestamptz IS NULL OR p.purchased_at >= ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
+             AND ($4::timestamptz IS NULL OR p.purchased_at <  ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date)
+         )                                                                   AS compras_total`,
+      [ctx.environment, ctx.unitId, opts.from ?? null, opts.to ?? null],
+    );
+    const r = res.rows[0];
+    const vendas = Number(r?.vendas_total ?? 0);
+    const despesas = Number(r?.despesas_total ?? 0);
+    const compras = Number(r?.compras_total ?? 0);
+    const entrou = vendas;
+    const saiu = despesas + compras;
+    return {
+      entrou, saiu, saldo: entrou - saiu,
+      vendas_total: vendas, vendas_count: Number(r?.vendas_count ?? 0),
+      despesas_total: despesas, compras_total: compras,
+    };
+  });
+}
+
 /**
  * Fila da tela RETIRADAS: só os pedidos de retirada (pickup) RESERVADOS aguardando
  * o cliente vir buscar — a fila de ação do balcão. Deriva de getPartnerVendas e

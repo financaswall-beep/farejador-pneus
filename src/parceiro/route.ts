@@ -62,6 +62,8 @@ import {
   getPartnerResumo,
   getPartnerVendas,
   getPartnerRelatorioVendas,
+  getPartnerRelatorioPneus,
+  getPartnerRelatorioCaixa,
   archivePartnerItem,
   unarchivePartnerItem,
   isDismissibleType,
@@ -1206,6 +1208,22 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
         from: q.from || null, to: q.to || null, status: q.status || null,
       }),
     });
+  });
+
+  // Relatório PNEU MAIS VENDIDO (0108) — SÓ DONO. Ranking por medida/marca no período.
+  fastify.get('/parceiro/:slug/api/relatorios/pneus', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const q = request.query as { from?: string; to?: string };
+    return reply.status(200).send({
+      rows: await getPartnerRelatorioPneus(getPartnerContext(request), { from: q.from || null, to: q.to || null }),
+    });
+  });
+
+  // Relatório CAIXA DO PERÍODO (0108) — SÓ DONO. "Vendi × gastei" (movimento, não lucro).
+  fastify.get('/parceiro/:slug/api/relatorios/caixa', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    const q = request.query as { from?: string; to?: string };
+    return reply.status(200).send(
+      await getPartnerRelatorioCaixa(getPartnerContext(request), { from: q.from || null, to: q.to || null }),
+    );
   });
 
   fastify.post('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {

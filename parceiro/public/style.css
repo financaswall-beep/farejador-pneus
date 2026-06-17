@@ -1446,6 +1446,12 @@ html, body {
    gigante e tapando o card. Reescreve pra 3 linhas com o workspace no 1fr. */
 .pos-main.retiradas-mode { grid-template-rows: 80px 1fr 46px; }
 
+/* Aba Relatorios (0108): mesma historia do chat/config/retiradas — sem faixa de
+   KPIs (so header, workspace, footer = 3 filhos no .pos-main). Sem este override o
+   workspace cai na linha de 88px e o rodape (46px) escorrega pro 1fr, ficando
+   gigante e tapando o relatorio. Reescreve pra 3 linhas com o workspace no 1fr. */
+.pos-main.relatorios-mode { grid-template-rows: 80px 1fr 46px; }
+
 /* FOTO SOB DEMANDA: a barra fina de alerta e um filho a MAIS do .pos-main (logo
    apos o header). Sem uma linha propria, ela roubava a linha de 88px (KPIs) e
    empurrava todo o resto pra baixo (layout bagunçado). Com a classe (so quando ha
@@ -1454,7 +1460,8 @@ html, body {
 .pos-main.photo-alert-on { grid-template-rows: 80px auto 88px 1fr 46px; }
 .pos-main.photo-alert-on.chat-mode,
 .pos-main.photo-alert-on.config-mode,
-.pos-main.photo-alert-on.retiradas-mode { grid-template-rows: 80px auto 1fr 46px; }
+.pos-main.photo-alert-on.retiradas-mode,
+.pos-main.photo-alert-on.relatorios-mode { grid-template-rows: 80px auto 1fr 46px; }
 
 .pos-kpis article,
 .pos-panel {
@@ -3972,6 +3979,40 @@ html, body {
 .pos-shell[data-theme="light"] .rel-input { background: #fff; color: #1e293b; border-color: rgba(15, 23, 42, .15); }
 .pos-shell[data-theme="light"] .rel-table td,
 .pos-shell[data-theme="light"] .rel-chip { color: #334155; }
+
+/* Sub-abas do Relatório (Vendas | Pneu mais vendido | Caixa) — segmented control. */
+.rel-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid rgba(148, 163, 184, .15); padding-bottom: 12px; }
+.rel-tab { font: 700 13px Inter, sans-serif; display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px solid rgba(148, 163, 184, .22); color: #cbd5e1; }
+.rel-tab svg { width: 16px; height: 16px; }
+.rel-tab:hover { background: rgba(148, 163, 184, .1); }
+.rel-tab.on { background: #2563eb; border-color: #2563eb; color: #fff; }
+.pos-shell[data-theme="light"] .rel-tab { color: #334155; }
+
+/* Caixa do período — 3 cards grandes (Entrou / Saiu / Saldo) + linha de detalhe. */
+.rel-cash { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.rel-cash-card { border-radius: 14px; padding: 16px 18px; border: 1px solid rgba(148, 163, 184, .18); background: rgba(148, 163, 184, .06); }
+.rel-cash-card small { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+.rel-cash-card strong { display: block; font-size: 28px; font-weight: 800; margin: 4px 0 2px; color: #f1f5f9; }
+.rel-cash-card span { font-size: 12px; color: #94a3b8; }
+.rel-cash-card.in { background: rgba(22, 163, 74, .1); border-color: rgba(22, 163, 74, .35); }
+.rel-cash-card.in strong { color: #4ade80; }
+.rel-cash-card.out { background: rgba(220, 63, 77, .1); border-color: rgba(220, 63, 77, .35); }
+.rel-cash-card.out strong { color: #f87171; }
+.rel-cash-card.pos strong { color: #38bdf8; }
+.rel-cash-card.neg strong { color: #f87171; }
+.rel-cash-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.rel-cash-detail div { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(148, 163, 184, .06); border: 1px solid rgba(148, 163, 184, .14); }
+.rel-cash-detail span { font-size: 13px; color: #94a3b8; }
+.rel-cash-detail b { font-size: 13px; font-weight: 700; color: #e2e8f0; }
+.rel-cash-note { font-size: 12px; color: #64748b; margin: 4px 2px 0; }
+.rel-cash-note b { color: #94a3b8; }
+.pos-shell[data-theme="light"] .rel-cash-card strong { color: #0f172a; }
+.pos-shell[data-theme="light"] .rel-cash-card.in strong { color: #15803d; }
+.pos-shell[data-theme="light"] .rel-cash-card.out strong { color: #b91c1c; }
+.pos-shell[data-theme="light"] .rel-cash-card.pos strong { color: #0369a1; }
+.pos-shell[data-theme="light"] .rel-cash-detail b { color: #1e293b; }
 
 /* Thumb da foto aprovada no card de separação (entrega E retirada). */
 .pos-route-photo {

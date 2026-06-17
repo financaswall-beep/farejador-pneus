@@ -209,6 +209,11 @@ function parceiroApp() {
     relTo: '',
     relRows: [],
     relLoading: false,
+    relView: 'vendas',     // sub-aba: 'vendas' | 'pneus' | 'caixa'
+    relPneusRows: [],      // ranking pneu mais vendido (período)
+    relPneusLoading: false,
+    relCaixa: null,        // { entrou, saiu, saldo, vendas_total, vendas_count, despesas_total, compras_total }
+    relCaixaLoading: false,
 
     saleForm: { customer_id: null, customer_name: '', customer_phone: '', source_tag: 'porta', partner_stock_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_status: 'received', receivable_due_date: '', receivable_installments: 1, fulfillment_mode: 'pickup', delivery_address: '' },
 
