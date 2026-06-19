@@ -1,0 +1,19 @@
+-- 0109c — GRANT UPDATE em commerce.partner_push_subscriptions pro app do parceiro.
+--
+-- FURO do 0109: a tabela ganhou GRANT INSERT/SELECT/DELETE pro role restrito
+-- (farejador_partner_app), mas NAO o UPDATE. O save da inscricao
+-- (savePartnerPushSubscription) usa:
+--     INSERT ... ON CONFLICT (environment, unit_id, endpoint) DO UPDATE ...
+-- e o Postgres EXIGE o privilegio UPDATE pra um INSERT...ON CONFLICT DO UPDATE,
+-- mesmo numa tabela VAZIA (sem conflito real) — o check de privilegio e por
+-- COMANDO, nao por linha. Sem UPDATE: "permission denied for table
+-- partner_push_subscriptions" -> POST /api/push/subscribe devolvia HTTP 500
+-- (passo "salvar"), a inscricao nunca gravava e o banner ficava pedindo pra
+-- ativar pra sempre. Provado ao vivo 2026-06-19 (Android do dono, keylen=87 ok).
+--
+-- partner_dismissed_items (0108) NAO bate nisso: usa ON CONFLICT DO NOTHING
+-- (so precisa de INSERT), por isso "arquivar" sempre funcionou.
+--
+-- Idempotente (GRANT e no-op se ja existir). Corrige AO VIVO, sem redeploy:
+-- o codigo deployado ja esta correto, faltava so o privilegio no banco.
+GRANT UPDATE ON commerce.partner_push_subscriptions TO farejador_partner_app;
