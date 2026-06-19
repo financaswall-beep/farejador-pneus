@@ -36,6 +36,10 @@ import {
   ringsForModalidade,
   type GeoRoutingCandidate,
 } from './geo-routing.js';
+import { MATRIZ_COORD, matrizFreightForKm } from './matriz-freight.js';
+// Re-export da lógica pura de frete da Matriz (módulo sem env, testável) — pra quem
+// já importa de fulfillment (tools.ts) não precisar saber do módulo novo.
+export { MATRIZ_COORD, matrizFreightForKm };
 
 interface RoutedUnitRow {
   partner_unit_id: string;
@@ -913,6 +917,21 @@ async function resolveDistances(
     }
   }
   return map;
+}
+
+/**
+ * Distância (km) do cliente até a MATRIZ: distância de RUA via Google quando há chave
+ * (mesma maquinaria/cache do anel), haversine de base. null se o cliente não tem
+ * coordenada (aí o frete cai no base — não dá pra medir). A coordenada da Matriz e a
+ * tabela de preço vivem em matriz-freight.ts (puro); aqui é só a medição (precisa banco).
+ */
+export async function matrizDistanceKm(
+  client: PoolClient,
+  origin: GeoPoint | null | undefined,
+): Promise<number | null> {
+  if (!origin) return null;
+  const m = await resolveDistances(client, origin, [{ unitId: 'matriz', location: MATRIZ_COORD }]);
+  return m.get('matriz') ?? null;
 }
 
 /**
