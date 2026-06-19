@@ -36,6 +36,14 @@
   <link rel="stylesheet" href="./style.css?v=20260614-mobile-nav" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
+
+  <!-- PWA (0109): vira "app" na tela inicial + base da notificação nativa. -->
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="theme-color" content="#ea580c" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="2W Pneus" />
+  <link rel="apple-touch-icon" href="./assets/icon-apple-180.png" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -291,6 +299,24 @@
             </template>
           </div>
         </div>
+      </div>
+
+      <!-- PWA (0109): convite pra ligar o aviso NATIVO do celular (toca com o app
+           fechado). Aparece só quando o aparelho suporta, o servidor tem push ligado,
+           ainda não ativou e o cara não dispensou. Liga com 1 toque (o clique é o
+           gesto que o navegador exige pra pedir permissão). -->
+      <div x-show="pushShouldOfferBanner" x-cloak
+           class="mx-3 mt-3 rounded-xl border border-brand-500 bg-brand-50 text-brand-700 px-4 py-3 flex items-center gap-3">
+        <i data-lucide="bell-ring" class="w-5 h-5 shrink-0"></i>
+        <div class="flex-1 text-sm leading-tight">
+          <strong>Ative os avisos no celular</strong>
+          <div class="text-brand-600">Receba pedido e foto novos mesmo com o app fechado.</div>
+        </div>
+        <button @click="enablePush()" :disabled="pushBusy"
+                class="shrink-0 rounded-lg bg-brand-600 text-white text-sm font-semibold px-3 py-2 disabled:opacity-50">
+          <span x-text="pushBusy ? 'Ativando…' : 'Ativar'"></span>
+        </button>
+        <button @click="dismissPushBanner()" class="shrink-0 text-brand-600 text-xs underline">agora não</button>
       </div>
 
       <!-- FOTO SOB DEMANDA: banner GLOBAL — o borracheiro pode estar em qualquer
@@ -2839,6 +2865,7 @@
 <script src="./app.entregas.js?v=20260611-onda-c"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
-<script src="./app.js?v=20260612-bloco2b"></script>
+<script src="./app.push.js?v=20260617-pwa-push"></script>
+<script src="./app.js?v=20260617-pwa-push"></script>
 </body>
 </html>

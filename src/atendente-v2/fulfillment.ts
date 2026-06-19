@@ -1283,5 +1283,18 @@ export async function materializePartnerOrder(
   const row = o.rows[0]!;
 
   logger.info({ environment: ctx.environment, unit_id: ctx.unitId, partner_order_id: orderId }, 'bot: partner_order materializado (2w)');
+
+  // Acorda o painel/celular da loja: pedido NOVO da Rede caiu. Mesmo canal/hub da
+  // foto; o disparador de push (push.ts) reage a kind='new_order' e manda a
+  // notificação nativa (PWA). Payload SEM dado do cliente (espelha a foto, E16).
+  // try/catch: aviso é acessório — falhar aqui NUNCA derruba a criação do pedido.
+  try {
+    await client.query(`SELECT pg_notify('partner_chat', $1)`, [
+      JSON.stringify({ unit_id: ctx.unitId, conversation_id: '', kind: 'new_order' }),
+    ]);
+  } catch (err) {
+    logger.warn({ err, unit_id: ctx.unitId, partner_order_id: orderId }, 'bot: pg_notify new_order falhou (ignorado)');
+  }
+
   return { partner_order_id: orderId, total_amount: row.total_amount };
 }

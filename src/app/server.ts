@@ -9,6 +9,7 @@ import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
+import { startPartnerPushFanout } from '../parceiro/push.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -19,6 +20,7 @@ let stopAgentV2: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
+let stopPartnerPush: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -46,6 +48,9 @@ async function start(): Promise<void> {
   stopPhotoExpirer = startPhotoRequestExpirer();
   // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.
   stopSatisfactionSurvey = startSatisfactionSurveyWorker();
+  // Push (PWA, 0109): escuta global do partner_chat -> notificação nativa no
+  // celular do borracheiro (foto/pedido com navegador fechado). No-op com a flag off.
+  stopPartnerPush = startPartnerPushFanout();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -59,6 +64,7 @@ async function shutdown(signal: string): Promise<void> {
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();
+  stopPartnerPush?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');

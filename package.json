@@ -26,12 +26,14 @@
     "pg": "^8.12.0",
     "pino": "^9.3.0",
     "sharp": "^0.34.5",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^11.14.0",
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.0",
+    "@types/web-push": "^3.6.4",
     "pino-pretty": "^11.2.0",
     "testcontainers": "^11.14.0",
     "tsx": "^4.16.0",
