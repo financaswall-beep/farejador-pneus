@@ -72,8 +72,17 @@ window.PARCEIRO_MODULES.push = () => ({
         this.pushEnabled = true;
         this.flash('🔔 Avisos ativados neste aparelho!', 'success');
       } catch (err) {
+        // Diagnóstico (go-live 0109): mostra o motivo REAL na tela. Web Push falha
+        // por N causas no aparelho (sem FCM, rede bloqueia, push service fora) e a
+        // msg genérica escondia tudo. err da inscrição = DOMException (tem .name);
+        // err do POST = Error do api() (tem .status). Suavizar depois que estabilizar.
         console.warn('push_enable_failed', err);
-        this.flash('Não consegui ativar os avisos agora. Tenta de novo.');
+        const parts = [];
+        if (err && err.name && err.name !== 'Error') parts.push(err.name);
+        if (err && err.status) parts.push('HTTP ' + err.status);
+        if (err && err.message) parts.push(err.message);
+        const detail = parts.join(' · ').slice(0, 160) || 'erro desconhecido';
+        this.flash('Falha ao ativar: ' + detail);
       } finally {
         this.pushBusy = false;
       }
