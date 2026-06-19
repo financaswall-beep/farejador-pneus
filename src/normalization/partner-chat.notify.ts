@@ -34,6 +34,11 @@ type Subscriber = (event: PartnerChatEvent) => void;
 // unit_id (core.units.id) -> callbacks (um por conexão SSE aberta).
 const subscribers = new Map<string, Set<Subscriber>>();
 
+// Escuta GLOBAL: recebe TODO evento, de qualquer unidade. O disparador de push
+// (push.ts) usa isto pra acordar o celular do borracheiro mesmo SEM nenhuma aba
+// SSE aberta naquela unidade — é justo esse o caso (navegador fechado).
+const globalSubscribers = new Set<Subscriber>();
+
 let client: Client | null = null;
 let started = false;
 let reconnectTimer: NodeJS.Timeout | null = null;
@@ -43,6 +48,14 @@ function usesSupabase(url: string): boolean {
 }
 
 function dispatch(event: PartnerChatEvent): void {
+  // Escutas globais primeiro (push): independem de haver SSE aberto na unidade.
+  for (const cb of globalSubscribers) {
+    try {
+      cb(event);
+    } catch (err) {
+      logger.warn({ err }, 'partner chat notify: global subscriber falhou');
+    }
+  }
   const set = subscribers.get(event.unit_id);
   if (!set) return;
   for (const cb of set) {
@@ -108,6 +121,15 @@ export function startPartnerChatNotifyHub(): void {
     logger.error({ err }, 'partner chat notify hub: falha no start');
     scheduleReconnect();
   });
+}
+
+/**
+ * Registra um listener GLOBAL (todo evento, qualquer unidade). Pro disparador de
+ * push, que precisa reagir mesmo sem SSE aberto. Retorna a função de cancelamento.
+ */
+export function subscribeAllPartnerChat(cb: Subscriber): () => void {
+  globalSubscribers.add(cb);
+  return () => globalSubscribers.delete(cb);
 }
 
 /** Registra um listener pra uma unidade. Retorna a função de cancelamento. */

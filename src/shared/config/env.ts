@@ -83,6 +83,24 @@ const envSchema = z.object({
   // 0105) e guarda por loja (ranking interno/discreto). Default OFF = dormente: não
   // enfileira, dispatcher não roda, captura inerte. Liga só quando o dono mandar.
   SATISFACTION_SURVEY: booleanStringSchema,
+  // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
+  // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
+  // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a
+  // aba aberta; isto cobre o aparelho no bolso. Default OFF = dormente: endpoints
+  // respondem {enabled:false}, disparador não engata, nada é gravado/enviado. Liga
+  // só quando o dono colar as chaves VAPID no Coolify e provar ao vivo.
+  PUSH_NOTIFICATIONS: booleanStringSchema,
+  // Par de chaves VAPID (Voluntary Application Server Identification) — a
+  // "identidade" que autoriza ESTE servidor a mandar push pros aparelhos inscritos.
+  // A PÚBLICA vai pro front (usada na inscrição) via endpoint; a PRIVADA NUNCA sai
+  // do servidor (só no Coolify, igual a chave do Google). Opcionais: sem elas, mesmo
+  // com a flag on, o push degrada elegante (endpoint diz enabled:false). Gerar com
+  // `node -e "console.log(require('web-push').generateVAPIDKeys())"`.
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  // Contato do "dono" do push (exigência do protocolo: e-mail/URL pra o serviço de
+  // push falar com a gente se houver abuso). mailto: do Wallace por padrão.
+  VAPID_SUBJECT: z.string().min(1).default('mailto:wallfernandes85@gmail.com'),
   // Chave do Google Maps Platform (Geocoding + Distance Matrix). Sem ela, a camada
   // força linha reta mesmo com ROUTING_GEO_ROAD_DISTANCE on (degrada elegante).
   GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),

@@ -352,6 +352,46 @@ export async function unarchivePartnerItem(ctx: PartnerContext, itemType: Dismis
   });
 }
 
+// ─── PUSH (PWA, 0109) ────────────────────────────────────────────────────────
+
+export interface PushSubscriptionInput {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent?: string | null;
+}
+
+/**
+ * Guarda (ou atualiza) a inscrição de push de UM aparelho NESTA loja. unit_id =
+ * ctx.unitId (do token, não do cliente) + RLS WITH CHECK = só dá pra inscrever a
+ * própria loja. ON CONFLICT (environment, unit_id, endpoint): re-permitir o mesmo
+ * aparelho na mesma loja atualiza as chaves e zera a contagem de falha.
+ */
+export async function savePartnerPushSubscription(ctx: PartnerContext, sub: PushSubscriptionInput): Promise<void> {
+  await withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await client.query(
+      `INSERT INTO commerce.partner_push_subscriptions
+         (environment, unit_id, endpoint, p256dh, auth, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (environment, unit_id, endpoint)
+         DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
+                       user_agent = EXCLUDED.user_agent, failure_count = 0`,
+      [ctx.environment, ctx.unitId, sub.endpoint, sub.p256dh, sub.auth, sub.userAgent ?? null],
+    );
+  });
+}
+
+/** Remove a inscrição deste aparelho (desativou os avisos). RLS escopa por unidade. */
+export async function deletePartnerPushSubscription(ctx: PartnerContext, endpoint: string): Promise<void> {
+  await withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await client.query(
+      `DELETE FROM commerce.partner_push_subscriptions
+        WHERE environment = $1 AND unit_id = $2 AND endpoint = $3`,
+      [ctx.environment, ctx.unitId, endpoint],
+    );
+  });
+}
+
 export async function getPartnerVendas(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(

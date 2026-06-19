@@ -43,6 +43,9 @@ window.PARCEIRO_MODULES.core = () => ({
             // Foto sob demanda: canal global (SSE + poll) vive desde já — o
             // alerta tem que tocar em QUALQUER aba, não só no Bate-papo.
             this.startPhotoGlobal();
+            // PWA (0109): registra o ajudante de push + (re)inscreve o aparelho.
+            // Quieto se o navegador não suportar ou o servidor estiver off.
+            void this.initPush();
           } catch (err) {
             if (err && err.status === 401) {
               this.apiToken = '';

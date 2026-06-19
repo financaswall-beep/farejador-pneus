@@ -140,6 +140,8 @@ function parceiroApp() {
     photoSoundOn: true,         // alerta sonoro SEMPRE ligado (sem mute — pedido de foto não pode passar batido)
     photoThumbUrls: {},         // cache { photo_request_id: objectURL } (img não manda Bearer → fetch+blob)
     photoLightbox: { open: false, url: null }, // foto ampliada (card de separação)
+    // PUSH (PWA, 0109): aviso NATIVO do celular com o app FECHADO (o som da foto só toca com a aba aberta). pushPermission: default|granted|denied.
+    pushSupported: false, pushServerEnabled: false, pushEnabled: false, pushBusy: false, pushPermission: 'default', pushBannerDismissed: false,
     // ─── BATE-PAPO (Tela 4): UI do painel direito ───
     chatPanelPedido: false,   // painel "Criar pedido" expandido? (acordeão exclusivo: começa fechado)
     chatPanelCliente: true,   // painel "Cliente" expandido? (contexto do atendimento — abre primeiro)
@@ -292,5 +294,6 @@ function parceiroApp() {
     window.PARCEIRO_MODULES.entregas, // passo 10: tela Entrega (rota) + tela Retiradas (pickup)
     window.PARCEIRO_MODULES.arquivar, // passo 11 (0108): "tirar da tela" (arquivar) — some da lista, fica no Relatório
     window.PARCEIRO_MODULES.relatorios, // passo 12 (0108): aba Relatórios (só dono) — histórico + desarquivar
+    window.PARCEIRO_MODULES.push, // passo 13 (0109): PWA — aviso nativo do celular (push com o app fechado)
   ]);
 }
