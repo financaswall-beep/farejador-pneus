@@ -29,8 +29,11 @@ window.PARCEIRO_MODULES.push = () => ({
       let vp;
       try { vp = await this.api('push/vapid-key'); }
       catch (e) { return; } // sem servidor/sessão: não insiste
-      this.pushServerEnabled = !!(vp && vp.enabled && vp.key);
-      if (!this.pushServerEnabled) return; // flag off no servidor: nem registra o SW
+      // NÃO liga o gate do banner (pushServerEnabled) aqui: primeiro descobre se
+      // ESTE aparelho já está inscrito. Senão o banner PISCA (aparece e some) na
+      // janela entre "servidor on" e "inscrito" pra quem já ativou. Libero no fim.
+      const serverOn = !!(vp && vp.enabled && vp.key);
+      if (!serverOn) return; // flag off no servidor: nem registra o SW
       let reg;
       try { reg = await navigator.serviceWorker.register('./sw.js'); }
       catch (e) { this.pushSupported = false; return; } // SW não registrou (http?/bloqueio)
@@ -40,6 +43,9 @@ window.PARCEIRO_MODULES.push = () => ({
           if (existing) { await this._pushSaveSub(existing); this.pushEnabled = true; }
         } catch (e) { /* não crava enabled; o banner reaparece se precisar */ }
       }
+      // AGORA libera o banner: já sei se está inscrito. Quem ativou nunca vê (sem
+      // flicker); quem não ativou vê estável, uma vez só.
+      this.pushServerEnabled = true;
     },
 
     // Chamado pelo botão "Ativar" (o clique é o gesto que o navegador exige pra
@@ -51,25 +57,22 @@ window.PARCEIRO_MODULES.push = () => ({
         return;
       }
       this.pushBusy = true;
-      // Diagnóstico go-live (0109): alert() FICA na tela (dá pra ler e printar com
-      // calma) e diz em QUE passo travou + o tamanho da chave recebida do servidor.
-      // Assim um print só resolve (inclusive pega chave VAPID colada torta no
-      // Coolify: pública limpa = 87). Trocar por flash discreto após estabilizar.
+      // Mensagens amigáveis ao usuário; o detalhe técnico (passo + erro) fica no
+      // console.warn pra debug remoto. O diagnóstico verboso (alert com passo/keylen)
+      // cumpriu o papel no go-live 06-19: achou o GRANT UPDATE que faltava (0109c).
       let stage = 'inicio';
-      let keyLen = -1;
       try {
         stage = 'pedir-chave';
         const vp = await this.api('push/vapid-key');
         if (!vp.enabled || !vp.key) {
-          alert('Avisos não ligados no servidor (enabled=' + vp.enabled + ', temChave=' + !!vp.key + ')');
+          this.flash('Os avisos ainda não estão ligados no servidor.');
           return;
         }
-        keyLen = String(vp.key).length;
         stage = 'permissao';
         const perm = await Notification.requestPermission();
         this.pushPermission = perm;
         if (perm !== 'granted') {
-          alert('Permissão não concedida (perm=' + perm + '). Precisa tocar em "Permitir".');
+          this.flash('Pra receber aviso com o app fechado, precisa tocar em "Permitir".');
           return;
         }
         stage = 'preparar-sw';
@@ -84,13 +87,8 @@ window.PARCEIRO_MODULES.push = () => ({
         this.pushEnabled = true;
         this.flash('🔔 Avisos ativados neste aparelho!', 'success');
       } catch (err) {
-        console.warn('push_enable_failed', err);
-        const parts = [];
-        if (err && err.name && err.name !== 'Error') parts.push(err.name);
-        if (err && err.status) parts.push('HTTP ' + err.status);
-        if (err && err.message) parts.push(err.message);
-        const detail = parts.join(' · ').slice(0, 180) || 'erro desconhecido';
-        alert('Falha ao ativar\npasso: ' + stage + '\nkeylen: ' + keyLen + '\n' + detail);
+        console.warn('push_enable_failed', { stage, err });
+        this.flash('Não consegui ativar os avisos agora. Tenta de novo.');
       } finally {
         this.pushBusy = false;
       }
