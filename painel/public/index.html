@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260601-rede-real-1"></script>
+<script src="/admin/painel/app.js?v=20260619-vendas-1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260601-rede-real-1"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260601-rede-real-1" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260619-vendas-1"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260619-vendas-1" />
 
 <script>
   tailwind.config = {
@@ -1406,11 +1406,11 @@
     </div>
 
     <!-- ═══ TELA: PEDIDOS ═══ -->
-    <div x-show="currentPage === 'pedidos'" class="p-8">
+    <div x-show="currentPage === 'vendas'" class="p-8">
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-semibold tracking-tight">Pedidos</h1>
-          <p class="text-sm text-gray-500 mt-1">Vendas registradas pela equipe</p>
+          <h1 class="text-2xl font-semibold tracking-tight">Vendas</h1>
+          <p class="text-sm text-gray-500 mt-1">O que a Matriz vende direto — varejo (cliente final) e atacado (parceiro)</p>
         </div>
         <button @click="openWalkinModal()"
                 class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium">
@@ -1419,33 +1419,34 @@
         </button>
       </div>
 
+      <!-- Sub-abas: Varejo | Atacado -->
+      <div class="inline-flex items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6">
+        <button @click="vendasTab = 'varejo'"
+                :class="vendasTab === 'varejo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Varejo</button>
+        <button @click="vendasTab = 'atacado'"
+                :class="vendasTab === 'atacado' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Atacado</button>
+      </div>
+
+      <!-- ─── VAREJO ─── -->
+      <div x-show="vendasTab === 'varejo'">
+
       <!-- Totalizadores (reais, da lista carregada) -->
       <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Pedidos carregados</div>
-          <div class="text-lg font-bold" x-text="pedidos.length"></div>
-          <div class="text-xs text-gray-400 mt-1 font-medium">últimos registros</div>
+          <div class="text-xs text-gray-500 mb-1">Vendas no varejo</div>
+          <div class="text-lg font-bold" x-text="vendasVarejoAtivas().length"></div>
+          <div class="text-xs text-gray-400 mt-1 font-medium">cliente final · Matriz</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Confirmados</div>
-          <div class="text-lg font-bold text-emerald-700" x-text="pedidos.filter(p => p.status !== 'Cancelado').length"></div>
+          <div class="text-xs text-gray-500 mb-1">Faturado no varejo</div>
+          <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(vendasVarejoTotal())"></div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Cancelados</div>
-          <div class="text-lg font-bold text-rose-600" x-text="pedidos.filter(p => p.status === 'Cancelado').length"></div>
+          <div class="text-xs text-gray-500 mb-1">Canceladas</div>
+          <div class="text-lg font-bold text-rose-600" x-text="vendasVarejo().filter(p => p.status === 'Cancelado').length"></div>
         </div>
-      </div>
-
-      <!-- Filtros -->
-      <div class="flex gap-2 mb-4">
-        <button class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm">Todos</button>
-        <button class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm hover:border-gray-300">Confirmados</button>
-        <button class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm hover:border-gray-300">Cancelados</button>
-        <div class="flex-1"></div>
-        <button class="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300">
-          <i data-lucide="calendar" class="w-4 h-4 text-gray-600"></i>
-          Últimos 30 dias
-        </button>
       </div>
 
       <!-- Tabela -->
@@ -1463,8 +1464,8 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <template x-for="pedido in pedidos">
-              <tr class="hover:bg-gray-50 cursor-pointer">
+            <template x-for="pedido in vendasVarejo()">
+              <tr class="hover:bg-gray-50">
                 <td class="px-5 py-3 text-gray-500" x-text="pedido.data"></td>
                 <td class="px-5 py-3 font-medium" x-text="pedido.cliente"></td>
                 <td class="px-5 py-3 text-gray-700" x-text="pedido.itens"></td>
@@ -1482,8 +1483,33 @@
                 </td>
               </tr>
             </template>
+            <tr x-show="vendasVarejo().length === 0">
+              <td colspan="7" class="px-5 py-10 text-center text-sm text-gray-500">
+                Nenhuma venda de varejo da Matriz ainda. Quando a Matriz atende um cliente direto, aparece aqui.
+              </td>
+            </tr>
           </tbody>
         </table>
+      </div>
+      </div><!-- /varejo -->
+
+      <!-- ─── ATACADO (próxima etapa) ─── -->
+      <div x-show="vendasTab === 'atacado'" class="bg-white border border-gray-200 rounded-xl p-8">
+        <div class="max-w-lg">
+          <div class="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center mb-4">
+            <i data-lucide="package" class="w-6 h-6 text-brand-600"></i>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">Atacado — sua venda pro parceiro</h3>
+          <p class="text-sm text-gray-600 leading-relaxed mb-4">
+            Aqui vai entrar a venda de pneu que você faz <span class="font-medium">pro borracheiro</span> —
+            e o <span class="font-medium">ranking de recompra</span> (quem compra forte, quem sumiu).
+            É a próxima etapa: registrar a venda, baixar do seu estoque e mandar pro estoque dele.
+          </p>
+          <span class="inline-flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <i data-lucide="hammer" class="w-3.5 h-3.5"></i>
+            Em construção — fundação aprovada
+          </span>
+        </div>
       </div>
     </div>
 

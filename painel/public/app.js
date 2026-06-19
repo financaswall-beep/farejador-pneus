@@ -62,6 +62,7 @@ function painelApp() {
     liveRefreshId: null,
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
+    vendasTab: 'varejo',
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -82,7 +83,7 @@ function painelApp() {
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
       { id: 'resumo',   label: 'Resumo',  icon: 'layout-dashboard' },
-      { id: 'pedidos',  label: 'Pedidos', icon: 'shopping-bag' },
+      { id: 'vendas',   label: 'Vendas',  icon: 'shopping-bag' },
       { id: 'rede',     label: 'Rede',    icon: 'network' },
     ],
 
@@ -676,7 +677,7 @@ function painelApp() {
           statusClass = done ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700';
           dotClass = done ? 'bg-emerald-500' : 'bg-indigo-500';
         } else {
-          status = row.status === 'confirmed' ? 'Confirmado' : (row.status || 'Aberto');
+          status = ({ open: 'Aberto', confirmed: 'Confirmado', pending: 'Pendente' })[row.status] || row.status || 'Aberto';
           statusClass = 'bg-emerald-50 text-emerald-700'; dotClass = 'bg-emerald-500';
         }
         const pagto = isPartner
@@ -689,11 +690,27 @@ function painelApp() {
           pagto,
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
+          totalAmount: Number(row.total_amount || 0),
+          unitSlug: row.unit_slug || null,
+          isPartner,
           status,
           statusClass,
           dotClass,
         };
       });
+    },
+
+    // Aba Vendas — Varejo = o que a MATRIZ (unit 'main') vende direto pro cliente final.
+    // Reusa this.pedidos (já carregado de /dashboard/pedidos) filtrando a unidade própria.
+    // Pedido roteado pro parceiro NÃO é venda da matriz — fica na aba Rede.
+    vendasVarejo() {
+      return this.pedidos.filter((p) => p.unitSlug === 'main');
+    },
+    vendasVarejoAtivas() {
+      return this.vendasVarejo().filter((p) => p.status !== 'Cancelado');
+    },
+    vendasVarejoTotal() {
+      return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
     },
 
     applyProdutos(rows) {
@@ -1209,7 +1226,7 @@ function painelApp() {
     async liveRefresh() {
       if (this.liveRefreshing || document.hidden) return;
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
-      if (!['resumo', 'rede', 'unidade', 'pedidos'].includes(this.currentPage)) return;
+      if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;
       try {
