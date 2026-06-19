@@ -51,38 +51,46 @@ window.PARCEIRO_MODULES.push = () => ({
         return;
       }
       this.pushBusy = true;
+      // Diagnóstico go-live (0109): alert() FICA na tela (dá pra ler e printar com
+      // calma) e diz em QUE passo travou + o tamanho da chave recebida do servidor.
+      // Assim um print só resolve (inclusive pega chave VAPID colada torta no
+      // Coolify: pública limpa = 87). Trocar por flash discreto após estabilizar.
+      let stage = 'inicio';
+      let keyLen = -1;
       try {
+        stage = 'pedir-chave';
         const vp = await this.api('push/vapid-key');
         if (!vp.enabled || !vp.key) {
-          this.flash('Os avisos ainda não estão ligados no servidor.');
+          alert('Avisos não ligados no servidor (enabled=' + vp.enabled + ', temChave=' + !!vp.key + ')');
           return;
         }
+        keyLen = String(vp.key).length;
+        stage = 'permissao';
         const perm = await Notification.requestPermission();
         this.pushPermission = perm;
         if (perm !== 'granted') {
-          this.flash('Pra receber aviso com o app fechado, precisa tocar em "Permitir".');
+          alert('Permissão não concedida (perm=' + perm + '). Precisa tocar em "Permitir".');
           return;
         }
+        stage = 'preparar-sw';
         const reg = await navigator.serviceWorker.ready;
+        stage = 'inscrever';
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: this._pushUrlB64ToUint8(vp.key),
         });
+        stage = 'salvar';
         await this._pushSaveSub(sub);
         this.pushEnabled = true;
         this.flash('🔔 Avisos ativados neste aparelho!', 'success');
       } catch (err) {
-        // Diagnóstico (go-live 0109): mostra o motivo REAL na tela. Web Push falha
-        // por N causas no aparelho (sem FCM, rede bloqueia, push service fora) e a
-        // msg genérica escondia tudo. err da inscrição = DOMException (tem .name);
-        // err do POST = Error do api() (tem .status). Suavizar depois que estabilizar.
         console.warn('push_enable_failed', err);
         const parts = [];
         if (err && err.name && err.name !== 'Error') parts.push(err.name);
         if (err && err.status) parts.push('HTTP ' + err.status);
         if (err && err.message) parts.push(err.message);
-        const detail = parts.join(' · ').slice(0, 160) || 'erro desconhecido';
-        this.flash('Falha ao ativar: ' + detail);
+        const detail = parts.join(' · ').slice(0, 180) || 'erro desconhecido';
+        alert('Falha ao ativar\npasso: ' + stage + '\nkeylen: ' + keyLen + '\n' + detail);
       } finally {
         this.pushBusy = false;
       }
