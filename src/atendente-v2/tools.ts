@@ -23,6 +23,8 @@ import {
   getUnitDisplayById,
   normalizeRegion,
   FRETE_PADRAO_BRL,
+  matrizFreightForKm,
+  matrizDistanceKm,
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
@@ -90,7 +92,14 @@ async function decideStoreGeoOrFallback(
     /** Endereço completo (rua+número) digitado pelo cliente na ENTREGA — geocodifica fino. */
     fullAddress?: string | null;
   },
-): Promise<{ routing: PartnerOrderRouting | null; onlyFar?: GeoOnlyFar }> {
+): Promise<{
+  routing: PartnerOrderRouting | null;
+  onlyFar?: GeoOnlyFar;
+  // Frete da MATRIZ por distância (só preenchido quando a entrega cai na matriz).
+  // Garantido por CÓDIGO (não confiar no valor_frete que o LLM passa).
+  matrizFreight?: number;
+  matrizDistanceKm?: number | null;
+}> {
   if (env.ROUTING_GEO && input.municipio) {
     const customerLocation = await resolveCustomerLocation(client, environment, conversationId, {
       municipio: input.municipio,
@@ -108,12 +117,15 @@ async function decideStoreGeoOrFallback(
       });
       if (geo.kind === 'partner') return { routing: geo.routing };
       if (geo.kind === 'only_far') return { routing: null, onlyFar: { unitName: geo.unitName, distanceKm: geo.distanceKm } };
-      return { routing: null }; // matriz
+      // matriz: mede cliente→Matriz e cobra o frete por DISTÂNCIA (decisão 06-19).
+      const km = await matrizDistanceKm(client, customerLocation);
+      return { routing: null, matrizFreight: matrizFreightForKm(km), matrizDistanceKm: km };
     }
     // sem coordenada → cai no fallback por cidade (caso F)
   }
   const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items });
-  return { routing };
+  // matriz sem coordenada (caso F): não dá pra medir distância → frete base da rede.
+  return routing ? { routing } : { routing: null, matrizFreight: matrizFreightForKm(null), matrizDistanceKm: null };
 }
 
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
@@ -600,6 +612,12 @@ export async function executeTool(
                 'Esse pneu só tem numa loja mais distante. Seja honesto: avise a distância e ofereça opções (entregar mesmo assim / medida equivalente mais perto / reservar e avisar). NÃO finja que é entrega normal.',
             });
           }
+          // Matriz (nem parceiro nem só-longe): se a entrega está disponível, o frete da
+          // Matriz é por DISTÂNCIA (decisão Wallace 06-19), garantido por CÓDIGO — não o
+          // fee fixo da zona. O criar_pedido cobra o MESMO valor (mesma fonte: o wrapper).
+          if (decision.matrizFreight != null && result.disponivel) {
+            return JSON.stringify({ ...result, valor: decision.matrizFreight.toFixed(2), motivo: undefined });
+          }
         }
         return JSON.stringify(result);
       }
@@ -942,7 +960,9 @@ async function criarPedido(
   const itens = args.itens as PedidoItem[];
   const subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
-  const valorFrete = Number(args.valor_frete ?? 0) || 0;
+  // let: o frete da MATRIZ por distância é reescrito por CÓDIGO no roteamento abaixo
+  // (não confiar no valor_frete do LLM). Parceiro/retirada não tocam aqui.
+  let valorFrete = Number(args.valor_frete ?? 0) || 0;
   // Consentimento de retirada longe (decisão Wallace 2026-06-08): o bot só marca true
   // depois que o cliente confirma que vai buscar mesmo a loja ficando longe.
   const confirmaRetiradaDistante = args.confirma_retirada_distante === true;
@@ -955,7 +975,7 @@ async function criarPedido(
     });
   }
 
-  const totalAmount = subtotal + valorFrete;
+  let totalAmount = subtotal + valorFrete;
 
   // Busca contact_id + telefone (phone_e164) direto da conversa/contato.
   const convResult = await client.query<{ contact_id: string | null; phone_e164: string | null }>(
@@ -1038,6 +1058,14 @@ async function criarPedido(
       });
     }
     partner = decision.routing;
+    // Frete da MATRIZ por DISTÂNCIA garantido por CÓDIGO (decisão Wallace 06-19): se a
+    // entrega cai na Matriz (sem parceiro), o frete é a tabela por km do MESMO wrapper que
+    // o calcular_frete usou — NÃO o valor_frete que o LLM passou (pode estar defasado).
+    // Parceiro segue no fixo (caminho próprio abaixo). Recalcula o total (frete mudou).
+    if (!partner && decision.matrizFreight != null) {
+      valorFrete = decision.matrizFreight;
+      totalAmount = subtotal + valorFrete;
+    }
   } else if (modalidade === 'pickup' && env.PICKUP_TO_PARTNER) {
     // RETIRADA pelos MESMOS critérios da entrega: proximidade (anel de retirada) + régua
     // de justiça. Município vem do geo (se houver) ou do bairro; coordenada vem do pino
