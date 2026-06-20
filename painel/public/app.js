@@ -63,6 +63,14 @@ function painelApp() {
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
     vendasTab: 'varejo',
+    // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
+    atacadoBuyers: [],
+    atacadoRanking: [],
+    atacadoLoading: false,
+    atacadoSaving: false,
+    atacadoMsg: null,
+    atacadoStaleDays: 30,
+    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -711,6 +719,100 @@ function painelApp() {
     },
     vendasVarejoTotal() {
       return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
+    },
+
+    // ── ATACADO (Fase 1) — venda pro borracheiro + ranking de recompra ──
+    atacadoBuyerKey(b) {
+      return b.customer_id ? `c:${b.customer_id}` : `p:${b.partner_id}`;
+    },
+    async loadAtacado() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      this.atacadoLoading = true;
+      try {
+        const [buyers, ranking] = await Promise.all([
+          this.apiGet('/admin/api/wholesale/buyers'),
+          this.apiGet('/admin/api/wholesale/ranking'),
+        ]);
+        this.atacadoBuyers = buyers.rows || [];
+        this.atacadoRanking = ranking.rows || [];
+      } catch (err) {
+        this.atacadoBuyers = [];
+        this.atacadoRanking = [];
+        console.warn('atacado load falhou:', err.message);
+      } finally {
+        this.atacadoLoading = false;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
+    atacadoAddItem() {
+      this.atacadoForm.items.push({ measure: '', brand: '', quantity: 1, unit_price: '' });
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    atacadoRemoveItem(i) {
+      if (this.atacadoForm.items.length > 1) this.atacadoForm.items.splice(i, 1);
+    },
+    atacadoFormTotal() {
+      return this.atacadoForm.items.reduce(
+        (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0,
+      );
+    },
+    atacadoLastPurchase(b) {
+      if (!b.last_purchase_at) return '—';
+      const d = new Date(b.last_purchase_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+    atacadoStatus(b) {
+      if (!Number(b.orders_count)) return { label: 'nunca comprou', cls: 'bg-amber-50 text-amber-700', dot: 'bg-amber-400' };
+      if (b.days_since_last != null && Number(b.days_since_last) > this.atacadoStaleDays)
+        return { label: `sumiu (${b.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600', dot: 'bg-rose-400' };
+      return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
+    },
+    async atacadoSubmit() {
+      const f = this.atacadoForm;
+      const body = { items: [], notes: f.notes ? f.notes.trim() : null };
+      if (f.buyerKey === 'new') {
+        if (!f.newName.trim()) { this.atacadoMsg = { ok: false, text: 'Diga o nome do novo cliente.' }; return; }
+        body.new_customer = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
+      } else if (f.buyerKey.startsWith('c:')) {
+        body.customer_id = f.buyerKey.slice(2);
+      } else if (f.buyerKey.startsWith('p:')) {
+        body.partner_id = f.buyerKey.slice(2);
+      } else {
+        this.atacadoMsg = { ok: false, text: 'Escolha o borracheiro.' }; return;
+      }
+      const items = f.items
+        .filter((it) => it.measure && it.measure.trim() && Number(it.quantity) > 0)
+        .map((it) => ({
+          measure: it.measure.trim(),
+          brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
+          quantity: Number(it.quantity),
+          unit_price: Number(it.unit_price) || 0,
+        }));
+      if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
+      body.items = items;
+
+      this.atacadoSaving = true;
+      this.atacadoMsg = null;
+      try {
+        const result = await this.apiPost('/admin/api/wholesale/sales', body);
+        this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}.` };
+        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
+        await this.loadAtacado();
+      } catch (err) {
+        this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };
+      } finally {
+        this.atacadoSaving = false;
+      }
+    },
+    atacadoErrText(code) {
+      const map = {
+        buyer_required: 'Escolha ou cadastre o comprador.',
+        items_required: 'Adicione ao menos um pneu.',
+        partner_not_found: 'Parceiro não encontrado.',
+        buyer_not_found: 'Cliente não encontrado.',
+      };
+      return map[code] || `Não consegui registrar (${code}).`;
     },
 
     applyProdutos(rows) {

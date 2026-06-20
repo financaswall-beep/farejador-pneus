@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260619-vendas-1"></script>
+<script src="/admin/painel/app.js?v=20260619-atacado-1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260619-vendas-1"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260619-vendas-1" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260619-atacado-1"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260619-atacado-1" />
 
 <script>
   tailwind.config = {
@@ -1424,7 +1424,7 @@
         <button @click="vendasTab = 'varejo'"
                 :class="vendasTab === 'varejo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
                 class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Varejo</button>
-        <button @click="vendasTab = 'atacado'"
+        <button @click="vendasTab = 'atacado'; loadAtacado()"
                 :class="vendasTab === 'atacado' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
                 class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Atacado</button>
       </div>
@@ -1493,22 +1493,131 @@
       </div>
       </div><!-- /varejo -->
 
-      <!-- ─── ATACADO (próxima etapa) ─── -->
-      <div x-show="vendasTab === 'atacado'" class="bg-white border border-gray-200 rounded-xl p-8">
-        <div class="max-w-lg">
-          <div class="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center mb-4">
-            <i data-lucide="package" class="w-6 h-6 text-brand-600"></i>
+      <!-- ─── ATACADO ─── -->
+      <div x-show="vendasTab === 'atacado'" class="space-y-6">
+
+        <!-- Nova venda de atacado -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="package-plus" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Nova venda de atacado</h3>
           </div>
-          <h3 class="text-lg font-semibold mb-2">Atacado — sua venda pro parceiro</h3>
-          <p class="text-sm text-gray-600 leading-relaxed mb-4">
-            Aqui vai entrar a venda de pneu que você faz <span class="font-medium">pro borracheiro</span> —
-            e o <span class="font-medium">ranking de recompra</span> (quem compra forte, quem sumiu).
-            É a próxima etapa: registrar a venda, baixar do seu estoque e mandar pro estoque dele.
-          </p>
-          <span class="inline-flex items-center gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <i data-lucide="hammer" class="w-3.5 h-3.5"></i>
-            Em construção — fundação aprovada
-          </span>
+
+          <!-- Comprador -->
+          <div class="grid md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Borracheiro</label>
+              <select x-model="atacadoForm.buyerKey" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">Selecione…</option>
+                <option value="new">+ Novo cliente (só atacado)</option>
+                <template x-for="b in atacadoBuyers" :key="(b.customer_id || b.partner_id)">
+                  <option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option>
+                </template>
+              </select>
+            </div>
+            <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Nome</label>
+                <input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Telefone</label>
+                <input x-model="atacadoForm.newPhone" type="text" placeholder="(opcional)"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+          </div>
+
+          <!-- Pneus -->
+          <label class="block text-xs font-medium text-gray-600 mb-1">Pneus</label>
+          <div class="space-y-2 mb-3">
+            <template x-for="(it, i) in atacadoForm.items" :key="i">
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <input x-model="it.measure" type="text" placeholder="Medida (ex.: 80/90-21)"
+                       class="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <input x-model="it.brand" type="text" placeholder="Marca"
+                       class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <input x-model.number="it.quantity" type="number" min="1" placeholder="Qtd"
+                       class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="Preço un."
+                       class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <button @click="atacadoRemoveItem(i)" x-show="atacadoForm.items.length > 1"
+                        class="col-span-1 flex justify-center text-gray-400 hover:text-rose-500" title="Remover">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </template>
+          </div>
+          <button @click="atacadoAddItem()"
+                  class="text-sm text-brand-600 hover:text-brand-700 font-medium mb-4 inline-flex items-center gap-1">
+            <i data-lucide="plus" class="w-4 h-4"></i> Adicionar pneu
+          </button>
+
+          <!-- Observação opcional -->
+          <input x-model="atacadoForm.notes" type="text" placeholder="Observação (opcional)"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4">
+
+          <!-- Total + registrar -->
+          <div class="flex items-center justify-between border-t border-gray-100 pt-4">
+            <div class="text-sm text-gray-500">Total:
+              <span class="text-lg font-bold text-gray-900" x-text="formatCurrency(atacadoFormTotal())"></span>
+            </div>
+            <button @click="atacadoSubmit()" :disabled="atacadoSaving"
+                    class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-50">
+              <span x-show="!atacadoSaving">Registrar venda</span>
+              <span x-show="atacadoSaving">Salvando…</span>
+            </button>
+          </div>
+
+          <div x-show="atacadoMsg" class="mt-3 text-sm px-3 py-2 rounded-lg"
+               :class="atacadoMsg && atacadoMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+               x-text="atacadoMsg ? atacadoMsg.text : ''"></div>
+        </div>
+
+        <!-- Ranking de recompra -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold">Ranking de recompra</h3>
+            <span class="text-xs text-gray-400">quem compra forte · quem sumiu</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                <th class="px-5 py-3 font-medium">Borracheiro</th>
+                <th class="px-5 py-3 font-medium text-center">Compras</th>
+                <th class="px-5 py-3 font-medium text-right">Total comprado</th>
+                <th class="px-5 py-3 font-medium">Última compra</th>
+                <th class="px-5 py-3 font-medium">Situação</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="b in atacadoRanking" :key="(b.buyer_id || b.partner_id)">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-5 py-3 font-medium">
+                    <span x-text="b.name"></span>
+                    <span x-show="b.is_partner" class="ml-1.5 text-xs px-1.5 py-0.5 bg-brand-50 text-brand-600 rounded">parceiro</span>
+                  </td>
+                  <td class="px-5 py-3 text-center text-gray-700" x-text="b.orders_count"></td>
+                  <td class="px-5 py-3 text-right font-semibold" x-text="formatCurrency(Number(b.total_bought || 0))"></td>
+                  <td class="px-5 py-3 text-gray-500" x-text="atacadoLastPurchase(b)"></td>
+                  <td class="px-5 py-3">
+                    <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full" :class="atacadoStatus(b).cls">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="atacadoStatus(b).dot"></span>
+                      <span x-text="atacadoStatus(b).label"></span>
+                    </span>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="atacadoRanking.length === 0">
+                <td colspan="5" class="px-5 py-10 text-center text-sm text-gray-500">
+                  Nenhum comprador ainda. Registre uma venda acima — os parceiros da rede já aparecem aqui pra você vender.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
