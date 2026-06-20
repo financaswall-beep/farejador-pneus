@@ -15,9 +15,12 @@ import {
   getPainelProdutos,
   getPainelRede,
   getRedeFunnel,
+  getWholesaleRanking,
   listPartnerApplications,
+  listWholesaleBuyers,
   registerManualOrder,
   registerWalkinOrder,
+  registerWholesaleSale,
   rejectPartnerApplication,
   setPartnerUnitDeliveryRadius,
 } from './queries.js';
@@ -63,6 +66,33 @@ const setDeliveryRadiusBodySchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   delivery_radius_km: z.number().positive().max(9999.99).nullable(),
 });
+
+// ATACADO (Fase 1): venda de atacado da Matriz. Comprador = ficha existente
+// (customer_id), parceiro da rede (partner_id) OU só-atacado novo (new_customer).
+// Preço DIGITADO por item. Admin-only (dado só da matriz).
+const wholesaleItemSchema = z.object({
+  measure: z.string().min(1).max(60),
+  brand: z.string().min(1).max(60).nullable().optional(),
+  quantity: z.number().int().positive().max(100000),
+  unit_price: z.number().min(0).max(9999999.99),
+});
+const registerWholesaleSaleSchema = z
+  .object({
+    environment: z.enum(['prod', 'test']).optional(),
+    customer_id: z.string().uuid().nullable().optional(),
+    partner_id: z.string().uuid().nullable().optional(),
+    new_customer: z
+      .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional() })
+      .nullable()
+      .optional(),
+    items: z.array(wholesaleItemSchema).min(1).max(50),
+    sold_at: z.string().min(1).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
+  .refine(
+    (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
+    { message: 'buyer_required' },
+  );
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
 const partnerApplicationSchema = z.object({
@@ -233,6 +263,35 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     const resumo = await getMatrizResumo(parsed.data.period);
     return reply.status(200).send({ ...dashboardPayload([]), ...resumo });
+  });
+
+  // ── ATACADO (Fase 1): vendas de atacado da Matriz + ranking de recompra ──
+  // Admin-only (dado SÓ da matriz; o parceiro nem tem grant no banco — migration 0110).
+
+  // Compradores do formulário "Nova venda" (fichas já criadas + parceiros sem ficha).
+  fastify.get('/admin/api/wholesale/buyers', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleBuyers()));
+  });
+
+  // Ranking de recompra (quem compra mais / quem sumiu / quem nunca comprou).
+  fastify.get('/admin/api/wholesale/ranking', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await getWholesaleRanking()));
+  });
+
+  // Registrar uma venda de atacado (comprador + pneus + preço digitado).
+  fastify.post('/admin/api/wholesale/sales', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = registerWholesaleSaleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request.headers) });
+      return reply.status(201).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale sale failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   // Cadastro de parceiro (Etapa 1 onboarding): cria unidade + parceiro + LOGIN + cobertura.
