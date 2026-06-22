@@ -18,6 +18,10 @@ import {
   getWholesaleRanking,
   listPartnerApplications,
   listWholesaleBuyers,
+  listWholesaleMeasures,
+  listWholesaleStock,
+  setWholesaleStock,
+  deleteWholesaleStock,
   registerManualOrder,
   registerWalkinOrder,
   registerWholesaleSale,
@@ -93,6 +97,18 @@ const registerWholesaleSaleSchema = z
     (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
     { message: 'buyer_required' },
   );
+
+// ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
+const setWholesaleStockSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  measure: z.string().min(1).max(60),
+  quantity_on_hand: z.number().int().min(0).max(1000000),
+  notes: z.string().max(1000).nullable().optional(),
+});
+const removeWholesaleStockSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  measure: z.string().min(1).max(60),
+});
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
 const partnerApplicationSchema = z.object({
@@ -290,6 +306,51 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale sale failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ── ATACADO (Fase 2): estoque do galpão por medida + autocomplete de medidas ──
+  // Admin-only (dado SÓ da matriz). A baixa na venda é Fase 2b (atrás de flag).
+
+  // Medidas pro autocomplete da venda (catálogo ∪ estoque), com quantidade em mãos.
+  fastify.get('/admin/api/wholesale/measures', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleMeasures()));
+  });
+
+  // Estoque do galpão (uma linha por medida).
+  fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleStock()));
+  });
+
+  // Define a quantidade de uma medida (upsert por medida).
+  fastify.post('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = setWholesaleStockSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const row = await setWholesaleStock(parsed.data);
+      return reply.status(200).send(row);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale stock set failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // Remove uma medida do estoque do galpão.
+  fastify.post('/admin/api/wholesale/stock/remove', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = removeWholesaleStockSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      await deleteWholesaleStock(parsed.data.measure, parsed.data.environment);
+      return reply.status(200).send({ ok: true });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale stock remove failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

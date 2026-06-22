@@ -71,6 +71,12 @@ function painelApp() {
     atacadoMsg: null,
     atacadoStaleDays: 30,
     atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
+    // ── ATACADO (Fase 2): estoque do galpão por medida ──
+    atacadoStock: [],
+    atacadoMeasures: [],
+    stockForm: { measure: '', quantity_on_hand: '', notes: '' },
+    stockSaving: false,
+    stockMsg: null,
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -730,15 +736,21 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking] = await Promise.all([
+        const [buyers, ranking, measures, stock] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
+          this.apiGet('/admin/api/wholesale/measures'),
+          this.apiGet('/admin/api/wholesale/stock'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
+        this.atacadoMeasures = measures.rows || [];
+        this.atacadoStock = stock.rows || [];
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
+        this.atacadoMeasures = [];
+        this.atacadoStock = [];
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -813,6 +825,50 @@ function painelApp() {
         buyer_not_found: 'Cliente não encontrado.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
+    },
+
+    // ── ATACADO (Fase 2) — estoque do galpão por medida ──
+    measureOnHand(measure) {
+      // Quanto tem de uma medida (pro form de venda mostrar "em estoque"). null = não cadastrada.
+      const m = (measure || '').trim();
+      if (!m) return null;
+      const row = this.atacadoMeasures.find((x) => x.measure === m);
+      return row && row.quantity_on_hand != null ? Number(row.quantity_on_hand) : null;
+    },
+    async stockSubmit() {
+      const measure = (this.stockForm.measure || '').trim();
+      const qty = Number(this.stockForm.quantity_on_hand);
+      if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
+      if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
+      this.stockSaving = true;
+      this.stockMsg = null;
+      try {
+        await this.apiPost('/admin/api/wholesale/stock', {
+          measure,
+          quantity_on_hand: qty,
+          notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
+        });
+        this.stockMsg = { ok: true, text: `${measure}: ${qty} em estoque.` };
+        this.stockForm = { measure: '', quantity_on_hand: '', notes: '' };
+        await this.loadAtacado();
+      } catch (err) {
+        this.stockMsg = { ok: false, text: `Não consegui salvar (${err.message}).` };
+      } finally {
+        this.stockSaving = false;
+      }
+    },
+    stockEdit(row) {
+      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, notes: row.notes || '' };
+      this.stockMsg = null;
+    },
+    async stockRemove(measure) {
+      if (!window.confirm(`Remover ${measure} do estoque do galpão?`)) return;
+      try {
+        await this.apiPost('/admin/api/wholesale/stock/remove', { measure });
+        await this.loadAtacado();
+      } catch (err) {
+        this.stockMsg = { ok: false, text: `Não consegui remover (${err.message}).` };
+      }
     },
 
     applyProdutos(rows) {

@@ -1535,19 +1535,23 @@
           <label class="block text-xs font-medium text-gray-600 mb-1">Pneus</label>
           <div class="space-y-2 mb-3">
             <template x-for="(it, i) in atacadoForm.items" :key="i">
-              <div class="grid grid-cols-12 gap-2 items-center">
-                <input x-model="it.measure" type="text" placeholder="Medida (ex.: 80/90-21)"
-                       class="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <input x-model="it.brand" type="text" placeholder="Marca"
-                       class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <input x-model.number="it.quantity" type="number" min="1" placeholder="Qtd"
-                       class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="Preço un."
-                       class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <button @click="atacadoRemoveItem(i)" x-show="atacadoForm.items.length > 1"
-                        class="col-span-1 flex justify-center text-gray-400 hover:text-rose-500" title="Remover">
-                  <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
+              <div>
+                <div class="grid grid-cols-12 gap-2 items-center">
+                  <input x-model="it.measure" type="text" list="atacado-measures" placeholder="Medida (ex.: 90/90-18)"
+                         class="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <input x-model="it.brand" type="text" placeholder="Marca"
+                         class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <input x-model.number="it.quantity" type="number" min="1" placeholder="Qtd"
+                         class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="Preço un."
+                         class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <button @click="atacadoRemoveItem(i)" x-show="atacadoForm.items.length > 1"
+                          class="col-span-1 flex justify-center text-gray-400 hover:text-rose-500" title="Remover">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <p x-show="measureOnHand(it.measure) !== null" class="text-xs text-emerald-600 mt-1 ml-1"
+                   x-text="'✓ ' + measureOnHand(it.measure) + ' em estoque no galpão'"></p>
               </div>
             </template>
           </div>
@@ -1576,6 +1580,72 @@
                :class="atacadoMsg && atacadoMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
                x-text="atacadoMsg ? atacadoMsg.text : ''"></div>
         </div>
+
+        <!-- Estoque do galpão (Fase 2) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="package" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Estoque do galpão</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-4 ml-10">Quantas unidades você tem de cada medida. Quando ligado, a venda de atacado dá baixa daqui.</p>
+
+          <!-- adicionar / atualizar uma medida -->
+          <div class="grid grid-cols-12 gap-2 items-center mb-2">
+            <input x-model="stockForm.measure" type="text" list="atacado-measures" placeholder="Medida (ex.: 90/90-18)"
+                   class="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="Unidades"
+                   class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <button @click="stockSubmit()" :disabled="stockSaving"
+                    class="col-span-4 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">
+              <span x-show="!stockSaving">Salvar medida</span>
+              <span x-show="stockSaving">Salvando…</span>
+            </button>
+          </div>
+          <div x-show="stockMsg" class="mb-3 text-sm px-3 py-2 rounded-lg"
+               :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+               x-text="stockMsg ? stockMsg.text : ''"></div>
+
+          <!-- lista do estoque atual -->
+          <div class="border border-gray-100 rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                  <th class="px-4 py-2 font-medium">Medida</th>
+                  <th class="px-4 py-2 font-medium text-center">Unidades</th>
+                  <th class="px-4 py-2 font-medium text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="row in atacadoStock" :key="row.measure">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 font-medium" x-text="row.measure"></td>
+                    <td class="px-4 py-2 text-center"
+                        :class="row.quantity_on_hand === 0 ? 'text-rose-500 font-semibold' : ''"
+                        x-text="row.quantity_on_hand"></td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                      <button @click="stockEdit(row)" class="text-xs text-brand-600 hover:text-brand-700 mr-3">editar</button>
+                      <button @click="stockRemove(row.measure)" class="text-xs text-rose-500 hover:text-rose-600">remover</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="atacadoStock.length === 0">
+                  <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">
+                    Estoque vazio. Cadastre suas medidas acima (ex.: 15 de 90/90-18).
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- medidas pro autocomplete (catálogo ∪ estoque do galpão) -->
+        <datalist id="atacado-measures">
+          <template x-for="m in atacadoMeasures" :key="m.measure">
+            <option :value="m.measure"></option>
+          </template>
+        </datalist>
 
         <!-- Ranking de recompra -->
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
