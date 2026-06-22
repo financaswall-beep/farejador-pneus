@@ -215,7 +215,11 @@ export async function buscarProduto(
     values.push(parsed.marca);
     filters.push(`brand ILIKE '%' || $${values.length} || '%'`);
   }
-  if (parsed.posicao_pneu) {
+  // 'both' = alias semântico de "qualquer posição" (MESMO fix do buscar_compatibilidade,
+  // 2026-05-23): sem este guard, posicao_pneu='both' virava `tire_position='both'` e
+  // excluía os pneus de posição ÚNICA (front/rear) — ex.: o 80/90-21 (dianteiro) sumia
+  // da busca por MEDIDA mesmo a Matriz tendo estoque. Só filtra quando é front/rear.
+  if (parsed.posicao_pneu && parsed.posicao_pneu !== 'both') {
     values.push(parsed.posicao_pneu);
     filters.push(`(tire_position = $${values.length} OR tire_position = 'both')`);
   }
