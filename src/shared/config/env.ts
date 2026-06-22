@@ -83,6 +83,12 @@ const envSchema = z.object({
   // 0105) e guarda por loja (ranking interno/discreto). Default OFF = dormente: não
   // enfileira, dispatcher não roda, captura inerte. Liga só quando o dono mandar.
   SATISFACTION_SURVEY: booleanStringSchema,
+  // ATACADO Fase 2b — BAIXA no estoque do galpão por medida. Quando a Matriz registra
+  // uma venda de atacado, decrementa commerce.wholesale_stock pela medida (clamp em 0:
+  // a venda NUNCA trava por falta de estoque; medida não cadastrada simplesmente não
+  // baixa). Default OFF = dormente: a venda registra igual, mas não mexe no estoque —
+  // deixa o dono cadastrar o galpão real antes de ligar. Liga quando o estoque for real.
+  WHOLESALE_STOCK_DECREMENT: booleanStringSchema,
   // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
   // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
   // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a

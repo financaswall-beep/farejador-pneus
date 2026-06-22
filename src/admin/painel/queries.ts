@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
+import { applyWholesaleStockDecrement } from './wholesale-stock.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -1070,6 +1071,9 @@ export async function registerWholesaleSale(
       );
     }
 
+    // 3b. BAIXA no estoque do galpão por medida (Fase 2b) — atrás de flag, mesma transação.
+    await applyWholesaleStockDecrement(client, environment, input.items, env.WHOLESALE_STOCK_DECREMENT);
+
     // 4. Grava o total (passo SEPARADO — enxerga os itens recém-inseridos).
     const tot = await client.query<{ total_amount: string }>(
       `UPDATE commerce.wholesale_orders
@@ -1093,4 +1097,95 @@ export async function registerWholesaleSale(
   } finally {
     client.release();
   }
+}
+
+// ─── ATACADO (Fase 2): estoque do galpão por MEDIDA (pneu usado) ──────────────
+// O dono controla o galpão por medida simples (ex.: '90/90-18' = 15 un.), SEPARADO
+// do estoque do varejo (commerce.stock_levels). Tabela commerce.wholesale_stock (0111),
+// dado SÓ da matriz (sem grant pro parceiro). Leitura/escrita aqui; a BAIXA na venda
+// é plugada em registerWholesaleSale atrás de flag (Fase 2b).
+
+export interface WholesaleStockRow {
+  measure: string;
+  quantity_on_hand: number;
+  notes: string | null;
+  updated_at: string;
+}
+
+/** Lista o estoque do galpão (uma linha por medida), ordenado pela medida. */
+export async function listWholesaleStock(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleStockRow[]> {
+  const r = await dbPool.query<WholesaleStockRow>(
+    `SELECT measure, quantity_on_hand, notes, updated_at
+       FROM commerce.wholesale_stock
+      WHERE environment = $1
+      ORDER BY measure`,
+    [environment],
+  );
+  return r.rows;
+}
+
+/** Define a quantidade de uma medida (upsert por medida). quantity_on_hand >= 0. */
+export async function setWholesaleStock(
+  input: { measure: string; quantity_on_hand: number; notes?: string | null; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleStockRow> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const measure = input.measure.trim();
+  if (!measure) throw new Error('measure_required');
+  if (!Number.isInteger(input.quantity_on_hand) || input.quantity_on_hand < 0) {
+    throw new Error('quantity_invalid');
+  }
+  const r = await dbPool.query<WholesaleStockRow>(
+    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, notes)
+          VALUES ($1, $2, $3, $4)
+     ON CONFLICT (environment, measure)
+     DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand,
+                   notes            = EXCLUDED.notes
+       RETURNING measure, quantity_on_hand, notes, updated_at`,
+    [environment, measure, input.quantity_on_hand, input.notes?.trim() || null],
+  );
+  return r.rows[0]!;
+}
+
+/** Remove uma medida do estoque do galpão (ex.: cadastrou errado). */
+export async function deleteWholesaleStock(
+  measure: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<void> {
+  await dbPool.query(
+    `DELETE FROM commerce.wholesale_stock WHERE environment = $1 AND measure = $2`,
+    [environment, measure.trim()],
+  );
+}
+
+export interface WholesaleMeasureRow {
+  measure: string;
+  quantity_on_hand: number | null; // null = conhecida no catálogo, sem estoque cadastrado
+}
+
+/** Medidas pro autocomplete da venda: catálogo (tire_specs) ∪ estoque do galpão,
+ *  com a quantidade em mãos (null quando a medida só existe no catálogo). */
+export async function listWholesaleMeasures(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleMeasureRow[]> {
+  const r = await dbPool.query<WholesaleMeasureRow>(
+    `SELECT m.measure, ws.quantity_on_hand
+       FROM (
+              SELECT DISTINCT tire_size AS measure
+                FROM commerce.tire_specs
+               WHERE environment = $1 AND tire_size IS NOT NULL
+              UNION
+              SELECT measure FROM commerce.wholesale_stock WHERE environment = $1
+            ) m
+       LEFT JOIN commerce.wholesale_stock ws
+              ON ws.environment = $1 AND ws.measure = m.measure
+      ORDER BY m.measure`,
+    [environment],
+  );
+  return r.rows;
 }
