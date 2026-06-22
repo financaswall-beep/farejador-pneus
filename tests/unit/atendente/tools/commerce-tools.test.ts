@@ -76,6 +76,28 @@ describe('commerce tools deterministicas da Atendente', () => {
     expect(client.calls).toHaveLength(0);
   });
 
+  it('buscarProduto: posicao "both" NAO restringe tire_position (fix do 80/90-21 dianteiro)', async () => {
+    // Regressao: 'both' = alias de "qualquer posicao". Sem o fix virava tire_position='both'
+    // e excluia pneus de posicao unica (front/rear) mesmo com estoque na Matriz.
+    const client = clientWithRows([[]]);
+    await buscarProduto(client, {
+      environment: 'test',
+      medida_pneu: '80/90-21',
+      posicao_pneu: 'both',
+      apenas_com_estoque: true,
+    });
+    // 'OR tire_position' só aparece no FILTRO de posição (o SELECT tem 'tire_position,' com vírgula).
+    expect(client.calls[0]!.text).not.toContain('OR tire_position'); // posicao nao filtra
+    expect(client.calls[0]!.values).toContain('80/90-21'); // medida ainda filtra
+    expect(client.calls[0]!.text).toContain('total_stock_available > 0'); // estoque ainda filtra
+  });
+
+  it('buscarProduto: posicao "rear" SEGUE restringindo tire_position', async () => {
+    const client = clientWithRows([[]]);
+    await buscarProduto(client, { environment: 'test', medida_pneu: '100/90-18', posicao_pneu: 'rear' });
+    expect(client.calls[0]!.text).toContain('OR tire_position'); // filtro de posicao presente
+  });
+
   it('verificarEstoque soma locais e retorna indisponivel quando total zero', async () => {
     const client = clientWithRows([
       [
