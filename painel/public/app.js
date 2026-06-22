@@ -77,6 +77,7 @@ function painelApp() {
     stockForm: { measure: '', quantity_on_hand: '', notes: '' },
     stockSaving: false,
     stockMsg: null,
+    measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -834,6 +835,23 @@ function painelApp() {
       if (!m) return null;
       const row = this.atacadoMeasures.find((x) => x.measure === m);
       return row && row.quantity_on_hand != null ? Number(row.quantity_on_hand) : null;
+    },
+    // Autocomplete da medida: SÓ filtra quando há texto digitado; mostra no máx 10 que casam.
+    measureFind(query, key) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) { this.measureBox = { key: null, hits: [] }; return; }
+      const hits = this.atacadoMeasures
+        .filter((m) => m.measure.toLowerCase().includes(q))
+        .slice(0, 10);
+      this.measureBox = { key, hits };
+    },
+    measurePick(value, obj) {
+      obj.measure = value;
+      this.measureBox = { key: null, hits: [] };
+    },
+    measureBlur() {
+      // delay pra o clique numa sugestão (mousedown) acontecer antes de fechar
+      setTimeout(() => { this.measureBox = { key: null, hits: [] }; }, 150);
     },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();

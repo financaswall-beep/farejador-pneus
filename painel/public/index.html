@@ -1505,55 +1505,68 @@
             <h3 class="text-base font-semibold">Nova venda de atacado</h3>
           </div>
 
-          <!-- Comprador -->
-          <div class="grid md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1">Borracheiro</label>
-              <select x-model="atacadoForm.buyerKey" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                <option value="">Selecione…</option>
-                <option value="new">+ Novo cliente (só atacado)</option>
-                <template x-for="b in atacadoBuyers" :key="(b.customer_id || b.partner_id)">
-                  <option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option>
-                </template>
-              </select>
-            </div>
-            <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Nome</label>
-                <input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Telefone</label>
-                <input x-model="atacadoForm.newPhone" type="text" placeholder="(opcional)"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              </div>
-            </div>
+          <!-- Cabeçalho das colunas (borracheiro + pneu lado a lado, compacto) -->
+          <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+            <div class="col-span-3">Borracheiro</div>
+            <div class="col-span-3">Medida</div>
+            <div class="col-span-2">Marca</div>
+            <div class="col-span-1 text-center">Un</div>
+            <div class="col-span-2">Preço</div>
+            <div class="col-span-1"></div>
           </div>
-
-          <!-- Pneus -->
-          <label class="block text-xs font-medium text-gray-600 mb-1">Pneus</label>
-          <div class="space-y-2 mb-3">
+          <div class="space-y-2 mb-2">
             <template x-for="(it, i) in atacadoForm.items" :key="i">
               <div>
                 <div class="grid grid-cols-12 gap-2 items-center">
-                  <input x-model="it.measure" type="text" list="atacado-measures" placeholder="Medida (ex.: 90/90-18)"
-                         class="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  <!-- borracheiro: só na 1ª linha; nas demais o espaço fica vazio pra alinhar -->
+                  <div class="col-span-3">
+                    <select x-show="i === 0" x-model="atacadoForm.buyerKey"
+                            class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                      <option value="">Selecione…</option>
+                      <option value="new">+ Novo (só atacado)</option>
+                      <template x-for="b in atacadoBuyers" :key="(b.customer_id || b.partner_id)">
+                        <option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option>
+                      </template>
+                    </select>
+                  </div>
+                  <!-- medida com autocomplete: filtra SÓ ao digitar -->
+                  <div class="col-span-3 relative">
+                    <input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @blur="measureBlur()"
+                           type="text" autocomplete="off" placeholder="90/90-18"
+                           class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                    <div x-show="measureBox.key === 'v'+i && measureBox.hits.length"
+                         class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+                      <template x-for="m in measureBox.hits" :key="m.measure">
+                        <button type="button" @mousedown.prevent="measurePick(m.measure, it)"
+                                class="w-full text-left px-3 py-1.5 text-sm hover:bg-brand-50 flex items-center justify-between">
+                          <span x-text="m.measure"></span>
+                          <span x-show="m.quantity_on_hand != null" class="text-xs text-emerald-600" x-text="m.quantity_on_hand + ' un'"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
                   <input x-model="it.brand" type="text" placeholder="Marca"
-                         class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                         class="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
                   <input x-model.number="it.quantity" type="number" min="1" placeholder="Qtd"
-                         class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                  <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="Preço un."
-                         class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                         class="col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+                  <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="0,00"
+                         class="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
                   <button @click="atacadoRemoveItem(i)" x-show="atacadoForm.items.length > 1"
                           class="col-span-1 flex justify-center text-gray-400 hover:text-rose-500" title="Remover">
                     <i data-lucide="x" class="w-4 h-4"></i>
                   </button>
                 </div>
-                <p x-show="measureOnHand(it.measure) !== null" class="text-xs text-emerald-600 mt-1 ml-1"
+                <p x-show="measureOnHand(it.measure) !== null" class="text-xs text-emerald-600 mt-0.5 ml-1"
                    x-text="'✓ ' + measureOnHand(it.measure) + ' em estoque no galpão'"></p>
               </div>
             </template>
+          </div>
+          <!-- novo cliente só-atacado: nome + telefone -->
+          <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-2 gap-2 mb-3">
+            <input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+            <input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
           </div>
           <button @click="atacadoAddItem()"
                   class="text-sm text-brand-600 hover:text-brand-700 font-medium mb-4 inline-flex items-center gap-1">
@@ -1591,61 +1604,74 @@
           </div>
           <p class="text-xs text-gray-500 mb-4 ml-10">Quantas unidades você tem de cada medida. Quando ligado, a venda de atacado dá baixa daqui.</p>
 
-          <!-- adicionar / atualizar uma medida -->
+          <!-- adicionar / atualizar uma medida (MESMOS campos da tabela: medida + unidades) -->
+          <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+            <div class="col-span-6">Medida</div>
+            <div class="col-span-3 text-center">Unidades</div>
+            <div class="col-span-3"></div>
+          </div>
           <div class="grid grid-cols-12 gap-2 items-center mb-2">
-            <input x-model="stockForm.measure" type="text" list="atacado-measures" placeholder="Medida (ex.: 90/90-18)"
-                   class="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="Unidades"
-                   class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <div class="col-span-6 relative">
+              <input x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
+                     type="text" autocomplete="off" placeholder="90/90-18"
+                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <div x-show="measureBox.key === 'estoque' && measureBox.hits.length"
+                   class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+                <template x-for="m in measureBox.hits" :key="m.measure">
+                  <button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)"
+                          class="w-full text-left px-3 py-1.5 text-sm hover:bg-brand-50" x-text="m.measure"></button>
+                </template>
+              </div>
+            </div>
+            <input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="Qtd"
+                   class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
             <button @click="stockSubmit()" :disabled="stockSaving"
-                    class="col-span-4 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">
-              <span x-show="!stockSaving">Salvar medida</span>
-              <span x-show="stockSaving">Salvando…</span>
+                    class="col-span-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">
+              <span x-show="!stockSaving">Salvar</span>
+              <span x-show="stockSaving">…</span>
             </button>
           </div>
           <div x-show="stockMsg" class="mb-3 text-sm px-3 py-2 rounded-lg"
                :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
                x-text="stockMsg ? stockMsg.text : ''"></div>
 
-          <!-- lista do estoque atual -->
+          <!-- lista do estoque atual (cabe ~10 na tela; o resto rola) -->
+          <div class="mb-1">
+            <span class="text-xs font-medium text-gray-500" x-text="atacadoStock.length + ' medida(s) cadastrada(s)'"></span>
+          </div>
           <div class="border border-gray-100 rounded-lg overflow-hidden">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200">
-                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                  <th class="px-4 py-2 font-medium">Medida</th>
-                  <th class="px-4 py-2 font-medium text-center">Unidades</th>
-                  <th class="px-4 py-2 font-medium text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="row in atacadoStock" :key="row.measure">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium" x-text="row.measure"></td>
-                    <td class="px-4 py-2 text-center"
-                        :class="row.quantity_on_hand === 0 ? 'text-rose-500 font-semibold' : ''"
-                        x-text="row.quantity_on_hand"></td>
-                    <td class="px-4 py-2 text-right whitespace-nowrap">
-                      <button @click="stockEdit(row)" class="text-xs text-brand-600 hover:text-brand-700 mr-3">editar</button>
-                      <button @click="stockRemove(row.measure)" class="text-xs text-rose-500 hover:text-rose-600">remover</button>
+            <div class="max-h-[380px] overflow-y-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                  <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                    <th class="px-4 py-2 font-medium">Medida</th>
+                    <th class="px-4 py-2 font-medium text-center">Unidades</th>
+                    <th class="px-4 py-2 font-medium text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="row in atacadoStock" :key="row.measure">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-2 font-medium" x-text="row.measure"></td>
+                      <td class="px-4 py-2 text-center"
+                          :class="row.quantity_on_hand === 0 ? 'text-rose-500 font-semibold' : ''"
+                          x-text="row.quantity_on_hand"></td>
+                      <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <button @click="stockEdit(row)" class="text-xs text-brand-600 hover:text-brand-700 mr-3">editar</button>
+                        <button @click="stockRemove(row.measure)" class="text-xs text-rose-500 hover:text-rose-600">remover</button>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="atacadoStock.length === 0">
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">
+                      Estoque vazio. Cadastre suas medidas acima (ex.: 15 de 90/90-18).
                     </td>
                   </tr>
-                </template>
-                <tr x-show="atacadoStock.length === 0">
-                  <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">
-                    Estoque vazio. Cadastre suas medidas acima (ex.: 15 de 90/90-18).
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-
-        <!-- medidas pro autocomplete (catálogo ∪ estoque do galpão) -->
-        <datalist id="atacado-measures">
-          <template x-for="m in atacadoMeasures" :key="m.measure">
-            <option :value="m.measure"></option>
-          </template>
-        </datalist>
 
         <!-- Ranking de recompra -->
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
