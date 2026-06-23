@@ -89,6 +89,14 @@ const envSchema = z.object({
   // baixa). Default OFF = dormente: a venda registra igual, mas não mexe no estoque —
   // deixa o dono cadastrar o galpão real antes de ligar. Liga quando o estoque for real.
   WHOLESALE_STOCK_DECREMENT: booleanStringSchema,
+  // ATACADO × VAREJO — ESTOQUE ÚNICO (unificação do galpão). O dono é atacadista com UM
+  // galpão físico que vende em dois canais (atacado p/ borracheiro + varejo via bot). Com a
+  // flag ON, quando o bot roteia um cliente pra MATRIZ (slug='main'), ele passa a conferir e
+  // baixar o estoque do GALPÃO (commerce.wholesale_stock, por MEDIDA) em vez da semente
+  // commerce.stock_levels — atacado e varejo saem do MESMO monte. O estoque dos PARCEIROS
+  // (partner_stock_levels) NÃO muda (trava do dono). Default OFF = dormente: matriz lê
+  // stock_levels como hoje. Liga quando o galpão real estiver cadastrado e provado.
+  WHOLESALE_UNIFIED_STOCK: booleanStringSchema,
   // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
   // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
   // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a
