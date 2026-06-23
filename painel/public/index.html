@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260622-atacado-2"></script>
+<script src="/admin/painel/app.js?v=20260622-atacado-3"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260622-atacado-2"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260622-atacado-2" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260622-atacado-3"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260622-atacado-3" />
 
 <script>
   tailwind.config = {
@@ -1496,6 +1496,24 @@
       <!-- ─── ATACADO ─── -->
       <div x-show="vendasTab === 'atacado'" class="space-y-6">
 
+        <!-- Resumo do atacado (Fase 3): faturamento, custo, lucro -->
+        <div x-show="atacadoResumo" class="grid grid-cols-3 gap-3">
+          <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Faturamento</div>
+            <div class="text-base md:text-lg font-bold text-gray-900" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0))"></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Custo</div>
+            <div class="text-base md:text-lg font-bold text-gray-700" x-text="formatCurrency(Number(atacadoResumo?.custo_total || 0))"></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Lucro</div>
+            <div class="text-base md:text-lg font-bold"
+                 :class="Number(atacadoResumo?.lucro_total || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'"
+                 x-text="formatCurrency(Number(atacadoResumo?.lucro_total || 0))"></div>
+          </div>
+        </div>
+
         <!-- Nova venda de atacado -->
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center gap-2 mb-4">
@@ -1556,8 +1574,10 @@
                     <i data-lucide="x" class="w-4 h-4"></i>
                   </button>
                 </div>
-                <p x-show="measureOnHand(it.measure) !== null" class="text-xs text-emerald-600 mt-0.5 ml-1"
-                   x-text="'✓ ' + measureOnHand(it.measure) + ' em estoque no galpão'"></p>
+                <p x-show="measureOnHand(it.measure) !== null || itemProfit(it) !== null" class="text-xs mt-0.5 ml-1 flex flex-wrap gap-x-4">
+                  <span x-show="measureOnHand(it.measure) !== null" class="text-emerald-600" x-text="'✓ ' + measureOnHand(it.measure) + ' em estoque'"></span>
+                  <span x-show="itemProfit(it) !== null" :class="itemProfit(it) >= 0 ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'" x-text="'lucro: ' + formatCurrency(itemProfit(it))"></span>
+                </p>
               </div>
             </template>
           </div>
@@ -1606,12 +1626,13 @@
 
           <!-- adicionar / atualizar uma medida (MESMOS campos da tabela: medida + unidades) -->
           <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-            <div class="col-span-6">Medida</div>
-            <div class="col-span-3 text-center">Unidades</div>
+            <div class="col-span-5">Medida</div>
+            <div class="col-span-2 text-center">Unidades</div>
+            <div class="col-span-2 text-center">Custo R$</div>
             <div class="col-span-3"></div>
           </div>
           <div class="grid grid-cols-12 gap-2 items-center mb-2">
-            <div class="col-span-6 relative">
+            <div class="col-span-5 relative">
               <input x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
                      type="text" autocomplete="off" placeholder="90/90-18"
                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
@@ -1624,7 +1645,9 @@
               </div>
             </div>
             <input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="Qtd"
-                   class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
+                   class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
+            <input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$"
+                   class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
             <button @click="stockSubmit()" :disabled="stockSaving"
                     class="col-span-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">
               <span x-show="!stockSaving">Salvar</span>
@@ -1646,6 +1669,7 @@
                   <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
                     <th class="px-4 py-2 font-medium">Medida</th>
                     <th class="px-4 py-2 font-medium text-center">Unidades</th>
+                    <th class="px-4 py-2 font-medium text-center">Custo R$</th>
                     <th class="px-4 py-2 font-medium text-right">Ações</th>
                   </tr>
                 </thead>
@@ -1656,6 +1680,7 @@
                       <td class="px-4 py-2 text-center"
                           :class="row.quantity_on_hand === 0 ? 'text-rose-500 font-semibold' : ''"
                           x-text="row.quantity_on_hand"></td>
+                      <td class="px-4 py-2 text-center text-gray-600" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
                       <td class="px-4 py-2 text-right whitespace-nowrap">
                         <button @click="stockEdit(row)" class="text-xs text-brand-600 hover:text-brand-700 mr-3">editar</button>
                         <button @click="stockRemove(row.measure)" class="text-xs text-rose-500 hover:text-rose-600">remover</button>
@@ -1663,7 +1688,7 @@
                     </tr>
                   </template>
                   <tr x-show="atacadoStock.length === 0">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">
+                    <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">
                       Estoque vazio. Cadastre suas medidas acima (ex.: 15 de 90/90-18).
                     </td>
                   </tr>

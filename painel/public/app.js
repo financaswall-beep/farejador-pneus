@@ -74,9 +74,10 @@ function painelApp() {
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', quantity_on_hand: '', notes: '' },
+    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' },
     stockSaving: false,
     stockMsg: null,
+    atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
@@ -737,21 +738,24 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking, measures, stock] = await Promise.all([
+        const [buyers, ranking, measures, stock, resumo] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
           this.apiGet('/admin/api/wholesale/stock'),
+          this.apiGet('/admin/api/wholesale/resumo'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
         this.atacadoMeasures = measures.rows || [];
         this.atacadoStock = stock.rows || [];
+        this.atacadoResumo = resumo || null;
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
         this.atacadoMeasures = [];
         this.atacadoStock = [];
+        this.atacadoResumo = null;
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -836,6 +840,19 @@ function painelApp() {
       const row = this.atacadoMeasures.find((x) => x.measure === m);
       return row && row.quantity_on_hand != null ? Number(row.quantity_on_hand) : null;
     },
+    // Custo unitário cadastrado da medida (null = sem estoque/custo). Fase 3.
+    measureCost(measure) {
+      const m = (measure || '').trim();
+      if (!m) return null;
+      const row = this.atacadoMeasures.find((x) => x.measure === m);
+      return row && row.unit_cost != null ? Number(row.unit_cost) : null;
+    },
+    // Lucro estimado de um item da venda = (preço − custo) × qtd. null se a medida não tem custo.
+    itemProfit(it) {
+      const cost = this.measureCost(it.measure);
+      if (cost == null) return null;
+      return (Number(it.unit_price || 0) - cost) * (Number(it.quantity) || 0);
+    },
     // Autocomplete da medida: SÓ filtra quando há texto digitado; mostra no máx 10 que casam.
     measureFind(query, key) {
       const q = (query || '').trim().toLowerCase();
@@ -856,18 +873,21 @@ function painelApp() {
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
+      const cost = Number(this.stockForm.unit_cost) || 0;
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
       if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
+      if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
       this.stockSaving = true;
       this.stockMsg = null;
       try {
         await this.apiPost('/admin/api/wholesale/stock', {
           measure,
           quantity_on_hand: qty,
+          unit_cost: cost,
           notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
         });
-        this.stockMsg = { ok: true, text: `${measure}: ${qty} em estoque.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', notes: '' };
+        this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}.` };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
         await this.loadAtacado();
       } catch (err) {
         this.stockMsg = { ok: false, text: `Não consegui salvar (${err.message}).` };
@@ -876,7 +896,7 @@ function painelApp() {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, notes: row.notes || '' };
+      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', notes: row.notes || '' };
       this.stockMsg = null;
     },
     async stockRemove(measure) {
