@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260622-atacado-3"></script>
+<script src="/admin/painel/app.js?v=20260622-atacado-4"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260622-atacado-3"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260622-atacado-3" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260622-atacado-4"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260622-atacado-4" />
 
 <script>
   tailwind.config = {
@@ -1648,12 +1648,16 @@
                    class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
             <input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$"
                    class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
-            <button @click="stockSubmit()" :disabled="stockSaving"
-                    class="col-span-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">
-              <span x-show="!stockSaving">Salvar</span>
-              <span x-show="stockSaving">…</span>
-            </button>
+            <div class="col-span-3 flex flex-col gap-1">
+              <button @click="stockEntry()" :disabled="stockSaving"
+                      class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium px-2 py-1.5 rounded-lg disabled:opacity-50">
+                <span x-show="!stockSaving">+ Entrada</span><span x-show="stockSaving">…</span>
+              </button>
+              <button @click="stockSubmit()" :disabled="stockSaving"
+                      class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1.5 rounded-lg disabled:opacity-50">Definir</button>
+            </div>
           </div>
+          <p class="text-[11px] text-gray-400 mb-2 px-1"><b class="text-brand-600">+ Entrada</b> soma a compra e atualiza o custo médio. <b>Definir</b> grava direto (inventário inicial ou correção).</p>
           <div x-show="stockMsg" class="mb-3 text-sm px-3 py-2 rounded-lg"
                :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
                x-text="stockMsg ? stockMsg.text : ''"></div>

@@ -899,6 +899,27 @@ function painelApp() {
       this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', notes: row.notes || '' };
       this.stockMsg = null;
     },
+    // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
+    async stockEntry() {
+      const measure = (this.stockForm.measure || '').trim();
+      const qty = Number(this.stockForm.quantity_on_hand);
+      const cost = Number(this.stockForm.unit_cost) || 0;
+      if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
+      if (!Number.isInteger(qty) || qty <= 0) { this.stockMsg = { ok: false, text: 'Quantos pneus entraram?' }; return; }
+      if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
+      this.stockSaving = true;
+      this.stockMsg = null;
+      try {
+        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost });
+        this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
+        await this.loadAtacado();
+      } catch (err) {
+        this.stockMsg = { ok: false, text: `Não consegui registrar a entrada (${err.message}).` };
+      } finally {
+        this.stockSaving = false;
+      }
+    },
     async stockRemove(measure) {
       if (!window.confirm(`Remover ${measure} do estoque do galpão?`)) return;
       try {
