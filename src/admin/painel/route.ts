@@ -22,6 +22,7 @@ import {
   listWholesaleMeasures,
   listWholesaleStock,
   setWholesaleStock,
+  addWholesaleStockEntry,
   deleteWholesaleStock,
   registerManualOrder,
   registerWalkinOrder,
@@ -110,6 +111,13 @@ const setWholesaleStockSchema = z.object({
 const removeWholesaleStockSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
+});
+// Entrada de compra (custo médio): soma quantidade + recalcula o custo médio ponderado.
+const entryWholesaleStockSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  measure: z.string().min(1).max(60),
+  quantity_in: z.number().int().positive().max(1000000),
+  unit_cost: z.number().min(0).max(9999999.99),
 });
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
@@ -328,6 +336,22 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   // Estoque do galpão (uma linha por medida).
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleStock()));
+  });
+
+  // ENTRADA de compra: soma a quantidade e recalcula o custo MÉDIO ponderado da medida.
+  fastify.post('/admin/api/wholesale/stock/entry', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = entryWholesaleStockSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const row = await addWholesaleStockEntry(parsed.data);
+      return reply.status(200).send(row);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale stock entry failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   // Define a quantidade de uma medida (upsert por medida).

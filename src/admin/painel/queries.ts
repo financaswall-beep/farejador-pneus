@@ -1163,6 +1163,34 @@ export async function setWholesaleStock(
   return r.rows[0]!;
 }
 
+/** ENTRADA de compra (custo médio): soma quantity_in ao estoque da medida e recalcula o
+ *  CUSTO MÉDIO PONDERADO — novo = (qty_atual*custo_atual + qty_in*custo_in)/(qty_atual+qty_in).
+ *  É como "a contabilidade bate" comprando a precos diferentes. Atômico no ON CONFLICT
+ *  (usa os valores ANTIGOS da linha no DO UPDATE). Primeira entrada = grava o custo direto. */
+export async function addWholesaleStockEntry(
+  input: { measure: string; quantity_in: number; unit_cost: number; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleStockRow> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const measure = input.measure.trim();
+  if (!measure) throw new Error('measure_required');
+  if (!Number.isInteger(input.quantity_in) || input.quantity_in <= 0) throw new Error('quantity_invalid');
+  if (!(input.unit_cost >= 0)) throw new Error('cost_invalid');
+  const r = await dbPool.query<WholesaleStockRow>(
+    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost)
+          VALUES ($1, $2, $3, $4)
+     ON CONFLICT (environment, measure) DO UPDATE SET
+       unit_cost = round(
+         (commerce.wholesale_stock.quantity_on_hand * commerce.wholesale_stock.unit_cost
+            + EXCLUDED.quantity_on_hand * EXCLUDED.unit_cost)
+         / NULLIF(commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand, 0), 2),
+       quantity_on_hand = commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand
+       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at`,
+    [environment, measure, input.quantity_in, input.unit_cost],
+  );
+  return r.rows[0]!;
+}
+
 /** Remove uma medida do estoque do galpão (ex.: cadastrou errado). */
 export async function deleteWholesaleStock(
   measure: string,
