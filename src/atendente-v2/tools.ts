@@ -28,6 +28,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
+import { getMatrizWholesaleStockMap } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -432,6 +433,14 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        // Unificação atacado×varejo (flag WHOLESALE_UNIFIED_STOCK): o estoque BASE da matriz
+        // vem do GALPÃO (por medida), não da view genérica. Os overrides de loja perto abaixo
+        // mandam por cima — parceiro perto que TEM o pneu ganha (trava do dono). OFF = view, hoje.
+        if (env.WHOLESALE_UNIFIED_STOCK) {
+          const prods = result.flatMap((v) => v.produtos);
+          const galpao = await getMatrizWholesaleStockMap(client, environment, prods.map((p) => p.product_id));
+          for (const p of prods) p.total_stock = galpao.get(p.product_id) ?? 0;
+        }
         // C2: estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM bairro/localização não
         // há loja resolvida → marca precisa_localizacao (furo #4): o bot pede o bairro antes
         // de prometer estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
@@ -507,6 +516,12 @@ export async function executeTool(
           limit: 10,
         });
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        // Unificação atacado×varejo (flag): estoque BASE da matriz vem do GALPÃO (por medida);
+        // os overrides de loja perto abaixo mandam por cima (parceiro que tem ganha). OFF = view, hoje.
+        if (env.WHOLESALE_UNIFIED_STOCK) {
+          const galpao = await getMatrizWholesaleStockMap(client, environment, result.map((p) => p.product_id));
+          for (const p of result) p.total_stock_available = galpao.get(p.product_id) ?? 0;
+        }
         // C2: a busca mostra o estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM
         // bairro/localização não há loja resolvida → o estoque é o da matriz (genérico) e
         // marcamos precisa_localizacao (furo #4): o bot pede o bairro antes de prometer

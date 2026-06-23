@@ -26,6 +26,7 @@ import { upsertPartnerCustomerWithClient } from '../parceiro/queries.js';
 import { logger } from '../shared/logger.js';
 import { env } from '../shared/config/env.js';
 import { rankUnitsByFairnessFromDb } from './fairness.js';
+import { getMatrizWholesaleStockQty } from './wholesale-stock-read.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm } from '../shared/geo/geo-cache.js';
@@ -674,6 +675,12 @@ export async function decideStoreForOrder(
   if (!matriz) throw new Error('Unidade matriz (slug=main) não encontrada');
 
   const matrizHasStock = async (pid: string): Promise<boolean> => {
+    // Unificação atacado×varejo (flag WHOLESALE_UNIFIED_STOCK): a Matriz confere o GALPÃO
+    // do atacado por MEDIDA (commerce.wholesale_stock) em vez da semente stock_levels.
+    // Parceiros (partner_stock_levels) INTOCADOS. Flag OFF = caminho de hoje, byte a byte.
+    if (env.WHOLESALE_UNIFIED_STOCK) {
+      return (await getMatrizWholesaleStockQty(client, environment, pid)) > 0;
+    }
     const r = await client.query<{ q: string }>(
       `SELECT COALESCE(quantity_available, 0)::text AS q
        FROM commerce.stock_levels
