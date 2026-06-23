@@ -1062,12 +1062,21 @@ export async function registerWholesaleSale(
     );
     const orderId = ord.rows[0]!.id;
 
-    // 3. Itens (preço digitado; line_total é gerado pelo banco).
+    // 3. Itens (preço digitado; line_total e line_profit gerados pelo banco). O CUSTO é
+    //    CONGELADO: snapshot do unit_cost do estoque da medida no momento da venda (Fase 3).
+    //    Buscado à PARTE (não como subquery no INSERT — reutilizar $1 env_t lá dava 42P08).
     for (const it of input.items) {
+      const m = it.measure.trim();
+      const costRow = await client.query<{ unit_cost: string }>(
+        `SELECT unit_cost FROM commerce.wholesale_stock
+          WHERE environment = $1 AND measure = $2 LIMIT 1`,
+        [environment, m],
+      );
+      const unitCost = costRow.rows[0]?.unit_cost ?? 0;
       await client.query(
-        `INSERT INTO commerce.wholesale_order_items (environment, order_id, measure, brand, quantity, unit_price)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [environment, orderId, it.measure, it.brand ?? null, it.quantity, it.unit_price],
+        `INSERT INTO commerce.wholesale_order_items (environment, order_id, measure, brand, quantity, unit_price, unit_cost)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [environment, orderId, m, it.brand ?? null, it.quantity, it.unit_price, unitCost],
       );
     }
 
@@ -1108,6 +1117,7 @@ export async function registerWholesaleSale(
 export interface WholesaleStockRow {
   measure: string;
   quantity_on_hand: number;
+  unit_cost: number;
   notes: string | null;
   updated_at: string;
 }
@@ -1118,7 +1128,7 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT measure, quantity_on_hand, notes, updated_at
+    `SELECT measure, quantity_on_hand, unit_cost, notes, updated_at
        FROM commerce.wholesale_stock
       WHERE environment = $1
       ORDER BY measure`,
@@ -1127,9 +1137,9 @@ export async function listWholesaleStock(
   return r.rows;
 }
 
-/** Define a quantidade de uma medida (upsert por medida). quantity_on_hand >= 0. */
+/** Define quantidade + custo unitário de uma medida (upsert por medida). qty/custo >= 0. */
 export async function setWholesaleStock(
-  input: { measure: string; quantity_on_hand: number; notes?: string | null; environment?: 'prod' | 'test' },
+  input: { measure: string; quantity_on_hand: number; unit_cost?: number; notes?: string | null; environment?: 'prod' | 'test' },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
@@ -1138,14 +1148,17 @@ export async function setWholesaleStock(
   if (!Number.isInteger(input.quantity_on_hand) || input.quantity_on_hand < 0) {
     throw new Error('quantity_invalid');
   }
+  const unitCost = input.unit_cost ?? 0;
+  if (!(unitCost >= 0)) throw new Error('cost_invalid');
   const r = await dbPool.query<WholesaleStockRow>(
-    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, notes)
-          VALUES ($1, $2, $3, $4)
+    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost, notes)
+          VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (environment, measure)
      DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand,
+                   unit_cost        = EXCLUDED.unit_cost,
                    notes            = EXCLUDED.notes
-       RETURNING measure, quantity_on_hand, notes, updated_at`,
-    [environment, measure, input.quantity_on_hand, input.notes?.trim() || null],
+       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at`,
+    [environment, measure, input.quantity_on_hand, unitCost, input.notes?.trim() || null],
   );
   return r.rows[0]!;
 }
@@ -1165,16 +1178,17 @@ export async function deleteWholesaleStock(
 export interface WholesaleMeasureRow {
   measure: string;
   quantity_on_hand: number | null; // null = conhecida no catálogo, sem estoque cadastrado
+  unit_cost: number | null;        // custo unitário cadastrado (null = sem estoque)
 }
 
-/** Medidas pro autocomplete da venda: catálogo (tire_specs) ∪ estoque do galpão,
- *  com a quantidade em mãos (null quando a medida só existe no catálogo). */
+/** Medidas pro autocomplete da venda: catálogo (tire_specs) ∪ estoque do galpão, com a
+ *  quantidade em mãos e o custo (null quando a medida só existe no catálogo). */
 export async function listWholesaleMeasures(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleMeasureRow[]> {
   const r = await dbPool.query<WholesaleMeasureRow>(
-    `SELECT m.measure, ws.quantity_on_hand
+    `SELECT m.measure, ws.quantity_on_hand, ws.unit_cost
        FROM (
               SELECT DISTINCT tire_size AS measure
                 FROM commerce.tire_specs
@@ -1188,4 +1202,33 @@ export async function listWholesaleMeasures(
     [environment],
   );
   return r.rows;
+}
+
+// ─── ATACADO (Fase 3): resumo de custo + lucro ───────────────────────────────
+export interface WholesaleResumoRow {
+  faturamento: string;
+  custo_total: string;
+  lucro_total: string;
+  vendas_count: number;
+}
+
+/** Totais do atacado (vendas confirmadas): faturamento, custo e lucro.
+ *  lucro = faturamento − custo (line_profit somado; pode ser negativo se vendeu abaixo). */
+export async function getWholesaleResumo(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleResumoRow> {
+  const r = await dbPool.query<WholesaleResumoRow>(
+    `SELECT
+       COALESCE(SUM(oi.line_total), 0)              AS faturamento,
+       COALESCE(SUM(oi.unit_cost * oi.quantity), 0) AS custo_total,
+       COALESCE(SUM(oi.line_profit), 0)             AS lucro_total,
+       COUNT(DISTINCT o.id)                         AS vendas_count
+       FROM commerce.wholesale_orders o
+       JOIN commerce.wholesale_order_items oi
+         ON oi.order_id = o.id AND oi.environment = o.environment
+      WHERE o.environment = $1 AND o.status = 'confirmed'`,
+    [environment],
+  );
+  return r.rows[0]!;
 }

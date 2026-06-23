@@ -16,6 +16,7 @@ import {
   getPainelRede,
   getRedeFunnel,
   getWholesaleRanking,
+  getWholesaleResumo,
   listPartnerApplications,
   listWholesaleBuyers,
   listWholesaleMeasures,
@@ -103,6 +104,7 @@ const setWholesaleStockSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
   quantity_on_hand: z.number().int().min(0).max(1000000),
+  unit_cost: z.number().min(0).max(9999999.99).optional(),
   notes: z.string().max(1000).nullable().optional(),
 });
 const removeWholesaleStockSchema = z.object({
@@ -313,9 +315,14 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   // ── ATACADO (Fase 2): estoque do galpão por medida + autocomplete de medidas ──
   // Admin-only (dado SÓ da matriz). A baixa na venda é Fase 2b (atrás de flag).
 
-  // Medidas pro autocomplete da venda (catálogo ∪ estoque), com quantidade em mãos.
+  // Medidas pro autocomplete da venda (catálogo ∪ estoque), com quantidade e custo.
   fastify.get('/admin/api/wholesale/measures', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleMeasures()));
+  });
+
+  // Resumo do atacado: faturamento, custo e lucro (Fase 3). Admin-only.
+  fastify.get('/admin/api/wholesale/resumo', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send({ ...dashboardPayload([]), ...(await getWholesaleResumo()) });
   });
 
   // Estoque do galpão (uma linha por medida).
