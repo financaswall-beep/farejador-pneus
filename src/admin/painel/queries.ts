@@ -4,6 +4,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement } from './wholesale-stock.js';
+import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -1120,6 +1121,9 @@ export interface WholesaleStockRow {
   unit_cost: number;
   notes: string | null;
   updated_at: string;
+  tire_width_mm: number | null;
+  tire_aspect_ratio: number | null;
+  tire_rim_diameter: number | null;
 }
 
 /** Lista o estoque do galpão (uma linha por medida), ordenado pela medida. */
@@ -1128,7 +1132,8 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT measure, quantity_on_hand, unit_cost, notes, updated_at
+    `SELECT measure, quantity_on_hand, unit_cost, notes, updated_at,
+            tire_width_mm, tire_aspect_ratio, tire_rim_diameter
        FROM commerce.wholesale_stock
       WHERE environment = $1
       ORDER BY measure`,
@@ -1143,22 +1148,32 @@ export async function setWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const measure = input.measure.trim();
-  if (!measure) throw new Error('measure_required');
+  const raw = input.measure.trim();
+  if (!raw) throw new Error('measure_required');
   if (!Number.isInteger(input.quantity_on_hand) || input.quantity_on_hand < 0) {
     throw new Error('quantity_invalid');
   }
   const unitCost = input.unit_cost ?? 0;
   if (!(unitCost >= 0)) throw new Error('cost_invalid');
+  // Fase 4: casa com o catálogo → grava o formato OFICIAL + os números; recusa fantasma.
+  const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
+  if (!cat) throw new Error('measure_not_in_catalog');
   const r = await dbPool.query<WholesaleStockRow>(
-    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost, notes)
-          VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO commerce.wholesale_stock
+            (environment, measure, quantity_on_hand, unit_cost, notes,
+             tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (environment, measure)
-     DO UPDATE SET quantity_on_hand = EXCLUDED.quantity_on_hand,
-                   unit_cost        = EXCLUDED.unit_cost,
-                   notes            = EXCLUDED.notes
-       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at`,
-    [environment, measure, input.quantity_on_hand, unitCost, input.notes?.trim() || null],
+     DO UPDATE SET quantity_on_hand  = EXCLUDED.quantity_on_hand,
+                   unit_cost         = EXCLUDED.unit_cost,
+                   notes             = EXCLUDED.notes,
+                   tire_width_mm     = EXCLUDED.tire_width_mm,
+                   tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
+                   tire_rim_diameter = EXCLUDED.tire_rim_diameter
+       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at,
+                 tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
+    [environment, cat.measure, input.quantity_on_hand, unitCost, input.notes?.trim() || null,
+     cat.width, cat.aspect, cat.rim],
   );
   return r.rows[0]!;
 }
@@ -1172,21 +1187,30 @@ export async function addWholesaleStockEntry(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const measure = input.measure.trim();
-  if (!measure) throw new Error('measure_required');
+  const raw = input.measure.trim();
+  if (!raw) throw new Error('measure_required');
   if (!Number.isInteger(input.quantity_in) || input.quantity_in <= 0) throw new Error('quantity_invalid');
   if (!(input.unit_cost >= 0)) throw new Error('cost_invalid');
+  // Fase 4: casa com o catálogo → formato OFICIAL + números; recusa fantasma.
+  const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
+  if (!cat) throw new Error('measure_not_in_catalog');
   const r = await dbPool.query<WholesaleStockRow>(
-    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost)
-          VALUES ($1, $2, $3, $4)
+    `INSERT INTO commerce.wholesale_stock
+            (environment, measure, quantity_on_hand, unit_cost,
+             tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (environment, measure) DO UPDATE SET
        unit_cost = round(
          (commerce.wholesale_stock.quantity_on_hand * commerce.wholesale_stock.unit_cost
             + EXCLUDED.quantity_on_hand * EXCLUDED.unit_cost)
          / NULLIF(commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand, 0), 2),
-       quantity_on_hand = commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand
-       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at`,
-    [environment, measure, input.quantity_in, input.unit_cost],
+       quantity_on_hand  = commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand,
+       tire_width_mm     = EXCLUDED.tire_width_mm,
+       tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
+       tire_rim_diameter = EXCLUDED.tire_rim_diameter
+       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at,
+                 tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
+    [environment, cat.measure, input.quantity_in, input.unit_cost, cat.width, cat.aspect, cat.rim],
   );
   return r.rows[0]!;
 }

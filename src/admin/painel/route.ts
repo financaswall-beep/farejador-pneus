@@ -230,6 +230,11 @@ function mapWriteError(err: unknown): { status: number; error: string } {
     return { status: 409, error: 'already_registered' };
   }
 
+  // Validações de escrita do galpão (atacado) — erro do usuário, não 500.
+  if (['measure_not_in_catalog', 'measure_required', 'quantity_invalid', 'cost_invalid'].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
+
   return { status: 500, error: 'internal_server_error' };
 }
 
