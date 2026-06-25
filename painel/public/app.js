@@ -870,6 +870,16 @@ function painelApp() {
       // delay pra o clique numa sugestão (mousedown) acontecer antes de fechar
       setTimeout(() => { this.measureBox = { key: null, hits: [] }; }, 150);
     },
+    // Texto amigável dos erros do cadastro do galpão (Fase 4: medida fora do catálogo).
+    stockErrText(code, acao) {
+      const map = {
+        measure_not_in_catalog: 'Essa medida não está no catálogo. Confira (ex.: 90/90-18) ou peça pra adicionar ao catálogo.',
+        measure_required: 'Diga a medida (ex.: 90/90-18).',
+        quantity_invalid: 'Quantidade inválida.',
+        cost_invalid: 'Custo inválido.',
+      };
+      return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
+    },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
@@ -890,7 +900,7 @@ function painelApp() {
         this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
         await this.loadAtacado();
       } catch (err) {
-        this.stockMsg = { ok: false, text: `Não consegui salvar (${err.message}).` };
+        this.stockMsg = { ok: false, text: this.stockErrText(err.message) };
       } finally {
         this.stockSaving = false;
       }
@@ -915,7 +925,7 @@ function painelApp() {
         this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
         await this.loadAtacado();
       } catch (err) {
-        this.stockMsg = { ok: false, text: `Não consegui registrar a entrada (${err.message}).` };
+        this.stockMsg = { ok: false, text: this.stockErrText(err.message, 'entrada') };
       } finally {
         this.stockSaving = false;
       }
