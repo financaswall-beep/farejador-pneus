@@ -84,7 +84,7 @@ export async function pollAndAttend(): Promise<void> {
       job.conversation_id,
       job.trigger_message_id,
     );
-    if (isStaleTrigger(staleCheck.triggerCreatedAt, staleCheck.latestOutgoingAt)) {
+    if (isStaleTrigger(staleCheck.thisTriggerAt, staleCheck.lastAnsweredTriggerAt)) {
       await markAtendenteJobSuperseded(client, job.id, 'superseded:already_replied_after_trigger');
       await client.query('COMMIT');
       logger.info(
