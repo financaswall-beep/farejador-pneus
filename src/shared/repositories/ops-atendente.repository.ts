@@ -128,34 +128,40 @@ export async function markAtendenteJobSuperseded(
 }
 
 /**
- * Carrega os dois horários que decidem se um job está "requentado": o horário do
- * gatilho (a mensagem que criou o job) e o horário da nossa última resposta
- * (outgoing) na conversa. A comparação fica em isStaleTrigger (testável). Query
- * burra de propósito — dois SELECTs simples, baixo risco.
+ * Carrega os dois horários que decidem se um job está "requentado": o horário do GATILHO
+ * deste job (a mensagem que o criou) e o horário da mensagem MAIS NOVA que o bot JÁ
+ * respondeu na conversa — ou seja, o gatilho do último turn ENTREGUE (agent.turns
+ * status='delivered'; delivered_message_id é coluna morta, não confiar nela). A
+ * comparação fica em isStaleTrigger (testável).
+ *
+ * Revisado 06-27: antes o 2º horário era o da última resposta (outgoing) na conversa, o
+ * que engolia uma pergunta nova quando a saudação saía atrasada (depois dela). Agora é a
+ * mensagem que a resposta DE FATO cobriu, não o relógio. Query burra de propósito, baixo risco.
  */
 export async function loadStaleTriggerCheck(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
   triggerMessageId: string,
-): Promise<{ triggerCreatedAt: Date | null; latestOutgoingAt: Date | null }> {
+): Promise<{ thisTriggerAt: Date | null; lastAnsweredTriggerAt: Date | null }> {
   const result = await client.query<{
-    trigger_created_at: Date | null;
-    latest_outgoing_at: Date | null;
+    this_trigger_at: Date | null;
+    last_answered_trigger_at: Date | null;
   }>(
     `SELECT
-       (SELECT created_at FROM core.messages WHERE id = $3) AS trigger_created_at,
-       (SELECT max(created_at) FROM core.messages
-          WHERE environment = $1
-            AND conversation_id = $2
-            AND is_private = false
-            AND message_type_name = 'outgoing') AS latest_outgoing_at`,
+       (SELECT created_at FROM core.messages WHERE id = $3) AS this_trigger_at,
+       (SELECT max(m.created_at)
+          FROM agent.turns t
+          JOIN core.messages m ON m.id = t.trigger_message_id AND m.environment = t.environment
+         WHERE t.environment = $1
+           AND t.conversation_id = $2
+           AND t.status = 'delivered') AS last_answered_trigger_at`,
     [environment, conversationId, triggerMessageId],
   );
   const row = result.rows[0];
   return {
-    triggerCreatedAt: row?.trigger_created_at ?? null,
-    latestOutgoingAt: row?.latest_outgoing_at ?? null,
+    thisTriggerAt: row?.this_trigger_at ?? null,
+    lastAnsweredTriggerAt: row?.last_answered_trigger_at ?? null,
   };
 }
 
