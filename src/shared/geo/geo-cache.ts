@@ -202,8 +202,9 @@ export async function cachedMatrizRoadInfo(
   if (env.GEO_CACHE) {
     try {
       const hit = (await readMany(client, [key])).get(key) as { km?: number; durationMinutes?: number } | undefined;
-      if (hit && typeof hit.km === 'number') {
-        return { km: hit.km, durationMinutes: hit.durationMinutes ?? null };
+      // Só aceita hit se tiver km E durationMinutes (entries antigas só têm km → re-chama Google).
+      if (hit && typeof hit.km === 'number' && typeof hit.durationMinutes === 'number') {
+        return { km: hit.km, durationMinutes: hit.durationMinutes };
       }
     } catch (err) {
       logger.warn({ err }, 'geo-cache: leitura falhou (segue pro Google)');
