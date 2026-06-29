@@ -29,7 +29,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap, applyMatrizGalpaoDecrement } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -736,7 +736,34 @@ export async function executeTool(
               taxa_instalacao: disp?.installation_fee ?? null,
             });
           } else {
-            // matriz: nenhum parceiro perto tem o pneu pra retirar.
+            // geo.kind === 'matriz': com ROUTING_MATRIZ_AS_STORE a matriz pode estar
+            // no anel de retirada (≤15 km) com estoque — nesse caso ela É a loja.
+            if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK && customerLocation) {
+              const matrizDist = await matrizDistanceKm(client, customerLocation);
+              const MAX_PICKUP_RING_KM = 15;
+              if (matrizDist != null && matrizDist <= MAX_PICKUP_RING_KM) {
+                const allInStock = (
+                  await Promise.all(
+                    productIds.map((id) =>
+                      getMatrizWholesaleStockQty(client, environment, id).then((q) => q >= 1),
+                    ),
+                  )
+                ).every(Boolean);
+                if (allInStock) {
+                  const nameRow = await client.query<{ name: string }>(
+                    `SELECT name FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
+                    [environment],
+                  );
+                  return JSON.stringify({
+                    encontrado: true,
+                    nome_loja: nameRow.rows[0]?.name ?? 'Farejador',
+                    distancia_km: Math.round(matrizDist),
+                    horario: null,
+                    taxa_instalacao: null,
+                  });
+                }
+              }
+            }
             return JSON.stringify({ encontrado: false, motivo: 'sem_loja_com_estoque_perto' });
           }
         }
