@@ -28,7 +28,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockMap, applyMatrizGalpaoDecrement } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -948,6 +948,17 @@ async function insertCommerceOrderMirror(
         `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
          VALUES ($1, $2, $3, $4, $5)`,
         [environment, order.id, item.product_id, item.quantity, item.unit_price],
+      );
+    }
+    // Matriz vende no varejo (!partnerOrderId) → abate o GALPÃO na MESMA transação. Parceiro
+    // NUNCA entra aqui (tem partner_order_id + reserva o próprio partner_stock_levels). Só na
+    // inserção REAL — o caminho de colisão de idempotência (retry) abaixo NÃO baixa de novo.
+    if (!input.partnerOrderId) {
+      await applyMatrizGalpaoDecrement(
+        client,
+        environment,
+        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
+        env.WHOLESALE_MATRIZ_DECREMENT,
       );
     }
     return order;
