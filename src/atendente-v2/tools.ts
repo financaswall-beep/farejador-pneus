@@ -566,11 +566,11 @@ export async function executeTool(
             // mesmo com o galpão cheio e a matriz ao lado do cliente.
             if (!estoqueLojaPerto && env.ROUTING_MATRIZ_AS_STORE) {
               const matrizDist = await matrizDistanceKm(client, customerLocation);
-              // Usa o anel de RETIRADA (15 km) como teto: só marca "loja perto" se o
-              // cliente consegue retirar na matriz. Acima disso, o bot mostra sem_estoque_loja_perto
-              // (honesto: não tem para retirada) e o calcular_frete ainda roteia a entrega.
-              const MAX_PICKUP_RING_KM = 15;
-              if (matrizDist != null && matrizDist <= MAX_PICKUP_RING_KM) {
+              // Usa o anel de ENTREGA (40 km) como teto: a matriz tem o pneu e pode servir
+              // — seja por retirada (≤15 km) ou entrega (≤40 km). O bot decide o que oferecer
+              // com base na distância; aqui só confirmamos que o estoque existe na rede.
+              const MAX_DELIVERY_RING_KM = 40;
+              if (matrizDist != null && matrizDist <= MAX_DELIVERY_RING_KM) {
                 estoqueLojaPerto = result.some((p) => p.total_stock_available > 0);
               }
             }
@@ -739,12 +739,15 @@ export async function executeTool(
               taxa_instalacao: disp?.installation_fee ?? null,
             });
           } else {
-            // geo.kind === 'matriz': com ROUTING_MATRIZ_AS_STORE a matriz pode estar
-            // no anel de retirada (≤15 km) com estoque — nesse caso ela É a loja.
+            // geo.kind === 'matriz': com ROUTING_MATRIZ_AS_STORE verifica se a matriz
+            // tem o pneu e a que distância fica. Três casos:
+            //  ≤15 km → loja de retirada normal (cliente vem aqui)
+            //  15-40 km → retirada_so_longe (cliente decide: vem mesmo assim ou entrega)
+            //  >40 km ou sem estoque → sem_loja_com_estoque_perto
             if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK && customerLocation) {
               const matrizDist = await matrizDistanceKm(client, customerLocation);
-              const MAX_PICKUP_RING_KM = 15;
-              if (matrizDist != null && matrizDist <= MAX_PICKUP_RING_KM) {
+              const MAX_DELIVERY_RING_KM = 40;
+              if (matrizDist != null && matrizDist <= MAX_DELIVERY_RING_KM) {
                 const allInStock = (
                   await Promise.all(
                     productIds.map((id) =>
@@ -757,13 +760,29 @@ export async function executeTool(
                     `SELECT name FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
                     [environment],
                   );
-                  return JSON.stringify({
-                    encontrado: true,
-                    nome_loja: nameRow.rows[0]?.name ?? 'Farejador',
-                    distancia_km: Math.round(matrizDist),
-                    horario: null,
-                    taxa_instalacao: null,
-                  });
+                  const nomeLoja = nameRow.rows[0]?.name ?? 'Farejador';
+                  const MAX_PICKUP_RING_KM = 15;
+                  if (matrizDist <= MAX_PICKUP_RING_KM) {
+                    // Perto: matriz como loja de retirada normal
+                    return JSON.stringify({
+                      encontrado: true,
+                      nome_loja: nomeLoja,
+                      distancia_km: Math.round(matrizDist),
+                      horario: null,
+                      taxa_instalacao: null,
+                    });
+                  } else {
+                    // Longe mas tem o pneu: igual ao only_far dos parceiros — cliente decide
+                    return JSON.stringify({
+                      encontrado: false,
+                      motivo: 'retirada_so_longe',
+                      nome_loja_distante: nomeLoja,
+                      nome_loja: nomeLoja,
+                      distancia_km: Math.round(matrizDist),
+                      horario: null,
+                      taxa_instalacao: null,
+                    });
+                  }
                 }
               }
             }
