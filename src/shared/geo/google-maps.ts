@@ -49,7 +49,7 @@ interface ReverseGeocodeResponse {
 
 interface DistanceMatrixResponse {
   status: string;
-  rows?: Array<{ elements?: Array<{ status: string; distance?: { value: number } }> }>;
+  rows?: Array<{ elements?: Array<{ status: string; distance?: { value: number }; duration?: { value: number } }> }>;
 }
 
 /** GET com timeout. Qualquer falha (HTTP não-ok, abort, parse) → null. Nunca lança. */
@@ -207,4 +207,33 @@ export async function roadDistanceKm(
   return elements.map((el) =>
     el.status === 'OK' && el.distance ? el.distance.value / 1000 : null,
   );
+}
+
+/**
+ * Distância (km) + duração (minutos) de 1 origem para 1 destino.
+ * Usado pela matriz pra mostrar "fica a ~X km, uns Y min de carro".
+ * Degrada elegante: sem chave ou falha → { km: null, durationMinutes: null }.
+ */
+export async function roadDistanceAndDuration(
+  origin: GeoPoint,
+  dest: GeoPoint,
+  apiKey: string | undefined,
+): Promise<{ km: number | null; durationMinutes: number | null }> {
+  if (!apiKey) return { km: null, durationMinutes: null };
+  const params = new URLSearchParams({
+    origins: `${origin.lat},${origin.lng}`,
+    destinations: `${dest.lat},${dest.lng}`,
+    key: apiKey,
+    mode: 'driving',
+    language: 'pt-BR',
+    region: 'br',
+  });
+  const json = (await fetchJson(`${DISTANCE_MATRIX_URL}?${params.toString()}`)) as DistanceMatrixResponse | null;
+  if (!json || json.status !== 'OK') return { km: null, durationMinutes: null };
+  const el = json.rows?.[0]?.elements?.[0];
+  if (!el || el.status !== 'OK') return { km: null, durationMinutes: null };
+  return {
+    km: el.distance ? el.distance.value / 1000 : null,
+    durationMinutes: el.duration ? Math.round(el.duration.value / 60) : null,
+  };
 }

@@ -26,6 +26,8 @@ import type { GeoPoint } from './haversine.js';
 import * as google from './google-maps.js';
 import type { GeocodeResult, ReverseGeocodeResult } from './google-maps.js';
 
+export interface RoadInfo { km: number | null; durationMinutes: number | null }
+
 const TTL = '90 days';
 
 /** 4 casas ≈ 11 m — junta pinos da mesma casa sem misturar vizinhos. */
@@ -183,4 +185,37 @@ export async function cachedRoadDistanceKm(
     }
   }
   return result;
+}
+
+/**
+ * Distância + duração de 1 origem → 1 destino com cache. Usado pela matriz pra
+ * dizer "fica a ~X km, uns Y min de carro". Reutiliza a chave `d:` do cache de
+ * distância mas guarda `{ km, durationMinutes }` em vez de só `{ km }`.
+ */
+export async function cachedMatrizRoadInfo(
+  client: PoolClient,
+  origin: GeoPoint,
+  dest: GeoPoint,
+  apiKey: string | undefined,
+): Promise<RoadInfo> {
+  const key = distanceCacheKey(origin, dest);
+  if (env.GEO_CACHE) {
+    try {
+      const hit = (await readMany(client, [key])).get(key) as { km?: number; durationMinutes?: number } | undefined;
+      if (hit && typeof hit.km === 'number') {
+        return { km: hit.km, durationMinutes: hit.durationMinutes ?? null };
+      }
+    } catch (err) {
+      logger.warn({ err }, 'geo-cache: leitura falhou (segue pro Google)');
+    }
+  }
+  const fresh = await google.roadDistanceAndDuration(origin, dest, apiKey);
+  if (fresh.km != null && env.GEO_CACHE) {
+    try {
+      await writeMany(client, [{ key, kind: 'distance', value: { km: fresh.km, durationMinutes: fresh.durationMinutes } }]);
+    } catch (err) {
+      logger.warn({ err }, 'geo-cache: escrita falhou (ignorada)');
+    }
+  }
+  return fresh;
 }

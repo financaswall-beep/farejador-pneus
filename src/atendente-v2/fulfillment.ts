@@ -29,7 +29,7 @@ import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { getMatrizWholesaleStockQty } from './wholesale-stock-read.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
-import { cachedRoadDistanceKm } from '../shared/geo/geo-cache.js';
+import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
 import {
   filterByModeAndCoverage,
   filterByModeAndRadiusPresence,
@@ -939,6 +939,21 @@ export async function matrizDistanceKm(
   if (!origin) return null;
   const m = await resolveDistances(client, origin, [{ unitId: 'matriz', location: MATRIZ_COORD }]);
   return m.get('matriz') ?? null;
+}
+
+/**
+ * Distância (km) + duração estimada (minutos) de carro do cliente até a MATRIZ.
+ * Usa o Google (via cache) quando disponível; degrada pra haversine sem duração.
+ */
+export async function matrizRoadInfo(
+  client: PoolClient,
+  origin: GeoPoint | null | undefined,
+): Promise<RoadInfo | null> {
+  if (!origin) return null;
+  if (env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY) {
+    return cachedMatrizRoadInfo(client, origin, MATRIZ_COORD, env.GOOGLE_MAPS_API_KEY);
+  }
+  return { km: haversineKm(origin, MATRIZ_COORD), durationMinutes: null };
 }
 
 /**

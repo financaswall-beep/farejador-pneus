@@ -26,6 +26,7 @@ import {
   MATRIZ_MAPS_URL,
   matrizFreightForKm,
   matrizDistanceKm,
+  matrizRoadInfo,
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
@@ -745,9 +746,9 @@ export async function executeTool(
             //  15-40 km → retirada_so_longe (cliente decide: vem mesmo assim ou entrega)
             //  >40 km ou sem estoque → sem_loja_com_estoque_perto
             if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK && customerLocation) {
-              const matrizDist = await matrizDistanceKm(client, customerLocation);
+              const info = await matrizRoadInfo(client, customerLocation);
               const MAX_DELIVERY_RING_KM = 40;
-              if (matrizDist != null && matrizDist <= MAX_DELIVERY_RING_KM) {
+              if (info?.km != null && info.km <= MAX_DELIVERY_RING_KM) {
                 const allInStock = (
                   await Promise.all(
                     productIds.map((id) =>
@@ -762,23 +763,23 @@ export async function executeTool(
                   );
                   const nomeLoja = nameRow.rows[0]?.name ?? 'Farejador';
                   const MAX_PICKUP_RING_KM = 15;
-                  if (matrizDist <= MAX_PICKUP_RING_KM) {
-                    // Perto: matriz como loja de retirada normal
+                  if (info.km <= MAX_PICKUP_RING_KM) {
                     return JSON.stringify({
                       encontrado: true,
                       nome_loja: nomeLoja,
-                      distancia_km: Math.round(matrizDist),
+                      distancia_km: Math.round(info.km),
+                      duracao_minutos: info.durationMinutes,
                       horario: null,
                       taxa_instalacao: null,
                     });
                   } else {
-                    // Longe mas tem o pneu: igual ao only_far dos parceiros — cliente decide
                     return JSON.stringify({
                       encontrado: false,
                       motivo: 'retirada_so_longe',
                       nome_loja_distante: nomeLoja,
                       nome_loja: nomeLoja,
-                      distancia_km: Math.round(matrizDist),
+                      distancia_km: Math.round(info.km),
+                      duracao_minutos: info.durationMinutes,
                       horario: null,
                       taxa_instalacao: null,
                     });
