@@ -97,6 +97,12 @@ const envSchema = z.object({
   // (partner_stock_levels) NÃO muda (trava do dono). Default OFF = dormente: matriz lê
   // stock_levels como hoje. Liga quando o galpão real estiver cadastrado e provado.
   WHOLESALE_UNIFIED_STOCK: booleanStringSchema,
+  // VAREJO DA MATRIZ — BAIXA do galpão. Quando a MATRIZ (slug='main') vende no VAREJO
+  // (balcão ou bot), abate commerce.wholesale_stock por medida (produto→tire_size→tireSizeKey,
+  // clamp em 0: a venda NUNCA trava). É a "outra metade" da unificação (a leitura já existe).
+  // SÓ a matriz; partner_stock_levels JAMAIS é tocado. Default OFF = dormente: a venda registra
+  // mas não mexe no galpão (estado de hoje). Liga quando o estoque real estiver cadastrado e provado.
+  WHOLESALE_MATRIZ_DECREMENT: booleanStringSchema,
   // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
   // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
   // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a

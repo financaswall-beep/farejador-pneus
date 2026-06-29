@@ -5,6 +5,7 @@ import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
+import { applyMatrizGalpaoDecrement } from '../../atendente-v2/wholesale-stock-read.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -621,8 +622,28 @@ export async function registerWalkinOrder(
       input.source_tag,
     ],
   );
+  const orderId = result.rows[0]!.order_id;
 
-  return { order_id: result.rows[0]!.order_id };
+  // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock). Best-effort
+  // FORA da transação SQL (a venda já commitou; a baixa tem clamp em 0 e NUNCA trava). SÓ quando
+  // a unit é a matriz (slug='main'; null no balcão = matriz). Atrás da flag WHOLESALE_MATRIZ_DECREMENT.
+  if (env.WHOLESALE_MATRIZ_DECREMENT) {
+    const m = await dbPool.query<{ id: string }>(
+      `SELECT id FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
+      [environment],
+    );
+    const matrizId = m.rows[0]?.id ?? null;
+    if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
+      await applyMatrizGalpaoDecrement(
+        dbPool as unknown as PoolClient,
+        environment,
+        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
+        true,
+      );
+    }
+  }
+
+  return { order_id: orderId };
 }
 
 export async function cancelManualOrder(
