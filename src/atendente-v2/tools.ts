@@ -566,8 +566,11 @@ export async function executeTool(
             // mesmo com o galpão cheio e a matriz ao lado do cliente.
             if (!estoqueLojaPerto && env.ROUTING_MATRIZ_AS_STORE) {
               const matrizDist = await matrizDistanceKm(client, customerLocation);
-              const MAX_DELIVERY_RING_KM = 40;
-              if (matrizDist != null && matrizDist <= MAX_DELIVERY_RING_KM) {
+              // Usa o anel de RETIRADA (15 km) como teto: só marca "loja perto" se o
+              // cliente consegue retirar na matriz. Acima disso, o bot mostra sem_estoque_loja_perto
+              // (honesto: não tem para retirada) e o calcular_frete ainda roteia a entrega.
+              const MAX_PICKUP_RING_KM = 15;
+              if (matrizDist != null && matrizDist <= MAX_PICKUP_RING_KM) {
                 estoqueLojaPerto = result.some((p) => p.total_stock_available > 0);
               }
             }
