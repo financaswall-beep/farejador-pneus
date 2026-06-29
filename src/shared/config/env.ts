@@ -103,6 +103,13 @@ const envSchema = z.object({
   // SÓ a matriz; partner_stock_levels JAMAIS é tocado. Default OFF = dormente: a venda registra
   // mas não mexe no galpão (estado de hoje). Liga quando o estoque real estiver cadastrado e provado.
   WHOLESALE_MATRIZ_DECREMENT: booleanStringSchema,
+  // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
+  // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
+  // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel
+  // (fairness máxima — zero leads recebidos). Só vence quando nenhum parceiro está no pool
+  // do anel E o galpão tem todos os itens. Requer WHOLESALE_UNIFIED_STOCK on. Default OFF =
+  // matriz segue como backstop passivo (comportamento de hoje). Liga no Coolify após provar ao vivo.
+  ROUTING_MATRIZ_AS_STORE: booleanStringSchema,
   // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
   // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
   // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a

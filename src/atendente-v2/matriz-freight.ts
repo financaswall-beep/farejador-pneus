@@ -16,6 +16,12 @@ import type { GeoPoint } from '../shared/geo/haversine.js';
 export const MATRIZ_COORD: GeoPoint = { lat: -22.8777701, lng: -42.9900824 };
 
 /**
+ * Link do Google Maps do galpão da matriz (Petiti/SG-Maricá) — confirmado pelo dono
+ * 2026-06-27. Usado pelo bot na retirada (Tijolo 3) igual ao maps_url dos parceiros.
+ */
+export const MATRIZ_MAPS_URL = 'https://maps.app.goo.gl/mECGFRkZw2ztpTf17';
+
+/**
  * Frete da MATRIZ por DISTÂNCIA (decisão Wallace 2026-06-19). A matriz é o backstop
  * universal e pode ser puxada pra longe — o frete escala pra não dar prejuízo:
  *   ≤ 15 km → R$ 9,90 · ≤ 25 km → R$ 13,00 · acima de 25 km → R$ 19,00 (última faixa/teto).

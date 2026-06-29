@@ -37,10 +37,10 @@ import {
   ringsForModalidade,
   type GeoRoutingCandidate,
 } from './geo-routing.js';
-import { MATRIZ_COORD, matrizFreightForKm } from './matriz-freight.js';
+import { MATRIZ_COORD, MATRIZ_MAPS_URL, matrizFreightForKm } from './matriz-freight.js';
 // Re-export da lógica pura de frete da Matriz (módulo sem env, testável) — pra quem
 // já importa de fulfillment (tools.ts) não precisar saber do módulo novo.
-export { MATRIZ_COORD, matrizFreightForKm };
+export { MATRIZ_COORD, MATRIZ_MAPS_URL, matrizFreightForKm };
 
 interface RoutedUnitRow {
   partner_unit_id: string;
@@ -1053,6 +1053,30 @@ export async function decideStoreForItemsGeo(
         })),
       },
     };
+  }
+
+  // ROUTING_MATRIZ_AS_STORE: a matriz entra no anel como candidata quando nenhum parceiro
+  // está no pool. Ela NUNCA bate um parceiro no mesmo anel (fairness máxima — zero leads).
+  // Vence sobre 'only_far' quando o galpão tem o pedido E a matriz está dentro do anel.
+  // Requer WHOLESALE_UNIFIED_STOCK on (garante que o galpão é a fonte de estoque da matriz).
+  if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK) {
+    const matrizDist = haversineKm(input.customerLocation, MATRIZ_COORD);
+    if (matrizDist <= Math.max(...rings)) {
+      const allInStock = (
+        await Promise.all(
+          input.items.map((i) =>
+            getMatrizWholesaleStockQty(client, environment, i.product_id).then((q) => q >= i.quantity),
+          ),
+        )
+      ).every(Boolean);
+      if (allInStock) {
+        logger.info(
+          { environment, matrizDistKm: Math.round(matrizDist), modalidade: input.modalidade },
+          'decideStoreForItemsGeo: matriz no anel, vence (nenhum parceiro no pool)',
+        );
+        return { kind: 'matriz' };
+      }
+    }
   }
 
   // caso E — só tem LONGE: existe loja com o pedido completo, mas além do maior anel.

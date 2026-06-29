@@ -23,6 +23,7 @@ import {
   getUnitDisplayById,
   normalizeRegion,
   FRETE_PADRAO_BRL,
+  MATRIZ_MAPS_URL,
   matrizFreightForKm,
   matrizDistanceKm,
   type PartnerOrderRouting,
@@ -1257,6 +1258,20 @@ async function criarPedido(
     respSubtotal = subtotal;
     respFrete = valorFrete;
     respTotal = totalAmount;
+
+    // Tijolo 3 — retirada no galpão da matriz: cartão com link do Maps pro cliente chegar.
+    if (modalidade === 'pickup' && unitId) {
+      const nameRow = await client.query<{ name: string }>(
+        `SELECT name FROM core.units WHERE id = $1 LIMIT 1`,
+        [unitId],
+      );
+      retirada = {
+        nome_loja: nameRow.rows[0]?.name ?? 'Farejador',
+        endereco: null,
+        maps_url: MATRIZ_MAPS_URL,
+        horario: null,
+      };
+    }
 
     logger.info(
       { environment, conversation_id: conversationId, order_id: order.id, order_number: order.order_number },
