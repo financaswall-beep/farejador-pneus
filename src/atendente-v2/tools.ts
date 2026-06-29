@@ -559,6 +559,18 @@ export async function executeTool(
               const a = avail.get(p.product_id);
               if (a) { p.total_stock_available = a.available; estoqueLojaPerto = true; }
             }
+            // ROUTING_MATRIZ_AS_STORE: se nenhum parceiro próximo tem o produto, verifica se a
+            // MATRIZ está no anel de entrega (≤40 km) e se o galpão tem o produto. Nesse caso,
+            // a matriz conta como "loja perto" — total_stock_available já foi setado do galpão
+            // (WHOLESALE_UNIFIED_STOCK, linhas acima). Sem isso o bot diria "sem loja perto"
+            // mesmo com o galpão cheio e a matriz ao lado do cliente.
+            if (!estoqueLojaPerto && env.ROUTING_MATRIZ_AS_STORE) {
+              const matrizDist = await matrizDistanceKm(client, customerLocation);
+              const MAX_DELIVERY_RING_KM = 40;
+              if (matrizDist != null && matrizDist <= MAX_DELIVERY_RING_KM) {
+                estoqueLojaPerto = result.some((p) => p.total_stock_available > 0);
+              }
+            }
             lojaResolvida = true;
           } else if (bairro && municipio) {
             // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
