@@ -950,7 +950,10 @@ export async function matrizRoadInfo(
   origin: GeoPoint | null | undefined,
 ): Promise<RoadInfo | null> {
   if (!origin) return null;
-  if (env.ROUTING_GEO_ROAD_DISTANCE && env.GOOGLE_MAPS_API_KEY) {
+  // Chama o Google sempre que a chave estiver disponível — independente de
+  // ROUTING_GEO_ROAD_DISTANCE (que controla o roteamento, não o display).
+  // A duração em minutos é informação pro cliente, não decisão de rota.
+  if (env.GOOGLE_MAPS_API_KEY) {
     return cachedMatrizRoadInfo(client, origin, MATRIZ_COORD, env.GOOGLE_MAPS_API_KEY);
   }
   return { km: haversineKm(origin, MATRIZ_COORD), durationMinutes: null };
