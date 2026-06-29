@@ -293,6 +293,20 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       }
     }
 
+    // Guarda anti-eco: se o bot está prestes a mandar o MESMO texto que mandou no
+    // turno anterior desta conversa, descarta silenciosamente — o cliente mandou duas
+    // mensagens seguidas e os dois turnos convergiram para a mesma resposta.
+    const lastTurn = await client.query<{ say_text: string }>(
+      `SELECT say_text FROM agent.turns
+       WHERE environment = $1 AND conversation_id = $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [environment, conversationId],
+    );
+    if (lastTurn.rows[0]?.say_text === finalBody) {
+      logger.info(logCtx, 'agent_v2: resposta identica ao turno anterior, descartando (anti-eco)');
+      return;
+    }
+
     await sendMessage(chatwootConvId, finalBody);
 
     // 5. Log turn (com actions pra reconstruir histórico de tool calls)
