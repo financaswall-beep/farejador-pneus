@@ -185,8 +185,18 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // recita o pneu de novo em vez de reconhecer a loja e avançar (conversa 668, 06-16).
     // Permissivo: se o cliente mudou de assunto, manda seguir o cliente (não engessa).
     const locationNudge = buildLocationReplyNudge(lastAssistantText, customerPin != null);
+    // Empurrão de MEDIDA DE PNEU: quando o cliente nomeia uma medida (ex: 90/90-12), o
+    // LLM às vezes responde "Tenho sim" de cabeça sem chamar buscar_produto — prometendo
+    // estoque que não conferiu. Detecta o padrão numérico na última mensagem e injeta
+    // ordem forte pro modelo chamar a ferramenta PRIMEIRO. Regex cobre os formatos reais:
+    // 90/90-12, 130/70-17, 90/90R18, 3.00-10. NUNCA dispara em mensagens sem medida.
+    const TIRE_SIZE_RE = /\d{2,3}[\/\.]\d{2,3}[-\/rR]\d{2}/;
+    const productNudge =
+      latestCustomerText && TIRE_SIZE_RE.test(latestCustomerText)
+        ? '\n\n[MEDIDA DE PNEU DETECTADA] O cliente informou uma medida de pneu na última mensagem. OBRIGATÓRIO: chame buscar_produto com essa medida ANTES de responder. Nunca diga "tenho"/"temos" nem confirme estoque sem o resultado da ferramenta neste turno — responder de memória é PROIBIDO.'
+        : '';
     const systemPromptWithContext =
-      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge;
+      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge + productNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },
