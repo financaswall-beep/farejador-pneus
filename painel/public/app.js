@@ -79,6 +79,13 @@ function painelApp() {
     stockMsg: null,
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
+    // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
+    fornecedores: [],
+    fornecedorRanking: [],
+    compras: [],
+    compraSaving: false,
+    compraMsg: null,
+    compraForm: { supplierKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -738,24 +745,33 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking, measures, stock, resumo] = await Promise.all([
+        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
           this.apiGet('/admin/api/wholesale/stock'),
           this.apiGet('/admin/api/wholesale/resumo'),
+          this.apiGet('/admin/api/wholesale/suppliers'),
+          this.apiGet('/admin/api/wholesale/suppliers/ranking'),
+          this.apiGet('/admin/api/wholesale/purchases'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
         this.atacadoMeasures = measures.rows || [];
         this.atacadoStock = stock.rows || [];
         this.atacadoResumo = resumo || null;
+        this.fornecedores = suppliers.rows || [];
+        this.fornecedorRanking = supRanking.rows || [];
+        this.compras = purchases.rows || [];
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
         this.atacadoMeasures = [];
         this.atacadoStock = [];
         this.atacadoResumo = null;
+        this.fornecedores = [];
+        this.fornecedorRanking = [];
+        this.compras = [];
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -828,6 +844,75 @@ function painelApp() {
         items_required: 'Adicione ao menos um pneu.',
         partner_not_found: 'Parceiro não encontrado.',
         buyer_not_found: 'Cliente não encontrado.',
+      };
+      return map[code] || `Não consegui registrar (${code}).`;
+    },
+
+    // ── ATACADO — FORNECEDORES (0114): compra/entrada com origem ──
+    compraAddItem() {
+      this.compraForm.items.push({ measure: '', brand: '', quantity: 1, unit_cost: '' });
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    compraRemoveItem(i) {
+      if (this.compraForm.items.length > 1) this.compraForm.items.splice(i, 1);
+    },
+    compraFormTotal() {
+      return this.compraForm.items.reduce(
+        (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_cost) || 0), 0,
+      );
+    },
+    fornecedorLastPurchase(s) {
+      if (!s.last_purchase_at) return '—';
+      const d = new Date(s.last_purchase_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+    fornecedorStatus(s) {
+      if (!Number(s.purchases_count)) return { label: 'sem compra', cls: 'bg-amber-50 text-amber-700' };
+      if (s.days_since_last != null && Number(s.days_since_last) > this.atacadoStaleDays)
+        return { label: `parado (${s.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600' };
+      return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700' };
+    },
+    async compraSubmit() {
+      const f = this.compraForm;
+      const body = { items: [], notes: f.notes ? f.notes.trim() : null };
+      if (f.supplierKey === 'new') {
+        if (!f.newName.trim()) { this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' }; return; }
+        body.new_supplier = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
+      } else if (f.supplierKey) {
+        body.supplier_id = f.supplierKey;
+      } else {
+        this.compraMsg = { ok: false, text: 'Escolha o fornecedor.' }; return;
+      }
+      const items = f.items
+        .filter((it) => it.measure && it.measure.trim() && Number(it.quantity) > 0)
+        .map((it) => ({
+          measure: it.measure.trim(),
+          brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
+          quantity: Number(it.quantity),
+          unit_cost: Number(it.unit_cost) || 0,
+        }));
+      if (items.length === 0) { this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
+      body.items = items;
+
+      this.compraSaving = true;
+      this.compraMsg = null;
+      try {
+        const result = await this.apiPost('/admin/api/wholesale/purchases', body);
+        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}. O galpão já recebeu.` };
+        this.compraForm = { supplierKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
+        await this.loadAtacado();
+      } catch (err) {
+        this.compraMsg = { ok: false, text: this.compraErrText(err.message) };
+      } finally {
+        this.compraSaving = false;
+      }
+    },
+    compraErrText(code) {
+      const map = {
+        supplier_required: 'Escolha ou cadastre o fornecedor.',
+        supplier_not_found: 'Fornecedor não encontrado.',
+        items_required: 'Adicione ao menos um pneu.',
+        measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },

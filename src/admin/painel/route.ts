@@ -27,6 +27,11 @@ import {
   registerManualOrder,
   registerWalkinOrder,
   registerWholesaleSale,
+  listWholesaleSuppliers,
+  registerWholesaleSupplier,
+  getWholesaleSupplierRanking,
+  registerWholesalePurchase,
+  listWholesalePurchases,
   rejectPartnerApplication,
   setPartnerUnitDeliveryRadius,
 } from './queries.js';
@@ -119,6 +124,35 @@ const entryWholesaleStockSchema = z.object({
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
 });
+
+// ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.
+const registerSupplierSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  name: z.string().min(1).max(200),
+  phone: z.string().max(40).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+});
+const purchaseItemSchema = z.object({
+  measure: z.string().min(1).max(60),
+  brand: z.string().min(1).max(60).nullable().optional(),
+  quantity: z.number().int().positive().max(100000),
+  unit_cost: z.number().min(0).max(9999999.99),
+});
+const registerPurchaseSchema = z
+  .object({
+    environment: z.enum(['prod', 'test']).optional(),
+    supplier_id: z.string().uuid().nullable().optional(),
+    new_supplier: z
+      .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional() })
+      .nullable()
+      .optional(),
+    items: z.array(purchaseItemSchema).min(1).max(50),
+    purchased_at: z.string().min(1).nullable().optional(),
+    notes: z.string().max(1000).nullable().optional(),
+  })
+  .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
+    message: 'supplier_required',
+  });
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
 const partnerApplicationSchema = z.object({
@@ -231,7 +265,8 @@ function mapWriteError(err: unknown): { status: number; error: string } {
   }
 
   // Validações de escrita do galpão (atacado) — erro do usuário, não 500.
-  if (['measure_not_in_catalog', 'measure_required', 'quantity_invalid', 'cost_invalid'].includes(err.message)) {
+  if (['measure_not_in_catalog', 'measure_required', 'quantity_invalid', 'cost_invalid',
+       'name_required', 'supplier_required', 'supplier_not_found', 'items_required'].includes(err.message)) {
     return { status: 400, error: err.message };
   }
 
@@ -387,6 +422,57 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale stock remove failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ── ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem) ──
+  // Admin-only (dado SÓ da matriz; parceiro sem grant no banco). A compra alimenta
+  // o custo médio do galpão na mesma transação (registerWholesalePurchase).
+
+  // Lista de fornecedores (dropdown do formulário de compra + gestão).
+  fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleSuppliers()));
+  });
+
+  // Cadastra um fornecedor (nome + telefone).
+  fastify.post('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = registerSupplierSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const row = await registerWholesaleSupplier(parsed.data);
+      return reply.status(201).send(row);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale supplier failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // Ranking de fornecedor (quanto comprei de cada / quem sumiu).
+  fastify.get('/admin/api/wholesale/suppliers/ranking', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await getWholesaleSupplierRanking()));
+  });
+
+  // Histórico de compras (cabeçalhos, mais recente primeiro).
+  fastify.get('/admin/api/wholesale/purchases', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesalePurchases()));
+  });
+
+  // Registra uma COMPRA (entrada) → alimenta o custo médio do galpão (mesma transação).
+  fastify.post('/admin/api/wholesale/purchases', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = registerPurchaseSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await registerWholesalePurchase({ ...parsed.data, created_by: operatorLabel(request.headers) });
+      return reply.status(201).send(result);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale purchase failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
