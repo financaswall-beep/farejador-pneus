@@ -107,6 +107,7 @@ function painelApp() {
     liveMenu: [
       { id: 'resumo',   label: 'Resumo',  icon: 'layout-dashboard' },
       { id: 'vendas',   label: 'Vendas',  icon: 'shopping-bag' },
+      { id: 'compras',  label: 'Compras', icon: 'shopping-cart' },
       { id: 'rede',     label: 'Rede',    icon: 'network' },
     ],
 
@@ -116,7 +117,6 @@ function painelApp() {
       { id: 'logistica',    label: 'Logística',     icon: 'truck' },
       { id: 'colaboradores',label: 'Colaboradores', icon: 'users' },
       { id: 'catalogo',     label: 'Catálogo',      icon: 'tag' },
-      { id: 'compras',      label: 'Compras',       icon: 'shopping-cart' },
       { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
     ],
 
@@ -1500,11 +1500,13 @@ function painelApp() {
         this.renderParceiroChart();
       });
 
-      this.$watch('currentPage', () => {
+      this.$watch('currentPage', (page) => {
         this.$nextTick(() => {
           lucide.createIcons();
           this.renderCurrentPageCharts();
         });
+        // Compras é tela própria: carrega fornecedor/compra/ranking ao entrar.
+        if (page === 'compras') void this.loadAtacado();
       });
 
       this.startLiveRefresh();
