@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260630-compras-aba"></script>
+<script src="/admin/painel/app.js?v=20260630-compras-insights"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260630-compras-aba"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260630-compras-aba" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260630-compras-insights"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260630-compras-insights" />
 
 <script>
   tailwind.config = {
@@ -1755,6 +1755,19 @@
         <p class="text-sm text-gray-500 mt-1">De quem você compra pro galpão. Registre a entrada de pneu com o fornecedor — o custo médio do galpão recalcula sozinho.</p>
       </div>
 
+      <!-- Sub-abas: Comprar (registrar entrada) | Fornecedores (lista + insights) -->
+      <div class="inline-flex items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6">
+        <button @click="comprasTab = 'comprar'"
+                :class="comprasTab === 'comprar' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Comprar</button>
+        <button @click="comprasTab = 'fornecedores'; loadAtacado()"
+                :class="comprasTab === 'fornecedores' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Fornecedores</button>
+      </div>
+
+      <!-- ─── COMPRAR: registrar a entrada do galpão ─── -->
+      <div x-show="comprasTab === 'comprar'">
+
       <!-- Registrar compra -->
       <div class="bg-white border border-gray-200 rounded-xl p-5 mb-5">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
@@ -1816,6 +1829,23 @@
              :class="compraMsg && compraMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
              x-text="compraMsg ? compraMsg.text : ''"></div>
       </div>
+      </div><!-- /comprar -->
+
+      <!-- ─── FORNECEDORES: a lista + os insights ─── -->
+      <div x-show="comprasTab === 'fornecedores'" class="space-y-6">
+
+      <!-- Dependência (#4): quanto do total de compras vem do MAIOR fornecedor -->
+      <template x-if="fornecedorDependencia()">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3"
+             :class="fornecedorDependencia().pct >= 60 ? 'border-amber-200 !bg-amber-50' : ''">
+          <i data-lucide="pie-chart" class="w-5 h-5 text-gray-400 flex-shrink-0"></i>
+          <div class="text-sm text-gray-700">
+            <span class="font-semibold" x-text="fornecedorDependencia().pct + '%'"></span>
+            das tuas compras vêm de <span class="font-medium" x-text="fornecedorDependencia().name"></span>.
+            <span x-show="fornecedorDependencia().pct >= 60" class="text-amber-700">⚠️ dependência alta de um fornecedor só.</span>
+          </div>
+        </div>
+      </template>
 
       <!-- Ranking de fornecedor -->
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -1854,6 +1884,48 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Preço por medida (#1 + #2): quem vende cada medida mais barato + especialidade -->
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold">Preço por medida</h3>
+          <span class="text-xs text-gray-400">quem te vende cada medida mais barato · ★ = melhor preço</span>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+              <th class="px-5 py-3 font-medium">Medida</th>
+              <th class="px-5 py-3 font-medium">Fornecedor</th>
+              <th class="px-5 py-3 font-medium text-center">Comprei</th>
+              <th class="px-5 py-3 font-medium text-right">Custo médio</th>
+              <th class="px-5 py-3 font-medium">Última</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="g in breakdownByMeasure()" :key="g.measure">
+              <template x-for="(row, ri) in g.suppliers" :key="g.measure + ':' + row.supplier_id">
+                <tr class="hover:bg-gray-50" :class="row.cheapest ? 'bg-emerald-50/40' : ''">
+                  <td class="px-5 py-3 font-medium align-top" x-text="ri === 0 ? g.measure : ''"></td>
+                  <td class="px-5 py-3">
+                    <span x-show="row.cheapest" class="text-emerald-600 mr-1">★</span>
+                    <span x-text="row.supplier_name"></span>
+                  </td>
+                  <td class="px-5 py-3 text-center text-gray-700" x-text="row.qty_total + ' un'"></td>
+                  <td class="px-5 py-3 text-right font-semibold" :class="row.cheapest ? 'text-emerald-700' : 'text-gray-900'" x-text="formatCurrency(Number(row.avg_cost || 0))"></td>
+                  <td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td>
+                </tr>
+              </template>
+            </template>
+            <tr x-show="fornecedorBreakdown.length === 0">
+              <td colspan="5" class="px-5 py-10 text-center text-sm text-gray-500">
+                Sem compras ainda. Os preços por fornecedor aparecem aqui assim que você registrar entradas.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      </div><!-- /fornecedores -->
     </div>
 
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->

@@ -14,6 +14,7 @@ import {
   registerWholesaleSupplier,
   registerWholesalePurchase,
   getWholesaleSupplierRanking,
+  getWholesaleSupplierMeasureBreakdown,
   listWholesalePurchases,
   listWholesaleStock,
 } from '../src/admin/painel/queries.js';
@@ -80,6 +81,23 @@ async function main(): Promise<void> {
         { supplier_id: sup.id, items: [{ measure: 'LIXO-123', quantity: 1, unit_cost: 5 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
     } catch (e) { rejeitou = (e as Error).message === 'measure_not_in_catalog'; }
     check('6 medida fora do catálogo → rejeita (rollback)', rejeitou);
+
+    // 7. INSIGHT #1/#2 breakdown: SUPPLIER1 na MEASURE = custo médio ponderado 25, 20un
+    const bd1 = (await getWholesaleSupplierMeasureBreakdown(ENV, pool)) as Array<{ supplier_id: string; measure: string; qty_total: string; avg_cost: string }>;
+    const mine1 = bd1.find((r) => r.supplier_id === sup.id && r.measure === MEASURE);
+    check('7 breakdown: custo médio ponderado 25 em 20un', !!mine1 && Number(mine1.avg_cost) === 25 && Number(mine1.qty_total) === 20,
+      mine1 ? `R$${mine1.avg_cost}/${mine1.qty_total}un` : 'não achou');
+
+    // 8. segundo fornecedor MAIS BARATO na mesma medida → tem que vir NA FRENTE (régua do ★)
+    const sup2 = await registerWholesaleSupplier({ name: SUPPLIER + '-B', environment: ENV }, pool);
+    await registerWholesalePurchase(
+      { supplier_id: sup2.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 15 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
+    const bd2 = (await getWholesaleSupplierMeasureBreakdown(ENV, pool)) as Array<{ supplier_id: string; measure: string; avg_cost: string }>;
+    const forMeasure = bd2.filter((r) => r.measure === MEASURE && (r.supplier_id === sup.id || r.supplier_id === sup2.id));
+    check('8 breakdown ordena do mais barato (sup2 R$15 antes do sup1 R$25)',
+      forMeasure.length === 2 && forMeasure[0]!.supplier_id === sup2.id && Number(forMeasure[0]!.avg_cost) === 15
+        && forMeasure[1]!.supplier_id === sup.id && Number(forMeasure[1]!.avg_cost) === 25,
+      forMeasure.map((r) => `R$${r.avg_cost}`).join(' < '));
 
     console.log(`\n${fails === 0 ? '✅ TODOS OS CASOS DE FORNECEDOR PASSARAM' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {

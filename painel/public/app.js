@@ -63,6 +63,7 @@ function painelApp() {
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
     vendasTab: 'varejo',
+    comprasTab: 'comprar', // sub-abas da tela Compras: 'comprar' | 'fornecedores'
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
     atacadoBuyers: [],
     atacadoRanking: [],
@@ -82,6 +83,7 @@ function painelApp() {
     // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
     fornecedores: [],
     fornecedorRanking: [],
+    fornecedorBreakdown: [], // fornecedor × medida (quem vende mais barato / especialidade)
     compras: [],
     compraSaving: false,
     compraMsg: null,
@@ -745,7 +747,7 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases] = await Promise.all([
+        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
@@ -754,6 +756,7 @@ function painelApp() {
           this.apiGet('/admin/api/wholesale/suppliers'),
           this.apiGet('/admin/api/wholesale/suppliers/ranking'),
           this.apiGet('/admin/api/wholesale/purchases'),
+          this.apiGet('/admin/api/wholesale/suppliers/breakdown'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
@@ -763,6 +766,7 @@ function painelApp() {
         this.fornecedores = suppliers.rows || [];
         this.fornecedorRanking = supRanking.rows || [];
         this.compras = purchases.rows || [];
+        this.fornecedorBreakdown = breakdown.rows || [];
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
@@ -772,6 +776,7 @@ function painelApp() {
         this.fornecedores = [];
         this.fornecedorRanking = [];
         this.compras = [];
+        this.fornecedorBreakdown = [];
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -871,6 +876,35 @@ function painelApp() {
       if (s.days_since_last != null && Number(s.days_since_last) > this.atacadoStaleDays)
         return { label: `parado (${s.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700' };
+    },
+    // ── INSIGHTS de fornecedor (0114) — lê só das compras já registradas ──
+    // #4 Dependência: % das compras (R$) que vem do MAIOR fornecedor. >60% acende alerta.
+    fornecedorDependencia() {
+      const tot = this.fornecedorRanking.reduce((s, f) => s + Number(f.total_spent || 0), 0);
+      if (tot <= 0) return null;
+      let topRow = null;
+      for (const f of this.fornecedorRanking) {
+        if (!topRow || Number(f.total_spent || 0) > Number(topRow.total_spent || 0)) topRow = f;
+      }
+      return { pct: Math.round((Number(topRow.total_spent || 0) / tot) * 100), name: topRow.name };
+    },
+    // #1 + #2: agrupa o breakdown por MEDIDA; dentro de cada uma já vem do mais barato
+    // pro mais caro (o banco ordena), então o 1º fornecedor é o "mais barato".
+    breakdownByMeasure() {
+      const groups = [];
+      const byKey = {};
+      for (const row of this.fornecedorBreakdown) {
+        let g = byKey[row.measure];
+        if (!g) { g = { measure: row.measure, suppliers: [], qty: 0 }; byKey[row.measure] = g; groups.push(g); }
+        g.suppliers.push({ ...row, cheapest: g.suppliers.length === 0 });
+        g.qty += Number(row.qty_total || 0);
+      }
+      return groups.sort((a, b) => b.qty - a.qty); // a medida que mais compro primeiro
+    },
+    fornecedorBreakdownDate(row) {
+      if (!row.last_purchased_at) return '—';
+      const d = new Date(row.last_purchased_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
     },
     async compraSubmit() {
       const f = this.compraForm;

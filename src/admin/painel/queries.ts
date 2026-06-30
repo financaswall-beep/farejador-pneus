@@ -1365,6 +1365,38 @@ export async function getWholesaleSupplierRanking(
   return r.rows;
 }
 
+/** Quebra fornecedor × medida: quanto comprei de cada medida de cada fornecedor e o
+ *  custo MÉDIO PONDERADO (sum(line_total)/sum(quantity)). Base dos insights "quem vende
+ *  a medida X mais barato" (#1) e "especialidade do fornecedor" (#2). Read-only, lê só
+ *  das compras confirmadas. Dado SÓ da matriz. Ordena por medida e, dentro dela, do
+ *  mais barato pro mais caro (o front marca o 1º como "mais barato"). */
+export async function getWholesaleSupplierMeasureBreakdown(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<unknown[]> {
+  const r = await dbPool.query(
+    `SELECT
+        s.id                                                       AS supplier_id,
+        s.name                                                     AS supplier_name,
+        pi.measure                                                 AS measure,
+        SUM(pi.quantity)                                           AS qty_total,
+        ROUND(SUM(pi.line_total) / NULLIF(SUM(pi.quantity), 0), 2) AS avg_cost,
+        MAX(p.purchased_at)                                        AS last_purchased_at
+       FROM commerce.wholesale_purchase_items pi
+       JOIN commerce.wholesale_purchases p
+         ON p.id = pi.purchase_id AND p.environment = pi.environment
+       JOIN commerce.wholesale_suppliers s
+         ON s.id = p.supplier_id AND s.environment = p.environment
+      WHERE pi.environment = $1
+        AND p.status = 'confirmed'
+        AND s.deleted_at IS NULL
+      GROUP BY s.id, s.name, pi.measure
+      ORDER BY pi.measure ASC, avg_cost ASC, qty_total DESC`,
+    [environment],
+  );
+  return r.rows;
+}
+
 export interface RegisterWholesalePurchaseInput {
   environment?: 'prod' | 'test';
   supplier_id?: string | null;                                  // ficha existente

@@ -30,6 +30,7 @@ import {
   listWholesaleSuppliers,
   registerWholesaleSupplier,
   getWholesaleSupplierRanking,
+  getWholesaleSupplierMeasureBreakdown,
   registerWholesalePurchase,
   listWholesalePurchases,
   rejectPartnerApplication,
@@ -454,6 +455,11 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   // Ranking de fornecedor (quanto comprei de cada / quem sumiu).
   fastify.get('/admin/api/wholesale/suppliers/ranking', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await getWholesaleSupplierRanking()));
+  });
+
+  // Quebra fornecedor × medida: "quem vende a medida X mais barato" + especialidade.
+  fastify.get('/admin/api/wholesale/suppliers/breakdown', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await getWholesaleSupplierMeasureBreakdown()));
   });
 
   // Histórico de compras (cabeçalhos, mais recente primeiro).
