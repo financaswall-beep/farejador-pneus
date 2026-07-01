@@ -10,6 +10,7 @@ import { sendMessage } from './sender.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
+import { buildDeliveryQuoteFirstNudge } from './delivery-nudge.js';
 import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
@@ -195,8 +196,16 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
       latestCustomerText && TIRE_SIZE_RE.test(latestCustomerText)
         ? '\n\n[MEDIDA DE PNEU DETECTADA] O cliente informou uma medida de pneu na última mensagem. OBRIGATÓRIO: chame buscar_produto com essa medida ANTES de responder. Nunca diga "tenho"/"temos" nem confirme estoque sem o resultado da ferramenta neste turno — responder de memória é PROIBIDO.'
         : '';
+    // Empurrão de ENTREGA-PELO-PINO (furo da conversa #696): quando o cliente escolhe entrega
+    // e já mandou o pino, o bot travava pedindo o endereço escrito só pra COTAR o frete. Com a
+    // flag on (calcular_frete já cota pelo pino), garante o comportamento: cotar primeiro,
+    // endereço por último. Só com a flag on (off = a ordem "chame sem bairro" não teria efeito,
+    // o schema ainda exigiria bairro) e byte a byte de hoje. Ver delivery-nudge.ts.
+    const deliveryNudge = env.DELIVERY_FREIGHT_FROM_PIN
+      ? buildDeliveryQuoteFirstNudge(latestCustomerText, customerPin != null)
+      : '';
     const systemPromptWithContext =
-      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge + productNudge;
+      basePrompt + (customerContext ?? '') + pinNudge + photoNudge + locationNudge + productNudge + deliveryNudge;
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPromptWithContext },

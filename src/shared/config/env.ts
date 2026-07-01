@@ -118,6 +118,18 @@ const envSchema = z.object({
   // do anel E o galpão tem todos os itens. Requer WHOLESALE_UNIFIED_STOCK on. Default OFF =
   // matriz segue como backstop passivo (comportamento de hoje). Liga no Coolify após provar ao vivo.
   ROUTING_MATRIZ_AS_STORE: booleanStringSchema,
+  // FRETE DE ENTREGA PELO PINO — quando o cliente já mandou a localização (pino), o bot
+  // passa a COTAR o frete de entrega direto da coordenada, SEM exigir que ele digite o
+  // endereço só pra cotar. Furo raiz (conversa #696, 07-01): calcular_frete é chaveado no
+  // BAIRRO (resolve_neighborhood), enquanto localizacao_loja e criar_pedido já são
+  // pino-nativos (fillCityFromPin + decideStoreGeoOrFallback) — então a RETIRADA saía do
+  // pino mas a ENTREGA travava pedindo "rua, número e bairro". Com a flag ON: (1) bairro
+  // vira OPCIONAL no schema do calcular_frete e (2) sem bairro + com pino, o handler cota
+  // pela MESMA fonte do criar_pedido (invariante §5.7: cotação == cobrança). O endereço
+  // escrito deixa de ser MURO pra cotar e vira detalhe do fechamento (pro entregador achar
+  // a porta). Só efeito com ROUTING_GEO on + pino. Default OFF = byte a byte de hoje
+  // (calcular_frete continua exigindo bairro). Liga após provar ao vivo.
+  DELIVERY_FREIGHT_FROM_PIN: booleanStringSchema,
   // PUSH (PWA) — notificação nativa do celular pro borracheiro quando cai FOTO ou
   // PEDIDO novo, mesmo com o navegador FECHADO (o "ajudante"/service worker é
   // acordado pelo push do navegador). O som da página (app.foto.js) só toca com a

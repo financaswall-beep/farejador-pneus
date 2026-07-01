@@ -131,15 +131,111 @@ async function decideStoreGeoOrFallback(
   return routing ? { routing } : { routing: null, matrizFreight: matrizFreightForKm(null), matrizDistanceKm: null };
 }
 
+/**
+ * Frete de ENTREGA cotado direto do PINO (flag DELIVERY_FREIGHT_FROM_PIN): quando o cliente
+ * já mandou a localização mas não digitou o bairro, cota pela coordenada em vez de exigir o
+ * endereço escrito. Usa a MESMA fonte do criar_pedido (decideStoreGeoOrFallback) → a cotação
+ * bate com a cobrança (invariante §5.7). Devolve a string JSON pronta pro tool result, ou
+ * `null` se não deu pra cotar pelo pino (sem produto escolhido, sem pino, ou sem cidade
+ * resolvida) — aí o caller degrada pro fluxo de hoje (pede o bairro/localização). Espelha os
+ * mesmos formatos de retorno do enriquecimento por bairro (parceiro fixo / só-longe / matriz
+ * por distância), pra o bot tratar igual.
+ */
+async function quoteFreteFromPin(
+  client: PoolClient,
+  environment: Environment,
+  conversationId: string,
+  produtos: { product_id: string; quantidade?: number }[],
+): Promise<string | null> {
+  // Sem produto escolhido não dá pra decidir a loja (estoque) — logo nem o frete. getRecent
+  // já tenta preencher no caller; se ainda vazio, degrada (o bot pede o pneu antes).
+  if (produtos.length === 0) return null;
+  // Cidade a partir do PINO (fillCityFromPin já exige ROUTING_GEO + chave + pino; sem pino
+  // devolve municipio=null). Sem cidade → não cota pelo pino (deixa pedir a localização).
+  const { municipio } = await fillCityFromPin(client, environment, conversationId, {
+    municipio: null,
+    neighborhoodCanonical: null,
+  });
+  if (!municipio) return null;
+  const decision = await decideStoreGeoOrFallback(client, environment, conversationId, {
+    municipio,
+    items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
+    bairro: undefined,
+  });
+  if (decision.onlyFar) {
+    return JSON.stringify({
+      encontrado: false,
+      disponivel: false,
+      apenas_longe: true,
+      distancia_km: Math.round(decision.onlyFar.distanceKm),
+      nome_loja_distante: decision.onlyFar.unitName,
+      orientacao:
+        'Esse pneu só tem numa loja mais distante. Seja honesto: avise a distância e ofereça opções (entregar mesmo assim / medida equivalente mais perto / reservar e avisar). NÃO finja que é entrega normal.',
+    });
+  }
+  if (decision.routing) {
+    // Entrega por PARCEIRO: frete fixo da rede (mesmo do criar_pedido no caminho parceiro).
+    return JSON.stringify({
+      encontrado: true,
+      disponivel: true,
+      valor: FRETE_PADRAO_BRL.toFixed(2),
+      municipio,
+      delivery_mode: 'delivery',
+      geo_resolution_id: null,
+      via_pino: true,
+    });
+  }
+  if (decision.matrizFreight != null) {
+    // Entrega pela MATRIZ: frete por DISTÂNCIA (mesma tabela por km do criar_pedido).
+    return JSON.stringify({
+      encontrado: true,
+      disponivel: true,
+      valor: decision.matrizFreight.toFixed(2),
+      municipio,
+      distancia_km: decision.matrizDistanceKm != null ? Math.round(decision.matrizDistanceKm) : undefined,
+      delivery_mode: 'delivery',
+      geo_resolution_id: null,
+      via_pino: true,
+    });
+  }
+  return null;
+}
+
 // ─── OpenAI tool schemas ───────────────────────────────────────────────────
 
 /**
  * Definições ATIVAS pro LLM: a tool pedir_foto só aparece com PHOTO_REQUESTS on
  * (flag off = o bot nem sabe que foto existe; o prompt também é condicional).
+ * Com DELIVERY_FREIGHT_FROM_PIN on, o calcular_frete deixa de EXIGIR bairro (o pino
+ * basta pra cotar a entrega) — flag off = schema byte a byte de hoje (bairro required),
+ * preservando o prompt caching das tool defs.
  */
 export function activeToolDefinitions(): ToolDefinition[] {
-  if (env.PHOTO_REQUESTS) return TOOL_DEFINITIONS;
-  return TOOL_DEFINITIONS.filter((t) => t.function.name !== 'pedir_foto');
+  let defs = env.PHOTO_REQUESTS ? TOOL_DEFINITIONS : TOOL_DEFINITIONS.filter((t) => t.function.name !== 'pedir_foto');
+  if (env.DELIVERY_FREIGHT_FROM_PIN) {
+    defs = defs.map((t) => (t.function.name === 'calcular_frete' ? calcularFretePinDef() : t));
+  }
+  return defs;
+}
+
+// Variante do calcular_frete com bairro OPCIONAL (frete pelo pino). Derivada do schema
+// canônico (não duplica propriedades) e memoizada. Lazy: TOOL_DEFINITIONS é declarado
+// depois, então só resolve na 1ª chamada (evita TDZ do const no topo do módulo).
+let _calcularFretePinDef: ToolDefinition | null = null;
+function calcularFretePinDef(): ToolDefinition {
+  if (_calcularFretePinDef) return _calcularFretePinDef;
+  const base = TOOL_DEFINITIONS.find((t) => t.function.name === 'calcular_frete');
+  if (!base) throw new Error('calcular_frete def não encontrada');
+  _calcularFretePinDef = {
+    ...base,
+    function: {
+      ...base.function,
+      description:
+        'Calcula o frete de ENTREGA. Se o cliente JÁ mandou a localização (pino), NÃO precisa de bairro — cota direto da localização; chame SEM bairro. Só informe o bairro se o cliente não mandou o pino.',
+      parameters: { ...base.function.parameters, required: [] },
+    },
+  };
+  return _calcularFretePinDef;
 }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -599,6 +695,30 @@ export async function executeTool(
       }
 
       case 'calcular_frete': {
+        // Memória do produto (furo raiz): se o LLM não passou os produtos, usa o que o
+        // bot já buscou na conversa — pra a cotação rotear pelo MESMO produto do pedido.
+        // Hoisted: serve aos DOIS caminhos (bairro digitado e pino).
+        let produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
+        if (produtos.length === 0) {
+          const ids = await getRecentProductIds(client, conversationId);
+          produtos = ids.map((id) => ({ product_id: id, quantidade: 1 }));
+        }
+        // Frete pelo PINO (flag DELIVERY_FREIGHT_FROM_PIN): o cliente já mandou a localização
+        // e NÃO digitou bairro → cota pela coordenada, sem exigir o endereço escrito só pra
+        // cotar (furo raiz da conversa #696). Só entra SEM bairro (o caminho do bairro
+        // digitado segue byte a byte). Sem pino → devolve "precisa_localizacao" e NÃO chama
+        // calcularFrete com bairro vazio (o zod exige bairro min(1) → daria erro).
+        const bairroArg = typeof args.bairro === 'string' ? args.bairro.trim() : '';
+        if (env.DELIVERY_FREIGHT_FROM_PIN && !bairroArg) {
+          const pinQuote = await quoteFreteFromPin(client, environment, conversationId, produtos);
+          if (pinQuote) return pinQuote;
+          return JSON.stringify({
+            encontrado: false,
+            disponivel: false,
+            motivo: 'precisa_localizacao',
+            orientacao: 'Sem a localização não dá pra cotar o frete: peça o pino 📍 ou o bairro do cliente.',
+          });
+        }
         const result = await calcularFrete(client, {
           environment,
           bairro: args.bairro as string,
@@ -609,13 +729,6 @@ export async function executeTool(
         // com o que o pedido vai cobrar. Com ROUTING_GEO, a decisão é por PROXIMIDADE
         // (anel) e pode devolver "só tem longe" (caso E) → o bot responde com honestidade
         // (D3). decideStoreGeoOrFallback é a fonte única (mesma decisão do criar_pedido).
-        let produtos = (args.produtos as { product_id: string; quantidade?: number }[] | undefined) ?? [];
-        // Memória do produto (furo raiz): se o LLM não passou os produtos, usa o que o
-        // bot já buscou na conversa — pra a cotação rotear pelo MESMO produto do pedido.
-        if (produtos.length === 0) {
-          const ids = await getRecentProductIds(client, conversationId);
-          produtos = ids.map((id) => ({ product_id: id, quantidade: 1 }));
-        }
         if (result.encontrado && result.geo_resolution_id && produtos.length > 0) {
           let municipio = await resolveMunicipioFromGeo(client, environment, result.geo_resolution_id);
           // Pino-first: geo órfão e sem cidade → reverse-geocode do pino preenche. Aditivo.
@@ -650,6 +763,13 @@ export async function executeTool(
           if (decision.matrizFreight != null && result.disponivel) {
             return JSON.stringify({ ...result, valor: decision.matrizFreight.toFixed(2), motivo: undefined });
           }
+        }
+        // Rede de segurança pelo PINO: o cliente digitou um bairro que NÃO resolveu (typo ou
+        // fora do dicionário) mas mandou o pino → cota pela coordenada em vez de devolver
+        // "bairro_nao_encontrado". Só com a flag on; sem pino, degrada pro result de hoje.
+        if (env.DELIVERY_FREIGHT_FROM_PIN && !result.encontrado) {
+          const pinQuote = await quoteFreteFromPin(client, environment, conversationId, produtos);
+          if (pinQuote) return pinQuote;
         }
         return JSON.stringify(result);
       }
