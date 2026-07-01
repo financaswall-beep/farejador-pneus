@@ -64,23 +64,33 @@ async function main(): Promise<void> {
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 5, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV }, pool);
     check('2 venda 5un: galpão 39 → 34', (await stockQty(client)) === 34, `${await stockQty(client)}un`);
 
-    // 3. CLAMP: vende 100 (mais que tem) → galpão vai a 0, NÃO fica negativo, venda registra
-    const v3 = await registerWholesaleSale(
-      { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 100, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV }, pool);
-    check('3 vende 100 (mais que tem): venda registra', Number(v3.total_amount) === 5000, String(v3.total_amount));
-    check('3b CLAMP: galpão vai a 0, não negativo', (await stockQty(client)) === 0, `${await stockQty(client)}un`);
+    // 3. TRAVA DE OVERSELL: vende 100 (tem 34) SEM confirmar → REJEITA e não grava nada (rollback)
+    let travou = false;
+    try {
+      await registerWholesaleSale(
+        { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 100, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV }, pool);
+    } catch (e) { travou = (e as Error).message.startsWith('oversell:'); }
+    check('3 vende 100 sem confirmar: TRAVA (oversell)', travou);
+    check('3b travou SEM tocar no estoque (segue 34)', (await stockQty(client)) === 34, `${await stockQty(client)}un`);
 
-    // 4. FURO: reseta 10un e vende com a medida TORTA ('99 99 99', como se digitasse sem clicar)
+    // 4. CONFIRMANDO (allow_oversell=true): a mesma venda passa → clampa em 0, registra R$5000
+    const v4 = await registerWholesaleSale(
+      { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 100, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV, allow_oversell: true }, pool);
+    check('4 confirmando (allow_oversell): venda registra R$5000', Number(v4.total_amount) === 5000, String(v4.total_amount));
+    check('4b clamp: galpão vai a 0, não negativo', (await stockQty(client)) === 0, `${await stockQty(client)}un`);
+
+    // 5. Medida TORTA ('99 99 99') SEM confirmar: o guard TAMBÉM barra (onHand 0 pra ela) → trava
+    //    em vez de gravar venda com custo 0. De brinde, tampa o furo da medida digitada errada.
     await client.query(`UPDATE commerce.wholesale_stock SET quantity_on_hand=10 WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
-    await registerWholesaleSale(
-      { customer_id: buyerId, items: [{ measure: '99 99 99', quantity: 1, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV }, pool);
-    const furoStock = await stockQty(client);
-    const furoItem = await client.query<{ unit_cost: string }>(
-      `SELECT unit_cost FROM commerce.wholesale_order_items WHERE environment=$1 AND measure=$2 ORDER BY id DESC LIMIT 1`, [ENV, '99 99 99']);
-    check('4 FURO confirmado: medida torta NÃO baixa (galpão fica 10)', furoStock === 10, `${furoStock}un`);
-    check('4b FURO confirmado: custo congelado virou 0 (lucro inflado)', Number(furoItem.rows[0]?.unit_cost) === 0, `custo ${furoItem.rows[0]?.unit_cost}`);
+    let travouTorta = false;
+    try {
+      await registerWholesaleSale(
+        { customer_id: buyerId, items: [{ measure: '99 99 99', quantity: 1, unit_price: 50 }], created_by: 'prova-venda-baixa', environment: ENV }, pool);
+    } catch (e) { travouTorta = (e as Error).message.startsWith('oversell:'); }
+    check('5 medida torta sem confirmar: guard TAMBÉM barra (onHand 0)', travouTorta);
+    check('5b galpão intacto (segue 10)', (await stockQty(client)) === 10, `${await stockQty(client)}un`);
 
-    console.log(`\n${fails === 0 ? '✅ BAIXA DA VENDA DE ATACADO PROVADA (e furo da medida torta confirmado)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    console.log(`\n${fails === 0 ? '✅ TRAVA DE OVERSELL PROVADA (barra sem confirmar, passa com allow_oversell, e ainda tampa a medida torta)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     await client.query(
       `DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN

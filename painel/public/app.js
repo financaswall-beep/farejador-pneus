@@ -576,7 +576,9 @@ function painelApp() {
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || `api_${response.status}`);
+        const e = new Error(payload.error || `api_${response.status}`);
+        e.payload = payload; e.status = response.status; // detalhe do erro (ex.: oversell)
+        throw e;
       }
       return response.json();
     },
@@ -833,7 +835,23 @@ function painelApp() {
       this.atacadoSaving = true;
       this.atacadoMsg = null;
       try {
-        const result = await this.apiPost('/admin/api/wholesale/sales', body);
+        let result;
+        try {
+          result = await this.apiPost('/admin/api/wholesale/sales', body);
+        } catch (err) {
+          // Trava de oversell (409): avisa o que faltou e, se o caixa confirmar, reenvia.
+          if (err.payload && err.payload.error === 'oversell') {
+            const lista = (err.payload.items || [])
+              .map((x) => `${x.measure} (tem ${x.available}, pediu ${x.requested})`).join('; ');
+            if (!window.confirm(`Estoque insuficiente — ${lista}.\n\nVender assim mesmo? O galpão vai a zero nessas medidas.`)) {
+              this.atacadoMsg = { ok: false, text: 'Venda cancelada — sem estoque suficiente.' };
+              return;
+            }
+            result = await this.apiPost('/admin/api/wholesale/sales', { ...body, allow_oversell: true });
+          } else {
+            throw err;
+          }
+        }
         this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}.` };
         this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
         await this.loadAtacado();

@@ -999,6 +999,7 @@ export interface RegisterWholesaleSaleInput {
   sold_at?: string | null;
   notes?: string | null;
   created_by: string;
+  allow_oversell?: boolean; // caixa confirmou vender acima do estoque (avisar+confirmar)
 }
 
 export interface RegisterWholesaleSaleResult {
@@ -1084,17 +1085,43 @@ export async function registerWholesaleSale(
     );
     const orderId = ord.rows[0]!.id;
 
-    // 3. Itens (preço digitado; line_total e line_profit gerados pelo banco). O CUSTO é
-    //    CONGELADO: snapshot do unit_cost do estoque da medida no momento da venda (Fase 3).
-    //    Buscado à PARTE (não como subquery no INSERT — reutilizar $1 env_t lá dava 42P08).
+    // 3. Disponibilidade + custo (com LOCK). Agrega a qtd pedida por medida, lê o estoque
+    //    com FOR UPDATE (trava a linha durante a venda — sem corrida de duas vendas no mesmo
+    //    pneu) e congela o custo (snapshot Fase 3, buscado à parte pra não dar 42P08 no INSERT).
+    const reqByMeasure = new Map<string, number>();
     for (const it of input.items) {
       const m = it.measure.trim();
-      const costRow = await client.query<{ unit_cost: string }>(
-        `SELECT unit_cost FROM commerce.wholesale_stock
-          WHERE environment = $1 AND measure = $2 LIMIT 1`,
+      if (m) reqByMeasure.set(m, (reqByMeasure.get(m) ?? 0) + it.quantity);
+    }
+    const stockByMeasure = new Map<string, { onHand: number; cost: number }>();
+    for (const m of reqByMeasure.keys()) {
+      const s = await client.query<{ quantity_on_hand: string; unit_cost: string | null }>(
+        `SELECT quantity_on_hand, unit_cost FROM commerce.wholesale_stock
+          WHERE environment = $1 AND measure = $2 LIMIT 1 FOR UPDATE`,
         [environment, m],
       );
-      const unitCost = costRow.rows[0]?.unit_cost ?? 0;
+      stockByMeasure.set(m, {
+        onHand: s.rows[0] ? Number(s.rows[0].quantity_on_hand) : 0,
+        cost: s.rows[0]?.unit_cost != null ? Number(s.rows[0].unit_cost) : 0,
+      });
+    }
+
+    // 3a. TRAVA DE OVERSELL: só quando a baixa está ligada (o estoque é fonte de verdade) e
+    //     o caixa NÃO confirmou vender assim mesmo. Aborta com a lista de medidas que estouraram
+    //     (a rota devolve 409 pro front avisar). Agregado por medida (2×30 fura um estoque de 40).
+    if (env.WHOLESALE_STOCK_DECREMENT && !input.allow_oversell) {
+      const short: Array<{ measure: string; available: number; requested: number }> = [];
+      for (const [m, req] of reqByMeasure) {
+        const onHand = stockByMeasure.get(m)?.onHand ?? 0;
+        if (req > onHand) short.push({ measure: m, available: onHand, requested: req });
+      }
+      if (short.length > 0) throw new Error('oversell:' + JSON.stringify(short));
+    }
+
+    // 3b. Itens (preço digitado; line_total/line_profit gerados pelo banco; custo congelado).
+    for (const it of input.items) {
+      const m = it.measure.trim();
+      const unitCost = stockByMeasure.get(m)?.cost ?? 0;
       await client.query(
         `INSERT INTO commerce.wholesale_order_items (environment, order_id, measure, brand, quantity, unit_price, unit_cost)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,

@@ -100,6 +100,7 @@ const registerWholesaleSaleSchema = z
     items: z.array(wholesaleItemSchema).min(1).max(50),
     sold_at: z.string().min(1).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
+    allow_oversell: z.boolean().optional(),
   })
   .refine(
     (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
@@ -355,6 +356,11 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
       const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request.headers) });
       return reply.status(201).send(result);
     } catch (err) {
+      // Oversell: 409 com a lista de medidas que estouraram — o front avisa e reenvia com
+      // allow_oversell se o caixa confirmar vender assim mesmo.
+      if (err instanceof Error && err.message.startsWith('oversell:')) {
+        return reply.status(409).send({ error: 'oversell', items: JSON.parse(err.message.slice(9)) });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale sale failed');
       return reply.status(mapped.status).send({ error: mapped.error });
