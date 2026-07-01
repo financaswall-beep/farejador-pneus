@@ -972,13 +972,22 @@ function painelApp() {
       if (cost == null) return null;
       return (Number(it.unit_price || 0) - cost) * (Number(it.quantity) || 0);
     },
-    // Autocomplete da medida: SÓ filtra quando há texto digitado; mostra no máx 10 que casam.
+    // Autocomplete da medida: casa por TEXTO e por DÍGITOS (ignora / - e espaço — ex.:
+    // "90 90 18" acha "90/90-18"). Campo vazio na VENDA mostra o que TEM no galpão (atalho
+    // pra escolher clicando); no cadastro do galpão (key='estoque') não abre nada vazio.
     measureFind(query, key) {
-      const q = (query || '').trim().toLowerCase();
-      if (!q) { this.measureBox = { key: null, hits: [] }; return; }
-      const hits = this.atacadoMeasures
-        .filter((m) => m.measure.toLowerCase().includes(q))
-        .slice(0, 10);
+      const raw = (query || '').trim().toLowerCase();
+      const digits = (s) => (s || '').replace(/\D/g, ''); // só números: casa qualquer separador
+      const qd = digits(raw);
+      let hits;
+      if (!raw) {
+        hits = key === 'estoque' ? [] : this.atacadoMeasures.filter((m) => Number(m.quantity_on_hand) > 0).slice(0, 12);
+      } else {
+        hits = this.atacadoMeasures.filter((m) => {
+          const mm = m.measure.toLowerCase();
+          return mm.includes(raw) || (qd !== '' && digits(mm).includes(qd));
+        }).slice(0, 12);
+      }
       this.measureBox = { key, hits };
     },
     measurePick(value, obj) {

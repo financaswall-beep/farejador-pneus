@@ -9,10 +9,10 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260630-compras-insights"></script>
+<script src="/admin/painel/app.js?v=20260701-medida-fix"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260630-compras-insights"></script>
-<link rel="stylesheet" href="/admin/painel/style.css?v=20260630-compras-insights" />
+<script defer src="/admin/painel/rede-fallback.js?v=20260701-medida-fix"></script>
+<link rel="stylesheet" href="/admin/painel/style.css?v=20260701-medida-fix" />
 
 <script>
   tailwind.config = {
@@ -1549,7 +1549,7 @@
                   </div>
                   <!-- medida com autocomplete: filtra SÓ ao digitar -->
                   <div class="col-span-3 relative">
-                    <input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @blur="measureBlur()"
+                    <input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()"
                            type="text" autocomplete="off" placeholder="90/90-18"
                            class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
                     <div x-show="measureBox.key === 'v'+i && measureBox.hits.length"
