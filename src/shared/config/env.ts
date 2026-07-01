@@ -103,6 +103,14 @@ const envSchema = z.object({
   // SÓ a matriz; partner_stock_levels JAMAIS é tocado. Default OFF = dormente: a venda registra
   // mas não mexe no galpão (estado de hoje). Liga quando o estoque real estiver cadastrado e provado.
   WHOLESALE_MATRIZ_DECREMENT: booleanStringSchema,
+  // VAREJO DA MATRIZ — TRAVA DE OVERSELL (Camada 1b: o bot/balcão NUNCA prometer/vender além
+  // do galpão). Com a flag ON, antes de registrar a venda no varejo da matriz (bot ou balcão),
+  // confere o galpão por MEDIDA com FOR UPDATE (checkMatrizGalpaoShortfall) e, se faltar, ABORTA
+  // sem gravar — o bot avisa "esse pneu esgotou" e o balcão retorna erro. Espelha a trava do
+  // ATACADO (registerWholesaleSale). Só faz sentido com WHOLESALE_MATRIZ_DECREMENT on (estoque
+  // real sendo mantido); gated por AMBas. Default OFF = dormente: comportamento de hoje (baixa
+  // com clamp em 0, NUNCA trava). Liga junto/depois do DECREMENT, após provar ao vivo.
+  WHOLESALE_MATRIZ_OVERSELL_GUARD: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

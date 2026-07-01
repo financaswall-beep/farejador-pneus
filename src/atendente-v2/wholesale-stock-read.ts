@@ -86,6 +86,83 @@ export async function getMatrizWholesaleStockMap(
   return out;
 }
 
+export interface GalpaoShortfall {
+  measure: string; // rótulo da medida pedida (o que o cliente quer), pra mensagem ao cliente
+  available: number; // soma disponível no galpão pra aquela medida (por chave canônica)
+  requested: number; // quanto o pedido pediu pra aquela medida
+}
+
+/**
+ * Trava de OVERSELL da matriz no VAREJO (bot/balcão) — a "guarda" que faltava pra a matriz
+ * NUNCA prometer/vender além do galpão (Camada 1b). Espelha a trava do ATACADO
+ * (registerWholesaleSale), mas pro caminho do varejo. LÊ o galpão com FOR UPDATE (trava as
+ * linhas até o commit da transação de QUEM CHAMA → sem corrida entre 2 vendas do mesmo pneu)
+ * e devolve as FALTAS (medida, disponível, pedido). Lista vazia = pode vender.
+ *
+ * Mesma régua da leitura/baixa: produto→medida (tire_specs)→chave canônica (tireSizeKey);
+ * soma o galpão por chave. Produto sem medida casável, sem spec, ou medida sem linha no
+ * galpão → disponível 0 (não inventa estoque → vira falta). PURA (recebe client + itens);
+ * DEVE rodar DENTRO da transação da venda (o FOR UPDATE só segura enquanto a transação vive).
+ */
+export async function checkMatrizGalpaoShortfall(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  items: Array<{ productId: string; quantity: number }>,
+): Promise<GalpaoShortfall[]> {
+  // 1. agrega a quantidade pedida por produto
+  const qtyByProduct = new Map<string, number>();
+  for (const it of items) {
+    if (it.quantity > 0) qtyByProduct.set(it.productId, (qtyByProduct.get(it.productId) ?? 0) + it.quantity);
+  }
+  if (qtyByProduct.size === 0) return [];
+
+  // 2. produto → medida (tire_size); agrega a quantidade pedida por CHAVE canônica e guarda
+  //    um rótulo (a medida crua do produto) pra a mensagem ao cliente.
+  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
+    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
+    [environment, [...qtyByProduct.keys()]],
+  );
+  const tireSizeByProduct = new Map<string, string | null>();
+  for (const s of specs.rows) tireSizeByProduct.set(s.product_id, s.tire_size);
+
+  const requestedByKey = new Map<string, number>();
+  const labelByKey = new Map<string, string>();
+  const shortfalls: GalpaoShortfall[] = [];
+  for (const [productId, qty] of qtyByProduct) {
+    const tireSize = tireSizeByProduct.get(productId) ?? null;
+    const key = tireSizeKey(tireSize);
+    if (!key) {
+      // produto sem medida casável (ou sem spec) → não casa NADA no galpão → falta tudo
+      shortfalls.push({ measure: tireSize ?? 'medida não identificada', available: 0, requested: qty });
+      continue;
+    }
+    requestedByKey.set(key, (requestedByKey.get(key) ?? 0) + qty);
+    if (!labelByKey.has(key)) labelByKey.set(key, tireSize ?? key);
+  }
+
+  if (requestedByKey.size === 0) return shortfalls;
+
+  // 3. soma o disponível no galpão por chave — COM FOR UPDATE (trava a corrida até o commit)
+  const stock = await client.query<{ measure: string; quantity_on_hand: number | string }>(
+    `SELECT measure, quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1 FOR UPDATE`,
+    [environment],
+  );
+  const availByKey = new Map<string, number>();
+  for (const row of stock.rows) {
+    const k = tireSizeKey(row.measure);
+    if (k) availByKey.set(k, (availByKey.get(k) ?? 0) + (Number(row.quantity_on_hand) || 0));
+  }
+
+  // 4. compara pedido × disponível por chave → falta quando disponível < pedido
+  for (const [key, requested] of requestedByKey) {
+    const available = availByKey.get(key) ?? 0;
+    if (available < requested) {
+      shortfalls.push({ measure: labelByKey.get(key) ?? key, available, requested });
+    }
+  }
+  return shortfalls;
+}
+
 /**
  * Baixa no GALPÃO da matriz (commerce.wholesale_stock) quando a MATRIZ vende no VAREJO —
  * balcão ou bot. É a "outra metade" da unificação: a leitura já existia, esta é a ESCRITA.

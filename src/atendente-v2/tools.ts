@@ -30,7 +30,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -1297,6 +1297,33 @@ async function criarPedido(
     // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)
     const unitId = await resolveMatrizUnitId(client, environment);
     const idempotencyKey = buildOrderIdempotencyKey(conversationId, unitId, itens, modalidade);
+
+    // Camada 1b — TRAVA DE OVERSELL da matriz no varejo: antes de gravar, confere o galpão por
+    // MEDIDA com FOR UPDATE (MESMA transação do agent → sem corrida) e, se faltar, ABORTA sem
+    // gravar nada (return ANTES do insert → o COMMIT do agent.ts fica vazio). O bot avisa o
+    // cliente em vez de prometer o que não tem. Dormente atrás da flag + exige a baixa ligada
+    // (só trava quando o estoque é real). Só o caminho MATRIZ (partner_order reserva o próprio).
+    if (env.WHOLESALE_MATRIZ_OVERSELL_GUARD && env.WHOLESALE_MATRIZ_DECREMENT) {
+      const faltas = await checkMatrizGalpaoShortfall(
+        client,
+        environment,
+        itens.map((i) => ({ productId: i.product_id, quantity: i.quantidade })),
+      );
+      if (faltas.length > 0) {
+        logger.info(
+          { environment, conversation_id: conversationId, faltas },
+          'agent_v2: pedido barrado por oversell no galpão (matriz)',
+        );
+        return JSON.stringify({
+          erro: 'estoque_insuficiente',
+          estoque_insuficiente: true,
+          faltas: faltas.map((f) => ({ medida: f.measure, disponivel: f.available, pedido: f.requested })),
+          mensagem:
+            'O galpão não tem essa quantidade agora. NÃO feche o pedido: avise o cliente quanto há disponível (ver "faltas") e ofereça ajustar a quantidade ou ver outra medida.',
+        });
+      }
+    }
+
     order = await insertCommerceOrderMirror(client, environment, {
       contactId,
       conversationId,
