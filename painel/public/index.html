@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260702-cancelar"></script>
+<script src="/admin/painel/app.js?v=20260702-varejo-lucro"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1432,22 +1432,53 @@
       <!-- ─── VAREJO ─── -->
       <div x-show="vendasTab === 'varejo'">
 
-      <!-- Totalizadores (reais, da lista carregada) -->
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+      <!-- Totalizadores (0117 — fatia 2): faturamento/custo/lucro com o custo CONGELADO na
+           venda, direto do servidor (sem o limite da lista); recorte Tudo × Esse mês.
+           Sem resumo carregado, faturamento/contagem caem no cálculo local da lista. -->
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs text-gray-500 font-medium">Financeiro do varejo (Matriz)</div>
+        <div class="inline-flex bg-gray-100 rounded-lg p-0.5">
+          <button @click="setVarejoPeriodo('tudo')"
+                  :class="varejoPeriodo === 'tudo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Tudo</button>
+          <button @click="setVarejoPeriodo('mes')"
+                  :class="varejoPeriodo === 'mes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Esse mês</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Vendas no varejo</div>
-          <div class="text-lg font-bold" x-text="vendasVarejoAtivas().length"></div>
+          <div class="text-lg font-bold" x-text="varejoResumo ? Number(varejoResumo.vendas_count || 0) : vendasVarejoAtivas().length"></div>
           <div class="text-xs text-gray-400 mt-1 font-medium">cliente final · Matriz</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Faturado no varejo</div>
-          <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(vendasVarejoTotal())"></div>
+          <div class="text-xs text-gray-500 mb-1">Faturamento</div>
+          <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(varejoResumo ? Number(varejoResumo.faturamento || 0) : vendasVarejoTotal())"></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">Custo (galpão)</div>
+          <div class="text-lg font-bold text-gray-700" x-text="varejoResumo ? formatCurrency(Number(varejoResumo.custo_total || 0)) : '—'"></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">Lucro</div>
+          <div class="text-lg font-bold"
+               :class="Number(varejoResumo?.lucro_total || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'"
+               x-text="varejoResumo ? formatCurrency(Number(varejoResumo.lucro_total || 0)) : '—'"></div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Canceladas</div>
           <div class="text-lg font-bold text-rose-600" x-text="vendasVarejo().filter(p => p.status === 'Cancelado').length"></div>
         </div>
       </div>
+      <!-- Honestidade: item vendido SEM custo congelado (venda antiga, flag desligada ou
+           medida sem custo no galpão) fica FORA do Custo/Lucro acima — avisa, não chuta. -->
+      <div x-show="varejoResumo && Number(varejoResumo.itens_sem_custo || 0) > 0"
+           class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+        <span class="font-semibold" x-text="Number(varejoResumo?.itens_sem_custo || 0)"></span>
+        item(ns) vendido(s) sem custo congelado — o Custo/Lucro acima não conta esses itens.
+      </div>
+      <div class="mb-3"></div>
 
       <!-- Tabela -->
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -1496,7 +1527,18 @@
       <!-- ─── ATACADO ─── -->
       <div x-show="vendasTab === 'atacado'" class="space-y-6">
 
-        <!-- Resumo do atacado (Fase 3): faturamento, custo, lucro -->
+        <!-- Resumo do atacado (Fase 3): faturamento, custo, lucro — recorte Tudo × Esse mês (0117) -->
+        <div x-show="atacadoResumo" class="flex items-center justify-between -mb-3">
+          <div class="text-xs text-gray-500 font-medium">Financeiro do atacado</div>
+          <div class="inline-flex bg-gray-100 rounded-lg p-0.5">
+            <button @click="setAtacadoPeriodo('tudo')"
+                    :class="atacadoPeriodo === 'tudo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                    class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Tudo</button>
+            <button @click="setAtacadoPeriodo('mes')"
+                    :class="atacadoPeriodo === 'mes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
+                    class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Esse mês</button>
+          </div>
+        </div>
         <div x-show="atacadoResumo" class="grid grid-cols-3 gap-3">
           <div class="bg-white border border-gray-200 rounded-xl p-4">
             <div class="text-xs text-gray-500 mb-1">Faturamento</div>

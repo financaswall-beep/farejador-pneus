@@ -5,6 +5,8 @@ import {
   getMatrizWholesaleStockQty,
   getMatrizWholesaleStockMap,
   checkMatrizGalpaoShortfall,
+  getMatrizGalpaoCostByProduct,
+  applyMatrizRetailCostSnapshot,
 } from '../../../src/atendente-v2/wholesale-stock-read.js';
 
 describe('tireSizeKey — chave canônica da medida (a ponte casa formatos diferentes)', () => {
@@ -195,5 +197,100 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
     expect(await checkMatrizGalpaoShortfall(client, 'test', [])).toEqual([]);
     expect(await checkMatrizGalpaoShortfall(client, 'test', [{ productId: 'p1', quantity: 0 }])).toEqual([]);
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('getMatrizGalpaoCostByProduct — custo médio do galpão por produto (0117)', () => {
+  function mockClient(
+    specs: Array<{ product_id: string; tire_size: string | null }>,
+    stockRows: Array<{ measure: string; quantity_on_hand: number; unit_cost: string | null }>,
+  ) {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: specs })
+      .mockResolvedValueOnce({ rows: stockRows });
+    return { client: { query } as unknown as PoolClient, query };
+  }
+
+  it('devolve o unit_cost da medida que casa — inclusive formato diferente', async () => {
+    const { client } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-18' }],
+      [{ measure: '90/90R18', quantity_on_hand: 10, unit_cost: '21.25' }],
+    );
+    const map = await getMatrizGalpaoCostByProduct(client, 'test', ['p1']);
+    expect(map.get('p1')).toBe(21.25);
+  });
+
+  it('duas linhas na mesma chave → vale a de MAIOR quantidade COM custo', async () => {
+    const { client } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-18' }],
+      [
+        { measure: '90/90-18', quantity_on_hand: 2, unit_cost: '50' },
+        { measure: '90/90R18', quantity_on_hand: 30, unit_cost: '20' }, // maior estoque manda
+        { measure: '90/90 - 18', quantity_on_hand: 99, unit_cost: null }, // sem custo não concorre
+      ],
+    );
+    expect((await getMatrizGalpaoCostByProduct(client, 'prod', ['p1'])).get('p1')).toBe(20);
+  });
+
+  it('medida sem custo no galpão → produto fica FORA do mapa (não inventa custo)', async () => {
+    const { client } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-18' }],
+      [{ measure: '90/90-18', quantity_on_hand: 10, unit_cost: null }],
+    );
+    expect((await getMatrizGalpaoCostByProduct(client, 'test', ['p1'])).has('p1')).toBe(false);
+  });
+
+  it('produto sem medida casável → fora do mapa; lista vazia → nem consulta o banco', async () => {
+    const { client } = mockClient([{ product_id: 'p1', tire_size: null }], [
+      { measure: '90/90-18', quantity_on_hand: 10, unit_cost: '21' },
+    ]);
+    expect((await getMatrizGalpaoCostByProduct(client, 'test', ['p1'])).size).toBe(0);
+
+    const query = vi.fn();
+    const empty = { query } as unknown as PoolClient;
+    expect((await getMatrizGalpaoCostByProduct(empty, 'test', [])).size).toBe(0);
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('applyMatrizRetailCostSnapshot — congela o custo na venda do varejo da matriz (0117)', () => {
+  it('flag off → não toca no banco (byte a byte como hoje)', async () => {
+    const query = vi.fn();
+    const client = { query } as unknown as PoolClient;
+    await applyMatrizRetailCostSnapshot(client, 'test', 'oid', [{ productId: 'p1', quantity: 1 }], false);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('flag on → UPDATE só nos itens COM custo, e só onde matriz_unit_cost ainda é NULL', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [
+        { product_id: 'p1', tire_size: '90/90-18' },
+        { product_id: 'p2', tire_size: '150/60-17' }, // medida sem linha no galpão → sem custo
+      ] })
+      .mockResolvedValueOnce({ rows: [{ measure: '90/90R18', quantity_on_hand: 10, unit_cost: '21.25' }] })
+      .mockResolvedValue({ rowCount: 1, rows: [] });
+    const client = { query } as unknown as PoolClient;
+    await applyMatrizRetailCostSnapshot(
+      client, 'test', 'oid-1',
+      [{ productId: 'p1', quantity: 2 }, { productId: 'p2', quantity: 1 }],
+      true,
+    );
+    // 2 leituras (specs + galpão) e UM update (só o p1 tem custo)
+    expect(query).toHaveBeenCalledTimes(3);
+    const [sql, params] = query.mock.calls[2]!;
+    expect(String(sql)).toContain('matriz_unit_cost IS NULL'); // retry não sobrescreve
+    expect(params).toEqual(['test', 'oid-1', 'p1', 21.25]);
+  });
+
+  it('nenhum produto com custo conhecido → nenhum UPDATE', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ product_id: 'p1', tire_size: null }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const client = { query } as unknown as PoolClient;
+    await applyMatrizRetailCostSnapshot(client, 'test', 'oid-2', [{ productId: 'p1', quantity: 1 }], true);
+    expect(query).toHaveBeenCalledTimes(2); // só as leituras
   });
 });

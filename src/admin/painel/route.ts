@@ -17,6 +17,7 @@ import {
   getRedeFunnel,
   getWholesaleRanking,
   getWholesaleResumo,
+  getVarejoResumo,
   listPartnerApplications,
   listWholesaleBuyers,
   listWholesaleMeasures,
@@ -54,6 +55,11 @@ const redeQuerySchema = z.object({
 
 const resumoQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d', 'month']).default('7d'),
+});
+
+// Recorte dos cards financeiros (atacado e varejo da matriz): mês corrente ou desde sempre.
+const financePeriodQuerySchema = z.object({
+  period: z.enum(['mes', 'tudo']).default('tudo'),
 });
 
 // Onboarding de parceiro (Etapa 1). Termos comerciais são definidos pela matriz aqui,
@@ -403,8 +409,18 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   });
 
   // Resumo do atacado: faturamento, custo e lucro (Fase 3). Admin-only.
-  fastify.get('/admin/api/wholesale/resumo', { preHandler: requireAdminAuth }, async (_request, reply) => {
-    return reply.status(200).send({ ...dashboardPayload([]), ...(await getWholesaleResumo()) });
+  fastify.get('/admin/api/wholesale/resumo', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = financePeriodQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    return reply.status(200).send({ ...dashboardPayload([]), ...(await getWholesaleResumo(undefined, undefined, parsed.data.period)) });
+  });
+
+  // VAREJO da matriz (0117 — fatia 2): faturamento/custo/lucro com o custo CONGELADO na
+  // venda, com recorte por mês. Mesma régua do card da aba Vendas (unit 'main', cancelado fora).
+  fastify.get('/admin/api/varejo/resumo', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = financePeriodQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    return reply.status(200).send({ ...dashboardPayload([]), ...(await getVarejoResumo(parsed.data.period)) });
   });
 
   // Estoque do galpão (uma linha por medida).

@@ -30,7 +30,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -1142,6 +1142,16 @@ async function insertCommerceOrderMirror(
         environment,
         input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
         env.WHOLESALE_MATRIZ_DECREMENT,
+      );
+      // Fatia 2 (0117): CONGELA o custo médio do galpão nos itens da venda da matriz —
+      // o lucro desta venda não muda quando o custo médio mudar depois. Mesma transação
+      // (rollback desfaz venda + retrato juntos). Item sem custo no galpão fica NULL.
+      await applyMatrizRetailCostSnapshot(
+        client,
+        environment,
+        order.id,
+        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
+        env.WHOLESALE_MATRIZ_RETAIL_COST,
       );
     }
     return order;

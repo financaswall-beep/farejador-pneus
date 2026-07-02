@@ -120,6 +120,13 @@ const envSchema = z.object({
   // PARCEIRO). Default OFF = dormente: tudo nasce 'paid' como hoje, endpoint devolve
   // enabled:false e a UI se esconde. Liga no Coolify quando o dono quiser operar fiado.
   WHOLESALE_FINANCE: booleanStringSchema,
+  // VAREJO DA MATRIZ — CUSTO CONGELADO (fatia 2 do financeiro, 0117): com a flag ON, a
+  // venda do varejo da matriz (bot, balcão walk-in e registro manual que cai na 'main')
+  // FOTOGRAFA o custo médio do galpão nos itens (order_items.matriz_unit_cost) — o lucro
+  // da venda não muda quando o custo médio mudar depois (mesmo desenho do atacado/0112).
+  // Item sem custo no galpão fica NULL e o resumo conta à parte (não chuta). Default OFF =
+  // dormente: nada é gravado (byte a byte como hoje). Liga no Coolify pós-prova ao vivo.
+  WHOLESALE_MATRIZ_RETAIL_COST: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

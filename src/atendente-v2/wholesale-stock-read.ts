@@ -221,3 +221,74 @@ export async function applyMatrizGalpaoDecrement(
     done.add(key);
   }
 }
+
+/**
+ * Custo médio do GALPÃO por produto (0117) — a MESMA ponte produto→medida→galpão da
+ * leitura/baixa (tire_specs → tireSizeKey → wholesale_stock), devolvendo o unit_cost
+ * (custo MÉDIO ponderado, mantido pelas entradas) em vez da quantidade. Entre linhas que
+ * casam a mesma chave vale a de MAIOR quantity_on_hand COM custo preenchido
+ * (determinístico; na prática o galpão tem uma linha por medida desde a 0113).
+ * Produto sem medida casável, sem spec, ou medida sem custo → fica FORA do mapa
+ * (não inventa custo — o chamador trata ausência como "sem custo congelado").
+ */
+export async function getMatrizGalpaoCostByProduct(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (productIds.length === 0) return out;
+
+  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
+    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
+    [environment, productIds],
+  );
+  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: string | null }>(
+    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
+    [environment],
+  );
+
+  const bestByKey = new Map<string, { qty: number; cost: number }>();
+  for (const row of stock.rows) {
+    const key = tireSizeKey(row.measure);
+    if (!key || row.unit_cost === null || row.unit_cost === undefined) continue;
+    const qty = Number(row.quantity_on_hand) || 0;
+    const cur = bestByKey.get(key);
+    if (!cur || qty > cur.qty) bestByKey.set(key, { qty, cost: Number(row.unit_cost) });
+  }
+  for (const s of specs.rows) {
+    const key = tireSizeKey(s.tire_size);
+    const best = key ? bestByKey.get(key) : undefined;
+    if (best) out.set(s.product_id, best.cost);
+  }
+  return out;
+}
+
+/**
+ * CONGELA o custo do galpão nos itens de uma venda do VAREJO da MATRIZ (0117) — o espelho,
+ * no varejo, do snapshot que o ATACADO já faz (unit_cost em wholesale_order_items): o custo
+ * médio pode mudar amanhã, mas o lucro DESTA venda fica gravado pra sempre. Escreve
+ * commerce.order_items.matriz_unit_cost SÓ onde está NULL (retry/idempotência não
+ * sobrescreve) e SÓ pros produtos com custo conhecido — item sem custo fica NULL e o
+ * resumo conta como "sem custo" (honestidade > chute). ⚠️ SÓ a MATRIZ chama isto (quem
+ * chama decide; parceiro JAMAIS passa aqui). `enabled` = flag por parâmetro (testável).
+ */
+export async function applyMatrizRetailCostSnapshot(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  orderId: string,
+  items: Array<{ productId: string; quantity: number }>,
+  enabled: boolean,
+): Promise<void> {
+  if (!enabled || items.length === 0) return;
+  const productIds = [...new Set(items.filter((i) => i.quantity > 0).map((i) => i.productId))];
+  const costByProduct = await getMatrizGalpaoCostByProduct(client, environment, productIds);
+  for (const [productId, cost] of costByProduct) {
+    await client.query(
+      `UPDATE commerce.order_items
+          SET matriz_unit_cost = $4
+        WHERE environment = $1 AND order_id = $2 AND product_id = $3 AND matriz_unit_cost IS NULL`,
+      [environment, orderId, productId, cost],
+    );
+  }
+}

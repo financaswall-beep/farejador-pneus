@@ -79,6 +79,10 @@ function painelApp() {
     stockSaving: false,
     stockMsg: null,
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
+    atacadoPeriodo: 'tudo', // recorte do card do atacado: 'tudo' | 'mes' (0117)
+    // ── VAREJO da matriz (0117 — fatia 2): resumo com custo CONGELADO na venda ──
+    varejoResumo: null, // null = ainda não carregou (cards caem no cálculo da lista)
+    varejoPeriodo: 'tudo',
     // FINANCEIRO do atacado (0115, flag WHOLESALE_FINANCE): fiado a receber/a pagar.
     // null = flag off (a UI inteira do financeiro se esconde sozinha).
     atacadoFinance: null,
@@ -744,6 +748,28 @@ function painelApp() {
     vendasVarejoTotal() {
       return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
     },
+    // Resumo do varejo com custo CONGELADO na venda (0117): faturamento/custo/lucro vêm do
+    // SERVIDOR (mesma régua da lista — unit 'main', cancelado fora — mas sem o limite de
+    // linhas dela). A lista continua alimentando a tabela; o resumo alimenta os CARDS.
+    async loadVarejoResumo() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      try {
+        this.varejoResumo = (await this.apiGet('/admin/api/varejo/resumo?period=' + this.varejoPeriodo)) || null;
+      } catch (err) {
+        this.varejoResumo = null; // cards caem no cálculo local da lista (fallback honesto)
+      }
+    },
+    async setVarejoPeriodo(p) {
+      this.varejoPeriodo = p;
+      await this.loadVarejoResumo();
+    },
+    async setAtacadoPeriodo(p) {
+      this.atacadoPeriodo = p;
+      try {
+        this.atacadoResumo = (await this.apiGet('/admin/api/wholesale/resumo?period=' + p)) || null;
+      } catch (err) { /* mantém o resumo anterior na tela */ }
+    },
 
     // ── ATACADO (Fase 1) — venda pro borracheiro + ranking de recompra ──
     atacadoBuyerKey(b) {
@@ -759,7 +785,7 @@ function painelApp() {
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
           this.apiGet('/admin/api/wholesale/stock'),
-          this.apiGet('/admin/api/wholesale/resumo'),
+          this.apiGet('/admin/api/wholesale/resumo?period=' + this.atacadoPeriodo),
           this.apiGet('/admin/api/wholesale/suppliers'),
           this.apiGet('/admin/api/wholesale/suppliers/ranking'),
           this.apiGet('/admin/api/wholesale/purchases'),
@@ -1433,6 +1459,7 @@ function painelApp() {
 
         this.saleModalOpen = false;
         await this.loadRealData();
+        void this.loadVarejoResumo(); // venda nova entra nos cards do varejo (0117)
       } catch (err) {
         this.orderError = err instanceof Error ? err.message : String(err);
       } finally {
@@ -1631,6 +1658,8 @@ function painelApp() {
         });
         // Compras é tela própria: carrega fornecedor/compra/ranking ao entrar.
         if (page === 'compras') void this.loadAtacado();
+        // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.
+        if (page === 'vendas') void this.loadVarejoResumo();
       });
 
       this.startLiveRefresh();

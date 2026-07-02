@@ -5,7 +5,7 @@ import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
-import { applyMatrizGalpaoDecrement } from '../../atendente-v2/wholesale-stock-read.js';
+import { applyMatrizGalpaoDecrement, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -592,8 +592,29 @@ export async function registerManualOrder(
       input.source_tag ?? null,
     ],
   );
+  const orderId = result.rows[0]!.order_id;
 
-  return { order_id: result.rows[0]!.order_id };
+  // Venda MANUAL que cai na MATRIZ (unit vazia → 'main' dentro da função SQL) também congela
+  // o custo do galpão nos itens (0117). NÃO baixa estoque aqui (comportamento de hoje: só
+  // walk-in e bot baixam) — este é só o retrato do custo pro lucro do varejo sair certo.
+  if (env.WHOLESALE_MATRIZ_RETAIL_COST) {
+    const m = await dbPool.query<{ id: string }>(
+      `SELECT id FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
+      [environment],
+    );
+    const matrizId = m.rows[0]?.id ?? null;
+    if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
+      await applyMatrizRetailCostSnapshot(
+        dbPool as unknown as PoolClient,
+        environment,
+        orderId,
+        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
+        true,
+      );
+    }
+  }
+
+  return { order_id: orderId };
 }
 
 export async function registerWalkinOrder(
@@ -624,21 +645,31 @@ export async function registerWalkinOrder(
   );
   const orderId = result.rows[0]!.order_id;
 
-  // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock). Best-effort
-  // FORA da transação SQL (a venda já commitou; a baixa tem clamp em 0 e NUNCA trava). SÓ quando
-  // a unit é a matriz (slug='main'; null no balcão = matriz). Atrás da flag WHOLESALE_MATRIZ_DECREMENT.
-  if (env.WHOLESALE_MATRIZ_DECREMENT) {
+  // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock) e CONGELA
+  // o custo médio nos itens (0117 — fatia 2: lucro real do varejo). Best-effort FORA da
+  // transação SQL (a venda já commitou; a baixa tem clamp em 0 e NUNCA trava; item sem custo
+  // fica NULL). SÓ quando a unit é a matriz (slug='main'; null no balcão = matriz). Cada
+  // efeito atrás da própria flag (WHOLESALE_MATRIZ_DECREMENT / WHOLESALE_MATRIZ_RETAIL_COST).
+  if (env.WHOLESALE_MATRIZ_DECREMENT || env.WHOLESALE_MATRIZ_RETAIL_COST) {
     const m = await dbPool.query<{ id: string }>(
       `SELECT id FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
       [environment],
     );
     const matrizId = m.rows[0]?.id ?? null;
     if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
+      const items = input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity }));
       await applyMatrizGalpaoDecrement(
         dbPool as unknown as PoolClient,
         environment,
-        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
-        true,
+        items,
+        env.WHOLESALE_MATRIZ_DECREMENT,
+      );
+      await applyMatrizRetailCostSnapshot(
+        dbPool as unknown as PoolClient,
+        environment,
+        orderId,
+        items,
+        env.WHOLESALE_MATRIZ_RETAIL_COST,
       );
     }
   }
@@ -1323,11 +1354,16 @@ export interface WholesaleResumoRow {
 }
 
 /** Totais do atacado (vendas confirmadas): faturamento, custo e lucro.
- *  lucro = faturamento − custo (line_profit somado; pode ser negativo se vendeu abaixo). */
+ *  lucro = faturamento − custo (line_profit somado; pode ser negativo se vendeu abaixo).
+ *  `period` 'mes' = só o mês corrente (fuso America/Sao_Paulo); 'tudo' = desde sempre. */
 export async function getWholesaleResumo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
+  period: 'mes' | 'tudo' = 'tudo',
 ): Promise<WholesaleResumoRow> {
+  const periodWhere = period === 'mes'
+    ? `AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`
+    : '';
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
        COALESCE(SUM(oi.line_total), 0)              AS faturamento,
@@ -1337,7 +1373,50 @@ export async function getWholesaleResumo(
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_order_items oi
          ON oi.order_id = o.id AND oi.environment = o.environment
-      WHERE o.environment = $1 AND o.status = 'confirmed'`,
+      WHERE o.environment = $1 AND o.status = 'confirmed' ${periodWhere}`,
+    [environment],
+  );
+  return r.rows[0]!;
+}
+
+// ─── VAREJO DA MATRIZ (0117 — fatia 2): resumo com custo CONGELADO + recorte por mês ─
+export interface VarejoResumoRow {
+  faturamento: string;
+  custo_total: string;
+  lucro_total: string;
+  vendas_count: number;
+  itens_sem_custo: number;
+}
+
+/** Totais do VAREJO da matriz (pedidos da unit 'main', cancelado fora) com o custo
+ *  congelado na venda (order_items.matriz_unit_cost). Honestidade: custo e lucro só
+ *  somam linhas COM custo congelado; `itens_sem_custo` conta as que ficaram de fora
+ *  (venda antiga, flag off, medida sem custo no galpão) pra UI avisar em vez de chutar.
+ *  A régua de "venda do varejo" é a MESMA do card/tabela da aba Vendas (unit slug='main'
+ *  e não-cancelado) — o resumo nunca diverge da lista. */
+export async function getVarejoResumo(
+  period: 'mes' | 'tudo' = 'tudo',
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<VarejoResumoRow> {
+  const periodWhere = period === 'mes'
+    ? `AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`
+    : '';
+  const r = await dbPool.query<VarejoResumoRow>(
+    `SELECT
+       COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount), 0)  AS faturamento,
+       COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)                 AS custo_total,
+       COALESCE(SUM(CASE WHEN oi.matriz_unit_cost IS NOT NULL
+                         THEN (oi.quantity * oi.unit_price - oi.discount_amount)
+                              - oi.matriz_unit_cost * oi.quantity END), 0) AS lucro_total,
+       COUNT(DISTINCT o.id)::int                                           AS vendas_count,
+       COUNT(*) FILTER (WHERE oi.matriz_unit_cost IS NULL)::int            AS itens_sem_custo
+       FROM commerce.orders o
+       JOIN core.units u
+         ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
+       JOIN commerce.order_items oi
+         ON oi.order_id = o.id AND oi.environment = o.environment
+      WHERE o.environment = $1 AND o.status <> 'cancelled' ${periodWhere}`,
     [environment],
   );
   return r.rows[0]!;
