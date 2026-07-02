@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260702-fiado"></script>
+<script src="/admin/painel/app.js?v=20260702-cancelar"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1690,6 +1690,48 @@
           <div x-show="atacadoMsg" class="mt-3 text-sm px-3 py-2 rounded-lg"
                :class="atacadoMsg && atacadoMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
                x-text="atacadoMsg ? atacadoMsg.text : ''"></div>
+        </div>
+
+        <!-- ÚLTIMAS VENDAS (0116): trilha visível + cancelar registro errado -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold">Últimas vendas</h3>
+            <span class="text-xs text-gray-400">registrou errado? cancela aqui — sai do resumo e o estoque volta</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                <th class="px-5 py-3 font-medium">Data</th>
+                <th class="px-5 py-3 font-medium">Borracheiro</th>
+                <th class="px-5 py-3 font-medium text-right">Total</th>
+                <th class="px-5 py-3 font-medium">Pagamento</th>
+                <th class="px-5 py-3 font-medium text-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="v in atacadoVendas" :key="v.id">
+                <tr :class="v.status === 'cancelled' ? 'opacity-50' : ''">
+                  <td class="px-5 py-3 text-gray-500" x-text="vendaData(v)"></td>
+                  <td class="px-5 py-3 font-medium text-gray-800" x-text="v.buyer_name"></td>
+                  <td class="px-5 py-3 text-right font-bold text-gray-900" x-text="formatCurrency(Number(v.total_amount))"></td>
+                  <td class="px-5 py-3">
+                    <span x-show="v.payment_status === 'pending'"
+                          class="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700">fiado</span>
+                    <span x-show="v.payment_status === 'paid'" class="text-xs text-gray-400">pago</span>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <span x-show="v.status === 'cancelled'"
+                          class="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600">cancelada</span>
+                    <button x-show="v.status === 'confirmed'" @click="atacadoCancelSale(v)"
+                            class="text-xs px-2.5 py-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 font-medium">Cancelar</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="atacadoVendas.length === 0">
+                <td colspan="5" class="px-5 py-6 text-center text-sm text-gray-400">Nenhuma venda registrada ainda.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Estoque do galpão (Fase 2) -->

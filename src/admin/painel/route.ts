@@ -36,6 +36,8 @@ import {
   getWholesaleFinance,
   settleWholesaleOrderPayment,
   settleWholesalePurchasePayment,
+  listWholesaleSales,
+  cancelWholesaleSale,
   rejectPartnerApplication,
   setPartnerUnitDeliveryRadius,
 } from './queries.js';
@@ -171,6 +173,14 @@ const settleWholesaleFinanceSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   kind: z.enum(['sale', 'purchase']),
   id: z.string().uuid(),
+});
+
+// CANCELAR venda de atacado (0116): registro errado sai do ranking/resumo/fiado
+// e devolve o estoque (espelho da baixa). Motivo opcional (trilha).
+const cancelWholesaleSaleSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  order_id: z.string().uuid(),
+  reason: z.string().max(300).nullable().optional(),
 });
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
@@ -515,6 +525,38 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
       return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
     }
     return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...(await getWholesaleFinance()) });
+  });
+
+  // Últimas vendas de atacado (vivas e canceladas — trilha visível). É de onde se cancela.
+  fastify.get('/admin/api/wholesale/sales', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await listWholesaleSales()));
+  });
+
+  // CANCELA uma venda de atacado (0116): confirmed → cancelled + trilha + devolve estoque.
+  fastify.post('/admin/api/wholesale/sales/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = cancelWholesaleSaleSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await cancelWholesaleSale({
+        order_id: parsed.data.order_id,
+        reason: parsed.data.reason ?? null,
+        environment: parsed.data.environment,
+        cancelled_by: operatorLabel(request.headers),
+      });
+      return reply.status(200).send({ cancelled: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'sale_not_found') {
+        return reply.status(404).send({ error: 'sale_not_found' });
+      }
+      if (err instanceof Error && err.message === 'sale_already_cancelled') {
+        return reply.status(409).send({ error: 'sale_already_cancelled' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale sale cancel failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   // QUITA um fiado (venda a receber OU compra a pagar). Quitar 2x → 404 (não sobrescreve).

@@ -82,6 +82,8 @@ function painelApp() {
     // FINANCEIRO do atacado (0115, flag WHOLESALE_FINANCE): fiado a receber/a pagar.
     // null = flag off (a UI inteira do financeiro se esconde sozinha).
     atacadoFinance: null,
+    // CANCELAR venda (0116): últimas vendas (vivas e canceladas) — de onde se cancela.
+    atacadoVendas: [],
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
     // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
     fornecedores: [],
@@ -752,7 +754,7 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown, finance] = await Promise.all([
+        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown, finance, vendas] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
@@ -763,6 +765,7 @@ function painelApp() {
           this.apiGet('/admin/api/wholesale/purchases'),
           this.apiGet('/admin/api/wholesale/suppliers/breakdown'),
           this.apiGet('/admin/api/wholesale/finance'),
+          this.apiGet('/admin/api/wholesale/sales'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
@@ -775,6 +778,7 @@ function painelApp() {
         this.fornecedorBreakdown = breakdown.rows || [];
         // flag off → enabled:false → null (a UI do financeiro some inteira)
         this.atacadoFinance = finance && finance.enabled ? finance : null;
+        this.atacadoVendas = vendas.rows || [];
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
@@ -786,6 +790,7 @@ function painelApp() {
         this.compras = [];
         this.fornecedorBreakdown = [];
         this.atacadoFinance = null;
+        this.atacadoVendas = [];
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -986,6 +991,28 @@ function painelApp() {
         measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
+    },
+
+    // ── ATACADO — CANCELAR VENDA (0116): registro errado sai sem apagar ──
+    vendaData(v) {
+      if (!v.sold_at) return '—';
+      const d = new Date(v.sold_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+    async atacadoCancelSale(v) {
+      const pago = v.payment_status === 'paid';
+      const aviso = pago
+        ? '\n\n⚠️ Essa venda consta como PAGA — se o dinheiro já entrou, o acerto com o borracheiro é por fora.'
+        : '\n\nEla sai do ranking, do resumo e do a receber; o estoque volta pro galpão.';
+      if (!window.confirm(`Cancelar a venda de ${v.buyer_name} (${this.formatCurrency(Number(v.total_amount))})?${aviso}`)) return;
+      const reason = window.prompt('Motivo (opcional):') || null;
+      try {
+        await this.apiPost('/admin/api/wholesale/sales/cancel', { order_id: v.id, reason });
+        await this.loadAtacado();
+      } catch (err) {
+        const msg = err.message === 'sale_already_cancelled' ? 'Essa venda já estava cancelada.' : `Não consegui cancelar (${err.message}).`;
+        window.alert(msg);
+      }
     },
 
     // ── ATACADO — FINANCEIRO (0115): fiado a receber/a pagar + quitar ──
