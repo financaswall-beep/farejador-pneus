@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260701-oversell"></script>
+<script src="/admin/painel/app.js?v=20260702-fiado"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1514,6 +1514,72 @@
           </div>
         </div>
 
+        <!-- FINANCEIRO do galpão (0115, flag WHOLESALE_FINANCE): o fiado dos dois lados.
+             atacadoFinance = null com a flag off → o bloco inteiro some. -->
+        <div x-show="atacadoFinance" class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="wallet" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Financeiro do galpão</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-4 ml-10">O fiado dos dois lados: quem te deve (borracheiro) e pra quem você deve (fornecedor).</p>
+
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="border border-gray-200 rounded-xl p-4">
+              <div class="text-xs text-gray-500 mb-1">A receber (fiado)</div>
+              <div class="text-base md:text-lg font-bold text-emerald-700" x-text="formatCurrency(Number(atacadoFinance?.a_receber_total || 0))"></div>
+              <div class="text-xs mt-1" :class="Number(atacadoFinance?.a_receber_vencidos || 0) > 0 ? 'text-rose-600 font-medium' : 'text-gray-400'"
+                   x-text="(atacadoFinance?.a_receber_count || 0) + ' em aberto' + (Number(atacadoFinance?.a_receber_vencidos || 0) > 0 ? ' · ' + atacadoFinance.a_receber_vencidos + ' vencido(s)' : '')"></div>
+            </div>
+            <div class="border border-gray-200 rounded-xl p-4">
+              <div class="text-xs text-gray-500 mb-1">A pagar (fornecedor)</div>
+              <div class="text-base md:text-lg font-bold text-rose-600" x-text="formatCurrency(Number(atacadoFinance?.a_pagar_total || 0))"></div>
+              <div class="text-xs mt-1" :class="Number(atacadoFinance?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600 font-medium' : 'text-gray-400'"
+                   x-text="(atacadoFinance?.a_pagar_count || 0) + ' em aberto' + (Number(atacadoFinance?.a_pagar_vencidos || 0) > 0 ? ' · ' + atacadoFinance.a_pagar_vencidos + ' vencido(s)' : '')"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Quem te deve</div>
+              <template x-for="r in (atacadoFinance?.receivables || [])" :key="r.id">
+                <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
+                  <div>
+                    <span class="font-medium text-gray-800" x-text="r.counterparty"></span>
+                    <span class="text-xs ml-2" :class="r.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
+                          x-text="r.due_date ? ((r.overdue ? 'VENCEU ' : 'vence ') + financeDate(r.due_date)) : 'sem vencimento'"></span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-bold text-gray-900" x-text="formatCurrency(Number(r.total_amount))"></span>
+                    <button @click="financeSettle('sale', r)"
+                            class="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">Recebi</button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!(atacadoFinance?.receivables || []).length" class="text-sm text-gray-400 py-2">Ninguém te devendo 👍</div>
+            </div>
+            <div>
+              <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Pra quem você deve</div>
+              <template x-for="p in (atacadoFinance?.payables || [])" :key="p.id">
+                <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
+                  <div>
+                    <span class="font-medium text-gray-800" x-text="p.counterparty"></span>
+                    <span class="text-xs ml-2" :class="p.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
+                          x-text="p.due_date ? ((p.overdue ? 'VENCEU ' : 'vence ') + financeDate(p.due_date)) : 'sem vencimento'"></span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-bold text-gray-900" x-text="formatCurrency(Number(p.total_amount))"></span>
+                    <button @click="financeSettle('purchase', p)"
+                            class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!(atacadoFinance?.payables || []).length" class="text-sm text-gray-400 py-2">Nenhuma conta com fornecedor.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Nova venda de atacado -->
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center gap-2 mb-4">
@@ -1592,6 +1658,18 @@
                   class="text-sm text-brand-600 hover:text-brand-700 font-medium mb-4 inline-flex items-center gap-1">
             <i data-lucide="plus" class="w-4 h-4"></i> Adicionar pneu
           </button>
+
+          <!-- FINANCEIRO (0115): recebido agora × fiado — só com o financeiro ligado -->
+          <div x-show="atacadoFinance" class="grid grid-cols-2 gap-2 mb-4">
+            <select x-model="atacadoForm.payment_status"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="paid">Recebido agora (à vista)</option>
+              <option value="pending">Fiado — fica no a receber</option>
+            </select>
+            <input x-show="atacadoForm.payment_status === 'pending'" x-model="atacadoForm.due_date" type="date"
+                   title="Vencimento (opcional)"
+                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          </div>
 
           <!-- Observação opcional -->
           <input x-model="atacadoForm.notes" type="text" placeholder="Observação (opcional)"
@@ -1810,6 +1888,18 @@
                 class="text-sm text-brand-600 hover:text-brand-700 font-medium mb-3 inline-flex items-center gap-1">
           <i data-lucide="plus" class="w-4 h-4"></i> Adicionar pneu
         </button>
+
+        <!-- FINANCEIRO (0115): pago na hora × a prazo — só com o financeiro ligado -->
+        <div x-show="atacadoFinance" class="grid grid-cols-2 gap-2 mb-3">
+          <select x-model="compraForm.payment_status"
+                  class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100">
+            <option value="paid">Pago na hora (à vista)</option>
+            <option value="pending">A prazo — fica no a pagar</option>
+          </select>
+          <input x-show="compraForm.payment_status === 'pending'" x-model="compraForm.due_date" type="date"
+                 title="Vencimento (opcional)"
+                 class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100">
+        </div>
 
         <input x-model="compraForm.notes" type="text" placeholder="Observação (opcional)"
                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-3 outline-none focus:ring-2 focus:ring-brand-100">

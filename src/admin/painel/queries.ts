@@ -1000,6 +1000,10 @@ export interface RegisterWholesaleSaleInput {
   notes?: string | null;
   created_by: string;
   allow_oversell?: boolean; // caixa confirmou vender acima do estoque (avisar+confirmar)
+  // FINANCEIRO (0115, flag WHOLESALE_FINANCE): 'pending' = fiado (A RECEBER do
+  // borracheiro), com vencimento opcional. Ignorado com a flag off (nasce 'paid').
+  payment_status?: 'paid' | 'pending';
+  due_date?: string | null;
 }
 
 export interface RegisterWholesaleSaleResult {
@@ -1077,11 +1081,17 @@ export async function registerWholesaleSale(
       throw new Error('buyer_required');
     }
 
-    // 2. Cabeçalho da venda.
+    // 2. Cabeçalho da venda. FINANCEIRO (0115): com a flag on, a venda pode nascer
+    //    'pending' (fiado → A RECEBER); flag off = 'paid' sem paid_at, byte a byte
+    //    o de antes (mesmo resultado do default da coluna).
+    const fiado = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+    const paymentStatus = fiado ? 'pending' : 'paid';
+    const paidAt = env.WHOLESALE_FINANCE && !fiado ? new Date().toISOString() : null;
+    const dueDate = fiado ? (input.due_date ?? null) : null;
     const ord = await client.query<{ id: string }>(
-      `INSERT INTO commerce.wholesale_orders (environment, buyer_id, sold_at, total_amount, created_by, notes)
-       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5) RETURNING id`,
-      [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null],
+      `INSERT INTO commerce.wholesale_orders (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at)
+       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz) RETURNING id`,
+      [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt],
     );
     const orderId = ord.rows[0]!.id;
 
@@ -1432,6 +1442,10 @@ export interface RegisterWholesalePurchaseInput {
   purchased_at?: string | null;
   notes?: string | null;
   created_by: string;
+  // FINANCEIRO (0115, flag WHOLESALE_FINANCE): 'pending' = compra fiada (A PAGAR ao
+  // fornecedor — porta que a 0114 deixou aberta). Ignorado com a flag off (nasce 'paid').
+  payment_status?: 'paid' | 'pending';
+  due_date?: string | null;
 }
 
 export interface RegisterWholesalePurchaseResult {
@@ -1483,11 +1497,17 @@ export async function registerWholesalePurchase(
       throw new Error('supplier_required');
     }
 
-    // 2. Cabeçalho da compra (total 0 — preenchido no passo 4).
+    // 2. Cabeçalho da compra (total 0 — preenchido no passo 4). FINANCEIRO (0115):
+    //    com a flag on, a compra pode nascer 'pending' (fiado → A PAGAR ao fornecedor);
+    //    flag off = 'paid' sem paid_at, byte a byte o de antes (default da 0114).
+    const fiado = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+    const paymentStatus = fiado ? 'pending' : 'paid';
+    const paidAt = env.WHOLESALE_FINANCE && !fiado ? new Date().toISOString() : null;
+    const dueDate = fiado ? (input.due_date ?? null) : null;
     const pur = await client.query<{ id: string }>(
-      `INSERT INTO commerce.wholesale_purchases (environment, supplier_id, purchased_at, total_amount, created_by, notes)
-       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5) RETURNING id`,
-      [environment, supplierId, input.purchased_at ?? null, input.created_by, input.notes ?? null],
+      `INSERT INTO commerce.wholesale_purchases (environment, supplier_id, purchased_at, total_amount, created_by, notes, payment_status, due_date, paid_at)
+       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz) RETURNING id`,
+      [environment, supplierId, input.purchased_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt],
     );
     const purchaseId = pur.rows[0]!.id;
 
@@ -1555,4 +1575,102 @@ export async function listWholesalePurchases(
     [environment, limit],
   );
   return r.rows;
+}
+
+// ─── ATACADO — FINANCEIRO (0115): o FIADO dos dois lados do galpão ────────────
+// A RECEBER = venda de atacado 'pending' (borracheiro levou e acerta depois).
+// A PAGAR = compra de fornecedor 'pending' (porta aberta na 0114). Vencido =
+// pending com due_date < hoje. Dado SÓ da matriz (regra de ouro — zero grant
+// pro parceiro); atrás da flag WHOLESALE_FINANCE (a rota devolve enabled:false).
+
+export interface WholesaleFinanceOpenRow {
+  id: string;
+  counterparty: string;      // borracheiro (a receber) ou fornecedor (a pagar)
+  total_amount: string;
+  registered_at: string;     // sold_at / purchased_at
+  due_date: string | null;
+  overdue: boolean;
+}
+
+export interface WholesaleFinanceResumo {
+  a_receber_total: string;
+  a_receber_count: number;
+  a_receber_vencidos: number;
+  a_pagar_total: string;
+  a_pagar_count: number;
+  a_pagar_vencidos: number;
+  receivables: WholesaleFinanceOpenRow[];
+  payables: WholesaleFinanceOpenRow[];
+}
+
+/** Resumo do fiado do galpão: totais + as listas em aberto (vencidos primeiro). */
+export async function getWholesaleFinance(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleFinanceResumo> {
+  const rec = await dbPool.query<WholesaleFinanceOpenRow>(
+    `SELECT o.id, c.name AS counterparty, o.total_amount, o.sold_at AS registered_at,
+            o.due_date, (o.due_date IS NOT NULL AND o.due_date < current_date) AS overdue
+       FROM commerce.wholesale_orders o
+       JOIN commerce.wholesale_customers c ON c.id = o.buyer_id AND c.environment = o.environment
+      WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
+      ORDER BY (o.due_date IS NULL), o.due_date, o.sold_at`,
+    [environment],
+  );
+  const pay = await dbPool.query<WholesaleFinanceOpenRow>(
+    `SELECT p.id, s.name AS counterparty, p.total_amount, p.purchased_at AS registered_at,
+            p.due_date, (p.due_date IS NOT NULL AND p.due_date < current_date) AS overdue
+       FROM commerce.wholesale_purchases p
+       JOIN commerce.wholesale_suppliers s ON s.id = p.supplier_id AND s.environment = p.environment
+      WHERE p.environment = $1 AND p.status = 'confirmed' AND p.payment_status = 'pending'
+      ORDER BY (p.due_date IS NULL), p.due_date, p.purchased_at`,
+    [environment],
+  );
+  const sum = (rows: WholesaleFinanceOpenRow[]) =>
+    rows.reduce((acc, r) => acc + Number(r.total_amount), 0).toFixed(2);
+  return {
+    a_receber_total: sum(rec.rows),
+    a_receber_count: rec.rows.length,
+    a_receber_vencidos: rec.rows.filter((r) => r.overdue).length,
+    a_pagar_total: sum(pay.rows),
+    a_pagar_count: pay.rows.length,
+    a_pagar_vencidos: pay.rows.filter((r) => r.overdue).length,
+    receivables: rec.rows,
+    payables: pay.rows,
+  };
+}
+
+/** QUITA um fiado de venda (A RECEBER): pending → paid + paid_at. Idempotente-avesso:
+ *  só quita quem está pending (quitar 2x → receivable_not_found, sem sobrescrever). */
+export async function settleWholesaleOrderPayment(
+  orderId: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<{ id: string; paid_at: string }> {
+  const r = await dbPool.query<{ id: string; paid_at: string }>(
+    `UPDATE commerce.wholesale_orders
+        SET payment_status = 'paid', paid_at = now()
+      WHERE id = $1 AND environment = $2 AND status = 'confirmed' AND payment_status = 'pending'
+      RETURNING id, paid_at`,
+    [orderId, environment],
+  );
+  if (!r.rows[0]) throw new Error('receivable_not_found');
+  return r.rows[0];
+}
+
+/** QUITA um fiado de compra (A PAGAR ao fornecedor): pending → paid + paid_at. */
+export async function settleWholesalePurchasePayment(
+  purchaseId: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<{ id: string; paid_at: string }> {
+  const r = await dbPool.query<{ id: string; paid_at: string }>(
+    `UPDATE commerce.wholesale_purchases
+        SET payment_status = 'paid', paid_at = now()
+      WHERE id = $1 AND environment = $2 AND status = 'confirmed' AND payment_status = 'pending'
+      RETURNING id, paid_at`,
+    [purchaseId, environment],
+  );
+  if (!r.rows[0]) throw new Error('payable_not_found');
+  return r.rows[0];
 }

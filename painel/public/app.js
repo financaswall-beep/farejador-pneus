@@ -71,7 +71,7 @@ function painelApp() {
     atacadoSaving: false,
     atacadoMsg: null,
     atacadoStaleDays: 30,
-    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
+    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
@@ -79,6 +79,9 @@ function painelApp() {
     stockSaving: false,
     stockMsg: null,
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
+    // FINANCEIRO do atacado (0115, flag WHOLESALE_FINANCE): fiado a receber/a pagar.
+    // null = flag off (a UI inteira do financeiro se esconde sozinha).
+    atacadoFinance: null,
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
     // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
     fornecedores: [],
@@ -87,7 +90,7 @@ function painelApp() {
     compras: [],
     compraSaving: false,
     compraMsg: null,
-    compraForm: { supplierKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
+    compraForm: { supplierKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [
@@ -749,7 +752,7 @@ function painelApp() {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
-        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown] = await Promise.all([
+        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown, finance] = await Promise.all([
           this.apiGet('/admin/api/wholesale/buyers'),
           this.apiGet('/admin/api/wholesale/ranking'),
           this.apiGet('/admin/api/wholesale/measures'),
@@ -759,6 +762,7 @@ function painelApp() {
           this.apiGet('/admin/api/wholesale/suppliers/ranking'),
           this.apiGet('/admin/api/wholesale/purchases'),
           this.apiGet('/admin/api/wholesale/suppliers/breakdown'),
+          this.apiGet('/admin/api/wholesale/finance'),
         ]);
         this.atacadoBuyers = buyers.rows || [];
         this.atacadoRanking = ranking.rows || [];
@@ -769,6 +773,8 @@ function painelApp() {
         this.fornecedorRanking = supRanking.rows || [];
         this.compras = purchases.rows || [];
         this.fornecedorBreakdown = breakdown.rows || [];
+        // flag off → enabled:false → null (a UI do financeiro some inteira)
+        this.atacadoFinance = finance && finance.enabled ? finance : null;
       } catch (err) {
         this.atacadoBuyers = [];
         this.atacadoRanking = [];
@@ -779,6 +785,7 @@ function painelApp() {
         this.fornecedorRanking = [];
         this.compras = [];
         this.fornecedorBreakdown = [];
+        this.atacadoFinance = null;
         console.warn('atacado load falhou:', err.message);
       } finally {
         this.atacadoLoading = false;
@@ -831,6 +838,11 @@ function painelApp() {
         }));
       if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
       body.items = items;
+      // FINANCEIRO (0115): fiado só quando o financeiro está ligado (flag). Vencimento opcional.
+      if (this.atacadoFinance && f.payment_status === 'pending') {
+        body.payment_status = 'pending';
+        if (f.due_date) body.due_date = f.due_date;
+      }
 
       this.atacadoSaving = true;
       this.atacadoMsg = null;
@@ -852,8 +864,9 @@ function painelApp() {
             throw err;
           }
         }
-        this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}.` };
-        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
+        const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
+        this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.` };
+        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
         await this.loadAtacado();
       } catch (err) {
         this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };
@@ -945,13 +958,19 @@ function painelApp() {
         }));
       if (items.length === 0) { this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
       body.items = items;
+      // FINANCEIRO (0115): compra fiada só com o financeiro ligado (flag).
+      if (this.atacadoFinance && f.payment_status === 'pending') {
+        body.payment_status = 'pending';
+        if (f.due_date) body.due_date = f.due_date;
+      }
 
       this.compraSaving = true;
       this.compraMsg = null;
       try {
         const result = await this.apiPost('/admin/api/wholesale/purchases', body);
-        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}. O galpão já recebeu.` };
-        this.compraForm = { supplierKey: '', newName: '', newPhone: '', notes: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
+        const fiadoTxt = body.payment_status === 'pending' ? ' (A PRAZO — foi pro a pagar)' : '';
+        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}. O galpão já recebeu.` };
+        this.compraForm = { supplierKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
         await this.loadAtacado();
       } catch (err) {
         this.compraMsg = { ok: false, text: this.compraErrText(err.message) };
@@ -967,6 +986,23 @@ function painelApp() {
         measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
+    },
+
+    // ── ATACADO — FINANCEIRO (0115): fiado a receber/a pagar + quitar ──
+    financeDate(d) {
+      if (!d) return 'sem data';
+      const dt = new Date(d + (String(d).length === 10 ? 'T12:00:00' : ''));
+      return isNaN(dt.getTime()) ? 'sem data' : dt.toLocaleDateString('pt-BR');
+    },
+    async financeSettle(kind, row) {
+      const rotulo = kind === 'sale' ? `receber de ${row.counterparty}` : `pagar pra ${row.counterparty}`;
+      if (!window.confirm(`Quitar ${this.formatCurrency(Number(row.total_amount))} (${rotulo})?`)) return;
+      try {
+        await this.apiPost('/admin/api/wholesale/finance/settle', { kind, id: row.id });
+        await this.loadAtacado();
+      } catch (err) {
+        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      }
     },
 
     // ── ATACADO (Fase 2) — estoque do galpão por medida ──

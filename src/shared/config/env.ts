@@ -111,6 +111,15 @@ const envSchema = z.object({
   // real sendo mantido); gated por AMBas. Default OFF = dormente: comportamento de hoje (baixa
   // com clamp em 0, NUNCA trava). Liga junto/depois do DECREMENT, após provar ao vivo.
   WHOLESALE_MATRIZ_OVERSELL_GUARD: booleanStringSchema,
+  // ATACADO — FINANCEIRO (fatia 1): o FIADO dos dois lados do galpão (0115). Com a
+  // flag ON: a venda de atacado pode nascer 'pending' (A RECEBER do borracheiro) e a
+  // compra do fornecedor pode nascer 'pending' (A PAGAR), com vencimento opcional e
+  // botão de quitar; o painel ganha o bloco "Financeiro do galpão" (a receber / a
+  // pagar / vencidos). Copia o DESENHO do finance.partner_* mas mora em wholesale_*
+  // (regra de ouro: dado SÓ da matriz, zero grant pro parceiro — finance.* é do
+  // PARCEIRO). Default OFF = dormente: tudo nasce 'paid' como hoje, endpoint devolve
+  // enabled:false e a UI se esconde. Liga no Coolify quando o dono quiser operar fiado.
+  WHOLESALE_FINANCE: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

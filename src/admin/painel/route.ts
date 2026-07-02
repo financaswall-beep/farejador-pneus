@@ -33,6 +33,9 @@ import {
   getWholesaleSupplierMeasureBreakdown,
   registerWholesalePurchase,
   listWholesalePurchases,
+  getWholesaleFinance,
+  settleWholesaleOrderPayment,
+  settleWholesalePurchasePayment,
   rejectPartnerApplication,
   setPartnerUnitDeliveryRadius,
 } from './queries.js';
@@ -101,6 +104,10 @@ const registerWholesaleSaleSchema = z
     sold_at: z.string().min(1).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
     allow_oversell: z.boolean().optional(),
+    // FINANCEIRO (0115): 'pending' = fiado (a receber), vencimento opcional.
+    // Ignorados com WHOLESALE_FINANCE off (a venda nasce 'paid', como hoje).
+    payment_status: z.enum(['paid', 'pending']).optional(),
+    due_date: z.string().date().nullable().optional(),
   })
   .refine(
     (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
@@ -151,10 +158,20 @@ const registerPurchaseSchema = z
     items: z.array(purchaseItemSchema).min(1).max(50),
     purchased_at: z.string().min(1).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
+    // FINANCEIRO (0115): 'pending' = compra fiada (a pagar ao fornecedor).
+    payment_status: z.enum(['paid', 'pending']).optional(),
+    due_date: z.string().date().nullable().optional(),
   })
   .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
     message: 'supplier_required',
   });
+
+// FINANCEIRO do atacado (0115): quitar um fiado — venda (a receber) ou compra (a pagar).
+const settleWholesaleFinanceSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  kind: z.enum(['sale', 'purchase']),
+  id: z.string().uuid(),
+});
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
 const partnerApplicationSchema = z.object({
@@ -485,6 +502,39 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale purchase failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ── ATACADO — FINANCEIRO (0115): o fiado do galpão (a receber / a pagar) ──
+  // Admin-only + flag WHOLESALE_FINANCE (off = enabled:false, a UI se esconde).
+
+  // Resumo do fiado: totais, vencidos e as listas em aberto.
+  fastify.get('/admin/api/wholesale/finance', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    if (!env.WHOLESALE_FINANCE) {
+      return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
+    }
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...(await getWholesaleFinance()) });
+  });
+
+  // QUITA um fiado (venda a receber OU compra a pagar). Quitar 2x → 404 (não sobrescreve).
+  fastify.post('/admin/api/wholesale/finance/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.WHOLESALE_FINANCE) return reply.status(404).send({ error: 'finance_disabled' });
+    const parsed = settleWholesaleFinanceSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = parsed.data.kind === 'sale'
+        ? await settleWholesaleOrderPayment(parsed.data.id, parsed.data.environment)
+        : await settleWholesalePurchasePayment(parsed.data.id, parsed.data.environment);
+      return reply.status(200).send({ settled: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && (err.message === 'receivable_not_found' || err.message === 'payable_not_found')) {
+        return reply.status(404).send({ error: err.message });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale finance settle failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
