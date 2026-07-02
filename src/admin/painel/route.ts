@@ -41,6 +41,12 @@ import {
   getWholesaleFinance,
   settleWholesaleOrderPayment,
   settleWholesalePurchasePayment,
+  getMatrizExpenses,
+  createMatrizExpense,
+  settleMatrizExpense,
+  removeMatrizExpense,
+  getMatrizFinanceiroVisao,
+  MATRIZ_EXPENSE_CATEGORIES,
   listWholesaleSales,
   cancelWholesaleSale,
   rejectPartnerApplication,
@@ -191,6 +197,21 @@ const registerPurchaseSchema = z
 const settleWholesaleFinanceSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   kind: z.enum(['sale', 'purchase']),
+  id: z.string().uuid(),
+});
+
+// DESPESAS da matriz (0120): lançar (à vista × a pagar), quitar e remover (soft).
+const createMatrizExpenseSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  category: z.enum(MATRIZ_EXPENSE_CATEGORIES),
+  description: z.string().max(300).nullable().optional(),
+  amount: z.number().positive(),
+  payment_status: z.enum(['paid', 'pending']).optional(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+});
+
+const matrizExpenseIdSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
   id: z.string().uuid(),
 });
 
@@ -657,6 +678,86 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
       }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale finance settle failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ── MATRIZ — FINANCEIRO: VISÃO CONSOLIDADA (Onda 1, SÓ leitura) ──
+  // A tela Financeiro inteira num GET: consolidado do mês (3 pernas − despesas),
+  // a receber/a pagar juntos e indicadores. SEM flag própria — cada fatia respeita
+  // a flag da sua fonte (fiado/comissão/despesas) e vem null com ela off.
+  fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send({ ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao()) });
+  });
+
+  // ── MATRIZ — DESPESAS GERAIS (0120, flag MATRIZ_EXPENSES): Fase A do livro-caixa ──
+  // A perna de SAÍDA que faltava (aluguel/funcionário/combustível/frete/manutenção).
+  // Admin-only + flag (off = enabled:false, a UI se esconde — padrão 0115/0118).
+
+  // Resumo: a pagar (vencidos primeiro) + pago no mês + últimas despesas.
+  fastify.get('/admin/api/matriz/despesas', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    if (!env.MATRIZ_EXPENSES) {
+      return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
+    }
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...(await getMatrizExpenses()) });
+  });
+
+  // Lança despesa (à vista nasce paga; a pagar nasce pending com vencimento opcional).
+  fastify.post('/admin/api/matriz/despesas', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
+    const parsed = createMatrizExpenseSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await createMatrizExpense({
+        ...parsed.data,
+        created_by: operatorLabel(request.headers),
+      });
+      return reply.status(201).send({ created: true, ...result });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel matriz expense create failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // QUITA uma despesa a pagar (pending → paid). Quitar 2x → 404 (não sobrescreve).
+  fastify.post('/admin/api/matriz/despesas/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
+    const parsed = matrizExpenseIdSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await settleMatrizExpense(parsed.data.id, parsed.data.environment);
+      return reply.status(200).send({ settled: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'expense_not_found') {
+        return reply.status(404).send({ error: 'expense_not_found' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel matriz expense settle failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // REMOVE despesa lançada errada (soft delete — trilha preservada).
+  fastify.post('/admin/api/matriz/despesas/remove', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
+    const parsed = matrizExpenseIdSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await removeMatrizExpense(parsed.data.id, parsed.data.environment);
+      return reply.status(200).send({ removed: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'expense_not_found') {
+        return reply.status(404).send({ error: 'expense_not_found' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel matriz expense remove failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

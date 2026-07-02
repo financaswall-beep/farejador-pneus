@@ -1665,6 +1665,7 @@ export async function listWholesalePurchases(
 export interface WholesaleFinanceOpenRow {
   id: string;
   counterparty: string;      // borracheiro (a receber) ou fornecedor (a pagar)
+  phone: string | null;      // deep-link "Cobrar no WhatsApp" da tela Financeiro
   total_amount: string;
   registered_at: string;     // sold_at / purchased_at
   due_date: string | null;
@@ -1688,7 +1689,7 @@ export async function getWholesaleFinance(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleFinanceResumo> {
   const rec = await dbPool.query<WholesaleFinanceOpenRow>(
-    `SELECT o.id, c.name AS counterparty, o.total_amount, o.sold_at AS registered_at,
+    `SELECT o.id, c.name AS counterparty, c.phone, o.total_amount, o.sold_at AS registered_at,
             o.due_date, (o.due_date IS NOT NULL AND o.due_date < current_date) AS overdue
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id = o.buyer_id AND c.environment = o.environment
@@ -1697,7 +1698,7 @@ export async function getWholesaleFinance(
     [environment],
   );
   const pay = await dbPool.query<WholesaleFinanceOpenRow>(
-    `SELECT p.id, s.name AS counterparty, p.total_amount, p.purchased_at AS registered_at,
+    `SELECT p.id, s.name AS counterparty, s.phone, p.total_amount, p.purchased_at AS registered_at,
             p.due_date, (p.due_date IS NOT NULL AND p.due_date < current_date) AS overdue
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s ON s.id = p.supplier_id AND s.environment = p.environment
@@ -1751,6 +1752,132 @@ export async function settleWholesalePurchasePayment(
     [purchaseId, environment],
   );
   if (!r.rows[0]) throw new Error('payable_not_found');
+  return r.rows[0];
+}
+
+// ─── MATRIZ — DESPESAS GERAIS (0120, flag MATRIZ_EXPENSES): Fase A do livro-caixa ─────
+// A única SAÍDA modelada da matriz era a compra de fornecedor (0114/0115); aluguel,
+// funcionário, combustível e frete pago não existiam → o "saldo" mentia por omissão.
+// Mesmo vocabulário do fiado 0115 (pending = a pagar; paid+paid_at = saiu do caixa) DE
+// PROPÓSITO: o sweep do livro-razão (Fase B, 0121) lê despesa/venda/compra com a MESMA
+// régua. Dado SÓ da matriz (zero grant — provado na 0120). Soft delete = trilha.
+
+export const MATRIZ_EXPENSE_CATEGORIES = [
+  'aluguel', 'funcionario', 'combustivel', 'frete', 'manutencao', 'outros',
+] as const;
+export type MatrizExpenseCategory = (typeof MATRIZ_EXPENSE_CATEGORIES)[number];
+
+export interface MatrizExpenseRow {
+  id: string;
+  category: string;
+  description: string | null;
+  amount: string;
+  occurred_at: string;
+  payment_status: 'paid' | 'pending';
+  due_date: string | null;
+  paid_at: string | null;
+  overdue: boolean;
+}
+
+export interface MatrizExpensesResumo {
+  a_pagar_total: string;
+  a_pagar_count: number;
+  a_pagar_vencidos: number;
+  pago_mes_total: string; // pagas no mês corrente (fuso São Paulo, mesmo recorte do varejo 0117)
+  entries: MatrizExpenseRow[];
+}
+
+/** Resumo das despesas da matriz: a pagar (vencidos primeiro) + pago no mês + últimas. */
+export async function getMatrizExpenses(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+  limit = 50,
+): Promise<MatrizExpensesResumo> {
+  const rows = await dbPool.query<MatrizExpenseRow>(
+    `SELECT id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
+            (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue
+       FROM commerce.matriz_expenses
+      WHERE environment = $1 AND deleted_at IS NULL
+      ORDER BY (payment_status = 'pending') DESC, (due_date IS NULL), due_date, occurred_at DESC
+      LIMIT $2`,
+    [environment, limit],
+  );
+  const tot = await dbPool.query<{ a_pagar_total: string; a_pagar_count: number; a_pagar_vencidos: number; pago_mes_total: string }>(
+    `SELECT COALESCE(SUM(amount) FILTER (WHERE payment_status = 'pending'), 0) AS a_pagar_total,
+            COUNT(*) FILTER (WHERE payment_status = 'pending')::int AS a_pagar_count,
+            COUNT(*) FILTER (WHERE payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date)::int AS a_pagar_vencidos,
+            COALESCE(SUM(amount) FILTER (WHERE payment_status = 'paid'
+              AND (COALESCE(paid_at, occurred_at) AT TIME ZONE 'America/Sao_Paulo')
+                    >= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')), 0) AS pago_mes_total
+       FROM commerce.matriz_expenses
+      WHERE environment = $1 AND deleted_at IS NULL`,
+    [environment],
+  );
+  return { ...tot.rows[0]!, entries: rows.rows };
+}
+
+export interface CreateMatrizExpenseInput {
+  category: MatrizExpenseCategory;
+  description?: string | null;
+  amount: number;
+  payment_status?: 'paid' | 'pending'; // omitido = 'paid' (pago na hora)
+  due_date?: string | null;            // só faz sentido no pending
+  created_by?: string | null;
+  environment?: 'prod' | 'test';
+}
+
+/** Lança uma despesa da matriz. À vista nasce paid+paid_at; a pagar nasce pending. */
+export async function createMatrizExpense(
+  input: CreateMatrizExpenseInput,
+  dbPool: Pool = defaultPool,
+): Promise<MatrizExpenseRow> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const paymentStatus = input.payment_status ?? 'paid';
+  const r = await dbPool.query<MatrizExpenseRow>(
+    `INSERT INTO commerce.matriz_expenses
+       (environment, category, description, amount, payment_status, due_date, paid_at, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'paid' THEN now() ELSE NULL END, $7)
+     RETURNING id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
+               (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue`,
+    [environment, input.category, input.description ?? null, input.amount,
+     paymentStatus, paymentStatus === 'pending' ? (input.due_date ?? null) : null,
+     input.created_by ?? null],
+  );
+  return r.rows[0]!;
+}
+
+/** QUITA uma despesa a pagar: pending → paid + paid_at (espelho do settle 0115).
+ *  Quitar 2x → expense_not_found (não sobrescreve o paid_at original). */
+export async function settleMatrizExpense(
+  expenseId: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<{ id: string; paid_at: string }> {
+  const r = await dbPool.query<{ id: string; paid_at: string }>(
+    `UPDATE commerce.matriz_expenses
+        SET payment_status = 'paid', paid_at = now()
+      WHERE id = $1 AND environment = $2 AND payment_status = 'pending' AND deleted_at IS NULL
+      RETURNING id, paid_at`,
+    [expenseId, environment],
+  );
+  if (!r.rows[0]) throw new Error('expense_not_found');
+  return r.rows[0];
+}
+
+/** REMOVE uma despesa lançada errada (soft delete — trilha preservada, nunca DELETE). */
+export async function removeMatrizExpense(
+  expenseId: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<{ id: string }> {
+  const r = await dbPool.query<{ id: string }>(
+    `UPDATE commerce.matriz_expenses
+        SET deleted_at = now()
+      WHERE id = $1 AND environment = $2 AND deleted_at IS NULL
+      RETURNING id`,
+    [expenseId, environment],
+  );
+  if (!r.rows[0]) throw new Error('expense_not_found');
   return r.rows[0];
 }
 
@@ -2047,4 +2174,212 @@ export async function updatePartnerCommercialTerms(
      })],
   );
   return { updated: true };
+}
+
+// ─── FINANCEIRO DA MATRIZ — VISÃO CONSOLIDADA (Onda 1: SÓ LEITURA) ────────────
+// A tela Financeiro num payload só: consolidado do MÊS das 3 pernas (atacado +
+// varejo 0117 + comissão 0118) menos as despesas (0120), A RECEBER e A PAGAR
+// juntos (fiado 0115 + comissão + despesa pendente, agenda por vencimento) e os
+// indicadores de dono (capital parado no galpão, giro, fiado em aberto, ponto de
+// equilíbrio). ZERO escrita e ZERO migration: cada fatia respeita a flag da sua
+// fonte — flag off → aquela fatia vem null/fora e a UI esconde. A varredura da
+// comissão NÃO roda aqui de propósito (já roda no boot do painel e no GET da
+// Rede; e o sweep ESTORNA lançamento órfão — visão tem que ser leitura barata
+// e sem efeito colateral).
+
+export interface FinanceiroReceivableItem {
+  tipo: 'fiado' | 'comissao';
+  id: string;                 // order id (fiado) ou partner_id (comissao)
+  nome: string;
+  valor: string;
+  due_date: string | null;    // comissão acumulada não tem vencimento
+  overdue: boolean;
+  phone: string | null;       // deep-link wa.me "Cobrar"
+  count?: number;             // comissão: nº de lançamentos em aberto
+}
+
+export interface FinanceiroPayableItem {
+  tipo: 'fornecedor' | 'despesa';
+  id: string;
+  nome: string;
+  categoria?: string;         // despesa: categoria (pro rótulo da agenda)
+  valor: string;
+  due_date: string | null;
+  overdue: boolean;
+}
+
+export interface FinanceiroVisao {
+  fontes: { fiado: boolean; comissao: boolean; despesas: boolean };
+  mes: {
+    faturamento: string;      // 3 pernas somadas (recorte mês São Paulo, régua 0117)
+    custo: string;            // custo do pneu vendido (atacado + varejo congelado)
+    despesas: string | null;  // ocorridas no mês (competência); null = flag off
+    lucro: string;            // faturamento − custo − despesas(0 se off)
+    margem_pct: number | null;
+    itens_sem_custo: number;  // varejo sem custo congelado → aviso de honestidade
+    pernas: {
+      atacado: { faturamento: string; lucro: string };
+      varejo: { faturamento: string; lucro: string };
+      comissao: { realizado: string } | null;
+    };
+    despesas_categoria: Array<{ category: string; total: string }> | null;
+  };
+  a_receber: { total: string; vencidos_count: number; itens: FinanceiroReceivableItem[] };
+  a_pagar: { total: string; vencidos_count: number; itens: FinanceiroPayableItem[] };
+  indicadores: {
+    capital_parado: string;   // Σ qty × custo médio do galpão
+    pneus_galpao: number;
+    giro_dias: number | null;         // capital / (custo vendido no mês / 30)
+    fiado_aberto_pct: number | null;  // % do faturamento do atacado do mês ainda pendente
+    ponto_equilibrio: number | null;  // despesas do mês / margem bruta do mês
+  };
+}
+
+/** Visão consolidada do Financeiro da matriz (Onda 1). Leitura pura das fontes
+ *  existentes; derivados calculados AQUI (não na UI) pra prova de integração cravar. */
+export async function getMatrizFinanceiroVisao(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<FinanceiroVisao> {
+  const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
+  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat] =
+    await Promise.all([
+      getWholesaleResumo(environment, dbPool, 'mes'),
+      getVarejoResumo('mes', environment, dbPool),
+      env.WHOLESALE_FINANCE ? getWholesaleFinance(environment, dbPool) : Promise.resolve(null),
+      env.MATRIZ_EXPENSES ? getMatrizExpenses(environment, dbPool) : Promise.resolve(null),
+      env.NETWORK_COMMISSION_LEDGER ? getCommissionLedger(environment, dbPool) : Promise.resolve(null),
+      env.NETWORK_COMMISSION_LEDGER
+        ? dbPool.query<{ realizado: string }>(
+            `SELECT COALESCE(SUM(commission_amount), 0) AS realizado
+               FROM network.commission_entries
+              WHERE environment = $1 AND status <> 'reversed'
+                AND (realized_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+            [environment],
+          ).then((r) => r.rows[0]!.realizado)
+        : Promise.resolve(null),
+      env.WHOLESALE_FINANCE
+        ? dbPool.query<{ aberto: string }>(
+            `SELECT COALESCE(SUM(total_amount), 0) AS aberto
+               FROM commerce.wholesale_orders
+              WHERE environment = $1 AND status = 'confirmed' AND payment_status = 'pending'
+                AND (created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+            [environment],
+          ).then((r) => r.rows[0]!.aberto)
+        : Promise.resolve(null),
+      dbPool.query<{ capital: string; pneus: number }>(
+        `SELECT COALESCE(SUM(quantity_on_hand * unit_cost), 0) AS capital,
+                COALESCE(SUM(quantity_on_hand), 0)::int AS pneus
+           FROM commerce.wholesale_stock WHERE environment = $1`,
+        [environment],
+      ).then((r) => r.rows[0]!),
+      env.MATRIZ_EXPENSES
+        ? dbPool.query<{ category: string; total: string }>(
+            `SELECT category, SUM(amount) AS total
+               FROM commerce.matriz_expenses
+              WHERE environment = $1 AND deleted_at IS NULL
+                AND (occurred_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}
+              GROUP BY category ORDER BY SUM(amount) DESC`,
+            [environment],
+          ).then((r) => r.rows)
+        : Promise.resolve(null),
+    ]);
+
+  // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
+  const comissaoRealizada = comissaoMes ? Number(comissaoMes) : 0;
+  const faturamento = Number(atacado.faturamento) + Number(varejo.faturamento) + comissaoRealizada;
+  const custo = Number(atacado.custo_total) + Number(varejo.custo_total);
+  const despesasMes = despCat ? despCat.reduce((s, c) => s + Number(c.total), 0) : null;
+  const lucroBruto = Number(atacado.lucro_total) + Number(varejo.lucro_total) + comissaoRealizada;
+  const lucro = lucroBruto - (despesasMes ?? 0);
+  const margemPct = faturamento > 0 ? Math.round((lucro / faturamento) * 1000) / 10 : null;
+
+  // A RECEBER: fiado do atacado (linha a linha) + comissão acumulada por parceiro.
+  const recebiveis: FinanceiroReceivableItem[] = [];
+  if (fiado) {
+    for (const r of fiado.receivables) {
+      recebiveis.push({ tipo: 'fiado', id: r.id, nome: r.counterparty, valor: r.total_amount,
+        due_date: r.due_date, overdue: r.overdue, phone: r.phone });
+    }
+  }
+  if (ledger) {
+    for (const p of ledger.partners) {
+      recebiveis.push({ tipo: 'comissao', id: p.partner_id, nome: p.partner_name,
+        valor: p.open_total, due_date: null, overdue: false, phone: p.whatsapp_phone,
+        count: p.open_count });
+    }
+  }
+  recebiveis.sort((a, b) => Number(b.overdue) - Number(a.overdue) || Number(b.valor) - Number(a.valor));
+
+  // A PAGAR (agenda): vencido primeiro, depois vencimento mais perto, sem data no fim.
+  const pagaveis: FinanceiroPayableItem[] = [];
+  if (fiado) {
+    for (const p of fiado.payables) {
+      pagaveis.push({ tipo: 'fornecedor', id: p.id, nome: p.counterparty, valor: p.total_amount,
+        due_date: p.due_date, overdue: p.overdue });
+    }
+  }
+  if (despesas) {
+    for (const d of despesas.entries) {
+      if (d.payment_status !== 'pending') continue;
+      pagaveis.push({ tipo: 'despesa', id: d.id, nome: d.description || d.category,
+        categoria: d.category, valor: d.amount, due_date: d.due_date, overdue: d.overdue });
+    }
+  }
+  pagaveis.sort((a, b) => {
+    if (a.overdue !== b.overdue) return Number(b.overdue) - Number(a.overdue);
+    if (!a.due_date && !b.due_date) return Number(b.valor) - Number(a.valor);
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0;
+  });
+
+  // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
+  const capitalParado = Number(capital.capital);
+  const giroDias = custo > 0 ? Math.round(capitalParado / (custo / 30)) : null;
+  const fatAtacado = Number(atacado.faturamento);
+  const fiadoAbertoPct = fiadoAbertoMes !== null && fatAtacado > 0
+    ? Math.round((Number(fiadoAbertoMes) / fatAtacado) * 100) : null;
+  const margemBrutaFrac = faturamento > 0 ? lucroBruto / faturamento : 0;
+  const pontoEquilibrio = despesasMes !== null && despesasMes > 0 && margemBrutaFrac > 0
+    ? Math.round(despesasMes / margemBrutaFrac) : null;
+
+  return {
+    fontes: {
+      fiado: Boolean(env.WHOLESALE_FINANCE),
+      comissao: Boolean(env.NETWORK_COMMISSION_LEDGER),
+      despesas: Boolean(env.MATRIZ_EXPENSES),
+    },
+    mes: {
+      faturamento: faturamento.toFixed(2),
+      custo: custo.toFixed(2),
+      despesas: despesasMes !== null ? despesasMes.toFixed(2) : null,
+      lucro: lucro.toFixed(2),
+      margem_pct: margemPct,
+      itens_sem_custo: varejo.itens_sem_custo,
+      pernas: {
+        atacado: { faturamento: atacado.faturamento, lucro: atacado.lucro_total },
+        varejo: { faturamento: varejo.faturamento, lucro: varejo.lucro_total },
+        comissao: comissaoMes !== null ? { realizado: Number(comissaoMes).toFixed(2) } : null,
+      },
+      despesas_categoria: despCat,
+    },
+    a_receber: {
+      total: ((fiado ? Number(fiado.a_receber_total) : 0) + (ledger ? Number(ledger.total_aberto) : 0)).toFixed(2),
+      vencidos_count: fiado ? fiado.a_receber_vencidos : 0,
+      itens: recebiveis,
+    },
+    a_pagar: {
+      total: ((fiado ? Number(fiado.a_pagar_total) : 0) + (despesas ? Number(despesas.a_pagar_total) : 0)).toFixed(2),
+      vencidos_count: (fiado ? fiado.a_pagar_vencidos : 0) + (despesas ? despesas.a_pagar_vencidos : 0),
+      itens: pagaveis,
+    },
+    indicadores: {
+      capital_parado: capitalParado.toFixed(2),
+      pneus_galpao: capital.pneus,
+      giro_dias: giroDias,
+      fiado_aberto_pct: fiadoAbertoPct,
+      ponto_equilibrio: pontoEquilibrio,
+    },
+  };
 }

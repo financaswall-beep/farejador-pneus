@@ -96,6 +96,22 @@ function painelApp() {
     // FINANCEIRO do atacado (0115, flag WHOLESALE_FINANCE): fiado a receber/a pagar.
     // null = flag off (a UI inteira do financeiro se esconde sozinha).
     atacadoFinance: null,
+    // DESPESAS da matriz (0120, flag MATRIZ_EXPENSES): a perna de SAÍDA que faltava
+    // (aluguel/funcionário/combustível/frete/manutenção). null = flag off (bloco some).
+    matrizDespesas: null,
+    despesasLoaded: false,
+    financeiroVisao: null,
+    despesaSaving: false,
+    despesaMsg: null,
+    despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },
+    despesaCategorias: [
+      { id: 'aluguel', label: 'Aluguel/galpão' },
+      { id: 'funcionario', label: 'Funcionário' },
+      { id: 'combustivel', label: 'Combustível' },
+      { id: 'frete', label: 'Frete pago' },
+      { id: 'manutencao', label: 'Manutenção' },
+      { id: 'outros', label: 'Outros' },
+    ],
     // CANCELAR venda (0116): últimas vendas (vivas e canceladas) — de onde se cancela.
     atacadoVendas: [],
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
@@ -126,14 +142,14 @@ function painelApp() {
     ],
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
-      { id: 'resumo',   label: 'Resumo',  icon: 'layout-dashboard' },
-      { id: 'vendas',   label: 'Vendas',  icon: 'shopping-bag' },
-      { id: 'compras',  label: 'Compras', icon: 'shopping-cart' },
-      { id: 'rede',     label: 'Rede',    icon: 'network' },
+      { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
+      { id: 'vendas',     label: 'Vendas',     icon: 'shopping-bag' },
+      { id: 'compras',    label: 'Compras',    icon: 'shopping-cart' },
+      { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
+      { id: 'rede',       label: 'Rede',       icon: 'network' },
     ],
 
     futureMenu: [
-      { id: 'financeiro',   label: 'Financeiro',    icon: 'wallet' },
       { id: 'estoque',      label: 'Estoque',       icon: 'package' },
       { id: 'logistica',    label: 'Logística',     icon: 'truck' },
       { id: 'colaboradores',label: 'Colaboradores', icon: 'users' },
@@ -1163,6 +1179,151 @@ function painelApp() {
       }
     },
 
+    // ── MATRIZ — DESPESAS GERAIS (0120): lançar / quitar / remover ──
+    // ── FINANCEIRO da matriz — tela própria: visão consolidada (Onda 1) + despesas (0120) ──
+    async loadFinanceiro() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      const [visao] = await Promise.all([
+        this.apiGet('/admin/api/matriz/financeiro').catch((err) => {
+          console.warn('financeiro visão falhou:', err.message);
+          return null;
+        }),
+        this.loadDespesas(),
+      ]);
+      // Rede piscou → mantém a visão anterior (dado de 15s atrás > tela apagada).
+      this.financeiroVisao = visao ?? this.financeiroVisao;
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    async loadDespesas() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      try {
+        const despesas = await this.apiGet('/admin/api/matriz/despesas');
+        // flag off → enabled:false → null (o bloco some; a tela mostra o aviso de dormente)
+        this.matrizDespesas = despesas && despesas.enabled ? despesas : null;
+      } catch (err) {
+        // Erro de REDE não apaga o bloco (mantém o dado anterior); só a flag off zera.
+        console.warn('despesas load falhou:', err.message);
+      } finally {
+        this.despesasLoaded = true;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
+    // Barra de participação (perna × maior perna do mês). Mínimo 2% pra barra existir.
+    finBarWidth(valor) {
+      const v = this.financeiroVisao;
+      if (!v) return '0%';
+      const candidatos = [
+        Number(v.mes.pernas.atacado.faturamento || 0),
+        Number(v.mes.pernas.varejo.faturamento || 0),
+        Number(v.mes.pernas.comissao?.realizado || 0),
+        Number(v.mes.despesas || 0),
+      ];
+      const max = Math.max(...candidatos);
+      if (!(max > 0) || !(Number(valor) > 0)) return '0%';
+      return Math.max(2, Math.round((Number(valor) / max) * 100)) + '%';
+    },
+    // "Cobrar no WhatsApp" da tela Financeiro (mesmo deep-link wa.me da página Rede).
+    finWhatsLink(item) {
+      const digits = String(item.phone || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const tel = digits.startsWith('55') ? digits : '55' + digits;
+      const msg = item.tipo === 'comissao'
+        ? 'Fala! Fechou ' + this.formatCurrency(Number(item.valor || 0)) +
+          ' de comissão das vendas que o Farejador mandou pra você. Como prefere acertar?'
+        : 'Fala! Tem ' + this.formatCurrency(Number(item.valor || 0)) +
+          ' em aberto aqui do pneu que você levou no atacado' +
+          (item.overdue ? ' (já venceu)' : '') + '. Como prefere acertar?';
+      return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+    },
+    // Rótulo de vencimento dos itens (a receber/agenda).
+    finVence(item) {
+      if (item.tipo === 'comissao') return (item.count || 0) + ' venda(s) da rede';
+      if (!item.due_date) return 'sem vencimento';
+      return (item.overdue ? 'VENCEU ' : 'vence ') + this.financeDate(item.due_date);
+    },
+    // "Recebi" direto da tela: fiado quita a venda; comissão quita o acumulado do parceiro.
+    async finReceber(item) {
+      const rotulo = item.tipo === 'comissao' ? 'a comissão de ' + item.nome : 'de ' + item.nome;
+      if (!window.confirm(`Recebeu ${this.formatCurrency(Number(item.valor))} ${rotulo}?`)) return;
+      try {
+        if (item.tipo === 'comissao') {
+          await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: item.id });
+        } else {
+          await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'sale', id: item.id });
+        }
+        await this.loadFinanceiro();
+      } catch (err) {
+        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      }
+    },
+    // "Paguei" direto da agenda: fornecedor quita a compra; despesa quita a despesa.
+    async finPagar(item) {
+      if (!window.confirm(`Pagar ${this.formatCurrency(Number(item.valor))} (${item.nome})?`)) return;
+      try {
+        if (item.tipo === 'despesa') {
+          await this.apiPost('/admin/api/matriz/despesas/settle', { id: item.id });
+        } else {
+          await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'purchase', id: item.id });
+        }
+        await this.loadFinanceiro();
+      } catch (err) {
+        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      }
+    },
+    despesaLabel(catId) {
+      const c = this.despesaCategorias.find((x) => x.id === catId);
+      return c ? c.label : catId;
+    },
+    async despesaSubmit() {
+      const valor = Number(String(this.despesaForm.amount).replace(',', '.'));
+      if (!valor || valor <= 0) {
+        this.despesaMsg = { ok: false, text: 'Valor da despesa precisa ser maior que zero.' };
+        return;
+      }
+      this.despesaSaving = true;
+      this.despesaMsg = null;
+      try {
+        const body = {
+          category: this.despesaForm.category,
+          description: this.despesaForm.description.trim() || null,
+          amount: valor,
+          payment_status: this.despesaForm.payment_status,
+        };
+        if (body.payment_status === 'pending' && this.despesaForm.due_date) {
+          body.due_date = this.despesaForm.due_date;
+        }
+        await this.apiPost('/admin/api/matriz/despesas', body);
+        const fiadoTxt = body.payment_status === 'pending' ? ' (foi pro A PAGAR)' : '';
+        this.despesaMsg = { ok: true, text: `Despesa lançada — ${this.formatCurrency(valor)}${fiadoTxt}.` };
+        this.despesaForm = { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' };
+        await this.loadFinanceiro();
+      } catch (err) {
+        this.despesaMsg = { ok: false, text: `Não consegui lançar (${err.message}).` };
+      } finally {
+        this.despesaSaving = false;
+      }
+    },
+    async despesaSettle(row) {
+      if (!window.confirm(`Pagar ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})?`)) return;
+      try {
+        await this.apiPost('/admin/api/matriz/despesas/settle', { id: row.id });
+        await this.loadFinanceiro();
+      } catch (err) {
+        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      }
+    },
+    async despesaRemove(row) {
+      if (!window.confirm(`Remover a despesa de ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})? Ela some das contas (a trilha fica no banco).`)) return;
+      try {
+        await this.apiPost('/admin/api/matriz/despesas/remove', { id: row.id });
+        await this.loadFinanceiro();
+      } catch (err) {
+        window.alert(`Não consegui remover (${err.message}).`);
+      }
+    },
+
     // ── ATACADO (Fase 2) — estoque do galpão por medida ──
     measureOnHand(measure) {
       // Quanto tem de uma medida (pro form de venda mostrar "em estoque"). null = não cadastrada.
@@ -1774,6 +1935,8 @@ function painelApp() {
         if (page === 'vendas') void this.loadVarejoResumo();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
         if (page === 'rede') void this.loadComissoes();
+        // Financeiro: visão consolidada (Onda 1) + despesas (0120) num carregador só.
+        if (page === 'financeiro') void this.loadFinanceiro();
       });
 
       this.startLiveRefresh();

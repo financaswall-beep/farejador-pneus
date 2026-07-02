@@ -134,6 +134,14 @@ const envSchema = z.object({
   // botão Recebi). Regras batidas com o dono em 07-02. Default OFF = dormente: endpoint
   // devolve enabled:false, a UI some e NADA é gravado. Liga no Coolify pós-Deploy.
   NETWORK_COMMISSION_LEDGER: booleanStringSchema,
+  // MATRIZ — DESPESAS GERAIS (Fase A do livro-caixa, 0120): com a flag ON, a aba
+  // FINANCEIRO do painel da matriz ganha o lançamento de despesas (aluguel/funcionário/
+  // combustível/frete/manutenção/outros) com pago na hora × a pagar (vocabulário do
+  // fiado 0115) — a perna de SAÍDA que faltava pro caixa fechar. A visão consolidada da
+  // mesma aba (Onda 1, SÓ leitura) mostra a fatia de despesas apenas com esta flag ON.
+  // Default OFF = dormente: endpoint devolve enabled:false e a UI se esconde. Liga no
+  // Coolify pós-Deploy. Fase B (0121, livro-razão) lê esta tabela com a mesma régua.
+  MATRIZ_EXPENSES: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel
