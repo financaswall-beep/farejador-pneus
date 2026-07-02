@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260702-varejo-lucro"></script>
+<script src="/admin/painel/app.js?v=20260703-comissao3"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -379,17 +379,17 @@
           <div class="bg-white border border-gray-200 rounded-xl p-5">
             <div class="flex items-center justify-between mb-1">
               <h3 class="font-semibold">A receber da rede</h3>
-              <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(redeTotalDevido())"></span>
+              <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(redeAReceberTotal())"></span>
             </div>
-            <p class="text-xs text-gray-500 mb-3">Mensalidade + comissão sobre vendas 2W · <span x-text="redePeriodLabel()"></span></p>
+            <p class="text-xs text-gray-500 mb-3" x-text="livroComissaoOn() ? 'Mensalidade do mês + comissões EM ABERTO no livro' : 'Mensalidade + comissão sobre vendas 2W · ' + redePeriodLabel()"></p>
             <div class="space-y-1.5 text-sm">
               <div class="flex items-center justify-between">
                 <span class="text-gray-500">Mensalidades</span>
                 <span class="font-medium" x-text="formatCurrency(redeTotalMensalidade())"></span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-gray-500">Comissão 2W</span>
-                <span class="font-medium" x-text="formatCurrency(redeTotalComissao())"></span>
+                <span class="text-gray-500" x-text="livroComissaoOn() ? 'Comissão (em aberto)' : 'Comissão 2W'"></span>
+                <span class="font-medium" x-text="formatCurrency(redeComissaoAReceber())"></span>
               </div>
             </div>
             <a href="#" @click.prevent="currentPage = 'rede'" class="mt-4 flex items-center justify-between text-sm text-gray-900 hover:underline">
@@ -444,6 +444,73 @@
         <div class="text-xs text-gray-400">
           sem dados simulados nesta tela
         </div>
+      </div>
+
+      <!-- Comissões a receber (0118, flag NETWORK_COMMISSION_LEDGER): cada venda 2W
+           realizada vira LANÇAMENTO (% congelado); cancelou, estorna sozinho. -->
+      <div x-show="comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold">Comissões a receber</h3>
+          <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(Number(comissoes?.total_aberto || 0))"></span>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">Cada venda que o bot trouxe (2W) e REALIZOU vira um lançamento — % sobre os PNEUS (frete fica fora), congelado no dia da venda; venda cancelada estorna sozinha.</p>
+        <!-- Alarme de cobrança: loja acumulou ≥ X → pisca COBRAR (X salvo nesta máquina) -->
+        <div class="flex items-center gap-2 mb-3 text-xs text-gray-600 flex-wrap">
+          <span>🔔 Piscar <b>COBRAR</b> quando a loja acumular</span>
+          <input type="number" min="0" step="50" :value="comissaoAlerta || ''"
+                 @change="setComissaoAlerta($event.target.value)" placeholder="R$"
+                 class="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+          <span class="text-gray-400" x-text="comissaoAlerta ? '(salvo nesta máquina)' : 'em branco = sem alarme'"></span>
+        </div>
+        <template x-if="comissoes && (comissoes.partners || []).length === 0">
+          <p class="text-sm text-gray-500 mb-2">Nenhuma comissão em aberto 👍</p>
+        </template>
+        <div class="space-y-2">
+          <template x-for="p in (comissoes?.partners || [])" :key="p.partner_id">
+            <div class="flex items-center justify-between gap-3 border rounded-lg px-3 py-2"
+                 :class="comissaoEstourou(p) ? 'border-rose-300 bg-rose-50' : 'border-gray-100'">
+              <div>
+                <div class="flex items-center gap-2">
+                  <div class="text-sm font-medium" x-text="p.partner_name"></div>
+                  <span x-show="comissaoEstourou(p)"
+                        class="animate-pulse text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">🔔 COBRAR</span>
+                </div>
+                <div class="text-xs text-gray-500" x-text="p.open_count + ' lançamento(s) em aberto'"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold" x-text="formatCurrency(Number(p.open_total || 0))"></span>
+                <a x-show="comissaoEstourou(p) && comissaoWhatsLink(p)" :href="comissaoWhatsLink(p)" target="_blank"
+                   class="text-xs px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800">Cobrar no WhatsApp</a>
+                <button @click="settleComissao(p)" :disabled="comissaoSettling === p.partner_id"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white disabled:opacity-50">
+                  <span x-text="comissaoSettling === p.partner_id ? 'Quitando...' : 'Recebi'"></span>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <template x-if="comissoes && (comissoes.entries || []).length > 0">
+          <div class="mt-4">
+            <button @click="comissaoExtratoAberto = !comissaoExtratoAberto"
+                    class="text-xs text-gray-500 underline underline-offset-2 mb-2"
+                    x-text="comissaoExtratoAberto ? 'esconder extrato' : 'ver extrato (lançamentos um a um)'"></button>
+            <div x-show="comissaoExtratoAberto" class="space-y-1">
+              <template x-for="e in (comissoes?.entries || [])" :key="e.id">
+                <div class="flex items-center justify-between text-xs px-2 py-1.5 rounded bg-gray-50"
+                     :class="e.status === 'reversed' ? 'opacity-60' : ''">
+                  <span class="text-gray-600">
+                    <span class="font-medium" x-text="e.partner_name"></span> ·
+                    <span x-text="formatCurrency(Number(e.commission_amount || 0))"></span>
+                    (<span x-text="Number(e.commission_percent)"></span>% de <span x-text="formatCurrency(Number(e.order_total || 0))"></span>)
+                  </span>
+                  <span class="px-2 py-0.5 rounded-full"
+                        :class="e.status === 'open' ? 'bg-amber-50 text-amber-700' : (e.status === 'settled' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500')"
+                        x-text="e.status === 'open' ? 'em aberto' : (e.status === 'settled' ? 'recebida' : (e.settled_at ? 'estornada (JÁ PAGA — acerto por fora)' : 'estornada'))"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
 
       <div class="grid grid-cols-2 xl:grid-cols-6 gap-4 mb-6">
@@ -582,10 +649,10 @@
         <div class="flex items-center justify-between mb-3">
           <div>
             <h3 class="font-semibold text-sm">A receber da rede</h3>
-            <p class="text-xs text-gray-500 mt-0.5">Mensalidade + comissão sobre vendas 2W · <span x-text="redePeriodLabel()"></span></p>
+            <p class="text-xs text-gray-500 mt-0.5" x-text="livroComissaoOn() ? 'Mensalidade do mês + comissões EM ABERTO no livro' : 'Mensalidade + comissão sobre vendas 2W · ' + redePeriodLabel()"></p>
           </div>
           <span class="text-sm font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
-                x-text="formatCurrency(redeTotalDevido())"></span>
+                x-text="formatCurrency(redeAReceberTotal())"></span>
         </div>
         <div class="grid grid-cols-3 gap-4 text-sm">
           <div>
@@ -593,15 +660,15 @@
             <div class="font-semibold" x-text="formatCurrency(redeTotalMensalidade())"></div>
           </div>
           <div>
-            <div class="text-xs text-gray-500 mb-1">Comissão (2W)</div>
-            <div class="font-semibold" x-text="formatCurrency(redeTotalComissao())"></div>
+            <div class="text-xs text-gray-500 mb-1" x-text="livroComissaoOn() ? 'Comissão (em aberto)' : 'Comissão (2W)'"></div>
+            <div class="font-semibold" x-text="formatCurrency(redeComissaoAReceber())"></div>
           </div>
           <div>
             <div class="text-xs text-gray-500 mb-1">Total devido</div>
-            <div class="font-bold text-emerald-700" x-text="formatCurrency(redeTotalDevido())"></div>
+            <div class="font-bold text-emerald-700" x-text="formatCurrency(redeAReceberTotal())"></div>
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 mt-3">Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.</p>
+        <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
@@ -1048,6 +1115,37 @@
         <p class="mt-2 text-[11px] text-gray-400">A Rede só manda entrega pra esse parceiro dentro do raio. Em branco = fora da entrega (só retirada).</p>
       </div>
 
+      <!-- Modelo comercial (Rede): editor dos termos do parceiro — 0118 (pendência de 06-01).
+           x-effect re-preenche o form quando troca o parceiro selecionado. -->
+      <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6" x-effect="selectedParceiroIndex; abrirTermsForm()">
+        <div class="text-sm font-semibold text-gray-700 mb-1">Modelo comercial (Rede)</div>
+        <p class="text-xs text-gray-500 mb-3">Vale pra comissões NOVAS daqui pra frente — lançamento já gerado fica com o % da época (congelado).</p>
+        <div class="flex items-end gap-3 flex-wrap">
+          <label class="text-xs text-gray-500 block">Modelo
+            <select x-model="termsForm.model" class="mt-1 block w-44 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900">
+              <option value="commission">Comissão</option>
+              <option value="monthly">Mensalidade</option>
+              <option value="hybrid">Comissão + mensalidade</option>
+            </select>
+          </label>
+          <label class="text-xs text-gray-500 block" x-show="termsForm.model !== 'monthly'">Comissão (%)
+            <input type="number" min="0" max="100" step="0.5" x-model="termsForm.percent"
+                   class="mt-1 block w-28 rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="%" />
+          </label>
+          <label class="text-xs text-gray-500 block" x-show="termsForm.model !== 'commission'">Mensalidade (R$)
+            <input type="number" min="0" step="10" x-model="termsForm.fee"
+                   class="mt-1 block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="R$" />
+          </label>
+          <button @click="salvarTerms()" :disabled="termsSaving"
+                  class="text-sm px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
+            <span x-text="termsSaving ? 'Salvando...' : 'Salvar termos'"></span>
+          </button>
+          <span x-show="termsMsg" class="text-xs"
+                :class="String(termsMsg).indexOf('Erro') === 0 ? 'text-rose-600' : 'text-emerald-600'"
+                x-text="termsMsg"></span>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Faturamento</div>
@@ -1215,19 +1313,19 @@
           </div>
 
           <div class="mt-5 border-t border-gray-100 pt-4">
-            <div class="text-xs text-gray-500 mb-2">Cobrança à matriz · <span x-text="redePeriodLabel()"></span></div>
+            <div class="text-xs text-gray-500 mb-2">Cobrança à matriz<span x-show="!livroComissaoOn()"> · <span x-text="redePeriodLabel()"></span></span></div>
             <div class="space-y-2">
               <div class="flex items-center justify-between text-sm">
                 <span class="text-gray-600">Mensalidade</span>
                 <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.mensalidadeDevida)"></span>
               </div>
               <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-600">Comissão sobre 2W<span x-show="selectedParceiro()?.comissaoPercent" x-text="' (' + selectedParceiro()?.comissaoPercent + '%)'"></span></span>
-                <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.comissaoDevida)"></span>
+                <span class="text-gray-600"><span x-text="livroComissaoOn() ? 'Comissão em aberto (livro)' : 'Comissão sobre 2W'"></span><span x-show="selectedParceiro()?.comissaoPercent" x-text="' (' + selectedParceiro()?.comissaoPercent + '%)'"></span></span>
+                <span class="font-semibold" x-text="formatCurrency(parceiroComissaoAReceber(selectedParceiro()))"></span>
               </div>
               <div class="border-t border-gray-100 pt-2 flex items-center justify-between text-sm">
                 <span class="font-medium">Total devido</span>
-                <span class="font-bold text-emerald-700" x-text="formatCurrency(selectedParceiro()?.devidoMatriz)"></span>
+                <span class="font-bold text-emerald-700" x-text="formatCurrency(parceiroAReceberTotal(selectedParceiro()))"></span>
               </div>
             </div>
           </div>

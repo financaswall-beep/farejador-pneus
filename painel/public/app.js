@@ -83,6 +83,16 @@ function painelApp() {
     // ── VAREJO da matriz (0117 — fatia 2): resumo com custo CONGELADO na venda ──
     varejoResumo: null, // null = ainda não carregou (cards caem no cálculo da lista)
     varejoPeriodo: 'tudo',
+    // ── REDE — comissões como lançamento (0118, flag NETWORK_COMMISSION_LEDGER) ──
+    comissoes: null, // null ou enabled:false = flag desligada (o bloco some sozinho)
+    comissaoSettling: null, // partner_id em quitação (trava o botão Recebi)
+    termsForm: { model: 'commission', percent: '', fee: '' }, // editor do modelo comercial
+    termsSaving: false,
+    termsMsg: null,
+    // Alarme de cobrança (decisão do dono 07-02): loja acumulou ≥ X em aberto → pisca
+    // "COBRAR". X salvo nesta máquina (mesmo padrão da meta da Rede). 0 = sem alarme.
+    comissaoAlerta: Number(localStorage.getItem('farejador_comissao_alerta') || 0),
+    comissaoExtratoAberto: false, // extrato (lançamentos 1 a 1) escondido por padrão
     // FINANCEIRO do atacado (0115, flag WHOLESALE_FINANCE): fiado a receber/a pagar.
     // null = flag off (a UI inteira do financeiro se esconde sozinha).
     atacadoFinance: null,
@@ -302,6 +312,29 @@ function painelApp() {
 
     redeTotalDevido() {
       return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.devidoMatriz || 0), 0);
+    },
+
+    // Livro de comissões (0118) LIGADO → "a receber" = lançamentos EM ABERTO no livro
+    // (o Recebi desconta na hora; frete fora; sem recorte de período). Desligado →
+    // estimativa antiga (% × vendas 2W do período). Dono apontou o furo em 07-02:
+    // quitou no livro e o card antigo continuava cobrando.
+    livroComissaoOn() {
+      return !!(this.comissoes && this.comissoes.enabled);
+    },
+    redeComissaoAReceber() {
+      return this.livroComissaoOn() ? Number(this.comissoes.total_aberto || 0) : this.redeTotalComissao();
+    },
+    redeAReceberTotal() {
+      return this.redeTotalMensalidade() + this.redeComissaoAReceber();
+    },
+    parceiroComissaoAReceber(p) {
+      if (!p) return 0;
+      if (!this.livroComissaoOn()) return Number(p.comissaoDevida || 0);
+      const hit = (this.comissoes.partners || []).find((x) => x.partner_id === p.partnerId);
+      return hit ? Number(hit.open_total || 0) : 0;
+    },
+    parceiroAReceberTotal(p) {
+      return p ? Number(p.mensalidadeDevida || 0) + this.parceiroComissaoAReceber(p) : 0;
     },
 
     redeConversao2w() {
@@ -769,6 +802,78 @@ function painelApp() {
       try {
         this.atacadoResumo = (await this.apiGet('/admin/api/wholesale/resumo?period=' + p)) || null;
       } catch (err) { /* mantém o resumo anterior na tela */ }
+    },
+
+    // ── REDE — comissões como lançamento (0118): o GET já roda a varredura no servidor
+    // (cria lançamento de venda 2W realizada; estorna o de venda cancelada). ──
+    async loadComissoes() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      try {
+        this.comissoes = (await this.apiGet('/admin/api/rede/comissoes')) || null;
+      } catch (err) {
+        this.comissoes = null; // sem resposta = bloco some (não inventa número)
+      }
+    },
+    async settleComissao(p) {
+      const total = this.formatCurrency(Number(p.open_total || 0));
+      if (!confirm(`Confirmar RECEBIDO de ${p.partner_name}?\n\n${p.open_count} lançamento(s) em aberto, total ${total}, viram "recebido" agora.`)) return;
+      this.comissaoSettling = p.partner_id;
+      try {
+        await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: p.partner_id });
+        await this.loadComissoes();
+      } catch (err) {
+        alert('Não deu pra quitar: ' + (err instanceof Error ? err.message : err));
+      } finally {
+        this.comissaoSettling = null;
+      }
+    },
+    setComissaoAlerta(value) {
+      this.comissaoAlerta = Math.max(0, Number(value) || 0);
+      localStorage.setItem('farejador_comissao_alerta', String(this.comissaoAlerta));
+    },
+    comissaoEstourou(p) {
+      return this.comissaoAlerta > 0 && Number(p.open_total || 0) >= this.comissaoAlerta;
+    },
+    // Atalho "cobrar no WhatsApp" (deep-link wa.me — padrão da casa, fora da API Meta).
+    comissaoWhatsLink(p) {
+      const digits = String(p.whatsapp_phone || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const tel = digits.startsWith('55') ? digits : '55' + digits;
+      const msg = 'Fala! Fechou ' + this.formatCurrency(Number(p.open_total || 0)) +
+        ' de comissão das vendas que o Farejador mandou pra você. Como prefere acertar?';
+      return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+    },
+    // Editor do modelo comercial (página da unidade): pré-carrega da ficha do parceiro
+    // selecionado. Vale pra comissões NOVAS — lançamento antigo fica com o % da época.
+    abrirTermsForm() {
+      const p = this.selectedParceiro();
+      if (!p) return;
+      this.termsForm = {
+        model: p.modeloComercialRaw || 'commission',
+        percent: p.comissaoPercentRaw === null || p.comissaoPercentRaw === undefined ? '' : p.comissaoPercentRaw,
+        fee: p.mensalidadeRaw === null || p.mensalidadeRaw === undefined ? '' : p.mensalidadeRaw,
+      };
+    },
+    async salvarTerms() {
+      const p = this.selectedParceiro();
+      if (!p || !p.partnerId) return;
+      this.termsSaving = true;
+      this.termsMsg = null;
+      try {
+        await this.apiPost(`/admin/api/partners/${p.partnerId}/terms`, {
+          commercial_model: this.termsForm.model,
+          commission_percent: this.termsForm.percent === '' ? null : Number(this.termsForm.percent),
+          monthly_fee: this.termsForm.fee === '' ? null : Number(this.termsForm.fee),
+        });
+        this.termsMsg = 'Salvo ✓';
+        await this.loadRealData(); // a ficha muda o rótulo da Rede (comissão %)
+      } catch (err) {
+        this.termsMsg = 'Erro: ' + (err instanceof Error ? err.message : err);
+      } finally {
+        this.termsSaving = false;
+        setTimeout(() => { this.termsMsg = null; }, 4000);
+      }
     },
 
     // ── ATACADO (Fase 1) — venda pro borracheiro + ranking de recompra ──
@@ -1301,6 +1406,7 @@ function painelApp() {
         return {
           id: row.partner_unit_id,
           unitId: row.unit_id,
+          partnerId: row.partner_id, // pro settle de comissão + editor de termos (0118)
           slug: row.slug,
           nome: row.display_name || row.partner_name || 'Unidade',
           documento: row.document_number || '-',
@@ -1308,6 +1414,9 @@ function painelApp() {
           whatsapp: row.whatsapp_phone || '-',
           endereco: row.address || '-',
           modeloComercial: this.partnerCommercialModel(row),
+          modeloComercialRaw, // valores crus pro editor de termos (0118)
+          comissaoPercentRaw: comissaoPercent,
+          mensalidadeRaw: mensalidadeValor,
           comissao: row.commission_percent ? `${Number(row.commission_percent)}%` : (row.monthly_fee ? this.formatCurrency(row.monthly_fee) : '-'),
           cidade: row.address || '-',
           status: this.partnerStatusLabel(row.unit_status || row.partner_status),
@@ -1636,6 +1745,9 @@ function painelApp() {
 
     init() {
       void this.loadRealData();
+      // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
+      // (flag off = resposta enabled:false, barata; a página Rede re-varre ao entrar).
+      void this.loadComissoes();
       this.$nextTick(() => {
         lucide.createIcons();
         this.renderChart();
@@ -1660,6 +1772,8 @@ function painelApp() {
         if (page === 'compras') void this.loadAtacado();
         // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.
         if (page === 'vendas') void this.loadVarejoResumo();
+        // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
+        if (page === 'rede') void this.loadComissoes();
       });
 
       this.startLiveRefresh();

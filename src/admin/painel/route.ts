@@ -18,6 +18,10 @@ import {
   getWholesaleRanking,
   getWholesaleResumo,
   getVarejoResumo,
+  sweepCommissionEntries,
+  getCommissionLedger,
+  settleCommissionEntries,
+  updatePartnerCommercialTerms,
   listPartnerApplications,
   listWholesaleBuyers,
   listWholesaleMeasures,
@@ -60,6 +64,15 @@ const resumoQuerySchema = z.object({
 // Recorte dos cards financeiros (atacado e varejo da matriz): mês corrente ou desde sempre.
 const financePeriodQuerySchema = z.object({
   period: z.enum(['mes', 'tudo']).default('tudo'),
+});
+
+// Comissões da Rede (0118): quitar por parceiro + editor do modelo comercial.
+const settleComissaoSchema = z.object({ partner_id: z.string().uuid() });
+const partnerIdParamSchema = z.object({ partner_id: z.string().uuid() });
+const partnerTermsSchema = z.object({
+  commercial_model: z.enum(['commission', 'monthly', 'hybrid']),
+  commission_percent: z.number().min(0).max(100).nullable(),
+  monthly_fee: z.number().min(0).nullable(),
 });
 
 // Onboarding de parceiro (Etapa 1). Termos comerciais são definidos pela matriz aqui,
@@ -421,6 +434,57 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     const parsed = financePeriodQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send({ ...dashboardPayload([]), ...(await getVarejoResumo(parsed.data.period)) });
+  });
+
+  // ── REDE — COMISSÕES COMO LANÇAMENTO (0118, flag NETWORK_COMMISSION_LEDGER) ──
+  // O GET roda a VARREDURA (cria lançamento de venda 2W realizada; estorna o de venda
+  // cancelada) e devolve o livro. Flag off → {enabled:false} e a UI some (nada é gravado).
+  fastify.get('/admin/api/rede/comissoes', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    if (!env.NETWORK_COMMISSION_LEDGER) {
+      return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
+    }
+    const sweep = await sweepCommissionEntries();
+    const ledger = await getCommissionLedger();
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, sweep, ...ledger });
+  });
+
+  // "Recebi": quita todos os lançamentos em aberto do parceiro.
+  fastify.post('/admin/api/rede/comissoes/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.NETWORK_COMMISSION_LEDGER) return reply.status(409).send({ error: 'ledger_disabled' });
+    const parsed = settleComissaoSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await settleCommissionEntries({ partner_id: parsed.data.partner_id, settled_by: 'matriz-painel' });
+      return reply.status(200).send(result);
+    } catch (err) {
+      if ((err as Error).message === 'nothing_open') return reply.status(404).send({ error: 'nothing_open' });
+      logger.error({ err }, 'painel commission settle failed');
+      return reply.status(500).send({ error: 'internal_error' });
+    }
+  });
+
+  // Editor do modelo comercial do parceiro (SEM flag — edição de cadastro, pendência 06-01).
+  fastify.post('/admin/api/partners/:partner_id/terms', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const params = partnerIdParamSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_params' });
+    const parsed = partnerTermsSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await updatePartnerCommercialTerms({
+        partner_id: params.data.partner_id,
+        commercial_model: parsed.data.commercial_model,
+        commission_percent: parsed.data.commission_percent,
+        monthly_fee: parsed.data.monthly_fee,
+        actor_label: 'matriz-painel',
+      });
+      return reply.status(200).send(result);
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg === 'partner_not_found') return reply.status(404).send({ error: msg });
+      if (msg === 'invalid_percent' || msg === 'invalid_fee') return reply.status(400).send({ error: msg });
+      logger.error({ err }, 'painel partner terms update failed');
+      return reply.status(500).send({ error: 'internal_error' });
+    }
   });
 
   // Estoque do galpão (uma linha por medida).

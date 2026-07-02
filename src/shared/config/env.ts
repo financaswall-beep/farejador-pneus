@@ -127,6 +127,13 @@ const envSchema = z.object({
   // Item sem custo no galpão fica NULL e o resumo conta à parte (não chuta). Default OFF =
   // dormente: nada é gravado (byte a byte como hoje). Liga no Coolify pós-prova ao vivo.
   WHOLESALE_MATRIZ_RETAIL_COST: booleanStringSchema,
+  // REDE — COMISSÃO COMO LANÇAMENTO (fatia 1 da cobrança, 0118): com a flag ON, o GET da
+  // tela varre as vendas 2W REALIZADAS (mesma régua 0077/0090 do faturamento do parceiro)
+  // e cria 1 lançamento por venda com o % da FICHA congelado; venda cancelada → estorno
+  // automático com trilha; painel ganha o bloco "Comissões a receber" (por parceiro +
+  // botão Recebi). Regras batidas com o dono em 07-02. Default OFF = dormente: endpoint
+  // devolve enabled:false, a UI some e NADA é gravado. Liga no Coolify pós-Deploy.
+  NETWORK_COMMISSION_LEDGER: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel
