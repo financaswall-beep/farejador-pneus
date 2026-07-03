@@ -145,12 +145,12 @@ function painelApp() {
       { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
       { id: 'vendas',     label: 'Vendas',     icon: 'shopping-bag' },
       { id: 'compras',    label: 'Compras',    icon: 'shopping-cart' },
+      { id: 'estoque',    label: 'Estoque',    icon: 'package' },
       { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
       { id: 'rede',       label: 'Rede',       icon: 'network' },
     ],
 
     futureMenu: [
-      { id: 'estoque',      label: 'Estoque',       icon: 'package' },
       { id: 'logistica',    label: 'Logística',     icon: 'truck' },
       { id: 'colaboradores',label: 'Colaboradores', icon: 'users' },
       { id: 'catalogo',     label: 'Catálogo',      icon: 'tag' },
@@ -1931,6 +1931,8 @@ function painelApp() {
         });
         // Compras é tela própria: carrega fornecedor/compra/ranking ao entrar.
         if (page === 'compras') void this.loadAtacado();
+        // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
+        if (page === 'estoque') void this.loadAtacado();
         // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.
         if (page === 'vendas') void this.loadVarejoResumo();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
