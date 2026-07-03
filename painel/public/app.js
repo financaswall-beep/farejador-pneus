@@ -1268,6 +1268,35 @@ function painelApp() {
       if (s === 'failed') return 'Não entregue';
       return 'Em separação';
     },
+    // Contato do card (paridade com o card de entrega do PARCEIRO, app.format.js):
+    // deep-links custo ZERO — o entregador fala pelo WhatsApp/discador DELE (fora
+    // da API Meta); Waze/Maps abrem navegação no endereço do cliente (sem chave/cota).
+    toE164Phone(rawDigits) {
+      const d = String(rawDigits || '').replace(/\D/g, '');
+      if (!d) return null;
+      if (d.length === 10 || d.length === 11) return `+55${d}`;
+      return `+${d}`; // 12+ dígitos: assume que já veio com DDI
+    },
+    waLink(rawPhone, text) {
+      const e164 = this.toE164Phone(rawPhone);
+      if (!e164) return '#';
+      const digits = e164.replace(/\D/g, '');
+      const t = text ? `?text=${encodeURIComponent(text)}` : '';
+      return `https://wa.me/${digits}${t}`;
+    },
+    deliveryAddr(d) {
+      return String(d?.delivery_address || '').trim();
+    },
+    wazeNavUrl(d) {
+      const addr = this.deliveryAddr(d);
+      if (!addr) return '#';
+      return `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`;
+    },
+    mapsNavUrl(d) {
+      const addr = this.deliveryAddr(d);
+      if (!addr) return '#';
+      return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
+    },
     rotaDoPedido(d) {
       if (!d?.trip_id || !this.logistica) return null;
       return (this.logistica.rotas_abertas || []).find((t) => t.id === d.trip_id)

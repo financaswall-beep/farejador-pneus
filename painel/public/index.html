@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-logistica"></script>
+<script src="/admin/painel/app.js?v=20260703-logistica2"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2353,6 +2353,18 @@
                     <div class="text-xs text-gray-500 mt-0.5">
                       <span x-text="logisticaItens(d)"></span> ·
                       <span class="font-semibold text-gray-700" x-text="formatCurrency(Number(d.total_amount))"></span>
+                    </div>
+                    <!-- Contato direto do entregador: WhatsApp do cliente + navegação (deep-links custo zero, paridade com o card do parceiro) -->
+                    <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <a x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido. 🛵')" target="_blank" rel="noopener"
+                         class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
+                        <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> WhatsApp</a>
+                      <a x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"
+                         class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-medium">
+                        <i data-lucide="navigation" class="w-3.5 h-3.5"></i> Waze</a>
+                      <a x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"
+                         class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 font-medium">
+                        <i data-lucide="map" class="w-3.5 h-3.5"></i> Maps</a>
                     </div>
                   </div>
                   <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
