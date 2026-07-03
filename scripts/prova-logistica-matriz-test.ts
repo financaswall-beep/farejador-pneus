@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   const { applyMatrizGalpaoDecrement } = await import('../src/atendente-v2/wholesale-stock-read.js');
   const {
     getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery,
-    openMatrizTrip, closeMatrizTrip, addMatrizTripReceipt,
+    openMatrizTrip, attachOrderToMatrizTrip, closeMatrizTrip, addMatrizTripReceipt,
     getMatrizTripReceiptImage, recordReceiptAiResult,
   } = await import('../src/admin/painel/queries.js');
 
@@ -84,12 +84,12 @@ async function main(): Promise<void> {
       `DELETE FROM commerce.matriz_trip_receipt_blobs WHERE environment=$1 AND receipt_id IN (
          SELECT r.id FROM commerce.matriz_trip_receipts r
          JOIN commerce.matriz_delivery_trips t ON t.id = r.trip_id
-        WHERE t.courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG'))`, [ENV]);
+        WHERE t.courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG','Pendura PROVA-LOG','Vazia PROVA-LOG'))`, [ENV]);
     await client.query(
       `DELETE FROM commerce.matriz_trip_receipts WHERE environment=$1 AND trip_id IN (
-         SELECT id FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG'))`, [ENV]);
+         SELECT id FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG','Pendura PROVA-LOG','Vazia PROVA-LOG'))`, [ENV]);
     await client.query(
-      `DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG')`, [ENV]);
+      `DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG','Pendura PROVA-LOG','Vazia PROVA-LOG')`, [ENV]);
     await client.query(
       `DELETE FROM commerce.matriz_expenses WHERE environment=$1 AND created_by IN ('logistica-fechamento','ia-comprovante') AND description LIKE '%PROVA-LOG%'`, [ENV]);
     await client.query(
@@ -225,7 +225,8 @@ async function main(): Promise<void> {
     check('L11 fechar rota 2x barrado (trip_not_found)', barrou2);
 
     // ── L12: rota SEM comprovante lido → fechamento LANÇA a despesa ──
-    const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100, environment: ENV });
+    // (07-03c) rota não abre vazia → a rota técnica leva 1 entrega descartável.
+    const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
     tripIds.push(trip2.trip_id);
     const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
     const unread = await recordReceiptAiResult({
@@ -251,7 +252,7 @@ async function main(): Promise<void> {
 
     // ── L14 (P1 da banca 07-03): ordem INVERSA — fecha lançando manual, LÊ depois →
     // o comprovante COLA na despesa do fechamento (não nasce a 2ª da mesma gasolina) ──
-    const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG', km_start: 200, environment: ENV });
+    const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG', km_start: 200, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
     tripIds.push(trip3.trip_id);
     const rec3 = await addMatrizTripReceipt({ trip_id: trip3.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
     const antes3 = await despesasProva();
@@ -277,7 +278,7 @@ async function main(): Promise<void> {
 
     // ── L15: teto de comprovantes por rota (banca: anti-abuso de storage) ──
     let capped = false;
-    const trip4 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 1, environment: ENV });
+    const trip4 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 1, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
     tripIds.push(trip4.trip_id);
     await client.query(
       `INSERT INTO commerce.matriz_trip_receipts (environment, trip_id, mime, size_bytes, ai_status)
@@ -322,7 +323,46 @@ async function main(): Promise<void> {
     check('L16d despesa apagada (soft delete) SAI do resumo da rota',
       Number(log.rotas_recentes.find((t) => t.id === trip5.trip_id)!.despesas_total) === 0);
 
-    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    // ── L17-L20: VÍNCULO PEDIDO↔ROTA (07-03c) — pendurar em rota aberta + rota não
+    // abre vazia. Decisão do dono: opção 2 (botão "pôr na rota" + trava de vazia). ──
+    const oBase = await seedOrder({ unitId: mainUnitId });
+    const trip6 = await openMatrizTrip({ courier_name: 'Pendura PROVA-LOG', km_start: 10, order_ids: [oBase], environment: ENV });
+    tripIds.push(trip6.trip_id);
+    const oPend = await seedOrder({ unitId: mainUnitId });
+    const att = await attachOrderToMatrizTrip({ order_id: oPend, trip_id: trip6.trip_id, environment: ENV });
+    const pendRow = (await client.query(`SELECT trip_id, delivery_status, delivery_courier FROM commerce.orders WHERE id=$1`, [oPend])).rows[0] as { trip_id: string; delivery_status: string; delivery_courier: string };
+    check('L17 pendurar: entrega entra na rota aberta (trip_id + dispatched + entregador herdado)',
+      att.trip_id === trip6.trip_id && pendRow.trip_id === trip6.trip_id
+      && pendRow.delivery_status === 'dispatched' && pendRow.delivery_courier === 'Pendura PROVA-LOG');
+
+    // pendurar de novo o MESMO pedido não re-amarra (trip_id IS NULL já falhou) → barra
+    let barrouRepend = false;
+    try { await attachOrderToMatrizTrip({ order_id: oPend, trip_id: trip6.trip_id, environment: ENV }); }
+    catch (e) { barrouRepend = (e as Error).message === 'delivery_not_found'; }
+    check('L17b pendurar 2x o mesmo pedido barra (já está em rota)', barrouRepend);
+
+    // guard: pedido FORA da main (sem unit) não pendura
+    let barrouGuard = false;
+    try { await attachOrderToMatrizTrip({ order_id: oSemUnit, trip_id: trip6.trip_id, environment: ENV }); }
+    catch (e) { barrouGuard = (e as Error).message === 'delivery_not_found'; }
+    check('L18 pendurar barra pedido fora da main (delivery_not_found)', barrouGuard);
+
+    // rota FECHADA não recebe pendurado (trip1 fechou no L10)
+    const oClosed = await seedOrder({ unitId: mainUnitId });
+    let barrouFechada = false;
+    try { await attachOrderToMatrizTrip({ order_id: oClosed, trip_id: trip1.trip_id, environment: ENV }); }
+    catch (e) { barrouFechada = (e as Error).message === 'trip_not_open'; }
+    check('L19 pendurar em rota FECHADA barra (trip_not_open)', barrouFechada);
+
+    // rota NÃO abre vazia (order_ids ausente → count 0 → rollback, nada nasce)
+    let barrouVazia = false;
+    try { await openMatrizTrip({ courier_name: 'Vazia PROVA-LOG', km_start: 5, environment: ENV }); }
+    catch (e) { barrouVazia = (e as Error).message === 'trip_needs_delivery'; }
+    const orphan = (await client.query(`SELECT count(*)::int AS n FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name='Vazia PROVA-LOG'`, [ENV])).rows[0] as { n: number };
+    check('L20 abrir rota vazia é rejeitada (trip_needs_delivery) e NÃO deixa trip órfã',
+      barrouVazia && orphan.n === 0);
+
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
     // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);

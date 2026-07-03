@@ -2692,6 +2692,11 @@ export async function openMatrizTrip(
       // Pedido que não entrou (cancelado no meio, já em outra rota, de parceiro):
       // a rota abre com os que valem; a tela mostra quantos entraram.
     }
+    // Decisão do dono 07-03c: rota NÃO abre vazia. Sem entrega que de fato entrou
+    // (order_ids vazio, ou todos inválidos/de parceiro/já em rota → count 0), o
+    // ROLLBACK do catch desfaz o INSERT da trip (nada nasce). O resto se pendura
+    // depois com attachOrderToMatrizTrip.
+    if (count === 0) throw new Error('trip_needs_delivery');
     await client.query('COMMIT');
     return { trip_id: tripId, deliveries_count: count };
   } catch (err) {
@@ -2700,6 +2705,45 @@ export async function openMatrizTrip(
   } finally {
     client.release();
   }
+}
+
+/** PENDURA uma entrega numa rota JÁ ABERTA (o "pendurar depois" — decisão do dono
+ *  07-03c). Mesmo efeito do vínculo na abertura: amarra trip_id, marca 'dispatched'
+ *  e herda o entregador da rota (só se o pedido ainda não tinha um). Só pega entrega
+ *  da MAIN, em aberto e FORA de rota (guard + trip_id IS NULL), e só entra em rota
+ *  ABERTA. Atômico: o EXISTS da rota aberta é avaliado no próprio UPDATE, então rota
+ *  que fecha no meio do caminho não recebe pedido órfão. */
+export async function attachOrderToMatrizTrip(
+  input: { order_id: string; trip_id: string; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<{ order_id: string; trip_id: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const r = await dbPool.query<{ order_id: string }>(
+    `UPDATE commerce.orders o
+        SET trip_id = $3, delivery_status = 'dispatched',
+            dispatched_at = COALESCE(o.dispatched_at, now()),
+            delivery_courier = COALESCE(o.delivery_courier,
+              (SELECT courier_name FROM commerce.matriz_delivery_trips WHERE id = $3 AND environment = $1)),
+            updated_at = now()
+      WHERE o.id = $2 AND o.environment = $1
+        AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
+        AND o.trip_id IS NULL
+        AND ${MAIN_DELIVERY_GUARD}
+        AND EXISTS (SELECT 1 FROM commerce.matriz_delivery_trips t
+                     WHERE t.id = $3 AND t.environment = $1 AND t.status = 'open')
+      RETURNING o.id AS order_id`,
+    [environment, input.order_id, input.trip_id],
+  );
+  if (r.rows[0]) return { order_id: r.rows[0].order_id, trip_id: input.trip_id };
+  // 0 linhas: diagnostica pra dar mensagem útil (pós-fato, não afeta a atomicidade
+  // do UPDATE acima). Rota fechada/inexistente → trip_not_open; senão o pedido já
+  // saiu do páreo (cancelado, entregue, já em outra rota, ou de parceiro).
+  const trip = await dbPool.query<{ status: string }>(
+    `SELECT status FROM commerce.matriz_delivery_trips WHERE id = $1 AND environment = $2`,
+    [input.trip_id, environment],
+  );
+  if (!trip.rows[0] || trip.rows[0].status !== 'open') throw new Error('trip_not_open');
+  throw new Error('delivery_not_found');
 }
 
 /** FECHA a rota: km final + gasolina + observação. Se informou gasolina E nenhum

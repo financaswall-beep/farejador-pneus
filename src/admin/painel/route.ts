@@ -51,6 +51,7 @@ import {
   setMatrizDeliveryStatus,
   failMatrizDelivery,
   openMatrizTrip,
+  attachOrderToMatrizTrip,
   closeMatrizTrip,
   addMatrizTripReceipt,
   getMatrizTripReceiptImage,
@@ -809,6 +810,10 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     fuel_spent: z.coerce.number().min(0).max(99999).optional().nullable(),
     notes: z.string().max(500).optional().nullable(),
   });
+  const pendurarRotaSchema = z.object({
+    order_id: z.string().uuid(),
+    trip_id: z.string().uuid(),
+  });
   const comprovanteParamsSchema = z.object({ tripId: z.string().uuid() });
   const comprovanteIdParamsSchema = z.object({ receiptId: z.string().uuid() });
   const lerComprovanteSchema = z.object({ receipt_id: z.string().uuid() });
@@ -883,8 +888,33 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
       });
       return reply.status(201).send({ created: true, ...result });
     } catch (err) {
+      if (err instanceof Error && err.message === 'trip_needs_delivery') {
+        return reply.status(400).send({ error: 'trip_needs_delivery' });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel logistica abrir rota failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // PENDURA uma entrega numa rota JÁ ABERTA (o "pendurar depois" — decisão do dono
+  // 07-03c). Mesma amarra do vínculo na abertura; só entrega da main, fora de rota,
+  // em rota aberta.
+  fastify.post('/admin/api/logistica/rotas/pendurar', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.MATRIZ_LOGISTICS) return reply.status(404).send({ error: 'logistics_disabled' });
+    const parsed = pendurarRotaSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await attachOrderToMatrizTrip(parsed.data);
+      return reply.status(200).send({ attached: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && (err.message === 'trip_not_open' || err.message === 'delivery_not_found')) {
+        return reply.status(404).send({ error: err.message });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel logistica pendurar rota failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

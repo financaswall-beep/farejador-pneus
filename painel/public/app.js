@@ -1366,10 +1366,31 @@ function painelApp() {
       if (!this.logistica) return [];
       return (this.logistica.abertas || []).filter((d) => !d.trip_id);
     },
+    // Rota aberta pra "pendurar" (a UI só deixa 1 aberta por vez).
+    rotaAberta() {
+      return (this.logistica?.rotas_abertas || [])[0] || null;
+    },
+    // Pendura uma entrega em aberto na rota que já está na rua (o "pendurar depois").
+    async pendurarNaRota(d) {
+      const rota = this.rotaAberta();
+      if (!rota) { this.logisticaMsg = { ok: false, text: 'Nenhuma rota aberta. Abra uma rota primeiro.' }; return; }
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/rotas/pendurar', { order_id: d.order_id, trip_id: rota.id });
+        this.logisticaMsg = { ok: true, text: `Entrega posta na rota de ${rota.courier_name || 'entregador'}.` };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui pôr na rota (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
     async abrirRota() {
       const courier = (this.rotaForm.courier_name || '').trim();
       if (!courier) { this.logisticaMsg = { ok: false, text: 'Diga o nome do entregador.' }; return; }
       const ids = Object.keys(this.rotaForm.selecionadas).filter((id) => this.rotaForm.selecionadas[id]);
+      // Decisão do dono 07-03c: rota não abre vazia (o backend também barra).
+      if (!ids.length) { this.logisticaMsg = { ok: false, text: 'Marque pelo menos 1 entrega pra abrir a rota. Sem entrega, não abre.' }; return; }
       this.logisticaSaving = true;
       try {
         const r = await this.apiPost('/admin/api/logistica/rotas', {

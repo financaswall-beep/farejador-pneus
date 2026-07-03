@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-logistica3"></script>
+<script src="/admin/painel/app.js?v=20260703-logistica4"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2315,7 +2315,7 @@
                    class="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm">
           </div>
           <div x-show="entregasSemRota().length" class="mb-3 space-y-1">
-            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Entregas que vão na rota</div>
+            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Marque as entregas que vão nessa rota</div>
             <template x-for="d in entregasSemRota()" :key="d.order_id">
               <label class="flex items-center gap-2 text-sm border border-gray-100 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="rounded border-gray-300">
@@ -2324,9 +2324,10 @@
               </label>
             </template>
           </div>
-          <div x-show="!entregasSemRota().length" class="text-sm text-gray-400 mb-3">Nenhuma entrega aberta fora de rota — dá pra abrir a rota vazia e pendurar depois.</div>
-          <button @click="abrirRota()" :disabled="logisticaSaving"
+          <div x-show="!entregasSemRota().length" class="text-sm text-gray-400 mb-3">Nenhuma entrega esperando. Um pedido de entrega (do bot ou do balcão) precisa existir pra abrir a rota.</div>
+          <button @click="abrirRota()" :disabled="logisticaSaving || !Object.values(rotaForm.selecionadas).some(Boolean)"
                   class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-50">Abrir rota</button>
+          <p x-show="entregasSemRota().length && !Object.values(rotaForm.selecionadas).some(Boolean)" class="text-xs text-gray-400 mt-2">Marque ao menos 1 entrega — a rota não abre vazia.</p>
         </div>
 
         <!-- ENTREGAS EM ABERTO -->
@@ -2372,6 +2373,9 @@
                            x-model="logisticaCouriers[d.order_id]"
                            class="border border-gray-300 rounded-lg px-2 py-1 text-xs w-32">
                     <div class="flex items-center gap-1.5">
+                      <button x-show="!d.trip_id && d.delivery_status === 'pending' && rotaAberta()" @click="pendurarNaRota(d)" :disabled="logisticaSaving"
+                              class="text-xs px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50"
+                              :title="'Pôr na rota de ' + (rotaAberta()?.courier_name || 'entregador')">Pôr na rota</button>
                       <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving"
                               class="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium disabled:opacity-50">Saiu</button>
                       <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]"
