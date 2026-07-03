@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   const { applyMatrizGalpaoDecrement } = await import('../src/atendente-v2/wholesale-stock-read.js');
   const {
     getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery,
-    openMatrizTrip, attachOrderToMatrizTrip, closeMatrizTrip, addMatrizTripReceipt,
+    openMatrizTrip, attachOrderToMatrizTrip, rescheduleMatrizDelivery, closeMatrizTrip, addMatrizTripReceipt,
     getMatrizTripReceiptImage, recordReceiptAiResult,
   } = await import('../src/admin/painel/queries.js');
 
@@ -362,7 +362,34 @@ async function main(): Promise<void> {
     check('L20 abrir rota vazia é rejeitada (trip_needs_delivery) e NÃO deixa trip órfã',
       barrouVazia && orphan.n === 0);
 
-    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    // ── L21-L24: AGENDAMENTO (07-03e) — data nasce D+1, dono remarca. Padrão =
+    // created_at+1 no fuso SP, calculado na leitura (bot intocado); remarcar grava
+    // a exceção; guard barra fora-da-main e entrega já fechada. ──
+    const oSched = await seedOrder({ unitId: mainUnitId });
+    const expectedD1 = (await client.query(`SELECT ((created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1)::text AS d FROM commerce.orders WHERE id=$1`, [oSched])).rows[0] as { d: string };
+    log = await getMatrizLogistica(ENV);
+    const sched1 = log.abertas.find((d) => d.order_id === oSched);
+    check('L21 data padrão = D+1 do pedido (scheduled_raw null, scheduled_date = created+1)',
+      !!sched1 && sched1.scheduled_raw === null && sched1.scheduled_date === expectedD1.d,
+      `scheduled=${sched1?.scheduled_date} esperado=${expectedD1.d}`);
+
+    const resched = await rescheduleMatrizDelivery({ order_id: oSched, scheduled_date: '2026-12-25', environment: ENV });
+    log = await getMatrizLogistica(ENV);
+    const sched2 = log.abertas.find((d) => d.order_id === oSched);
+    check('L22 remarcar grava a data e a leitura usa a remarcada (não o D+1)',
+      resched.scheduled_date === '2026-12-25' && !!sched2 && sched2.scheduled_raw === '2026-12-25' && sched2.scheduled_date === '2026-12-25');
+
+    let barrouResched = false;
+    try { await rescheduleMatrizDelivery({ order_id: oSemUnit, scheduled_date: '2026-12-25', environment: ENV }); }
+    catch (e) { barrouResched = (e as Error).message === 'delivery_not_found'; }
+    check('L23 remarcar barra pedido fora da main (delivery_not_found)', barrouResched);
+
+    let barrouReschedDone = false;
+    try { await rescheduleMatrizDelivery({ order_id: oMain, scheduled_date: '2026-12-25', environment: ENV }); }
+    catch (e) { barrouReschedDone = (e as Error).message === 'delivery_not_found'; }
+    check('L24 remarcar entrega JÁ entregue barra (delivery_not_found)', barrouReschedDone);
+
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota + agendamento D+1)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
     // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);

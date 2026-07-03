@@ -2456,6 +2456,12 @@ export interface MatrizDeliveryRow {
   created_at: string;
   dispatched_at: string | null;
   delivered_at: string | null;
+  /** Data EFETIVA de entrega prevista (YYYY-MM-DD): a remarcada, ou o padrão D+1
+   *  (created_at+1, fuso SP) quando nunca foi remarcada. */
+  scheduled_date: string;
+  /** A data remarcada crua (NULL = usando o padrão D+1). Só pra UI saber se o dono
+   *  já mexeu na data. */
+  scheduled_raw: string | null;
   items: Array<{ quantity: number; label: string }>;
 }
 
@@ -2510,6 +2516,8 @@ export async function getMatrizLogistica(
     SELECT o.id AS order_id, c.name AS customer_name, c.phone_e164 AS customer_phone,
            o.delivery_address, o.total_amount::text, o.status, o.delivery_status,
            o.delivery_courier, o.trip_id, o.created_at, o.dispatched_at, o.delivered_at,
+           o.scheduled_delivery_date::text AS scheduled_raw,
+           COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
                        'quantity', oi.quantity,
                        'label', COALESCE(pr.product_name, 'item')) ORDER BY oi.created_at)
@@ -2561,7 +2569,7 @@ export async function getMatrizLogistica(
   const [abertas, finalizadas, rotasAbertas, rotasRecentes] = await Promise.all([
     dbPool.query<MatrizDeliveryRow>(
       `${deliverySelect} AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
-       ORDER BY o.created_at ASC`, [environment]),
+       ORDER BY scheduled_date ASC, o.created_at ASC`, [environment]),
     dbPool.query<MatrizDeliveryRow>(
       `${deliverySelect} AND (o.delivery_status IN ('delivered','failed') OR o.status = 'cancelled')
        ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC LIMIT 30`, [environment]),
@@ -2744,6 +2752,28 @@ export async function attachOrderToMatrizTrip(
   );
   if (!trip.rows[0] || trip.rows[0].status !== 'open') throw new Error('trip_not_open');
   throw new Error('delivery_not_found');
+}
+
+/** REMARCA a data prevista de entrega (agendamento — 07-03e). Só entrega da MAIN
+ *  ainda EM ABERTO (pending/dispatched — entregue/cancelada não remarca). Grava a
+ *  data crua em scheduled_delivery_date; a leitura passa a usá-la no lugar do padrão
+ *  D+1. O guard barra pedido de parceiro. */
+export async function rescheduleMatrizDelivery(
+  input: { order_id: string; scheduled_date: string; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<{ order_id: string; scheduled_date: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const r = await dbPool.query<{ order_id: string; scheduled_date: string }>(
+    `UPDATE commerce.orders o
+        SET scheduled_delivery_date = $3::date, updated_at = now()
+      WHERE o.id = $2 AND o.environment = $1
+        AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
+        AND ${MAIN_DELIVERY_GUARD}
+      RETURNING o.id AS order_id, o.scheduled_delivery_date::text AS scheduled_date`,
+    [environment, input.order_id, input.scheduled_date],
+  );
+  if (!r.rows[0]) throw new Error('delivery_not_found');
+  return r.rows[0];
 }
 
 /** FECHA a rota: km final + gasolina + observação. Se informou gasolina E nenhum

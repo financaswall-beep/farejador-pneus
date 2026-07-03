@@ -1370,6 +1370,44 @@ function painelApp() {
     rotaAberta() {
       return (this.logistica?.rotas_abertas || [])[0] || null;
     },
+    // ── Agendamento (07-03e): toda entrega nasce pra D+1; o dono remarca se precisar ──
+    hojeISO() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+    amanhaISO() {
+      const d = new Date(); d.setDate(d.getDate() + 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+    // Rótulo amigável da data prevista (hoje/amanhã/atrasada/dd-mm). Compara YYYY-MM-DD
+    // como string (lexicográfico = cronológico). "Atrasada" só faz sentido antes de sair.
+    dataEntregaLabel(d) {
+      const dt = d?.scheduled_date; if (!dt) return '';
+      const [, m, day] = dt.split('-'); const br = day + '/' + m;
+      if (d.delivery_status === 'pending' && dt < this.hojeISO()) return 'atrasada · era ' + br;
+      if (dt === this.hojeISO()) return 'pra hoje';
+      if (dt === this.amanhaISO()) return 'pra amanhã';
+      return 'pra ' + br;
+    },
+    dataEntregaClass(d) {
+      const dt = d?.scheduled_date;
+      if (d?.delivery_status === 'pending' && dt < this.hojeISO()) return 'bg-rose-50 text-rose-700';
+      if (dt === this.hojeISO()) return 'bg-blue-50 text-blue-700';
+      return 'bg-amber-50 text-amber-700';
+    },
+    async remarcarEntrega(d, novaData) {
+      if (!novaData || novaData === d.scheduled_date) return;
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/entregas/remarcar', { order_id: d.order_id, scheduled_date: novaData });
+        this.logisticaMsg = { ok: true, text: 'Entrega remarcada.' };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui remarcar (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
     // Pendura uma entrega em aberto na rota que já está na rua (o "pendurar depois").
     async pendurarNaRota(d) {
       const rota = this.rotaAberta();

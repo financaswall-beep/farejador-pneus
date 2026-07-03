@@ -52,6 +52,7 @@ import {
   failMatrizDelivery,
   openMatrizTrip,
   attachOrderToMatrizTrip,
+  rescheduleMatrizDelivery,
   closeMatrizTrip,
   addMatrizTripReceipt,
   getMatrizTripReceiptImage,
@@ -814,6 +815,10 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
     order_id: z.string().uuid(),
     trip_id: z.string().uuid(),
   });
+  const remarcarEntregaSchema = z.object({
+    order_id: z.string().uuid(),
+    scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'data_invalida'),
+  });
   const comprovanteParamsSchema = z.object({ tripId: z.string().uuid() });
   const comprovanteIdParamsSchema = z.object({ receiptId: z.string().uuid() });
   const lerComprovanteSchema = z.object({ receipt_id: z.string().uuid() });
@@ -870,6 +875,27 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
       }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel logistica falhou failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // REMARCA a data prevista de entrega (agendamento — 07-03e). Toda entrega nasce
+  // pra D+1; aqui o dono empurra pra outro dia (ex.: não entregou no dia).
+  fastify.post('/admin/api/logistica/entregas/remarcar', { preHandler: requireAdminAuth }, async (request, reply) => {
+    if (!env.MATRIZ_LOGISTICS) return reply.status(404).send({ error: 'logistics_disabled' });
+    const parsed = remarcarEntregaSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await rescheduleMatrizDelivery(parsed.data);
+      return reply.status(200).send({ rescheduled: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'delivery_not_found') {
+        return reply.status(404).send({ error: 'delivery_not_found' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel logistica remarcar failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
