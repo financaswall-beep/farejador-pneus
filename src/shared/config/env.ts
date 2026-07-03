@@ -142,6 +142,20 @@ const envSchema = z.object({
   // Default OFF = dormente: endpoint devolve enabled:false e a UI se esconde. Liga no
   // Coolify pós-Deploy. Fase B (0121, livro-razão) lê esta tabela com a mesma régua.
   MATRIZ_EXPENSES: booleanStringSchema,
+  // LOGÍSTICA DA MATRIZ (0121): aba Logística no painel da matriz — entregas da 'main'
+  // nos moldes do parceiro (em separação → saiu → entregue/não entregue) + DIÁRIO DE ROTA
+  // do entregador (decisão do dono 07-03: por SAÍDA, não por entrega — km inicial/final,
+  // gasolina, comprovantes). Fechar rota com gasolina informada lança despesa 'combustivel'
+  // no 0120 (anti-dupla-contagem: só quando nenhum comprovante da rota já virou despesa).
+  // "Não entregue" CANCELA o pedido no caminho atômico (galpão volta via trilha fdd9148).
+  // Default OFF = dormente: endpoint devolve enabled:false e a UI se esconde.
+  MATRIZ_LOGISTICS: booleanStringSchema,
+  // IA LÊ O COMPROVANTE (0121, requer MATRIZ_LOGISTICS): o comprovante anexado à rota
+  // passa pela visão da OpenAI, que extrai categoria/valor/data e LANÇA a despesa (0120)
+  // sozinha, amarrada ao comprovante (receipts.ai_expense_id, created_by 'ia-comprovante').
+  // Sem confiança → NÃO lança (ai_status 'unreadable', lançar na mão). Default OFF =
+  // comprovante só fica guardado (ai_status 'skipped'); despesa segue manual.
+  MATRIZ_RECEIPT_AI: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

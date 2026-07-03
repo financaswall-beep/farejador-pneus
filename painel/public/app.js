@@ -112,6 +112,17 @@ function painelApp() {
       { id: 'manutencao', label: 'Manutenção' },
       { id: 'outros', label: 'Outros' },
     ],
+    // ── LOGÍSTICA da matriz (0121, flag MATRIZ_LOGISTICS): entregas + rota do dia ──
+    logistica: null, // payload do GET (null/enabled:false = dormente → aviso na tela)
+    logisticaLoaded: false,
+    logisticaSaving: false,
+    logisticaMsg: null,
+    rotaForm: { courier_name: '', km_start: '', selecionadas: {} },
+    fecharForm: { km_end: '', fuel_spent: '', notes: '' },
+    logisticaCouriers: {}, // rascunho de entregador por pedido (entrega avulsa)
+    logisticaPays: {},     // forma de pagamento por pedido (só no Entregue)
+    uploadingReceipt: false,
+    receiptUrls: {}, // miniaturas autenticadas (fetch com token → blob URL; <img> puro leva 401)
     // CANCELAR venda (0116): últimas vendas (vivas e canceladas) — de onde se cancela.
     atacadoVendas: [],
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
@@ -146,12 +157,12 @@ function painelApp() {
       { id: 'vendas',     label: 'Vendas',     icon: 'shopping-bag' },
       { id: 'compras',    label: 'Compras',    icon: 'shopping-cart' },
       { id: 'estoque',    label: 'Estoque',    icon: 'package' },
+      { id: 'logistica',  label: 'Logística',  icon: 'truck' },
       { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
       { id: 'rede',       label: 'Rede',       icon: 'network' },
     ],
 
     futureMenu: [
-      { id: 'logistica',    label: 'Logística',     icon: 'truck' },
       { id: 'colaboradores',label: 'Colaboradores', icon: 'users' },
       { id: 'catalogo',     label: 'Catálogo',      icon: 'tag' },
       { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
@@ -1210,6 +1221,199 @@ function painelApp() {
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },
+    // ── LOGÍSTICA da matriz (0121): entregas + rota do dia ──
+    async loadLogistica() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      try {
+        const payload = await this.apiGet('/admin/api/logistica');
+        // flag off → enabled:false → null (a tela mostra o aviso de dormente)
+        this.logistica = payload && payload.enabled ? payload : null;
+        void this.loadReceiptThumbs();
+      } catch (err) {
+        // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).
+        console.warn('logistica load falhou:', err.message);
+      } finally {
+        this.logisticaLoaded = true;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
+    // Miniaturas dos comprovantes: o endpoint exige Bearer, e <img src> não manda
+    // header (levaria 401 — achado da banca 07-03). Busca com o token e vira blob URL.
+    async loadReceiptThumbs() {
+      const rotas = [...(this.logistica?.rotas_abertas || []), ...(this.logistica?.rotas_recentes || [])];
+      const vivos = new Set();
+      for (const t of rotas) for (const r of (t.receipts || [])) vivos.add(r.id);
+      // revoga o que saiu de cena (rota antiga fora do top-10)
+      for (const id of Object.keys(this.receiptUrls)) {
+        if (!vivos.has(id)) { try { URL.revokeObjectURL(this.receiptUrls[id]); } catch (e) { /* já foi */ } delete this.receiptUrls[id]; }
+      }
+      for (const id of vivos) {
+        if (this.receiptUrls[id]) continue;
+        try {
+          const resp = await fetch(`/admin/api/logistica/comprovantes/${id}/imagem`, { headers: { Authorization: `Bearer ${this.apiToken}` } });
+          if (!resp.ok) continue;
+          this.receiptUrls[id] = URL.createObjectURL(await resp.blob());
+        } catch (e) { /* miniatura é cosmética; o dado da rota já está na tela */ }
+      }
+    },
+    logisticaItens(d) {
+      const items = Array.isArray(d?.items) ? d.items : [];
+      if (!items.length) return 'Sem itens';
+      return items.map((it) => `${Number(it.quantity)}× ${it.label}`).join(' · ');
+    },
+    logisticaStatusLabel(s) {
+      if (s === 'dispatched') return 'Saiu pra entrega';
+      if (s === 'delivered') return 'Entregue';
+      if (s === 'failed') return 'Não entregue';
+      return 'Em separação';
+    },
+    rotaDoPedido(d) {
+      if (!d?.trip_id || !this.logistica) return null;
+      return (this.logistica.rotas_abertas || []).find((t) => t.id === d.trip_id)
+        || (this.logistica.rotas_recentes || []).find((t) => t.id === d.trip_id) || null;
+    },
+    rotaKm(t) {
+      if (t?.km_start == null || t?.km_end == null) return null;
+      const km = Number(t.km_end) - Number(t.km_start);
+      return Number.isFinite(km) && km >= 0 ? km : null;
+    },
+    async logisticaStatus(d, status) {
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/entregas/status', {
+          order_id: d.order_id,
+          status,
+          courier: (this.logisticaCouriers[d.order_id] || d.delivery_courier || '').trim() || null,
+          payment_method: status === 'delivered' ? (this.logisticaPays[d.order_id] || 'Pix') : null,
+        });
+        this.logisticaMsg = status === 'delivered'
+          ? { ok: true, text: 'Entrega finalizada — pedido fechado.' }
+          : { ok: true, text: 'Saiu pra entrega.' };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui atualizar (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+    async logisticaFalhou(d) {
+      const who = d.customer_name || 'este pedido';
+      const reason = window.prompt(`Marcar a entrega de ${who} como NÃO entregue?\n\nEscreva o motivo (o pedido é cancelado e o pneu VOLTA pro galpão):`);
+      if (reason === null) return;
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/entregas/falhou', {
+          order_id: d.order_id,
+          reason: reason.trim() || null,
+        });
+        this.logisticaMsg = { ok: true, text: 'Marcado como não entregue — pedido cancelado e galpão recomposto.' };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui marcar (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+    entregasSemRota() {
+      if (!this.logistica) return [];
+      return (this.logistica.abertas || []).filter((d) => !d.trip_id);
+    },
+    async abrirRota() {
+      const courier = (this.rotaForm.courier_name || '').trim();
+      if (!courier) { this.logisticaMsg = { ok: false, text: 'Diga o nome do entregador.' }; return; }
+      const ids = Object.keys(this.rotaForm.selecionadas).filter((id) => this.rotaForm.selecionadas[id]);
+      this.logisticaSaving = true;
+      try {
+        const r = await this.apiPost('/admin/api/logistica/rotas', {
+          courier_name: courier,
+          km_start: this.rotaForm.km_start === '' ? null : Number(this.rotaForm.km_start),
+          order_ids: ids,
+        });
+        this.logisticaMsg = { ok: true, text: `Rota aberta pra ${courier} com ${r.deliveries_count} entrega(s).` };
+        this.rotaForm = { courier_name: '', km_start: '', selecionadas: {} };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui abrir a rota (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+    async fecharRota(t) {
+      const abertasNaRota = (this.logistica?.abertas || []).filter((d) => d.trip_id === t.id).length;
+      if (abertasNaRota > 0 && !window.confirm(`Ainda tem ${abertasNaRota} entrega(s) em aberto nessa rota. Fechar mesmo assim?`)) return;
+      this.logisticaSaving = true;
+      try {
+        const r = await this.apiPost('/admin/api/logistica/rotas/fechar', {
+          trip_id: t.id,
+          km_end: this.fecharForm.km_end === '' ? null : Number(this.fecharForm.km_end),
+          fuel_spent: this.fecharForm.fuel_spent === '' ? null : Number(this.fecharForm.fuel_spent),
+          notes: (this.fecharForm.notes || '').trim() || null,
+        });
+        this.logisticaMsg = r.fuel_expense_id
+          ? { ok: true, text: 'Rota fechada — gasolina lançada como despesa no Financeiro.' }
+          : { ok: true, text: 'Rota fechada.' };
+        this.fecharForm = { km_end: '', fuel_spent: '', notes: '' };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui fechar a rota (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+    async enviarComprovante(t, ev) {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        this.logisticaMsg = { ok: false, text: 'Manda uma FOTO do comprovante (JPG/PNG/WebP).' };
+        ev.target.value = '';
+        return;
+      }
+      this.uploadingReceipt = true;
+      try {
+        const resp = await fetch(`/admin/api/logistica/rotas/${t.id}/comprovante`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${this.apiToken}`, 'X-Operator-Label': this.operatorLabel, 'Content-Type': file.type },
+          body: file,
+        });
+        const payload = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(payload.error || `api_${resp.status}`);
+        if (payload.ai_status === 'parsed' && payload.linked_existing) {
+          this.logisticaMsg = { ok: true, text: `Comprovante lido: ${payload.ai_summary} — amarrado à despesa que o fechamento já lançou (não duplica).` };
+        } else if (payload.ai_status === 'parsed') {
+          this.logisticaMsg = { ok: true, text: `Comprovante lido: ${payload.ai_summary} — despesa JÁ lançada no Financeiro.` };
+        } else if (payload.ai_status === 'unreadable') {
+          this.logisticaMsg = { ok: false, text: `Comprovante guardado, mas a IA não teve certeza (${payload.ai_summary || 'ilegível'}) — lança a despesa na mão no Financeiro.` };
+        } else if (payload.ai_status === 'pending') {
+          this.logisticaMsg = { ok: false, text: 'Comprovante guardado; a leitura falhou agora — clica em "ler de novo".' };
+        } else {
+          this.logisticaMsg = { ok: true, text: 'Comprovante guardado (leitura por IA desligada).' };
+        }
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui subir o comprovante (${err.message}).` };
+      } finally {
+        this.uploadingReceipt = false;
+        ev.target.value = '';
+      }
+    },
+    async lerComprovante(r) {
+      this.logisticaSaving = true;
+      try {
+        const res = await this.apiPost('/admin/api/logistica/comprovantes/ler', { receipt_id: r.id });
+        this.logisticaMsg = res.ai_status === 'parsed'
+          ? (res.linked_existing
+            ? { ok: true, text: `Comprovante lido: ${res.ai_summary} — amarrado à despesa que o fechamento já lançou (não duplica).` }
+            : { ok: true, text: `Comprovante lido: ${res.ai_summary} — despesa lançada.` })
+          : { ok: false, text: `A IA ainda não teve certeza (${res.ai_summary || 'ilegível'}) — lança na mão.` };
+        await this.loadLogistica();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: 'A leitura falhou (IA fora do ar?) — tenta de novo daqui a pouco.' };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+
     // Barra de participação (perna × maior perna do mês). Mínimo 2% pra barra existir.
     finBarWidth(valor) {
       const v = this.financeiroVisao;
@@ -1933,6 +2137,8 @@ function painelApp() {
         if (page === 'compras') void this.loadAtacado();
         // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
         if (page === 'estoque') void this.loadAtacado();
+        // Logística (0121): entregas da matriz + rota do dia do entregador.
+        if (page === 'logistica') void this.loadLogistica();
         // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.
         if (page === 'vendas') void this.loadVarejoResumo();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.

@@ -1,0 +1,327 @@
+/**
+ * PROVA de INTEGRAÇÃO da LOGÍSTICA DA MATRIZ (0121, 2026-07-03). Roda no env `test`
+ * chamando o CÓDIGO REAL. Blinda:
+ *   fila só enxerga entrega da MAIN (pickup/outra unit ficam fora, leitura E escrita) ·
+ *   termômetro (saiu → entregue fecha o pedido) · NÃO ENTREGUE cancela e o galpão
+ *   VOLTA (caminho fdd9148) · rota abre com as entregas certas (inválidas ficam fora) ·
+ *   fechar rota com gasolina lança despesa 'combustivel' UMA vez (fechar 2x barra) ·
+ *   ANTI-DUPLA-CONTAGEM: comprovante lido pela IA ganha do fechamento (fuel não relança) ·
+ *   leitura idempotente (2ª chamada não duplica despesa) · unreadable NÃO lança ·
+ *   blob do comprovante salva e volta byte a byte.
+ *
+ * Seeds descartáveis (medida '95/95-95', PROVA-LOG) e LIMPA no finally.
+ *
+ * USO:
+ *   npx tsx --env-file=.env.pooler scripts/prova-logistica-matriz-test.ts
+ */
+
+process.env.MATRIZ_LOGISTICS = 'true';
+process.env.MATRIZ_EXPENSES = 'true';
+process.env.MATRIZ_RECEIPT_AI = 'true';
+
+const ENV = 'test' as const;
+const MEASURE = '95/95-95';
+
+async function main(): Promise<void> {
+  const { pool } = await import('../src/persistence/db.js');
+  const { env } = await import('../src/shared/config/env.js');
+  const { applyMatrizGalpaoDecrement } = await import('../src/atendente-v2/wholesale-stock-read.js');
+  const {
+    getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery,
+    openMatrizTrip, closeMatrizTrip, addMatrizTripReceipt,
+    getMatrizTripReceiptImage, recordReceiptAiResult,
+  } = await import('../src/admin/painel/queries.js');
+
+  if (env.FAREJADOR_ENV !== 'test') throw new Error('ABORTADO: só roda em test.');
+  console.log('=== PROVA LOGÍSTICA DA MATRIZ (test) ===');
+
+  const client = await pool.connect();
+  let fails = 0;
+  let productId = '';
+  let contactId = '';
+  let mainUnitId = '';
+  const orderIds: string[] = [];
+  const tripIds: string[] = [];
+  const check = (name: string, ok: boolean, extra = ''): void => {
+    if (!ok) fails++;
+    console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
+  };
+  const qtyOf = async (): Promise<number> => {
+    const r = await client.query<{ q: string }>(
+      `SELECT quantity_on_hand AS q FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    return Number(r.rows[0]?.q ?? -1);
+  };
+  const despesasProva = async (): Promise<number> => {
+    const r = await client.query<{ n: string }>(
+      `SELECT count(*) AS n FROM commerce.matriz_expenses
+        WHERE environment=$1 AND deleted_at IS NULL
+          AND created_by IN ('logistica-fechamento','ia-comprovante')
+          AND description LIKE '%PROVA-LOG%'`, [ENV]);
+    return Number(r.rows[0]!.n);
+  };
+  const seedOrder = async (opts: { mode?: 'delivery' | 'pickup'; unitId?: string | null; qty?: number }): Promise<string> => {
+    const mode = opts.mode ?? 'delivery';
+    const o = await client.query<{ id: string }>(
+      `INSERT INTO commerce.orders (environment, contact_id, total_amount, status, fulfillment_mode, delivery_address, unit_id)
+       VALUES ($1::env_t, $2, 100, 'open', $3, $4, $5) RETURNING id`,
+      [ENV, contactId, mode, mode === 'delivery' ? 'Rua PROVA-LOG, 1 - Centro - Rio' : null, opts.unitId ?? null]);
+    const id = o.rows[0]!.id;
+    await client.query(
+      `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
+       VALUES ($1::env_t, $2, $3, $4, 100)`, [ENV, id, productId, opts.qty ?? 1]);
+    orderIds.push(id);
+    return id;
+  };
+
+  try {
+    // ── PRÉ-LIMPEZA (banca 07-03): run anterior interrompido não pode envenenar
+    // este (o finally só limpa o que ESTE processo rastreou). Varre por marcador. ──
+    await client.query(
+      `UPDATE commerce.orders SET trip_id=NULL WHERE environment=$1 AND delivery_address LIKE '%PROVA-LOG%'`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.matriz_trip_receipt_blobs WHERE environment=$1 AND receipt_id IN (
+         SELECT r.id FROM commerce.matriz_trip_receipts r
+         JOIN commerce.matriz_delivery_trips t ON t.id = r.trip_id
+        WHERE t.courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG'))`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.matriz_trip_receipts WHERE environment=$1 AND trip_id IN (
+         SELECT id FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG'))`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG')`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.matriz_expenses WHERE environment=$1 AND created_by IN ('logistica-fechamento','ia-comprovante') AND description LIKE '%PROVA-LOG%'`, [ENV]);
+    await client.query(
+      `DELETE FROM audit.events WHERE environment=$1 AND entity_id IN (
+         SELECT o.id FROM commerce.orders o WHERE o.environment=$1 AND o.delivery_address LIKE '%PROVA-LOG%')`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.order_items WHERE environment=$1 AND order_id IN (
+         SELECT id FROM commerce.orders WHERE environment=$1 AND delivery_address LIKE '%PROVA-LOG%')`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.order_items WHERE environment=$1 AND product_id IN (
+         SELECT id FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-LOG-%')`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.orders WHERE environment=$1 AND (delivery_address LIKE '%PROVA-LOG%'
+         OR id IN (SELECT DISTINCT order_id FROM commerce.order_items WHERE environment=$1 AND product_id IN (
+              SELECT id FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-LOG-%')))`, [ENV]);
+    await client.query(
+      `DELETE FROM commerce.tire_specs WHERE environment=$1 AND product_id IN (
+         SELECT id FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-LOG-%')`, [ENV]);
+    await client.query(`DELETE FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-LOG-%'`, [ENV]);
+    await client.query(`DELETE FROM core.contacts WHERE environment=$1 AND name='PROVA-LOG contato'`, [ENV]);
+
+    // ── setup: unit main + produto + galpão(10×R$20) + contato ──
+    const mu = await client.query<{ id: string }>(
+      `SELECT id FROM core.units WHERE environment=$1 AND slug='main'`, [ENV]);
+    if (!mu.rows[0]) throw new Error('unit main não existe no env test — rodar seed da matriz antes.');
+    mainUnitId = mu.rows[0].id;
+    const prod = await client.query<{ id: string }>(
+      `INSERT INTO commerce.products (environment, product_code, product_name, product_type, brand)
+       VALUES ($1::env_t, $2, 'PROVA-LOG pneu', 'tire', 'PROVA') RETURNING id`, [ENV, 'PROVA-LOG-' + (Date.now() % 1000000)]);
+    productId = prod.rows[0]!.id;
+    await client.query(
+      `INSERT INTO commerce.tire_specs (environment, product_id, tire_size, width_mm, aspect_ratio, rim_diameter)
+       VALUES ($1::env_t, $2, $3, 95, 95, 95)`, [ENV, productId, MEASURE]);
+    await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(
+      `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost) VALUES ($1,$2,10,20)`, [ENV, MEASURE]);
+    const c = await client.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment, chatwoot_contact_id, name, phone_e164)
+       VALUES ($1::env_t, $2, 'PROVA-LOG contato', '+5521900000000') RETURNING id`, [ENV, Date.now() % 2000000000]);
+    contactId = c.rows[0]!.id;
+    check('setup: unit main + produto + galpão 10un + contato', (await qtyOf()) === 10);
+
+    // ── L1: entrega da main aparece na fila; pickup e sem-unit ficam FORA ──
+    const oMain = await seedOrder({ unitId: mainUnitId });
+    const oPickup = await seedOrder({ mode: 'pickup', unitId: mainUnitId });
+    const oSemUnit = await seedOrder({ unitId: null });
+    let log = await getMatrizLogistica(ENV);
+    const ids = log.abertas.map((d) => d.order_id);
+    check('L1 fila enxerga SÓ entrega da main', ids.includes(oMain) && !ids.includes(oPickup) && !ids.includes(oSemUnit),
+      `abertas=${ids.length}`);
+
+    // ── L2: guard de ESCRITA — pedido fora da main não atualiza ──
+    let barrou = false;
+    try { await setMatrizDeliveryStatus({ order_id: oSemUnit, status: 'dispatched', environment: ENV }); }
+    catch (e) { barrou = (e as Error).message === 'delivery_not_found'; }
+    check('L2 escrita barrada fora da main (delivery_not_found)', barrou);
+
+    // ── L3: saiu pra entrega ──
+    await setMatrizDeliveryStatus({ order_id: oMain, status: 'dispatched', courier: 'Zé da Moto', environment: ENV });
+    let row = (await client.query(`SELECT delivery_status, delivery_courier, dispatched_at FROM commerce.orders WHERE id=$1`, [oMain])).rows[0] as { delivery_status: string; delivery_courier: string; dispatched_at: string | null };
+    check('L3 saiu pra entrega (dispatched + entregador + carimbo)',
+      row.delivery_status === 'dispatched' && row.delivery_courier === 'Zé da Moto' && row.dispatched_at !== null);
+
+    // ── L4: entregue fecha o pedido ──
+    await setMatrizDeliveryStatus({ order_id: oMain, status: 'delivered', payment_method: 'Pix', environment: ENV });
+    const done = (await client.query(`SELECT status, delivery_status, delivered_at, payment_method FROM commerce.orders WHERE id=$1`, [oMain])).rows[0] as { status: string; delivery_status: string; delivered_at: string | null; payment_method: string };
+    log = await getMatrizLogistica(ENV);
+    check('L4 entregue: pedido delivered + carimbo + pagamento + sai da fila',
+      done.status === 'delivered' && done.delivery_status === 'delivered' && done.delivered_at !== null
+      && done.payment_method === 'Pix' && !log.abertas.some((d) => d.order_id === oMain)
+      && log.finalizadas.some((d) => d.order_id === oMain));
+
+    // ── L5: NÃO ENTREGUE cancela e o galpão VOLTA (fdd9148) ──
+    const oFail = await seedOrder({ unitId: mainUnitId, qty: 3 });
+    await applyMatrizGalpaoDecrement(client, ENV, [{ productId, quantity: 3 }], true, oFail);
+    check('L5a venda baixou o galpão (10→7)', (await qtyOf()) === 7, `qty=${await qtyOf()}`);
+    await failMatrizDelivery({ order_id: oFail, reason: 'cliente não estava', actor_label: 'prova-log', environment: ENV });
+    const failed = (await client.query(`SELECT status, delivery_status FROM commerce.orders WHERE id=$1`, [oFail])).rows[0] as { status: string; delivery_status: string };
+    check('L5b não entregue: failed + cancelado + galpão VOLTA (7→10)',
+      failed.status === 'cancelled' && failed.delivery_status === 'failed' && (await qtyOf()) === 10, `qty=${await qtyOf()}`);
+
+    // ── L6: abrir rota — só a entrega válida entra ──
+    const oRota = await seedOrder({ unitId: mainUnitId });
+    const trip1 = await openMatrizTrip({
+      courier_name: 'Zé da Moto', km_start: 45000,
+      order_ids: [oRota, oPickup, oFail], // pickup e cancelado NÃO podem entrar
+      environment: ENV,
+    });
+    tripIds.push(trip1.trip_id);
+    const rotaRow = (await client.query(`SELECT delivery_status, trip_id, delivery_courier FROM commerce.orders WHERE id=$1`, [oRota])).rows[0] as { delivery_status: string; trip_id: string; delivery_courier: string };
+    check('L6 rota abre com 1 de 3 (pickup/cancelado ficam fora) e a entrega SAI',
+      trip1.deliveries_count === 1 && rotaRow.delivery_status === 'dispatched'
+      && rotaRow.trip_id === trip1.trip_id && rotaRow.delivery_courier === 'Zé da Moto',
+      `entraram=${trip1.deliveries_count}`);
+
+    // ── L7: comprovante — blob salva e volta byte a byte ──
+    const fakeJpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from('PROVA-LOG-RECIBO'.repeat(10))]);
+    const rec1 = await addMatrizTripReceipt({ trip_id: trip1.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
+    const img = await getMatrizTripReceiptImage(rec1.receipt_id, ENV);
+    check('L7 comprovante guardado (pending, IA ligada) e blob volta byte a byte',
+      rec1.ai_status === 'pending' && img !== null && Buffer.compare(img!.bytes, fakeJpeg) === 0);
+
+    // ── L8: IA leu → despesa nasce UMA vez, amarrada ao comprovante ──
+    const antes = await despesasProva();
+    const parsed1 = await recordReceiptAiResult({
+      receipt_id: rec1.receipt_id,
+      result: { kind: 'parsed', category: 'combustivel', amount: 187.3, summary: 'Posto PROVA-LOG · R$ 187.30' },
+      environment: ENV,
+    });
+    check('L8 IA lançou a despesa (parsed + expense_id)',
+      parsed1.ai_status === 'parsed' && parsed1.ai_expense_id !== null && (await despesasProva()) === antes + 1);
+
+    // ── L9: leitura repetida NÃO duplica ──
+    const parsed2 = await recordReceiptAiResult({
+      receipt_id: rec1.receipt_id,
+      result: { kind: 'parsed', category: 'combustivel', amount: 187.3, summary: 'Posto PROVA-LOG · R$ 187.30' },
+      environment: ENV,
+    });
+    check('L9 re-leitura idempotente (mesma despesa, não duplica)',
+      parsed2.ai_expense_id === parsed1.ai_expense_id && (await despesasProva()) === antes + 1);
+
+    // ── L10: ANTI-DUPLA-CONTAGEM — fechar com gasolina NÃO relança (comprovante ganhou) ──
+    const fech1 = await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080, fuel_spent: 187.3, environment: ENV });
+    const t1 = (await client.query(`SELECT status, km_end, fuel_spent, fuel_expense_id FROM commerce.matriz_delivery_trips WHERE id=$1`, [trip1.trip_id])).rows[0] as { status: string; km_end: string; fuel_spent: string; fuel_expense_id: string | null };
+    check('L10 fechar rota com comprovante-despesa NÃO relança (anti-dupla)',
+      fech1.fuel_expense_id === null && t1.status === 'closed' && Number(t1.km_end) === 45080
+      && Number(t1.fuel_spent) === 187.3 && t1.fuel_expense_id === null && (await despesasProva()) === antes + 1);
+
+    // ── L11: fechar 2ª vez barra ──
+    let barrou2 = false;
+    try { await closeMatrizTrip({ trip_id: trip1.trip_id, environment: ENV }); }
+    catch (e) { barrou2 = (e as Error).message === 'trip_not_found'; }
+    check('L11 fechar rota 2x barrado (trip_not_found)', barrou2);
+
+    // ── L12: rota SEM comprovante lido → fechamento LANÇA a despesa ──
+    const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100, environment: ENV });
+    tripIds.push(trip2.trip_id);
+    const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
+    const unread = await recordReceiptAiResult({
+      receipt_id: rec2.receipt_id,
+      result: { kind: 'unreadable', summary: 'cupom amassado PROVA-LOG' },
+      environment: ENV,
+    });
+    check('L12a unreadable NÃO lança despesa', unread.ai_expense_id === null && (await despesasProva()) === antes + 1);
+    const fech2 = await closeMatrizTrip({ trip_id: trip2.trip_id, km_end: 180, fuel_spent: 95.5, notes: 'PROVA-LOG', environment: ENV });
+    const desp2 = fech2.fuel_expense_id
+      ? (await client.query(`SELECT category, amount, created_by, description FROM commerce.matriz_expenses WHERE id=$1`, [fech2.fuel_expense_id])).rows[0] as { category: string; amount: string; created_by: string; description: string }
+      : null;
+    check('L12b fechamento lança combustivel R$95.50 (created_by logistica-fechamento)',
+      desp2 !== null && desp2.category === 'combustivel' && Number(desp2.amount) === 95.5
+      && desp2.created_by === 'logistica-fechamento' && desp2.description.includes('PROVA-LOG')
+      && (await despesasProva()) === antes + 2);
+
+    // ── L13: rota fechada aparece nas recentes com comprovantes ──
+    log = await getMatrizLogistica(ENV);
+    const rec = log.rotas_recentes.find((t) => t.id === trip1.trip_id);
+    check('L13 rota fechada nas recentes, com comprovante e leitura',
+      !!rec && rec.receipts.length === 1 && rec.receipts[0]!.ai_status === 'parsed' && rec.deliveries_count === 1);
+
+    // ── L14 (P1 da banca 07-03): ordem INVERSA — fecha lançando manual, LÊ depois →
+    // o comprovante COLA na despesa do fechamento (não nasce a 2ª da mesma gasolina) ──
+    const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG', km_start: 200, environment: ENV });
+    tripIds.push(trip3.trip_id);
+    const rec3 = await addMatrizTripReceipt({ trip_id: trip3.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
+    const antes3 = await despesasProva();
+    const fech3 = await closeMatrizTrip({ trip_id: trip3.trip_id, km_end: 260, fuel_spent: 120, notes: 'PROVA-LOG fecha antes', environment: ENV });
+    check('L14a fechou ANTES da leitura → despesa manual nasceu',
+      fech3.fuel_expense_id !== null && (await despesasProva()) === antes3 + 1);
+    const parsed3 = await recordReceiptAiResult({
+      receipt_id: rec3.receipt_id,
+      result: { kind: 'parsed', category: 'combustivel', amount: 120, summary: 'Posto PROVA-LOG · R$ 120.00' },
+      environment: ENV,
+    });
+    check('L14b leitura DEPOIS cola na despesa do fechamento (não duplica)',
+      parsed3.linked_existing === true && parsed3.ai_expense_id === fech3.fuel_expense_id
+      && (await despesasProva()) === antes3 + 1);
+    const rec3row = (await client.query(`SELECT ai_status, ai_expense_id FROM commerce.matriz_trip_receipts WHERE id=$1`, [rec3.receipt_id])).rows[0] as { ai_status: string; ai_expense_id: string };
+    check('L14c comprovante virou LASTRO da despesa existente (parsed + amarrado)',
+      rec3row.ai_status === 'parsed' && rec3row.ai_expense_id === fech3.fuel_expense_id);
+
+    // ── L15: teto de comprovantes por rota (banca: anti-abuso de storage) ──
+    let capped = false;
+    const trip4 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 1, environment: ENV });
+    tripIds.push(trip4.trip_id);
+    await client.query(
+      `INSERT INTO commerce.matriz_trip_receipts (environment, trip_id, mime, size_bytes, ai_status)
+       SELECT $1, $2, 'image/jpeg', 10, 'skipped' FROM generate_series(1, 50)`, [ENV, trip4.trip_id]);
+    try { await addMatrizTripReceipt({ trip_id: trip4.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV }); }
+    catch (e) { capped = (e as Error).message === 'receipt_limit'; }
+    check('L15 51º comprovante barrado (receipt_limit)', capped);
+
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+  } finally {
+    // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
+    // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);
+    // 3º só ENTÃO apaga as despesas capturadas.
+    const expIds = tripIds.length
+      ? (await client.query<{ id: string }>(
+          `SELECT fuel_expense_id AS id FROM commerce.matriz_delivery_trips
+            WHERE environment=$1 AND id = ANY($2::uuid[]) AND fuel_expense_id IS NOT NULL
+           UNION
+           SELECT ai_expense_id AS id FROM commerce.matriz_trip_receipts
+            WHERE environment=$1 AND trip_id = ANY($2::uuid[]) AND ai_expense_id IS NOT NULL`,
+          [ENV, tripIds])).rows.map((r) => r.id)
+      : [];
+    for (const id of orderIds) {
+      await client.query(`UPDATE commerce.orders SET trip_id=NULL WHERE id=$1`, [id]);
+    }
+    if (tripIds.length) {
+      await client.query(`DELETE FROM commerce.matriz_trip_receipt_blobs WHERE environment=$1 AND receipt_id IN (SELECT id FROM commerce.matriz_trip_receipts WHERE trip_id = ANY($2::uuid[]))`, [ENV, tripIds]);
+      await client.query(`DELETE FROM commerce.matriz_trip_receipts WHERE environment=$1 AND trip_id = ANY($2::uuid[])`, [ENV, tripIds]);
+      await client.query(`DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND id = ANY($2::uuid[])`, [ENV, tripIds]);
+    }
+    if (expIds.length) {
+      await client.query(
+        `DELETE FROM commerce.matriz_expenses
+          WHERE environment=$1 AND id = ANY($2::uuid[])
+            AND created_by IN ('logistica-fechamento','ia-comprovante')`, [ENV, expIds]);
+    }
+    for (const id of orderIds) {
+      await client.query(`DELETE FROM audit.events WHERE environment=$1 AND entity_id=$2`, [ENV, id]);
+      await client.query(`DELETE FROM commerce.order_items WHERE environment=$1 AND order_id=$2`, [ENV, id]);
+      await client.query(`DELETE FROM commerce.orders WHERE id=$1`, [id]);
+    }
+    await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    if (productId) {
+      await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND product_id=$2`, [ENV, productId]);
+      await client.query(`DELETE FROM commerce.products WHERE id=$1`, [productId]);
+    }
+    if (contactId) await client.query(`DELETE FROM core.contacts WHERE id=$1`, [contactId]);
+    client.release();
+    await pool.end();
+  }
+  process.exit(fails > 0 ? 1 : 0);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });

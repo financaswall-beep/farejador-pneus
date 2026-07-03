@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-estoque"></script>
+<script src="/admin/painel/app.js?v=20260703-logistica"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2207,6 +2207,249 @@
       </div>
     </div>
 
+    <!-- ═══ TELA: LOGÍSTICA da matriz (0121 — entregas nos moldes do parceiro + rota do dia) ═══ -->
+    <div x-show="currentPage === 'logistica'" class="p-8">
+      <div class="mb-6">
+        <h1 class="text-2xl font-semibold tracking-tight">Logística</h1>
+        <p class="text-sm text-gray-500 mt-1">As entregas da Matriz e a rota do entregador — km, gasolina e comprovante viram custo sozinhos</p>
+      </div>
+
+      <!-- Dormente (flag MATRIZ_LOGISTICS off) -->
+      <div x-show="logisticaLoaded && !logistica" class="max-w-5xl bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-500">
+        <i data-lucide="truck" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
+        <span>A Logística está dormente — liga a chave <span class="font-mono text-xs bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">MATRIZ_LOGISTICS</span> no Coolify (e <span class="font-mono text-xs bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">MATRIZ_RECEIPT_AI</span> pra IA ler comprovante).</span>
+      </div>
+
+      <div x-show="logistica" class="space-y-6 max-w-5xl">
+        <div x-show="logisticaMsg" class="text-sm px-3 py-2 rounded-lg"
+             :class="logisticaMsg && logisticaMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+             x-text="logisticaMsg ? logisticaMsg.text : ''"></div>
+
+        <!-- ROTA DO DIA: abertas primeiro; sem rota aberta → form de abrir -->
+        <template x-for="t in (logistica?.rotas_abertas || [])" :key="t.id">
+          <div class="bg-white border border-brand-200 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+                  <i data-lucide="truck" class="w-4 h-4 text-brand-600"></i>
+                </div>
+                <h3 class="text-base font-semibold">Rota na rua — <span x-text="t.courier_name"></span></h3>
+              </div>
+              <span class="text-xs text-gray-400" x-text="'saiu ' + new Date(t.started_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })"></span>
+            </div>
+            <p class="text-xs text-gray-500 mb-4 ml-10">
+              <span x-text="t.deliveries_count + ' entrega(s) nesta rota'"></span>
+              <span x-show="t.km_start != null" x-text="' · km inicial ' + t.km_start"></span>
+            </p>
+
+            <!-- comprovantes já anexados -->
+            <div x-show="(t.receipts || []).length" class="mb-4 space-y-2">
+              <div class="text-xs font-medium text-gray-400 uppercase tracking-wide">Comprovantes</div>
+              <template x-for="r in (t.receipts || [])" :key="r.id">
+                <div class="flex items-center gap-3 border border-gray-100 rounded-lg p-2">
+                  <!-- miniatura via blob autenticado (img puro não manda o token → 401) -->
+                  <a x-show="receiptUrls[r.id]" :href="receiptUrls[r.id]" target="_blank" class="flex-shrink-0">
+                    <img :src="receiptUrls[r.id]" class="w-12 h-12 object-cover rounded-md border border-gray-200" alt="comprovante">
+                  </a>
+                  <div x-show="!receiptUrls[r.id]" class="w-12 h-12 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="receipt" class="w-5 h-5 text-gray-300"></i>
+                  </div>
+                  <div class="flex-1 min-w-0 text-xs">
+                    <span x-show="r.ai_status === 'parsed'" class="text-emerald-700 font-medium">✓ lido pela IA — despesa lançada</span>
+                    <span x-show="r.ai_status === 'unreadable'" class="text-amber-700 font-medium">IA sem certeza — lança na mão</span>
+                    <span x-show="r.ai_status === 'pending'" class="text-gray-500">aguardando leitura</span>
+                    <span x-show="r.ai_status === 'skipped'" class="text-gray-400">guardado (IA desligada)</span>
+                    <div class="text-gray-500 truncate" x-text="r.ai_summary || ''"></div>
+                  </div>
+                  <button x-show="logistica?.receipt_ai && (r.ai_status === 'pending' || r.ai_status === 'unreadable')"
+                          @click="lerComprovante(r)" :disabled="logisticaSaving"
+                          class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50">ler de novo</button>
+                </div>
+              </template>
+            </div>
+
+            <!-- anexar comprovante -->
+            <label class="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium cursor-pointer mb-4">
+              <i data-lucide="paperclip" class="w-4 h-4"></i>
+              <span x-text="uploadingReceipt ? 'Enviando…' : 'Anexar comprovante (gasolina, pedágio…)'"></span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden"
+                     :disabled="uploadingReceipt" @change="enviarComprovante(t, $event)">
+            </label>
+
+            <!-- fechar rota -->
+            <div class="border-t border-gray-100 pt-4">
+              <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+                <div class="col-span-3">Km final</div>
+                <div class="col-span-3">Gasolina R$</div>
+                <div class="col-span-4">Observação</div>
+                <div class="col-span-2"></div>
+              </div>
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <input x-model="fecharForm.km_end" type="number" min="0" placeholder="ex.: 45210"
+                       class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <input x-model="fecharForm.fuel_spent" type="number" min="0" step="0.01" placeholder="0,00"
+                       class="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <input x-model="fecharForm.notes" type="text" placeholder="opcional"
+                       class="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <button @click="fecharRota(t)" :disabled="logisticaSaving"
+                        class="col-span-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium px-3 py-2 rounded-lg disabled:opacity-50">Fechar rota</button>
+              </div>
+              <p class="text-[11px] text-gray-400 mt-2 px-1">Informou gasolina sem comprovante lido → a despesa entra no Financeiro sozinha. Comprovante lido pela IA → a despesa já foi (não duplica).</p>
+            </div>
+          </div>
+        </template>
+
+        <!-- Abrir rota (só quando não há rota na rua) -->
+        <div x-show="!(logistica?.rotas_abertas || []).length" class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="route" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Abrir rota do dia</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-4 ml-10">O entregador sai com as entregas marcadas; km e gasolina fecham a conta na volta.</p>
+          <div class="grid grid-cols-12 gap-2 mb-3">
+            <input x-model="rotaForm.courier_name" type="text" placeholder="Nome do entregador"
+                   class="col-span-7 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <input x-model="rotaForm.km_start" type="number" min="0" placeholder="Km inicial (odômetro)"
+                   class="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div x-show="entregasSemRota().length" class="mb-3 space-y-1">
+            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Entregas que vão na rota</div>
+            <template x-for="d in entregasSemRota()" :key="d.order_id">
+              <label class="flex items-center gap-2 text-sm border border-gray-100 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="rounded border-gray-300">
+                <span class="font-medium" x-text="d.customer_name || 'Cliente'"></span>
+                <span class="text-gray-400 text-xs truncate" x-text="d.delivery_address || ''"></span>
+              </label>
+            </template>
+          </div>
+          <div x-show="!entregasSemRota().length" class="text-sm text-gray-400 mb-3">Nenhuma entrega aberta fora de rota — dá pra abrir a rota vazia e pendurar depois.</div>
+          <button @click="abrirRota()" :disabled="logisticaSaving"
+                  class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-50">Abrir rota</button>
+        </div>
+
+        <!-- ENTREGAS EM ABERTO -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold">Entregas em aberto</h3>
+            <span class="text-xs text-gray-400" x-text="(logistica?.abertas || []).length + ' pedido(s)'"></span>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <template x-for="d in (logistica?.abertas || [])" :key="d.order_id">
+              <div class="p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-medium" x-text="d.customer_name || 'Cliente'"></span>
+                      <span class="text-xs text-gray-400" x-text="d.customer_phone || ''"></span>
+                      <span class="text-xs px-2 py-0.5 rounded-full"
+                            :class="d.delivery_status === 'dispatched' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'"
+                            x-text="logisticaStatusLabel(d.delivery_status)"></span>
+                      <span x-show="d.trip_id" class="text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-600"
+                            x-text="'rota: ' + (rotaDoPedido(d)?.courier_name || 'aberta')"></span>
+                    </div>
+                    <div class="text-sm text-gray-600 mt-0.5" x-text="d.delivery_address || 'Sem endereço'"></div>
+                    <div class="text-xs text-gray-500 mt-0.5">
+                      <span x-text="logisticaItens(d)"></span> ·
+                      <span class="font-semibold text-gray-700" x-text="formatCurrency(Number(d.total_amount))"></span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <input x-show="!d.trip_id && d.delivery_status === 'pending'" type="text" placeholder="Entregador"
+                           x-model="logisticaCouriers[d.order_id]"
+                           class="border border-gray-300 rounded-lg px-2 py-1 text-xs w-32">
+                    <div class="flex items-center gap-1.5">
+                      <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving"
+                              class="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium disabled:opacity-50">Saiu</button>
+                      <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]"
+                              class="border border-gray-300 rounded-lg px-1.5 py-1 text-xs">
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão">Cartão</option>
+                      </select>
+                      <button x-show="d.delivery_status === 'dispatched'" @click="logisticaStatus(d, 'delivered')" :disabled="logisticaSaving"
+                              class="text-xs px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium disabled:opacity-50">Entregue</button>
+                      <button @click="logisticaFalhou(d)" :disabled="logisticaSaving"
+                              class="text-xs px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 font-medium disabled:opacity-50">Não entregue</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <div x-show="!(logistica?.abertas || []).length" class="px-5 py-10 text-center text-sm text-gray-500">
+              Nenhuma entrega em aberto. Pedido de entrega do bot (ou do balcão) aparece aqui.
+            </div>
+          </div>
+        </div>
+
+        <!-- FINALIZADAS + ROTAS RECENTES -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+              <h3 class="text-base font-semibold">Finalizadas recentes</h3>
+            </div>
+            <table class="w-full text-sm">
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="d in (logistica?.finalizadas || [])" :key="d.order_id">
+                  <tr>
+                    <td class="px-4 py-2.5">
+                      <div class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></div>
+                      <div class="text-xs text-gray-400" x-text="logisticaItens(d)"></div>
+                    </td>
+                    <td class="px-4 py-2.5 text-right text-xs">
+                      <span x-show="d.delivery_status === 'delivered'" class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">entregue</span>
+                      <span x-show="d.delivery_status === 'failed' || d.status === 'cancelled'" class="px-2 py-1 rounded-full bg-rose-50 text-rose-600" x-text="d.delivery_status === 'failed' ? 'não entregue' : 'cancelado'"></span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!(logistica?.finalizadas || []).length">
+                  <td class="px-4 py-8 text-center text-sm text-gray-400">Nada finalizado ainda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+              <h3 class="text-base font-semibold">Rotas recentes</h3>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                  <th class="px-4 py-2 font-medium">Rota</th>
+                  <th class="px-4 py-2 font-medium text-center">Km</th>
+                  <th class="px-4 py-2 font-medium text-right">Gasolina</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
+                  <tr>
+                    <td class="px-4 py-2.5">
+                      <div class="font-medium text-gray-800" x-text="t.courier_name"></div>
+                      <div class="text-xs text-gray-400">
+                        <span x-text="new Date(t.started_at).toLocaleDateString('pt-BR')"></span>
+                        <span x-text="' · ' + t.deliveries_count + ' entrega(s)'"></span>
+                        <span x-show="(t.receipts || []).length" x-text="' · ' + t.receipts.length + ' comprovante(s)'"></span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-2.5 text-center text-gray-600" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></td>
+                    <td class="px-4 py-2.5 text-right">
+                      <span class="font-semibold" x-text="t.fuel_spent != null ? formatCurrency(Number(t.fuel_spent)) : '—'"></span>
+                      <div x-show="t.fuel_expense_id || (t.receipts || []).some(r => r.ai_expense_id)" class="text-[11px] text-emerald-600">no Financeiro ✓</div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!(logistica?.rotas_recentes || []).length">
+                  <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-400">Nenhuma rota fechada ainda.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ TELA: FINANCEIRO da matriz (Onda 1 — visão consolidada SÓ-LEITURA + despesas 0120) ═══ -->
     <div x-show="currentPage === 'financeiro'" class="p-8">
       <div class="mb-6">
@@ -2453,7 +2696,7 @@
     </div>
 
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->
-    <div x-show="['logistica','colaboradores','catalogo','relatorios','config'].includes(currentPage)"
+    <div x-show="['colaboradores','catalogo','relatorios','config'].includes(currentPage)"
          class="flex items-center justify-center min-h-[80vh] p-8">
       <div class="text-center max-w-md">
         <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm">

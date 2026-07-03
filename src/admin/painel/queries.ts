@@ -2429,3 +2429,466 @@ export async function getMatrizFinanceiroVisao(
     },
   };
 }
+
+// ─── LOGÍSTICA DA MATRIZ (0121) — entregas da 'main' + diário de rota ─────────
+// Espelho do parceiro (0068/0069) no pedido da MATRIZ: em separação → saiu →
+// entregue / não entregue. Decisões do dono 07-03: diário por SAÍDA (rota com
+// km inicial/final + gasolina + comprovantes; as entregas penduram na rota).
+// Termômetro NÃO mexe na régua de faturamento (0117 conta não-cancelado);
+// "não entregue" CANCELA no caminho atômico (galpão volta pela trilha fdd9148).
+// Guard em toda escrita: só pedido de ENTREGA da unit 'main' (parceiro intocado).
+
+const MAIN_DELIVERY_GUARD = `
+  o.fulfillment_mode = 'delivery'
+  AND EXISTS (SELECT 1 FROM core.units u
+               WHERE u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main')`;
+
+export interface MatrizDeliveryRow {
+  order_id: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  delivery_address: string | null;
+  total_amount: string;
+  status: string;
+  delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
+  delivery_courier: string | null;
+  trip_id: string | null;
+  created_at: string;
+  dispatched_at: string | null;
+  delivered_at: string | null;
+  items: Array<{ quantity: number; label: string }>;
+}
+
+export interface MatrizTripRow {
+  id: string;
+  courier_name: string;
+  status: 'open' | 'closed';
+  km_start: string | null;
+  km_end: string | null;
+  fuel_spent: string | null;
+  fuel_expense_id: string | null;
+  notes: string | null;
+  started_at: string;
+  ended_at: string | null;
+  deliveries_count: number;
+  receipts: Array<{
+    id: string;
+    ai_status: 'pending' | 'parsed' | 'unreadable' | 'skipped';
+    ai_summary: string | null;
+    ai_expense_id: string | null;
+    created_at: string;
+  }>;
+}
+
+export interface MatrizLogistica {
+  abertas: MatrizDeliveryRow[];
+  finalizadas: MatrizDeliveryRow[];
+  rotas_abertas: MatrizTripRow[];
+  rotas_recentes: MatrizTripRow[];
+}
+
+/** A tela Logística num GET: entregas da main (abertas + últimas finalizadas) + rotas. */
+export async function getMatrizLogistica(
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<MatrizLogistica> {
+  const deliverySelect = `
+    SELECT o.id AS order_id, c.name AS customer_name, c.phone_e164 AS customer_phone,
+           o.delivery_address, o.total_amount::text, o.status, o.delivery_status,
+           o.delivery_courier, o.trip_id, o.created_at, o.dispatched_at, o.delivered_at,
+           COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                       'quantity', oi.quantity,
+                       'label', COALESCE(pr.product_name, 'item')) ORDER BY oi.created_at)
+                       FROM commerce.order_items oi
+                       LEFT JOIN commerce.products pr ON pr.id = oi.product_id
+                      WHERE oi.order_id = o.id AND oi.environment = o.environment), '[]'::jsonb) AS items
+      FROM commerce.orders o
+      LEFT JOIN core.contacts c ON c.id = o.contact_id
+     WHERE o.environment = $1 AND ${MAIN_DELIVERY_GUARD}`;
+
+  const tripSelect = `
+    SELECT t.id, t.courier_name, t.status, t.km_start::text, t.km_end::text,
+           t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
+           (SELECT COUNT(*)::int FROM commerce.orders o
+             WHERE o.trip_id = t.id AND o.environment = t.environment) AS deliveries_count,
+           COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                       'id', r.id, 'ai_status', r.ai_status, 'ai_summary', r.ai_summary,
+                       'ai_expense_id', r.ai_expense_id, 'created_at', r.created_at)
+                       ORDER BY r.created_at DESC)
+                       FROM commerce.matriz_trip_receipts r
+                      WHERE r.trip_id = t.id), '[]'::jsonb) AS receipts
+      FROM commerce.matriz_delivery_trips t
+     WHERE t.environment = $1 AND t.deleted_at IS NULL`;
+
+  const [abertas, finalizadas, rotasAbertas, rotasRecentes] = await Promise.all([
+    dbPool.query<MatrizDeliveryRow>(
+      `${deliverySelect} AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
+       ORDER BY o.created_at ASC`, [environment]),
+    dbPool.query<MatrizDeliveryRow>(
+      `${deliverySelect} AND (o.delivery_status IN ('delivered','failed') OR o.status = 'cancelled')
+       ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC LIMIT 30`, [environment]),
+    dbPool.query<MatrizTripRow>(
+      `${tripSelect} AND t.status = 'open' ORDER BY t.started_at DESC`, [environment]),
+    dbPool.query<MatrizTripRow>(
+      `${tripSelect} AND t.status = 'closed' ORDER BY t.started_at DESC LIMIT 10`, [environment]),
+  ]);
+  return {
+    abertas: abertas.rows,
+    finalizadas: finalizadas.rows,
+    rotas_abertas: rotasAbertas.rows,
+    rotas_recentes: rotasRecentes.rows,
+  };
+}
+
+/** Saiu pra entrega / entregue. "Não entregue" NÃO passa aqui — é failMatrizDelivery. */
+export async function setMatrizDeliveryStatus(
+  input: {
+    order_id: string;
+    status: 'dispatched' | 'delivered';
+    courier?: string | null;
+    payment_method?: string | null;
+    environment?: 'prod' | 'test';
+  },
+  dbPool: Pool = defaultPool,
+): Promise<{ order_id: string; delivery_status: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  // Entregue também fecha o PEDIDO (status delivered — verdade comercial do 0013);
+  // a régua de faturamento (0117) não muda: já contava o pedido não-cancelado.
+  const r = await dbPool.query<{ order_id: string; delivery_status: string }>(
+    `UPDATE commerce.orders o
+        SET delivery_status = $3,
+            delivery_courier = COALESCE(NULLIF($4, ''), o.delivery_courier),
+            dispatched_at = CASE WHEN $3 = 'dispatched' THEN COALESCE(o.dispatched_at, now()) ELSE o.dispatched_at END,
+            delivered_at  = CASE WHEN $3 = 'delivered'  THEN now() ELSE o.delivered_at END,
+            status        = CASE WHEN $3 = 'delivered'  THEN 'delivered' ELSE o.status END,
+            payment_method = CASE WHEN $3 = 'delivered' THEN COALESCE(NULLIF($5, ''), o.payment_method) ELSE o.payment_method END,
+            closed_at     = CASE WHEN $3 = 'delivered'  THEN COALESCE(o.closed_at, now()) ELSE o.closed_at END,
+            closed_by     = CASE WHEN $3 = 'delivered'  THEN COALESCE(o.closed_by, 'logistica-matriz') ELSE o.closed_by END,
+            updated_at    = now()
+      WHERE o.id = $2 AND o.environment = $1
+        AND o.status <> 'cancelled' AND o.delivery_status <> 'delivered'
+        AND ${MAIN_DELIVERY_GUARD}
+      RETURNING o.id AS order_id, o.delivery_status`,
+    [environment, input.order_id, input.status, input.courier ?? null, input.payment_method ?? null],
+  );
+  if (!r.rows[0]) throw new Error('delivery_not_found');
+  return r.rows[0];
+}
+
+/** NÃO ENTREGUE: marca failed E CANCELA o pedido no MESMO caminho atômico do
+ *  cancelamento (fdd9148) — galpão volta guiado pela trilha; falhou a devolução,
+ *  volta tudo. O motivo fica na trilha do cancel_manual_order. */
+export async function failMatrizDelivery(
+  input: { order_id: string; reason?: string | null; actor_label?: string | null; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<{ order_id: string; delivery_status: 'failed' }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const marked = await client.query(
+      `UPDATE commerce.orders o
+          SET delivery_status = 'failed', updated_at = now()
+        WHERE o.id = $2 AND o.environment = $1
+          AND o.status <> 'cancelled' AND o.delivery_status <> 'delivered'
+          AND ${MAIN_DELIVERY_GUARD}
+        RETURNING o.id`,
+      [environment, input.order_id],
+    );
+    if (!marked.rows[0]) throw new Error('delivery_not_found');
+    await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
+      input.order_id,
+      input.actor_label ?? 'logistica-matriz',
+      input.reason ?? 'entrega falhou',
+    ]);
+    await applyMatrizGalpaoReturn(client, environment, input.order_id);
+    await client.query('COMMIT');
+    return { order_id: input.order_id, delivery_status: 'failed' };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** ABRE a rota do dia: cria o diário e pendura as entregas escolhidas (elas saem
+ *  pra entrega juntas — dispatched + entregador da rota). */
+export async function openMatrizTrip(
+  input: {
+    courier_name: string;
+    km_start?: number | null;
+    order_ids?: string[];
+    created_by?: string | null;
+    environment?: 'prod' | 'test';
+  },
+  dbPool: Pool = defaultPool,
+): Promise<{ trip_id: string; deliveries_count: number }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const courier = input.courier_name.trim();
+  if (!courier) throw new Error('courier_required');
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const trip = await client.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_delivery_trips (environment, courier_name, km_start, created_by)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [environment, courier, input.km_start ?? null, input.created_by ?? 'matriz-painel'],
+    );
+    const tripId = trip.rows[0]!.id;
+    let count = 0;
+    if (input.order_ids && input.order_ids.length > 0) {
+      const upd = await client.query(
+        `UPDATE commerce.orders o
+            SET trip_id = $3, delivery_status = 'dispatched',
+                dispatched_at = COALESCE(o.dispatched_at, now()),
+                delivery_courier = $4, updated_at = now()
+          WHERE o.id = ANY($2::uuid[]) AND o.environment = $1
+            AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
+            AND o.trip_id IS NULL
+            AND ${MAIN_DELIVERY_GUARD}
+          RETURNING o.id`,
+        [environment, input.order_ids, tripId, courier],
+      );
+      count = upd.rowCount ?? 0;
+      // Pedido que não entrou (cancelado no meio, já em outra rota, de parceiro):
+      // a rota abre com os que valem; a tela mostra quantos entraram.
+    }
+    await client.query('COMMIT');
+    return { trip_id: tripId, deliveries_count: count };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** FECHA a rota: km final + gasolina + observação. Se informou gasolina E nenhum
+ *  comprovante desta rota já virou despesa (IA), lança a despesa 'combustivel'
+ *  (0120) na MESMA transação — anti-dupla-contagem por desenho. Respeita a flag
+ *  MATRIZ_EXPENSES (off = diário grava, lançamento não nasce). */
+export async function closeMatrizTrip(
+  input: {
+    trip_id: string;
+    km_end?: number | null;
+    fuel_spent?: number | null;
+    notes?: string | null;
+    environment?: 'prod' | 'test';
+  },
+  dbPool: Pool = defaultPool,
+): Promise<{ trip_id: string; fuel_expense_id: string | null }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const trip = await client.query<{ id: string; courier_name: string; km_start: string | null; started_at: string }>(
+      `SELECT id, courier_name, km_start::text, started_at
+         FROM commerce.matriz_delivery_trips
+        WHERE id = $2 AND environment = $1 AND status = 'open' AND deleted_at IS NULL
+        FOR UPDATE`,
+      [environment, input.trip_id],
+    );
+    if (!trip.rows[0]) throw new Error('trip_not_found');
+    const t = trip.rows[0];
+
+    const fuel = input.fuel_spent != null && Number(input.fuel_spent) > 0 ? Number(input.fuel_spent) : null;
+    let fuelExpenseId: string | null = null;
+    if (fuel !== null && env.MATRIZ_EXPENSES) {
+      const parsed = await client.query(
+        `SELECT 1 FROM commerce.matriz_trip_receipts
+          WHERE trip_id = $1 AND ai_expense_id IS NOT NULL LIMIT 1`,
+        [input.trip_id],
+      );
+      if (!parsed.rows[0]) {
+        const kmLabel = input.km_end != null && t.km_start != null
+          ? ` (km ${Number(t.km_start)}–${Number(input.km_end)})` : '';
+        const exp = await client.query<{ id: string }>(
+          `INSERT INTO commerce.matriz_expenses
+             (environment, category, description, amount, payment_status, paid_at, created_by)
+           VALUES ($1, 'combustivel', $2, $3, 'paid', now(), 'logistica-fechamento')
+           RETURNING id`,
+          [environment,
+           `Rota ${new Date(t.started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${t.courier_name}${kmLabel}`,
+           fuel],
+        );
+        fuelExpenseId = exp.rows[0]!.id;
+      }
+    }
+
+    await client.query(
+      `UPDATE commerce.matriz_delivery_trips
+          SET status = 'closed', ended_at = now(),
+              km_end = COALESCE($3, km_end),
+              fuel_spent = COALESCE($4, fuel_spent),
+              notes = COALESCE(NULLIF($5, ''), notes),
+              fuel_expense_id = COALESCE($6, fuel_expense_id)
+        WHERE id = $2 AND environment = $1`,
+      [environment, input.trip_id, input.km_end ?? null, fuel, input.notes ?? null, fuelExpenseId],
+    );
+    await client.query('COMMIT');
+    return { trip_id: input.trip_id, fuel_expense_id: fuelExpenseId };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** Anexa um comprovante (bytes JÁ re-encodados pelo funil blindado) à rota. */
+export async function addMatrizTripReceipt(
+  input: {
+    trip_id: string;
+    bytes: Buffer;
+    mime: string;
+    environment?: 'prod' | 'test';
+  },
+  dbPool: Pool = defaultPool,
+): Promise<{ receipt_id: string; ai_status: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const aiStatus = env.MATRIZ_RECEIPT_AI ? 'pending' : 'skipped';
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const trip = await client.query(
+      `SELECT 1 FROM commerce.matriz_delivery_trips
+        WHERE id = $2 AND environment = $1 AND deleted_at IS NULL`,
+      [environment, input.trip_id],
+    );
+    if (!trip.rows[0]) throw new Error('trip_not_found');
+    // Teto de comprovantes por rota (banca 07-03, anti-abuso de storage — blob é BYTEA).
+    const count = await client.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM commerce.matriz_trip_receipts WHERE trip_id = $1`,
+      [input.trip_id],
+    );
+    if (Number(count.rows[0]!.n) >= 50) throw new Error('receipt_limit');
+    const receipt = await client.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_trip_receipts (environment, trip_id, mime, size_bytes, ai_status)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [environment, input.trip_id, input.mime, input.bytes.length, aiStatus],
+    );
+    const receiptId = receipt.rows[0]!.id;
+    await client.query(
+      `INSERT INTO commerce.matriz_trip_receipt_blobs (receipt_id, environment, bytes)
+       VALUES ($1, $2, $3)`,
+      [receiptId, environment, input.bytes],
+    );
+    await client.query('COMMIT');
+    return { receipt_id: receiptId, ai_status: aiStatus };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** Bytes do comprovante pro GET de imagem do painel. */
+export async function getMatrizTripReceiptImage(
+  receiptId: string,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<{ bytes: Buffer; mime: string } | null> {
+  const r = await dbPool.query<{ bytes: Buffer; mime: string }>(
+    `SELECT b.bytes, m.mime
+       FROM commerce.matriz_trip_receipt_blobs b
+       JOIN commerce.matriz_trip_receipts m ON m.id = b.receipt_id
+      WHERE b.receipt_id = $1 AND b.environment = $2`,
+    [receiptId, environment],
+  );
+  return r.rows[0] ?? null;
+}
+
+/** Grava o veredito da IA sobre um comprovante. parsed → LANÇA a despesa (0120)
+ *  na mesma transação, amarrada ao comprovante (idempotente: comprovante que já
+ *  virou despesa não lança de novo). unreadable → só marca (lançar na mão).
+ *  ANTI-DUPLA nas DUAS ordens (banca 07-03): se a rota JÁ lançou a despesa no
+ *  FECHAMENTO (fuel_expense_id), o comprovante COLA nela como lastro — não cria
+ *  segunda despesa da mesma gasolina. O FOR UPDATE na trip serializa com
+ *  closeMatrizTrip (fecha a race leitura×fechamento nas duas direções). */
+export async function recordReceiptAiResult(
+  input: {
+    receipt_id: string;
+    result:
+      | { kind: 'parsed'; category: MatrizExpenseCategory; amount: number; summary: string }
+      | { kind: 'unreadable'; summary: string };
+    environment?: 'prod' | 'test';
+  },
+  dbPool: Pool = defaultPool,
+): Promise<{ receipt_id: string; ai_status: string; ai_expense_id: string | null; linked_existing?: boolean }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const receipt = await client.query<{ id: string; trip_id: string; ai_expense_id: string | null }>(
+      `SELECT r.id, r.trip_id, r.ai_expense_id
+         FROM commerce.matriz_trip_receipts r
+        WHERE r.id = $2 AND r.environment = $1
+        FOR UPDATE`,
+      [environment, input.receipt_id],
+    );
+    if (!receipt.rows[0]) throw new Error('receipt_not_found');
+    if (receipt.rows[0].ai_expense_id) {
+      // Já lançado (retry/dupla chamada) — não duplica despesa.
+      await client.query('COMMIT');
+      return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: receipt.rows[0].ai_expense_id };
+    }
+
+    if (input.result.kind === 'unreadable') {
+      await client.query(
+        `UPDATE commerce.matriz_trip_receipts
+            SET ai_status = 'unreadable', ai_summary = $3
+          WHERE id = $2 AND environment = $1`,
+        [environment, input.receipt_id, input.result.summary],
+      );
+      await client.query('COMMIT');
+      return { receipt_id: input.receipt_id, ai_status: 'unreadable', ai_expense_id: null };
+    }
+
+    // FOR UPDATE: serializa com closeMatrizTrip (que também trava a trip) —
+    // e é aqui que a ordem "fechou lançando manual → leu o comprovante DEPOIS"
+    // deixa de duplicar (achado P1 da banca 07-03).
+    const trip = await client.query<{ courier_name: string; started_at: string; fuel_expense_id: string | null }>(
+      `SELECT courier_name, started_at, fuel_expense_id
+         FROM commerce.matriz_delivery_trips WHERE id = $1
+         FOR UPDATE`,
+      [receipt.rows[0].trip_id],
+    );
+    const existingFuelExpense = trip.rows[0]?.fuel_expense_id ?? null;
+    if (existingFuelExpense) {
+      await client.query(
+        `UPDATE commerce.matriz_trip_receipts
+            SET ai_status = 'parsed', ai_summary = $3, ai_expense_id = $4
+          WHERE id = $2 AND environment = $1`,
+        [environment, input.receipt_id, `${input.result.summary} · lastro da despesa do fechamento`, existingFuelExpense],
+      );
+      await client.query('COMMIT');
+      return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: existingFuelExpense, linked_existing: true };
+    }
+
+    const rotaLabel = trip.rows[0]
+      ? `Rota ${new Date(trip.rows[0].started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${trip.rows[0].courier_name}`
+      : 'Rota';
+    const exp = await client.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_expenses
+         (environment, category, description, amount, payment_status, paid_at, created_by)
+       VALUES ($1, $2, $3, $4, 'paid', now(), 'ia-comprovante')
+       RETURNING id`,
+      [environment, input.result.category, `${rotaLabel} · ${input.result.summary}`, input.result.amount],
+    );
+    await client.query(
+      `UPDATE commerce.matriz_trip_receipts
+          SET ai_status = 'parsed', ai_summary = $3, ai_expense_id = $4
+        WHERE id = $2 AND environment = $1`,
+      [environment, input.receipt_id, input.result.summary, exp.rows[0]!.id],
+    );
+    await client.query('COMMIT');
+    return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: exp.rows[0]!.id };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
