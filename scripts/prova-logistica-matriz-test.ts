@@ -7,7 +7,9 @@
  *   fechar rota com gasolina lança despesa 'combustivel' UMA vez (fechar 2x barra) ·
  *   ANTI-DUPLA-CONTAGEM: comprovante lido pela IA ganha do fechamento (fuel não relança) ·
  *   leitura idempotente (2ª chamada não duplica despesa) · unreadable NÃO lança ·
- *   blob do comprovante salva e volta byte a byte.
+ *   blob do comprovante salva e volta byte a byte · "A ROTA SE PAGOU?" (frete
+ *   embutido + lucro pela régua 0117 + despesas amarradas; falha fora; soft
+ *   delete de despesa reflete).
  *
  * Seeds descartáveis (medida '95/95-95', PROVA-LOG) e LIMPA no finally.
  *
@@ -59,16 +61,16 @@ async function main(): Promise<void> {
           AND description LIKE '%PROVA-LOG%'`, [ENV]);
     return Number(r.rows[0]!.n);
   };
-  const seedOrder = async (opts: { mode?: 'delivery' | 'pickup'; unitId?: string | null; qty?: number }): Promise<string> => {
+  const seedOrder = async (opts: { mode?: 'delivery' | 'pickup'; unitId?: string | null; qty?: number; total?: number; unitCost?: number | null; discount?: number }): Promise<string> => {
     const mode = opts.mode ?? 'delivery';
     const o = await client.query<{ id: string }>(
       `INSERT INTO commerce.orders (environment, contact_id, total_amount, status, fulfillment_mode, delivery_address, unit_id)
-       VALUES ($1::env_t, $2, 100, 'open', $3, $4, $5) RETURNING id`,
-      [ENV, contactId, mode, mode === 'delivery' ? 'Rua PROVA-LOG, 1 - Centro - Rio' : null, opts.unitId ?? null]);
+       VALUES ($1::env_t, $2, $3, 'open', $4, $5, $6) RETURNING id`,
+      [ENV, contactId, opts.total ?? 100, mode, mode === 'delivery' ? 'Rua PROVA-LOG, 1 - Centro - Rio' : null, opts.unitId ?? null]);
     const id = o.rows[0]!.id;
     await client.query(
-      `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
-       VALUES ($1::env_t, $2, $3, $4, 100)`, [ENV, id, productId, opts.qty ?? 1]);
+      `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price, discount_amount, matriz_unit_cost)
+       VALUES ($1::env_t, $2, $3, $4, 100, $5, $6)`, [ENV, id, productId, opts.qty ?? 1, opts.discount ?? 0, opts.unitCost ?? null]);
     orderIds.push(id);
     return id;
   };
@@ -82,12 +84,12 @@ async function main(): Promise<void> {
       `DELETE FROM commerce.matriz_trip_receipt_blobs WHERE environment=$1 AND receipt_id IN (
          SELECT r.id FROM commerce.matriz_trip_receipts r
          JOIN commerce.matriz_delivery_trips t ON t.id = r.trip_id
-        WHERE t.courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG'))`, [ENV]);
+        WHERE t.courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG'))`, [ENV]);
     await client.query(
       `DELETE FROM commerce.matriz_trip_receipts WHERE environment=$1 AND trip_id IN (
-         SELECT id FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG'))`, [ENV]);
+         SELECT id FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG'))`, [ENV]);
     await client.query(
-      `DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG')`, [ENV]);
+      `DELETE FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name IN ('Zé da Moto','Maria PROVA-LOG','Rota-Fecha-Antes PROVA-LOG','Resumo PROVA-LOG')`, [ENV]);
     await client.query(
       `DELETE FROM commerce.matriz_expenses WHERE environment=$1 AND created_by IN ('logistica-fechamento','ia-comprovante') AND description LIKE '%PROVA-LOG%'`, [ENV]);
     await client.query(
@@ -267,6 +269,11 @@ async function main(): Promise<void> {
     const rec3row = (await client.query(`SELECT ai_status, ai_expense_id FROM commerce.matriz_trip_receipts WHERE id=$1`, [rec3.receipt_id])).rows[0] as { ai_status: string; ai_expense_id: string };
     check('L14c comprovante virou LASTRO da despesa existente (parsed + amarrado)',
       rec3row.ai_status === 'parsed' && rec3row.ai_expense_id === fech3.fuel_expense_id);
+    // (banca 07-03, revisão do resumo) despesas_total da rota NÃO dobra no caso
+    // linked: fuel_expense_id E ai_expense_id apontam pra MESMA despesa → soma 1×.
+    log = await getMatrizLogistica(ENV);
+    check('L14d despesas_total da rota linked NÃO dobra (120, não 240)',
+      Number(log.rotas_recentes.find((t) => t.id === trip3.trip_id)!.despesas_total) === 120);
 
     // ── L15: teto de comprovantes por rota (banca: anti-abuso de storage) ──
     let capped = false;
@@ -279,7 +286,43 @@ async function main(): Promise<void> {
     catch (e) { capped = (e as Error).message === 'receipt_limit'; }
     check('L15 51º comprovante barrado (receipt_limit)', capped);
 
-    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    // ── L16: "A ROTA SE PAGOU?" — resumo financeiro da rota (frete embutido no
+    // total + lucro pela régua 0117 + despesas amarradas). A: 1×100 custo 60,
+    // total 109,90 (frete 9,90 · lucro 40). B: 2×100 custo 60, total 213 (frete 13
+    // · lucro 80). C: FALHA (fica fora da conta). D: entregue SEM custo congelado
+    // (soma frete, lucro fica de fora, aviso conta). Fecha com gasolina 35. ──
+    const oA = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
+    const oB = await seedOrder({ unitId: mainUnitId, qty: 2, total: 213, unitCost: 60 });
+    const oC = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
+    const oD = await seedOrder({ unitId: mainUnitId, total: 109.9 }); // sem custo congelado
+    const trip5 = await openMatrizTrip({
+      courier_name: 'Resumo PROVA-LOG', km_start: 500,
+      order_ids: [oA, oB, oC, oD], environment: ENV,
+    });
+    tripIds.push(trip5.trip_id);
+    await setMatrizDeliveryStatus({ order_id: oA, status: 'delivered', environment: ENV });
+    await setMatrizDeliveryStatus({ order_id: oB, status: 'delivered', environment: ENV });
+    await setMatrizDeliveryStatus({ order_id: oD, status: 'delivered', environment: ENV });
+    await failMatrizDelivery({ order_id: oC, reason: 'PROVA-LOG resumo', actor_label: 'prova-log', environment: ENV });
+    const fech5 = await closeMatrizTrip({ trip_id: trip5.trip_id, km_end: 560, fuel_spent: 35, environment: ENV });
+    log = await getMatrizLogistica(ENV);
+    const t5 = log.rotas_recentes.find((t) => t.id === trip5.trip_id);
+    const rz = t5?.resumo;
+    check('L16a resumo: 3 entregues (falha FORA) e frete 9,90+13+9,90 = 32,80',
+      !!rz && rz.entregues === 3 && Math.abs(rz.frete_total - 32.8) < 0.005,
+      `resumo=${JSON.stringify(rz)}`);
+    check('L16b lucro dos pneus SÓ com custo congelado (40+80=120) + 1 item sem custo AVISADO',
+      !!rz && Math.abs(rz.lucro_pneus - 120) < 0.005 && rz.itens_sem_custo === 1);
+    check('L16c despesas da rota = gasolina do fechamento (35) → sobra 32,80+120−35 = 117,80',
+      !!t5 && Math.abs(Number(t5.despesas_total) - 35) < 0.005,
+      `despesas=${t5?.despesas_total}`);
+    // Dono APAGA a despesa no Financeiro (soft delete) → a rota reflete na hora.
+    await client.query(`UPDATE commerce.matriz_expenses SET deleted_at = now() WHERE id = $1`, [fech5.fuel_expense_id]);
+    log = await getMatrizLogistica(ENV);
+    check('L16d despesa apagada (soft delete) SAI do resumo da rota',
+      Number(log.rotas_recentes.find((t) => t.id === trip5.trip_id)!.despesas_total) === 0);
+
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
     // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);

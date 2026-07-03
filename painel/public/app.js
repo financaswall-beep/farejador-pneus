@@ -1307,6 +1307,24 @@ function painelApp() {
       const km = Number(t.km_end) - Number(t.km_start);
       return Number.isFinite(km) && km >= 0 ? km : null;
     },
+    // "A rota se pagou?" — frete cobrado + lucro dos pneus (custo congelado 0117)
+    // − despesas da rota. Componentes vêm do servidor; aqui SÓ soma e formata.
+    rotaResumo(t) {
+      const r = t?.resumo;
+      if (!r) return null;
+      const despesas = Number(t.despesas_total || 0);
+      if (!r.entregues && !despesas) return null; // rota sem entrega e sem gasto: nada a dizer
+      const frete = Number(r.frete_total || 0);
+      const lucro = Number(r.lucro_pneus || 0);
+      return {
+        entregues: Number(r.entregues || 0),
+        frete,
+        lucro,
+        despesas,
+        resultado: Math.round((frete + lucro - despesas) * 100) / 100,
+        semCusto: Number(r.itens_sem_custo || 0),
+      };
+    },
     async logisticaStatus(d, status) {
       this.logisticaSaving = true;
       try {

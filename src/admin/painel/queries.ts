@@ -2471,6 +2471,20 @@ export interface MatrizTripRow {
   started_at: string;
   ended_at: string | null;
   deliveries_count: number;
+  /** "A rota se pagou?" — SÓ das entregas DELIVERED da rota (failed/cancelada fora).
+   *  Régua do lucro = a MESMA do varejo 0117 (custo congelado; item sem custo fica
+   *  fora do lucro e é CONTADO pra UI avisar — nunca chuta). Frete = total_amount −
+   *  itens (o bot embute o frete no total; walk-in sem frete → 0, nunca negativo). */
+  resumo: {
+    entregues: number;
+    frete_total: number;
+    faturamento_pneus: number;
+    lucro_pneus: number;
+    itens_sem_custo: number;
+  };
+  /** Σ despesas vivas amarradas à rota (fechamento ∪ comprovantes lidos — o IN
+   *  dedup cobre o linked_existing; deleted_at IS NULL = dono apagou, rota reflete). */
+  despesas_total: string;
   receipts: Array<{
     id: string;
     ai_status: 'pending' | 'parsed' | 'unreadable' | 'skipped';
@@ -2511,6 +2525,30 @@ export async function getMatrizLogistica(
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
            (SELECT COUNT(*)::int FROM commerce.orders o
              WHERE o.trip_id = t.id AND o.environment = t.environment) AS deliveries_count,
+           (SELECT jsonb_build_object(
+                     'entregues', COUNT(*),
+                     'frete_total', COALESCE(ROUND(SUM(GREATEST(x.total_amount - x.itens_valor, 0)), 2), 0),
+                     'faturamento_pneus', COALESCE(ROUND(SUM(x.itens_valor), 2), 0),
+                     'lucro_pneus', COALESCE(ROUND(SUM(x.lucro_valor), 2), 0),
+                     'itens_sem_custo', COALESCE(SUM(x.itens_sem_custo), 0))
+              FROM (SELECT o2.id, o2.total_amount,
+                           COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount), 0) AS itens_valor,
+                           COALESCE(SUM(CASE WHEN oi.matriz_unit_cost IS NOT NULL
+                                             THEN (oi.quantity * oi.unit_price - oi.discount_amount)
+                                                  - oi.matriz_unit_cost * oi.quantity END), 0) AS lucro_valor,
+                           COUNT(*) FILTER (WHERE oi.matriz_unit_cost IS NULL)::int AS itens_sem_custo
+                      FROM commerce.orders o2
+                      JOIN commerce.order_items oi
+                        ON oi.order_id = o2.id AND oi.environment = o2.environment
+                     WHERE o2.trip_id = t.id AND o2.environment = t.environment
+                       AND o2.delivery_status = 'delivered' AND o2.status <> 'cancelled'
+                     GROUP BY o2.id, o2.total_amount) x) AS resumo,
+           (SELECT COALESCE(SUM(e.amount), 0)::text
+              FROM commerce.matriz_expenses e
+             WHERE e.environment = t.environment AND e.deleted_at IS NULL
+               AND (e.id = t.fuel_expense_id
+                    OR e.id IN (SELECT r2.ai_expense_id FROM commerce.matriz_trip_receipts r2
+                                 WHERE r2.trip_id = t.id AND r2.ai_expense_id IS NOT NULL))) AS despesas_total,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
                        'id', r.id, 'ai_status', r.ai_status, 'ai_summary', r.ai_summary,
                        'ai_expense_id', r.ai_expense_id, 'created_at', r.created_at)

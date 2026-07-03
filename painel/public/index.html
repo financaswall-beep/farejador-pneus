@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-logistica2"></script>
+<script src="/admin/painel/app.js?v=20260703-logistica3"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2444,6 +2444,17 @@
                         <span x-text="' · ' + t.deliveries_count + ' entrega(s)'"></span>
                         <span x-show="(t.receipts || []).length" x-text="' · ' + t.receipts.length + ' comprovante(s)'"></span>
                       </div>
+                      <!-- A rota se pagou? frete + lucro dos pneus (custo congelado) − gastos da rota -->
+                      <template x-if="rotaResumo(t)">
+                        <div class="text-[11px] mt-1">
+                          <span class="font-semibold" :class="rotaResumo(t).resultado >= 0 ? 'text-emerald-700' : 'text-rose-600'"
+                                x-text="(rotaResumo(t).resultado >= 0 ? 'sobrou ' : 'faltou ') + formatCurrency(Math.abs(rotaResumo(t).resultado))"></span>
+                          <span class="text-gray-400"
+                                x-text="' — frete ' + formatCurrency(rotaResumo(t).frete) + ' + pneus ' + formatCurrency(rotaResumo(t).lucro) + ' − rota ' + formatCurrency(rotaResumo(t).despesas)"></span>
+                          <div x-show="rotaResumo(t).semCusto > 0" class="text-amber-600"
+                               x-text="rotaResumo(t).semCusto + ' item(ns) sem custo congelado — lucro parcial'"></div>
+                        </div>
+                      </template>
                     </td>
                     <td class="px-4 py-2.5 text-center text-gray-600" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></td>
                     <td class="px-4 py-2.5 text-right">
