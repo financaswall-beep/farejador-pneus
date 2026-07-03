@@ -2,22 +2,30 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
 import { applyMatrizGalpaoDecrement } from '../../../src/atendente-v2/wholesale-stock-read.js';
 
-// Mock do client: responde tire_specs / SELECT measure / captura os UPDATE.
+// Mock do client: responde tire_specs / SELECT measure / captura os UPDATE (que agora
+// devolvem old_qty/new_qty do RETURNING) / captura o INSERT da trilha (audit.events).
 function mockClient(
   specs: { product_id: string; tire_size: string | null }[],
   stock: { measure: string }[],
+  onHand = 10, // qty antes da baixa (a devolvida no old_qty; new = clamp em 0)
 ) {
   const updates: Array<[string, string, number]> = [];
+  const audits: Array<{ sql: string; params: unknown[] }> = [];
   const query = vi.fn(async (sql: string, params: unknown[]) => {
     if (sql.includes('commerce.tire_specs')) return { rows: specs };
     if (sql.includes('UPDATE commerce.wholesale_stock')) {
       updates.push(params as [string, string, number]);
-      return { rowCount: 1 };
+      const req = Number((params as [string, string, number])[2]);
+      return { rows: [{ old_qty: String(onHand), new_qty: String(Math.max(0, onHand - req)) }], rowCount: 1 };
+    }
+    if (sql.includes('INSERT INTO audit.events')) {
+      audits.push({ sql, params });
+      return { rows: [] };
     }
     if (sql.includes('SELECT measure')) return { rows: stock };
     return { rows: [] };
   });
-  return { client: { query } as unknown as PoolClient, query, updates };
+  return { client: { query } as unknown as PoolClient, query, updates, audits };
 }
 
 describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (varejo)', () => {
@@ -69,5 +77,38 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
     );
     await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 1 }], true);
     expect(updates).toEqual([]);
+  });
+
+  it('com orderId: grava a trilha da baixa (audit.events) com o delta REAL', async () => {
+    const { client, audits } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-12' }],
+      [{ measure: '90/90-12' }],
+      10, // tinha 10; vende 2 → delta real 2
+    );
+    await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 2 }], true, 'ord-1');
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.sql).toContain('matriz_galpao_decrement');
+    const payload = JSON.parse(audits[0]!.params[2] as string);
+    expect(payload.movements).toEqual([{ measure: '90/90-12', qty: 2 }]);
+  });
+
+  it('clamp: vende 15 com 10 → trilha registra 10 (não 15)', async () => {
+    const { client, audits } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-12' }],
+      [{ measure: '90/90-12' }],
+      10, // tinha 10; vende 15 → clamp em 0, delta real 10
+    );
+    await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 15 }], true, 'ord-2');
+    const payload = JSON.parse(audits[0]!.params[2] as string);
+    expect(payload.movements).toEqual([{ measure: '90/90-12', qty: 10 }]);
+  });
+
+  it('sem orderId: baixa mas NÃO grava trilha (comportamento antigo preservado)', async () => {
+    const { client, audits } = mockClient(
+      [{ product_id: 'p1', tire_size: '90/90-12' }],
+      [{ measure: '90/90-12' }],
+    );
+    await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 2 }], true);
+    expect(audits).toHaveLength(0);
   });
 });

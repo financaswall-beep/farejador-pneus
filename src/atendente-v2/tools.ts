@@ -30,7 +30,7 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -1142,6 +1142,7 @@ async function insertCommerceOrderMirror(
         environment,
         input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
         env.WHOLESALE_MATRIZ_DECREMENT,
+        order.id,
       );
       // Fatia 2 (0117): CONGELA o custo médio do galpão nos itens da venda da matriz —
       // o lucro desta venda não muda quando o custo médio mudar depois. Mesma transação
@@ -1782,14 +1783,19 @@ async function cancelarPedido(
     });
   }
 
-  // Reaproveita function ja existente do admin (commerce.cancel_manual_order)
+  // Reaproveita function ja existente do admin (commerce.cancel_manual_order). Venda do
+  // VAREJO da matriz baixou o GALPÃO → devolve na MESMA transação (espelho da baixa, guiado
+  // pela trilha; venda que não baixou não devolve nada).
   try {
     const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
+    await client.query('BEGIN');
     await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
       order.id,
       'agent_v2_bot',
       reason,
     ]);
+    await applyMatrizGalpaoReturn(client, environment, order.id);
+    await client.query('COMMIT');
 
     logger.info(
       { environment, conversation_id: conversationId, order_number: orderNumber, motivo, detalhes },
@@ -1803,6 +1809,7 @@ async function cancelarPedido(
       mensagem: `Pedido ${orderNumber} cancelado.`,
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({ environment, order_number: orderNumber, err: message }, 'agent_v2: erro ao cancelar pedido');
     return JSON.stringify({ erro: `Nao foi possivel cancelar: ${message}` });

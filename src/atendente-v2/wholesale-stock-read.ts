@@ -179,6 +179,7 @@ export async function applyMatrizGalpaoDecrement(
   environment: 'prod' | 'test',
   items: Array<{ productId: string; quantity: number }>,
   enabled: boolean,
+  orderId?: string,
 ): Promise<void> {
   if (!enabled || items.length === 0) return;
 
@@ -201,25 +202,97 @@ export async function applyMatrizGalpaoDecrement(
   }
   if (qtyByKey.size === 0) return;
 
-  // 3. abate a linha do galpão que casa por chave (uma por chave; clamp em 0)
+  // 3. abate a linha do galpão que casa por chave (uma por chave; clamp em 0). Captura o
+  //    delta REAL (antes − depois): sob clamp, "pedi 5 mas só tinha 3" registra 3 removidos,
+  //    não 5 — a devolução no cancelamento nunca infla o estoque (fura o clamp assimétrico).
   const stock = await client.query<{ measure: string }>(
     `SELECT measure FROM commerce.wholesale_stock WHERE environment = $1`,
     [environment],
   );
   const done = new Set<string>();
+  const movements: Array<{ measure: string; qty: number }> = [];
   for (const row of stock.rows) {
     const key = tireSizeKey(row.measure);
     if (!key || done.has(key)) continue;
     const qty = qtyByKey.get(key);
     if (!qty) continue;
-    await client.query(
-      `UPDATE commerce.wholesale_stock
-          SET quantity_on_hand = GREATEST(0, quantity_on_hand - $3)
-        WHERE environment = $1 AND measure = $2`,
+    const upd = await client.query<{ old_qty: string; new_qty: string }>(
+      `WITH antes AS (
+         SELECT quantity_on_hand AS q FROM commerce.wholesale_stock
+          WHERE environment = $1 AND measure = $2 FOR UPDATE
+       )
+       UPDATE commerce.wholesale_stock s
+          SET quantity_on_hand = GREATEST(0, s.quantity_on_hand - $3)
+         FROM antes
+        WHERE s.environment = $1 AND s.measure = $2
+        RETURNING antes.q AS old_qty, s.quantity_on_hand AS new_qty`,
       [environment, row.measure, qty],
     );
     done.add(key);
+    const removed = Number(upd.rows[0]?.old_qty ?? 0) - Number(upd.rows[0]?.new_qty ?? 0);
+    if (removed > 0) movements.push({ measure: row.measure, qty: removed });
   }
+
+  // 4. trilha da baixa (audit.events) pra o cancelamento devolver EXATAMENTE o que saiu.
+  //    Só grava se veio um orderId e algo saiu de fato — venda que não baixou não deixa
+  //    rastro, então cancelá-la não devolve nada (sem estoque inventado).
+  if (orderId && movements.length > 0) {
+    await client.query(
+      `INSERT INTO audit.events (environment, domain, entity_table, entity_id, event_type, actor_label, payload_after)
+       VALUES ($1, 'stock', 'commerce.wholesale_stock', $2, 'matriz_galpao_decrement', 'matriz-venda', $3::jsonb)`,
+      [environment, orderId, JSON.stringify({ order_id: orderId, movements })],
+    );
+  }
+}
+
+/**
+ * Devolve ao GALPÃO o que a venda de VAREJO da matriz baixou, quando o pedido é CANCELADO —
+ * o espelho do applyMatrizGalpaoDecrement. É guiada pela TRILHA (audit.events
+ * 'matriz_galpao_decrement'), não pelos itens do pedido nem pela flag atual: devolve
+ * EXATAMENTE o que a baixa registrou ter tirado. Consequências (todas desejadas):
+ *   - venda que não baixou (flag off na hora) → sem trilha → devolve nada (não inventa);
+ *   - venda sob clamp (tirou menos que o pedido) → devolve só o que saiu;
+ *   - segundo cancelamento → grava 'matriz_galpao_return', o guard abaixo corta (idempotente).
+ * Deve rodar na MESMA transação do cancelamento (rollback desfaz cancelamento + devolução).
+ */
+export async function applyMatrizGalpaoReturn(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  orderId: string,
+): Promise<void> {
+  // idempotência: já devolvido? não devolve de novo.
+  const already = await client.query(
+    `SELECT 1 FROM audit.events
+      WHERE environment = $1 AND entity_id = $2 AND event_type = 'matriz_galpao_return' LIMIT 1`,
+    [environment, orderId],
+  );
+  if (already.rows.length > 0) return;
+
+  // o que a venda REALMENTE tirou (última baixa registrada deste pedido).
+  const dec = await client.query<{ payload_after: { movements?: Array<{ measure: string; qty: number }> } }>(
+    `SELECT payload_after FROM audit.events
+      WHERE environment = $1 AND entity_id = $2 AND event_type = 'matriz_galpao_decrement'
+      ORDER BY created_at DESC LIMIT 1`,
+    [environment, orderId],
+  );
+  const movements = dec.rows[0]?.payload_after?.movements ?? [];
+  if (movements.length === 0) return; // não baixou → nada a devolver
+
+  for (const mv of movements) {
+    if (!mv.measure || !(mv.qty > 0)) continue;
+    await client.query(
+      `UPDATE commerce.wholesale_stock
+          SET quantity_on_hand = quantity_on_hand + $3
+        WHERE environment = $1 AND measure = $2`,
+      [environment, mv.measure, mv.qty],
+    );
+  }
+
+  await client.query(
+    `INSERT INTO audit.events (environment, domain, entity_table, entity_id, event_type, actor_label, payload_after)
+     VALUES ($1, 'stock', 'commerce.wholesale_stock', $2, 'matriz_galpao_return', 'matriz-cancel', $3::jsonb)`,
+    [environment, orderId, JSON.stringify({ order_id: orderId, movements })],
+  );
 }
 
 /**

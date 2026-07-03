@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-financeiro2"></script>
+<script src="/admin/painel/app.js?v=20260703-financeiro3"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2338,7 +2338,7 @@
             <div class="bg-white border border-gray-200 rounded-xl p-4">
               <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Giro do estoque</div>
               <div class="text-lg font-bold mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? financeiroVisao.indicadores.giro_dias + ' dias' : '—'"></div>
-              <div class="text-xs text-gray-400 mt-1">tempo do pneu virar dinheiro</div>
+              <div class="text-xs text-gray-400 mt-1">tempo do pneu virar dinheiro (base 30 dias)</div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-4">
               <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="clock" class="w-4 h-4"></i> Fiado do mês em aberto</div>

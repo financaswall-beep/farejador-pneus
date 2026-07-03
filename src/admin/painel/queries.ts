@@ -5,7 +5,7 @@ import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
-import { applyMatrizGalpaoDecrement, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
+import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -53,6 +53,7 @@ export interface CancelManualOrderInput {
   order_id: string;
   actor_label: string;
   reason: string;
+  environment?: 'prod' | 'test';
 }
 
 const DEFAULT_LIMIT = 50;
@@ -663,6 +664,7 @@ export async function registerWalkinOrder(
         environment,
         items,
         env.WHOLESALE_MATRIZ_DECREMENT,
+        orderId,
       );
       await applyMatrizRetailCostSnapshot(
         dbPool as unknown as PoolClient,
@@ -681,11 +683,26 @@ export async function cancelManualOrder(
   input: CancelManualOrderInput,
   dbPool: Pool = defaultPool,
 ): Promise<{ cancelled: true }> {
-  await dbPool.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
-    input.order_id,
-    input.actor_label,
-    input.reason,
-  ]);
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  // Cancelamento + devolução do galpão ATÔMICOS: o pedido do VAREJO da matriz que baixou
+  // o galpão o recompõe ao cancelar (espelho da baixa, guiado pela trilha). Se a devolução
+  // falha, o cancelamento faz rollback junto (mais forte que a baixa, best-effort na venda).
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT commerce.cancel_manual_order($1, $2, $3)', [
+      input.order_id,
+      input.actor_label,
+      input.reason,
+    ]);
+    await applyMatrizGalpaoReturn(client, environment, input.order_id);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 
   return { cancelled: true };
 }
@@ -2229,8 +2246,8 @@ export interface FinanceiroVisao {
   indicadores: {
     capital_parado: string;   // Σ qty × custo médio do galpão
     pneus_galpao: number;
-    giro_dias: number | null;         // capital / (custo vendido no mês / 30)
-    fiado_aberto_pct: number | null;  // % do faturamento do atacado do mês ainda pendente
+    giro_dias: number | null;         // capital / (custo vendido em 30d móveis / 30)
+    fiado_aberto_pct: number | null;  // % do faturamento do atacado do mês ainda pendente (clamp 100)
     ponto_equilibrio: number | null;  // despesas do mês / margem bruta do mês
   };
 }
@@ -2242,7 +2259,7 @@ export async function getMatrizFinanceiroVisao(
   dbPool: Pool = defaultPool,
 ): Promise<FinanceiroVisao> {
   const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
-  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat] =
+  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d] =
     await Promise.all([
       getWholesaleResumo(environment, dbPool, 'mes'),
       getVarejoResumo('mes', environment, dbPool),
@@ -2258,12 +2275,18 @@ export async function getMatrizFinanceiroVisao(
             [environment],
           ).then((r) => r.rows[0]!.realizado)
         : Promise.resolve(null),
+      // Fiado do mês em aberto: soma dos ITENS (line_total) das vendas confirmed pending —
+      // a MESMA base do denominador (faturamento do atacado = SUM(oi.line_total) do getWholesaleResumo).
+      // Antes somava o header (total_amount) contra itens no denominador → venda sem item
+      // estourava o % (500%). Agora numerador e denominador batem; clamp em 100 no cálculo.
       env.WHOLESALE_FINANCE
         ? dbPool.query<{ aberto: string }>(
-            `SELECT COALESCE(SUM(total_amount), 0) AS aberto
-               FROM commerce.wholesale_orders
-              WHERE environment = $1 AND status = 'confirmed' AND payment_status = 'pending'
-                AND (created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+            `SELECT COALESCE(SUM(oi.line_total), 0) AS aberto
+               FROM commerce.wholesale_orders o
+               JOIN commerce.wholesale_order_items oi
+                 ON oi.order_id = o.id AND oi.environment = o.environment
+              WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
+                AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
             [environment],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),
@@ -2283,6 +2306,26 @@ export async function getMatrizFinanceiroVisao(
             [environment],
           ).then((r) => r.rows)
         : Promise.resolve(null),
+      // Custo do pneu vendido nos ÚLTIMOS 30 DIAS (janela móvel) — base do GIRO. Mês-calendário
+      // encolhe o denominador no dia 2 e o giro estoura; a janela de 30d corridos é estável e
+      // é o padrão de mercado. Atacado (unit_cost congelado) + varejo da main (matriz_unit_cost).
+      dbPool.query<{ custo: string }>(
+        `SELECT
+           (SELECT COALESCE(SUM(oi.unit_cost * oi.quantity), 0)
+              FROM commerce.wholesale_orders o
+              JOIN commerce.wholesale_order_items oi
+                ON oi.order_id = o.id AND oi.environment = o.environment
+             WHERE o.environment = $1 AND o.status = 'confirmed'
+               AND o.created_at >= now() - interval '30 days')
+         + (SELECT COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)
+              FROM commerce.orders o
+              JOIN core.units u ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
+              JOIN commerce.order_items oi ON oi.order_id = o.id AND oi.environment = o.environment
+             WHERE o.environment = $1 AND o.status <> 'cancelled'
+               AND o.created_at >= now() - interval '30 days')
+           AS custo`,
+        [environment],
+      ).then((r) => r.rows[0]!.custo),
     ]);
 
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
@@ -2336,10 +2379,13 @@ export async function getMatrizFinanceiroVisao(
 
   // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
   const capitalParado = Number(capital.capital);
-  const giroDias = custo > 0 ? Math.round(capitalParado / (custo / 30)) : null;
+  // Giro na janela móvel de 30 dias (não mês-calendário) → estável no começo do mês.
+  const custoJanela = Number(custo30d);
+  const giroDias = custoJanela > 0 ? Math.round(capitalParado / (custoJanela / 30)) : null;
   const fatAtacado = Number(atacado.faturamento);
+  // Mesma base (line_total) nos dois lados + clamp em 100 (nunca > 100% do faturamento).
   const fiadoAbertoPct = fiadoAbertoMes !== null && fatAtacado > 0
-    ? Math.round((Number(fiadoAbertoMes) / fatAtacado) * 100) : null;
+    ? Math.min(100, Math.round((Number(fiadoAbertoMes) / fatAtacado) * 100)) : null;
   const margemBrutaFrac = faturamento > 0 ? lucroBruto / faturamento : 0;
   const pontoEquilibrio = despesasMes !== null && despesasMes > 0 && margemBrutaFrac > 0
     ? Math.round(despesasMes / margemBrutaFrac) : null;
