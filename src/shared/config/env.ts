@@ -163,6 +163,13 @@ const envSchema = z.object({
   // do anel E o galpão tem todos os itens. Requer WHOLESALE_UNIFIED_STOCK on. Default OFF =
   // matriz segue como backstop passivo (comportamento de hoje). Liga no Coolify após provar ao vivo.
   ROUTING_MATRIZ_AS_STORE: booleanStringSchema,
+  // MATRIZ CONCORRE DE IGUAL (decisão do dono 2026-07-03) — vai ALÉM do backstop: com a flag
+  // on, a matriz TOMA o pedido do parceiro campeão quando está ESTRITAMENTE mais perto do
+  // cliente que TODO parceiro do pool (linha reta). Empate / parceiro mais perto → parceiro
+  // fica (a régua ENTRE parceiros não muda). Requer WHOLESALE_UNIFIED_STOCK on (galpão = fonte
+  // do estoque da matriz). Default OFF = matriz só backstop (ROUTING_MATRIZ_AS_STORE). Liga no
+  // Coolify após provar ao vivo (risco: canibalizar a venda do parceiro — decisão do dono).
+  ROUTING_MATRIZ_COMPETES: booleanStringSchema,
   // FRETE DE ENTREGA PELO PINO — quando o cliente já mandou a localização (pino), o bot
   // passa a COTAR o frete de entrega direto da coordenada, SEM exigir que ele digite o
   // endereço só pra cotar. Furo raiz (conversa #696, 07-01): calcular_frete é chaveado no

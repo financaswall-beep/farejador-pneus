@@ -1052,6 +1052,36 @@ export async function decideStoreForItemsGeo(
     const ordered = await rankUnitsByFairnessFromDb(client, environment, [...poolByUnit.keys()]);
     const winnerId = ordered.find((id) => poolByUnit.has(id)) ?? selection.pool[0]!.cand.ctx.unitId;
     const win = poolByUnit.get(winnerId)!;
+
+    // ROUTING_MATRIZ_COMPETES (decisão do dono 2026-07-03): a matriz concorre de IGUAL e TOMA
+    // o pedido do parceiro campeão SÓ quando está ESTRITAMENTE mais perto do cliente que TODO
+    // parceiro do pool (linha reta, apples-to-apples — mesmo que a distância do parceiro tenha
+    // sido medida por rua). Empate ou parceiro mais perto → parceiro fica (a régua ENTRE
+    // parceiros, acima, segue intacta). Requer WHOLESALE_UNIFIED_STOCK on + galpão com todos os
+    // itens. Default OFF (a matriz segue só como backstop no bloco de baixo).
+    if (env.ROUTING_MATRIZ_COMPETES && env.WHOLESALE_UNIFIED_STOCK) {
+      const matrizDist = haversineKm(input.customerLocation, MATRIZ_COORD);
+      const nearestPartnerDist = Math.min(
+        ...selection.pool.map((f) => haversineKm(input.customerLocation, f.cand.location!)),
+      );
+      if (matrizDist < nearestPartnerDist && matrizDist <= Math.max(...rings)) {
+        const allInStock = (
+          await Promise.all(
+            input.items.map((i) =>
+              getMatrizWholesaleStockQty(client, environment, i.product_id).then((q) => q >= i.quantity),
+            ),
+          )
+        ).every(Boolean);
+        if (allInStock) {
+          logger.info(
+            { environment, matrizDistKm: Math.round(matrizDist), nearestPartnerKm: Math.round(nearestPartnerDist), modalidade: input.modalidade },
+            'decideStoreForItemsGeo: matriz concorre e VENCE (mais perto que todo parceiro do pool)',
+          );
+          return { kind: 'matriz' };
+        }
+      }
+    }
+
     logger.info(
       { environment, unit_id: winnerId, ring_km: selection.ringKm, pool: selection.pool.length, modalidade: input.modalidade, road: env.ROUTING_GEO_ROAD_DISTANCE },
       'decideStoreForItemsGeo: loja escolhida no anel pela régua',
