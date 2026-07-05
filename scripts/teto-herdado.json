@@ -3,7 +3,6 @@
   "tetos": {
     "src/parceiro/queries.ts": 4310,
     "src/admin/painel/queries.ts": 3301,
-    "painel/public/app.js": 3027,
     "src/atendente-v2/tools.ts": 2012,
     "src/parceiro/route.ts": 1678,
     "src/atendente-v2/fulfillment.ts": 1423,
