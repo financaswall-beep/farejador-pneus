@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Farejador — Entregas</title>
+<meta name="theme-color" content="#0f172a" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="/entregas.js?v=20260704-entregador1"></script>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  [x-cloak] { display: none !important; }
+  body { -webkit-tap-highlight-color: transparent; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen" x-data="entregasApp()" x-init="init()">
+
+  <!-- ═══ LOGIN ═══ -->
+  <div x-show="!token" x-cloak class="min-h-screen flex flex-col justify-center px-6 max-w-md mx-auto">
+    <div class="text-center mb-8">
+      <div class="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center mx-auto mb-4">
+        <i data-lucide="truck" class="w-8 h-8 text-white"></i>
+      </div>
+      <h1 class="text-2xl font-bold">Entregas</h1>
+      <p class="text-sm text-slate-500 mt-1">Entra com teu usuário e senha</p>
+    </div>
+    <div x-show="loginMsg" class="text-sm px-4 py-3 rounded-xl mb-4 bg-rose-50 text-rose-700" x-text="loginMsg"></div>
+    <input x-model="loginForm.username" type="text" inputmode="verbatim" autocapitalize="none" autocomplete="username"
+           placeholder="usuário" class="w-full border border-slate-300 rounded-xl px-4 py-4 text-base mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+    <input x-model="loginForm.password" type="password" autocomplete="current-password" placeholder="senha"
+           @keydown.enter="fazerLogin()" class="w-full border border-slate-300 rounded-xl px-4 py-4 text-base mb-4 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+    <button @click="fazerLogin()" :disabled="!!logando"
+            class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
+      <span x-text="logando ? 'Entrando…' : 'Entrar'"></span>
+    </button>
+  </div>
+
+  <!-- ═══ APP ═══ -->
+  <div x-show="token" x-cloak class="max-w-md mx-auto pb-24">
+    <!-- Cabeçalho -->
+    <header class="sticky top-0 z-10 bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+      <div>
+        <div class="text-xs text-slate-400">Entregador</div>
+        <div class="font-semibold" x-text="displayName || 'você'"></div>
+      </div>
+      <button @click="sair()" class="text-xs text-slate-300 border border-slate-700 rounded-lg px-3 py-1.5">Sair</button>
+    </header>
+
+    <div x-show="msg" x-cloak class="mx-5 mt-4 text-sm px-4 py-3 rounded-xl"
+         :class="msg && msg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+         x-text="msg ? msg.text : ''"></div>
+
+    <!-- ── SEM ROTA ABERTA: fila do dia → abrir rota ── -->
+    <div x-show="!rotaAberta" class="px-5 mt-5">
+      <h2 class="text-lg font-bold mb-1">Entregas de hoje</h2>
+      <p class="text-sm text-slate-500 mb-4">Marca as que vão contigo e bate o km pra abrir a rota.</p>
+
+      <div x-show="fila.length === 0" class="bg-white rounded-2xl p-6 text-center text-slate-400 text-sm">
+        Nenhuma entrega na fila agora.
+      </div>
+
+      <template x-for="d in fila" :key="d.order_id">
+        <label class="block bg-white rounded-2xl p-4 mb-3 shadow-sm">
+          <div class="flex items-start gap-3">
+            <input type="checkbox" :value="d.order_id" x-model="selecionadas" class="mt-1 w-5 h-5 rounded" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold truncate" x-text="d.customer_name || 'Cliente'"></span>
+                <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0" :class="badgeClass(d)" x-text="badgeText(d)"></span>
+              </div>
+              <div class="text-sm text-slate-500 mt-0.5" x-text="d.delivery_address || 'sem endereço'"></div>
+              <div class="text-sm mt-1" x-text="itensText(d)"></div>
+              <div class="text-base font-bold mt-1">Cobrar <span x-text="brl(d.cobrar)"></span></div>
+            </div>
+          </div>
+        </label>
+      </template>
+
+      <div x-show="fila.length > 0" class="bg-white rounded-2xl p-4 mt-4 shadow-sm">
+        <label class="text-sm text-slate-500">Km inicial (do painel da moto)</label>
+        <input x-model="kmInicial" type="number" inputmode="decimal" placeholder="ex.: 45210"
+               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <button @click="abrirRota()" :disabled="!!salvando || selecionadas.length === 0"
+                class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
+          <span x-text="selecionadas.length ? ('Abrir rota com ' + selecionadas.length + ' entrega(s)') : 'Marca as entregas'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── ROTA ABERTA: entregas + fechar ── -->
+    <div x-show="rotaAberta" class="px-5 mt-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold">Minha rota</h2>
+          <p class="text-sm text-slate-500" x-text="'Saída às ' + (rotaAberta ? horaSaida(rotaAberta.started_at) : '') + (rotaAberta && rotaAberta.km_start ? ' · km ' + rotaAberta.km_start : '')"></p>
+        </div>
+        <span class="text-xs bg-slate-200 text-slate-600 rounded-full px-3 py-1" x-text="(rotaAberta ? rotaAberta.entregas.length : 0) + ' entregas'"></span>
+      </div>
+
+      <template x-for="d in (rotaAberta ? rotaAberta.entregas : [])" :key="d.order_id">
+        <div class="bg-white rounded-2xl p-4 mb-3 shadow-sm">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold truncate" x-text="d.customer_name || 'Cliente'"></span>
+            <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                  :class="d.delivery_status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                  x-text="d.delivery_status === 'delivered' ? 'entregue' : 'a caminho'"></span>
+          </div>
+          <div class="text-sm text-slate-500 mt-0.5" x-text="d.delivery_address || 'sem endereço'"></div>
+          <div class="text-sm mt-1" x-text="itensText(d)"></div>
+          <div class="text-base font-bold mt-1">Cobrar <span x-text="brl(d.cobrar)"></span></div>
+
+          <!-- Deep-links -->
+          <div class="flex gap-2 mt-3">
+            <a :href="whatsUrl(d)" x-show="d.customer_phone" target="_blank" rel="noopener"
+               class="flex-1 text-center text-sm bg-emerald-50 text-emerald-700 rounded-xl py-2.5 font-medium">WhatsApp</a>
+            <a :href="wazeUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener"
+               class="flex-1 text-center text-sm bg-sky-50 text-sky-700 rounded-xl py-2.5 font-medium">Waze</a>
+            <a :href="mapsUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener"
+               class="flex-1 text-center text-sm bg-slate-100 text-slate-700 rounded-xl py-2.5 font-medium">Maps</a>
+          </div>
+
+          <!-- Ações (só enquanto a caminho) -->
+          <div x-show="d.delivery_status !== 'delivered'" class="mt-3">
+            <div x-show="pagando !== d.order_id" class="flex gap-2">
+              <button @click="pagando = d.order_id"
+                      class="flex-1 bg-emerald-600 text-white rounded-xl py-3 text-sm font-semibold active:bg-emerald-700">Entreguei</button>
+              <button @click="naoEntreguei(d)"
+                      class="flex-1 bg-white border border-rose-200 text-rose-600 rounded-xl py-3 text-sm font-semibold active:bg-rose-50">Não entreguei</button>
+            </div>
+            <!-- Escolha do pagamento -->
+            <div x-show="pagando === d.order_id" class="mt-1">
+              <div class="text-sm text-slate-500 mb-2">Recebeu como?</div>
+              <div class="grid grid-cols-3 gap-2">
+                <template x-for="pm in ['dinheiro','pix','cartao']" :key="pm">
+                  <button @click="entreguei(d, pm)" :disabled="!!salvando"
+                          class="bg-emerald-600 text-white rounded-xl py-3 text-sm font-semibold active:bg-emerald-700 disabled:opacity-50 capitalize" x-text="pm"></button>
+                </template>
+              </div>
+              <button @click="pagando = null" class="w-full text-center text-xs text-slate-400 mt-2">cancelar</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- FECHAR ROTA -->
+      <div class="bg-white rounded-2xl p-4 mt-5 shadow-sm">
+        <h3 class="font-bold mb-1">Fechar a rota</h3>
+        <p class="text-sm text-slate-500 mb-3">No fim do dia: km final, gasolina e foto do comprovante.</p>
+        <label class="text-sm text-slate-500">Km final</label>
+        <input x-model="fecharForm.km_end" type="number" inputmode="decimal" placeholder="ex.: 45340"
+               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <label class="text-sm text-slate-500">Gasolina (R$)</label>
+        <input x-model="fecharForm.fuel_spent" type="number" inputmode="decimal" placeholder="ex.: 50,00"
+               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+
+        <label class="block w-full text-center bg-slate-100 text-slate-700 rounded-xl py-3 text-sm font-medium mb-3 cursor-pointer">
+          <span x-text="uploadando ? 'Enviando foto…' : '📷 Foto do comprovante'"></span>
+          <input type="file" accept="image/*" capture="environment" class="hidden" @change="subirComprovante($event)" :disabled="!!uploadando" />
+        </label>
+        <div x-show="comprovantesOk > 0" class="text-xs text-emerald-600 mb-3" x-text="comprovantesOk + ' comprovante(s) enviado(s)'"></div>
+
+        <button @click="fecharRota()" :disabled="!!salvando"
+                class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
+          Fechar rota
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

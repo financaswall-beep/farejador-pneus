@@ -151,6 +151,14 @@ function painelApp() {
       { id: 'dependencia_2w', label: 'Dependentes 2W' },
       { id: 'risco', label: 'Score baixo' },
     ],
+    // ── COLABORADORES da matriz (0124 — fatia 1): staff próprio, vendedor/entregador ──
+    colaboradores: [],
+    colabLoaded: false,
+    colabSaving: false,
+    colabMsg: null,
+    colabShowForm: false,
+    colabForm: { display_name: '', username: '', password: '', job: 'vendedor' },
+
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
       { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
@@ -160,10 +168,10 @@ function painelApp() {
       { id: 'logistica',  label: 'Logística',  icon: 'truck' },
       { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
       { id: 'rede',       label: 'Rede',       icon: 'network' },
+      { id: 'colaboradores', label: 'Colaboradores', icon: 'users' },
     ],
 
     futureMenu: [
-      { id: 'colaboradores',label: 'Colaboradores', icon: 'users' },
       { id: 'catalogo',     label: 'Catálogo',      icon: 'tag' },
       { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
     ],
@@ -1519,6 +1527,104 @@ function painelApp() {
         this.logisticaSaving = false;
       }
     },
+    // ── COLABORADORES da matriz (0124 — fatia 1: cadastro; a pessoa ainda não loga) ──
+    async loadColaboradores() {
+      this.ensureCredentials();
+      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      try {
+        const payload = await this.apiGet('/admin/api/colaboradores');
+        this.colaboradores = payload.collaborators || [];
+        this.colabLoaded = true;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      } catch (err) {
+        console.error('colaboradores load failed', err);
+      }
+    },
+    colabJobLabel(job) {
+      return job === 'entregador' ? 'Entregador' : 'Vendedor';
+    },
+    async criarColaborador() {
+      const f = this.colabForm;
+      if (!f.display_name.trim() || !f.username.trim() || !f.password) {
+        this.colabMsg = { ok: false, text: 'Preenche nome, usuário e senha.' };
+        return;
+      }
+      this.colabSaving = true;
+      this.colabMsg = null;
+      try {
+        await this.apiPost('/admin/api/colaboradores', {
+          display_name: f.display_name.trim(),
+          username: f.username.trim(),
+          password: f.password,
+          job: f.job,
+        });
+        this.colabMsg = { ok: true, text: `${f.display_name.trim()} cadastrado como ${this.colabJobLabel(f.job).toLowerCase()}.` };
+        this.colabForm = { display_name: '', username: '', password: '', job: 'vendedor' };
+        this.colabShowForm = false;
+        await this.loadColaboradores();
+      } catch (err) {
+        this.colabMsg = err.message === 'username_taken'
+          ? { ok: false, text: 'Esse usuário já existe na rede — escolhe outro.' }
+          : { ok: false, text: `Não consegui cadastrar (${err.message}).` };
+      } finally {
+        this.colabSaving = false;
+      }
+    },
+    async mudarFuncaoColaborador(c, job) {
+      if (c.job === job) return;
+      this.colabSaving = true;
+      try {
+        await this.apiPost('/admin/api/colaboradores/funcao', { id: c.id, job });
+        this.colabMsg = { ok: true, text: `${c.display_name} agora é ${this.colabJobLabel(job).toLowerCase()}.` };
+        await this.loadColaboradores();
+      } catch (err) {
+        this.colabMsg = { ok: false, text: `Não consegui mudar a função (${err.message}).` };
+        await this.loadColaboradores(); // repõe o select no valor real do banco
+      } finally {
+        this.colabSaving = false;
+      }
+    },
+    async trocarSenhaColaborador(c) {
+      const senha = prompt(`Nova senha pra ${c.display_name} (mínimo 6):`);
+      if (senha === null) return;
+      if (senha.length < 6) { this.colabMsg = { ok: false, text: 'Senha muito curta (mínimo 6).' }; return; }
+      this.colabSaving = true;
+      try {
+        await this.apiPost('/admin/api/colaboradores/senha', { id: c.id, password: senha });
+        this.colabMsg = { ok: true, text: `Senha de ${c.display_name} trocada.` };
+      } catch (err) {
+        this.colabMsg = { ok: false, text: `Não consegui trocar a senha (${err.message}).` };
+      } finally {
+        this.colabSaving = false;
+      }
+    },
+    async revogarColaborador(c) {
+      if (!confirm(`Revogar o acesso de ${c.display_name}? Ele sai da ativa mas fica na trilha (dá pra reativar).`)) return;
+      this.colabSaving = true;
+      try {
+        await this.apiPost('/admin/api/colaboradores/revogar', { id: c.id });
+        this.colabMsg = { ok: true, text: `${c.display_name} revogado.` };
+        await this.loadColaboradores();
+      } catch (err) {
+        this.colabMsg = { ok: false, text: `Não consegui revogar (${err.message}).` };
+      } finally {
+        this.colabSaving = false;
+      }
+    },
+    async reativarColaborador(c) {
+      this.colabSaving = true;
+      try {
+        await this.apiPost('/admin/api/colaboradores/reativar', { id: c.id });
+        this.colabMsg = { ok: true, text: `${c.display_name} reativado (mesma senha de antes).` };
+        await this.loadColaboradores();
+      } catch (err) {
+        this.colabMsg = err.message === 'username_taken'
+          ? { ok: false, text: 'O usuário dele foi reaproveitado por outra conta — cadastra de novo com outro usuário.' }
+          : { ok: false, text: `Não consegui reativar (${err.message}).` };
+      } finally {
+        this.colabSaving = false;
+      }
+    },
 
     // Barra de participação (perna × maior perna do mês). Mínimo 2% pra barra existir.
     finBarWidth(valor) {
@@ -2249,6 +2355,8 @@ function painelApp() {
         if (page === 'vendas') void this.loadVarejoResumo();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
         if (page === 'rede') void this.loadComissoes();
+        // Colaboradores (0124): o staff da matriz — vendedor/entregador.
+        if (page === 'colaboradores') void this.loadColaboradores();
         // Financeiro: visão consolidada (Onda 1) + despesas (0120) num carregador só.
         if (page === 'financeiro') void this.loadFinanceiro();
       });

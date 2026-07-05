@@ -9,7 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="/admin/painel/app.js?v=20260703-logistica5"></script>
+<script src="/admin/painel/app.js?v=20260704-colaboradores1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2728,8 +2728,113 @@
       </div>
     </div>
 
+    <!-- ═══ TELA: COLABORADORES da matriz (0124 — fatia 1: cadastro; telas por função vêm nas próximas fatias) ═══ -->
+    <div x-show="currentPage === 'colaboradores'" class="p-8">
+      <div class="mb-6">
+        <h1 class="text-2xl font-semibold tracking-tight">Colaboradores</h1>
+        <p class="text-sm text-gray-500 mt-1">O pessoal da Matriz — cadastra vendedor e entregador; a tela de cada função entra na próxima etapa</p>
+      </div>
+
+      <div class="space-y-6 max-w-5xl">
+        <div x-show="colabMsg" class="text-sm px-3 py-2 rounded-lg"
+             :class="colabMsg && colabMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+             x-text="colabMsg ? colabMsg.text : ''"></div>
+
+        <!-- Fatia 1 = só cadastro: ninguém loga ainda (as telas por função vêm depois) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-500">
+          <i data-lucide="info" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
+          <span>Por enquanto é só o <span class="font-medium text-gray-700">cadastro</span>: o colaborador ainda <span class="font-medium text-gray-700">não entra no sistema</span>. A tela do entregador (rota do dia) e a do vendedor (frente de caixa) entram nas próximas etapas — cada um vai ver só a dele, sem financeiro.</span>
+        </div>
+
+        <!-- NOVO COLABORADOR -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+                <i data-lucide="user-plus" class="w-4 h-4 text-brand-600"></i>
+              </div>
+              <h3 class="text-base font-semibold">Novo colaborador</h3>
+            </div>
+            <button @click="colabShowForm = !colabShowForm; colabMsg = null"
+                    class="text-xs px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium"
+                    x-text="colabShowForm ? 'Fechar' : '+ Cadastrar'"></button>
+          </div>
+          <div x-show="colabShowForm" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-gray-500">Nome</label>
+              <input type="text" x-model="colabForm.display_name" placeholder="ex.: João da Moto"
+                     class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Função</label>
+              <select x-model="colabForm.job"
+                      class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-200">
+                <option value="vendedor">Vendedor (frente de caixa)</option>
+                <option value="entregador">Entregador (rota do dia)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Usuário (login — único na rede)</label>
+              <input type="text" x-model="colabForm.username" placeholder="ex.: joao.moto"
+                     class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Senha temporária (mínimo 6)</label>
+              <input type="text" x-model="colabForm.password" placeholder="ele troca com você depois"
+                     class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+            </div>
+            <div class="md:col-span-2">
+              <button @click="criarColaborador()" :disabled="!!colabSaving"
+                      class="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-50">
+                Cadastrar colaborador
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EQUIPE (lista) -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="users" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Equipe da Matriz</h3>
+          </div>
+          <template x-for="c in colaboradores" :key="c.id">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 py-3 text-sm">
+              <div class="min-w-[180px]">
+                <span class="font-medium text-gray-800" x-text="c.display_name"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="'@' + c.username"></span>
+                <span class="text-xs px-2 py-0.5 rounded-full ml-2"
+                      :class="c.active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-400'"
+                      x-text="c.active ? 'ativo' : 'revogado'"></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <select x-show="c.active" :value="c.job" :disabled="!!colabSaving"
+                        @change="mudarFuncaoColaborador(c, $event.target.value)"
+                        class="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                  <option value="vendedor">Vendedor</option>
+                  <option value="entregador">Entregador</option>
+                </select>
+                <span x-show="!c.active" class="text-xs text-gray-400" x-text="colabJobLabel(c.job)"></span>
+                <button x-show="c.active" @click="trocarSenhaColaborador(c)" :disabled="!!colabSaving"
+                        class="text-xs px-2.5 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium">Trocar senha</button>
+                <button x-show="c.active" @click="revogarColaborador(c)" :disabled="!!colabSaving"
+                        class="text-xs px-2.5 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium">Revogar</button>
+                <button x-show="!c.active" @click="reativarColaborador(c)" :disabled="!!colabSaving"
+                        class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Reativar</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="colabLoaded && !colaboradores.length" class="text-sm text-gray-400 py-2">
+            Ninguém cadastrado ainda — clica em “+ Cadastrar” pra colocar teu primeiro vendedor ou entregador.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->
-    <div x-show="['colaboradores','catalogo','relatorios','config'].includes(currentPage)"
+    <div x-show="['catalogo','relatorios','config'].includes(currentPage)"
          class="flex items-center justify-center min-h-[80vh] p-8">
       <div class="text-center max-w-md">
         <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm">

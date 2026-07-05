@@ -6,6 +6,7 @@ import { registerReconcileRoute } from '../admin/reconcile.route.js';
 import { registerPainelRoute } from '../admin/painel/route.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
+import { registerEntregadorRoute } from '../admin/entregador/route.js';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerChatwootWebhookRoutes(fastify);
@@ -16,4 +17,6 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerParceiroRoute(fastify);
   // Porta única de login (/login) — 0095. Aditiva: o login por slug continua.
   await registerLoginGlobalRoute(fastify);
+  // Portal do entregador (/entregas) — 0125. Dormente atrás de MATRIZ_ENTREGADOR_PORTAL.
+  await registerEntregadorRoute(fastify);
 }
