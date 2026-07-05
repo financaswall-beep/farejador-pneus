@@ -2,7 +2,6 @@
   "comentario": "Arquivos HERDADOS acima de 300 linhas (censo 2026-07-05). Teto = linhas na data + folga de 25 pra conserto pontual. SO PODE DIMINUIR: quem fatiar um arquivo pra baixo de 300 REMOVE a entrada no mesmo commit. Arquivo fora desta lista obedece o teto universal de 300.",
   "tetos": {
     "src/parceiro/queries.ts": 4310,
-    "src/admin/painel/queries.ts": 3301,
     "src/atendente-v2/tools.ts": 2012,
     "src/parceiro/route.ts": 1678,
     "src/atendente-v2/fulfillment.ts": 1423,
