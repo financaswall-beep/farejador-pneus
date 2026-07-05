@@ -1,71 +1,149 @@
 #!/usr/bin/env node
 /**
- * FISCAL DE TAMANHO — painel do parceiro (teto de 300 linhas por arquivo).
+ * FISCAL DE TAMANHO — repo inteiro (teto de 300 linhas por arquivo de producao).
  *
- * Regra permanente do projeto (obra PLANO_REFATORACAO_PAINEL_300_2026-06-10.md):
- * nenhum parceiro/public/app*.js pode passar de 300 linhas.
+ * Historia: a regra nasceu no painel do parceiro (obra
+ * PLANO_REFATORACAO_PAINEL_300_2026-06-10.md, app.js 4755→24 modulos) e em
+ * 2026-07-05 foi estendida pro codigo de producao inteiro (censo
+ * docs/CENSO_TAMANHO_ARQUIVOS_2026-07-05.md).
  *
- * EXCEÇÃO TEMPORÁRIA durante a obra: scripts/obra-painel-teto.json registra o
- * teto vigente do app.js (que começa em 4755 e SÓ PODE DIMINUIR a cada passo —
- * quem extrai um módulo atualiza o teto no MESMO commit). No fim da obra
- * (passo 11) o JSON é apagado e vale o teto universal de 300.
+ * O que e vigiado (codigo de PRODUCAO):
+ *   - src\**\*.ts
+ *   - painel/public/*.js e parceiro/public/*.js
+ * Fora da regra (de proposito): tests/, scripts/ (provas sao roteiro linear),
+ * db/migrations (registro historico), *.html e *.css (fatiar exige tecnica
+ * propria — ficam pra obra futura).
+ *
+ * Regras:
+ *   1. Arquivo NOVO (fora de scripts/teto-herdado.json): teto universal de 300.
+ *   2. Arquivo HERDADO (na lista): teto CONGELADO no censo + folga 25 — pode
+ *      encolher, NAO pode engordar. Quem fatiar pra baixo de 300 REMOVE a
+ *      entrada do JSON no mesmo commit (o fiscal avisa quando da).
  *
  * Uso: node scripts/checar-tamanho.cjs   (ou: npm run checar-tamanho)
- * Sai com código 1 se qualquer arquivo estourar o teto.
+ * Sai com codigo 1 se qualquer arquivo estourar o teto.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 
 const RAIZ = path.join(__dirname, '..');
-const PUBLIC_DIR = path.join(RAIZ, 'parceiro', 'public');
 const TETO_UNIVERSAL = 300;
-const EXCECAO_PATH = path.join(__dirname, 'obra-painel-teto.json');
+const HERDADO_PATH = path.join(__dirname, 'teto-herdado.json');
 
 function contarLinhas(arquivo) {
-  // Mesma semântica de `wc -l` / Get-Content .Count: newline final não cria linha extra.
+  // Mesma semântica de `wc -l`: newline final não cria linha extra.
   const texto = fs.readFileSync(arquivo, 'utf8');
   const linhas = texto.split(/\r?\n/);
   if (linhas.length > 0 && linhas[linhas.length - 1] === '') linhas.pop();
   return linhas.length;
 }
 
-function lerExcecoes() {
-  if (!fs.existsSync(EXCECAO_PATH)) return {};
+function lerHerdados() {
+  if (!fs.existsSync(HERDADO_PATH)) return {};
   try {
-    const json = JSON.parse(fs.readFileSync(EXCECAO_PATH, 'utf8'));
+    const json = JSON.parse(fs.readFileSync(HERDADO_PATH, 'utf8'));
     return json.tetos || {};
   } catch (err) {
-    console.error(`[FALHA] obra-painel-teto.json ilegível: ${err.message}`);
+    console.error(`[FALHA] teto-herdado.json ilegível: ${err.message}`);
     process.exit(1);
   }
 }
 
-function main() {
-  const excecoes = lerExcecoes();
-  const arquivos = fs
-    .readdirSync(PUBLIC_DIR)
-    .filter((f) => /^app(\.[\w-]+)*\.js$/.test(f)) // * = segmentos compostos (app.charts.resumo.js)
-    .sort();
+function walk(dir) {
+  let saida = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) saida = saida.concat(walk(p));
+    else saida.push(p);
+  }
+  return saida;
+}
 
-  if (arquivos.length === 0) {
-    console.error(`[FALHA] nenhum app*.js encontrado em ${PUBLIC_DIR}`);
+function alvosDeProducao() {
+  const alvos = [];
+  for (const f of walk(path.join(RAIZ, 'src'))) {
+    if (f.endsWith('.ts')) alvos.push(f);
+  }
+  for (const dir of ['painel/public', 'parceiro/public']) {
+    const abs = path.join(RAIZ, dir);
+    if (!fs.existsSync(abs)) continue;
+    for (const f of fs.readdirSync(abs)) {
+      if (f.endsWith('.js')) alvos.push(path.join(abs, f));
+    }
+  }
+  return alvos.sort();
+}
+
+function relativo(arquivo) {
+  return path.relative(RAIZ, arquivo).split(path.sep).join('/');
+}
+
+function main() {
+  const herdados = lerHerdados();
+  const alvos = alvosDeProducao();
+
+  if (alvos.length === 0) {
+    console.error('[FALHA] nenhum arquivo de produção encontrado — checar caminhos do fiscal.');
     process.exit(1);
   }
 
   let estourou = false;
-  for (const nome of arquivos) {
-    const linhas = contarLinhas(path.join(PUBLIC_DIR, nome));
-    const teto = Object.prototype.hasOwnProperty.call(excecoes, nome) ? excecoes[nome] : TETO_UNIVERSAL;
-    const ok = linhas <= teto;
-    if (!ok) estourou = true;
-    const aviso = teto !== TETO_UNIVERSAL ? ` (teto TEMPORARIO da obra: ${teto})` : '';
-    console.log(`${ok ? '[OK]   ' : '[FALHA]'} ${nome}: ${linhas} linhas${aviso}`);
+  const violacoes = [];
+  const censoHerdado = [];
+  let quitados = 0;
+
+  for (const arquivo of alvos) {
+    const rel = relativo(arquivo);
+    const linhas = contarLinhas(arquivo);
+    const ehHerdado = Object.prototype.hasOwnProperty.call(herdados, rel);
+    const teto = ehHerdado ? herdados[rel] : TETO_UNIVERSAL;
+
+    if (linhas > teto) {
+      estourou = true;
+      violacoes.push({ rel, linhas, teto, ehHerdado });
+    }
+    if (ehHerdado) {
+      censoHerdado.push({ rel, linhas, teto });
+      if (linhas <= TETO_UNIVERSAL) quitados += 1;
+    }
   }
 
-  if (estourou) {
-    console.error('\n[FALHA] arquivo acima do teto. Refatore antes de commitar (regra do plano, secao 3).');
+  // Entrada herdada apontando pra arquivo que não existe mais = lista suja.
+  for (const rel of Object.keys(herdados)) {
+    if (!fs.existsSync(path.join(RAIZ, rel))) {
+      estourou = true;
+      violacoes.push({ rel, linhas: 0, teto: herdados[rel], fantasma: true });
+    }
+  }
+
+  console.log(`Fiscal de tamanho — ${alvos.length} arquivos de produção vigiados (teto ${TETO_UNIVERSAL}; herdados: ${censoHerdado.length}).`);
+
+  if (censoHerdado.length > 0) {
+    console.log('\nCenso dos herdados (divida catalogada — pode encolher, nao pode engordar):');
+    for (const c of censoHerdado.sort((a, b) => b.linhas - a.linhas)) {
+      const status = c.linhas <= TETO_UNIVERSAL ? 'QUITADO — remover do teto-herdado.json' : `teto congelado ${c.teto}`;
+      console.log(`  [CENSO] ${c.rel}: ${c.linhas} linhas (${status})`);
+    }
+    if (quitados > 0) {
+      console.log(`  → ${quitados} arquivo(s) já abaixo de 300: limpar a(s) entrada(s) no teto-herdado.json.`);
+    }
+  }
+
+  if (violacoes.length > 0) {
+    console.error('');
+    for (const v of violacoes.sort((a, b) => b.linhas - a.linhas)) {
+      if (v.fantasma) {
+        console.error(`[FALHA] ${v.rel}: está no teto-herdado.json mas não existe mais — remover a entrada.`);
+      } else if (v.ehHerdado) {
+        console.error(`[FALHA] ${v.rel}: ${v.linhas} linhas — HERDADO com teto congelado em ${v.teto}. Arquivo da lista de refatoração NÃO pode engordar: fatie o que ia adicionar (ou extraia o mesmo tanto).`);
+      } else {
+        console.error(`[FALHA] ${v.rel}: ${v.linhas} linhas — acima do teto universal de ${TETO_UNIVERSAL}. Arquivo novo nasce fatiado: dividir por assunto antes de commitar.`);
+      }
+    }
+    console.error('\n[FALHA] fiscal de tamanho: refatore antes de commitar (censo 2026-07-05 + regra da obra de 06-10).');
     process.exit(1);
   }
+
   console.log('\n[OK] fiscal de tamanho: todos os arquivos dentro do teto.');
 }
 

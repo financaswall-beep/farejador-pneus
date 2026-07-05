@@ -1,0 +1,22 @@
+{
+  "comentario": "Arquivos HERDADOS acima de 300 linhas (censo 2026-07-05). Teto = linhas na data + folga de 25 pra conserto pontual. SO PODE DIMINUIR: quem fatiar um arquivo pra baixo de 300 REMOVE a entrada no mesmo commit. Arquivo fora desta lista obedece o teto universal de 300.",
+  "tetos": {
+    "src/parceiro/queries.ts": 4310,
+    "src/admin/painel/queries.ts": 3301,
+    "painel/public/app.js": 3027,
+    "src/atendente-v2/tools.ts": 2012,
+    "src/parceiro/route.ts": 1678,
+    "src/atendente-v2/fulfillment.ts": 1423,
+    "src/admin/painel/route.ts": 1413,
+    "src/atendente/tools/commerce-tools.ts": 504,
+    "src/atendente-v2/agent.ts": 503,
+    "src/admin/entregador/queries.ts": 401,
+    "src/atendente-v2/wholesale-stock-read.ts": 392,
+    "src/atendente-v2/prompt.ts": 367,
+    "src/admin/reconcile.service.ts": 365,
+    "src/admin/chatwoot-api.client.ts": 354,
+    "src/parceiro/auth.ts": 349,
+    "src/normalization/dispatcher.ts": 327,
+    "src/normalization/partner-chat.fanout.ts": 326
+  }
+}
