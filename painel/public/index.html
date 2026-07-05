@@ -2728,11 +2728,11 @@
       </div>
     </div>
 
-    <!-- ═══ TELA: COLABORADORES da matriz (0124 — fatia 1: cadastro; telas por função vêm nas próximas fatias) ═══ -->
+    <!-- ═══ TELA: COLABORADORES da matriz (0124 — cadastro; entregador já loga em /entregas (0125); frente de caixa do vendedor vem depois) ═══ -->
     <div x-show="currentPage === 'colaboradores'" class="p-8">
       <div class="mb-6">
         <h1 class="text-2xl font-semibold tracking-tight">Colaboradores</h1>
-        <p class="text-sm text-gray-500 mt-1">O pessoal da Matriz — cadastra vendedor e entregador; a tela de cada função entra na próxima etapa</p>
+        <p class="text-sm text-gray-500 mt-1">O pessoal da Matriz — cadastra vendedor e entregador; o entregador já entra na tela dele em /entregas</p>
       </div>
 
       <div class="space-y-6 max-w-5xl">
@@ -2740,10 +2740,10 @@
              :class="colabMsg && colabMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
              x-text="colabMsg ? colabMsg.text : ''"></div>
 
-        <!-- Fatia 1 = só cadastro: ninguém loga ainda (as telas por função vêm depois) -->
+        <!-- Entregador loga em /entregas (0125, atrás da flag MATRIZ_ENTREGADOR_PORTAL); frente de caixa do vendedor ainda não existe -->
         <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-500">
           <i data-lucide="info" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
-          <span>Por enquanto é só o <span class="font-medium text-gray-700">cadastro</span>: o colaborador ainda <span class="font-medium text-gray-700">não entra no sistema</span>. A tela do entregador (rota do dia) e a do vendedor (frente de caixa) entram nas próximas etapas — cada um vai ver só a dele, sem financeiro.</span>
+          <span>O <span class="font-medium text-gray-700">entregador</span> cadastrado aqui já entra na tela dele (rota do dia, sem financeiro): <span class="font-medium text-gray-700">/entregas</span> no celular, com o usuário e a senha desta tela. A do <span class="font-medium text-gray-700">vendedor</span> (frente de caixa) entra na próxima etapa.</span>
         </div>
 
         <!-- NOVO COLABORADOR -->
