@@ -78,6 +78,32 @@ window.PAINEL_MODULES.atacado = function () {
         return { label: `sumiu (${b.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600', dot: 'bg-rose-400' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
     },
+    // RECIBO no WhatsApp (2026-07-06): "manda o papel" do borracheiro sem custo —
+    // deep-link wa.me com o texto pronto (padrão da casa, fora da API Meta).
+    // Sem telefone no cadastro → null e o botão some (a UI esconde).
+    reciboWhatsLink(v) {
+      const digits = String(v.buyer_phone || '').replace(/\D/g, '');
+      if (!digits || v.status !== 'confirmed') return null;
+      const tel = digits.startsWith('55') ? digits : '55' + digits;
+      const data = new Date(v.sold_at);
+      const linhas = (v.items || []).map((it) =>
+        `• ${it.quantity}x ${it.measure} — ${this.formatCurrency(Number(it.unit_price))} cada`);
+      const pagamento = v.payment_status === 'paid'
+        ? 'Pago ✓'
+        : 'Fiado' + (v.due_date ? ` — vence ${new Date(v.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}` : '');
+      const msg = [
+        `🧾 Recibo — 2W Pneus (${isNaN(data.getTime()) ? '' : data.toLocaleDateString('pt-BR')})`,
+        `Cliente: ${v.buyer_name}`,
+        '',
+        ...linhas,
+        '',
+        `Total: ${this.formatCurrency(Number(v.total_amount))}`,
+        `Pagamento: ${pagamento}`,
+        '',
+        'Qualquer coisa é só chamar. Obrigado pela parceria! 🤝',
+      ].join('\n');
+      return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+    },
     async atacadoSubmit() {
       const f = this.atacadoForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };

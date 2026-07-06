@@ -20,6 +20,7 @@ import { registerPainelParceiros } from './route-parceiros.js';
 import { registerPainelCandidaturas } from './route-candidaturas.js';
 import { registerPainelPedidos } from './route-pedidos.js';
 import { registerPainelColaboradores } from './route-colaboradores.js';
+import { registerPainelNotificacoes } from './route-notificacoes.js';
 
 export async function registerPainelRoute(fastify: FastifyInstance): Promise<void> {
   await registerPainelStatic(fastify); // estáticos do painel (index/app.js/módulos/css) (linhas 377-394 pré-obra)
@@ -35,4 +36,5 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   await registerPainelCandidaturas(fastify); // seja-parceiro (público) + fila de candidaturas (linhas 1162-1225 pré-obra)
   await registerPainelPedidos(fastify); // pedido manual/walk-in + cancelar (linhas 1226-1283 pré-obra)
   await registerPainelColaboradores(fastify); // colaboradores da matriz (0124) (linhas 1284-1398 pré-obra)
+  await registerPainelNotificacoes(fastify); // sino do painel (2026-07-06): notificações reais
 }

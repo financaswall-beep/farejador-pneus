@@ -91,7 +91,7 @@ function painelApp() {
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' },
+    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' },
     stockSaving: false,
     stockMsg: null,
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
@@ -201,7 +201,10 @@ function painelApp() {
     ],
 
     // Resumo (cockpit do dono) = bot/tráfego (applyMatrizResumo) + cobrança (applyRede).
-    notificacoes: [],
+    // SINO (2026-07-06): payload do servidor + assinaturas lidas (localStorage).
+    // `notificacoes` virou GETTER derivado no módulo app.sino.js — não é mais estado.
+    sino: null,
+    sinoLidas: JSON.parse(localStorage.getItem('farejador_sino_lidas') || '[]'),
     kpis: [],
     leadsRecuperar: [],
     resumoSeries: [],
@@ -237,6 +240,7 @@ function painelApp() {
     window.PAINEL_MODULES.logistica, // app.logistica.js (linhas 1233-1405 pré-obra): logística (0121) leitura: cards, rota, datas D+1, deep-links
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA
     window.PAINEL_MODULES.colaboradores, // app.colaboradores.js (linhas 1531-1629 pré-obra): colaboradores da matriz (0124): criar/função/senha/revogar
+    window.PAINEL_MODULES.sino, // app.sino.js (2026-07-06): sino vivo — getter notificacoes derivado + lidas em localStorage
     window.PAINEL_MODULES.financeiro, // app.financeiro.js (linhas 1630-1743 pré-obra): aba Financeiro (visão 3 pernas) + despesas (0120)
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)

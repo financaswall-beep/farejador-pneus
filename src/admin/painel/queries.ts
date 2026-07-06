@@ -22,3 +22,4 @@ export * from './queries-logistica.js'; // logística (0121) leitura: entregas, 
 export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendurar/remarcar/recolocar/fechar rota
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)
 export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): CRUD + senha + revogar
+export * from './queries-notificacoes.js'; // sino do painel: entregas falhadas + vencidos + galpão pra repor

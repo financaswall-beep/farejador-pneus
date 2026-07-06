@@ -15,6 +15,8 @@ export interface WholesaleStockRow {
   measure: string;
   quantity_on_hand: number;
   unit_cost: number;
+  /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
+  min_quantity: number | null;
   notes: string | null;
   updated_at: string;
   tire_width_mm: number | null;
@@ -28,7 +30,7 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT measure, quantity_on_hand, unit_cost, notes, updated_at,
+    `SELECT measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
             tire_width_mm, tire_aspect_ratio, tire_rim_diameter
        FROM commerce.wholesale_stock
       WHERE environment = $1
@@ -38,9 +40,11 @@ export async function listWholesaleStock(
   return r.rows;
 }
 
-/** Define quantidade + custo unitário de uma medida (upsert por medida). qty/custo >= 0. */
+/** Define quantidade + custo unitário + mínimo de uma medida (upsert por medida).
+ *  min_quantity: null LIMPA o mínimo (campo vazio no form = sem alerta); o form
+ *  "Definir" sempre manda o valor completo — não há merge parcial. */
 export async function setWholesaleStock(
-  input: { measure: string; quantity_on_hand: number; unit_cost?: number; notes?: string | null; environment?: 'prod' | 'test' },
+  input: { measure: string; quantity_on_hand: number; unit_cost?: number; min_quantity?: number | null; notes?: string | null; environment?: 'prod' | 'test' },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
@@ -51,24 +55,29 @@ export async function setWholesaleStock(
   }
   const unitCost = input.unit_cost ?? 0;
   if (!(unitCost >= 0)) throw new Error('cost_invalid');
+  const minQuantity = input.min_quantity ?? null;
+  if (minQuantity !== null && (!Number.isInteger(minQuantity) || minQuantity < 0)) {
+    throw new Error('min_invalid');
+  }
   // Fase 4: casa com o catálogo → grava o formato OFICIAL + os números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
-            (environment, measure, quantity_on_hand, unit_cost, notes,
+            (environment, measure, quantity_on_hand, unit_cost, min_quantity, notes,
              tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (environment, measure)
      DO UPDATE SET quantity_on_hand  = EXCLUDED.quantity_on_hand,
                    unit_cost         = EXCLUDED.unit_cost,
+                   min_quantity      = EXCLUDED.min_quantity,
                    notes             = EXCLUDED.notes,
                    tire_width_mm     = EXCLUDED.tire_width_mm,
                    tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
                    tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at,
+       RETURNING measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
-    [environment, cat.measure, input.quantity_on_hand, unitCost, input.notes?.trim() || null,
+    [environment, cat.measure, input.quantity_on_hand, unitCost, minQuantity, input.notes?.trim() || null,
      cat.width, cat.aspect, cat.rim],
   );
   return r.rows[0]!;
@@ -104,7 +113,7 @@ export async function addWholesaleStockEntry(
        tire_width_mm     = EXCLUDED.tire_width_mm,
        tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
        tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, quantity_on_hand, unit_cost, notes, updated_at,
+       RETURNING measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, input.quantity_in, input.unit_cost, cat.width, cat.aspect, cat.rim],
   );

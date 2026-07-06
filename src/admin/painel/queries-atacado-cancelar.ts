@@ -14,25 +14,34 @@ import { hashPassword } from '../../parceiro/password.js';
 export interface WholesaleSaleRow {
   id: string;
   buyer_name: string;
+  /** Telefone do borracheiro (2026-07-06): alimenta o RECIBO via wa.me. NULL = sem botão. */
+  buyer_phone: string | null;
   sold_at: string;
   total_amount: string;
   payment_status: string;
   due_date: string | null;
   status: string;
   items_count: number;
+  /** Itens da venda (2026-07-06): o corpo do recibo — medida × qtd × preço. */
+  items: Array<{ measure: string; quantity: number; unit_price: string }>;
 }
 
 /** Últimas vendas de atacado (vivas E canceladas — a trilha fica visível), mais
- *  recente primeiro. É a lista de onde o dono cancela um registro errado. */
+ *  recente primeiro. É a lista de onde o dono cancela um registro errado e tira
+ *  o RECIBO pro WhatsApp do borracheiro (por isso telefone + itens). */
 export async function listWholesaleSales(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
   limit = 15,
 ): Promise<WholesaleSaleRow[]> {
   const r = await dbPool.query<WholesaleSaleRow>(
-    `SELECT o.id, c.name AS buyer_name, o.sold_at, o.total_amount,
+    `SELECT o.id, c.name AS buyer_name, c.phone AS buyer_phone, o.sold_at, o.total_amount,
             o.payment_status, o.due_date, o.status,
-            (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id = o.id)::int AS items_count
+            (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id = o.id)::int AS items_count,
+            COALESCE((SELECT json_agg(json_build_object(
+                        'measure', i.measure, 'quantity', i.quantity, 'unit_price', i.unit_price)
+                      ORDER BY i.measure)
+                        FROM commerce.wholesale_order_items i WHERE i.order_id = o.id), '[]'::json) AS items
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id = o.buyer_id AND c.environment = o.environment
       WHERE o.environment = $1

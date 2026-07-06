@@ -99,6 +99,7 @@ export const setWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
   quantity_on_hand: z.number().int().min(0).max(1000000),
   unit_cost: z.number().min(0).max(9999999.99).optional(),
+  min_quantity: z.number().int().min(0).max(1000000).nullable().optional(), // 0126: null/ausente = sem alerta
   notes: z.string().max(1000).nullable().optional(),
 });
 export const removeWholesaleStockSchema = z.object({

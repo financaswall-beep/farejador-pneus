@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-06T02:52:09.371Z",
-  "total": 86,
+  "geradoEm": "2026-07-06T04:19:50.565Z",
+  "total": 88,
   "rotas": [
     "GET /admin/api/colaboradores AUTH(1)",
     "GET /admin/api/dashboard/matriz-resumo AUTH(1)",
@@ -11,6 +11,7 @@
     "GET /admin/api/logistica/comprovantes/:receiptId/imagem AUTH(1)",
     "GET /admin/api/matriz/despesas AUTH(1)",
     "GET /admin/api/matriz/financeiro AUTH(1)",
+    "GET /admin/api/matriz/notificacoes AUTH(1)",
     "GET /admin/api/partner-applications AUTH(1)",
     "GET /admin/api/rede/comissoes AUTH(1)",
     "GET /admin/api/varejo/resumo AUTH(1)",
@@ -46,6 +47,7 @@
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",
     "GET /admin/painel/app.rede.apply.js PUBLICA",
     "GET /admin/painel/app.rede.kpis.js PUBLICA",
+    "GET /admin/painel/app.sino.js PUBLICA",
     "GET /admin/painel/app.unidade.kpis.js PUBLICA",
     "GET /admin/painel/app.varejo.js PUBLICA",
     "GET /admin/painel/app.venda.modal.js PUBLICA",

@@ -57,16 +57,24 @@ window.PAINEL_MODULES.galpao = function () {
         measure_required: 'Diga a medida (ex.: 90/90-18).',
         quantity_invalid: 'Quantidade inválida.',
         cost_invalid: 'Custo inválido.',
+        min_invalid: 'Mínimo inválido (número inteiro, 0 ou mais).',
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
+    },
+    // 0126: badge "repor" da tabela — mínimo definido e qtd chegou nele (zero tem cor própria).
+    stockPrecisaRepor(row) {
+      return row.min_quantity != null && Number(row.quantity_on_hand) <= Number(row.min_quantity);
     },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
+      const minRaw = String(this.stockForm.min_quantity ?? '').trim();
+      const min = minRaw === '' ? null : Number(minRaw); // vazio = sem mínimo (limpa)
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
       if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
+      if (min !== null && (!Number.isInteger(min) || min < 0)) { this.stockMsg = { ok: false, text: 'Mínimo inválido (número inteiro, 0 ou mais).' }; return; }
       this.stockSaving = true;
       this.stockMsg = null;
       try {
@@ -74,11 +82,13 @@ window.PAINEL_MODULES.galpao = function () {
           measure,
           quantity_on_hand: qty,
           unit_cost: cost,
+          min_quantity: min,
           notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
         });
-        this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
+        this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
         await this.loadAtacado();
+        void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
       } catch (err) {
         this.stockMsg = { ok: false, text: this.stockErrText(err.message) };
       } finally {
@@ -86,7 +96,7 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', notes: row.notes || '' };
+      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
@@ -102,8 +112,9 @@ window.PAINEL_MODULES.galpao = function () {
       try {
         const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost });
         this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', notes: '' };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
         await this.loadAtacado();
+        void this.loadSino(); // entrada pode ter tirado a medida do "repor"
       } catch (err) {
         this.stockMsg = { ok: false, text: this.stockErrText(err.message, 'entrada') };
       } finally {

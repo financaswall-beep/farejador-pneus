@@ -83,6 +83,8 @@ window.PAINEL_MODULES.core = function () {
       // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
       // (flag off = resposta enabled:false, barata; a página Rede re-varre ao entrar).
       void this.loadComissoes();
+      // Sino (2026-07-06): notificações reais já no boot.
+      void this.loadSino();
       this.$nextTick(() => {
         lucide.createIcons();
         this.renderChart();
@@ -150,6 +152,8 @@ window.PAINEL_MODULES.core = function () {
     async liveRefresh() {
       if (this.liveRefreshing || document.hidden) return;
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      // Sino atualiza em QUALQUER página (aviso é aviso); tem try/catch próprio.
+      void this.loadSino();
       if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;
