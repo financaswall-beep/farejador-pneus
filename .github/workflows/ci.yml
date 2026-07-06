@@ -21,6 +21,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      # Obra 300: teto de 300 linhas por arquivo de produção (novo >300 = FALHA;
+      # herdados congelados em scripts/teto-herdado.json). Roda ANTES do install
+      # de propósito — é node puro e barra push de QUALQUER máquina/ferramenta.
+      - name: Fiscal de tamanho (teto 300)
+        run: node scripts/checar-tamanho.cjs
+
       - name: Install dependencies
         run: npm ci
 
