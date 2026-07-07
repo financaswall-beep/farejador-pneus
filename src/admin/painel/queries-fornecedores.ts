@@ -11,6 +11,7 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { addWholesaleStockEntry } from './queries-galpao.js';
+import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 
 export interface WholesaleSupplierRow {
   id: string;
@@ -174,6 +175,9 @@ export async function registerWholesalePurchase(
       [environment, supplierId, input.purchased_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt],
     );
     const purchaseId = pur.rows[0]!.id;
+
+    // rótulo pro filme do galpão (0128): as entradas desta transação saem como 'compra'
+    await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
 
     // 3. Itens: cada um ALIMENTA o custo médio do galpão (mesma transação) e é gravado
     //    com a medida CANÔNICA que o galpão guardou (item e estoque nunca divergem).

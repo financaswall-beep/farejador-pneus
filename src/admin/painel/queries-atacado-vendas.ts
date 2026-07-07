@@ -220,7 +220,8 @@ export async function registerWholesaleSale(
     }
 
     // 3b. BAIXA no estoque do galpão por medida (Fase 2b) — atrás de flag, mesma transação.
-    await applyWholesaleStockDecrement(client, environment, input.items, env.WHOLESALE_STOCK_DECREMENT);
+    // O orderId vira o ref do filme do galpão (0128): "saiu 3 na venda X".
+    await applyWholesaleStockDecrement(client, environment, input.items, env.WHOLESALE_STOCK_DECREMENT, orderId);
 
     // 4. Grava o total (passo SEPARADO — enxerga os itens recém-inseridos).
     const tot = await client.query<{ total_amount: string }>(

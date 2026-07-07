@@ -11,6 +11,7 @@ export async function applyWholesaleStockDecrement(
   environment: 'prod' | 'test',
   items: Array<{ measure: string; quantity: number }>,
   enabled: boolean,
+  ref?: string,
 ): Promise<void> {
   if (!enabled) return;
   const byMeasure = new Map<string, number>();
@@ -18,6 +19,13 @@ export async function applyWholesaleStockDecrement(
     const m = it.measure.trim();
     if (m) byMeasure.set(m, (byMeasure.get(m) ?? 0) + it.quantity);
   }
+  if (byMeasure.size === 0) return;
+  // rótulo pro filme do galpão (0128) — local à transação da venda, o trigger lê
+  await client.query(
+    `SELECT set_config('app.galpao_source', 'venda_atacado', true),
+            set_config('app.galpao_ref', COALESCE($1, ''), true)`,
+    [ref ?? null],
+  );
   for (const [measure, qty] of byMeasure) {
     await client.query(
       `UPDATE commerce.wholesale_stock
@@ -39,6 +47,7 @@ export async function applyWholesaleStockReturn(
   environment: 'prod' | 'test',
   items: Array<{ measure: string; quantity: number }>,
   enabled: boolean,
+  ref?: string,
 ): Promise<void> {
   if (!enabled) return;
   const byMeasure = new Map<string, number>();
@@ -46,6 +55,13 @@ export async function applyWholesaleStockReturn(
     const m = it.measure.trim();
     if (m) byMeasure.set(m, (byMeasure.get(m) ?? 0) + it.quantity);
   }
+  if (byMeasure.size === 0) return;
+  // rótulo pro filme do galpão (0128) — devolução do cancelamento
+  await client.query(
+    `SELECT set_config('app.galpao_source', 'cancelamento_venda', true),
+            set_config('app.galpao_ref', COALESCE($1, ''), true)`,
+    [ref ?? null],
+  );
   for (const [measure, qty] of byMeasure) {
     await client.query(
       `UPDATE commerce.wholesale_stock

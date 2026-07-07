@@ -58,6 +58,7 @@ async function main(): Promise<void> {
        SELECT id FROM commerce.wholesale_customers WHERE environment=$1 AND name='PROVA-SINO-BORRACHEIRO')`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_customers WHERE environment=$1 AND name='PROVA-SINO-BORRACHEIRO'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(`DELETE FROM commerce.wholesale_stock_movements WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND product_id IN (
        SELECT id FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-SINO-%')`, [ENV]);
     await client.query(`DELETE FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-SINO-%'`, [ENV]);

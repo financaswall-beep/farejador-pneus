@@ -173,6 +173,7 @@ async function main(): Promise<void> {
     await client.query(`DELETE FROM commerce.wholesale_purchases WHERE environment=$1 AND created_by='prova-cancel'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_suppliers WHERE environment=$1 AND name LIKE 'PROVA-CANCEL-%'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(`DELETE FROM commerce.wholesale_stock_movements WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND tire_size=$2`, [ENV, MEASURE]);
     client.release();
     await pool.end();

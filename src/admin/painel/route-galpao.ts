@@ -6,9 +6,12 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { addWholesaleStockEntry, deleteWholesaleStock, listWholesaleStock, setWholesaleStock } from './queries.js';
+import {
+  addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, deleteWholesaleStockComRotulo,
+  listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
+} from './queries.js';
 import { dashboardPayload, mapWriteError } from './route-helpers.js';
-import { entryWholesaleStockSchema, removeWholesaleStockSchema, setWholesaleStockSchema } from './route-schemas.js';
+import { baixaWholesaleStockSchema, entryWholesaleStockSchema, removeWholesaleStockSchema, setWholesaleStockSchema } from './route-schemas.js';
 
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -22,7 +25,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const row = await addWholesaleStockEntry(parsed.data);
+      const row = await addWholesaleStockEntryComRotulo(parsed.data);
       return reply.status(200).send(row);
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -38,7 +41,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const row = await setWholesaleStock(parsed.data);
+      const row = await setWholesaleStockComRotulo(parsed.data);
       return reply.status(200).send(row);
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -54,13 +57,37 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      await deleteWholesaleStock(parsed.data.measure, parsed.data.environment);
+      await deleteWholesaleStockComRotulo(parsed.data.measure, parsed.data.environment);
       return reply.status(200).send({ ok: true });
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale stock remove failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
+  });
+
+  // BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo (não é venda).
+  fastify.post('/admin/api/wholesale/stock/baixa', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = baixaWholesaleStockSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const row = await applyGalpaoBaixaManual(parsed.data);
+      return reply.status(200).send(row);
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale stock baixa failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // O FILME do galpão (0128): últimos movimentos, todos ou de uma medida (?measure=&limit=).
+  fastify.get('/admin/api/wholesale/stock/movimentos', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const q = request.query as { measure?: string; limit?: string };
+    const limit = Math.min(Math.max(1, Number(q.limit) || 50), 200);
+    const rows = await listGalpaoMovements({ measure: q.measure?.slice(0, 60) || null, limit });
+    return reply.status(200).send(dashboardPayload(rows));
   });
 
   // ── ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem) ──

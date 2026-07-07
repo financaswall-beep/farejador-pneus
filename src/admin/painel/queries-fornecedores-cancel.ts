@@ -5,6 +5,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 
 export interface CancelWholesalePurchaseInput {
   purchase_id: string;
@@ -48,6 +49,9 @@ export async function cancelWholesalePurchase(
         RETURNING cancelled_at`,
       [input.purchase_id, environment, input.cancelled_by, input.reason?.slice(0, 300) ?? null],
     );
+
+    // rótulo pro filme do galpão (0128): a reversão sai como 'cancelamento_compra'
+    await setGalpaoMovContext(client, { source: 'cancelamento_compra', ref: input.purchase_id });
 
     // Reverte o galpão item a item (a medida gravada no item é a CANÔNICA do galpão).
     // Linha a linha em sequência: cada UPDATE lê o estado que a linha anterior deixou.

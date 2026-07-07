@@ -110,7 +110,8 @@ window.PAINEL_MODULES.core = function () {
         // Compras é tela própria: carrega fornecedor/compra/ranking ao entrar.
         if (page === 'compras') void this.loadAtacado();
         // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
-        if (page === 'estoque') void this.loadAtacado();
+        // O filme (0128) carrega junto — é a mesma visita à aba.
+        if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(); }
         // Logística (0121): entregas da matriz + rota do dia do entregador.
         if (page === 'logistica') void this.loadLogistica();
         // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.

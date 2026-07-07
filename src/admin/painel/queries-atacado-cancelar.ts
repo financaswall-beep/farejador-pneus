@@ -94,7 +94,7 @@ export async function cancelWholesaleSale(
         WHERE environment = $1 AND order_id = $2`,
       [environment, input.order_id],
     );
-    await applyWholesaleStockReturn(client, environment, items.rows, env.WHOLESALE_STOCK_DECREMENT);
+    await applyWholesaleStockReturn(client, environment, items.rows, env.WHOLESALE_STOCK_DECREMENT, input.order_id);
 
     await client.query('COMMIT');
     return {

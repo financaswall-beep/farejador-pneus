@@ -13,6 +13,7 @@ export * from './queries-pedidos-acoes.js'; // registrar pedido manual/walk-in +
 export * from './queries-parceiros.js'; // criar parceiro + candidaturas (aprovar/rejeitar)
 export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo
+export * from './queries-galpao-movimentos.js'; // filme do galpão (0128): rótulo, baixa manual c/ motivo, leitura
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)
 export * from './queries-fornecedores-cancel.js'; // cancelar compra (0127) + arquivar fornecedor
 export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despesas da matriz (0120)

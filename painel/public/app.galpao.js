@@ -126,9 +126,129 @@ window.PAINEL_MODULES.galpao = function () {
       try {
         await this.apiPost('/admin/api/wholesale/stock/remove', { measure });
         await this.loadAtacado();
+        void this.loadGalpaoFilme(); // a remoção entra no filme
       } catch (err) {
         this.stockMsg = { ok: false, text: `Não consegui remover (${err.message}).` };
       }
+    },
+    // ── Auditoria 07-07: busca + "repor primeiro" — a lista que a tabela renderiza ──
+    // Busca casa por TEXTO e por DÍGITOS (mesma régua do autocomplete); ordenação põe
+    // ZEROU no topo, depois REPOR, depois o resto (alfabético dentro de cada grupo).
+    stockRowsView() {
+      const digits = (s) => (s || '').replace(/\D/g, '');
+      const q = (this.stockBusca || '').trim().toLowerCase();
+      const qd = digits(q);
+      let rows = this.atacadoStock;
+      if (q) rows = rows.filter((r) => r.measure.toLowerCase().includes(q) || (qd !== '' && digits(r.measure).includes(qd)));
+      const peso = (r) => (Number(r.quantity_on_hand) === 0 ? 0 : (this.stockPrecisaRepor(r) ? 1 : 2));
+      return [...rows].sort((a, b) => peso(a) - peso(b) || a.measure.localeCompare(b.measure));
+    },
+    // Resumo do topo: pneus no galpão, capital parado (Σ qty × custo médio — a MESMA conta
+    // do indicador da aba Financeiro), medidas zeradas e pra repor. Calculado da lista
+    // que JÁ veio (nunca diverge da tabela ao lado).
+    stockResumo() {
+      let pneus = 0, capital = 0, zeradas = 0, repor = 0;
+      for (const r of this.atacadoStock) {
+        const q = Number(r.quantity_on_hand) || 0;
+        pneus += q;
+        capital += q * (Number(r.unit_cost) || 0);
+        if (q === 0) zeradas++;
+        else if (this.stockPrecisaRepor(r)) repor++;
+      }
+      return { pneus, capital, zeradas, repor };
+    },
+    // ── BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo ──
+    stockBaixaOpen(row) {
+      this.stockBaixaForm = { measure: row.measure, quantity: '', tipo: 'quebra', texto: '' };
+      this.stockMsg = null;
+      this.$nextTick(() => { const el = document.getElementById('galpao-baixa-qtd'); if (el) el.focus(); });
+    },
+    stockBaixaFechar() {
+      this.stockBaixaForm = { measure: null, quantity: '', tipo: 'quebra', texto: '' };
+    },
+    async stockBaixaSubmit() {
+      const f = this.stockBaixaForm;
+      const qty = Number(f.quantity);
+      if (!Number.isInteger(qty) || qty <= 0) { this.stockMsg = { ok: false, text: 'Quantos pneus saem?' }; return; }
+      const reason = f.tipo + (f.texto && f.texto.trim() ? ': ' + f.texto.trim() : '');
+      this.stockBaixaSaving = true;
+      this.stockMsg = null;
+      try {
+        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, quantity: qty, reason });
+        this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${f.tipo}) — sobraram ${row.quantity_on_hand} un.` };
+        this.stockBaixaFechar();
+        await this.loadAtacado();
+        void this.loadSino(); // a baixa pode ter posto a medida no "repor"
+        void this.loadGalpaoFilme();
+      } catch (err) {
+        this.stockMsg = { ok: false, text: this.stockBaixaErrText(err.message) };
+      } finally {
+        this.stockBaixaSaving = false;
+      }
+    },
+    stockBaixaErrText(code) {
+      const s = String(code);
+      if (s.startsWith('baixa_maior_que_estoque')) {
+        return `Não dá: o galpão só tem ${s.split(':')[1]} dessa medida. Confere o pneu físico — se o número do sistema estiver errado, corrija pelo Definir.`;
+      }
+      const map = {
+        measure_not_found: 'Essa medida não está no galpão.',
+        reason_required: 'Diga o motivo da baixa.',
+        quantity_invalid: 'Quantidade inválida.',
+        quantidade_inteira: 'Quantidade inválida (número inteiro).',
+      };
+      return map[code] || `Não consegui dar a baixa (${code}).`;
+    },
+    // ── O FILME (0128): a movimentação do galpão — quem mexeu, quanto, quando ──
+    async loadGalpaoFilme(measure) {
+      if (measure !== undefined) this.galpaoFilme.measure = measure;
+      // guarda de corrida: o load geral do watch e o clique "filme" podem estar em voo
+      // juntos — só a resposta do pedido MAIS RECENTE pode pintar a tela.
+      const req = (this.galpaoFilme.req = (this.galpaoFilme.req || 0) + 1);
+      this.galpaoFilme.loading = true;
+      try {
+        const m = this.galpaoFilme.measure;
+        const r = await this.apiGet('/admin/api/wholesale/stock/movimentos' + (m ? '?measure=' + encodeURIComponent(m) : ''));
+        if (req !== this.galpaoFilme.req) return; // resposta velha: descarta
+        this.galpaoFilme.rows = r.rows || [];
+      } catch (err) {
+        if (req !== this.galpaoFilme.req) return;
+        this.galpaoFilme.rows = [];
+        console.warn('filme do galpão falhou:', err.message);
+      } finally {
+        if (req === this.galpaoFilme.req) this.galpaoFilme.loading = false;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
+    // Clicou "filme" numa medida: filtra a movimentação e desce até ela.
+    filmeDaMedida(measure) {
+      void this.loadGalpaoFilme(measure);
+      this.$nextTick(() => { const el = document.getElementById('galpao-filme'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    },
+    movRotulo(m) {
+      const map = {
+        definir: 'Definir (ajuste da tela)', entrada: 'Entrada avulsa', compra: 'Compra de fornecedor',
+        cancelamento_compra: 'Compra cancelada', venda_atacado: 'Venda de atacado',
+        cancelamento_venda: 'Venda de atacado cancelada', varejo: 'Venda do varejo (bot/balcão)',
+        cancelamento_varejo: 'Varejo cancelado (voltou)', baixa_manual: 'Baixa manual',
+        remocao: 'Medida removida', sem_rotulo: 'mexida sem rótulo',
+      };
+      let t = map[m.source] || m.source;
+      if (m.source === 'baixa_manual' && m.reason) t += ' — ' + m.reason;
+      else if (m.source === 'compra' && m.reason) t += ' (' + m.reason + ')';
+      return t;
+    },
+    movQuando(m) {
+      const d = new Date(m.created_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+    // Custo médio só aparece no filme quando MUDOU (entrada/compra recalculam; baixa não).
+    movCustoTexto(m) {
+      const b = m.cost_before == null ? null : Number(m.cost_before);
+      const a = m.cost_after == null ? null : Number(m.cost_after);
+      if (a == null || b === a) return '';
+      if (b == null) return this.formatCurrency(a);
+      return this.formatCurrency(b) + ' → ' + this.formatCurrency(a);
     },
 
   };

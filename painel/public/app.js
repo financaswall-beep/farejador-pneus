@@ -94,6 +94,11 @@ function painelApp() {
     stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' },
     stockSaving: false,
     stockMsg: null,
+    // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
+    stockBusca: '',
+    stockBaixaForm: { measure: null, quantity: '', tipo: 'quebra', texto: '' },
+    stockBaixaSaving: false,
+    galpaoFilme: { rows: [], measure: null, loading: false },
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
     atacadoPeriodo: 'tudo', // recorte do card do atacado: 'tudo' | 'mes' (0117)
     // ── VAREJO da matriz (0117 — fatia 2): resumo com custo CONGELADO na venda ──

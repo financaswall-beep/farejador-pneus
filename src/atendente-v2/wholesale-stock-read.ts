@@ -202,6 +202,12 @@ export async function applyMatrizGalpaoDecrement(
   }
   if (qtyByKey.size === 0) return;
 
+  // rótulo pro filme do galpão (0128): o trigger grava a baixa com origem 'varejo'
+  await client.query(
+    `SELECT set_config('app.galpao_source','varejo',true), set_config('app.galpao_ref',COALESCE($1,''),true)`,
+    [orderId ?? null],
+  );
+
   // 3. abate a linha do galpão que casa por chave (uma por chave; clamp em 0). Captura o
   //    delta REAL (antes − depois): sob clamp, "pedi 5 mas só tinha 3" registra 3 removidos,
   //    não 5 — a devolução no cancelamento nunca infla o estoque (fura o clamp assimétrico).
@@ -277,6 +283,12 @@ export async function applyMatrizGalpaoReturn(
   );
   const movements = dec.rows[0]?.payload_after?.movements ?? [];
   if (movements.length === 0) return; // não baixou → nada a devolver
+
+  // rótulo pro filme do galpão (0128): devolução do cancelamento do varejo
+  await client.query(
+    `SELECT set_config('app.galpao_source','cancelamento_varejo',true), set_config('app.galpao_ref',$1,true)`,
+    [orderId],
+  );
 
   for (const mv of movements) {
     if (!mv.measure || !(mv.qty > 0)) continue;

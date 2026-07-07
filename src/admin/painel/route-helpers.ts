@@ -39,8 +39,14 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
 
   // Validações de escrita do galpão (atacado) — erro do usuário, não 500.
   if (['measure_not_in_catalog', 'measure_required', 'quantity_invalid', 'cost_invalid',
-       'name_required', 'supplier_required', 'supplier_not_found', 'items_required'].includes(err.message)) {
+       'name_required', 'supplier_required', 'supplier_not_found', 'items_required',
+       'measure_not_found', 'reason_required', 'min_invalid'].includes(err.message)) {
     return { status: 400, error: err.message };
+  }
+
+  // Baixa manual (0128): 'baixa_maior_que_estoque:<qtd>' carrega o saldo real no código.
+  if (err.message.startsWith('baixa_maior_que_estoque')) {
+    return { status: 409, error: err.message };
   }
 
   return { status: 500, error: 'internal_server_error' };

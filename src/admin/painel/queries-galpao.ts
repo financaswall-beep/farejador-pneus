@@ -45,7 +45,7 @@ export async function listWholesaleStock(
  *  "Definir" sempre manda o valor completo — não há merge parcial. */
 export async function setWholesaleStock(
   input: { measure: string; quantity_on_hand: number; unit_cost?: number; min_quantity?: number | null; notes?: string | null; environment?: 'prod' | 'test' },
-  dbPool: Pool = defaultPool,
+  dbPool: Pool | PoolClient = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const raw = input.measure.trim();
@@ -124,7 +124,7 @@ export async function addWholesaleStockEntry(
 export async function deleteWholesaleStock(
   measure: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
+  dbPool: Pool | PoolClient = defaultPool,
 ): Promise<void> {
   await dbPool.query(
     `DELETE FROM commerce.wholesale_stock WHERE environment = $1 AND measure = $2`,

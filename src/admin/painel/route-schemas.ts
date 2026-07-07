@@ -113,6 +113,13 @@ export const entryWholesaleStockSchema = z.object({
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
 });
+// Baixa MANUAL com motivo (0128 — quebra/perda/uso interno): recusa acima do saldo.
+export const baixaWholesaleStockSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  measure: z.string().min(1).max(60),
+  quantity: z.number().int('quantidade_inteira').positive().max(1000000),
+  reason: z.string().min(2).max(300),
+});
 
 // ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.
 export const registerSupplierSchema = z.object({
