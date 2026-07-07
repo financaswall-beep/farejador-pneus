@@ -24,15 +24,18 @@
 <script src="/admin/painel/app.logistica.acoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.sino.js?v=20260706-sino1"></script>
+<script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
+<script src="/admin/painel/app.bot.js?v=20260706-bot1"></script>
+<script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.galpao.js?v=20260706-sino1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.core.js?v=20260706-sino1"></script>
+<script src="/admin/painel/app.core.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260706-sino1"></script>
+<script src="/admin/painel/app.js?v=20260706-bot1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2840,6 +2843,212 @@
           </template>
           <div x-show="colabLoaded && !colaboradores.length" class="text-sm text-gray-400 py-2">
             Ninguém cadastrado ainda — clica em “+ Cadastrar” pra colocar teu primeiro vendedor ou entregador.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TELA: BOT (2026-07-06) — campainha + cards + mapa + radar ═══ -->
+    <div x-show="currentPage === 'bot'" class="p-8">
+      <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Bot</h1>
+          <p class="text-sm text-gray-500 mt-1">O atendente no WhatsApp — quem está esperando AGORA, onde a demanda mora e o que faltou pra vender</p>
+        </div>
+        <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
+          <template x-for="p in redePeriods" :key="'botp-' + p.id">
+            <button @click="setBotPeriodo(p.id)"
+                    :class="botPeriodo === p.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'"
+                    class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors" x-text="p.label"></button>
+          </template>
+        </div>
+      </div>
+
+      <!-- CAMPAINHA: se essa tela só tivesse UMA coisa, seria essa -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white border rounded-xl p-5" :class="botMudas.length ? 'border-rose-200' : 'border-gray-200'">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="botMudas.length ? 'bg-rose-50' : 'bg-emerald-50'">
+                <i data-lucide="bell-ring" class="w-4 h-4" :class="botMudas.length ? 'text-rose-600' : 'text-emerald-600'"></i>
+              </div>
+              <h3 class="text-base font-semibold">Cliente esperando resposta</h3>
+            </div>
+            <span x-show="botMudas.length" class="text-xs font-semibold bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full" x-text="botMudas.length"></span>
+          </div>
+          <template x-for="m in botMudas" :key="m.conversation_id">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm">
+              <div class="min-w-0">
+                <span class="font-medium text-gray-800" x-text="m.contact_name || 'Cliente'"></span>
+                <span class="text-xs text-rose-600 font-semibold ml-2" x-text="'mudo há ' + botMinutosLabel(m.minutos)"></span>
+                <p class="text-xs text-gray-500 truncate mt-0.5" x-text="'“' + m.preview + '”'"></p>
+              </div>
+              <button @click="abrirNoChatwoot(m.chatwoot_conversation_id)"
+                      class="text-xs px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium whitespace-nowrap flex-shrink-0">
+                Abrir no Chatwoot
+              </button>
+            </div>
+          </template>
+          <div x-show="botCampainha && !botMudas.length" class="text-sm text-emerald-700 py-1.5">
+            Ninguém esperando — o bot está em dia. ✓
+          </div>
+          <div x-show="!botCampainha" class="text-sm text-gray-400 py-1.5">Carregando…</div>
+        </div>
+
+        <div class="bg-white border rounded-xl p-5" :class="botEscalados.length ? 'border-amber-200' : 'border-gray-200'">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                <i data-lucide="hand" class="w-4 h-4 text-amber-600"></i>
+              </div>
+              <h3 class="text-base font-semibold">Pediu pra falar com gente <span class="text-xs text-gray-400 font-normal">(48h)</span></h3>
+            </div>
+            <span x-show="botEscalados.length" class="text-xs font-semibold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full" x-text="botEscalados.length"></span>
+          </div>
+          <template x-for="e in botEscalados" :key="'esc-' + e.conversation_id">
+            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2.5 text-sm">
+              <div class="min-w-0">
+                <span class="font-medium text-gray-800" x-text="e.contact_name || 'Cliente'"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="botQuandoLabel(e.quando)"></span>
+                <p class="text-xs text-gray-500 truncate mt-0.5" x-text="e.motivo || 'sem motivo registrado'"></p>
+              </div>
+              <button @click="abrirNoChatwoot(e.chatwoot_conversation_id)"
+                      class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium whitespace-nowrap flex-shrink-0">
+                Abrir no Chatwoot
+              </button>
+            </div>
+          </template>
+          <div x-show="botCampainha && !botEscalados.length" class="text-sm text-gray-400 py-1.5">
+            Nenhum pedido de atendimento humano nas últimas 48h.
+          </div>
+          <div x-show="!botCampainha" class="text-sm text-gray-400 py-1.5">Carregando…</div>
+        </div>
+      </div>
+
+      <!-- CARDS do período -->
+      <div x-show="botCards" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Conversas</p>
+          <p class="text-2xl font-semibold mt-1" x-text="botCards ? botCards.conversas : '—'"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Fecharam pedido</p>
+          <p class="text-2xl font-semibold mt-1 text-emerald-700" x-text="botCards ? botCards.fecharam : '—'"></p>
+          <p class="text-[11px] text-gray-400" x-text="botCards ? (botCards.taxa_conversao + '% de conversão') : ''"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Escalaram</p>
+          <p class="text-2xl font-semibold mt-1 text-amber-600" x-text="botCards ? botCards.escalaram : '—'"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Abandonaram</p>
+          <p class="text-2xl font-semibold mt-1 text-gray-500" x-text="botCards ? botCards.abandonaram : '—'"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Custo do bot</p>
+          <p class="text-2xl font-semibold mt-1" x-text="botCards ? formatCurrency(Number(botCards.custo_bot || 0)) : '—'"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500 mb-2">Horário de pico</p>
+          <template x-for="h in botHorarios" :key="'bh-' + h.label">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[10px] text-gray-400 w-14" x-text="h.label"></span>
+              <div class="flex-1 bg-gray-100 rounded-full h-1.5">
+                <div class="bg-gray-800 h-1.5 rounded-full" :style="'width:' + h.pct + '%'"></div>
+              </div>
+              <span class="text-[10px] text-gray-500 w-4 text-right" x-text="h.n"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- MAPA por município -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="map" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Mapa da demanda</h3>
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <template x-for="c in botCamadas" :key="'bc-' + c.id">
+              <button @click="setBotCamada(c.id)"
+                      :class="botCamada === c.id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'"
+                      class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors" x-text="c.label"></button>
+            </template>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mb-3" x-text="botCamadaAtual().desc + ' — clica num município que ele responde'"></p>
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr,240px] gap-4 items-start">
+          <div id="bot-mapa" class="min-h-[220px]">
+            <div x-show="botLoading" class="text-sm text-gray-400 p-6">Carregando o mapa…</div>
+          </div>
+          <div>
+            <div x-show="botMapaSel" class="border border-gray-200 rounded-xl p-4 mb-3">
+              <p class="text-sm font-semibold" x-text="botMapaSel ? botMapaSel.municipio : ''"></p>
+              <div class="mt-2 space-y-1.5 text-xs text-gray-600">
+                <div class="flex justify-between"><span>Chamaram</span><span class="font-semibold" x-text="botMapaSel ? botMapaSel.chamou : ''"></span></div>
+                <div class="flex justify-between"><span>Viraram pedido</span><span class="font-semibold text-emerald-700" x-text="botMapaSel ? botMapaSel.pediu : ''"></span></div>
+                <div class="flex justify-between"><span>Entregues</span><span class="font-semibold" x-text="botMapaSel ? botMapaSel.efetivou : ''"></span></div>
+                <div class="flex justify-between"><span>Faltou pneu</span><span class="font-semibold text-rose-600" x-text="botMapaSel ? botMapaSel.faltou : ''"></span></div>
+              </div>
+            </div>
+            <div x-show="!botMapaSel" class="border border-dashed border-gray-200 rounded-xl p-4 mb-3 text-xs text-gray-400">
+              Clica num município pra ver os números dele aqui.
+            </div>
+            <div class="flex items-center gap-1 text-[11px] text-gray-400">
+              <span>pouco</span>
+              <template x-for="(cor, i) in botLegenda" :key="'lg-' + i">
+                <span class="inline-block w-4 h-2.5 rounded-sm" :style="'background:' + cor"></span>
+              </template>
+              <span>muito</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2" x-show="botSemRegiao > 0"
+               x-text="botSemRegiao + ' conversa(s) sem região identificada ficam fora do mapa'"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RADAR: pediram e a Rede não tinha -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+            <i data-lucide="radar" class="w-4 h-4 text-amber-600"></i>
+          </div>
+          <h3 class="text-base font-semibold">Pediram e a Rede NÃO tinha</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">Tua lista de compra: cada linha é venda que escapou — repõe no galpão e oferece no atacado pros parceiros da região</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" x-show="botRadar.length">
+            <thead>
+              <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
+                <th class="py-2 pr-4 font-medium">Medida</th>
+                <th class="py-2 pr-4 font-medium">Pediram</th>
+                <th class="py-2 pr-4 font-medium">Fora do catálogo</th>
+                <th class="py-2 pr-4 font-medium">Sem estoque perto</th>
+                <th class="py-2 font-medium">Galpão tem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in botRadar" :key="'rad-' + r.medida">
+                <tr class="border-b border-gray-50">
+                  <td class="py-2 pr-4 font-mono font-medium text-gray-800" x-text="r.medida"></td>
+                  <td class="py-2 pr-4"><span class="font-semibold" x-text="r.pedidos"></span><span class="text-xs text-gray-400"> vez(es)</span></td>
+                  <td class="py-2 pr-4 text-gray-500" x-text="r.fora_catalogo || '—'"></td>
+                  <td class="py-2 pr-4 text-gray-500" x-text="r.sem_estoque_perto || '—'"></td>
+                  <td class="py-2">
+                    <span x-show="r.galpao_qty !== null" class="text-xs px-2 py-0.5 rounded-full"
+                          :class="Number(r.galpao_qty) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
+                          x-text="Number(r.galpao_qty) > 0 ? (r.galpao_qty + ' un') : 'zerado'"></span>
+                    <span x-show="r.galpao_qty === null" class="text-xs text-gray-400">não cadastrada</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="botVisao && !botRadar.length" class="text-sm text-gray-400 py-2">
+            Nada faltou no período — a Rede segurou toda a demanda. ✓
           </div>
         </div>
       </div>

@@ -178,6 +178,7 @@ function painelApp() {
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
       { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
+      { id: 'bot',        label: 'Bot',        icon: 'bot', badge: null },
       { id: 'vendas',     label: 'Vendas',     icon: 'shopping-bag' },
       { id: 'compras',    label: 'Compras',    icon: 'shopping-cart' },
       { id: 'estoque',    label: 'Estoque',    icon: 'package' },
@@ -205,6 +206,13 @@ function painelApp() {
     // `notificacoes` virou GETTER derivado no módulo app.sino.js — não é mais estado.
     sino: null,
     sinoLidas: JSON.parse(localStorage.getItem('farejador_sino_lidas') || '[]'),
+    // TELA DO BOT (2026-07-06): campainha (cliente esperando) + visão (cards/mapa/radar).
+    botCampainha: null,
+    botVisao: null,
+    botLoading: false,
+    botPeriodo: '30d',
+    botCamada: 'chamou',
+    botMapaSel: null,
     kpis: [],
     leadsRecuperar: [],
     resumoSeries: [],
@@ -241,6 +249,8 @@ function painelApp() {
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA
     window.PAINEL_MODULES.colaboradores, // app.colaboradores.js (linhas 1531-1629 pré-obra): colaboradores da matriz (0124): criar/função/senha/revogar
     window.PAINEL_MODULES.sino, // app.sino.js (2026-07-06): sino vivo — getter notificacoes derivado + lidas em localStorage
+    window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
+    window.PAINEL_MODULES.botMapa, // app.bot.mapa.js (2026-07-06): desenho do mapa IBGE pintado por camada
     window.PAINEL_MODULES.financeiro, // app.financeiro.js (linhas 1630-1743 pré-obra): aba Financeiro (visão 3 pernas) + despesas (0120)
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)

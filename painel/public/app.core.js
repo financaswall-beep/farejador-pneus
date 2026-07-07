@@ -85,6 +85,8 @@ window.PAINEL_MODULES.core = function () {
       void this.loadComissoes();
       // Sino (2026-07-06): notificações reais já no boot.
       void this.loadSino();
+      // Campainha do bot (2026-07-06): cliente esperando é alarme — badge já no boot.
+      void this.loadBotCampainha();
       this.$nextTick(() => {
         lucide.createIcons();
         this.renderChart();
@@ -119,6 +121,8 @@ window.PAINEL_MODULES.core = function () {
         if (page === 'colaboradores') void this.loadColaboradores();
         // Financeiro: visão consolidada (Onda 1) + despesas (0120) num carregador só.
         if (page === 'financeiro') void this.loadFinanceiro();
+        // Bot (2026-07-06): visão (cards/mapa/radar) ao entrar na aba.
+        if (page === 'bot') void this.loadBotVisao();
       });
 
       this.startLiveRefresh();
@@ -154,6 +158,8 @@ window.PAINEL_MODULES.core = function () {
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       // Sino atualiza em QUALQUER página (aviso é aviso); tem try/catch próprio.
       void this.loadSino();
+      // Campainha do bot idem: cliente esperando não pode depender da aba aberta.
+      void this.loadBotCampainha();
       if (!['resumo', 'rede', 'unidade', 'vendas'].includes(this.currentPage)) return;
 
       this.liveRefreshing = true;

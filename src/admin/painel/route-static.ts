@@ -19,6 +19,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.logistica.js', 'app.logistica.acoes.js', 'app.colaboradores.js', 'app.sino.js', 'app.financeiro.js',
     'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
+    'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js',
   ];
   for (const modulo of painelModulos) {
     fastify.get(`/admin/painel/${modulo}`, async (_request, reply) => sendStatic(reply, modulo, 'text/javascript; charset=utf-8'));
