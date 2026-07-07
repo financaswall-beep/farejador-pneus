@@ -73,6 +73,35 @@ sensores já gravam (analytics por trigger SQL, pedidos, galpão). Zero risco de
 Seeds da prova descartáveis (acc 93939, medida '93/93-93', source 'prova_bot'), pré-limpeza +
 limpeza no finally, checks do mapa por DELTA (imunes a dado pré-existente no env test).
 
+## Fatia 2 (mesmo dia — "ta coloca ai o que vc acha interessante")
+Saiu de um CENSO read-only no analytics de prod (scratchpad, fora do git): o gerador 0102
+grava **3 camadas** (facts + classifications + linguistic_hints) e a fatia 1 só usava a
+primeira. Descoberta-chave: **o "funil do dia com perdas por motivo" da tela suprema JÁ
+EXISTIA no banco** (`stage_reached` + `loss_reason`, recalculados por conversa a cada turno).
+- **Funil do período** — 6 etapas ACUMULADAS no front (abriu → mostrou interesse → recebeu
+  preço → deu o bairro → frete na mesa → pedido); distribuição vem crua do servidor
+  (`stage_reached` = etapa MÁXIMA por conversa). **Perdas por motivo** em chips (achou caro /
+  citou concorrente / sumiu após frete / após bairro / desistiu cedo / foi pro humano / sem
+  motivo claro) — cada motivo pede um remédio diferente (frete? preço? estoque?).
+- **3 cards que a v_daily_metrics já calculava e a tela ignorava**: faturamento (bot),
+  ticket médio (sum/sum no período, não média de médias) e resposta média em segundos
+  (prod real 07-06: mediana 20s / p90 46s).
+- **"Da boca do cliente"** — linguistic_hints por conversa DISTINTA (3 "tá caro" na mesma
+  conversa = 1): preço, concorrente, parcelado/fiado, garantia, instalação, pressa. Rotulado
+  na tela como "sensor por palavra-chave — termômetro, não balança".
+- **Medidas mais pedidas × galpão** — fact `medida_consultada` (tudo que consultaram, achando
+  ou não) ao lado do radar do "faltou": reposição preventiva vs reativa.
+- Arquitetura: visão MUDOU DE CASA pra `queries-bot-visao.ts` (fatia por assunto, teto 300;
+  campainha ficou em `queries-bot.ts` com 96 linhas); barrel exporta os dois; rota INTOCADA
+  (mesmos 2 GETs — payload ganhou chaves novas, rotas 93 idênticas). `?v=20260706-bot2`.
+- Provas: prova estendida pra **19 checks ×2** (B15 funil delta, B16 perda delta, B17 boca
+  delta por conversa, B18 mais-pedidas × galpão, B19 chaves novas dos cards); paridade
+  regravada 341→**345** (4 getters novos); 522 unit; preview 4224 (payload + funil/boca/
+  tabelas lado a lado inspecionados no DOM; amostra visual injetada só na tela e removida).
+- NÃO entrou de propósito: nota de satisfação (pesquisa 0105 dormente — card de sensor
+  desligado é tela mentirosa), moto mais consultada (decisão de compra é por MEDIDA),
+  detalhe de tokens (custo do card já responde).
+
 ## O que NÃO entrou (de propósito — fatias futuras da tela suprema)
 - Funil do dia com perdas por motivo (bloco 2 da conversa original) e camadas extras do mapa
   (medida campeã por região, ticket médio, rota se pagou por destino, fiado por região, comissão

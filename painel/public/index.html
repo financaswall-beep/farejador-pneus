@@ -25,7 +25,7 @@
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.sino.js?v=20260706-sino1"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.bot.js?v=20260706-bot1"></script>
+<script src="/admin/painel/app.bot.js?v=20260706-bot2"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.galpao.js?v=20260706-sino1"></script>
@@ -2848,7 +2848,7 @@
       </div>
     </div>
 
-    <!-- ═══ TELA: BOT (2026-07-06) — campainha + cards + mapa + radar ═══ -->
+    <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
     <div x-show="currentPage === 'bot'" class="p-8">
       <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -2949,6 +2949,20 @@
           <p class="text-2xl font-semibold mt-1" x-text="botCards ? formatCurrency(Number(botCards.custo_bot || 0)) : '—'"></p>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Faturamento (bot)</p>
+          <p class="text-2xl font-semibold mt-1 text-emerald-700" x-text="botCards ? formatCurrency(Number(botCards.faturamento || 0)) : '—'"></p>
+          <p class="text-[11px] text-gray-400">compara com o custo ao lado</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Ticket médio</p>
+          <p class="text-2xl font-semibold mt-1" x-text="botCards && botCards.ticket_medio !== null ? formatCurrency(Number(botCards.ticket_medio)) : '—'"></p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
+          <p class="text-xs text-gray-500">Resposta média</p>
+          <p class="text-2xl font-semibold mt-1" x-text="botCards && botCards.resposta_seg !== null ? botCards.resposta_seg + 's' : '—'"></p>
+          <p class="text-[11px] text-gray-400">do "oi" à resposta do bot</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500 mb-2">Horário de pico</p>
           <template x-for="h in botHorarios" :key="'bh-' + h.label">
             <div class="flex items-center gap-2 mb-1">
@@ -2959,6 +2973,56 @@
               <span class="text-[10px] text-gray-500 w-4 text-right" x-text="h.n"></span>
             </div>
           </template>
+        </div>
+      </div>
+
+      <!-- FUNIL + BOCA: onde a conversa para, e o que o cliente fala -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-2">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <i data-lucide="filter" class="w-4 h-4 text-brand-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Funil do período</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">De todo mundo que chamou, até onde a conversa foi — e por que parou. Cada motivo de perda pede um remédio diferente</p>
+          <template x-for="f in botFunil" :key="'fn-' + f.id">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-xs text-gray-500 w-36 flex-shrink-0" x-text="f.label"></span>
+              <div class="flex-1 bg-gray-100 rounded-full h-4">
+                <div class="bg-gray-800 h-4 rounded-full" :style="'width:' + (f.n > 0 ? Math.max(f.pct, 3) : 0) + '%'"></div>
+              </div>
+              <span class="text-xs font-semibold w-8 text-right" x-text="f.n"></span>
+            </div>
+          </template>
+          <div class="mt-4 pt-3 border-t border-gray-100">
+            <p class="text-xs font-medium text-gray-600 mb-2">Por que perdeu <span class="text-gray-400 font-normal">(quem não fechou)</span></p>
+            <div class="flex flex-wrap gap-1.5" x-show="botPerdas.length">
+              <template x-for="p in botPerdas" :key="'pd-' + p.label">
+                <span class="text-xs bg-rose-50 text-rose-700 px-2 py-1 rounded-lg">
+                  <span x-text="p.label"></span> <span class="font-semibold" x-text="p.n"></span>
+                </span>
+              </template>
+            </div>
+            <p x-show="botVisao && !botPerdas.length" class="text-xs text-gray-400">Nenhuma perda classificada no período. ✓</p>
+          </div>
+        </div>
+
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+              <i data-lucide="message-circle" class="w-4 h-4 text-violet-600"></i>
+            </div>
+            <h3 class="text-base font-semibold">Da boca do cliente</h3>
+          </div>
+          <p class="text-xs text-gray-500 mb-2">Quantas conversas tocaram em cada assunto</p>
+          <template x-for="b in botBoca" :key="'bb-' + b.id">
+            <div class="flex items-center justify-between border-b border-gray-50 py-2 text-sm">
+              <span class="text-gray-600" x-text="b.label"></span>
+              <span class="font-semibold" :class="b.n > 0 ? 'text-gray-900' : 'text-gray-300'" x-text="b.n"></span>
+            </div>
+          </template>
+          <p class="text-[11px] text-gray-400 mt-2">Sensor por palavra-chave — termômetro, não balança.</p>
         </div>
       </div>
 
@@ -3010,7 +3074,8 @@
         </div>
       </div>
 
-      <!-- RADAR: pediram e a Rede não tinha -->
+      <!-- RADAR (faltou) + MAIS PEDIDAS: as duas listas de compra -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       <div class="bg-white border border-gray-200 rounded-xl p-5">
         <div class="flex items-center gap-2 mb-1">
           <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -3051,6 +3116,45 @@
             Nada faltou no período — a Rede segurou toda a demanda. ✓
           </div>
         </div>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-center gap-2 mb-1">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <h3 class="text-base font-semibold">Medidas mais pedidas</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">Tudo que consultaram no período (achando ou não) × teu galpão — reposição preventiva: repõe ANTES de faltar</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" x-show="botMedidasTop.length">
+            <thead>
+              <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
+                <th class="py-2 pr-4 font-medium">Medida</th>
+                <th class="py-2 pr-4 font-medium">Pediram</th>
+                <th class="py-2 font-medium">Galpão tem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="m in botMedidasTop" :key="'mt-' + m.medida">
+                <tr class="border-b border-gray-50">
+                  <td class="py-2 pr-4 font-mono font-medium text-gray-800" x-text="m.medida"></td>
+                  <td class="py-2 pr-4"><span class="font-semibold" x-text="m.consultas"></span><span class="text-xs text-gray-400"> vez(es)</span></td>
+                  <td class="py-2">
+                    <span x-show="m.galpao_qty !== null" class="text-xs px-2 py-0.5 rounded-full"
+                          :class="Number(m.galpao_qty) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
+                          x-text="Number(m.galpao_qty) > 0 ? (m.galpao_qty + ' un') : 'zerado'"></span>
+                    <span x-show="m.galpao_qty === null" class="text-xs text-gray-400">não cadastrada</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="botVisao && !botMedidasTop.length" class="text-sm text-gray-400 py-2">
+            Nenhuma medida consultada no período.
+          </div>
+        </div>
+      </div>
       </div>
     </div>
 

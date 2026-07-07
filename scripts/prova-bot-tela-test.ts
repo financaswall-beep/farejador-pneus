@@ -9,6 +9,10 @@
  *   pedido_criado vira "pediu" · faltou_estoque vira "faltou" no mapa e linha no
  *   radar com motivo + estoque do galpão · conversa sem município cai em
  *   sem_regiao · fact FORA da janela 30d não conta.
+ * Fatia 2 (funil/boca/mais-pedidas): stage_reached vira funil (delta) ·
+ *   loss_reason vira perda por motivo (delta) · hint de linguagem vira "boca do
+ *   cliente" por conversa distinta (delta) · medida_consultada vira "mais pedidas"
+ *   cruzada com o galpão · cards ganharam faturamento/ticket_medio/resposta_seg.
  *
  * Seeds descartáveis (chatwoot_account_id=93939, contato 'PROVA-BOT contato',
  * medida '93/93-93', source 'prova_bot') com pré-limpeza + limpeza no finally.
@@ -38,6 +42,14 @@ async function main(): Promise<void> {
   };
 
   const limpar = async (): Promise<void> => {
+    await client.query(
+      `DELETE FROM analytics.conversation_classifications WHERE conversation_id IN (
+         SELECT id FROM core.conversations WHERE environment=$1 AND chatwoot_account_id=$2)`,
+      [ENV, ACC]);
+    await client.query(
+      `DELETE FROM analytics.linguistic_hints WHERE conversation_id IN (
+         SELECT id FROM core.conversations WHERE environment=$1 AND chatwoot_account_id=$2)`,
+      [ENV, ACC]);
     await client.query(
       `DELETE FROM analytics.conversation_facts WHERE conversation_id IN (
          SELECT id FROM core.conversations WHERE environment=$1 AND chatwoot_account_id=$2)`,
@@ -93,8 +105,16 @@ async function main(): Promise<void> {
     // ── visão ANTES dos seeds (baseline pro delta) ──
     const antes = await getBotVisao('30d', ENV, pool);
     const antesMarica = antes.mapa.find((m) => m.municipio === 'Maricá');
+    const funilDe = (p: Awaited<ReturnType<typeof getBotVisao>>, etapa: string): number =>
+      p.funil.find((x) => x.etapa === etapa)?.n ?? 0;
+    const perdaDe = (p: Awaited<ReturnType<typeof getBotVisao>>, motivo: string): number =>
+      p.perdas.find((x) => x.motivo === motivo)?.n ?? 0;
+    const bocaDe = (p: Awaited<ReturnType<typeof getBotVisao>>, tipo: string): number =>
+      p.boca.find((x) => x.tipo === tipo)?.convs ?? 0;
     const a = { chamou: antesMarica?.chamou ?? 0, pediu: antesMarica?.pediu ?? 0,
-      faltou: antesMarica?.faltou ?? 0, semRegiao: antes.sem_regiao };
+      faltou: antesMarica?.faltou ?? 0, semRegiao: antes.sem_regiao,
+      funilPedido: funilDe(antes, 'pedido_criado'), funilFrete: funilDe(antes, 'frete_calculado'),
+      perdaPreco: perdaDe(antes, 'objecao_preco'), bocaParcelado: bocaDe(antes, 'pergunta_parcelamento') };
 
     // ── setup: contato + 4 conversas ──
     const ct = await client.query<{ id: string }>(
@@ -114,7 +134,7 @@ async function main(): Promise<void> {
       muda1 ? `minutos=${muda1.minutos}, preview="${muda1.preview}"` : 'não apareceu');
 
     // ── B2: mensagem de 2 min NÃO alarma (grace de 5 min) ──
-    await novaMsg(conv2, 2, 2, 'oi');
+    const msg2 = await novaMsg(conv2, 2, 2, 'oi');
     camp = await getBotCampainha(ENV, pool);
     check('B2 conversa em andamento (2 min) NÃO alarma', !camp.mudas.some((m) => m.conversation_id === conv2));
 
@@ -150,6 +170,27 @@ async function main(): Promise<void> {
       `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand)
        VALUES ($1::env_t, $2, 4)`, [ENV, MEASURE]);
 
+    // ── seeds fatia 2: funil/perdas (classifications, espelho do _insert_classification)
+    //    + boca (linguistic_hint na msg da conv2) ──
+    const novaClass = async (convId: string, dimension: string, value: string): Promise<void> => {
+      await client.query(
+        `INSERT INTO analytics.conversation_classifications
+           (environment, conversation_id, dimension, value, truth_type, source,
+            confidence_level, extractor_version, ruleset_hash)
+         VALUES ($1::env_t, $2, $3, $4, 'inferred', 'prova_bot', 1.00, 'prova_v1', 'prova_v1')`,
+        [ENV, convId, dimension, value]);
+    };
+    await novaClass(conv1, 'stage_reached', 'pedido_criado');
+    await novaClass(conv2, 'stage_reached', 'frete_calculado');
+    await novaClass(conv2, 'loss_reason', 'objecao_preco');
+    await client.query(
+      `INSERT INTO analytics.linguistic_hints
+         (environment, conversation_id, message_id, hint_type, matched_text, pattern_id,
+          truth_type, source, confidence_level, extractor_version, ruleset_hash)
+       VALUES ($1::env_t, $2, $3, 'pergunta_parcelamento', 'fiado', 'prova',
+               'observed', 'prova_bot', 0.90, 'prova_v1', 'prova_v1')`,
+      [ENV, conv2, msg2]);
+
     const depois = await getBotVisao('30d', ENV, pool);
     const marica = depois.mapa.find((m) => m.municipio === 'Maricá');
     const d = { chamou: marica?.chamou ?? 0, pediu: marica?.pediu ?? 0, faltou: marica?.faltou ?? 0 };
@@ -179,7 +220,26 @@ async function main(): Promise<void> {
     check('B14 janela today responde e enxerga os seeds de hoje',
       (maricaHoje?.chamou ?? 0) >= 2);
 
-    console.log(fails === 0 ? '\n[VERDE] 14/14 — tela do Bot provada.' : `\n[VERMELHO] ${fails} check(s) falharam.`);
+    // ── fatia 2: funil + perdas + boca + mais-pedidas + cards novos ──
+    check('B15 funil: pedido_criado +1 e frete_calculado +1 (delta)',
+      funilDe(depois, 'pedido_criado') === a.funilPedido + 1 &&
+      funilDe(depois, 'frete_calculado') === a.funilFrete + 1,
+      `pedido ${a.funilPedido}->${funilDe(depois, 'pedido_criado')}, frete ${a.funilFrete}->${funilDe(depois, 'frete_calculado')}`);
+    check('B16 perdas: objecao_preco +1 (delta)',
+      perdaDe(depois, 'objecao_preco') === a.perdaPreco + 1,
+      `${a.perdaPreco}->${perdaDe(depois, 'objecao_preco')}`);
+    check('B17 boca: pergunta_parcelamento +1 conversa (delta)',
+      bocaDe(depois, 'pergunta_parcelamento') === a.bocaParcelado + 1,
+      `${a.bocaParcelado}->${bocaDe(depois, 'pergunta_parcelamento')}`);
+    const mt = depois.medidas_top.find((m) => m.medida === MEASURE);
+    check('B18 mais-pedidas: medida consultada aparece cruzada com o galpão (4 un)',
+      !!mt && mt.consultas >= 1 && Number(mt.galpao_qty) === 4,
+      mt ? `consultas=${mt.consultas} galpao=${mt.galpao_qty}` : 'não apareceu');
+    check('B19 cards ganharam faturamento/ticket_medio/resposta_seg',
+      !!depois.cards && 'faturamento' in depois.cards && 'ticket_medio' in depois.cards
+        && 'resposta_seg' in depois.cards);
+
+    console.log(fails === 0 ? '\n[VERDE] 19/19 — tela do Bot (fatias 1+2) provada.' : `\n[VERMELHO] ${fails} check(s) falharam.`);
     process.exitCode = fails === 0 ? 0 : 1;
   } finally {
     await limpar();

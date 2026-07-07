@@ -79,6 +79,59 @@ window.PAINEL_MODULES.bot = function () {
       return itens.map((i) => ({ ...i, pct: Math.round((i.n / max) * 100) }));
     },
 
+    // Funil ACUMULADO: o servidor manda onde cada conversa PAROU (stage_reached);
+    // aqui vira "chegaram ATÉ AQUI ou além" — a leitura natural de funil.
+    get botFunil() {
+      const ETAPAS = [
+        ['abriu_conversa', 'Chamaram'],
+        ['mostrou_interesse', 'Mostraram interesse'],
+        ['recebeu_cotacao', 'Receberam preço'],
+        ['forneceu_bairro', 'Deram o bairro'],
+        ['frete_calculado', 'Frete na mesa'],
+        ['pedido_criado', 'Pedido criado'],
+      ];
+      const dist = (this.botVisao && this.botVisao.funil) || [];
+      const porEtapa = Object.fromEntries(dist.map((f) => [f.etapa, Number(f.n || 0)]));
+      let acum = 0;
+      const deBaixoPraCima = [...ETAPAS].reverse().map(([id, label]) => {
+        acum += porEtapa[id] || 0;
+        return { id, label, n: acum };
+      });
+      const linhas = deBaixoPraCima.reverse();
+      const total = Math.max(1, linhas[0] ? linhas[0].n : 0);
+      return linhas.map((l) => ({ ...l, pct: Math.round((l.n / total) * 100) }));
+    },
+    get botPerdas() {
+      const NOMES = {
+        objecao_preco: 'Achou caro',
+        mencionou_concorrente: 'Citou concorrente',
+        desistiu_apos_frete: 'Sumiu depois do frete',
+        desistiu_apos_bairro: 'Sumiu depois do bairro',
+        desistiu_cedo: 'Desistiu cedo',
+        escalado_humano: 'Foi pro humano',
+        abandonou_sem_motivo_claro: 'Sumiu sem motivo claro',
+      };
+      return (((this.botVisao && this.botVisao.perdas) || []))
+        .map((p) => ({ label: NOMES[p.motivo] || p.motivo, n: Number(p.n || 0) }));
+    },
+    // Boca do cliente: ordem FIXA (zero também aparece — sensor vivo mostrando calmaria).
+    get botBoca() {
+      const TIPOS = [
+        ['objecao_preco', 'Falou "tá caro"'],
+        ['mencao_concorrente', 'Citou concorrente'],
+        ['pergunta_parcelamento', 'Pediu parcelado/fiado'],
+        ['pergunta_garantia', 'Perguntou de garantia'],
+        ['pediu_instalacao', 'Pediu instalação'],
+        ['urgencia', 'Tá com pressa'],
+      ];
+      const dados = (this.botVisao && this.botVisao.boca) || [];
+      const porTipo = Object.fromEntries(dados.map((b) => [b.tipo, Number(b.convs || 0)]));
+      return TIPOS.map(([id, label]) => ({ id, label, n: porTipo[id] || 0 }));
+    },
+    get botMedidasTop() {
+      return (this.botVisao && this.botVisao.medidas_top) || [];
+    },
+
     // ─── Chatwoot: a conversa se resolve LÁ; aqui só o atalho ───
     chatwootConvUrl(chatwootId) {
       if (!this.chatwootBaseUrl || !this.chatwootAccountId || !chatwootId) return null;

@@ -23,4 +23,5 @@ export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendu
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)
 export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): CRUD + senha + revogar
 export * from './queries-notificacoes.js'; // sino do painel: entregas falhadas + vencidos + galpão pra repor
-export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando) + visão (mapa/radar/cards)
+export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando agora)
+export * from './queries-bot-visao.js'; // tela do Bot fatia 2: visão (cards/funil/mapa/boca/radar)
