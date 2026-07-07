@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
+import { archiveWholesaleSupplier, cancelWholesalePurchase, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
+import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -58,6 +58,53 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale purchase failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // CANCELA uma compra (0127): confirmed → cancelled + trilha + galpão reverte
+  // pelo inverso ponderado. Espelho da rota de cancelar venda (0116).
+  fastify.post('/admin/api/wholesale/purchases/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = cancelWholesalePurchaseSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await cancelWholesalePurchase({
+        purchase_id: parsed.data.purchase_id,
+        reason: parsed.data.reason ?? null,
+        environment: parsed.data.environment,
+        cancelled_by: operatorLabel(request.headers),
+      });
+      return reply.status(200).send({ cancelled: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'purchase_not_found') {
+        return reply.status(404).send({ error: 'purchase_not_found' });
+      }
+      if (err instanceof Error && err.message === 'purchase_already_cancelled') {
+        return reply.status(409).send({ error: 'purchase_already_cancelled' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale purchase cancel failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ARQUIVA um fornecedor (soft delete): some do form/ranking; compras e dívida ficam.
+  fastify.post('/admin/api/wholesale/suppliers/archive', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = archiveWholesaleSupplierSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await archiveWholesaleSupplier(parsed.data.supplier_id, parsed.data.environment);
+      return reply.status(200).send({ archived: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'supplier_not_found') {
+        return reply.status(404).send({ error: 'supplier_not_found' });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale supplier archive failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

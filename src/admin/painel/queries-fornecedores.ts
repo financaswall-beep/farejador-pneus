@@ -220,20 +220,27 @@ export interface WholesalePurchaseRow {
   purchased_at: string;
   total_amount: string;
   items_count: number;
+  payment_status: string;
+  due_date: string | null;
+  status: string;
+  cancelled_at: string | null;
 }
 
-/** Histórico de compras (cabeçalhos), mais recente primeiro, com nome do fornecedor. */
+/** Últimas compras (vivas E canceladas — a trilha fica visível, espelho da lista de
+ *  vendas 0116), mais recente primeiro. É a lista de onde o dono confere o que
+ *  registrou e cancela um registro errado (0127). */
 export async function listWholesalePurchases(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
-  limit = 50,
+  limit = 15,
 ): Promise<WholesalePurchaseRow[]> {
   const r = await dbPool.query<WholesalePurchaseRow>(
     `SELECT p.id, s.name AS supplier_name, p.purchased_at, p.total_amount,
-            (SELECT count(*) FROM commerce.wholesale_purchase_items i WHERE i.purchase_id = p.id)::int AS items_count
+            (SELECT COALESCE(sum(i.quantity), 0) FROM commerce.wholesale_purchase_items i WHERE i.purchase_id = p.id)::int AS items_count,
+            p.payment_status, p.due_date, p.status, p.cancelled_at
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s ON s.id = p.supplier_id AND s.environment = p.environment
-      WHERE p.environment = $1 AND p.status = 'confirmed'
+      WHERE p.environment = $1
       ORDER BY p.purchased_at DESC
       LIMIT $2`,
     [environment, limit],

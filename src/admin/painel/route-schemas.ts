@@ -124,7 +124,8 @@ export const registerSupplierSchema = z.object({
 export const purchaseItemSchema = z.object({
   measure: z.string().min(1).max(60),
   brand: z.string().min(1).max(60).nullable().optional(),
-  quantity: z.number().int().positive().max(100000),
+  // 'quantidade_inteira' = código que o front traduz (o texto cru do zod vaza inglês).
+  quantity: z.number().int('quantidade_inteira').positive().max(100000),
   unit_cost: z.number().min(0).max(9999999.99),
 });
 export const registerPurchaseSchema = z
@@ -145,6 +146,20 @@ export const registerPurchaseSchema = z
   .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
     message: 'supplier_required',
   });
+
+// CANCELAR compra (0127): espelho do cancelamento da venda — sai sem apagar,
+// o galpão reverte pelo inverso ponderado. Motivo opcional (trilha).
+export const cancelWholesalePurchaseSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  purchase_id: z.string().uuid(),
+  reason: z.string().max(300).nullable().optional(),
+});
+
+// ARQUIVAR fornecedor (soft delete): some do form/ranking; compras e dívida ficam.
+export const archiveWholesaleSupplierSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  supplier_id: z.string().uuid(),
+});
 
 // FINANCEIRO do atacado (0115): quitar um fiado — venda (a receber) ou compra (a pagar).
 export const settleWholesaleFinanceSchema = z.object({

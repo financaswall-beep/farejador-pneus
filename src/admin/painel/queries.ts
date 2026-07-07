@@ -14,6 +14,7 @@ export * from './queries-parceiros.js'; // criar parceiro + candidaturas (aprova
 export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)
+export * from './queries-fornecedores-cancel.js'; // cancelar compra (0127) + arquivar fornecedor
 export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despesas da matriz (0120)
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)
 export * from './queries-comissoes.js'; // comissões como lançamento (0118): varredura, livro, quitar, termos

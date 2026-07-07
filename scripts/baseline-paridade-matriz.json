@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-07T01:16:31.930Z",
+  "geradoEm": "2026-07-07T02:41:42.498Z",
   "commitBase": "dd64a35",
-  "total": 345,
+  "total": 348,
   "propriedades": {
     "abrirNoChatwoot": "function",
     "abrirRota": "function",
@@ -92,6 +92,8 @@
     "comissaoWhatsLink": "function",
     "comissoes": "value:null",
     "compraAddItem": "function",
+    "compraCancel": "function",
+    "compraData": "function",
     "compraErrText": "function",
     "compraForm": "value:object",
     "compraFormTotal": "function",
@@ -136,6 +138,7 @@
     "financeiroVisao": "value:null",
     "formatCurrency": "function",
     "formatDateTime": "function",
+    "fornecedorArchive": "function",
     "fornecedorBreakdown": "value:array",
     "fornecedorBreakdownDate": "function",
     "fornecedorDependencia": "function",

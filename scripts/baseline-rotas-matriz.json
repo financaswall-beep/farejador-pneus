@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-07T00:38:49.602Z",
-  "total": 93,
+  "geradoEm": "2026-07-07T02:42:02.512Z",
+  "total": 95,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -87,12 +87,14 @@
     "POST /admin/api/rede/comissoes/settle AUTH(1)",
     "POST /admin/api/wholesale/finance/settle AUTH(1)",
     "POST /admin/api/wholesale/purchases AUTH(1)",
+    "POST /admin/api/wholesale/purchases/cancel AUTH(1)",
     "POST /admin/api/wholesale/sales AUTH(1)",
     "POST /admin/api/wholesale/sales/cancel AUTH(1)",
     "POST /admin/api/wholesale/stock AUTH(1)",
     "POST /admin/api/wholesale/stock/entry AUTH(1)",
     "POST /admin/api/wholesale/stock/remove AUTH(1)",
     "POST /admin/api/wholesale/suppliers AUTH(1)",
+    "POST /admin/api/wholesale/suppliers/archive AUTH(1)",
     "POST /api/seja-parceiro PUBLICA",
     "PUT /admin/api/partners/:partnerUnitId/delivery-radius AUTH(1)"
   ]

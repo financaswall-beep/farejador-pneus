@@ -61,6 +61,10 @@ window.PAINEL_MODULES.compras = function () {
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       if (f.supplierKey === 'new') {
         if (!f.newName.trim()) { this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' }; return; }
+        // Auditoria 07-06: nome repetido cria OUTRA ficha e polui o ranking — perguntar antes.
+        const nomeNovo = f.newName.trim().toLowerCase();
+        if (this.fornecedores.some((s) => s.name.trim().toLowerCase() === nomeNovo)
+            && !window.confirm(`Já existe um fornecedor chamado "${f.newName.trim()}".\n\nCriar OUTRO com o mesmo nome? Se é o mesmo, cancela e escolhe ele na lista.`)) return;
         body.new_supplier = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
       } else if (f.supplierKey) {
         body.supplier_id = f.supplierKey;
@@ -76,6 +80,21 @@ window.PAINEL_MODULES.compras = function () {
           unit_cost: Number(it.unit_cost) || 0,
         }));
       if (items.length === 0) { this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
+      // Auditoria 07-06: linha PREENCHIDA mas inválida (sem medida / sem quantidade) era
+      // descartada em silêncio — a tela mostrava um total e registrava outro. Linha 100%
+      // vazia (sobrou do "+ Adicionar pneu") segue ignorada sem pergunta.
+      const descartadas = f.items.filter((it) => {
+        const valida = it.measure && it.measure.trim() && Number(it.quantity) > 0;
+        if (valida) return false;
+        return (it.measure && it.measure.trim()) || (it.brand && it.brand.trim())
+          || (it.unit_cost !== '' && it.unit_cost != null && Number(it.unit_cost) > 0)
+          || Number(it.quantity) !== 1;
+      });
+      if (descartadas.length > 0
+          && !window.confirm(`${descartadas.length} linha(s) sem medida (ou sem quantidade) vão ficar DE FORA da compra.\n\nRegistrar mesmo assim?`)) return;
+      // Auditoria 07-06: custo em branco virava R$ 0 calado e DERRUBAVA o custo médio.
+      if (items.some((it) => it.unit_cost === 0)
+          && !window.confirm('Tem pneu com custo R$ 0 — entra de graça e DERRUBA o custo médio do galpão.\n\nÉ isso mesmo?')) return;
       body.items = items;
       // FINANCEIRO (0115): compra fiada só com o financeiro ligado (flag).
       if (this.atacadoFinance && f.payment_status === 'pending') {
@@ -103,8 +122,41 @@ window.PAINEL_MODULES.compras = function () {
         supplier_not_found: 'Fornecedor não encontrado.',
         items_required: 'Adicione ao menos um pneu.',
         measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
+        quantidade_inteira: 'Quantidade tem que ser número inteiro (sem vírgula).',
       };
       return map[code] || `Não consegui registrar (${code}).`;
+    },
+
+    // ── COMPRAS — ÚLTIMAS COMPRAS + CANCELAR (0127): registro errado sai sem apagar ──
+    compraData(c) {
+      if (!c.purchased_at) return '—';
+      const d = new Date(c.purchased_at);
+      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
+    },
+    async compraCancel(c) {
+      const pago = c.payment_status === 'paid';
+      const aviso = pago
+        ? '\n\n⚠️ Essa compra consta como PAGA — se o dinheiro já saiu, o acerto com o fornecedor é por fora.'
+        : '\n\nOs pneus saem do galpão e o custo médio recalcula; se estava a prazo, sai do a pagar.';
+      if (!window.confirm(`Cancelar a compra de ${c.supplier_name} (${this.formatCurrency(Number(c.total_amount))})?${aviso}`)) return;
+      const reason = window.prompt('Motivo (opcional):') || null;
+      try {
+        await this.apiPost('/admin/api/wholesale/purchases/cancel', { purchase_id: c.id, reason });
+        await this.loadAtacado();
+      } catch (err) {
+        const msg = err.message === 'purchase_already_cancelled' ? 'Essa compra já estava cancelada.' : `Não consegui cancelar (${err.message}).`;
+        window.alert(msg);
+      }
+    },
+    // ── FORNECEDOR — ARQUIVAR (soft): some da lista/ranking; compras e dívidas ficam ──
+    async fornecedorArchive(s) {
+      if (!window.confirm(`Arquivar o fornecedor ${s.name}?\n\nEle some da lista e do ranking. As compras antigas continuam no histórico e dívida pendente continua no Financeiro.`)) return;
+      try {
+        await this.apiPost('/admin/api/wholesale/suppliers/archive', { supplier_id: s.supplier_id });
+        await this.loadAtacado();
+      } catch (err) {
+        window.alert(`Não consegui arquivar (${err.message}).`);
+      }
     },
 
     // ── ATACADO — CANCELAR VENDA (0116): registro errado sai sem apagar ──

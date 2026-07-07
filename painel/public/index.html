@@ -19,7 +19,7 @@
 <script src="/admin/painel/app.varejo.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260706-sino1"></script>
-<script src="/admin/painel/app.compras.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.compras.js?v=20260707-compras1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
@@ -2017,6 +2017,51 @@
              :class="compraMsg && compraMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
              x-text="compraMsg ? compraMsg.text : ''"></div>
       </div>
+
+      <!-- Últimas compras (0127): confere o que registrou · cancela registro errado -->
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold">Últimas compras</h3>
+          <span class="text-xs text-gray-400">registrou errado? cancela aqui — os pneus saem do galpão e o custo médio recalcula</span>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+              <th class="px-5 py-3 font-medium">Data</th>
+              <th class="px-5 py-3 font-medium">Fornecedor</th>
+              <th class="px-5 py-3 font-medium text-center">Pneus</th>
+              <th class="px-5 py-3 font-medium text-right">Total</th>
+              <th class="px-5 py-3 font-medium">Pagamento</th>
+              <th class="px-5 py-3 font-medium text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="c in compras" :key="c.id">
+              <tr :class="c.status === 'cancelled' ? 'opacity-50' : ''">
+                <td class="px-5 py-3 text-gray-500" x-text="compraData(c)"></td>
+                <td class="px-5 py-3 font-medium text-gray-800" x-text="c.supplier_name"></td>
+                <td class="px-5 py-3 text-center text-gray-700" x-text="c.items_count"></td>
+                <td class="px-5 py-3 text-right font-bold text-gray-900" x-text="formatCurrency(Number(c.total_amount))"></td>
+                <td class="px-5 py-3">
+                  <span x-show="c.payment_status === 'pending'"
+                        class="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700"
+                        x-text="'a prazo' + (c.due_date ? ' · vence ' + financeDate(c.due_date) : '')"></span>
+                  <span x-show="c.payment_status === 'paid'" class="text-xs text-gray-400">pago</span>
+                </td>
+                <td class="px-5 py-3 text-right whitespace-nowrap">
+                  <span x-show="c.status === 'cancelled'"
+                        class="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600">cancelada</span>
+                  <button x-show="c.status === 'confirmed'" @click="compraCancel(c)"
+                          class="text-xs px-2.5 py-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 font-medium">Cancelar</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="compras.length === 0">
+              <td colspan="6" class="px-5 py-6 text-center text-sm text-gray-400">Nenhuma compra registrada ainda.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       </div><!-- /comprar -->
 
       <!-- ─── FORNECEDORES: a lista + os insights ─── -->
@@ -2049,6 +2094,7 @@
               <th class="px-5 py-3 font-medium text-right">Total gasto</th>
               <th class="px-5 py-3 font-medium">Última compra</th>
               <th class="px-5 py-3 font-medium">Situação</th>
+              <th class="px-5 py-3 font-medium text-right"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -2062,10 +2108,14 @@
                   <span class="inline-flex items-center text-xs px-2 py-1 rounded-full" :class="fornecedorStatus(s).cls"
                         x-text="fornecedorStatus(s).label"></span>
                 </td>
+                <td class="px-5 py-3 text-right">
+                  <button @click="fornecedorArchive(s)" title="Arquivar (some da lista; compras e dívidas ficam)"
+                          class="text-xs px-2.5 py-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 font-medium">arquivar</button>
+                </td>
               </tr>
             </template>
             <tr x-show="fornecedorRanking.length === 0">
-              <td colspan="5" class="px-5 py-10 text-center text-sm text-gray-500">
+              <td colspan="6" class="px-5 py-10 text-center text-sm text-gray-500">
                 Nenhum fornecedor ainda. Registre uma compra acima.
               </td>
             </tr>
