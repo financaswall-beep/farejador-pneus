@@ -43,6 +43,8 @@ export interface MatrizDeliveryRow {
 
 export interface MatrizTripRow {
   id: string;
+  /** Número amigável (0129): ROTA-0001, ... — o que o dono fala/audita. */
+  trip_number: string;
   courier_name: string;
   status: 'open' | 'closed';
   km_start: string | null;
@@ -78,6 +80,11 @@ export interface MatrizTripRow {
 
 export interface MatrizLogistica {
   abertas: MatrizDeliveryRow[];
+  /** O LIMBO do portal (0125): o entregador REPORTOU não-entregue (failed) e o pedido
+   *  ainda NÃO foi cancelado — o dono decide: recolocar na fila ou confirmar (cancela
+   *  e o galpão volta). Bloco próprio da tela (auditoria 07-08 — antes se perdia nas
+   *  finalizadas sem motivo nem botão). */
+  reportadas: MatrizDeliveryRow[];
   finalizadas: MatrizDeliveryRow[];
   rotas_abertas: MatrizTripRow[];
   rotas_recentes: MatrizTripRow[];
@@ -105,7 +112,7 @@ export async function getMatrizLogistica(
      WHERE o.environment = $1 AND ${MAIN_DELIVERY_GUARD}`;
 
   const tripSelect = `
-    SELECT t.id, t.courier_name, t.status, t.km_start::text, t.km_end::text,
+    SELECT t.id, t.trip_number, t.courier_name, t.status, t.km_start::text, t.km_end::text,
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
            (SELECT COUNT(*)::int FROM commerce.orders o
              WHERE o.trip_id = t.id AND o.environment = t.environment) AS deliveries_count,
@@ -142,12 +149,16 @@ export async function getMatrizLogistica(
       FROM commerce.matriz_delivery_trips t
      WHERE t.environment = $1 AND t.deleted_at IS NULL`;
 
-  const [abertas, finalizadas, rotasAbertas, rotasRecentes] = await Promise.all([
+  const [abertas, reportadas, finalizadas, rotasAbertas, rotasRecentes] = await Promise.all([
     dbPool.query<MatrizDeliveryRow>(
       `${deliverySelect} AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
        ORDER BY scheduled_date ASC, o.created_at ASC`, [environment]),
+    // o limbo do portal (failed SEM cancelar) — mesma régua do sino (queries-notificacoes)
     dbPool.query<MatrizDeliveryRow>(
-      `${deliverySelect} AND (o.delivery_status IN ('delivered','failed') OR o.status = 'cancelled')
+      `${deliverySelect} AND o.status <> 'cancelled' AND o.delivery_status = 'failed'
+       ORDER BY o.updated_at DESC`, [environment]),
+    dbPool.query<MatrizDeliveryRow>(
+      `${deliverySelect} AND (o.delivery_status = 'delivered' OR o.status = 'cancelled')
        ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC LIMIT 30`, [environment]),
     dbPool.query<MatrizTripRow>(
       `${tripSelect} AND t.status = 'open' ORDER BY t.started_at DESC`, [environment]),
@@ -156,6 +167,7 @@ export async function getMatrizLogistica(
   ]);
   return {
     abertas: abertas.rows,
+    reportadas: reportadas.rows,
     finalizadas: finalizadas.rows,
     rotas_abertas: rotasAbertas.rows,
     rotas_recentes: rotasRecentes.rows,

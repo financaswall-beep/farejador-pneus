@@ -128,6 +128,42 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
         this.logisticaSaving = false;
       }
     },
+    // ── REPORTADAS pelo entregador (0125 → auditoria 07-08): o dono DECIDE ──
+    // O portal marca failed SEM cancelar; aqui a decisão vira botão:
+    // RECOLOCAR (volta pra fila, solta da rota, limpa o motivo) ou
+    // CONFIRMAR (cancela o pedido e o galpão volta — caminho atômico fdd9148).
+    async logisticaRecolocar(d) {
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/entregas/recolocar', { order_id: d.order_id });
+        this.logisticaMsg = { ok: true, text: 'Entrega recolocada na fila — sai na próxima rota.' };
+        await this.loadLogistica();
+        void this.loadSino(); // saiu do limbo → o aviso do sino some
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui recolocar (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+    async logisticaConfirmarFalha(d) {
+      const who = d.customer_name || 'este pedido';
+      if (!window.confirm(`Confirmar o NÃO-ENTREGUE de ${who}?\n\nO pedido é cancelado e o pneu VOLTA pro galpão.`)) return;
+      this.logisticaSaving = true;
+      try {
+        await this.apiPost('/admin/api/logistica/entregas/falhou', {
+          order_id: d.order_id,
+          reason: d.delivery_failure_reason || 'não entregue — confirmado pelo dono',
+        });
+        this.logisticaMsg = { ok: true, text: 'Não-entregue confirmado — pedido cancelado e galpão recomposto.' };
+        await this.loadLogistica();
+        void this.loadSino();
+      } catch (err) {
+        this.logisticaMsg = { ok: false, text: `Não consegui confirmar (${err.message}).` };
+      } finally {
+        this.logisticaSaving = false;
+      }
+    },
+
     // ── COLABORADORES da matriz (0124 — fatia 1: cadastro; a pessoa ainda não loga) ──
   };
 };

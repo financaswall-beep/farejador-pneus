@@ -92,7 +92,7 @@
     <div x-show="rotaAberta" class="px-5 mt-5">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-lg font-bold">Minha rota</h2>
+          <h2 class="text-lg font-bold" x-text="'Minha rota' + (rotaAberta && rotaAberta.trip_number ? ' — ' + rotaAberta.trip_number : '')"></h2>
           <p class="text-sm text-slate-500" x-text="'Saída às ' + (rotaAberta ? horaSaida(rotaAberta.started_at) : '') + (rotaAberta && rotaAberta.km_start ? ' · km ' + rotaAberta.km_start : '')"></p>
         </div>
         <span class="text-xs bg-slate-200 text-slate-600 rounded-full px-3 py-1" x-text="(rotaAberta ? rotaAberta.entregas.length : 0) + ' entregas'"></span>

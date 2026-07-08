@@ -169,8 +169,8 @@ export async function closeMatrizTrip(
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const trip = await client.query<{ id: string; courier_name: string; km_start: string | null; started_at: string }>(
-      `SELECT id, courier_name, km_start::text, started_at
+    const trip = await client.query<{ id: string; trip_number: string; courier_name: string; km_start: string | null; started_at: string }>(
+      `SELECT id, trip_number, courier_name, km_start::text, started_at
          FROM commerce.matriz_delivery_trips
         WHERE id = $2 AND environment = $1 AND status = 'open' AND deleted_at IS NULL
         FOR UPDATE`,
@@ -196,7 +196,7 @@ export async function closeMatrizTrip(
            VALUES ($1, 'combustivel', $2, $3, 'paid', now(), 'logistica-fechamento')
            RETURNING id`,
           [environment,
-           `Rota ${new Date(t.started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${t.courier_name}${kmLabel}`,
+           `${t.trip_number} · ${new Date(t.started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${t.courier_name}${kmLabel}`,
            fuel],
         );
         fuelExpenseId = exp.rows[0]!.id;

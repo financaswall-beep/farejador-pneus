@@ -21,7 +21,7 @@
 <script src="/admin/painel/app.atacado.js?v=20260706-sino1"></script>
 <script src="/admin/painel/app.compras.js?v=20260707-compras1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.logistica.acoes.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.sino.js?v=20260706-sino1"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
@@ -2410,7 +2410,7 @@
                 <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
                   <i data-lucide="truck" class="w-4 h-4 text-brand-600"></i>
                 </div>
-                <h3 class="text-base font-semibold">Rota na rua — <span x-text="t.courier_name"></span></h3>
+                <h3 class="text-base font-semibold">Rota na rua — <span class="text-brand-600" x-text="t.trip_number"></span> · <span x-text="t.courier_name"></span></h3>
               </div>
               <span class="text-xs text-gray-400" x-text="'saiu ' + new Date(t.started_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })"></span>
             </div>
@@ -2507,6 +2507,50 @@
           <p x-show="entregasSemRota().length && !Object.values(rotaForm.selecionadas).some(Boolean)" class="text-xs text-gray-400 mt-2">Marque ao menos 1 entrega — a rota não abre vazia.</p>
         </div>
 
+        <!-- REPORTADAS PELO ENTREGADOR (0125 → 07-08): o limbo virou decisão do dono -->
+        <div x-show="(logistica?.reportadas || []).length" x-cloak class="bg-white border border-amber-300 rounded-xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+              <h3 class="text-base font-semibold text-amber-900">Reportadas pelo entregador — você decide</h3>
+            </div>
+            <span class="text-xs text-amber-700" x-text="(logistica?.reportadas || []).length + ' pedido(s)'"></span>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <template x-for="d in (logistica?.reportadas || [])" :key="d.order_id">
+              <div class="p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-medium" x-text="d.customer_name || 'Cliente'"></span>
+                      <span class="text-xs text-gray-400" x-text="d.customer_phone || ''"></span>
+                      <span x-show="d.trip_id" class="text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-600"
+                            x-text="rotaDoPedido(d) ? (rotaDoPedido(d).trip_number + ' · ' + rotaDoPedido(d).courier_name) : 'em rota'"></span>
+                    </div>
+                    <div class="text-sm text-gray-600 mt-0.5" x-text="d.delivery_address || 'Sem endereço'"></div>
+                    <div class="text-xs text-gray-500 mt-0.5">
+                      <span x-text="logisticaItens(d)"></span> ·
+                      <span class="font-semibold text-gray-700" x-text="formatCurrency(Number(d.total_amount))"></span>
+                    </div>
+                    <div class="mt-1.5 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                      <span class="font-medium">Motivo do entregador:</span>
+                      <span x-text="d.delivery_failure_reason || '(sem motivo escrito)'"></span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <button @click="logisticaRecolocar(d)" :disabled="logisticaSaving"
+                            class="text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium disabled:opacity-50"
+                            title="Volta pra fila — sai na próxima rota">Recolocar na fila</button>
+                    <button @click="logisticaConfirmarFalha(d)" :disabled="logisticaSaving"
+                            class="text-xs px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium disabled:opacity-50"
+                            title="Cancela o pedido; o pneu volta pro galpão">Confirmar não-entregue</button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- ENTREGAS EM ABERTO -->
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -2525,7 +2569,7 @@
                             :class="d.delivery_status === 'dispatched' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'"
                             x-text="logisticaStatusLabel(d.delivery_status)"></span>
                       <span x-show="d.trip_id" class="text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-600"
-                            x-text="'rota: ' + (rotaDoPedido(d)?.courier_name || 'aberta')"></span>
+                            x-text="rotaDoPedido(d) ? (rotaDoPedido(d).trip_number + ' · ' + rotaDoPedido(d).courier_name) : 'em rota'"></span>
                       <span class="text-xs px-2 py-0.5 rounded-full" :class="dataEntregaClass(d)" x-text="dataEntregaLabel(d)"></span>
                     </div>
                     <div class="text-sm text-gray-600 mt-0.5" x-text="d.delivery_address || 'Sem endereço'"></div>
@@ -2625,11 +2669,29 @@
                 <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
                   <tr>
                     <td class="px-4 py-2.5">
-                      <div class="font-medium text-gray-800" x-text="t.courier_name"></div>
+                      <div class="font-medium text-gray-800"><span class="text-brand-600" x-text="t.trip_number"></span> · <span x-text="t.courier_name"></span></div>
                       <div class="text-xs text-gray-400">
                         <span x-text="new Date(t.started_at).toLocaleDateString('pt-BR')"></span>
                         <span x-text="' · ' + t.deliveries_count + ' entrega(s)'"></span>
                         <span x-show="(t.receipts || []).length" x-text="' · ' + t.receipts.length + ' comprovante(s)'"></span>
+                      </div>
+                      <!-- comprovantes da rota FECHADA (auditoria 07-08): status + "ler de novo" —
+                           antes um pending em rota fechada ficava preso (botão só existia na aberta) -->
+                      <div x-show="(t.receipts || []).length" class="mt-1.5 space-y-1">
+                        <template x-for="r in (t.receipts || [])" :key="r.id">
+                          <div class="flex items-center gap-2 text-[11px]">
+                            <a x-show="receiptUrls[r.id]" :href="receiptUrls[r.id]" target="_blank" class="flex-shrink-0">
+                              <img :src="receiptUrls[r.id]" class="w-7 h-7 object-cover rounded border border-gray-200" alt="comprovante">
+                            </a>
+                            <span x-show="r.ai_status === 'parsed'" class="text-emerald-700">✓ lido — despesa lançada</span>
+                            <span x-show="r.ai_status === 'unreadable'" class="text-amber-700">IA sem certeza — lança na mão</span>
+                            <span x-show="r.ai_status === 'pending'" class="text-gray-500">aguardando leitura</span>
+                            <span x-show="r.ai_status === 'skipped'" class="text-gray-400">guardado (IA desligada)</span>
+                            <button x-show="logistica?.receipt_ai && (r.ai_status === 'pending' || r.ai_status === 'unreadable')"
+                                    @click="lerComprovante(r)" :disabled="logisticaSaving"
+                                    class="px-2 py-0.5 rounded bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50">ler de novo</button>
+                          </div>
+                        </template>
                       </div>
                       <!-- A rota se pagou? frete + lucro dos pneus (custo congelado) − gastos da rota -->
                       <template x-if="rotaResumo(t)">

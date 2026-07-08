@@ -150,6 +150,7 @@ export interface EntregadorDeliveryCard {
 export interface EntregadorRota {
   rota_aberta: {
     trip_id: string;
+    trip_number: string; // 0129: ROTA-XXXX — o entregador fala o mesmo número que o dono audita
     km_start: string | null;
     started_at: string;
     entregas: EntregadorDeliveryCard[];
@@ -179,8 +180,8 @@ export async function getEntregadorRota(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<EntregadorRota> {
-  const trip = await dbPool.query<{ id: string; km_start: string | null; started_at: string }>(
-    `SELECT id, km_start::text, started_at
+  const trip = await dbPool.query<{ id: string; trip_number: string; km_start: string | null; started_at: string }>(
+    `SELECT id, trip_number, km_start::text, started_at
        FROM commerce.matriz_delivery_trips
       WHERE environment = $1 AND courier_collaborator_id = $2 AND status = 'open' AND deleted_at IS NULL
       ORDER BY started_at DESC LIMIT 1`,
@@ -205,7 +206,7 @@ export async function getEntregadorRota(
 
   return {
     rota_aberta: openTrip
-      ? { trip_id: openTrip.id, km_start: openTrip.km_start, started_at: openTrip.started_at, entregas: rotaEntregas.rows }
+      ? { trip_id: openTrip.id, trip_number: openTrip.trip_number, km_start: openTrip.km_start, started_at: openTrip.started_at, entregas: rotaEntregas.rows }
       : null,
     fila: fila.rows,
   };

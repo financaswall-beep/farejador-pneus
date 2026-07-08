@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   const { env } = await import('../src/shared/config/env.js');
   const { applyMatrizGalpaoDecrement } = await import('../src/atendente-v2/wholesale-stock-read.js');
   const {
-    getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery,
+    getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery, requeueMatrizDelivery,
     openMatrizTrip, attachOrderToMatrizTrip, rescheduleMatrizDelivery, closeMatrizTrip, addMatrizTripReceipt,
     getMatrizTripReceiptImage, recordReceiptAiResult,
   } = await import('../src/admin/painel/queries.js');
@@ -389,7 +389,68 @@ async function main(): Promise<void> {
     catch (e) { barrouReschedDone = (e as Error).message === 'delivery_not_found'; }
     check('L24 remarcar entrega JÁ entregue barra (delivery_not_found)', barrouReschedDone);
 
-    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota + agendamento D+1)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    // ── L25-L27: REPORTADAS pelo entregador (0125 → auditoria 07-08) — o limbo
+    // "failed SEM cancelar" tem bloco próprio e o dono DECIDE: recolocar ou confirmar. ──
+    const oReport = await seedOrder({ unitId: mainUnitId, qty: 2 });
+    await applyMatrizGalpaoDecrement(client, ENV, [{ productId, quantity: 2 }], true, oReport);
+    const qtyAntesReport = await qtyOf();
+    // o portal reporta: failed + motivo, SEM cancelar (mesmo UPDATE do reportDeliveryFailed)
+    await client.query(
+      `UPDATE commerce.orders SET delivery_status='failed', delivery_failure_reason='portão fechado PROVA-LOG', updated_at=now()
+        WHERE id=$1 AND environment=$2`, [oReport, ENV]);
+    log = await getMatrizLogistica(ENV);
+    const rep = log.reportadas.find((d) => d.order_id === oReport);
+    check('L25 reportada entra no bloco próprio COM o motivo (fora de abertas E finalizadas)',
+      !!rep && rep.delivery_failure_reason === 'portão fechado PROVA-LOG'
+      && !log.abertas.some((d) => d.order_id === oReport)
+      && !log.finalizadas.some((d) => d.order_id === oReport));
+
+    // L26: o dono DISCORDA → recoloca na fila (pending, fora de rota, motivo limpo)
+    await requeueMatrizDelivery({ order_id: oReport, environment: ENV });
+    log = await getMatrizLogistica(ENV);
+    const req1 = (await client.query(`SELECT delivery_status, trip_id, delivery_failure_reason FROM commerce.orders WHERE id=$1`, [oReport])).rows[0] as { delivery_status: string; trip_id: string | null; delivery_failure_reason: string | null };
+    check('L26 recolocar: volta pending + solta da rota + limpa motivo + reaparece nas abertas',
+      req1.delivery_status === 'pending' && req1.trip_id === null && req1.delivery_failure_reason === null
+      && log.abertas.some((d) => d.order_id === oReport)
+      && !log.reportadas.some((d) => d.order_id === oReport));
+
+    let barrouReq = false;
+    try { await requeueMatrizDelivery({ order_id: oReport, environment: ENV }); }
+    catch (e) { barrouReq = (e as Error).message === 'delivery_not_found'; }
+    check('L26b recolocar de novo (já pending) barra (delivery_not_found)', barrouReq);
+
+    // L27: reporta de novo e o dono CONFIRMA → cancela e o galpão VOLTA (+2)
+    await client.query(
+      `UPDATE commerce.orders SET delivery_status='failed', delivery_failure_reason='agora foi mesmo PROVA-LOG', updated_at=now()
+        WHERE id=$1 AND environment=$2`, [oReport, ENV]);
+    await failMatrizDelivery({ order_id: oReport, reason: 'agora foi mesmo PROVA-LOG', actor_label: 'prova-log', environment: ENV });
+    log = await getMatrizLogistica(ENV);
+    const conf = (await client.query(`SELECT status FROM commerce.orders WHERE id=$1`, [oReport])).rows[0] as { status: string };
+    check('L27 confirmar: cancela + galpão volta (+2) + sai do bloco + entra nas finalizadas',
+      conf.status === 'cancelled' && (await qtyOf()) === qtyAntesReport + 2
+      && !log.reportadas.some((d) => d.order_id === oReport)
+      && log.finalizadas.some((d) => d.order_id === oReport),
+      `qty=${await qtyOf()} (antes=${qtyAntesReport})`);
+
+    // ── L28: NÚMERO DA ROTA (0129) — formato ROTA-XXXX, único, e a despesa do
+    // fechamento CARREGA o número (auditar despesa↔rota no Financeiro). ──
+    const numeradas = [...log.rotas_abertas, ...log.rotas_recentes];
+    check('L28a toda rota tem trip_number ROTA-XXXX e sem repetição',
+      numeradas.length > 0 && numeradas.every((t) => /^ROTA-\d{4,}$/.test(t.trip_number))
+      && new Set(numeradas.map((t) => t.trip_number)).size === numeradas.length,
+      numeradas.map((t) => t.trip_number).join(' '));
+
+    const fechPend = await closeMatrizTrip({ trip_id: trip6.trip_id, km_end: 60, fuel_spent: 22, environment: ENV });
+    const t6num = (await client.query<{ trip_number: string }>(
+      `SELECT trip_number FROM commerce.matriz_delivery_trips WHERE id=$1`, [trip6.trip_id])).rows[0]!.trip_number;
+    const expDesc = fechPend.fuel_expense_id
+      ? (await client.query<{ description: string }>(
+          `SELECT description FROM commerce.matriz_expenses WHERE id=$1`, [fechPend.fuel_expense_id])).rows[0]!.description
+      : '';
+    check('L28b despesa do fechamento carrega o número da rota (despesa↔rota auditável)',
+      !!fechPend.fuel_expense_id && expDesc.includes(t6num), expDesc);
+
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota + agendamento D+1 + reportadas/decisão do dono + número da rota)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
     // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);
@@ -423,6 +484,7 @@ async function main(): Promise<void> {
       await client.query(`DELETE FROM commerce.orders WHERE id=$1`, [id]);
     }
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(`DELETE FROM commerce.wholesale_stock_movements WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     if (productId) {
       await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND product_id=$2`, [ENV, productId]);
       await client.query(`DELETE FROM commerce.products WHERE id=$1`, [productId]);

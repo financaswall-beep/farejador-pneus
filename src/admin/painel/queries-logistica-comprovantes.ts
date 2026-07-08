@@ -124,8 +124,8 @@ export async function recordReceiptAiResult(
     // FOR UPDATE: serializa com closeMatrizTrip (que também trava a trip) —
     // e é aqui que a ordem "fechou lançando manual → leu o comprovante DEPOIS"
     // deixa de duplicar (achado P1 da banca 07-03).
-    const trip = await client.query<{ courier_name: string; started_at: string; fuel_expense_id: string | null }>(
-      `SELECT courier_name, started_at, fuel_expense_id
+    const trip = await client.query<{ trip_number: string; courier_name: string; started_at: string; fuel_expense_id: string | null }>(
+      `SELECT trip_number, courier_name, started_at, fuel_expense_id
          FROM commerce.matriz_delivery_trips WHERE id = $1
          FOR UPDATE`,
       [receipt.rows[0].trip_id],
@@ -143,7 +143,7 @@ export async function recordReceiptAiResult(
     }
 
     const rotaLabel = trip.rows[0]
-      ? `Rota ${new Date(trip.rows[0].started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${trip.rows[0].courier_name}`
+      ? `${trip.rows[0].trip_number} · ${new Date(trip.rows[0].started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${trip.rows[0].courier_name}`
       : 'Rota';
     const exp = await client.query<{ id: string }>(
       `INSERT INTO commerce.matriz_expenses
