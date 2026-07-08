@@ -42,6 +42,9 @@ Rede de **borracharias** na região metropolitana do Rio. Um **bot no WhatsApp**
 ## 5. Time de agentes (`.claude/agents/` — LOCAL, gitignored)
 `bot` e `parceiro` e `matriz` e `banco` e `seguranca` rodam em Opus (zona sensível); `coletor`/`escriba`/`executor`/`front` em Sonnet (tarefas mecânicas). Use o especialista do domínio. ⚠️ Essa pasta NÃO está no git — não viaja pra outra máquina (só pro mesmo PC).
 
+### 5.1 🔒 TRAVA — skills de design de terceiros (`ui-ux-pro-max` & cia) OFF neste projeto
+As 7 skills de UI/UX instaladas GLOBAL na máquina do Wallace (`~/.claude/skills/`: `ui-ux-pro-max`, `ui-styling`, `design`, `design-system`, `brand`, `slides`, `banner-design`) são **PROIBIDAS de uso automático no Farejador**. Elas falam React/shadcn/Tailwind; nossos painéis são **Alpine.js + CSS puro** — o conselho de componente/config delas NÃO encaixa e pode introduzir padrão errado. Regra pra QUALQUER Claude/LLM que abrir este repo: **NÃO invocar nenhuma dessas skills a menos que o Wallace peça explicitamente** (ex.: "usa a skill de design nessa aba"). Sem pedido dele = trabalhar do jeito da casa (o stack do painel, §3). São ferramenta pessoal dele, não do projeto — o repo não depende delas e não as versiona.
+
 ## 6. O motor de roteamento (o coração)
 `src/atendente-v2/fulfillment.ts` → `decideStoreForItemsGeo`:
 1. **Candidatos** (`resolveUnitCandidates(municipio)`) ← hoje filtra por CIDADE (o "muro" — ver §8).
