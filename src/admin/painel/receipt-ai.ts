@@ -13,41 +13,83 @@
  *   - Erro de TRANSPORTE (rede/5xx/timeout) NÃO vira 'unreadable': estoura
  *     pra rota deixar o comprovante 'pending' com botão "ler de novo".
  *
+ * 0130: o vocabulário de categoria deixou de ser fixo — a IA enxerga as
+ * modalidades ATIVAS do dono (pedágio, alimentação…) e classifica nelas em vez
+ * de jogar tudo em "outros". A busca é FAIL-OPEN: banco falhou → 6 de fábrica.
+ *
  * Mesmo padrão do agent.ts: fetch cru no chat/completions, sem SDK.
  */
 
 import { env } from '../../shared/config/env.js';
-import { MATRIZ_EXPENSE_CATEGORIES, type MatrizExpenseCategory } from './queries.js';
+import { MATRIZ_EXPENSE_CATEGORIES, type MatrizExpenseCategory } from './queries-fiado-despesas.js';
+import { listActiveExpenseCategorySlugs } from './queries-despesas-categorias.js';
 
 export type ReceiptReading =
   | { kind: 'parsed'; category: MatrizExpenseCategory; amount: number; summary: string }
   | { kind: 'unreadable'; summary: string };
 
+export interface ReceiptCategoryOption {
+  id: string;    // slug ('pedagio')
+  label: string; // rótulo da tela ('Pedágio') — ajuda a IA a mapear o comprovante
+}
+
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const MIN_CONFIDENCE = 0.7;
 const MAX_PLAUSIBLE_AMOUNT = 10_000;
 
-const SYSTEM_PROMPT = [
-  'Você lê COMPROVANTES brasileiros (cupom fiscal, recibo de posto de gasolina, nota de oficina, comprovante de pagamento).',
-  'Responda SÓ com um JSON, sem texto em volta:',
-  '{"ok":true,"category":"combustivel|manutencao|frete|outros","amount":123.45,"merchant":"nome do estabelecimento","date":"YYYY-MM-DD ou null","confidence":0.0-1.0}',
-  'Regras:',
-  '- amount = valor TOTAL pago, em reais, com PONTO decimal (ex.: 187.30). É o número que importa — confira duas vezes.',
-  '- category: posto/combustível/gasolina/etanol/diesel/GNV → "combustivel"; oficina/peça/pneu/mecânica do VEÍCULO → "manutencao"; frete/carreto pago a terceiro → "frete"; qualquer outra coisa (pedágio, estacionamento, lanche) → "outros".',
-  '- confidence: sua certeza de que o amount está certo.',
-  '- Se a imagem não for um comprovante, ou o valor total não estiver legível, devolva {"ok":false,"reason":"explique em 1 frase o que faltou"}.',
-  '- NUNCA invente ou estime valor. Ilegível = ok:false.',
-].join('\n');
+const FALLBACK_CATEGORIES: ReceiptCategoryOption[] =
+  MATRIZ_EXPENSE_CATEGORIES.map((id) => ({ id, label: id }));
+
+/** Monta o prompt com o vocabulário VIVO de modalidades (puro — a prova testa sem rede). */
+export function buildReceiptSystemPrompt(categories: ReceiptCategoryOption[]): string {
+  const ids = categories.map((c) => c.id);
+  const extras = categories.filter(
+    (c) => !(MATRIZ_EXPENSE_CATEGORIES as readonly string[]).includes(c.id),
+  );
+  const extraLine = extras.length
+    ? `- Modalidades do dono (use quando o comprovante for disso): ${extras.map((c) => `"${c.id}" = ${c.label}`).join('; ')}.`
+    : null;
+  return [
+    'Você lê COMPROVANTES brasileiros (cupom fiscal, recibo de posto de gasolina, nota de oficina, comprovante de pagamento).',
+    'Responda SÓ com um JSON, sem texto em volta:',
+    `{"ok":true,"category":"${ids.join('|')}","amount":123.45,"merchant":"nome do estabelecimento","date":"YYYY-MM-DD ou null","confidence":0.0-1.0}`,
+    'Regras:',
+    '- amount = valor TOTAL pago, em reais, com PONTO decimal (ex.: 187.30). É o número que importa — confira duas vezes.',
+    '- category: posto/combustível/gasolina/etanol/diesel/GNV → "combustivel"; oficina/peça/pneu/mecânica do VEÍCULO → "manutencao"; frete/carreto pago a terceiro → "frete".',
+    ...(extraLine ? [extraLine] : []),
+    '- Nada encaixou em nenhuma modalidade → "outros".',
+    '- confidence: sua certeza de que o amount está certo.',
+    '- Se a imagem não for um comprovante, ou o valor total não estiver legível, devolva {"ok":false,"reason":"explique em 1 frase o que faltou"}.',
+    '- NUNCA invente ou estime valor. Ilegível = ok:false.',
+  ].join('\n');
+}
+
+/** Categoria devolvida pela IA → slug VÁLIDO do vocabulário (fora dele = 'outros'). Pura. */
+export function resolveReceiptCategory(raw: unknown, allowedIds: string[]): string {
+  const c = String(raw);
+  return allowedIds.includes(c) ? c : 'outros';
+}
+
+/** Modalidades ativas do env — FAIL-OPEN: banco falhou → as 6 de fábrica (a leitura nunca trava por isso). */
+async function activeCategoriesFailOpen(): Promise<ReceiptCategoryOption[]> {
+  try {
+    const rows = await listActiveExpenseCategorySlugs();
+    return rows.length ? rows : FALLBACK_CATEGORIES;
+  } catch {
+    return FALLBACK_CATEGORIES;
+  }
+}
 
 /** Lê o comprovante. Joga erro em falha de transporte (fica 'pending', dá pra tentar de novo). */
 export async function readReceiptWithAI(bytes: Buffer, mime: string): Promise<ReceiptReading> {
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('openai_key_missing');
 
+  const categories = await activeCategoriesFailOpen();
   const body = JSON.stringify({
     model: env.OPENAI_MODEL,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildReceiptSystemPrompt(categories) },
       {
         role: 'user',
         content: [
@@ -101,9 +143,7 @@ export async function readReceiptWithAI(bytes: Buffer, mime: string): Promise<Re
     return { kind: 'unreadable', summary: 'IA leu mas sem certeza suficiente — confere e lança na mão' };
   }
 
-  const category: MatrizExpenseCategory = (MATRIZ_EXPENSE_CATEGORIES as readonly string[]).includes(String(parsed.category))
-    ? (String(parsed.category) as MatrizExpenseCategory)
-    : 'outros';
+  const category = resolveReceiptCategory(parsed.category, categories.map((c) => c.id));
   const merchant = typeof parsed.merchant === 'string' && parsed.merchant.trim() ? parsed.merchant.trim() : 'estabelecimento';
   const date = typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? ` · ${parsed.date}` : '';
 

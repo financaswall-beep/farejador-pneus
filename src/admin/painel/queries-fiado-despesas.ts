@@ -111,10 +111,13 @@ export async function settleWholesalePurchasePayment(
 // PROPÓSITO: o sweep do livro-razão (Fase B, 0121) lê despesa/venda/compra com a MESMA
 // régua. Dado SÓ da matriz (zero grant — provado na 0120). Soft delete = trilha.
 
+// As 6 de FÁBRICA (0120). Desde a 0130 a lista viva mora em
+// commerce.matriz_expense_categories (o dono cadastra "Pedágio", "Alimentação"…);
+// estas ficam como fallback fail-open da IA de comprovante e seed de referência.
 export const MATRIZ_EXPENSE_CATEGORIES = [
   'aluguel', 'funcionario', 'combustivel', 'frete', 'manutencao', 'outros',
 ] as const;
-export type MatrizExpenseCategory = (typeof MATRIZ_EXPENSE_CATEGORIES)[number];
+export type MatrizExpenseCategory = string; // 0130: categoria é slug validado por FK + guard de ativa
 
 export interface MatrizExpenseRow {
   id: string;
@@ -128,29 +131,66 @@ export interface MatrizExpenseRow {
   overdue: boolean;
 }
 
+export interface MatrizExpensesFiltro {
+  month?: string;    // 'YYYY-MM' — competência por occurred_at no fuso SP: a MESMA régua
+                     // da perna "Despesas" do consolidado (as duas telas nunca discordam)
+  category?: string; // slug da modalidade (0130)
+  limit?: number;
+}
+
 export interface MatrizExpensesResumo {
   a_pagar_total: string;
   a_pagar_count: number;
   a_pagar_vencidos: number;
   pago_mes_total: string; // pagas no mês corrente (fuso São Paulo, mesmo recorte do varejo 0117)
   entries: MatrizExpenseRow[];
+  // Soma/contagem do recorte pedido (mês × modalidade). null = chamada sem filtro (visão).
+  periodo: { total: string; count: number; truncado: boolean } | null;
 }
 
-/** Resumo das despesas da matriz: a pagar (vencidos primeiro) + pago no mês + últimas. */
+/** Resumo das despesas da matriz: a pagar (vencidos primeiro) + pago no mês + a lista.
+ *  Com filtro (mês/modalidade) a lista vira EXTRATO DO PERÍODO (cronológico, novas
+ *  primeiro) com soma própria — é o que mata a "lista infinita" da tela. */
 export async function getMatrizExpenses(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
-  limit = 50,
+  filtro?: MatrizExpensesFiltro,
 ): Promise<MatrizExpensesResumo> {
+  const where: string[] = ['environment = $1', 'deleted_at IS NULL'];
+  const params: unknown[] = [environment];
+  if (filtro?.month) {
+    params.push(filtro.month);
+    where.push(`date_trunc('month', occurred_at AT TIME ZONE 'America/Sao_Paulo') = to_date($${params.length}, 'YYYY-MM')`);
+  }
+  if (filtro?.category) {
+    params.push(filtro.category);
+    where.push(`category = $${params.length}`);
+  }
+  const temFiltro = Boolean(filtro?.month || filtro?.category);
+  const limit = filtro?.limit ?? (temFiltro ? 200 : 50);
+  // Extrato do período lê cronológico; sem filtro mantém a agenda (pendente primeiro).
+  const orderBy = temFiltro
+    ? `occurred_at DESC`
+    : `(payment_status = 'pending') DESC, (due_date IS NULL), due_date, occurred_at DESC`;
   const rows = await dbPool.query<MatrizExpenseRow>(
     `SELECT id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
             (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue
        FROM commerce.matriz_expenses
-      WHERE environment = $1 AND deleted_at IS NULL
-      ORDER BY (payment_status = 'pending') DESC, (due_date IS NULL), due_date, occurred_at DESC
-      LIMIT $2`,
-    [environment, limit],
+      WHERE ${where.join(' AND ')}
+      ORDER BY ${orderBy}
+      LIMIT $${params.length + 1}`,
+    [...params, limit],
   );
+  let periodo: MatrizExpensesResumo['periodo'] = null;
+  if (temFiltro) {
+    const p = await dbPool.query<{ total: string; count: number }>(
+      `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*)::int AS count
+         FROM commerce.matriz_expenses
+        WHERE ${where.join(' AND ')}`,
+      params,
+    );
+    periodo = { total: p.rows[0]!.total, count: p.rows[0]!.count, truncado: p.rows[0]!.count > rows.rows.length };
+  }
   const tot = await dbPool.query<{ a_pagar_total: string; a_pagar_count: number; a_pagar_vencidos: number; pago_mes_total: string }>(
     `SELECT COALESCE(SUM(amount) FILTER (WHERE payment_status = 'pending'), 0) AS a_pagar_total,
             COUNT(*) FILTER (WHERE payment_status = 'pending')::int AS a_pagar_count,
@@ -162,11 +202,11 @@ export async function getMatrizExpenses(
       WHERE environment = $1 AND deleted_at IS NULL`,
     [environment],
   );
-  return { ...tot.rows[0]!, entries: rows.rows };
+  return { ...tot.rows[0]!, entries: rows.rows, periodo };
 }
 
 export interface CreateMatrizExpenseInput {
-  category: MatrizExpenseCategory;
+  category: string; // slug de modalidade ATIVA (0130) — inexistente/arquivada → 'category_invalid'
   description?: string | null;
   amount: number;
   payment_status?: 'paid' | 'pending'; // omitido = 'paid' (pago na hora)
@@ -175,7 +215,10 @@ export interface CreateMatrizExpenseInput {
   environment?: 'prod' | 'test';
 }
 
-/** Lança uma despesa da matriz. À vista nasce paid+paid_at; a pagar nasce pending. */
+/** Lança uma despesa da matriz. À vista nasce paid+paid_at; a pagar nasce pending.
+ *  0130: só entra em modalidade ATIVA — arquivada/inexistente → 'category_invalid'
+ *  (o EXISTS barra arquivada; a FK barra corrida). Casts ::env_t explícitos porque
+ *  $1 aparece 2x contra env_t (lição 42P08 da casa). */
 export async function createMatrizExpense(
   input: CreateMatrizExpenseInput,
   dbPool: Pool = defaultPool,
@@ -185,14 +228,17 @@ export async function createMatrizExpense(
   const r = await dbPool.query<MatrizExpenseRow>(
     `INSERT INTO commerce.matriz_expenses
        (environment, category, description, amount, payment_status, due_date, paid_at, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'paid' THEN now() ELSE NULL END, $7)
+     SELECT $1::env_t, $2, $3, $4, $5, $6::date, CASE WHEN $5 = 'paid' THEN now() ELSE NULL END, $7
+      WHERE EXISTS (SELECT 1 FROM commerce.matriz_expense_categories c
+                     WHERE c.environment = $1::env_t AND c.slug = $2 AND c.archived_at IS NULL)
      RETURNING id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
                (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue`,
     [environment, input.category, input.description ?? null, input.amount,
      paymentStatus, paymentStatus === 'pending' ? (input.due_date ?? null) : null,
      input.created_by ?? null],
   );
-  return r.rows[0]!;
+  if (!r.rows[0]) throw new Error('category_invalid');
+  return r.rows[0];
 }
 
 /** QUITA uma despesa a pagar: pending → paid + paid_at (espelho do settle 0115).

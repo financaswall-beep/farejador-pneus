@@ -19,7 +19,7 @@
 <script src="/admin/painel/app.varejo.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260706-sino1"></script>
-<script src="/admin/painel/app.compras.js?v=20260707-compras1"></script>
+<script src="/admin/painel/app.compras.js?v=20260708-despesas1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
@@ -27,7 +27,7 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260706-bot2"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260708-frete1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260708-despesas1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260707-estoque1"></script>
+<script src="/admin/painel/app.js?v=20260708-despesas1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2933,10 +2933,11 @@
         <div class="border border-gray-200 rounded-xl p-4 mb-4">
           <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Lançar despesa</div>
           <div class="grid grid-cols-12 gap-2 items-center">
-            <select x-model="despesaForm.category" class="col-span-3 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white">
-              <template x-for="c in despesaCategorias" :key="c.id">
+            <select x-model="despesaForm.category" @change="despesaCatSelect()" class="col-span-3 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white">
+              <template x-for="c in despesaCatAtivas()" :key="c.id">
                 <option :value="c.id" x-text="c.label" :selected="despesaForm.category === c.id"></option>
               </template>
+              <option value="__nova__">➕ Nova modalidade…</option>
             </select>
             <input x-model="despesaForm.description" type="text" placeholder="Descrição (opcional)"
                    class="col-span-4 border border-gray-200 rounded-lg px-2 py-2 text-sm" />
@@ -2958,11 +2959,41 @@
                       x-text="despesaSaving ? 'Lançando...' : 'Lançar'"></button>
             </div>
           </div>
+          <!-- Modalidades do dono (0130): arquivar tira do form; as de fábrica ficam. -->
+          <div x-show="despesaCatCustom().length" class="flex items-center flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-100">
+            <span class="text-xs text-gray-400">Suas modalidades:</span>
+            <template x-for="c in despesaCatCustom()" :key="c.id">
+              <span class="inline-flex items-center gap-1 text-xs bg-gray-50 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5 text-gray-600">
+                <span x-text="c.label"></span>
+                <button @click="despesaArquivarCategoria(c)" title="Arquivar (some do formulário; despesas antigas ficam)"
+                        class="w-4 h-4 rounded-full hover:bg-rose-50 hover:text-rose-600 text-gray-400 leading-none">×</button>
+              </span>
+            </template>
+          </div>
         </div>
 
-        <!-- Últimas despesas -->
+        <!-- Despesas do período (0130): um mês por vez — a lista nunca vira rolo infinito. -->
         <div>
-          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Últimas despesas</div>
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide">Despesas do período</div>
+            <div class="flex items-center gap-2">
+              <input type="month" x-model="despesaFiltro.mes" @change="despesaFiltroMudou()"
+                     class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white" title="Mês (pela data do lançamento)" />
+              <select x-model="despesaFiltro.categoria" @change="despesaFiltroMudou()"
+                      class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                <option value="">Todas as modalidades</option>
+                <template x-for="c in despesaCatAtivas()" :key="c.id">
+                  <option :value="c.id" x-text="c.label"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div x-show="matrizDespesas?.periodo" class="text-xs text-gray-500 mb-2">
+            <span class="font-semibold text-gray-700" x-text="(matrizDespesas?.periodo?.count || 0) + ' despesa(s)'"></span>
+            · <span class="font-semibold text-gray-700" x-text="formatCurrency(Number(matrizDespesas?.periodo?.total || 0))"></span> no período
+            <span x-show="despesaFiltro.categoria" x-text="'em ' + despesaLabel(despesaFiltro.categoria)"></span>
+            <span x-show="matrizDespesas?.periodo?.truncado" class="text-amber-600 font-medium">· lista grande — mostrando as 200 primeiras</span>
+          </div>
           <template x-for="d in (matrizDespesas?.entries || [])" :key="d.id">
             <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
               <div>
@@ -2984,7 +3015,7 @@
               </div>
             </div>
           </template>
-          <div x-show="!(matrizDespesas?.entries || []).length" class="text-sm text-gray-400 py-2">Nenhuma despesa lançada ainda.</div>
+          <div x-show="!(matrizDespesas?.entries || []).length" class="text-sm text-gray-400 py-2">Nenhuma despesa nesse período — troca o mês ali em cima pra ver as antigas.</div>
         </div>
       </div>
     </div>

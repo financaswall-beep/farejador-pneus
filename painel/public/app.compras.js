@@ -218,9 +218,17 @@ window.PAINEL_MODULES.compras = function () {
       this.ensureCredentials();
       if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
       try {
-        const despesas = await this.apiGet('/admin/api/matriz/despesas');
+        // 0130: a lista é o EXTRATO do período — 1º load cai no mês corrente (fuso SP).
+        if (!this.despesaFiltro.mes) this.despesaFiltro.mes = this.despesaMesAtual();
+        const qs = new URLSearchParams();
+        if (this.despesaFiltro.mes) qs.set('mes', this.despesaFiltro.mes);
+        if (this.despesaFiltro.categoria) qs.set('categoria', this.despesaFiltro.categoria);
+        const despesas = await this.apiGet('/admin/api/matriz/despesas' + (qs.toString() ? '?' + qs.toString() : ''));
         // flag off → enabled:false → null (o bloco some; a tela mostra o aviso de dormente)
         this.matrizDespesas = despesas && despesas.enabled ? despesas : null;
+        if (despesas && despesas.enabled && Array.isArray(despesas.categorias) && despesas.categorias.length) {
+          this.despesaCategorias = despesas.categorias; // lista viva (0130): fábrica + as do dono
+        }
       } catch (err) {
         // Erro de REDE não apaga o bloco (mantém o dado anterior); só a flag off zera.
         console.warn('despesas load falhou:', err.message);

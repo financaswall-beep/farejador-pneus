@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-07T04:01:50.662Z",
-  "total": 97,
+  "geradoEm": "2026-07-08T16:11:05.077Z",
+  "total": 99,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -76,6 +76,8 @@
     "POST /admin/api/logistica/rotas/fechar AUTH(1)",
     "POST /admin/api/logistica/rotas/pendurar AUTH(1)",
     "POST /admin/api/matriz/despesas AUTH(1)",
+    "POST /admin/api/matriz/despesas/categorias AUTH(1)",
+    "POST /admin/api/matriz/despesas/categorias/arquivar AUTH(1)",
     "POST /admin/api/matriz/despesas/remove AUTH(1)",
     "POST /admin/api/matriz/despesas/settle AUTH(1)",
     "POST /admin/api/orders/:order_id/cancel AUTH(1)",

@@ -70,6 +70,55 @@ window.PAINEL_MODULES.financeiro = function () {
       const c = this.despesaCategorias.find((x) => x.id === catId);
       return c ? c.label : catId;
     },
+    // ── Modalidades vivas (0130): fábrica + as do dono; arquivada some do form ──
+    despesaMesAtual() {
+      // Mês corrente no fuso da operação (SP) — toISOString viraria o mês mais cedo à noite.
+      return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' })
+        .format(new Date()).slice(0, 7);
+    },
+    despesaCatAtivas() {
+      return this.despesaCategorias.filter((c) => !c.archived);
+    },
+    despesaCatCustom() {
+      return this.despesaCategorias.filter((c) => !c.archived && c.is_system === false);
+    },
+    despesaFiltroMudou() {
+      void this.loadDespesas();
+    },
+    // Opção "➕ Nova modalidade…" do select: cria e já deixa selecionada no form.
+    despesaCatSelect() {
+      if (this.despesaForm.category !== '__nova__') return;
+      this.despesaForm.category = 'outros';
+      void this.despesaNovaCategoria();
+    },
+    async despesaNovaCategoria() {
+      const nome = window.prompt('Nome da nova modalidade de despesa (ex.: Pedágio, Alimentação):');
+      if (!nome || !nome.trim()) return;
+      try {
+        const res = await this.apiPost('/admin/api/matriz/despesas/categorias', { label: nome.trim() });
+        await this.loadDespesas();
+        if (res && res.id) this.despesaForm.category = res.id;
+        this.despesaMsg = { ok: true, text: `Modalidade "${res.label}" pronta — já dá pra lançar nela.` };
+      } catch (err) {
+        const txt = String(err.message || '').includes('category_exists')
+          ? 'Já existe uma modalidade com esse nome.'
+          : String(err.message || '').includes('category_label_invalid')
+            ? 'Nome muito curto — usa pelo menos 2 letras.'
+            : `Não consegui criar (${err.message}).`;
+        this.despesaMsg = { ok: false, text: txt };
+      }
+    },
+    async despesaArquivarCategoria(c) {
+      if (!window.confirm(`Arquivar a modalidade "${c.label}"? As despesas antigas continuam nas contas — ela só sai do formulário (dá pra reativar criando com o mesmo nome).`)) return;
+      try {
+        await this.apiPost('/admin/api/matriz/despesas/categorias/arquivar', { slug: c.id });
+        if (this.despesaForm.category === c.id) this.despesaForm.category = 'outros';
+        if (this.despesaFiltro.categoria === c.id) this.despesaFiltro.categoria = '';
+        await this.loadDespesas();
+      } catch (err) {
+        window.alert(`Não consegui arquivar (${err.message}).`);
+      }
+    },
     async despesaSubmit() {
       const valor = Number(String(this.despesaForm.amount).replace(',', '.'));
       if (!valor || valor <= 0) {

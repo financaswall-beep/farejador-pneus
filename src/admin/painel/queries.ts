@@ -17,6 +17,7 @@ export * from './queries-galpao-movimentos.js'; // filme do galpão (0128): rót
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)
 export * from './queries-fornecedores-cancel.js'; // cancelar compra (0127) + arquivar fornecedor
 export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despesas da matriz (0120)
+export * from './queries-despesas-categorias.js'; // modalidades de despesa cadastráveis pelo dono (0130)
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)
 export * from './queries-comissoes.js'; // comissões como lançamento (0118): varredura, livro, quitar, termos
 export * from './queries-financeiro-visao.js'; // visão consolidada do Financeiro da matriz (só leitura)

@@ -3,7 +3,6 @@
 // de topo (transformação mecânica; o gerador prova a reversa). Porta: ./route.js.
 import path from 'node:path';
 import { z } from 'zod';
-import { MATRIZ_EXPENSE_CATEGORIES } from './queries.js';
 
 export const publicDir = path.join(process.cwd(), 'painel', 'public');
 
@@ -178,7 +177,9 @@ export const settleWholesaleFinanceSchema = z.object({
 // DESPESAS da matriz (0120): lançar (à vista × a pagar), quitar e remover (soft).
 export const createMatrizExpenseSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
-  category: z.enum(MATRIZ_EXPENSE_CATEGORIES),
+  // 0130: modalidade virou lista viva — o formato valida aqui; existir E estar
+  // ativa valida no banco (guard + FK). z.enum fixo barraria as do dono.
+  category: z.string().regex(/^[a-z0-9_]{2,40}$/),
   description: z.string().max(300).nullable().optional(),
   amount: z.number().positive(),
   payment_status: z.enum(['paid', 'pending']).optional(),
@@ -188,6 +189,20 @@ export const createMatrizExpenseSchema = z.object({
 export const matrizExpenseIdSchema = z.object({
   environment: z.enum(['prod', 'test']).optional(),
   id: z.string().uuid(),
+});
+
+// 0130: modalidades de despesa cadastráveis + filtro de período da lista.
+export const matrizExpenseCategoryCreateSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  label: z.string().trim().min(2).max(40),
+});
+export const matrizExpenseCategoryArchiveSchema = z.object({
+  environment: z.enum(['prod', 'test']).optional(),
+  slug: z.string().regex(/^[a-z0-9_]{2,40}$/),
+});
+export const matrizExpensesQuerySchema = z.object({
+  mes: z.string().regex(/^\d{4}-\d{2}$/).optional(),       // competência (occurred_at, fuso SP)
+  categoria: z.string().regex(/^[a-z0-9_]{2,40}$/).optional(),
 });
 
 // CANCELAR venda de atacado (0116): registro errado sai do ranking/resumo/fiado

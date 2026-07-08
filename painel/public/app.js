@@ -125,6 +125,9 @@ function painelApp() {
     despesaSaving: false,
     despesaMsg: null,
     despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },
+    // Recorte da lista (0130): mês (competência SP — preenchido no 1º load) × modalidade.
+    despesaFiltro: { mes: '', categoria: '' },
+    // Bootstrap das modalidades — o payload do GET (lista VIVA da 0130, com as do dono) sobrescreve.
     despesaCategorias: [
       { id: 'aluguel', label: 'Aluguel/galpão' },
       { id: 'funcionario', label: 'Funcionário' },
