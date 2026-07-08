@@ -38,7 +38,7 @@ export interface FinanceiroPayableItem {
 export interface FinanceiroVisao {
   fontes: { fiado: boolean; comissao: boolean; despesas: boolean };
   mes: {
-    faturamento: string;      // 3 pernas somadas (recorte mês São Paulo, régua 0117)
+    faturamento: string;      // pernas somadas + frete de entrega (recorte mês São Paulo, régua 0117)
     custo: string;            // custo do pneu vendido (atacado + varejo congelado)
     despesas: string | null;  // ocorridas no mês (competência); null = flag off
     lucro: string;            // faturamento − custo − despesas(0 se off)
@@ -48,6 +48,10 @@ export interface FinanceiroVisao {
       atacado: { faturamento: string; lucro: string };
       varejo: { faturamento: string; lucro: string };
       comissao: { realizado: string } | null;
+      // Frete de ENTREGA da main (auditoria 07-08): a gasolina da rota já descontava
+      // nas despesas (0120) mas a receita do frete não somava — o lucro mentia pra
+      // baixo. Régua da Logística: GREATEST(total − itens, 0); janela do varejo.
+      frete: { recebido: string };
     };
     despesas_categoria: Array<{ category: string; total: string }> | null;
   };
@@ -69,7 +73,7 @@ export async function getMatrizFinanceiroVisao(
   dbPool: Pool = defaultPool,
 ): Promise<FinanceiroVisao> {
   const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
-  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d] =
+  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes] =
     await Promise.all([
       getWholesaleResumo(environment, dbPool, 'mes'),
       getVarejoResumo('mes', environment, dbPool),
@@ -136,14 +140,32 @@ export async function getMatrizFinanceiroVisao(
            AS custo`,
         [environment],
       ).then((r) => r.rows[0]!.custo),
+      // FRETE DE ENTREGA da main no mês (auditoria 07-08): total − itens por pedido
+      // (o bot embute o frete no total; GREATEST clampa walk-in/desconto em 0 — régua
+      // idêntica à da Logística), janela e cancelado na MESMA régua da perna do varejo.
+      dbPool.query<{ frete: string }>(
+        `SELECT COALESCE(SUM(GREATEST(o.total_amount - itens.s, 0)), 0) AS frete
+           FROM commerce.orders o
+           JOIN core.units u ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
+           JOIN LATERAL (
+             SELECT COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount), 0) AS s
+               FROM commerce.order_items oi
+              WHERE oi.order_id = o.id AND oi.environment = o.environment) itens ON true
+          WHERE o.environment = $1 AND o.status <> 'cancelled' AND o.fulfillment_mode = 'delivery'
+            AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+        [environment],
+      ).then((r) => r.rows[0]!.frete),
     ]);
 
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
+  // Frete entra CHEIO no lucro (não tem custo de pneu; o custo dele — gasolina da
+  // rota — já desconta na perna das despesas).
   const comissaoRealizada = comissaoMes ? Number(comissaoMes) : 0;
-  const faturamento = Number(atacado.faturamento) + Number(varejo.faturamento) + comissaoRealizada;
+  const freteRecebido = Number(freteMes);
+  const faturamento = Number(atacado.faturamento) + Number(varejo.faturamento) + comissaoRealizada + freteRecebido;
   const custo = Number(atacado.custo_total) + Number(varejo.custo_total);
   const despesasMes = despCat ? despCat.reduce((s, c) => s + Number(c.total), 0) : null;
-  const lucroBruto = Number(atacado.lucro_total) + Number(varejo.lucro_total) + comissaoRealizada;
+  const lucroBruto = Number(atacado.lucro_total) + Number(varejo.lucro_total) + comissaoRealizada + freteRecebido;
   const lucro = lucroBruto - (despesasMes ?? 0);
   const margemPct = faturamento > 0 ? Math.round((lucro / faturamento) * 1000) / 10 : null;
 
@@ -190,8 +212,10 @@ export async function getMatrizFinanceiroVisao(
   // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
   const capitalParado = Number(capital.capital);
   // Giro na janela móvel de 30 dias (não mês-calendário) → estável no começo do mês.
+  // Galpão zerado → null ("—"): "0 dias" é ruído, não informação (auditoria 07-08).
   const custoJanela = Number(custo30d);
-  const giroDias = custoJanela > 0 ? Math.round(capitalParado / (custoJanela / 30)) : null;
+  const giroDias = capitalParado > 0 && custoJanela > 0
+    ? Math.round(capitalParado / (custoJanela / 30)) : null;
   const fatAtacado = Number(atacado.faturamento);
   // Mesma base (line_total) nos dois lados + clamp em 100 (nunca > 100% do faturamento).
   const fiadoAbertoPct = fiadoAbertoMes !== null && fatAtacado > 0
@@ -217,6 +241,7 @@ export async function getMatrizFinanceiroVisao(
         atacado: { faturamento: atacado.faturamento, lucro: atacado.lucro_total },
         varejo: { faturamento: varejo.faturamento, lucro: varejo.lucro_total },
         comissao: comissaoMes !== null ? { realizado: Number(comissaoMes).toFixed(2) } : null,
+        frete: { recebido: freteRecebido.toFixed(2) },
       },
       despesas_categoria: despCat,
     },

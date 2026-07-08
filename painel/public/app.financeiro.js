@@ -11,6 +11,7 @@ window.PAINEL_MODULES.financeiro = function () {
         Number(v.mes.pernas.atacado.faturamento || 0),
         Number(v.mes.pernas.varejo.faturamento || 0),
         Number(v.mes.pernas.comissao?.realizado || 0),
+        Number(v.mes.pernas.frete?.recebido || 0),
         Number(v.mes.despesas || 0),
       ];
       const max = Math.max(...candidatos);

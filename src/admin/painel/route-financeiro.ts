@@ -6,12 +6,23 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { createMatrizExpense, getMatrizExpenses, getMatrizFinanceiroVisao, removeMatrizExpense, settleMatrizExpense } from './queries.js';
+import { createMatrizExpense, getMatrizExpenses, getMatrizFinanceiroVisao, removeMatrizExpense, settleMatrizExpense, sweepCommissionEntries } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { createMatrizExpenseSchema, matrizExpenseIdSchema } from './route-schemas.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    // Varredura da comissão ANTES da visão (auditoria 07-08): sem ela, venda 2W
+    // realizada com o painel já aberto só virava lançamento ao entrar na Rede —
+    // o "quem te deve" e a perna do mês ficavam defasados. Mesmo sweep idempotente
+    // do GET da Rede; FAIL-OPEN: varredura caiu → a visão ainda serve (e loga).
+    if (env.NETWORK_COMMISSION_LEDGER) {
+      try {
+        await sweepCommissionEntries();
+      } catch (err) {
+        logger.warn({ err }, 'painel financeiro: sweep da comissão falhou (visão segue)');
+      }
+    }
     return reply.status(200).send({ ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao()) });
   });
 

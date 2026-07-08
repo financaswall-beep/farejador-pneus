@@ -209,7 +209,7 @@ export async function updatePartnerCommercialTerms(
 // indicadores de dono (capital parado no galpão, giro, fiado em aberto, ponto de
 // equilíbrio). ZERO escrita e ZERO migration: cada fatia respeita a flag da sua
 // fonte — flag off → aquela fatia vem null/fora e a UI esconde. A varredura da
-// comissão NÃO roda aqui de propósito (já roda no boot do painel e no GET da
-// Rede; e o sweep ESTORNA lançamento órfão — visão tem que ser leitura barata
-// e sem efeito colateral).
+// comissão NÃO roda aqui de propósito (roda na PORTA: boot do painel, GET da
+// Rede e — desde a auditoria 07-08 — GET do Financeiro; a visão continua leitura
+// barata e sem efeito colateral, testável a seco).
 

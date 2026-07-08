@@ -7,7 +7,11 @@
  *   A RECEBER junta fiado (com telefone) + comissão por parceiro · A PAGAR junta
  *   fornecedor + despesa pendente em agenda (vencido primeiro) · indicadores
  *   (capital parado, giro, fiado %, ponto de equilíbrio) com guarda null ·
- *   quitar fonte reflete na visão · a visão NÃO roda o sweep (leitura pura).
+ *   quitar fonte reflete na visão · a visão NÃO roda o sweep (leitura pura) ·
+ *   FRETE DE ENTREGA da main (auditoria 07-08): total−itens (GREATEST 0, régua
+ *   da Logística) soma no faturamento e no lucro do mês; pickup fora; cancelou
+ *   → sai. (A gasolina da rota já descontava nas despesas; agora os dois lados
+ *   da entrega aparecem.)
  *
  * Seeds descartáveis (medida '97/97-97', created_by 'prova-fin-visao') e LIMPA
  * tudo (DELETE físico) no finally.
@@ -45,11 +49,29 @@ async function main(): Promise<void> {
   let fails = 0;
   let buyerId = '';
   let comissaoId = '';
+  let mainUnitId = '';
+  let productId = '';
+  let contactId = '';
+  const orderIds: string[] = [];
   const check = (name: string, ok: boolean, extra = ''): void => {
     if (!ok) fails++;
     console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
   };
   const cents = (n: number): number => Math.round(n * 100);
+  // Pedido de VAREJO da main (molde da prova-logistica): total pode embutir frete.
+  const seedOrder = async (opts: { mode: 'delivery' | 'pickup'; total: number; itemPrice: number }): Promise<string> => {
+    const o = await client.query<{ id: string }>(
+      `INSERT INTO commerce.orders (environment, contact_id, total_amount, status, fulfillment_mode, delivery_address, unit_id)
+       VALUES ($1::env_t, $2, $3, 'open', $4, $5, $6) RETURNING id`,
+      [ENV, contactId, opts.total, opts.mode,
+       opts.mode === 'delivery' ? 'Rua PROVA-FIN-VISAO, 1 - Centro - Rio' : null, mainUnitId]);
+    const id = o.rows[0]!.id;
+    await client.query(
+      `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price, discount_amount)
+       VALUES ($1::env_t, $2, $3, 1, $4, 0)`, [ENV, id, productId, opts.itemPrice]);
+    orderIds.push(id);
+    return id;
+  };
 
   try {
     // ── setup: catálogo + galpão (50un × R$10) + borracheiro COM telefone ──
@@ -65,7 +87,22 @@ async function main(): Promise<void> {
     const b = await client.query<{ id: string }>(
       `INSERT INTO commerce.wholesale_customers (environment, name, phone) VALUES ($1,'PROVA-VISAO-BORRACHEIRO','21988887777') RETURNING id`, [ENV]);
     buyerId = b.rows[0]!.id;
-    check('setup: catálogo + galpão 50un×R$10 + borracheiro com telefone', true);
+    // Frete de entrega (V9): unit main + produto próprio + contato pro pedido de varejo.
+    const mu = await client.query<{ id: string }>(
+      `SELECT id FROM core.units WHERE environment=$1 AND slug='main' LIMIT 1`, [ENV]);
+    if (!mu.rows[0]) throw new Error('sem unit main no env test');
+    mainUnitId = mu.rows[0].id;
+    const prodFrete = await client.query<{ id: string }>(
+      `INSERT INTO commerce.products (environment, product_code, product_name, product_type, brand)
+       VALUES ($1::env_t, $2, 'PROVA-FIN-VISAO pneu', 'tire', 'PROVA') RETURNING id`,
+      [ENV, 'PROVA-FINV-' + (Date.now() % 1000000)]);
+    productId = prodFrete.rows[0]!.id;
+    const ct = await client.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment, chatwoot_contact_id, name, phone_e164)
+       VALUES ($1::env_t, $2, 'PROVA-FIN-VISAO CLIENTE', '+5521900001111') RETURNING id`,
+      [ENV, 900000000 + (Date.now() % 1000000)]);
+    contactId = ct.rows[0]!.id;
+    check('setup: catálogo + galpão 50un×R$10 + borracheiro com telefone + main/produto/contato', true);
 
     // ── régua de partida (test pode ter lixo de outras frentes) ──
     const base = await getMatrizFinanceiroVisao(ENV, pool);
@@ -180,7 +217,38 @@ async function main(): Promise<void> {
     check('V8b competência do mês volta ao base (soft delete some das contas)',
       cents(Number(v.mes.despesas ?? 0) - baseDespesas) === 0, `${v.mes.despesas}`);
 
-    console.log(`\n${fails === 0 ? '✅ VISÃO DO FINANCEIRO PROVADA (3 pernas + a receber/a pagar juntos + telefone + indicadores + quitações refletem)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    // ── V9: FRETE DE ENTREGA da main soma no consolidado (auditoria 07-08) ──
+    // Régua da Logística: frete = GREATEST(total − itens, 0); janela/cancelado = régua do varejo.
+    const antes = await getMatrizFinanceiroVisao(ENV, pool);
+    const freteAntes = Number(antes.mes.pernas.frete.recebido);
+    const fatAntes = Number(antes.mes.faturamento);
+    const lucroAntes = Number(antes.mes.lucro);
+    const entregaId = await seedOrder({ mode: 'delivery', total: 110, itemPrice: 100 });
+    v = await getMatrizFinanceiroVisao(ENV, pool);
+    check('V9 entrega com frete embute no consolidado (frete +10 = 110 − 100)',
+      cents(Number(v.mes.pernas.frete.recebido) - freteAntes) === 1000,
+      `${freteAntes} → ${v.mes.pernas.frete.recebido}`);
+    check('V9b faturamento do mês sobe os 110 (100 varejo + 10 frete)',
+      cents(Number(v.mes.faturamento) - fatAntes) === 11000, `${fatAntes} → ${v.mes.faturamento}`);
+    check('V9c lucro do mês sobe SÓ o frete (item sem custo congelado não chuta lucro de pneu)',
+      cents(Number(v.mes.lucro) - lucroAntes) === 1000, `${lucroAntes} → ${v.mes.lucro}`);
+
+    // pickup total==itens e entrega com total MENOR que itens (clamp GREATEST 0): frete não mexe
+    await seedOrder({ mode: 'pickup', total: 100, itemPrice: 100 });
+    await seedOrder({ mode: 'delivery', total: 90, itemPrice: 100 });
+    v = await getMatrizFinanceiroVisao(ENV, pool);
+    check('V9d retirada não gera frete e total<itens clampa em 0 (nunca negativo)',
+      cents(Number(v.mes.pernas.frete.recebido) - freteAntes) === 1000,
+      String(v.mes.pernas.frete.recebido));
+
+    // cancelar a entrega → o frete dela SAI (mesma régua retroativa do varejo)
+    await client.query(`UPDATE commerce.orders SET status='cancelled' WHERE id=$1 AND environment=$2`, [entregaId, ENV]);
+    v = await getMatrizFinanceiroVisao(ENV, pool);
+    check('V9e entrega cancelada tira o frete do mês',
+      cents(Number(v.mes.pernas.frete.recebido) - freteAntes) === 0,
+      String(v.mes.pernas.frete.recebido));
+
+    console.log(`\n${fails === 0 ? '✅ VISÃO DO FINANCEIRO PROVADA (3 pernas + FRETE de entrega + a receber/a pagar juntos + telefone + indicadores + quitações refletem)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     if (comissaoId) await client.query(`DELETE FROM network.commission_entries WHERE id=$1`, [comissaoId]);
     await client.query(
@@ -189,6 +257,13 @@ async function main(): Promise<void> {
     await client.query(`DELETE FROM commerce.wholesale_orders WHERE environment=$1 AND created_by=$2`, [ENV, CREATED_BY]);
     await client.query(`DELETE FROM commerce.matriz_expenses WHERE environment=$1 AND created_by=$2`, [ENV, CREATED_BY]);
     if (buyerId) await client.query(`DELETE FROM commerce.wholesale_customers WHERE id=$1`, [buyerId]);
+    // Pedidos de varejo do V9 (frete) + produto/contato próprios da prova.
+    for (const id of orderIds) {
+      await client.query(`DELETE FROM commerce.order_items WHERE environment=$1 AND order_id=$2`, [ENV, id]);
+      await client.query(`DELETE FROM commerce.orders WHERE environment=$1 AND id=$2`, [ENV, id]);
+    }
+    if (productId) await client.query(`DELETE FROM commerce.products WHERE id=$1`, [productId]);
+    if (contactId) await client.query(`DELETE FROM core.contacts WHERE id=$1`, [contactId]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND tire_size=$2`, [ENV, MEASURE]);
     client.release();
