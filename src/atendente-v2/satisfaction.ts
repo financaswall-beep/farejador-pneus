@@ -132,6 +132,56 @@ async function dispatchNewSurveys(): Promise<void> {
   }
 }
 
+/**
+ * Disparo da MATRIZ (0131): a matriz virou loja e é quem MAIS entrega, mas o
+ * pedido dela vive em commerce.orders (unit 'main'), SEM partner_order_id — então
+ * o dispatch acima nunca a via. Aqui o segundo trilho: entrega da main marcada
+ * 'delivered' (setMatrizDeliveryStatus) recém-finalizada, sem pesquisa, ganha UMA
+ * (dedup pelo índice único parcial em order_id). Retirada da matriz não tem marco
+ * de escrita (commerce.orders não tem retrieved_at) → fora do escopo, de propósito.
+ * A captura da nota (por conversation_id) e o expirador servem os DOIS trilhos.
+ */
+export async function dispatchMatrizDeliverySurveys(): Promise<void> {
+  const cands = await pool.query<{
+    order_id: string; unit_id: string; environment: string;
+    conv: string; contact: string | null; loja: string;
+  }>(
+    `SELECT o.id AS order_id, o.unit_id, o.environment::text AS environment,
+            cv.chatwoot_conversation_id AS conv, ct.chatwoot_contact_id AS contact, u.name AS loja
+       FROM commerce.orders o
+       JOIN core.units u ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
+       JOIN core.conversations cv ON cv.id = o.source_conversation_id
+       LEFT JOIN core.contacts ct ON ct.id = cv.contact_id
+      WHERE o.status = 'delivered' AND o.fulfillment_mode = 'delivery'
+        AND o.delivery_status = 'delivered'
+        AND o.delivered_at >= now() - interval '${RECENT_WINDOW}'
+        AND cv.chatwoot_conversation_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM commerce.satisfaction_surveys s WHERE s.order_id = o.id)
+      LIMIT 50`,
+  );
+
+  for (const r of cands.rows) {
+    const ins = await pool.query<{ id: string }>(
+      `INSERT INTO commerce.satisfaction_surveys
+         (environment, unit_id, order_id, fulfillment_mode, conversation_id, contact_id, status, asked_at)
+       VALUES ($1, $2, $3, 'delivery', $4, $5, 'pending', now())
+       ON CONFLICT (order_id) WHERE order_id IS NOT NULL DO NOTHING
+       RETURNING id`,
+      [r.environment, r.unit_id, r.order_id, Number(r.conv), r.contact ? Number(r.contact) : null],
+    );
+    if (ins.rowCount !== 1) continue; // outra réplica já pegou
+
+    try {
+      await sendMessage(Number(r.conv), surveyQuestion(r.loja));
+    } catch (err) {
+      logger.error({ err, orderId: r.order_id }, 'satisfaction matriz: pergunta nao enviada');
+    }
+  }
+  if (cands.rowCount && cands.rowCount > 0) {
+    logger.info({ count: cands.rowCount }, 'satisfaction matriz: pesquisas disparadas');
+  }
+}
+
 // ─── Expiração ────────────────────────────────────────────────────────────────
 
 async function expireStaleSurveys(): Promise<void> {
@@ -158,6 +208,7 @@ export function startSatisfactionSurveyWorker(): () => void {
   }
   const timer = setInterval(() => {
     dispatchNewSurveys().catch((err) => logger.error({ err }, 'satisfaction dispatcher: varredura falhou'));
+    dispatchMatrizDeliverySurveys().catch((err) => logger.error({ err }, 'satisfaction matriz dispatcher: varredura falhou'));
     expireStaleSurveys().catch((err) => logger.error({ err }, 'satisfaction expirer: varredura falhou'));
   }, WORKER_INTERVAL_MS);
   logger.info('satisfaction survey: worker ligado (SATISFACTION_SURVEY on)');

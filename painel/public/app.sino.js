@@ -67,6 +67,19 @@ window.PAINEL_MODULES.sino = function () {
           });
         }
       }
+      // Candidatura de parceiro esperando (deriva de this.applications, que o boot
+      // já carrega pro badge — mesmo padrão da comissão, sem estado duplicado).
+      const apps = this.applications || [];
+      if (apps.length > 0) {
+        itens.push({
+          id: 'cand:' + apps.map((a) => a.id).join(','),
+          icon: 'inbox', iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600',
+          title: apps.length + (apps.length === 1 ? ' candidatura de parceiro' : ' candidaturas de parceiro'),
+          desc: (apps[0] && apps[0].trade_name ? '"' + apps[0].trade_name + '"' : 'Novo interessado') +
+            (apps.length > 1 ? ' e mais ' + (apps.length - 1) : '') + ' esperando sua análise.',
+          action: 'applications', time: 'abrir Candidaturas →',
+        });
+      }
       // Comissão >= alarme do dono (alarme mora no localStorage — front soma sozinho).
       const estouradas = ((this.comissoes && this.comissoes.enabled && this.comissoes.partners) || [])
         .filter((p) => this.comissaoEstourou(p));
@@ -86,7 +99,9 @@ window.PAINEL_MODULES.sino = function () {
 
     sinoClick(notif) {
       this.sinoMarcarLida(notif.id);
-      this.currentPage = notif.page;
+      // Candidatura abre o MODAL (não é uma página); o resto navega pela aba.
+      if (notif.action === 'applications') this.openApplications();
+      else if (notif.page) this.currentPage = notif.page;
       this.$nextTick(() => lucide.createIcons());
     },
 

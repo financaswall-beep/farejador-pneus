@@ -64,7 +64,7 @@ window.PAINEL_MODULES.unidadeKpis = function () {
       if (!parceiro) return [];
       const estoqueItens = parceiro.estoqueItens || [];
       const margemValor = parceiro.margemValor ?? (Number(String(parceiro.margem || '0').replace('%', '')) || 0);
-      return [
+      const checks = [
         { label: 'Resultado positivo', ok: Number(parceiro.lucroEstimado || 0) >= 0, peso: 20 },
         { label: 'Vendeu hoje', ok: this.parceiroVendaHojeValor(parceiro) > 0, peso: 15 },
         { label: 'Estoque atualizado', ok: Number(parceiro.diasSemAtualizar ?? 99) <= 3, peso: 15 },
@@ -73,6 +73,16 @@ window.PAINEL_MODULES.unidadeKpis = function () {
         { label: 'Custos registrados', ok: Number(parceiro.comprasPneus || 0) > 0 || Number(parceiro.despesasExtras || 0) > 0 || Number(parceiro.folha || 0) > 0, peso: 10 },
         { label: 'Parceria 2W ativa', ok: Number(parceiro.vendas2w || 0) > 0, peso: 10 },
       ];
+      // Nota do cliente (0105/0131): só entra quando HÁ amostra — o único sinal que o
+      // parceiro não falsifica. Sem nota ainda → o check não aparece (não pune a amostra
+      // vazia; o saudeScore normaliza pelos pesos presentes).
+      if (Number(parceiro.satisfacaoCount || 0) > 0) {
+        checks.push({
+          label: `Cliente satisfeito (${Number(parceiro.satisfacaoNota).toFixed(1)}⭐, ${parceiro.satisfacaoCount})`,
+          ok: Number(parceiro.satisfacaoNota || 0) >= 4, peso: 20,
+        });
+      }
+      return checks;
     },
 
     saudeScore(parceiro = this.selectedParceiro()) {

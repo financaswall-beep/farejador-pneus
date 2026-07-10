@@ -151,6 +151,11 @@ window.PAINEL_MODULES.redeApply = function () {
           ticket: this.formatCurrency(ticket),
           estoque: `${Number(row.stock_items || 0)} itens`,
           estoqueBaixo: Number(row.low_stock_items || 0),
+          // Nota do cliente (0105/0131): média + amostra. null = sem nota ainda
+          // (o score de saúde só cobra a nota quando há amostra — não pune quem não tem).
+          satisfacaoNota: (row.satisfaction_avg === null || row.satisfaction_avg === undefined)
+            ? null : Number(row.satisfaction_avg),
+          satisfacaoCount: Number(row.satisfaction_count || 0),
           margem: margem === null ? '-' : `${margem}%`,
           margemValor: margem,
           comprasPneus,

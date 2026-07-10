@@ -49,6 +49,8 @@ export async function getPainelRede(
        COALESCE(employee_expenses.employee_total, 0) + COALESCE(other_expenses.other_total, 0) AS expenses_month,
        s.stock_items,
        s.low_stock_items,
+       satisfaction.avg_rating AS satisfaction_avg,
+       COALESCE(satisfaction.n, 0) AS satisfaction_count,
        COALESCE(period_sales.sales_total, 0)
          - COALESCE(period_purchases.purchases_total, 0)
          - COALESCE(employee_expenses.employee_total, 0)
@@ -160,6 +162,14 @@ export async function getPainelRede(
          AND ps.unit_id = s.unit_id
          AND ps.deleted_at IS NULL
      ) stock ON true
+     LEFT JOIN LATERAL (
+       -- Nota do cliente (0105/0131): média + nº de respostas da loja. Vazio (null/0)
+       -- com a flag off — o score só usa o check quando há amostra (count > 0).
+       SELECT round(avg(ss.rating)::numeric, 1) AS avg_rating, count(*)::int AS n
+       FROM commerce.satisfaction_surveys ss
+       WHERE ss.environment = s.environment AND ss.unit_id = s.unit_id
+         AND ss.status = 'answered'
+     ) satisfaction ON true
      LEFT JOIN LATERAL (
        SELECT jsonb_agg(event ORDER BY event_at DESC) AS events
        FROM (
