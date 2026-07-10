@@ -215,19 +215,19 @@ export const cancelWholesaleSaleSchema = z.object({
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.
 export const partnerApplicationSchema = z.object({
-  trade_name: z.string().min(2),
-  responsible_name: z.string().min(1).nullable().optional(),
-  whatsapp_phone: z.string().min(1).nullable().optional(),
+  trade_name: z.string().trim().min(2).max(160),
+  responsible_name: z.string().trim().min(1).max(160).nullable().optional(),
+  whatsapp_phone: z.string().trim().min(1).max(40).nullable().optional(),
   // E-mail é opcional e sem validação de formato: o canal real é o WhatsApp.
   // Vazio vira null pra não derrubar o envio.
   email: z.preprocess(
     (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
     z.string().max(160).nullable().optional(),
   ),
-  address: z.string().min(1).nullable().optional(),
-  municipios: z.string().min(1).nullable().optional(),
+  address: z.string().trim().min(1).max(500).nullable().optional(),
+  municipios: z.string().trim().min(1).max(500).nullable().optional(),
   message: z.string().max(1000).nullable().optional(),
-  website: z.string().optional(),
+  website: z.string().max(500).optional(),
 });
 
 export const applicationsQuerySchema = z.object({
@@ -292,4 +292,3 @@ export const cancelParamsSchema = z.object({
 export const cancelBodySchema = z.object({
   reason: z.string().min(1).max(500),
 });
-

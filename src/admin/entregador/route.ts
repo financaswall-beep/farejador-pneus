@@ -14,7 +14,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { rateLimitHit } from '../../parceiro/rate-limit.js';
+import {
+  rateLimitBlocked,
+  rateLimitClear,
+  rateLimitHit,
+  rateLimitRetryAfterSeconds,
+} from '../../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from '../../parceiro/photo-upload.js';
 import { readReceiptWithAI } from '../painel/receipt-ai.js';
 import { recordReceiptAiResult } from '../painel/queries.js';
@@ -116,16 +121,32 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
 
   // ── Login: usuário+senha → sessão es_. Resposta ÚNICA 401. ──
   fastify.post('/api/entregas/login', { preHandler: flagGate }, async (request, reply) => {
-    if (rateLimitHit(`entregador:ip:${request.ip}`, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS)) {
-      return reply.status(429).send({ error: 'too_many_attempts' });
+    const ipKey = `entregador:ip:${request.ip}`;
+    if (rateLimitBlocked(ipKey, LOGIN_MAX_PER_IP)) {
+      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
     }
     const parsed = loginSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return reply.status(401).send({ error: 'invalid_credentials' });
-    if (rateLimitHit(`entregador:user:${parsed.data.username.toLowerCase()}`, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) {
-      return reply.status(429).send({ error: 'too_many_attempts' });
+    if (!parsed.success) {
+      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+      if (exceeded) return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
+      return reply.status(401).send({ error: 'invalid_credentials' });
+    }
+    const userKey = `entregador:user:${parsed.data.username.toLowerCase()}`;
+    if (rateLimitBlocked(userKey, LOGIN_MAX_ATTEMPTS)) {
+      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(userKey))).status(429).send({ error: 'too_many_attempts' });
     }
     const auth = await authenticateEntregador(env.FAREJADOR_ENV, parsed.data.username, parsed.data.password);
-    if (!auth) return reply.status(401).send({ error: 'invalid_credentials' });
+    if (!auth) {
+      const ipExceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+      const userExceeded = rateLimitHit(userKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+      if (ipExceeded || userExceeded) {
+        const retryKey = userExceeded ? userKey : ipKey;
+        return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(retryKey))).status(429).send({ error: 'too_many_attempts' });
+      }
+      return reply.status(401).send({ error: 'invalid_credentials' });
+    }
+    rateLimitClear(ipKey);
+    rateLimitClear(userKey);
     return reply.status(200).send(auth);
   });
 

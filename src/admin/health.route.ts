@@ -14,7 +14,7 @@ export async function registerHealthRoute(fastify: FastifyInstance): Promise<voi
       await Promise.race([pool.query('SELECT 1'), timeoutPromise]);
       if (timeout) clearTimeout(timeout);
       logger.info({ environment: env.FAREJADOR_ENV }, 'health check passed');
-      return reply.status(200).send({ status: 'ok', environment: env.FAREJADOR_ENV });
+      return reply.status(200).send({ status: 'ok' });
     } catch (err) {
       if (timeout) clearTimeout(timeout);
       logger.error({ err, environment: env.FAREJADOR_ENV }, 'health check failed');

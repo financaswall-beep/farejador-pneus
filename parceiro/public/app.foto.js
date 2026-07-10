@@ -51,25 +51,27 @@ window.PARCEIRO_MODULES.foto = () => ({
       if (!this.apiToken || !this.canSee('batepapo')) return;
       this.stopPhotoGlobal();
       void this.loadPhotoRequests();
-      // SSE global: MESMO endpoint do chat (auth por token na query). Só reage
+      // SSE global: MESMO endpoint do chat (ticket curto e descartável). Só reage
       // a kind='photo_request' — o chat continua dono dos eventos dele na aba.
-      if (window.EventSource) {
-        try {
-          const url = `/parceiro/${this.slug}/api/chat/stream?token=${encodeURIComponent(this.apiToken)}`;
-          const es = new EventSource(url);
-          es.addEventListener('message', (ev) => {
-            try {
-              const payload = JSON.parse(ev.data || '{}');
-              if (payload.kind === 'photo_request') void this.loadPhotoRequests();
-            } catch (e) { /* payload não-JSON: ignora */ }
-          });
-          this.photoES = es;
-        } catch (err) {
-          console.warn('photo_sse_failed', err);
-        }
-      }
+      if (window.EventSource) void this.startPhotoSse();
       // Rede de segurança: poll lento sempre (pega evento perdido / SSE caído).
       this.photoPollTimer = setInterval(() => { void this.loadPhotoRequests(); }, 25000);
+    },
+    async startPhotoSse() {
+      try {
+        const issued = await this.api('chat/stream-ticket', { method: 'POST' });
+        const url = `/parceiro/${this.slug}/api/chat/stream?ticket=${encodeURIComponent(issued.ticket)}`;
+        const es = new EventSource(url);
+        es.addEventListener('message', (ev) => {
+          try {
+            const payload = JSON.parse(ev.data || '{}');
+            if (payload.kind === 'photo_request') void this.loadPhotoRequests();
+          } catch (e) { /* payload não-JSON: ignora */ }
+        });
+        this.photoES = es;
+      } catch (err) {
+        console.warn('photo_sse_failed', err);
+      }
     },
     stopPhotoGlobal() {
       if (this.photoPollTimer) { clearInterval(this.photoPollTimer); this.photoPollTimer = null; }

@@ -10,6 +10,7 @@ build/
 
 # Env files (NEVER commit real secrets)
 .env
+.env.*
 .env.local
 .env.*.local
 .env.production
@@ -19,6 +20,9 @@ build/
 .env.preview
 # Keep the template
 !.env.example
+
+# Local archives/backups may contain production exports or secrets
+*.tgz
 
 # Test output
 coverage/
@@ -72,3 +76,9 @@ poll-atendente.*
 test-chatwoot-conn.*
 tmp-describe.*
 cenario-*.json
+
+# One-off production credential utilities must stay local
+scripts/*senha*wallace*
+scripts/preparar-acesso-wallace-prod.cjs
+scripts/resetar-senha-pessoa.cjs
+scripts/seed-login-teste-prod.cjs

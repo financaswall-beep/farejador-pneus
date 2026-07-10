@@ -98,8 +98,7 @@ function extractBearerToken(header: unknown): string | null {
  */
 /**
  * Valida slug+token e devolve o contexto do parceiro (ou null se invalido).
- * Reusavel fora do preHandler — ex.: SSE, onde o token vem por query string
- * porque EventSource nao manda header Authorization.
+ * Reutilizável pelo preHandler e por fluxos internos que validam credenciais.
  */
 function rowToContext(row: PartnerAuthRow): PartnerContext {
   // Fail-safe: qualquer valor inesperado de role é tratado como 'funcionario'

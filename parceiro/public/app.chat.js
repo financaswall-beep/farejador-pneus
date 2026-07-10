@@ -146,18 +146,19 @@ window.PARCEIRO_MODULES.chat = () => ({
       this.stopChatPolling();
       void this.loadChat();
       // Fatia 3: tempo real via SSE (push). Em cada evento recarrega a lista.
-      this.startChatSse();
+      void this.startChatSse();
       // Rede de seguranca: poll lento sempre ligado, pega evento perdido (ex.:
       // SSE caiu e voltou entre dois eventos).
       this.chatTimer = setInterval(() => { void this.loadChat(); }, 30000);
     },
-    startChatSse() {
+    async startChatSse() {
       // FIX 2026-06-10: era `this.token`, que NUNCA existiu (o estado chama
       // apiToken) → o SSE do chat nunca conectava e o "tempo real" era o poll
       // de 5s, silenciosamente. Achado na construção do alerta de foto.
       if (!window.EventSource || !this.apiToken) { this.startChatFallbackPoll(); return; }
       try {
-        const url = `/parceiro/${this.slug}/api/chat/stream?token=${encodeURIComponent(this.apiToken)}`;
+        const issued = await this.api('chat/stream-ticket', { method: 'POST' });
+        const url = `/parceiro/${this.slug}/api/chat/stream?ticket=${encodeURIComponent(issued.ticket)}`;
         const es = new EventSource(url);
         es.addEventListener('message', () => { void this.loadChat(); });
         es.onopen = () => { this.stopChatFallbackPoll(); }; // SSE de pe: nao precisa do poll rapido.

@@ -22,6 +22,8 @@ function montarPainelApp(estado, fabricas) {
 }
 
 function painelApp() {
+  // Migração de segurança: o token antigo não pode continuar persistido entre sessões.
+  localStorage.removeItem('farejador_admin_token');
   const estado = {
     // ─── ESTADO ─────────────────────────────────────
     currentPage: 'resumo',
@@ -66,7 +68,7 @@ function painelApp() {
     approveSubmitting: false,
     approveError: null,
     approveResult: null,
-    apiToken: localStorage.getItem('farejador_admin_token') || '',
+    apiToken: sessionStorage.getItem('farejador_admin_token') || '',
     operatorLabel: localStorage.getItem('farejador_operator_label') || 'Wallace',
     apiStatus: 'mock',
     apiError: null,

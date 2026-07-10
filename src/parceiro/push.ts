@@ -22,6 +22,7 @@ import { pool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { subscribeAllPartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
+import { isAllowedPushEndpoint } from './push-endpoint.js';
 
 // TTL do push (segundos): 10 min casa com a janela da foto. Depois disso o aviso
 // já não é útil — melhor expirar que tocar atrasado.
@@ -95,6 +96,13 @@ async function sendToUnit(unitId: string, payload: PushPayload): Promise<void> {
 
 async function deliver(unitId: string, sub: SubRow, body: string): Promise<void> {
   try {
+    // Revalida no envio para cobrir registros antigos e mudanca de DNS.
+    if (!(await isAllowedPushEndpoint(sub.endpoint))) {
+      // Não apaga: uma falha transitória de DNS não deve destruir inscrição válida.
+      // O envio continua fail-closed e tentará revalidar no próximo evento.
+      logger.warn({ unitId }, 'push: endpoint não validado; envio bloqueado');
+      return;
+    }
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       body,

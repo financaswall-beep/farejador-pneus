@@ -9,6 +9,10 @@ import { logger } from '../../shared/logger.js';
 import { approvePartnerApplication, createPartnerApplication, listPartnerApplications, rejectPartnerApplication } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel, sendStatic } from './route-helpers.js';
 import { applicationsQuerySchema, approveApplicationSchema, partnerApplicationSchema } from './route-schemas.js';
+import { rateLimitHit } from '../../shared/rate-limit.js';
+
+const APPLICATION_MAX_PER_IP = 5;
+const APPLICATION_WINDOW_MS = 60 * 60 * 1000;
 
 export async function registerPainelCandidaturas(fastify: FastifyInstance): Promise<void> {
   fastify.post('/api/seja-parceiro', async (request, reply) => {
@@ -19,6 +23,9 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
     // honeypot: bots preenchem 'website'; humano deixa vazio → finge sucesso e não grava.
     if (parsed.data.website && parsed.data.website.trim().length > 0) {
       return reply.status(201).send({ ok: true });
+    }
+    if (rateLimitHit(`partner-application:${request.ip}`, APPLICATION_MAX_PER_IP, APPLICATION_WINDOW_MS)) {
+      return reply.header('Retry-After', '3600').status(429).send({ error: 'too_many_attempts' });
     }
     try {
       const result = await createPartnerApplication(parsed.data);

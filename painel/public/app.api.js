@@ -5,11 +5,6 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.api = function () {
   return {
     ensureCredentials() {
-      if (!this.apiToken && ['localhost', '127.0.0.1'].includes(location.hostname)) {
-        this.apiToken = 'dev-admin-token-local';
-        localStorage.setItem('farejador_admin_token', this.apiToken);
-      }
-
       if (!this.operatorLabel) {
         this.operatorLabel = prompt('Nome do operador') || 'Wallace';
         localStorage.setItem('farejador_operator_label', this.operatorLabel);
@@ -19,7 +14,7 @@ window.PAINEL_MODULES.api = function () {
         const token = prompt('ADMIN_AUTH_TOKEN para carregar dados reais');
         if (token) {
           this.apiToken = token;
-          localStorage.setItem('farejador_admin_token', token);
+          sessionStorage.setItem('farejador_admin_token', token);
         }
       }
     },
@@ -35,12 +30,11 @@ window.PAINEL_MODULES.api = function () {
     async apiGet(path) {
       if (!this.apiToken) throw new Error('missing_admin_token');
       const response = await fetch(path, { headers: this.apiHeaders() });
-      if (response.status === 401 && ['localhost', '127.0.0.1'].includes(location.hostname)) {
-        this.apiToken = 'dev-admin-token-local';
-        localStorage.setItem('farejador_admin_token', this.apiToken);
-        const retry = await fetch(path, { headers: this.apiHeaders() });
-        if (!retry.ok) throw new Error(`api_${retry.status}`);
-        return retry.json();
+      if (response.status === 401 || response.status === 429) {
+        if (response.status === 401) {
+          this.apiToken = '';
+          sessionStorage.removeItem('farejador_admin_token');
+        }
       }
       if (!response.ok) throw new Error(`api_${response.status}`);
       return response.json();

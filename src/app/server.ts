@@ -10,10 +10,14 @@ import { startAgentV2Worker } from '../atendente-v2/worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 import { startPartnerPushFanout } from '../parceiro/push.js';
+import { registerSecurityHeaders } from './security-headers.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
+  trustProxy: env.TRUST_PROXY,
 });
+
+registerSecurityHeaders(fastify, env.NODE_ENV === 'production');
 
 let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;

@@ -3615,7 +3615,9 @@ export async function getPartnerSelfIdentity(
 // nem partner_sessions (só EXECUTE em validate_partner_session, no auth.ts).
 // ─────────────────────────────────────────────────────────────────────────
 
-const SESSION_TTL_DAYS = 30;
+// Reduz a janela de uso de uma sessão roubada; tokens existentes mantêm o prazo
+// gravado até serem revogados/expirarem.
+const SESSION_TTL_DAYS = 7;
 
 export interface PartnerSessionResult {
   session_token: string; // texto puro — devolvido UMA vez; o banco guarda só o hash

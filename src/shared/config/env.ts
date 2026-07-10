@@ -2,10 +2,26 @@ import { z } from 'zod';
 
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 
+// Piso de COMPRIMENTO dos segredos em produção (ADMIN_AUTH_TOKEN / CHATWOOT_HMAC_SECRET).
+// ⚠️ Mede tamanho, NÃO aleatoriedade: barra o segredo curto/óbvio ("123456"), mas não
+// impede um longo-e-fraco ("aaaa..."). A força real vem de GERAR aleatório (crypto/openssl).
+// 24 chars gerados ao acaso já dão >128 bits = forte. Mantido em 24 (não 32) pra NÃO
+// obrigar rotação de segredo já em uso e casado com terceiros (o HMAC é compartilhado com
+// o webhook do Chatwoot; trocar exige atualizar os DOIS lados juntos, senão o bot fica surdo).
+const MIN_SECRET_BYTES = 24;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FAREJADOR_ENV: z.enum(['prod', 'test']),
   PORT: z.string().transform(Number).pipe(z.number().int().min(1).max(65535)).default('3000'),
+  // false = socket remoto; true = confia em qualquer X-Forwarded-For;
+  // string = lista/CIDR entendida pelo proxy-addr do Fastify.
+  TRUST_PROXY: z.string().default('false').transform((value): boolean | string => {
+    const normalized = value.trim();
+    if (normalized === 'true') return true;
+    if (normalized === 'false' || normalized === '') return false;
+    return normalized;
+  }),
   DATABASE_URL: z.string().min(1),
   // Etapa 5 da auditoria 2026-05-21: pool separado pro Portal Parceiro com
   // role sem BYPASSRLS. Opcional pra nao quebrar ambientes que ainda nao
@@ -14,7 +30,7 @@ const envSchema = z.object({
   DATABASE_POOL_MAX: z.string().transform(Number).pipe(z.number().int().min(1)).default('10'),
   DATABASE_SSL: booleanStringSchema,
   CHATWOOT_HMAC_SECRET: z.string().min(1),
-  CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(1)).default('300'),
+  CHATWOOT_WEBHOOK_MAX_AGE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(1).max(900)).default('300'),
   CHATWOOT_API_BASE_URL: z.string().min(1).optional(),
   CHATWOOT_API_TOKEN: z.string().min(1).optional(),
   CHATWOOT_ACCOUNT_ID: z.string().transform(Number).pipe(z.number().int()).optional(),
@@ -239,6 +255,24 @@ const envSchema = z.object({
         .map((part) => part.trim())
         .filter((part) => part.length > 0),
     ),
+}).superRefine((value, ctx) => {
+  // Em producao, segredo curto e configuracao invalida: melhor falhar no boot.
+  if (value.NODE_ENV === 'production' && value.FAREJADOR_ENV === 'prod') {
+    if (Buffer.byteLength(value.ADMIN_AUTH_TOKEN, 'utf8') < MIN_SECRET_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ADMIN_AUTH_TOKEN'],
+        message: `must contain at least ${MIN_SECRET_BYTES} bytes in production`,
+      });
+    }
+    if (Buffer.byteLength(value.CHATWOOT_HMAC_SECRET, 'utf8') < MIN_SECRET_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHATWOOT_HMAC_SECRET'],
+        message: `must contain at least ${MIN_SECRET_BYTES} bytes in production`,
+      });
+    }
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

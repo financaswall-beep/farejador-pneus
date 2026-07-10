@@ -87,7 +87,7 @@ describe('registerHealthRoute', () => {
     await fastify._routes['/healthz'].handler({}, reply);
 
     expect(reply.statusCode).toBe(200);
-    expect(reply.payload).toEqual({ status: 'ok', environment: 'prod' });
+    expect(reply.payload).toEqual({ status: 'ok' });
   });
 
   it('returns 503 when DB rejects', async () => {

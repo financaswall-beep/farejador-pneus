@@ -9,9 +9,11 @@ const baseEnv = {
   ADMIN_AUTH_TOKEN: 'expected-admin-token',
 };
 
-function createRequest(authHeader?: string): FastifyRequest {
+function createRequest(authHeader?: string, ip = '203.0.113.10'): FastifyRequest {
   return {
     headers: authHeader ? { authorization: authHeader } : {},
+    ip,
+    log: { warn: vi.fn() },
   } as unknown as FastifyRequest;
 }
 
@@ -19,6 +21,11 @@ function createReply(): FastifyReply {
   const reply = {
     statusCode: 200,
     payload: undefined as unknown,
+    headers: {} as Record<string, string>,
+    header: vi.fn(function header(this: typeof reply, name: string, value: string) {
+      this.headers[name] = value;
+      return this;
+    }),
     status: vi.fn(function status(this: typeof reply, code: number) {
       this.statusCode = code;
       return this;
@@ -108,5 +115,24 @@ describe('requireAdminAuth', () => {
 
     expect(reply.statusCode).toBe(200);
     expect(done).toHaveBeenCalledOnce();
+  });
+
+  it('returns 429 after 10 invalid attempts from the same IP', async () => {
+    const requireAdminAuth = await loadAuth();
+    const done = vi.fn() as unknown as HookHandlerDoneFunction;
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const reply = createReply();
+      requireAdminAuth(createRequest('Bearer wrong', '198.51.100.8'), reply, done);
+      expect(reply.statusCode).toBe(401);
+    }
+
+    const blockedReply = createReply();
+    requireAdminAuth(createRequest('Bearer expected-admin-token', '198.51.100.8'), blockedReply, done);
+
+    expect(blockedReply.statusCode).toBe(429);
+    expect(blockedReply.payload).toEqual({ error: 'too_many_attempts' });
+    expect(blockedReply.headers['Retry-After']).toBeDefined();
+    expect(done).not.toHaveBeenCalled();
   });
 });

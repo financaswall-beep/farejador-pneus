@@ -2,15 +2,23 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, requireOwner, requireScreen, resolvePartnerPermissions, getPartnerContext, authenticatePartner, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
-import { rateLimitHit } from './rate-limit.js';
+import {
+  rateLimitBlocked,
+  rateLimitClear,
+  rateLimitHit,
+  rateLimitRetryAfterSeconds,
+} from '../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 
-// Login/1º acesso: até 10 tentativas por IP+slug a cada 5 min (anti-brute-force).
+// Login/1º acesso: até 10 falhas por usuário e 20 por IP em 5 min.
 const LOGIN_MAX_ATTEMPTS = 10;
+const LOGIN_MAX_PER_IP = 20;
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
+const SSE_TICKET_MAX_PER_MINUTE = 60;
+const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
 // Etapa 4: encadeamento padrão pros endpoints SÓ-DONO. Pós-Fase 1 (Config), o uso
 // fica RESERVADO ao CADEADO DURO: gestão de funcionários e TODOS os /configuracoes*.
@@ -111,6 +119,9 @@ import {
 } from './queries.js';
 import { env } from '../shared/config/env.js';
 import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
+import { acquirePartnerSseSlot } from './sse-limit.js';
+import { isAllowedPushEndpoint } from './push-endpoint.js';
+import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
 
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
@@ -571,17 +582,40 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   // token de SESSÃO que o front guarda e usa como Bearer. Resposta única pra
   // usuário inexistente e senha errada (não revela qual).
   fastify.post('/parceiro/:slug/api/login', async (request, reply) => {
+    const ipKey = `login:ip:${request.ip}`;
+    if (rateLimitBlocked(ipKey, LOGIN_MAX_PER_IP)) {
+      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
+    }
     const params = paramsSchema.safeParse(request.params);
     // Slug malformado/inexistente devolve a MESMA resposta de credencial inválida
     // (não revela quais slugs existem).
-    if (!params.success) return reply.status(401).send({ error: 'invalid_credentials' });
-    if (rateLimitHit(`login:${request.ip}:${params.data.slug}`, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS)) {
-      return reply.status(429).send({ error: 'too_many_attempts' });
+    if (!params.success) {
+      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+      if (exceeded) return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
+      return reply.status(401).send({ error: 'invalid_credentials' });
     }
     const parsed = loginSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return reply.status(401).send({ error: 'invalid_credentials' });
+    if (!parsed.success) {
+      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+      if (exceeded) return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
+      return reply.status(401).send({ error: 'invalid_credentials' });
+    }
+    const userKey = `login:user:${params.data.slug}:${parsed.data.username.toLowerCase()}`;
+    if (rateLimitBlocked(userKey, LOGIN_MAX_ATTEMPTS)) {
+      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(userKey))).status(429).send({ error: 'too_many_attempts' });
+    }
     const result = await authenticatePartnerLogin(env.FAREJADOR_ENV, params.data.slug, parsed.data.username, parsed.data.password);
-    if (!result) return reply.status(401).send({ error: 'invalid_credentials' });
+    if (!result) {
+      const ipExceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
+      const userExceeded = rateLimitHit(userKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+      if (ipExceeded || userExceeded) {
+        const retryKey = userExceeded ? userKey : ipKey;
+        return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(retryKey))).status(429).send({ error: 'too_many_attempts' });
+      }
+      return reply.status(401).send({ error: 'invalid_credentials' });
+    }
+    rateLimitClear(ipKey);
+    rateLimitClear(userKey);
     return reply.status(200).send(result);
   });
 
@@ -1144,6 +1178,9 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (!env.PUSH_NOTIFICATIONS) return reply.status(200).send({ enabled: false });
     const parsed = pushSubscribeSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_subscription' });
+    if (!(await isAllowedPushEndpoint(parsed.data.endpoint))) {
+      return reply.status(400).send({ error: 'invalid_subscription_endpoint' });
+    }
     const ua = String(request.headers['user-agent'] ?? '').slice(0, 300) || null;
     await savePartnerPushSubscription(getPartnerContext(request), {
       endpoint: parsed.data.endpoint,
@@ -1163,23 +1200,31 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ ok: true });
   });
 
-  // Tempo real (Fatia 3): SSE que empurra um evento quando chega mensagem nova,
-  // pra UI atualizar na hora sem depender do polling. EventSource NAO manda
-  // header Authorization — por isso o token vem por query string e e validado
-  // aqui do mesmo jeito (mesma function SECURITY DEFINER). O front cai no
-  // polling se o SSE nao conectar.
+  // EventSource não envia Authorization. O endpoint autenticado emite um ticket
+  // opaco, descartável e de curta duração; a sessão nunca entra na URL do stream.
+  fastify.post('/parceiro/:slug/api/chat/stream-ticket', {
+    preHandler: [requirePartnerAuth, requireScreen('batepapo')],
+  }, async (request: PartnerAuthedRequest, reply) => {
+    const ctx = getPartnerContext(request);
+    const rateKey = `sse-ticket:${ctx.tokenId}`;
+    if (rateLimitHit(rateKey, SSE_TICKET_MAX_PER_MINUTE, SSE_TICKET_WINDOW_MS)) {
+      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(rateKey))).status(429).send({ error: 'too_many_attempts' });
+    }
+    const result = mintPartnerSseTicket(ctx);
+    return reply.status(201).send({ ticket: result.ticket, expires_in: result.expiresInSeconds });
+  });
+
   fastify.get('/parceiro/:slug/api/chat/stream', async (request, reply) => {
     const { slug } = request.params as { slug: string };
-    const { token } = request.query as { token?: string };
-    if (!slug || !token) return reply.code(401).send({ error: 'partner_unauthorized' });
-    const ctx = await authenticatePartner(slug.trim(), token);
+    const { ticket } = request.query as { ticket?: string };
+    if (!slug || !ticket) return reply.code(401).send({ error: 'partner_unauthorized' });
+    const ctx = consumePartnerSseTicket(ticket, slug.trim());
     if (!ctx) return reply.code(401).send({ error: 'partner_unauthorized' });
 
-    // Tela Bate-papo desligada pro funcionário → 403 (espelha requireScreen, que
-    // este endpoint não usa por autenticar via query string). Owner passa sempre.
-    if (ctx.role !== 'owner') {
-      const permissions = await resolvePartnerPermissions(ctx);
-      if (!permissions.batepapo) return reply.code(403).send({ error: 'partner_forbidden_screen', screen: 'batepapo' });
+    // A permissão de bate-papo já foi verificada ao emitir o ticket.
+    const releaseSseSlot = acquirePartnerSseSlot(request.ip, ctx.tokenId);
+    if (!releaseSseSlot) {
+      return reply.header('Retry-After', '30').code(429).send({ error: 'too_many_connections' });
     }
 
     // Assume o controle da resposta crua (stream que nao fecha).
@@ -1209,6 +1254,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const cleanup = (): void => {
       clearInterval(heartbeat);
       unsubscribe();
+      releaseSseSlot();
     };
     request.raw.on('close', cleanup);
     request.raw.on('error', cleanup);

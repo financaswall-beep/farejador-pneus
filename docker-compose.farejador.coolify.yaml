@@ -9,6 +9,8 @@ services:
       NODE_ENV: production
       FAREJADOR_ENV: ${FAREJADOR_ENV:-prod}
       PORT: ${PORT:-3000}
+      # Confia apenas no proxy privado/loopback do Coolify para resolver request.ip.
+      TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}

@@ -1,4 +1,10 @@
 (function () {
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]);
+  }
+
   function money(value) {
     return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
@@ -74,11 +80,11 @@
                   ${partners.map((row) => `
                     <tr>
                       <td>
-                        <strong>${row.display_name || row.partner_name || 'Unidade'}</strong>
-                        <small>${row.slug || '-'}</small>
+                        <strong>${escapeHtml(row.display_name || row.partner_name || 'Unidade')}</strong>
+                        <small>${escapeHtml(row.slug || '-')}</small>
                       </td>
-                      <td>${row.responsible_name || '-'}</td>
-                      <td><span class="fallback-status">${statusLabel(row.unit_status || row.partner_status)}</span></td>
+                      <td>${escapeHtml(row.responsible_name || '-')}</td>
+                      <td><span class="fallback-status">${escapeHtml(statusLabel(row.unit_status || row.partner_status))}</span></td>
                       <td>${money(row.sales_month)}</td>
                       <td>${Number(row.orders_month || 0)}</td>
                       <td>${Number(row.stock_items || 0)} itens</td>
@@ -112,19 +118,19 @@
         <div><span>Venda hoje</span><strong>${money(row.sales_today)}</strong></div>
       </div>
       <h3>Top pneus vendidos</h3>
-      <ul>${topItems.map((item) => `<li>${item.label}: ${item.quantity} un.</li>`).join('') || '<li>Sem venda registrada.</li>'}</ul>
+      <ul>${topItems.map((item) => `<li>${escapeHtml(item.label)}: ${Number(item.quantity || 0)} un.</li>`).join('') || '<li>Sem venda registrada.</li>'}</ul>
       <h3>Estoque local</h3>
-      <ul>${stock.slice(0, 6).map((item) => `<li>${item.item_name} ${item.tire_size || ''} - ${item.is_tracked ? `${item.quantity_on_hand || 0} un.` : 'não controlado'}</li>`).join('') || '<li>Sem estoque cadastrado.</li>'}</ul>
+      <ul>${stock.slice(0, 6).map((item) => `<li>${escapeHtml(item.item_name)} ${escapeHtml(item.tire_size || '')} - ${item.is_tracked ? `${Number(item.quantity_on_hand || 0)} un.` : 'não controlado'}</li>`).join('') || '<li>Sem estoque cadastrado.</li>'}</ul>
       <h3>Últimos lançamentos</h3>
-      <ul>${events.slice(0, 6).map((event) => `<li>${formatDate(event.event_at)} - ${event.type}: ${event.description} (${money(event.amount)})</li>`).join('') || '<li>Sem lançamentos recentes.</li>'}</ul>
+      <ul>${events.slice(0, 6).map((event) => `<li>${escapeHtml(formatDate(event.event_at))} - ${escapeHtml(event.type)}: ${escapeHtml(event.description)} (${money(event.amount)})</li>`).join('') || '<li>Sem lançamentos recentes.</li>'}</ul>
     `;
   }
 
   async function loadFallback() {
     if (window.Alpine) return;
 
-    const token = localStorage.getItem('farejador_admin_token') || 'dev-admin-token-local';
-    localStorage.setItem('farejador_admin_token', token);
+    const token = sessionStorage.getItem('farejador_admin_token') || '';
+    if (!token) return;
 
     try {
       const response = await fetch('/admin/api/dashboard/rede', {
@@ -137,7 +143,7 @@
       document.body.innerHTML = `
         <main class="fallback-error">
           <h1>Não consegui carregar a Rede</h1>
-          <p>${err instanceof Error ? err.message : String(err)}</p>
+          <p>${escapeHtml(err instanceof Error ? err.message : String(err))}</p>
         </main>
       `;
     }
