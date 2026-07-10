@@ -42,23 +42,32 @@ window.PAINEL_MODULES.redeKpis = function () {
       return this.formatCurrency(this.redeTotalVendasValor());
     },
 
+    // O servidor manda a série do PERÍODO inteiro (mês = até 31 pontos, hoje por último).
+    // O gráfico mostra os ÚLTIMOS 7 dias, alinhados pelo FIM — somar os 7 PRIMEIROS
+    // escondia a venda de hoje e rotulava o dia 7 do mês de "Hoje" (auditoria 07-10).
     redeSalesSeries() {
-      const series = [0, 0, 0, 0, 0, 0, 0];
+      const maxLen = Math.max(0, ...this.parceirosRede.map((p) => (Array.isArray(p.serieVendas) ? p.serieVendas.length : 0)));
+      const len = Math.min(7, maxLen) || 7;
+      const series = new Array(len).fill(0);
       for (const parceiro of this.parceirosRede) {
-        const values = Array.isArray(parceiro.serieVendas) ? parceiro.serieVendas : [];
-        for (let i = 0; i < 7; i += 1) {
-          series[i] += Number(values[i] || 0);
+        const values = (Array.isArray(parceiro.serieVendas) ? parceiro.serieVendas : []).slice(-len);
+        const offset = len - values.length;
+        for (let i = 0; i < values.length; i += 1) {
+          series[offset + i] += Number(values[i] || 0);
         }
       }
       return series;
     },
 
     redeOrderSeries() {
-      const series = [0, 0, 0, 0, 0, 0, 0];
+      const maxLen = Math.max(0, ...this.parceirosRede.map((p) => (Array.isArray(p.seriePedidos) ? p.seriePedidos.length : 0)));
+      const len = Math.min(7, maxLen) || 7;
+      const series = new Array(len).fill(0);
       for (const parceiro of this.parceirosRede) {
-        const values = Array.isArray(parceiro.seriePedidos) ? parceiro.seriePedidos : [];
-        for (let i = 0; i < 7; i += 1) {
-          series[i] += Number(values[i] || 0);
+        const values = (Array.isArray(parceiro.seriePedidos) ? parceiro.seriePedidos : []).slice(-len);
+        const offset = len - values.length;
+        for (let i = 0; i < values.length; i += 1) {
+          series[offset + i] += Number(values[i] || 0);
         }
       }
       return series;
