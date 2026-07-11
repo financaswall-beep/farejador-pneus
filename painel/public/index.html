@@ -3425,8 +3425,89 @@
         </div>
       </div>
 
-      <!-- CARDS do período -->
-      <div x-show="botTab === 'vendas' && botCards" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+      <!-- VENDAS: leitura comercial do funil, preservando o menu e a navegação do painel -->
+      <div x-show="botTab === 'vendas'" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="message-circle-more" class="w-7 h-7 text-emerald-800"></i></div>
+            <div><p class="text-xs text-gray-500">Conversas</p><p class="text-2xl font-semibold text-emerald-900 mt-1" x-text="botCards ? Number(botCards.conversas || 0).toLocaleString('pt-BR') : '—'"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-check" class="w-7 h-7 text-emerald-800"></i></div>
+            <div><p class="text-xs text-gray-500">Fecharam pedido</p><p class="text-2xl font-semibold text-emerald-900 mt-1" x-text="botCards ? Number(botCards.fecharam || 0).toLocaleString('pt-BR') : '—'"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="percent" class="w-7 h-7 text-emerald-800"></i></div>
+            <div><p class="text-xs text-gray-500">Taxa de conversão</p><p class="text-2xl font-semibold text-emerald-900 mt-1" x-text="botCards ? String(botCards.taxa_conversao || 0).replace('.', ',') + '%' : '—'"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-dollar-sign" class="w-7 h-7 text-emerald-800"></i></div>
+            <div><p class="text-xs text-gray-500">Faturamento (bot)</p><p class="text-2xl font-semibold text-emerald-900 mt-1" x-text="botCards ? formatCurrency(Number(botCards.faturamento || 0)) : '—'"></p></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4"><h3 class="text-base font-semibold">Funil do período <span class="text-gray-400 font-normal">ⓘ</span></h3><span class="text-[11px] bg-emerald-50 text-emerald-800 rounded-lg px-2.5 py-1">acumulado</span></div>
+            <div class="grid grid-cols-1 md:grid-cols-[42%,1fr] gap-5 items-stretch">
+              <div class="flex flex-col justify-center gap-0.5 py-1" aria-hidden="true">
+                <template x-for="(f, i) in botFunil" :key="'funil-shape-' + f.id">
+                  <div class="h-8 mx-auto bg-gradient-to-r from-emerald-800 to-emerald-500 border-b border-white/70"
+                       :style="'width:' + Math.max(32, 100 - (i * 13)) + '%; opacity:' + Math.max(.28, 1 - (i * .13)) + '; clip-path:polygon(4% 0,96% 0,89% 100%,11% 100%)'"></div>
+                </template>
+              </div>
+              <div class="grid" :style="'grid-template-rows:repeat(' + Math.max(botFunil.length, 1) + ', minmax(34px, 1fr))'">
+                <template x-for="f in botFunil" :key="'funil-row-' + f.id">
+                  <div class="grid grid-cols-[1fr,58px,55px] gap-2 items-center border-b border-dashed border-gray-200 last:border-0 text-sm">
+                    <span class="text-gray-700" x-text="f.label"></span><span class="font-semibold text-right" x-text="Number(f.n || 0).toLocaleString('pt-BR')"></span><span class="justify-self-end text-[11px] text-emerald-800 bg-emerald-50 rounded-md px-2 py-1" x-text="String(f.pct || 0).replace('.', ',') + '%' "></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-3">* Funil acumulado: cada etapa considera todos que chegaram até ela ou além.</p>
+          </section>
+
+          <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-5">Por que perdeu <span class="text-gray-400 font-normal">ⓘ</span></h3>
+            <div class="space-y-4">
+              <template x-for="p in botPerdas" :key="'perda-nova-' + p.label">
+                <div class="grid grid-cols-[145px,1fr,44px,50px] gap-3 items-center text-sm">
+                  <span class="text-gray-700 truncate" x-text="p.label"></span>
+                  <div class="h-1.5 bg-emerald-50 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-emerald-700 to-emerald-400 rounded-full" :style="'width:' + (botPerdas[0]?.n ? Math.max(4, Math.round((p.n / botPerdas[0].n) * 100)) : 0) + '%' "></div></div>
+                  <span class="font-semibold text-right" x-text="p.n"></span>
+                  <span class="text-xs text-gray-500 text-right" x-text="botPerdas.reduce((s, item) => s + item.n, 0) ? String(Math.round((p.n / botPerdas.reduce((s, item) => s + item.n, 0)) * 1000) / 10).replace('.', ',') + '%' : '0%' "></span>
+                </div>
+              </template>
+              <p x-show="botVisao && !botPerdas.length" class="text-sm text-gray-400 py-8 text-center">Nenhuma perda classificada no período.</p>
+            </div>
+          </section>
+
+          <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-5">Da boca do cliente <span class="text-gray-400 font-normal">ⓘ</span></h3>
+            <div class="space-y-4">
+              <template x-for="(b, i) in botBoca" :key="'boca-nova-' + b.id">
+                <div class="grid grid-cols-[20px,145px,1fr,42px,48px] gap-3 items-center text-sm">
+                  <span class="w-4 h-4 rounded-full bg-emerald-700 text-white text-[9px] flex items-center justify-center" x-text="i + 1"></span><span class="text-gray-600 truncate" x-text="b.label"></span>
+                  <div class="h-1.5 bg-emerald-50 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-emerald-700 to-emerald-400 rounded-full" :style="'width:' + (botBoca[0]?.n ? Math.max(3, Math.round((b.n / botBoca[0].n) * 100)) : 0) + '%' "></div></div>
+                  <span class="font-semibold text-right" x-text="b.n"></span><span class="text-xs text-gray-500 text-right" x-text="botBoca.reduce((s, item) => s + item.n, 0) ? String(Math.round((b.n / botBoca.reduce((s, item) => s + item.n, 0)) * 1000) / 10).replace('.', ',') + '%' : '0%' "></span>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center gap-3 mb-5"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="lightbulb" class="w-5 h-5 text-emerald-800"></i></div><h3 class="text-base font-semibold">Leitura do período</h3></div>
+            <div class="space-y-5 text-sm text-gray-600 leading-relaxed">
+              <div class="flex gap-3"><span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-700 text-white flex-shrink-0 flex items-center justify-center text-[10px]">✓</span><p>A maior queda acontece entre <strong class="text-emerald-800" x-text="botFunil.length > 2 ? botFunil[2].label : 'a cotação'"></strong> e <strong class="text-emerald-800" x-text="botFunil.length > 3 ? botFunil[3].label : 'a localização'"></strong>.</p></div>
+              <div class="flex gap-3"><span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-700 text-white flex-shrink-0 flex items-center justify-center text-[10px]">✓</span><p><strong class="text-emerald-800" x-text="botPerdas.length ? '“' + botPerdas[0].label + '”' : 'O principal motivo'"></strong> é hoje o motivo de perda mais frequente.</p></div>
+              <div class="flex gap-3"><span class="w-5 h-5 mt-0.5 rounded-full bg-emerald-700 text-white flex-shrink-0 flex items-center justify-center text-[10px]">✓</span><p>Das <strong class="text-emerald-800" x-text="botCards ? Number(botCards.conversas || 0).toLocaleString('pt-BR') : '0'"></strong> conversas, <strong class="text-emerald-800" x-text="botCards ? String(botCards.taxa_conversao || 0).replace('.', ',') + '%' : '0%'"></strong> chegaram a pedido criado.</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Bloco anterior mantido oculto durante a substituição visual. -->
+      <div x-show="false" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500">Conversas</p>
           <p class="text-2xl font-semibold mt-1" x-text="botCards ? botCards.conversas : '—'"></p>
@@ -3477,7 +3558,7 @@
       </div>
 
       <!-- FUNIL + BOCA: onde a conversa para, e o que o cliente fala -->
-      <div x-show="botTab === 'vendas'" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div x-show="false" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-2">
           <div class="flex items-center gap-2 mb-1">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
