@@ -10,7 +10,7 @@ window.PAINEL_MODULES.sino = function () {
   return {
     async loadSino() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.sino = await this.apiGet('/admin/api/matriz/notificacoes');
       } catch (err) {

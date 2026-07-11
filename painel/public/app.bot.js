@@ -9,7 +9,7 @@ window.PAINEL_MODULES.bot = function () {
     // cliente esperando é alarme, não estatística. Badge acende na aba do menu.
     async loadBotCampainha() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.botCampainha = await this.apiGet('/admin/api/bot/campainha');
       } catch (err) {
@@ -24,7 +24,7 @@ window.PAINEL_MODULES.bot = function () {
 
     async loadBotVisao() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       this.botLoading = true;
       try {
         this.botVisao = await this.apiGet(

@@ -264,10 +264,12 @@
       <div class="w-px h-6 bg-gray-200 mx-1"></div>
 
       <!-- Avatar do operador -->
-      <button class="flex items-center gap-2 p-1 pr-2.5 hover:bg-gray-100 rounded-lg transition-colors">
-        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold">W</div>
-        <span class="text-sm font-medium">Wallace</span>
-        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-500"></i>
+      <button @click="logoutAdmin()" title="Sair da Matriz"
+              class="flex items-center gap-2 p-1 pr-2.5 hover:bg-gray-100 rounded-lg transition-colors">
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold"
+             x-text="operatorLabel.charAt(0).toUpperCase()">O</div>
+        <span class="text-sm font-medium" x-text="operatorLabel">Operador</span>
+        <i data-lucide="log-out" class="w-3.5 h-3.5 text-gray-500"></i>
       </button>
     </div>
 
@@ -3066,13 +3068,22 @@
               </select>
             </div>
             <div>
+              <label class="text-xs text-gray-500">Acesso ao painel da Matriz</label>
+              <select x-model="colabForm.panel_role"
+                      class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-200">
+                <option :value="null">Sem acesso ao painel</option>
+                <option value="admin">Administrador</option>
+                <option value="owner">Proprietário</option>
+              </select>
+            </div>
+            <div>
               <label class="text-xs text-gray-500">Usuário (login — único na rede)</label>
               <input type="text" x-model="colabForm.username" placeholder="ex.: joao.moto"
                      class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
             </div>
             <div>
-              <label class="text-xs text-gray-500">Senha temporária (mínimo 6)</label>
-              <input type="text" x-model="colabForm.password" placeholder="ele troca com você depois"
+              <label class="text-xs text-gray-500">Senha temporária (mínimo 12)</label>
+              <input type="password" x-model="colabForm.password" placeholder="mínimo 12 caracteres"
                      class="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
             </div>
             <div class="md:col-span-2">
@@ -3107,6 +3118,13 @@
                         class="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
                   <option value="vendedor">Vendedor</option>
                   <option value="entregador">Entregador</option>
+                </select>
+                <select x-show="c.active" :value="c.panel_role || ''" :disabled="!!colabSaving"
+                        @change="mudarAcessoColaborador(c, $event.target.value)"
+                        class="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                  <option value="">Sem painel</option>
+                  <option value="admin">Admin</option>
+                  <option value="owner">Proprietário</option>
                 </select>
                 <span x-show="!c.active" class="text-xs text-gray-400" x-text="colabJobLabel(c.job)"></span>
                 <button x-show="c.active" @click="trocarSenhaColaborador(c)" :disabled="!!colabSaving"

@@ -108,7 +108,7 @@ export async function registerPainelLogistica(fastify: FastifyInstance): Promise
     try {
       const result = await failMatrizDelivery({
         ...parsed.data,
-        actor_label: operatorLabel(request.headers),
+        actor_label: operatorLabel(request),
       });
       return reply.status(200).send({ failed: true, ...result });
     } catch (err) {

@@ -6,7 +6,7 @@ window.PAINEL_MODULES.logistica = function () {
   return {
     async loadLogistica() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         const payload = await this.apiGet('/admin/api/logistica');
         // flag off → enabled:false → null (a tela mostra o aviso de dormente)
@@ -33,7 +33,7 @@ window.PAINEL_MODULES.logistica = function () {
       for (const id of vivos) {
         if (this.receiptUrls[id]) continue;
         try {
-          const resp = await fetch(`/admin/api/logistica/comprovantes/${id}/imagem`, { headers: { Authorization: `Bearer ${this.apiToken}` } });
+          const resp = await fetch(`/admin/api/logistica/comprovantes/${id}/imagem`, { credentials: 'same-origin' });
           if (!resp.ok) continue;
           this.receiptUrls[id] = URL.createObjectURL(await resp.blob());
         } catch (e) { /* miniatura é cosmética; o dado da rota já está na tela */ }

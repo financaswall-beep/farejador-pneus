@@ -202,7 +202,7 @@ window.PAINEL_MODULES.compras = function () {
     // ── FINANCEIRO da matriz — tela própria: visão consolidada (Onda 1) + despesas (0120) ──
     async loadFinanceiro() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       const [visao] = await Promise.all([
         this.apiGet('/admin/api/matriz/financeiro').catch((err) => {
           console.warn('financeiro visão falhou:', err.message);
@@ -216,7 +216,7 @@ window.PAINEL_MODULES.compras = function () {
     },
     async loadDespesas() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         // 0130: a lista é o EXTRATO do período — 1º load cai no mês corrente (fuso SP).
         if (!this.despesaFiltro.mes) this.despesaFiltro.mes = this.despesaMesAtual();

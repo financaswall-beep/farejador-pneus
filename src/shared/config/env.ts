@@ -35,6 +35,9 @@ const envSchema = z.object({
   CHATWOOT_API_TOKEN: z.string().min(1).optional(),
   CHATWOOT_ACCOUNT_ID: z.string().transform(Number).pipe(z.number().int()).optional(),
   ADMIN_AUTH_TOKEN: z.string().min(1),
+  // Transição do login humano: true mantém Bearer emergencial; desligar após
+  // criar e validar a primeira conta owner da Matriz.
+  ADMIN_BEARER_FALLBACK_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   // OpenAI (usado pelo Agent V2)

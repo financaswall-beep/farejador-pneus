@@ -2,13 +2,18 @@
 // VERBATIM das linhas 326-375 do route.ts pré-obra + prefixo 'export ' nas declarações
 // de topo (transformação mecânica; o gerador prova a reversa). Porta: ./route.js.
 import { readFile } from 'node:fs/promises';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { publicDir } from './route-schemas.js';
 import { env } from '../../shared/config/env.js';
 import path from 'node:path';
+import { getAdminContext } from '../auth.js';
 
-export function operatorLabel(headers: Record<string, unknown>): string {
-  const raw = headers['x-operator-label'];
+export function operatorLabel(request: FastifyRequest): string {
+  const context = getAdminContext(request);
+  if (context.authType === 'session') {
+    return `${context.displayName} (${context.username ?? context.collaboratorId})`.slice(0, 120);
+  }
+  const raw = request.headers['x-operator-label'];
   if (typeof raw === 'string' && raw.trim().length > 0) {
     return raw.trim().slice(0, 120);
   }
@@ -62,4 +67,3 @@ export function dashboardPayload(rows: unknown[]) {
     rows,
   };
 }
-

@@ -98,7 +98,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
 
     // ── Etapa 3: candidaturas de parceiro ──
     async loadApplications() {
-      if (!this.apiToken) return;
+      if (!this.adminAuthenticated) return;
       this.applicationsLoading = true;
       try {
         const payload = await this.apiGet('/admin/api/partner-applications?status=pending');

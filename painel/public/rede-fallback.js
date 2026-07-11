@@ -129,13 +129,11 @@
   async function loadFallback() {
     if (window.Alpine) return;
 
-    const token = sessionStorage.getItem('farejador_admin_token') || '';
-    if (!token) return;
-
     try {
       const response = await fetch('/admin/api/dashboard/rede', {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'same-origin',
       });
+      if (response.status === 401) { location.replace('/admin/login'); return; }
       if (!response.ok) throw new Error(`api_${response.status}`);
       const payload = await response.json();
       renderFallback(payload.rows || []);

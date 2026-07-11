@@ -3,10 +3,10 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { MatrizCollaboratorUsernameTakenError, createMatrizCollaborator, listMatrizCollaborators, reactivateMatrizCollaborator, resetMatrizCollaboratorPassword, revokeMatrizCollaborator, updateMatrizCollaboratorJob } from './queries.js';
+import { MatrizCollaboratorUsernameTakenError, MatrizLastOwnerError, createMatrizCollaborator, listMatrizCollaborators, reactivateMatrizCollaborator, resetMatrizCollaboratorPassword, revokeMatrizCollaborator, updateMatrizCollaboratorJob, updateMatrizCollaboratorPanelRole } from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 
 export async function registerPainelColaboradores(fastify: FastifyInstance): Promise<void> {
@@ -17,20 +17,25 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
   const criarColaboradorSchema = z.object({
     display_name: z.string().trim().min(2).max(120),
     username: colaboradorUsernameField,
-    password: z.string().min(6).max(200),
+    password: z.string().min(12).max(200),
     job: z.enum(['vendedor', 'entregador']),
+    panel_role: z.enum(['owner', 'admin']).nullable().default(null),
   });
   const funcaoColaboradorSchema = z.object({
     id: z.string().uuid(),
     job: z.enum(['vendedor', 'entregador']),
   });
   const idColaboradorSchema = z.object({ id: z.string().uuid() });
+  const acessoColaboradorSchema = z.object({
+    id: z.string().uuid(),
+    panel_role: z.enum(['owner', 'admin']).nullable(),
+  });
   const senhaColaboradorSchema = z.object({
     id: z.string().uuid(),
-    password: z.string().min(6).max(200),
+    password: z.string().min(12).max(200),
   });
 
-  fastify.get('/admin/api/colaboradores', { preHandler: requireAdminAuth }, async (_request, reply) => {
+  fastify.get('/admin/api/colaboradores', { preHandler: requireAdminOwner }, async (_request, reply) => {
     try {
       return reply.status(200).send({ collaborators: await listMatrizCollaborators() });
     } catch (err) {
@@ -40,13 +45,13 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     }
   });
 
-  fastify.post('/admin/api/colaboradores', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/colaboradores', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = criarColaboradorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await createMatrizCollaborator({ ...parsed.data, actor_label: operatorLabel(request.headers) });
+      const result = await createMatrizCollaborator({ ...parsed.data, actor_label: operatorLabel(request) });
       return reply.status(201).send({ created: true, ...result });
     } catch (err) {
       if (err instanceof MatrizCollaboratorUsernameTakenError) {
@@ -58,7 +63,7 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     }
   });
 
-  fastify.post('/admin/api/colaboradores/funcao', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/colaboradores/funcao', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = funcaoColaboradorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -74,7 +79,21 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     }
   });
 
-  fastify.post('/admin/api/colaboradores/revogar', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/colaboradores/acesso', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const parsed = acessoColaboradorSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await updateMatrizCollaboratorPanelRole(parsed.data);
+      if (!result.updated) return reply.status(404).send({ error: 'collaborator_not_found' });
+      return reply.status(200).send({ updated: true });
+    } catch (error) {
+      if (error instanceof MatrizLastOwnerError) return reply.status(409).send({ error: 'last_owner_required' });
+      const mapped = mapWriteError(error);
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/colaboradores/revogar', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = idColaboradorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -84,13 +103,14 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
       if (!result.revoked) return reply.status(404).send({ error: 'collaborator_not_found' });
       return reply.status(200).send({ revoked: true });
     } catch (err) {
+      if (err instanceof MatrizLastOwnerError) return reply.status(409).send({ error: 'last_owner_required' });
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel colaboradores revogar failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
 
-  fastify.post('/admin/api/colaboradores/reativar', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/colaboradores/reativar', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = idColaboradorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -109,7 +129,7 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     }
   });
 
-  fastify.post('/admin/api/colaboradores/senha', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/colaboradores/senha', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = senhaColaboradorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });

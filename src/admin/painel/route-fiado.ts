@@ -34,7 +34,7 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
         order_id: parsed.data.order_id,
         reason: parsed.data.reason ?? null,
         environment: parsed.data.environment,
-        cancelled_by: operatorLabel(request.headers),
+        cancelled_by: operatorLabel(request),
       });
       return reply.status(200).send({ cancelled: true, ...result });
     } catch (err) {

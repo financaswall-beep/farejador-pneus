@@ -57,7 +57,7 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
       const result = await approvePartnerApplication({
         ...parsed.data,
         application_id: id,
-        actor_label: operatorLabel(request.headers),
+        actor_label: operatorLabel(request),
       });
       if (result.already_exists) return reply.status(409).send({ error: 'slug_already_exists', slug: result.slug });
       return reply.status(200).send(result);
@@ -73,7 +73,7 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
     const { id } = request.params as { id: string };
     const body = (request.body ?? {}) as { notes?: string };
     try {
-      const result = await rejectPartnerApplication(id, operatorLabel(request.headers), body.notes ?? null);
+      const result = await rejectPartnerApplication(id, operatorLabel(request), body.notes ?? null);
       return reply.status(200).send(result);
     } catch (err) {
       const mapped = mapWriteError(err);

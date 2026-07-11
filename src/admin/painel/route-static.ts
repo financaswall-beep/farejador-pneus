@@ -9,6 +9,12 @@ import { logger } from '../../shared/logger.js';
 import { sendStatic } from './route-helpers.js';
 
 export async function registerPainelStatic(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/admin/login', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'no-store'), 'login.html', 'text/html; charset=utf-8'));
+  fastify.get('/admin/login.js', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'no-store'), 'login.js', 'text/javascript; charset=utf-8'));
+  fastify.get('/admin/login.css', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'no-store'), 'login.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel', async (_request, reply) => sendStatic(reply, 'index.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/painel/', async (_request, reply) => sendStatic(reply, 'index.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));

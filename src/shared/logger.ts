@@ -10,6 +10,7 @@ export const loggerOptions: LoggerOptions = {
   redact: {
     paths: [
       'req.headers.authorization',
+      'req.headers.cookie',
       'req.headers["x-partner-token"]',
       'req.headers["x-chatwoot-signature"]',
       'req.query.token',

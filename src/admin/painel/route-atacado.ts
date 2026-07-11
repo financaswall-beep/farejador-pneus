@@ -27,7 +27,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request.headers) });
+      const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request) });
       return reply.status(201).send(result);
     } catch (err) {
       // Oversell: 409 com a lista de medidas que estouraram — o front avisa e reenvia com

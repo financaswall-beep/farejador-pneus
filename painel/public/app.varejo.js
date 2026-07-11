@@ -59,7 +59,7 @@ window.PAINEL_MODULES.varejo = function () {
     // linhas dela). A lista continua alimentando a tabela; o resumo alimenta os CARDS.
     async loadVarejoResumo() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.varejoResumo = (await this.apiGet('/admin/api/varejo/resumo?period=' + this.varejoPeriodo)) || null;
       } catch (err) {

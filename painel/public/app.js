@@ -24,6 +24,7 @@ function montarPainelApp(estado, fabricas) {
 function painelApp() {
   // Migração de segurança: o token antigo não pode continuar persistido entre sessões.
   localStorage.removeItem('farejador_admin_token');
+  sessionStorage.removeItem('farejador_admin_token');
   const estado = {
     // ─── ESTADO ─────────────────────────────────────
     currentPage: 'resumo',
@@ -68,8 +69,9 @@ function painelApp() {
     approveSubmitting: false,
     approveError: null,
     approveResult: null,
-    apiToken: sessionStorage.getItem('farejador_admin_token') || '',
-    operatorLabel: localStorage.getItem('farejador_operator_label') || 'Wallace',
+    adminAuthenticated: false,
+    adminUser: null,
+    operatorLabel: 'Operador',
     apiStatus: 'mock',
     apiError: null,
     serverEnvironment: null,
@@ -183,7 +185,7 @@ function painelApp() {
     colabSaving: false,
     colabMsg: null,
     colabShowForm: false,
-    colabForm: { display_name: '', username: '', password: '', job: 'vendedor' },
+    colabForm: { display_name: '', username: '', password: '', job: 'vendedor', panel_role: null },
 
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [

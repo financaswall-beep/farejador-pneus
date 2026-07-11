@@ -22,7 +22,7 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
     try {
       const result = await openMatrizTrip({
         ...parsed.data,
-        created_by: operatorLabel(request.headers),
+        created_by: operatorLabel(request),
       });
       return reply.status(201).send({ created: true, ...result });
     } catch (err) {

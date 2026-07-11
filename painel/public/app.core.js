@@ -5,8 +5,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.core = function () {
   return {
     async loadRealData() {
-      this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       this.loadApplications(); // Etapa 3: badge de candidaturas (não bloqueia o resto)
 
       // Promise.allSettled: cada bloco é independente — um endpoint que falhe
@@ -49,8 +48,7 @@ window.PAINEL_MODULES.core = function () {
     },
 
     async loadRedeData() {
-      this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
 
       try {
         const rede = await this.apiGet(`/admin/api/dashboard/rede?period=${encodeURIComponent(this.redePeriod)}`);
@@ -78,7 +76,8 @@ window.PAINEL_MODULES.core = function () {
       }
     },
 
-    init() {
+    async init() {
+      if (!(await this.ensureCredentials())) return;
       void this.loadRealData();
       // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
       // (flag off = resposta enabled:false, barata; a página Rede re-varre ao entrar).
@@ -156,7 +155,7 @@ window.PAINEL_MODULES.core = function () {
 
     async liveRefresh() {
       if (this.liveRefreshing || document.hidden) return;
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       // Sino atualiza em QUALQUER página (aviso é aviso); tem try/catch próprio.
       void this.loadSino();
       // Campainha do bot idem: cliente esperando não pode depender da aba aberta.

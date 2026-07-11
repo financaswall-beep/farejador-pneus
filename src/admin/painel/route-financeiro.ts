@@ -60,7 +60,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
       const result = await createMatrizExpenseCategory({
         label: parsed.data.label,
         environment: parsed.data.environment,
-        created_by: operatorLabel(request.headers),
+        created_by: operatorLabel(request),
       });
       return reply.status(201).send({ created: true, ...result });
     } catch (err) {
@@ -106,7 +106,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
     try {
       const result = await createMatrizExpense({
         ...parsed.data,
-        created_by: operatorLabel(request.headers),
+        created_by: operatorLabel(request),
       });
       return reply.status(201).send({ created: true, ...result });
     } catch (err) {

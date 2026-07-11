@@ -88,7 +88,8 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
       try {
         const resp = await fetch(`/admin/api/logistica/rotas/${t.id}/comprovante`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${this.apiToken}`, 'X-Operator-Label': this.operatorLabel, 'Content-Type': file.type },
+          credentials: 'same-origin',
+          headers: { 'Content-Type': file.type },
           body: file,
         });
         const payload = await resp.json().catch(() => ({}));

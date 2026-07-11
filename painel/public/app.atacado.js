@@ -9,7 +9,7 @@ window.PAINEL_MODULES.atacado = function () {
     },
     async loadAtacado() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
       try {
         const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown, finance, vendas] = await Promise.all([

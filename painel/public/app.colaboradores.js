@@ -5,8 +5,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.colaboradores = function () {
   return {
     async loadColaboradores() {
-      this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         const payload = await this.apiGet('/admin/api/colaboradores');
         this.colaboradores = payload.collaborators || [];
@@ -18,6 +17,11 @@ window.PAINEL_MODULES.colaboradores = function () {
     },
     colabJobLabel(job) {
       return job === 'entregador' ? 'Entregador' : 'Vendedor';
+    },
+    colabAccessLabel(role) {
+      if (role === 'owner') return 'Proprietário';
+      if (role === 'admin') return 'Administrador';
+      return 'Sem acesso ao painel';
     },
     async criarColaborador() {
       const f = this.colabForm;
@@ -33,9 +37,10 @@ window.PAINEL_MODULES.colaboradores = function () {
           username: f.username.trim(),
           password: f.password,
           job: f.job,
+          panel_role: f.panel_role || null,
         });
         this.colabMsg = { ok: true, text: `${f.display_name.trim()} cadastrado como ${this.colabJobLabel(f.job).toLowerCase()}.` };
-        this.colabForm = { display_name: '', username: '', password: '', job: 'vendedor' };
+        this.colabForm = { display_name: '', username: '', password: '', job: 'vendedor', panel_role: null };
         this.colabShowForm = false;
         await this.loadColaboradores();
       } catch (err) {
@@ -60,10 +65,27 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabSaving = false;
       }
     },
+    async mudarAcessoColaborador(c, panelRole) {
+      const role = panelRole || null;
+      if (c.panel_role === role) return;
+      this.colabSaving = true;
+      try {
+        await this.apiPost('/admin/api/colaboradores/acesso', { id: c.id, panel_role: role });
+        this.colabMsg = { ok: true, text: `Acesso de ${c.display_name}: ${this.colabAccessLabel(role)}.` };
+        await this.loadColaboradores();
+      } catch (err) {
+        this.colabMsg = err.message === 'last_owner_required'
+          ? { ok: false, text: 'Não é possível remover o último proprietário da Matriz.' }
+          : { ok: false, text: `Não consegui mudar o acesso (${err.message}).` };
+        await this.loadColaboradores();
+      } finally {
+        this.colabSaving = false;
+      }
+    },
     async trocarSenhaColaborador(c) {
-      const senha = prompt(`Nova senha pra ${c.display_name} (mínimo 6):`);
+      const senha = prompt(`Nova senha pra ${c.display_name} (mínimo 12):`);
       if (senha === null) return;
-      if (senha.length < 6) { this.colabMsg = { ok: false, text: 'Senha muito curta (mínimo 6).' }; return; }
+      if (senha.length < 12) { this.colabMsg = { ok: false, text: 'Senha muito curta (mínimo 12).' }; return; }
       this.colabSaving = true;
       try {
         await this.apiPost('/admin/api/colaboradores/senha', { id: c.id, password: senha });
@@ -82,7 +104,9 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabMsg = { ok: true, text: `${c.display_name} revogado.` };
         await this.loadColaboradores();
       } catch (err) {
-        this.colabMsg = { ok: false, text: `Não consegui revogar (${err.message}).` };
+        this.colabMsg = err.message === 'last_owner_required'
+          ? { ok: false, text: 'Não é possível revogar o último proprietário da Matriz.' }
+          : { ok: false, text: `Não consegui revogar (${err.message}).` };
       } finally {
         this.colabSaving = false;
       }

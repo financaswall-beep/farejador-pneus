@@ -17,7 +17,7 @@ export async function registerPainelParceiros(fastify: FastifyInstance): Promise
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await createPartnerUnit({ ...parsed.data, actor_label: operatorLabel(request.headers) });
+      const result = await createPartnerUnit({ ...parsed.data, actor_label: operatorLabel(request) });
       if (result.already_exists) {
         return reply.status(409).send({ error: 'slug_already_exists', slug: result.slug });
       }

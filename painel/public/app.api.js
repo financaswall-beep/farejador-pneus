@@ -4,49 +4,52 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.api = function () {
   return {
-    ensureCredentials() {
-      if (!this.operatorLabel) {
-        this.operatorLabel = prompt('Nome do operador') || 'Wallace';
-        localStorage.setItem('farejador_operator_label', this.operatorLabel);
+    async ensureCredentials() {
+      if (this.adminAuthenticated) return true;
+      const response = await fetch('/admin/api/auth/me', { credentials: 'same-origin' });
+      if (!response.ok) {
+        location.replace('/admin/login');
+        return false;
       }
-
-      if (!this.apiToken && location.pathname.startsWith('/admin/painel')) {
-        const token = prompt('ADMIN_AUTH_TOKEN para carregar dados reais');
-        if (token) {
-          this.apiToken = token;
-          sessionStorage.setItem('farejador_admin_token', token);
-        }
+      const payload = await response.json();
+      this.adminUser = payload.user;
+      this.operatorLabel = payload.user.display_name;
+      this.adminAuthenticated = true;
+      if (payload.user.role !== 'owner') {
+        this.liveMenu = this.liveMenu.filter((item) => item.id !== 'colaboradores');
       }
+      return true;
     },
 
     apiHeaders() {
       return {
-        Authorization: `Bearer ${this.apiToken}`,
-        'X-Operator-Label': this.operatorLabel,
         'Content-Type': 'application/json',
       };
     },
 
+    adminUnauthorized() {
+      this.adminAuthenticated = false;
+      this.adminUser = null;
+      location.replace('/admin/login');
+    },
+
     async apiGet(path) {
-      if (!this.apiToken) throw new Error('missing_admin_token');
-      const response = await fetch(path, { headers: this.apiHeaders() });
-      if (response.status === 401 || response.status === 429) {
-        if (response.status === 401) {
-          this.apiToken = '';
-          sessionStorage.removeItem('farejador_admin_token');
-        }
-      }
+      if (!this.adminAuthenticated) throw new Error('missing_admin_session');
+      const response = await fetch(path, { credentials: 'same-origin', headers: this.apiHeaders() });
+      if (response.status === 401) this.adminUnauthorized();
       if (!response.ok) throw new Error(`api_${response.status}`);
       return response.json();
     },
 
     async apiPost(path, body) {
-      if (!this.apiToken) throw new Error('missing_admin_token');
+      if (!this.adminAuthenticated) throw new Error('missing_admin_session');
       const response = await fetch(path, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: this.apiHeaders(),
         body: JSON.stringify(body),
       });
+      if (response.status === 401) this.adminUnauthorized();
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         const e = new Error(payload.error || `api_${response.status}`);
@@ -57,17 +60,33 @@ window.PAINEL_MODULES.api = function () {
     },
 
     async apiPut(path, body) {
-      if (!this.apiToken) throw new Error('missing_admin_token');
+      if (!this.adminAuthenticated) throw new Error('missing_admin_session');
       const response = await fetch(path, {
         method: 'PUT',
+        credentials: 'same-origin',
         headers: this.apiHeaders(),
         body: JSON.stringify(body),
       });
+      if (response.status === 401) this.adminUnauthorized();
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || `api_${response.status}`);
       }
       return response.json();
+    },
+
+    async logoutAdmin() {
+      try {
+        await fetch('/admin/api/auth/logout', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+      } finally {
+        this.adminAuthenticated = false;
+        location.replace('/admin/login');
+      }
     },
 
     // Matriz define o raio de entrega do parceiro selecionado (proximidade-primeiro Fase 2).

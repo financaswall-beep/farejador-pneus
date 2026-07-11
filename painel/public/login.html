@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entrar na Matriz — Farejador</title>
+  <link rel="stylesheet" href="/admin/login.css?v=20260710-admin-login1" />
+  <script defer src="/admin/login.js?v=20260710-admin-login1"></script>
+</head>
+<body>
+  <main class="shell">
+    <section class="card" aria-labelledby="title">
+      <div class="brand"><span>2W</span> Farejador</div>
+      <h1 id="title">Acesso à Matriz</h1>
+      <p class="subtitle">Entre com sua conta individual. Sua sessão fica protegida em cookie seguro.</p>
+
+      <div id="loading" class="notice">Verificando o acesso…</div>
+
+      <form id="login-form" class="hidden" novalidate>
+        <label for="username">Usuário</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="60" />
+        <label for="password">Senha</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" />
+        <p id="login-error" class="error" role="alert"></p>
+        <button type="submit">Entrar</button>
+      </form>
+
+      <form id="bootstrap-form" class="hidden" novalidate>
+        <div class="notice warning">
+          Primeiro acesso: crie a conta proprietária. O token emergencial será usado somente nesta operação e não será salvo.
+        </div>
+        <label for="display-name">Seu nome</label>
+        <input id="display-name" name="display_name" autocomplete="name" required maxlength="120" />
+        <label for="bootstrap-username">Novo usuário</label>
+        <input id="bootstrap-username" name="username" autocomplete="username" required maxlength="60" />
+        <label for="bootstrap-password">Nova senha</label>
+        <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="200" />
+        <small>Use pelo menos 12 caracteres e não reutilize outra senha.</small>
+        <label for="emergency-token">ADMIN_AUTH_TOKEN atual</label>
+        <input id="emergency-token" name="token" type="password" autocomplete="off" required />
+        <p id="bootstrap-error" class="error" role="alert"></p>
+        <button type="submit">Criar conta proprietária</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

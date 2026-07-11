@@ -6,7 +6,7 @@ window.PAINEL_MODULES.comissoes = function () {
   return {
     async loadComissoes() {
       this.ensureCredentials();
-      if (!this.apiToken || !location.pathname.startsWith('/admin/painel')) return;
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
         this.comissoes = (await this.apiGet('/admin/api/rede/comissoes')) || null;
       } catch (err) {

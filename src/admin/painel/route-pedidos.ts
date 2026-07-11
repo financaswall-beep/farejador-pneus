@@ -20,7 +20,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     try {
       const result = await registerManualOrder({
         ...parsed.data,
-        actor_label: operatorLabel(request.headers),
+        actor_label: operatorLabel(request),
       });
       return reply.status(200).send(result);
     } catch (err) {
@@ -39,7 +39,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     try {
       const result = await registerWalkinOrder({
         ...parsed.data,
-        actor_label: operatorLabel(request.headers),
+        actor_label: operatorLabel(request),
       });
       return reply.status(200).send(result);
     } catch (err) {
@@ -60,7 +60,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
       return reply.status(200).send(await cancelManualOrder({
         order_id: params.data.order_id,
         reason: body.data.reason,
-        actor_label: operatorLabel(request.headers),
+        actor_label: operatorLabel(request),
       }));
     } catch (err) {
       const mapped = mapWriteError(err);

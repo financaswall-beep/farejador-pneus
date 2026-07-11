@@ -53,7 +53,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await registerWholesalePurchase({ ...parsed.data, created_by: operatorLabel(request.headers) });
+      const result = await registerWholesalePurchase({ ...parsed.data, created_by: operatorLabel(request) });
       return reply.status(201).send(result);
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -74,7 +74,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
         purchase_id: parsed.data.purchase_id,
         reason: parsed.data.reason ?? null,
         environment: parsed.data.environment,
-        cancelled_by: operatorLabel(request.headers),
+        cancelled_by: operatorLabel(request),
       });
       return reply.status(200).send({ cancelled: true, ...result });
     } catch (err) {

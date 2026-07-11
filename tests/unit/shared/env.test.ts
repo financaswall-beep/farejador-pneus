@@ -46,4 +46,9 @@ describe('environment security validation', () => {
       .toBe('loopback, linklocal, uniquelocal');
     expect(parseEnv({ ...baseEnv, TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(false);
   });
+
+  it('allows disabling the emergency admin bearer after owner bootstrap', () => {
+    expect(parseEnv({ ...baseEnv, ADMIN_BEARER_FALLBACK_ENABLED: 'false' }).ADMIN_BEARER_FALLBACK_ENABLED)
+      .toBe(false);
+  });
 });

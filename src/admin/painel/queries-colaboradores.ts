@@ -12,12 +12,14 @@ import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailC
 import { hashPassword } from '../../parceiro/password.js';
 
 export type MatrizCollaboratorJob = 'vendedor' | 'entregador';
+export type MatrizPanelRole = 'owner' | 'admin';
 
 export interface MatrizCollaborator {
   id: string;
   display_name: string;
   username: string;
   job: MatrizCollaboratorJob;
+  panel_role: MatrizPanelRole | null;
   active: boolean;
   created_at: string;
   revoked_at: string | null;
@@ -42,9 +44,10 @@ export async function listMatrizCollaborators(
 ): Promise<MatrizCollaborator[]> {
   const res = await dbPool.query<{
     id: string; display_name: string; username: string; job: MatrizCollaboratorJob;
+    panel_role: MatrizPanelRole | null;
     created_at: string; revoked_at: string | null;
   }>(
-    `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.created_at, mc.revoked_at
+    `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.panel_role, mc.created_at, mc.revoked_at
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp ON pp.id = mc.person_id
       WHERE mc.environment = $1
@@ -60,6 +63,7 @@ export interface CreateMatrizCollaboratorInput {
   username: string;
   password: string;
   job: MatrizCollaboratorJob;
+  panel_role?: MatrizPanelRole | null;
   actor_label?: string | null;
 }
 
@@ -81,10 +85,10 @@ export async function createMatrizCollaborator(
       [environment, cleanUsername, passwordHash],
     );
     const collab = await client.query<{ id: string }>(
-      `INSERT INTO network.matriz_collaborators (environment, person_id, display_name, job, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO network.matriz_collaborators (environment, person_id, display_name, job, panel_role, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [environment, person.rows[0]!.id, input.display_name.trim(), input.job, input.actor_label ?? null],
+      [environment, person.rows[0]!.id, input.display_name.trim(), input.job, input.panel_role ?? null, input.actor_label ?? null],
     );
     await client.query('COMMIT');
     return { id: collab.rows[0]!.id, username: cleanUsername };
@@ -111,6 +115,69 @@ export async function updateMatrizCollaboratorJob(
   return { updated: (res.rowCount ?? 0) > 0 };
 }
 
+export class MatrizLastOwnerError extends Error {
+  constructor() { super('last_owner_required'); }
+}
+
+async function lockAndProtectLastOwner(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  collaboratorId: string,
+  nextRole: MatrizPanelRole | null,
+): Promise<{ found: boolean; personId: string | null }> {
+  const target = await client.query<{ person_id: string; panel_role: MatrizPanelRole | null }>(
+    `SELECT person_id, panel_role FROM network.matriz_collaborators
+      WHERE environment = $1 AND id = $2 AND revoked_at IS NULL
+      FOR UPDATE`,
+    [environment, collaboratorId],
+  );
+  const row = target.rows[0];
+  if (!row) return { found: false, personId: null };
+  if (row.panel_role === 'owner' && nextRole !== 'owner') {
+    const owners = await client.query(
+      `SELECT id FROM network.matriz_collaborators
+        WHERE environment = $1 AND panel_role = 'owner' AND revoked_at IS NULL
+        FOR UPDATE`,
+      [environment],
+    );
+    if (owners.rows.length <= 1) throw new MatrizLastOwnerError();
+  }
+  return { found: true, personId: row.person_id };
+}
+
+export async function updateMatrizCollaboratorPanelRole(
+  input: { environment?: 'prod' | 'test'; id: string; panel_role: MatrizPanelRole | null },
+  dbPool: Pool = defaultPool,
+): Promise<{ updated: boolean }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const target = await lockAndProtectLastOwner(client, environment, input.id, input.panel_role);
+    if (!target.found) {
+      await client.query('ROLLBACK');
+      return { updated: false };
+    }
+    await client.query(
+      `UPDATE network.matriz_collaborators SET panel_role = $3
+        WHERE environment = $1 AND id = $2 AND revoked_at IS NULL`,
+      [environment, input.id, input.panel_role],
+    );
+    await client.query(
+      `UPDATE network.matriz_staff_sessions SET revoked_at = now()
+        WHERE person_id = $1 AND revoked_at IS NULL`,
+      [target.personId],
+    );
+    await client.query('COMMIT');
+    return { updated: true };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Revoga o colaborador (trilha fica). A PESSOA também é revogada — libera o
  * username — mas SÓ se ela não tiver nenhum vínculo ativo de loja (defesa:
@@ -124,6 +191,11 @@ export async function revokeMatrizCollaborator(
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
+    const target = await lockAndProtectLastOwner(client, environment, input.id, null);
+    if (!target.found) {
+      await client.query('ROLLBACK');
+      return { revoked: false };
+    }
     const res = await client.query<{ person_id: string }>(
       `UPDATE network.matriz_collaborators
           SET revoked_at = now()
@@ -234,6 +306,11 @@ export async function resetMatrizCollaboratorPassword(
             SET login_password_hash = $2, login_password_set_at = now()
           WHERE person_id = $1 AND revoked_at IS NULL`,
         [personId, passwordHash],
+      );
+      await client.query(
+        `UPDATE network.matriz_staff_sessions SET revoked_at = now()
+          WHERE person_id = $1 AND revoked_at IS NULL`,
+        [personId],
       );
     }
     await client.query('COMMIT');
