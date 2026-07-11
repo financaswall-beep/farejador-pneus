@@ -223,6 +223,8 @@ function painelApp() {
     botVisao: null,
     botLoading: false,
     botTab: 'visao',
+    botConversaBusca: '',
+    botConversaFiltro: 'todos',
     botPeriodo: '30d',
     botCamada: 'chamou',
     botMapaSel: null,

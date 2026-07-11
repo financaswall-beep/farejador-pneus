@@ -3276,8 +3276,96 @@
         </div>
       </div>
 
-      <!-- CAMPAINHA: se essa tela só tivesse UMA coisa, seria essa -->
-      <div x-show="botTab === 'conversas'" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <!-- CONVERSAS: fila operacional do Bot -->
+      <div x-show="botTab === 'conversas'" class="space-y-4">
+        <div class="bg-white border border-gray-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div class="flex items-center gap-5 min-w-0">
+            <div class="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0 relative">
+              <i data-lucide="message-circle-more" class="w-12 h-12 text-emerald-700"></i>
+              <span x-show="botConversasFila.length" class="absolute right-1 bottom-2 w-6 h-6 rounded-full bg-rose-500 text-white text-[11px] font-semibold flex items-center justify-center" x-text="botConversasFila.length"></span>
+            </div>
+            <div>
+              <h2 class="text-xl font-semibold text-emerald-800" x-text="botConversasFila.length ? (botConversasFila.length + ' conversa(s) precisam de atenção') : 'Tudo sob controle'"></h2>
+              <p class="text-sm text-gray-700 mt-1">
+                <span x-text="botMudas.length + ' esperando resposta'"></span>
+                <span class="text-gray-300 mx-2">·</span>
+                <span x-text="botEscalados.length + ' pediram atendimento humano'"></span>
+              </p>
+              <p class="text-xs text-gray-400 mt-2">Última atualização <span class="text-emerald-700 font-medium">agora</span></p>
+            </div>
+          </div>
+          <button @click="atualizarBotFila()" class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>Atualizar fila
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center relative">
+              <i data-lucide="message-circle" class="w-7 h-7 text-emerald-700"></i>
+              <span class="absolute -right-1 bottom-0 w-5 h-5 rounded-full bg-rose-500 border-2 border-white text-white text-[10px] font-semibold flex items-center justify-center">!</span>
+            </div>
+            <div><p class="text-sm text-gray-500">Clientes esperando resposta</p><p class="text-2xl font-semibold" x-text="botMudas.length"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center relative">
+              <i data-lucide="users" class="w-7 h-7 text-emerald-700"></i>
+              <span class="absolute -right-1 bottom-0 w-5 h-5 rounded-full bg-amber-400 border-2 border-white text-white text-[10px] font-semibold flex items-center justify-center">!</span>
+            </div>
+            <div><p class="text-sm text-gray-500">Pediram pra falar com gente <span class="text-xs">(48h)</span></p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div>
+          </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <label class="relative block w-full lg:max-w-sm">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="search" x-model="botConversaBusca" placeholder="Buscar cliente ou conversa"
+                   class="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200">
+          </label>
+          <div class="grid grid-cols-3 bg-white border border-gray-200 rounded-lg overflow-hidden w-full lg:w-auto">
+            <button @click="botConversaFiltro = 'todos'" :class="botConversaFiltro === 'todos' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium transition-colors">Todos</button>
+            <button @click="botConversaFiltro = 'esperando'" :class="botConversaFiltro === 'esperando' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium border-l border-gray-200 transition-colors whitespace-nowrap">Esperando resposta</button>
+            <button @click="botConversaFiltro = 'humano'" :class="botConversaFiltro === 'humano' ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'" class="px-5 py-2.5 text-xs font-medium border-l border-gray-200 transition-colors whitespace-nowrap">Atendimento humano</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr),320px] gap-4 items-start">
+          <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 pt-5 pb-3"><h3 class="text-base font-semibold">Fila de atenção</h3></div>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[760px] text-sm">
+                <thead><tr class="text-left text-xs text-gray-400 border-b border-gray-100"><th class="px-5 py-3 font-medium">Cliente</th><th class="px-3 py-3 font-medium">Última mensagem</th><th class="px-3 py-3 font-medium">Situação</th><th class="px-3 py-3 font-medium">Espera</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+                <tbody>
+                  <template x-for="c in botConversasFiltradas" :key="c.id">
+                    <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                      <td class="px-5 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="message-circle" class="w-4 h-4"></i></div><span class="font-medium text-gray-800" x-text="c.nome"></span></div></td>
+                      <td class="px-3 py-3 text-gray-600 max-w-xs"><p class="truncate" x-text="c.mensagem"></p></td>
+                      <td class="px-3 py-3"><span class="text-[11px] px-2 py-1 rounded-md font-medium" :class="c.tipo === 'esperando' ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-amber-50 text-amber-700 border border-amber-100'" x-text="c.tipo === 'esperando' ? 'Esperando resposta' : 'Atendimento humano'"></span></td>
+                      <td class="px-3 py-3 text-gray-600 whitespace-nowrap" x-text="botMinutosLabel(c.minutos)"></td>
+                      <td class="px-5 py-3 text-right"><button @click="abrirNoChatwoot(c.chatwoot_id)" :disabled="!c.chatwoot_id" class="inline-flex items-center gap-1.5 text-xs border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-3 py-1.5 font-medium disabled:opacity-40 whitespace-nowrap">Abrir no Chatwoot<i data-lucide="external-link" class="w-3.5 h-3.5"></i></button></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="!botConversasFiltradas.length" class="px-5 py-10 text-center text-sm text-gray-400">Nenhuma conversa encontrada neste filtro.</div>
+          </div>
+
+          <aside class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-5">Resumo das últimas 48h</h3>
+            <div class="space-y-6">
+              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="chart-no-axes-column-increasing" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Respondidos pelo bot</p><p class="text-2xl font-semibold" x-text="botRespondidas48h"></p></div></div>
+              <div class="border-t border-gray-100"></div>
+              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Encaminhados para humano</p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div></div>
+              <div class="border-t border-gray-100"></div>
+              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Tempo médio de espera</p><p class="text-2xl font-semibold" x-text="Math.floor(botEsperaMediaSeg / 3600) ? (Math.floor(botEsperaMediaSeg / 3600) + 'h ' + Math.round((botEsperaMediaSeg % 3600) / 60) + 'min') : (Math.round(botEsperaMediaSeg / 60) + 'min')"></p></div></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- Campainha anterior removida: a fila operacional acima passa a ser a interface oficial. -->
+      <div x-show="false" class="hidden">
         <div class="bg-white border rounded-xl p-5" :class="botMudas.length ? 'border-rose-200' : 'border-gray-200'">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">

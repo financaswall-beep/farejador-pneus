@@ -46,12 +46,53 @@ window.PAINEL_MODULES.bot = function () {
       void this.loadBotVisao();
     },
 
+    atualizarBotFila() {
+      void this.loadBotCampainha();
+    },
+
     // ─── getters derivados (nada de estado duplicado) ───
     get botMudas() {
       return (this.botCampainha && this.botCampainha.mudas) || [];
     },
     get botEscalados() {
       return (this.botCampainha && this.botCampainha.escalados) || [];
+    },
+    get botConversasFila() {
+      const mudas = this.botMudas.map((m) => ({
+        id: 'm-' + m.conversation_id,
+        chatwoot_id: m.chatwoot_conversation_id,
+        nome: m.contact_name || 'Cliente',
+        mensagem: m.preview || '(sem texto)',
+        tipo: 'esperando',
+        minutos: Number(m.minutos || 0),
+      }));
+      const agora = Date.now();
+      const escalados = this.botEscalados.map((e) => ({
+        id: 'e-' + e.conversation_id,
+        chatwoot_id: e.chatwoot_conversation_id,
+        nome: e.contact_name || 'Cliente',
+        mensagem: e.motivo || 'Sem motivo registrado',
+        tipo: 'humano',
+        minutos: e.quando ? Math.max(0, Math.floor((agora - new Date(e.quando).getTime()) / 60000)) : 0,
+      }));
+      return [...mudas, ...escalados].sort((a, b) => a.minutos - b.minutos);
+    },
+    get botConversasFiltradas() {
+      const busca = String(this.botConversaBusca || '').trim().toLowerCase();
+      return this.botConversasFila.filter((c) => {
+        if (this.botConversaFiltro !== 'todos' && c.tipo !== this.botConversaFiltro) return false;
+        return !busca || c.nome.toLowerCase().includes(busca) || c.mensagem.toLowerCase().includes(busca);
+      });
+    },
+    get botRespondidas48h() {
+      if (this.botCards && this.botCards.respondidas_bot_48h != null) return Number(this.botCards.respondidas_bot_48h);
+      if (!this.botCards) return 0;
+      return Math.max(0, Number(this.botCards.conversas || 0) - Number(this.botCards.escalaram || 0) - Number(this.botCards.abandonaram || 0));
+    },
+    get botEsperaMediaSeg() {
+      if (this.botCards && this.botCards.espera_media_seg != null) return Number(this.botCards.espera_media_seg);
+      const filas = this.botConversasFila;
+      return filas.length ? Math.round((filas.reduce((s, c) => s + c.minutos, 0) / filas.length) * 60) : 0;
     },
     get botCards() {
       return (this.botVisao && this.botVisao.cards) || null;
