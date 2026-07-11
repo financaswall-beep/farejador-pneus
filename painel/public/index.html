@@ -3050,8 +3050,16 @@
               <h3 class="text-base font-semibold">Novo colaborador</h3>
             </div>
             <button @click="colabShowForm = !colabShowForm; colabMsg = null"
-                    class="text-xs px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium"
-                    x-text="colabShowForm ? 'Fechar' : '+ Cadastrar'"></button>
+                    :aria-expanded="colabShowForm"
+                    class="group relative isolate inline-flex items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-brand-600 to-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-200/60 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand-200/80 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 active:translate-y-0">
+              <span aria-hidden="true" class="absolute -right-3 -top-5 -z-10 h-14 w-14 rounded-full bg-white/20 transition-transform duration-300 group-hover:scale-125"></span>
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 ring-1 ring-white/30">
+                <i x-show="!colabShowForm" data-lucide="user-plus" class="h-4 w-4"></i>
+                <i x-show="colabShowForm" data-lucide="x" class="h-4 w-4"></i>
+              </span>
+              <span x-text="colabShowForm ? 'Fechar cadastro' : 'Novo colaborador'"></span>
+              <i x-show="!colabShowForm" data-lucide="arrow-right" class="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"></i>
+            </button>
           </div>
           <div x-show="colabShowForm" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -3144,7 +3152,7 @@
     </div>
 
     <!-- ═══ TELA: BOT (2026-07-06, fatia 2 06b) — campainha + cards + funil/boca + mapa + radar/mais-pedidas ═══ -->
-    <div x-show="currentPage === 'bot'" class="p-8">
+    <div x-show="currentPage === 'bot'" class="p-8 bg-gray-50/40 min-h-screen">
       <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 class="text-2xl font-semibold tracking-tight">Bot</h1>
@@ -3153,14 +3161,123 @@
         <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
           <template x-for="p in redePeriods" :key="'botp-' + p.id">
             <button @click="setBotPeriodo(p.id)"
-                    :class="botPeriodo === p.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'"
+                    :class="botPeriodo === p.id ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:text-emerald-800'"
                     class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors" x-text="p.label"></button>
           </template>
         </div>
       </div>
 
+      <!-- NAVEGAÇÃO INTERNA: separa operação, vendas e demanda sem perder nenhum dado atual -->
+      <div class="flex items-center gap-7 border-b border-gray-200 mb-7 overflow-x-auto">
+        <button @click="botTab = 'visao'"
+                :class="botTab === 'visao' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-800'"
+                class="pb-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors">Visão geral</button>
+        <button @click="botTab = 'conversas'"
+                :class="botTab === 'conversas' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-800'"
+                class="pb-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors">Conversas</button>
+        <button @click="botTab = 'vendas'"
+                :class="botTab === 'vendas' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-800'"
+                class="pb-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors">Vendas</button>
+        <button @click="botTab = 'demanda'; $nextTick(() => renderBotMapa())"
+                :class="botTab === 'demanda' ? 'text-emerald-800 border-emerald-700' : 'text-gray-500 border-transparent hover:text-gray-800'"
+                class="pb-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors">Demanda e estoque</button>
+      </div>
+
+      <!-- VISÃO GERAL: cockpit leve do Bot -->
+      <div x-show="botTab === 'visao'" class="space-y-4">
+        <div class="bg-white border border-gray-200 rounded-2xl px-6 py-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div class="flex items-center gap-5 min-w-0">
+            <div class="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0"
+                 :class="(botMudas.length + botEscalados.length) > 0 ? 'bg-amber-50' : 'bg-emerald-50'">
+              <i x-show="(botMudas.length + botEscalados.length) === 0" data-lucide="circle-check" class="w-12 h-12 text-emerald-700"></i>
+              <i x-show="(botMudas.length + botEscalados.length) > 0" data-lucide="bell-ring" class="w-12 h-12 text-amber-600"></i>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-xl font-semibold text-emerald-800"
+                  x-text="!botCampainha ? 'Atualizando operação…' : ((botMudas.length + botEscalados.length) ? ((botMudas.length + botEscalados.length) + ' conversa(s) precisam de atenção') : 'Tudo sob controle')"></h2>
+              <p class="text-sm text-gray-700 mt-1"
+                 x-text="!botCampainha ? 'Buscando a situação mais recente do atendimento' : (botMudas.length ? (botMudas.length + ' cliente(s) esperando resposta') : 'Nenhum cliente esperando resposta')"></p>
+              <p class="text-xs text-gray-400 mt-2">Última atualização <span class="text-emerald-700 font-medium">agora</span></p>
+            </div>
+          </div>
+          <button @click="botTab = 'conversas'"
+                  class="inline-flex items-center justify-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>Ver conversas
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="message-circle" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Conversas</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? botCards.conversas : '—'"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="shopping-bag" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Fecharam pedido</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? botCards.fecharam : '—'"></p><p class="text-[11px] text-emerald-700" x-text="botCards ? (botCards.taxa_conversao + '% de conversão') : ''"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Custo do bot</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? formatCurrency(Number(botCards.custo_bot || 0)) : '—'"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="chart-no-axes-combined" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Faturamento (bot)</p><p class="text-2xl font-semibold mt-0.5" x-text="botCards ? formatCurrency(Number(botCards.faturamento || 0)) : '—'"></p></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-5">Resultado do período</h3>
+            <template x-for="r in [
+              { label: 'Fecharam pedido', n: Number(botCards?.fecharam || 0), color: 'bg-emerald-600' },
+              { label: 'Escalaram', n: Number(botCards?.escalaram || 0), color: 'bg-amber-400' },
+              { label: 'Abandonaram', n: Number(botCards?.abandonaram || 0), color: 'bg-rose-500' }
+            ]" :key="'res-' + r.label">
+              <div class="grid grid-cols-[130px,1fr,55px,48px] items-center gap-3 mb-5 text-sm">
+                <span class="flex items-center gap-2 text-gray-700"><span class="w-2.5 h-2.5 rounded-full" :class="r.color"></span><span x-text="r.label"></span></span>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full" :class="r.color" :style="'width:' + (botCards?.conversas ? Math.min(100, Math.round((r.n / Number(botCards.conversas)) * 100)) : 0) + '%' "></div></div>
+                <span class="font-medium text-right" x-text="r.n"></span>
+                <span class="text-xs text-gray-400 text-right" x-text="botCards?.conversas ? Math.round((r.n / Number(botCards.conversas)) * 100) + '%' : '—'"></span>
+              </div>
+            </template>
+            <div class="pt-3 border-t border-gray-100 flex justify-between text-sm"><span class="text-gray-400">Total de conversas</span><span class="font-medium" x-text="botCards ? botCards.conversas : '—'"></span></div>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-5">Operação</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="tag" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Ticket médio</p><p class="text-lg font-semibold" x-text="botCards?.ticket_medio != null ? formatCurrency(Number(botCards.ticket_medio)) : '—'"></p></div></div>
+              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Resposta média</p><p class="text-lg font-semibold" x-text="botCards?.resposta_seg != null ? botCards.resposta_seg + 's' : '—'"></p></div></div>
+              <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-[11px] text-gray-500">Horário de pico</p><p class="text-sm font-semibold" x-text="botHorarios.length ? botHorarios.reduce((a, b) => a.n >= b.n ? a : b).label : '—'"></p></div></div>
+            </div>
+            <div class="h-24 flex items-end gap-3 border-b border-gray-100 px-2">
+              <template x-for="h in botHorarios" :key="'overview-' + h.label">
+                <div class="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                  <div class="w-full max-w-14 bg-emerald-200 rounded-t" :class="h.pct >= 95 ? 'bg-emerald-700' : ''" :style="'height:' + Math.max(8, h.pct) + '%' "></div>
+                  <span class="text-[10px] text-gray-400" x-text="h.label"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4"><h3 class="text-base font-semibold">Atenção rápida</h3><button @click="botTab = 'conversas'" class="text-sm text-emerald-700 hover:text-emerald-900 font-medium">Ver todas →</button></div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="flex items-center justify-between gap-4 border border-gray-100 rounded-xl p-4">
+              <div class="flex items-center gap-3 min-w-0"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botMudas.length ? ((botMudas[0].contact_name || 'Cliente') + ' está esperando') : 'Nenhum cliente esperando'"></p><p class="text-xs text-gray-500 truncate" x-text="botMudas.length ? botMudas[0].preview : 'O bot está em dia'"></p></div></div>
+              <button x-show="botMudas.length" @click="abrirNoChatwoot(botMudas[0].chatwoot_conversation_id)" class="text-xs border border-emerald-700 text-emerald-800 rounded-lg px-3 py-2 whitespace-nowrap">Abrir no Chatwoot</button>
+            </div>
+            <div class="flex items-center justify-between gap-4 border border-gray-100 rounded-xl p-4">
+              <div class="flex items-center gap-3 min-w-0"><div class="w-11 h-11 rounded-full bg-orange-50 flex items-center justify-center"><i data-lucide="user-round-plus" class="w-5 h-5 text-orange-600"></i></div><div class="min-w-0"><p class="text-sm font-medium" x-text="botEscalados.length ? ((botEscalados[0].contact_name || 'Cliente') + ' pediu uma pessoa') : 'Nenhum pedido de atendimento humano'"></p><p class="text-xs text-gray-500 truncate" x-text="botEscalados.length ? (botEscalados[0].motivo || 'Sem motivo registrado') : 'Últimas 48h sem escaladas'"></p></div></div>
+              <button x-show="botEscalados.length" @click="abrirNoChatwoot(botEscalados[0].chatwoot_conversation_id)" class="text-xs border border-emerald-700 text-emerald-800 rounded-lg px-3 py-2 whitespace-nowrap">Abrir no Chatwoot</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- CAMPAINHA: se essa tela só tivesse UMA coisa, seria essa -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div x-show="botTab === 'conversas'" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div class="bg-white border rounded-xl p-5" :class="botMudas.length ? 'border-rose-200' : 'border-gray-200'">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-2">
@@ -3221,7 +3338,7 @@
       </div>
 
       <!-- CARDS do período -->
-      <div x-show="botCards" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+      <div x-show="botTab === 'vendas' && botCards" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <p class="text-xs text-gray-500">Conversas</p>
           <p class="text-2xl font-semibold mt-1" x-text="botCards ? botCards.conversas : '—'"></p>
@@ -3272,7 +3389,7 @@
       </div>
 
       <!-- FUNIL + BOCA: onde a conversa para, e o que o cliente fala -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div x-show="botTab === 'vendas'" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-2">
           <div class="flex items-center gap-2 mb-1">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
@@ -3322,7 +3439,7 @@
       </div>
 
       <!-- MAPA por município -->
-      <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div x-show="botTab === 'demanda'" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
           <div class="flex items-center gap-2">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
@@ -3370,7 +3487,7 @@
       </div>
 
       <!-- RADAR (faltou) + MAIS PEDIDAS: as duas listas de compra -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       <div class="bg-white border border-gray-200 rounded-xl p-5">
         <div class="flex items-center gap-2 mb-1">
           <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">

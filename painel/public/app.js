@@ -222,6 +222,7 @@ function painelApp() {
     botCampainha: null,
     botVisao: null,
     botLoading: false,
+    botTab: 'visao',
     botPeriodo: '30d',
     botCamada: 'chamou',
     botMapaSel: null,
