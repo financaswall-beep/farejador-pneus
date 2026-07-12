@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-08T16:11:05.077Z",
-  "total": 99,
+  "geradoEm": "2026-07-12T10:03:10.414Z",
+  "total": 103,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -29,6 +29,9 @@
     "GET /admin/api/wholesale/suppliers AUTH(1)",
     "GET /admin/api/wholesale/suppliers/breakdown AUTH(1)",
     "GET /admin/api/wholesale/suppliers/ranking AUTH(1)",
+    "GET /admin/login PUBLICA",
+    "GET /admin/login.css PUBLICA",
+    "GET /admin/login.js PUBLICA",
     "GET /admin/painel PUBLICA",
     "GET /admin/painel/ PUBLICA",
     "GET /admin/painel/app.api.js PUBLICA",
@@ -62,6 +65,7 @@
     "GET /seja-parceiro PUBLICA",
     "GET /seja-parceiro-2w.png PUBLICA",
     "POST /admin/api/colaboradores AUTH(1)",
+    "POST /admin/api/colaboradores/acesso AUTH(1)",
     "POST /admin/api/colaboradores/funcao AUTH(1)",
     "POST /admin/api/colaboradores/reativar AUTH(1)",
     "POST /admin/api/colaboradores/revogar AUTH(1)",

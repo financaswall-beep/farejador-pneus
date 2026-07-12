@@ -4,19 +4,13 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
-import {
-  rateLimitBlocked,
-  rateLimitClear,
-  rateLimitHit,
-  rateLimitRetryAfterSeconds,
-} from '../shared/rate-limit.js';
+import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
+// Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
+// as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
+import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
 
-// Login/1º acesso: até 10 falhas por usuário e 20 por IP em 5 min.
-const LOGIN_MAX_ATTEMPTS = 10;
-const LOGIN_MAX_PER_IP = 20;
-const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -96,7 +90,6 @@ import {
   resetPartnerFuncionarioPassword,
   listPartnerFuncionarios,
   revokePartnerFuncionario,
-  authenticatePartnerLogin,
   setOwnPartnerCredentials,
   revokePartnerSession,
   PartnerUsernameConflictError,
@@ -578,46 +571,8 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     sendStatic(reply, 'manifest.webmanifest', 'application/manifest+json; charset=utf-8'),
   );
 
-  // P1 — Login por usuário+senha (PÚBLICO; é a porta de entrada). Devolve um
-  // token de SESSÃO que o front guarda e usa como Bearer. Resposta única pra
-  // usuário inexistente e senha errada (não revela qual).
-  fastify.post('/parceiro/:slug/api/login', async (request, reply) => {
-    const ipKey = `login:ip:${request.ip}`;
-    if (rateLimitBlocked(ipKey, LOGIN_MAX_PER_IP)) {
-      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
-    }
-    const params = paramsSchema.safeParse(request.params);
-    // Slug malformado/inexistente devolve a MESMA resposta de credencial inválida
-    // (não revela quais slugs existem).
-    if (!params.success) {
-      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
-      if (exceeded) return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
-      return reply.status(401).send({ error: 'invalid_credentials' });
-    }
-    const parsed = loginSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
-      if (exceeded) return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(ipKey))).status(429).send({ error: 'too_many_attempts' });
-      return reply.status(401).send({ error: 'invalid_credentials' });
-    }
-    const userKey = `login:user:${params.data.slug}:${parsed.data.username.toLowerCase()}`;
-    if (rateLimitBlocked(userKey, LOGIN_MAX_ATTEMPTS)) {
-      return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(userKey))).status(429).send({ error: 'too_many_attempts' });
-    }
-    const result = await authenticatePartnerLogin(env.FAREJADOR_ENV, params.data.slug, parsed.data.username, parsed.data.password);
-    if (!result) {
-      const ipExceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
-      const userExceeded = rateLimitHit(userKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
-      if (ipExceeded || userExceeded) {
-        const retryKey = userExceeded ? userKey : ipKey;
-        return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(retryKey))).status(429).send({ error: 'too_many_attempts' });
-      }
-      return reply.status(401).send({ error: 'invalid_credentials' });
-    }
-    rateLimitClear(ipKey);
-    rateLimitClear(userKey);
-    return reply.status(200).send(result);
-  });
+  // P1 — Login por usuário+senha (PÚBLICO): handler + throttle em ./route-login.ts.
+  registerParceiroLoginRoute(fastify, { paramsSchema, loginSchema });
 
   // P1 — Primeiro acesso do DONO: autenticado pelo TOKEN cru que ele colou, define
   // o próprio usuário+senha e já recebe uma sessão. Posse do token (não-sessão)
