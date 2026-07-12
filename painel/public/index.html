@@ -3608,41 +3608,50 @@
       </div>
 
       <!-- MAPA por município -->
-      <div x-show="botTab === 'demanda'" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mb-4">
+        <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="map-pin" class="w-5 h-5 text-emerald-800"></i></div>
+          <div><p class="text-xl font-semibold" x-text="botMapaRows.filter(r => Number(r.chamou || 0) > 0).length"></p><p class="text-xs text-gray-500">municípios com demanda</p></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-help" class="w-5 h-5 text-emerald-800"></i></div>
+          <div><p class="text-xl font-semibold" x-text="botSemRegiao"></p><p class="text-xs text-gray-500">conversas sem região</p></div>
+        </div>
+      </div>
+
+      <div x-show="botTab === 'demanda'" class="bg-white border border-gray-200 rounded-xl p-5 mb-4 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
           <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-              <i data-lucide="map" class="w-4 h-4 text-brand-600"></i>
-            </div>
-            <h3 class="text-base font-semibold">Mapa da demanda</h3>
+            <h3 class="text-xl font-semibold">Mapa da demanda</h3>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
             <template x-for="c in botCamadas" :key="'bc-' + c.id">
               <button @click="setBotCamada(c.id)"
-                      :class="botCamada === c.id ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'"
-                      class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors" x-text="c.label"></button>
+                      :class="botCamada === c.id ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-600 hover:bg-emerald-50 border-gray-200'"
+                      class="text-xs px-4 py-2 border rounded-lg font-medium transition-colors" x-text="c.label"></button>
             </template>
           </div>
         </div>
-        <p class="text-xs text-gray-500 mb-3" x-text="botCamadaAtual().desc + ' — clica num município que ele responde'"></p>
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr,240px] gap-4 items-start">
-          <div id="bot-mapa" class="min-h-[220px]">
+        <p class="text-xs text-gray-500 mb-4" x-text="botCamadaAtual().desc + ' — clique em um município para ver os detalhes'"></p>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr),360px] gap-4 items-stretch">
+          <div id="bot-mapa" class="min-h-[330px] bg-sky-50/40 rounded-xl overflow-hidden border border-sky-100">
             <div x-show="botLoading" class="text-sm text-gray-400 p-6">Carregando o mapa…</div>
           </div>
-          <div>
-            <div x-show="botMapaSel" class="border border-gray-200 rounded-xl p-4 mb-3">
-              <p class="text-sm font-semibold" x-text="botMapaSel ? botMapaSel.municipio : ''"></p>
-              <div class="mt-2 space-y-1.5 text-xs text-gray-600">
-                <div class="flex justify-between"><span>Chamaram</span><span class="font-semibold" x-text="botMapaSel ? botMapaSel.chamou : ''"></span></div>
-                <div class="flex justify-between"><span>Viraram pedido</span><span class="font-semibold text-emerald-700" x-text="botMapaSel ? botMapaSel.pediu : ''"></span></div>
-                <div class="flex justify-between"><span>Entregues</span><span class="font-semibold" x-text="botMapaSel ? botMapaSel.efetivou : ''"></span></div>
-                <div class="flex justify-between"><span>Faltou pneu</span><span class="font-semibold text-rose-600" x-text="botMapaSel ? botMapaSel.faltou : ''"></span></div>
+          <div class="border border-gray-200 rounded-xl p-5 bg-white">
+            <div x-show="botMapaSel">
+              <div class="flex items-center justify-between gap-3 mb-4"><p class="text-2xl font-semibold" x-text="botMapaSel ? botMapaSel.municipio : ''"></p><span class="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full">Município selecionado</span></div>
+              <div class="space-y-3 text-sm text-gray-600">
+                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-700"></i>Chamaram</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.chamou : ''"></span></div>
+                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="shopping-cart" class="w-4 h-4 text-emerald-700"></i>Viraram pedido</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.pediu : ''"></span></div>
+                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Entregues</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.efetivou : ''"></span></div>
+                <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"><span class="flex items-center gap-3"><i data-lucide="circle-alert" class="w-4 h-4 text-rose-500"></i>Faltou pneu</span><span class="text-xl font-semibold text-gray-900" x-text="botMapaSel ? botMapaSel.faltou : ''"></span></div>
+                <div class="pt-4 mt-4 border-t border-gray-100"><p class="text-xs text-gray-500">Conversão (virou pedido)</p><p class="text-xl font-semibold mt-1" x-text="botMapaSel && Number(botMapaSel.chamou) ? String(Math.round((Number(botMapaSel.pediu) / Number(botMapaSel.chamou)) * 1000) / 10).replace('.', ',') + '%' : '0%'"></p><div class="h-2 bg-gray-100 rounded-full mt-2 overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + (botMapaSel && Number(botMapaSel.chamou) ? Math.min(100, Math.round((Number(botMapaSel.pediu) / Number(botMapaSel.chamou)) * 100)) : 0) + '%' "></div></div></div>
               </div>
             </div>
-            <div x-show="!botMapaSel" class="border border-dashed border-gray-200 rounded-xl p-4 mb-3 text-xs text-gray-400">
-              Clica num município pra ver os números dele aqui.
+            <div x-show="!botMapaSel" class="min-h-[270px] flex flex-col items-center justify-center text-center text-sm text-gray-400">
+              <i data-lucide="map-pin" class="w-8 h-8 mb-3 text-gray-300"></i><p>Selecione um município no mapa<br>para ver os números dele aqui.</p>
             </div>
-            <div class="flex items-center gap-1 text-[11px] text-gray-400">
+            <div class="flex items-center gap-1 text-[11px] text-gray-400 mt-4">
               <span>pouco</span>
               <template x-for="(cor, i) in botLegenda" :key="'lg-' + i">
                 <span class="inline-block w-4 h-2.5 rounded-sm" :style="'background:' + cor"></span>
@@ -3656,15 +3665,12 @@
       </div>
 
       <!-- RADAR (faltou) + MAIS PEDIDAS: as duas listas de compra -->
-      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div x-show="botTab === 'demanda'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
         <div class="flex items-center gap-2 mb-1">
-          <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-            <i data-lucide="radar" class="w-4 h-4 text-amber-600"></i>
-          </div>
-          <h3 class="text-base font-semibold">Pediram e a Rede NÃO tinha</h3>
+          <h3 class="text-xl font-semibold">Pediram e a Rede NÃO tinha</h3>
         </div>
-        <p class="text-xs text-gray-500 mb-3">Tua lista de compra: cada linha é venda que escapou — repõe no galpão e oferece no atacado pros parceiros da região</p>
+        <p class="text-xs text-gray-500 mb-3">Vendas que escaparam e viraram lista de compra</p>
         <div class="overflow-x-auto">
           <table class="w-full text-sm" x-show="botRadar.length">
             <thead>
@@ -3699,14 +3705,11 @@
         </div>
       </div>
 
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
         <div class="flex items-center gap-2 mb-1">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
-          </div>
-          <h3 class="text-base font-semibold">Medidas mais pedidas</h3>
+          <h3 class="text-xl font-semibold">Medidas mais pedidas</h3>
         </div>
-        <p class="text-xs text-gray-500 mb-3">Tudo que consultaram no período (achando ou não) × teu galpão — reposição preventiva: repõe ANTES de faltar</p>
+        <p class="text-xs text-gray-500 mb-3">Reposição preventiva antes de faltar</p>
         <div class="overflow-x-auto">
           <table class="w-full text-sm" x-show="botMedidasTop.length">
             <thead>

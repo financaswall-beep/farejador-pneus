@@ -30,6 +30,17 @@ window.PAINEL_MODULES.bot = function () {
         this.botVisao = await this.apiGet(
           '/admin/api/bot/visao?period=' + encodeURIComponent(this.botPeriodo),
         );
+        if (!this.botMapaSel && this.botMapaRows.length) {
+          const destaque = [...this.botMapaRows]
+            .sort((a, b) => Number(b.chamou || 0) - Number(a.chamou || 0))[0];
+          this.botMapaSel = {
+            municipio: destaque.municipio,
+            chamou: destaque.chamou,
+            pediu: destaque.pediu,
+            efetivou: destaque.efetivou,
+            faltou: destaque.faltou,
+          };
+        }
       } catch (err) {
         this.botVisao = null;
       }
