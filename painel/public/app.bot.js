@@ -96,12 +96,14 @@ window.PAINEL_MODULES.bot = function () {
       });
     },
     get botRespondidas48h() {
+      // SÓ do servidor (régua real de 48h em queries-bot-visao) — sem conta
+      // inventada no front; servidor calado = travessão honesto.
       if (this.botCards && this.botCards.respondidas_bot_48h != null) return Number(this.botCards.respondidas_bot_48h);
-      if (!this.botCards) return 0;
-      return Math.max(0, Number(this.botCards.conversas || 0) - Number(this.botCards.escalaram || 0) - Number(this.botCards.abandonaram || 0));
+      return '—';
     },
     get botEsperaMediaSeg() {
-      if (this.botCards && this.botCards.espera_media_seg != null) return Number(this.botCards.espera_media_seg);
+      // Espera média da FILA DE AGORA (média dos minutos exibidos linha a linha
+      // na própria fila) — o rótulo na tela diz isso; não é métrica do período.
       const filas = this.botConversasFila;
       return filas.length ? Math.round((filas.reduce((s, c) => s + c.minutos, 0) / filas.length) * 60) : 0;
     },

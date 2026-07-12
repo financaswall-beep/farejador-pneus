@@ -83,6 +83,19 @@ export async function getBotVisao(
        WHERE dia >= ${sinceSql}`,
     );
     out.cards = r.rows[0] ?? null;
+    if (out.cards) {
+      // Card "Resumo das últimas 48h" (aba Conversas): régua FIXA de 48h — NÃO
+      // acompanha o seletor de período. Conversas distintas com resposta do bot
+      // ENTREGUE (mesma régua delivered da campainha/stale-trigger).
+      const r48 = await dbPool.query<{ respondidas_bot_48h: number }>(
+        `SELECT count(DISTINCT t.conversation_id)::int AS respondidas_bot_48h
+         FROM agent.turns t
+         WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status = 'delivered'
+           AND t.created_at > now() - interval '48 hours'`,
+        [environment],
+      );
+      out.cards.respondidas_bot_48h = r48.rows[0]?.respondidas_bot_48h ?? 0;
+    }
   } catch { /* view ausente → cards null, tela avisa */ }
 
   try {

@@ -25,7 +25,7 @@
 <script src="/admin/painel/app.colaboradores.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.sino.js?v=20260710-rede2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.bot.js?v=20260706-bot2"></script>
+<script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260708-despesas1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260708-despesas1"></script>
+<script src="/admin/painel/app.js?v=20260712-botui1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -3358,7 +3358,7 @@
               <div class="border-t border-gray-100"></div>
               <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Encaminhados para humano</p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div></div>
               <div class="border-t border-gray-100"></div>
-              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Tempo médio de espera</p><p class="text-2xl font-semibold" x-text="Math.floor(botEsperaMediaSeg / 3600) ? (Math.floor(botEsperaMediaSeg / 3600) + 'h ' + Math.round((botEsperaMediaSeg % 3600) / 60) + 'min') : (Math.round(botEsperaMediaSeg / 60) + 'min')"></p></div></div>
+              <div class="flex items-center gap-4"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-7 h-7 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Espera média da fila agora</p><p class="text-2xl font-semibold" x-text="Math.floor(botEsperaMediaSeg / 3600) ? (Math.floor(botEsperaMediaSeg / 3600) + 'h ' + Math.round((botEsperaMediaSeg % 3600) / 60) + 'min') : (Math.round(botEsperaMediaSeg / 60) + 'min')"></p></div></div>
             </div>
           </aside>
         </div>

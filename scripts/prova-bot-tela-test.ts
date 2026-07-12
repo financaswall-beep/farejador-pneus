@@ -114,7 +114,8 @@ async function main(): Promise<void> {
     const a = { chamou: antesMarica?.chamou ?? 0, pediu: antesMarica?.pediu ?? 0,
       faltou: antesMarica?.faltou ?? 0, semRegiao: antes.sem_regiao,
       funilPedido: funilDe(antes, 'pedido_criado'), funilFrete: funilDe(antes, 'frete_calculado'),
-      perdaPreco: perdaDe(antes, 'objecao_preco'), bocaParcelado: bocaDe(antes, 'pergunta_parcelamento') };
+      perdaPreco: perdaDe(antes, 'objecao_preco'), bocaParcelado: bocaDe(antes, 'pergunta_parcelamento'),
+      respondidas48h: Number(antes.cards?.respondidas_bot_48h ?? 0) };
 
     // ── setup: contato + 4 conversas ──
     const ct = await client.query<{ id: string }>(
@@ -239,7 +240,14 @@ async function main(): Promise<void> {
       !!depois.cards && 'faturamento' in depois.cards && 'ticket_medio' in depois.cards
         && 'resposta_seg' in depois.cards);
 
-    console.log(fails === 0 ? '\n[VERDE] 19/19 — tela do Bot (fatias 1+2) provada.' : `\n[VERMELHO] ${fails} check(s) falharam.`);
+    // ── B20 (redesign 07-12): respondidas_bot_48h vem do SERVIDOR com régua
+    //    FIXA de 48h — o turn delivered do B3 (conv1) é a ÚNICA conversa nova
+    //    respondida → delta exato +1, independente do período selecionado. ──
+    check('B20 cards.respondidas_bot_48h: turn delivered vira +1 conversa (delta)',
+      Number(depois.cards?.respondidas_bot_48h) === a.respondidas48h + 1,
+      `antes=${a.respondidas48h} depois=${depois.cards?.respondidas_bot_48h}`);
+
+    console.log(fails === 0 ? '\n[VERDE] 20/20 — tela do Bot (fatias 1+2) provada.' : `\n[VERMELHO] ${fails} check(s) falharam.`);
     process.exitCode = fails === 0 ? 0 : 1;
   } finally {
     await limpar();
