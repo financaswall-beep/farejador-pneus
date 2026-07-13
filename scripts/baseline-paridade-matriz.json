@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-13T22:10:21.016Z",
+  "geradoEm": "2026-07-13T22:32:44.273Z",
   "commitBase": "dd64a35",
-  "total": 415,
+  "total": 416,
   "propriedades": {
     "abrirNoChatwoot": "function",
     "abrirNovoColaborador": "function",
@@ -170,6 +170,7 @@
     "finLucroPerna": "function",
     "finPagar": "function",
     "finPctLucro": "function",
+    "finQuitando": "value:boolean",
     "finReceber": "function",
     "finResPct": "function",
     "finResSeg": "function",

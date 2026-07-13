@@ -92,8 +92,10 @@ window.PAINEL_MODULES.financeiro = function () {
     },
     // "Recebi" direto da tela: fiado quita a venda; comissão quita o acumulado do parceiro.
     async finReceber(item) {
+      if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
       const rotulo = item.tipo === 'comissao' ? 'a comissão de ' + item.nome : 'de ' + item.nome;
       if (!window.confirm(`Recebeu ${this.formatCurrency(Number(item.valor))} ${rotulo}?`)) return;
+      this.finQuitando = true;
       try {
         if (item.tipo === 'comissao') {
           await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: item.id });
@@ -101,13 +103,18 @@ window.PAINEL_MODULES.financeiro = function () {
           await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'sale', id: item.id });
         }
         await this.loadFinanceiro();
+        await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
       } catch (err) {
         window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      } finally {
+        this.finQuitando = false;
       }
     },
     // "Paguei" direto da agenda: fornecedor quita a compra; despesa quita a despesa.
     async finPagar(item) {
+      if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
       if (!window.confirm(`Pagar ${this.formatCurrency(Number(item.valor))} (${item.nome})?`)) return;
+      this.finQuitando = true;
       try {
         if (item.tipo === 'despesa') {
           await this.apiPost('/admin/api/matriz/despesas/settle', { id: item.id });
@@ -115,8 +122,11 @@ window.PAINEL_MODULES.financeiro = function () {
           await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'purchase', id: item.id });
         }
         await this.loadFinanceiro();
+        await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
       } catch (err) {
         window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      } finally {
+        this.finQuitando = false;
       }
     },
     despesaLabel(catId) {
@@ -238,12 +248,17 @@ window.PAINEL_MODULES.financeiro = function () {
       }
     },
     async despesaSettle(row) {
+      if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
       if (!window.confirm(`Pagar ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})?`)) return;
+      this.finQuitando = true;
       try {
         await this.apiPost('/admin/api/matriz/despesas/settle', { id: row.id });
         await this.loadFinanceiro();
+        await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
       } catch (err) {
         window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
+      } finally {
+        this.finQuitando = false;
       }
     },
     async despesaRemove(row) {

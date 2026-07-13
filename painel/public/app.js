@@ -127,6 +127,7 @@ function painelApp() {
     despesasLoaded: false,
     financeiroVisao: null,
     finTab: 'visao', // redesign 07-12 (desenho do dono): sub-abas visao|cobrancas|pagar|despesas|indicadores
+    finQuitando: false, // trava anti-duplo-clique dos botões Recebi/Paguei (07-13); some o erro à toa
     despesaSaving: false,
     despesaMsg: null,
     despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },

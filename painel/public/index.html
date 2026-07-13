@@ -23,11 +23,11 @@
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
-<script src="/admin/painel/app.sino.js?v=20260710-rede2"></script>
+<script src="/admin/painel/app.sino.js?v=20260713-pagar2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260713-fin2"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260713-pagar2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260713-pagar1"></script>
+<script src="/admin/painel/app.js?v=20260713-pagar2"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2905,8 +2905,8 @@
                   <span class="font-bold text-gray-900 num" x-text="formatCurrency(Number(item.valor))"></span>
                   <a x-show="finWhatsLink(item)" :href="finWhatsLink(item)" target="_blank" rel="noopener"
                      class="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">Cobrar</a>
-                  <button @click="finReceber(item)"
-                          class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Recebi</button>
+                  <button @click="finReceber(item)" :disabled="finQuitando"
+                          class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Recebi</button>
                 </div>
               </div>
             </template>
@@ -2996,8 +2996,8 @@
                             <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
                             <td class="py-2.5 pr-3 whitespace-nowrap"><span class="inline-block text-xs rounded-full px-2.5 py-0.5" :class="pagarStatus(item).cls" x-text="pagarStatus(item).label"></span></td>
                             <td class="py-2.5 text-right whitespace-nowrap">
-                              <button @click="finPagar(item)"
-                                      class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                              <button @click="finPagar(item)" :disabled="finQuitando"
+                                      class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
                             </td>
                           </tr>
                         </template>
@@ -3265,8 +3265,8 @@
                       <span x-show="d.payment_status === 'pending' && !d.overdue" class="inline-block text-xs bg-amber-50 text-amber-700 rounded-full px-2.5 py-0.5" x-text="d.due_date ? ('vence ' + financeDate(d.due_date)) : 'a pagar'"></span>
                     </td>
                     <td class="py-2.5 text-right whitespace-nowrap">
-                      <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)"
-                              class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                      <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)" :disabled="finQuitando"
+                              class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
                       <button @click="despesaRemove(d)" title="Remover (lançado errado)"
                               class="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-rose-50 hover:text-rose-600 ml-1 align-middle">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>

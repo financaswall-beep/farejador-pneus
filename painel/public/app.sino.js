@@ -53,7 +53,7 @@ window.PAINEL_MODULES.sino = function () {
             title: 'Fiado vencido no atacado',
             desc: s.fiado_vencido.count + ' venda(s) vencida(s), ' +
               this.formatCurrency(Number(s.fiado_vencido.total)) + ' pra cobrar.',
-            page: 'financeiro', time: 'abrir Financeiro →',
+            page: 'financeiro', tab: 'cobrancas', time: 'abrir Cobranças →',
           });
         }
         if (s.a_pagar_vencido && s.a_pagar_vencido.count > 0) {
@@ -63,7 +63,7 @@ window.PAINEL_MODULES.sino = function () {
             title: 'Conta vencida a pagar',
             desc: s.a_pagar_vencido.count + ' conta(s) vencida(s), ' +
               this.formatCurrency(Number(s.a_pagar_vencido.total)) + ' no total.',
-            page: 'financeiro', time: 'abrir Financeiro →',
+            page: 'financeiro', tab: 'pagar', filter: 'vencida', time: 'abrir Contas a pagar →',
           });
         }
       }
@@ -101,7 +101,13 @@ window.PAINEL_MODULES.sino = function () {
       this.sinoMarcarLida(notif.id);
       // Candidatura abre o MODAL (não é uma página); o resto navega pela aba.
       if (notif.action === 'applications') this.openApplications();
-      else if (notif.page) this.currentPage = notif.page;
+      else if (notif.page) {
+        this.currentPage = notif.page;
+        // Financeiro tem sub-abas: a notificação leva DIRETO na certa, já filtrada
+        // (conta vencida → Contas a pagar/vencidas; fiado → Cobranças).
+        if (notif.tab) this.finTab = notif.tab;
+        this.pagarFiltro = notif.filter || '';
+      }
       this.$nextTick(() => lucide.createIcons());
     },
 
