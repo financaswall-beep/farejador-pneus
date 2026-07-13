@@ -2764,7 +2764,7 @@
 
       <!-- ═══════ SUB-ABA: VISÃO GERAL ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'visao'" class="max-w-6xl space-y-5">
+        <div x-show="finTab === 'visao'" class="w-full space-y-5">
 
           <!-- 4 cards do topo -->
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -2890,7 +2890,7 @@
 
       <!-- ═══════ SUB-ABA: COBRANÇAS (quem te deve) ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'cobrancas'" class="max-w-3xl">
+        <div x-show="finTab === 'cobrancas'" class="w-full">
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <h3 class="text-base font-semibold mb-1">Quem te deve</h3>
             <p class="text-xs text-gray-500 mb-3">Fiado do atacado e comissão da rede — vencido primeiro. O botão “Cobrar” abre o WhatsApp com a mensagem pronta.</p>
@@ -2918,7 +2918,7 @@
 
       <!-- ═══════ SUB-ABA: CONTAS A PAGAR (agenda) ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'pagar'" class="max-w-3xl">
+        <div x-show="finTab === 'pagar'" class="w-full">
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <h3 class="text-base font-semibold mb-1">Agenda de pagamentos</h3>
             <p class="text-xs text-gray-500 mb-3">Compras de fornecedor e despesas a pagar — vencido primeiro, depois pelo vencimento mais perto.</p>
@@ -2944,7 +2944,7 @@
 
       <!-- ═══════ SUB-ABA: INDICADORES ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'indicadores'" class="max-w-4xl grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div x-show="finTab === 'indicadores'" class="w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="package" class="w-4 h-4"></i> Parado no galpão</div>
             <div class="text-2xl font-bold mt-1 num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></div>
@@ -2974,7 +2974,7 @@
       </template>
 
       <!-- ═══════ SUB-ABA: DESPESAS ═══════ -->
-      <div x-show="finTab === 'despesas'" class="max-w-5xl">
+      <div x-show="finTab === 'despesas'" class="w-full">
       <!-- Despesas dormentes (flag MATRIZ_EXPENSES off) → nota compacta; o resto da tela segue vivo. -->
       <div x-show="despesasLoaded && !matrizDespesas" class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-500">
         <i data-lucide="wallet" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
