@@ -2767,24 +2767,24 @@
         <div x-show="finTab === 'visao'" class="max-w-6xl space-y-5">
 
           <!-- 4 cards do topo -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Resultado do mês</p>
-                <p class="text-xl font-bold num" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
+                <p class="text-2xl font-bold leading-tight num" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Entrou</p>
-                <p class="text-xl font-bold text-gray-900 num" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
+                <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Saiu (despesas)</p>
-                <p class="text-xl font-bold text-rose-600 num" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
+                <p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="bell" class="w-5 h-5 text-amber-600"></i></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="bell" class="w-5 h-5 text-amber-600"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Atenção hoje</p>
                 <p class="text-sm font-semibold text-gray-900 mt-0.5">
                   <span x-text="financeiroVisao.a_pagar.vencidos_count"></span> vencido(s) + <span x-text="finCobrancasAbertas()"></span> cobrança(s)</p></div>
@@ -2849,9 +2849,9 @@
             <div class="space-y-3.5 text-sm">
               <template x-for="f in [
                 { id: 'atacado', label: 'Atacado', cor: 'bg-emerald-600', valor: Number(financeiroVisao.mes.pernas.atacado.faturamento), on: true },
-                { id: 'varejo', label: 'Varejo (bot + balcão)', cor: 'bg-blue-500', valor: Number(financeiroVisao.mes.pernas.varejo.faturamento), on: true },
-                { id: 'frete', label: 'Frete de entrega', cor: 'bg-cyan-500', valor: Number((financeiroVisao.mes.pernas.frete && financeiroVisao.mes.pernas.frete.recebido) || 0), on: !!financeiroVisao.mes.pernas.frete },
-                { id: 'comissao', label: 'Comissão da rede', cor: 'bg-violet-500', valor: Number((financeiroVisao.mes.pernas.comissao && financeiroVisao.mes.pernas.comissao.realizado) || 0), on: !!financeiroVisao.mes.pernas.comissao }
+                { id: 'varejo', label: 'Varejo (bot + balcão)', cor: 'bg-emerald-500', valor: Number(financeiroVisao.mes.pernas.varejo.faturamento), on: true },
+                { id: 'frete', label: 'Frete de entrega', cor: 'bg-teal-500', valor: Number((financeiroVisao.mes.pernas.frete && financeiroVisao.mes.pernas.frete.recebido) || 0), on: !!financeiroVisao.mes.pernas.frete },
+                { id: 'comissao', label: 'Comissão da rede', cor: 'bg-lime-600', valor: Number((financeiroVisao.mes.pernas.comissao && financeiroVisao.mes.pernas.comissao.realizado) || 0), on: !!financeiroVisao.mes.pernas.comissao }
               ]" :key="f.id">
                 <div class="grid grid-cols-12 gap-3 items-center" x-show="f.on">
                   <span class="col-span-4 sm:col-span-3 text-gray-600 flex items-center gap-2">
@@ -2867,20 +2867,20 @@
           </div>
 
           <!-- 4 indicadores de dono -->
-          <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="percent" class="w-5 h-5 text-emerald-700"></i></div>
               <div><p class="text-lg font-bold num" x-text="financeiroVisao.mes.margem_pct !== null ? String(financeiroVisao.mes.margem_pct).replace('.', ',') + '%' : '—'"></p><p class="text-xs text-gray-500">Margem do mês · sobre o faturamento</p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="coins" class="w-5 h-5 text-emerald-700"></i></div>
               <div><p class="text-lg font-bold num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></p><p class="text-xs text-gray-500">Capital parado · em estoque</p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="refresh-cw" class="w-5 h-5 text-emerald-700"></i></div>
-              <div><p class="text-lg font-bold num" x-text="financeiroVisao.indicadores.giro_vezes !== null ? String(financeiroVisao.indicadores.giro_vezes).replace('.', ',') + 'x' : '—'"></p><p class="text-xs text-gray-500">Giro do estoque · no mês</p></div>
+              <div><p class="text-lg font-bold num" x-text="finGiroTexto()"></p><p class="text-xs text-gray-500">Giro do estoque · no mês</p></div>
             </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="scale" class="w-5 h-5 text-emerald-700"></i></div>
               <div><p class="text-lg font-bold num" x-text="financeiroVisao.indicadores.ponto_equilibrio !== null ? formatCurrency(financeiroVisao.indicadores.ponto_equilibrio) : '—'"></p><p class="text-xs text-gray-500">Ponto de equilíbrio · faturamento necessário</p></div>
             </div>
@@ -2952,7 +2952,7 @@
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Giro do estoque</div>
-            <div class="text-2xl font-bold mt-1 num" x-text="financeiroVisao.indicadores.giro_vezes !== null ? String(financeiroVisao.indicadores.giro_vezes).replace('.', ',') + 'x' : '—'"></div>
+            <div class="text-2xl font-bold mt-1 num" x-text="finGiroTexto()"></div>
             <div class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? 'o galpão gira a cada ' + financeiroVisao.indicadores.giro_dias + ' dias (base 30d)' : 'sem base pra calcular'"></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">

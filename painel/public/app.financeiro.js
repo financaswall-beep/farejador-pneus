@@ -64,6 +64,14 @@ window.PAINEL_MODULES.financeiro = function () {
       return (this.financeiroVisao && this.financeiroVisao.a_receber.itens.length) || 0;
     },
     // "Cobrar no WhatsApp" da tela Financeiro (mesmo deep-link wa.me da página Rede).
+    finGiroTexto() {
+      const ind = this.financeiroVisao && this.financeiroVisao.indicadores;
+      if (!ind || ind.giro_dias === null || ind.giro_dias === undefined) return '—';
+      const dias = Number(ind.giro_dias);
+      if (!(dias > 0)) return '—';
+      const vezes = Math.round((30 / dias) * 10) / 10;
+      return String(vezes).replace('.', ',') + 'x';
+    },
     finWhatsLink(item) {
       const digits = String(item.phone || '').replace(/\D/g, '');
       if (!digits) return null;
