@@ -3171,31 +3171,74 @@
 
       <!-- ═══════ SUB-ABA: INDICADORES ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'indicadores'" class="w-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="package" class="w-4 h-4"></i> Parado no galpão</div>
-            <div class="text-2xl font-bold mt-1 num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></div>
-            <div class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.pneus_galpao + ' pneus ao custo médio'"></div>
+        <div x-show="finTab === 'indicadores'" class="w-full space-y-5">
+          <!-- Quatro sinais principais, todos calculados pelo backend financeiro atual. -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Margem líquida</p><p class="text-2xl font-bold leading-tight num" :class="finIndicadoresPainel().lucro >= 0 ? 'text-gray-900' : 'text-rose-600'" x-text="finIndicadoresPainel().margem !== null ? String(finIndicadoresPainel().margem).replace('.', ',') + '%' : '—'"></p><p class="text-xs text-gray-400 mt-1">quanto do faturamento virou lucro</p></div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="target" class="w-5 h-5 text-emerald-700"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Ponto de equilíbrio</p><p class="text-2xl font-bold leading-tight num" x-text="finIndicadoresPainel().pontoEquilibrio !== null ? formatCurrency(finIndicadoresPainel().pontoEquilibrio) : '—'"></p><p class="text-xs text-gray-400 mt-1" x-text="finIndicadoresPainel().pontoPct !== null ? String(finIndicadoresPainel().pontoPct).replace('.', ',') + '% atingido no período' : 'sem base para calcular'"></p></div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="refresh-cw" class="w-5 h-5 text-emerald-700"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Giro do estoque</p><p class="text-2xl font-bold leading-tight num" x-text="finGiroTexto()"></p><p class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? String(financeiroVisao.indicadores.giro_dias).replace('.', ',') + ' dias em média · base 30d' : 'sem base para calcular'"></p></div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="Number(financeiroVisao.indicadores.fiado_aberto_pct || 0) > 20 ? 'bg-rose-50' : 'bg-amber-50'"><i data-lucide="clock-3" class="w-5 h-5" :class="Number(financeiroVisao.indicadores.fiado_aberto_pct || 0) > 20 ? 'text-rose-600' : 'text-amber-600'"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Fiado em aberto</p><p class="text-2xl font-bold leading-tight num" :class="Number(financeiroVisao.indicadores.fiado_aberto_pct || 0) > 20 ? 'text-rose-600' : 'text-gray-900'" x-text="financeiroVisao.indicadores.fiado_aberto_pct !== null ? String(financeiroVisao.indicadores.fiado_aberto_pct).replace('.', ',') + '%' : '—'"></p><p class="text-xs text-gray-400 mt-1">das vendas do atacado no mês</p></div>
+            </div>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="refresh-cw" class="w-4 h-4"></i> Giro do estoque</div>
-            <div class="text-2xl font-bold mt-1 num" x-text="finGiroTexto()"></div>
-            <div class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? 'o galpão gira a cada ' + financeiroVisao.indicadores.giro_dias + ' dias (base 30d)' : 'sem base pra calcular'"></div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+            <!-- Sem histórico inventado: compara os componentes reais do período selecionado. -->
+            <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[338px]">
+              <h3 class="text-base font-semibold">Composição do resultado</h3><p class="text-xs text-gray-500 mt-0.5">Faturamento, custos, despesas e lucro do período atual.</p>
+              <div class="h-[245px] mt-5 px-2 flex items-end justify-around gap-5 border-b border-gray-200">
+                <template x-for="item in finIndicadoresPainel().resultados" :key="item.label">
+                  <div class="h-full flex-1 max-w-[132px] flex flex-col justify-end items-center min-w-0">
+                    <p class="text-xs font-semibold text-gray-700 num mb-2 whitespace-nowrap" x-text="formatCurrency(item.valor)"></p>
+                    <div class="w-full max-w-[74px] rounded-t-md transition-all" :class="item.cls" :style="'height:' + Math.max(5, item.pct) + '%' "></div>
+                    <p class="text-xs text-gray-500 mt-2 mb-3 text-center whitespace-nowrap" x-text="item.label"></p>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[338px]">
+              <h3 class="text-base font-semibold">Saúde financeira</h3><p class="text-xs text-gray-500 mt-0.5">Leitura direta dos números, sem nota artificial.</p>
+              <div class="mt-5 rounded-xl p-4 flex items-center gap-4" :class="finIndicadoresPainel().saude.bg"><div class="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center"><i data-lucide="activity" class="w-6 h-6" :class="finIndicadoresPainel().saude.cls"></i></div><div><p class="text-xs text-gray-500">Situação do período</p><p class="text-xl font-bold" :class="finIndicadoresPainel().saude.cls" x-text="finIndicadoresPainel().saude.label"></p></div></div>
+              <div class="mt-5 divide-y divide-gray-100">
+                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Lucro do período</span><span class="font-semibold num" :class="finIndicadoresPainel().lucro >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finIndicadoresPainel().lucro)"></span></div>
+                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Ponto de equilíbrio</span><span class="font-semibold num" x-text="finIndicadoresPainel().pontoPct !== null ? String(finIndicadoresPainel().pontoPct).replace('.', ',') + '%' : '—'"></span></div>
+                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Títulos vencidos</span><span class="font-semibold num" :class="finIndicadoresPainel().vencidos > 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="finIndicadoresPainel().vencidos"></span></div>
+                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Capital parado</span><span class="font-semibold num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span></div>
+              </div>
+            </div>
           </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="clock" class="w-4 h-4"></i> Fiado do mês em aberto</div>
-            <div class="text-2xl font-bold mt-1 num" x-text="financeiroVisao.indicadores.fiado_aberto_pct !== null ? financeiroVisao.indicadores.fiado_aberto_pct + '%' : '—'"></div>
-            <div class="text-xs text-gray-400 mt-1">da venda do atacado ainda sem receber</div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-xs text-gray-500"><i data-lucide="scale" class="w-4 h-4"></i> Ponto de equilíbrio</div>
-            <div class="text-2xl font-bold mt-1 num" x-text="financeiroVisao.indicadores.ponto_equilibrio !== null ? formatCurrency(financeiroVisao.indicadores.ponto_equilibrio) : '—'"></div>
-            <div class="text-xs text-gray-400 mt-1">venda/mês que paga as contas</div>
-          </div>
-          <div class="sm:col-span-2 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center gap-2 text-xs text-gray-500 mb-1"><i data-lucide="percent" class="w-4 h-4"></i> Margem do mês</div>
-            <div class="text-2xl font-bold num" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="financeiroVisao.mes.margem_pct !== null ? String(financeiroVisao.mes.margem_pct).replace('.', ',') + '%' : '—'"></div>
-            <div class="text-xs text-gray-400 mt-1">quanto do que entrou virou lucro (faturamento incluindo frete − custo − despesas)</div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[260px]">
+              <h3 class="text-base font-semibold">Margem bruta por operação</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">Antes do rateio das despesas gerais.</p>
+              <div class="space-y-4"><template x-for="fonte in finIndicadoresPainel().fontes" :key="fonte.label"><div class="grid grid-cols-[125px_minmax(0,1fr)_48px] items-center gap-3"><span class="text-xs text-gray-600 truncate" x-text="fonte.label"></span><div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-600 rounded-full" :style="'width:' + Math.max(fonte.barra, fonte.valor > 0 ? 3 : 0) + '%' "></div></div><span class="text-xs font-semibold text-right num" x-text="fonte.margem !== null ? String(fonte.margem).replace('.', ',') + '%' : '—'"></span></div></template></div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[260px]">
+              <h3 class="text-base font-semibold">Pressão do caixa</h3><p class="text-xs text-gray-500 mt-0.5 mb-4">Comparação do que está aberto para receber e pagar.</p>
+              <div class="divide-y divide-gray-100">
+                <div class="py-3 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="arrow-down-left" class="w-4 h-4 text-emerald-700"></i></div><span class="text-sm text-gray-600">A receber</span></div><span class="font-semibold num" x-text="formatCurrency(finIndicadoresPainel().receber)"></span></div>
+                <div class="py-3 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center"><i data-lucide="arrow-up-right" class="w-4 h-4 text-rose-600"></i></div><span class="text-sm text-gray-600">A pagar</span></div><span class="font-semibold num" x-text="formatCurrency(finIndicadoresPainel().pagar)"></span></div>
+                <div class="py-3 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center"><i data-lucide="scale" class="w-4 h-4 text-gray-600"></i></div><span class="text-sm text-gray-600">Saldo em aberto</span></div><span class="font-bold num" :class="finIndicadoresPainel().saldoAberto >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finIndicadoresPainel().saldoAberto)"></span></div>
+              </div>
+              <p class="text-xs text-gray-400 mt-3" x-text="finIndicadoresPainel().cobertura !== null ? 'Os recebíveis cobrem ' + String(finIndicadoresPainel().cobertura).replace('.', ',') + 'x as contas abertas.' : 'Sem contas abertas para calcular cobertura.'"></p>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[260px]">
+              <h3 class="text-base font-semibold">Leitura do período</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">Os três sinais mais importantes agora.</p>
+              <div class="space-y-5"><template x-for="(texto, idx) in finIndicadoresPainel().leituras" :key="idx"><div class="flex items-start gap-3"><div class="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-700"></i></div><p class="text-sm text-gray-600 leading-relaxed" x-text="texto"></p></div></template></div>
+            </div>
           </div>
         </div>
       </template>

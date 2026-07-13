@@ -73,6 +73,70 @@ window.PAINEL_MODULES.financeiro = function () {
       return String(vezes).replace('.', ',') + 'x';
     },
     // ── Sub-aba Cobranças: derivados da lista real a_receber.itens ──
+    // Sub-aba Indicadores: somente derivados do payload financeiro real.
+    // Não cria série histórica nem prazo médio que o backend ainda não mede.
+    finIndicadoresPainel() {
+      const v = this.financeiroVisao;
+      if (!v) return null;
+      const m = v.mes;
+      const ind = v.indicadores;
+      const faturamento = Number(m.faturamento || 0);
+      const custo = Number(m.custo || 0);
+      const despesas = Number(m.despesas || 0);
+      const lucro = Number(m.lucro || 0);
+      const margem = m.margem_pct === null ? null : Number(m.margem_pct);
+      const pontoEquilibrio = ind.ponto_equilibrio === null ? null : Number(ind.ponto_equilibrio);
+      const pontoPct = pontoEquilibrio && pontoEquilibrio > 0
+        ? Math.round((faturamento / pontoEquilibrio) * 1000) / 10
+        : null;
+      const receber = Number(v.a_receber.total || 0);
+      const pagar = Number(v.a_pagar.total || 0);
+      const saldoAberto = receber - pagar;
+      const cobertura = pagar > 0 ? Math.round((receber / pagar) * 100) / 100 : null;
+      const maxResultado = Math.max(faturamento, custo, despesas, Math.abs(lucro), 1);
+      const resultados = [
+        { label: 'Faturamento', valor: faturamento, pct: (faturamento / maxResultado) * 100, cls: 'bg-emerald-700' },
+        { label: 'Custo dos pneus', valor: custo, pct: (custo / maxResultado) * 100, cls: 'bg-gray-400' },
+        { label: 'Despesas', valor: despesas, pct: (despesas / maxResultado) * 100, cls: 'bg-rose-400' },
+        { label: lucro >= 0 ? 'Lucro' : 'Prejuízo', valor: lucro, pct: (Math.abs(lucro) / maxResultado) * 100, cls: lucro >= 0 ? 'bg-emerald-500' : 'bg-rose-600' },
+      ];
+      const fontesBase = [
+        { label: 'Atacado', valor: Number(m.pernas.atacado.faturamento || 0), lucro: Number(m.pernas.atacado.lucro || 0) },
+        { label: 'Varejo (bot + balcão)', valor: Number(m.pernas.varejo.faturamento || 0), lucro: Number(m.pernas.varejo.lucro || 0) },
+        { label: 'Frete', valor: Number(m.pernas.frete?.recebido || 0), lucro: Number(m.pernas.frete?.recebido || 0) },
+        { label: 'Comissão da rede', valor: Number(m.pernas.comissao?.realizado || 0), lucro: Number(m.pernas.comissao?.realizado || 0) },
+      ];
+      const fontes = fontesBase.map((item) => {
+        const margemFonte = this.finPctLucro(item.valor, item.lucro);
+        return { ...item, margem: margemFonte, barra: margemFonte === null ? 0 : Math.max(0, Math.min(100, margemFonte)) };
+      });
+      const vencidos = Number(v.a_receber.vencidos_count || 0) + Number(v.a_pagar.vencidos_count || 0);
+      const saudavel = lucro >= 0 && (pontoPct === null || pontoPct >= 100) && vencidos === 0;
+      const critico = lucro < 0;
+      const saude = {
+        label: critico ? 'Resultado negativo' : saudavel ? 'Saudável' : 'Pede atenção',
+        cls: critico ? 'text-rose-600' : saudavel ? 'text-emerald-700' : 'text-amber-600',
+        bg: critico ? 'bg-rose-50' : saudavel ? 'bg-emerald-50' : 'bg-amber-50',
+        icon: critico ? 'trending-down' : saudavel ? 'badge-check' : 'circle-alert',
+      };
+      const leituras = [
+        lucro >= 0
+          ? 'O período gerou ' + this.formatCurrency(lucro) + ' de lucro.'
+          : 'O período está com ' + this.formatCurrency(Math.abs(lucro)) + ' de prejuízo.',
+        pontoPct === null
+          ? 'Ainda não há base suficiente para calcular o ponto de equilíbrio.'
+          : pontoPct >= 100
+            ? 'O faturamento atingiu ' + String(pontoPct).replace('.', ',') + '% do ponto de equilíbrio.'
+            : 'Faltam ' + this.formatCurrency(Math.max(0, pontoEquilibrio - faturamento)) + ' para o ponto de equilíbrio.',
+        saldoAberto >= 0
+          ? 'Há ' + this.formatCurrency(saldoAberto) + ' a mais para receber do que para pagar.'
+          : 'As contas a pagar superam os recebíveis em ' + this.formatCurrency(Math.abs(saldoAberto)) + '.',
+      ];
+      return {
+        faturamento, custo, despesas, lucro, margem, pontoEquilibrio, pontoPct,
+        receber, pagar, saldoAberto, cobertura, resultados, fontes, vencidos, saude, leituras,
+      };
+    },
     cobrancaDias(due) {
       if (!due) return null;
       const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
