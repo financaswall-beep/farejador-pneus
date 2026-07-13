@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-13T06:32:51.922Z",
+  "geradoEm": "2026-07-13T22:10:21.016Z",
   "commitBase": "dd64a35",
-  "total": 409,
+  "total": 415,
   "propriedades": {
     "abrirNoChatwoot": "function",
     "abrirNovoColaborador": "function",
@@ -262,6 +262,12 @@
     "operatorLabel": "value:string",
     "orderError": "value:null",
     "orderSubmitting": "value:boolean",
+    "pagarClasse": "function",
+    "pagarDias": "function",
+    "pagarFila": "function",
+    "pagarFiltro": "value:string",
+    "pagarPainel": "function",
+    "pagarStatus": "function",
     "parceiroAReceberTotal": "function",
     "parceiroComissaoAReceber": "function",
     "parceiroLucroClass": "function",

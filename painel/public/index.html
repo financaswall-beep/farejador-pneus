@@ -19,7 +19,7 @@
 <script src="/admin/painel/app.varejo.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260706-sino1"></script>
-<script src="/admin/painel/app.compras.js?v=20260708-despesas1"></script>
+<script src="/admin/painel/app.compras.js?v=20260713-pagar1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260712-fin1"></script>
+<script src="/admin/painel/app.js?v=20260713-pagar1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2915,29 +2915,180 @@
         </div>
       </template>
 
-      <!-- ═══════ SUB-ABA: CONTAS A PAGAR (agenda) ═══════ -->
+      <!-- ═══════ SUB-ABA: CONTAS A PAGAR (redesign 07-13, desenho do dono) ═══════ -->
+      <!-- Tudo DERIVADO de financeiroVisao.a_pagar.itens (fornecedor + despesa a pagar);
+           helpers pagar* em app.compras.js. Ação de quitar = finPagar (a MESMA da agenda). -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'pagar'" class="w-full">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-1">Agenda de pagamentos</h3>
-            <p class="text-xs text-gray-500 mb-3">Compras de fornecedor e despesas a pagar — vencido primeiro, depois pelo vencimento mais perto.</p>
-            <template x-for="item in financeiroVisao.a_pagar.itens" :key="item.tipo + item.id">
-              <div class="flex items-center justify-between gap-2 border-b border-gray-100 py-2.5 text-sm">
-                <div class="min-w-0">
-                  <div class="font-medium text-gray-800 truncate" x-text="item.nome"></div>
-                  <div class="text-xs"
-                       :class="item.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                       x-text="(item.tipo === 'despesa' ? 'despesa · ' + despesaLabel(item.categoria).toLowerCase() : 'compra de fornecedor') + ' · ' + finVence(item)"></div>
+        <div x-show="finTab === 'pagar'" class="w-full space-y-5">
+
+          <!-- Estado vazio bonito (sem nada a pagar) -->
+          <div x-show="!financeiroVisao.a_pagar.itens.length" class="bg-white border border-gray-200 rounded-xl p-10 text-center shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-600"></i></div>
+            <p class="text-base font-semibold text-gray-800">Nenhuma conta pendente.</p>
+            <p class="text-sm text-gray-500 mt-1">Compra de fornecedor a prazo e despesa a pagar aparecem aqui — vencidas primeiro.</p>
+          </div>
+
+          <template x-if="financeiroVisao.a_pagar.itens.length">
+            <div class="space-y-5">
+
+              <!-- 4 cards do topo (molde da Visão geral) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                  <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
+                    <p class="text-2xl font-bold leading-tight num" :class="pagarPainel().cards.vencidas.total > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="formatCurrency(pagarPainel().cards.vencidas.total)"></p>
+                    <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.vencidas.count + ' título' + (pagarPainel().cards.vencidas.count === 1 ? '' : 's')"></p></div>
                 </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <span class="font-bold text-gray-900 num" x-text="formatCurrency(Number(item.valor))"></span>
-                  <button @click="finPagar(item)"
-                          class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                  <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar" class="w-5 h-5 text-amber-600"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p>
+                    <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(pagarPainel().cards.hoje.total)"></p>
+                    <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.hoje.count + ' título' + (pagarPainel().cards.hoje.count === 1 ? '' : 's')"></p></div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                  <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-check" class="w-5 h-5 text-emerald-700"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Próximos 7 dias</p>
+                    <p class="text-2xl font-bold leading-tight text-emerald-700 num" x-text="formatCurrency(pagarPainel().cards.sete.total)"></p>
+                    <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.sete.count + ' título' + (pagarPainel().cards.sete.count === 1 ? '' : 's')"></p></div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                  <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="receipt" class="w-5 h-5 text-gray-600"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Total em aberto</p>
+                    <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(pagarPainel().cards.aberto.total)"></p>
+                    <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.aberto.count + ' título' + (pagarPainel().cards.aberto.count === 1 ? '' : 's')"></p></div>
                 </div>
               </div>
-            </template>
-            <div x-show="!financeiroVisao.a_pagar.itens.length" class="text-sm text-gray-400 py-6 text-center">Nenhuma conta pendente.</div>
-          </div>
+
+              <!-- Fila de pagamento (tabela) | Atenção rápida -->
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+                <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                  <div class="flex items-start justify-between flex-wrap gap-3 mb-3">
+                    <div>
+                      <h3 class="text-base font-semibold">Fila de pagamento</h3>
+                      <p class="text-xs text-gray-500 mt-0.5">Vencidas primeiro, depois pelo vencimento mais perto.</p>
+                    </div>
+                    <div x-show="pagarFiltro" class="flex items-center gap-2 text-xs">
+                      <span class="text-gray-500">Filtrando:</span>
+                      <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-700 rounded-full pl-2.5 pr-1 py-0.5 font-medium"
+                            x-text="({ vencida: 'vencidas', hoje: 'vencem hoje', sete: 'próximos 7 dias' })[pagarFiltro] || pagarFiltro">
+                      </span>
+                      <button @click="pagarFiltro = ''" class="text-gray-400 hover:text-rose-600 font-medium">limpar ✕</button>
+                    </div>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full min-w-[640px] text-sm">
+                      <thead>
+                        <tr class="text-xs text-gray-400 border-b border-gray-100">
+                          <th class="text-left font-medium py-2 pr-3">Fornecedor</th>
+                          <th class="text-left font-medium py-2 pr-3">Categoria</th>
+                          <th class="text-left font-medium py-2 pr-3">Vencimento</th>
+                          <th class="text-right font-medium py-2 pr-3">Valor</th>
+                          <th class="text-left font-medium py-2 pr-3">Status</th>
+                          <th class="text-right font-medium py-2">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="item in pagarFila()" :key="item.tipo + item.id">
+                          <tr class="border-b border-gray-100">
+                            <td class="py-2.5 pr-3 font-medium text-gray-800" x-text="item.nome"></td>
+                            <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="item.tipo === 'fornecedor' ? 'Fornecedor de pneus' : despesaLabel(item.categoria || 'outros')"></span></td>
+                            <td class="py-2.5 pr-3 text-gray-500 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'sem vencimento'"></td>
+                            <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
+                            <td class="py-2.5 pr-3 whitespace-nowrap"><span class="inline-block text-xs rounded-full px-2.5 py-0.5" :class="pagarStatus(item).cls" x-text="pagarStatus(item).label"></span></td>
+                            <td class="py-2.5 text-right whitespace-nowrap">
+                              <button @click="finPagar(item)"
+                                      class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div x-show="!pagarFila().length" class="text-sm text-gray-400 py-6 text-center">Nenhum título nesse filtro — <button @click="pagarFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todos</button>.</div>
+                </div>
+
+                <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                  <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
+                  <div class="space-y-3">
+                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                      <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-4 h-4 text-rose-600"></i></div>
+                      <div class="min-w-0"><p class="text-xs text-gray-500">Títulos vencidos</p><p class="text-base font-semibold num" :class="pagarPainel().cards.vencidas.count > 0 ? 'text-rose-600' : ''" x-text="pagarPainel().cards.vencidas.count"></p></div>
+                      <button @click="pagarFiltro = 'vencida'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver títulos</button>
+                    </div>
+                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                      <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar" class="w-4 h-4 text-amber-600"></i></div>
+                      <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p><p class="text-base font-semibold num" x-text="pagarPainel().cards.hoje.count"></p></div>
+                      <button @click="pagarFiltro = 'hoje'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver títulos</button>
+                    </div>
+                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                      <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="users" class="w-4 h-4 text-gray-500"></i></div>
+                      <div class="min-w-0"><p class="text-xs text-gray-500">Negociar com fornecedores</p><p class="text-xs text-gray-400">abrir a tela de Compras</p></div>
+                      <button @click="currentPage = 'compras'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver fornecedores</button>
+                    </div>
+                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                      <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="plus" class="w-4 h-4 text-emerald-700"></i></div>
+                      <div class="min-w-0"><p class="text-xs text-gray-500">Cadastrar nova conta</p><p class="text-xs text-gray-400">lançar despesa a pagar</p></div>
+                      <button @click="finTab = 'despesas'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Novo título</button>
+                    </div>
+                    <!-- Importar contas a pagar: SEM importador de títulos no projeto ainda.
+                         Botão visual desabilitado (não mente que funciona); conectar aqui
+                         quando existir o endpoint de importação por planilha. -->
+                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 opacity-60">
+                      <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="upload" class="w-4 h-4 text-gray-400"></i></div>
+                      <div class="min-w-0"><p class="text-xs text-gray-500">Importar contas a pagar</p><p class="text-xs text-gray-400">em breve</p></div>
+                      <button disabled title="Em breve — importação por planilha" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 bg-gray-50 font-medium whitespace-nowrap cursor-not-allowed">Importar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Calendário de vencimentos | Por categoria -->
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+                <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                  <h3 class="text-base font-semibold mb-1">Calendário de vencimentos</h3>
+                  <p class="text-xs text-gray-500 mb-4">O que vence por dia — vermelho atrasou, amarelo é hoje, verde é o que vem.</p>
+                  <div class="overflow-x-auto pb-1">
+                    <div class="flex gap-2 min-w-max">
+                      <template x-for="c in pagarPainel().calendario" :key="c.key">
+                        <div class="flex flex-col items-center gap-1.5 w-[96px] flex-shrink-0">
+                          <div class="text-center leading-tight h-8">
+                            <div class="text-xs font-medium text-gray-700" x-text="c.label"></div>
+                            <div class="text-[11px] text-gray-400" x-text="c.sub"></div>
+                          </div>
+                          <div class="w-full rounded-lg py-3 px-2 text-center"
+                               :class="c.total <= 0 ? 'bg-gray-50 text-gray-300'
+                                 : c.tom === 'atraso' ? 'bg-rose-50 text-rose-700'
+                                 : c.tom === 'hoje' ? 'bg-amber-50 text-amber-700'
+                                 : 'bg-emerald-50 text-emerald-700'">
+                            <div class="text-xs font-semibold num" x-text="c.total > 0 ? formatCurrency(c.total) : '—'"></div>
+                            <div class="text-[11px] mt-0.5" x-show="c.count > 0" x-text="c.count + ' tít.'"></div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-4 pt-3 border-t border-gray-100">Total em aberto: <span class="font-semibold text-gray-800 num" x-text="formatCurrency(pagarPainel().cards.aberto.total)"></span> <span class="text-gray-400">· títulos sem vencimento não entram no calendário, mas contam no total.</span></p>
+                </div>
+
+                <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                  <h3 class="text-base font-semibold mb-1">Por categoria</h3>
+                  <p class="text-xs text-gray-500 mb-4">quanto pesa cada tipo de conta no total em aberto</p>
+                  <div class="space-y-3">
+                    <template x-for="cat in pagarPainel().categorias" :key="cat.label">
+                      <div>
+                        <div class="flex items-center justify-between text-sm gap-2">
+                          <span class="text-gray-600 min-w-0 truncate" x-text="cat.label"></span>
+                          <span class="whitespace-nowrap"><span class="text-gray-900 font-medium num" x-text="formatCurrency(cat.total)"></span> <span class="text-gray-400 text-xs num" x-text="String(cat.pct).replace('.', ',') + '%'"></span></span>
+                        </div>
+                        <div class="bg-gray-100 rounded h-2 mt-1.5"><div class="h-2 rounded bg-emerald-600" :style="'width:' + Math.max(cat.pct > 0 ? 2 : 0, cat.pct) + '%'"></div></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </template>
         </div>
       </template>
 

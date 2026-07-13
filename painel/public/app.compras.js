@@ -237,6 +237,62 @@ window.PAINEL_MODULES.compras = function () {
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },
+    // ── Sub-aba CONTAS A PAGAR (07-13): DERIVADO de a_pagar.itens (fornecedor +
+    // despesa a pagar). Zero API/contrato novo — só classifica/agrupa pra EXIBIR. ──
+    pagarDias(due) {
+      if (!due) return null; // sem vencimento → fora do calendário e dos baldes de data
+      const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+      return Math.round((new Date(String(due).slice(0, 10) + 'T00:00:00Z') - new Date(hoje + 'T00:00:00Z')) / 86400000);
+    },
+    pagarClasse(i) { // fonte única pro filtro da fila E pra cor do status
+      if (i.overdue) return 'vencida';            // overdue é do servidor — manda
+      const d = this.pagarDias(i.due_date);
+      if (d === null) return 'semdata';
+      if (d < 0) return 'vencida';
+      if (d === 0) return 'hoje';
+      return d <= 7 ? 'sete' : 'depois';
+    },
+    pagarStatus(i) {
+      const c = this.pagarClasse(i);
+      if (c === 'vencida') return { label: i.due_date ? 'Venceu ' + this.financeDate(i.due_date) : 'Vencida', cls: 'bg-rose-50 text-rose-600 font-semibold' };
+      if (c === 'hoje') return { label: 'Vence hoje', cls: 'bg-amber-50 text-amber-700 font-medium' };
+      if (c === 'semdata') return { label: 'Sem vencimento', cls: 'bg-gray-100 text-gray-500' };
+      return { label: 'Vence ' + this.financeDate(i.due_date), cls: 'bg-emerald-50 text-emerald-700' };
+    },
+    pagarFila() { // '' = tudo; já vem vencido-primeiro do servidor
+      const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
+      return this.pagarFiltro ? itens.filter((i) => this.pagarClasse(i) === this.pagarFiltro) : itens;
+    },
+    pagarPainel() { // cards do topo + calendário + quebra por categoria, num passo só
+      const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
+      const base = new Date(new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date()) + 'T00:00:00Z').getTime();
+      const cards = { vencidas: { total: 0, count: 0 }, hoje: { total: 0, count: 0 }, sete: { total: 0, count: 0 }, aberto: { total: 0, count: 0 } };
+      const cal = [{ key: 'vencida', label: 'Vencidas', sub: '', tom: 'atraso', total: 0, count: 0 }];
+      for (let o = 0; o <= 6; o++) {
+        const dt = new Date(base + o * 86400000);
+        const wd = o === 0 ? 'Hoje' : o === 1 ? 'Amanhã'
+          : new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'short' }).format(dt).replace('.', '');
+        cal.push({ key: 'd' + o, label: wd.charAt(0).toUpperCase() + wd.slice(1), tom: o === 0 ? 'hoje' : 'futuro', total: 0, count: 0,
+          sub: new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(dt) });
+      }
+      cal.push({ key: 'depois', label: 'Depois', sub: '+7 dias', tom: 'futuro', total: 0, count: 0 });
+      const cats = new Map();
+      for (const i of itens) {
+        const v = Number(i.valor || 0);
+        cards.aberto.total += v; cards.aberto.count++;
+        const c = this.pagarClasse(i);
+        if (c === 'vencida') { cards.vencidas.total += v; cards.vencidas.count++; cal[0].total += v; cal[0].count++; }
+        else if (c === 'hoje') { cards.hoje.total += v; cards.hoje.count++; cal[1].total += v; cal[1].count++; }
+        else if (c === 'sete') { cards.sete.total += v; cards.sete.count++; const d = this.pagarDias(i.due_date); const k = d <= 6 ? d + 1 : cal.length - 1; cal[k].total += v; cal[k].count++; }
+        else if (c === 'depois') { cal[cal.length - 1].total += v; cal[cal.length - 1].count++; }
+        const ck = i.tipo === 'fornecedor' ? 'Fornecedor de pneus' : this.despesaLabel(i.categoria || 'outros');
+        cats.set(ck, (cats.get(ck) || 0) + v);
+      }
+      const grand = cards.aberto.total;
+      const categorias = [...cats.entries()].map(([label, total]) => ({ label, total,
+        pct: grand > 0 ? Math.round((total / grand) * 1000) / 10 : 0 })).sort((a, b) => b.total - a.total);
+      return { cards, calendario: cal, categorias };
+    },
     // ── LOGÍSTICA da matriz (0121): entregas + rota do dia ──
   };
 };

@@ -132,6 +132,9 @@ function painelApp() {
     despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },
     // Recorte da lista (0130): mês (competência SP — preenchido no 1º load) × modalidade.
     despesaFiltro: { mes: '', categoria: '' },
+    // Sub-aba Contas a pagar (07-13): filtro da fila vindo do card Atenção rápida
+    // ('' = tudo | 'vencida' | 'hoje' | 'sete'). Front-only, não vai pro servidor.
+    pagarFiltro: '',
     // Bootstrap das modalidades — o payload do GET (lista VIVA da 0130, com as do dono) sobrescreve.
     despesaCategorias: [
       { id: 'aluguel', label: 'Aluguel/galpão' },
