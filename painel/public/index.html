@@ -2921,15 +2921,9 @@
       <template x-if="financeiroVisao">
         <div x-show="finTab === 'pagar'" class="w-full space-y-5">
 
-          <!-- Estado vazio bonito (sem nada a pagar) -->
-          <div x-show="!financeiroVisao.a_pagar.itens.length" class="bg-white border border-gray-200 rounded-xl p-10 text-center shadow-sm">
-            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3"><i data-lucide="check-circle-2" class="w-6 h-6 text-emerald-600"></i></div>
-            <p class="text-base font-semibold text-gray-800">Nenhuma conta pendente.</p>
-            <p class="text-sm text-gray-500 mt-1">Compra de fornecedor a prazo e despesa a pagar aparecem aqui — vencidas primeiro.</p>
-          </div>
-
-          <template x-if="financeiroVisao.a_pagar.itens.length">
-            <div class="space-y-5">
+          <!-- A estrutura permanece visível mesmo sem títulos: cards zerados,
+               fila vazia, calendário e atalhos continuam úteis para o dono. -->
+          <div class="space-y-5">
 
               <!-- 4 cards do topo (molde da Visão geral) -->
               <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -3004,7 +2998,12 @@
                       </tbody>
                     </table>
                   </div>
-                  <div x-show="!pagarFila().length" class="text-sm text-gray-400 py-6 text-center">Nenhum título nesse filtro — <button @click="pagarFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todos</button>.</div>
+                  <div x-show="!financeiroVisao.a_pagar.itens.length" class="py-8 text-center">
+                    <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2"><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i></div>
+                    <p class="text-sm font-medium text-gray-700">Nenhuma conta pendente.</p>
+                    <p class="text-xs text-gray-400 mt-1">Compras a prazo e despesas a pagar aparecerão nesta fila.</p>
+                  </div>
+                  <div x-show="financeiroVisao.a_pagar.itens.length && !pagarFila().length" class="text-sm text-gray-400 py-6 text-center">Nenhum título nesse filtro — <button @click="pagarFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todos</button>.</div>
                 </div>
 
                 <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -3083,12 +3082,15 @@
                         <div class="bg-gray-100 rounded h-2 mt-1.5"><div class="h-2 rounded bg-emerald-600" :style="'width:' + Math.max(cat.pct > 0 ? 2 : 0, cat.pct) + '%'"></div></div>
                       </div>
                     </template>
+                    <div x-show="!pagarPainel().categorias.length" class="rounded-lg bg-gray-50 px-4 py-8 text-center">
+                      <p class="text-sm font-medium text-gray-600">Sem valores por categoria</p>
+                      <p class="text-xs text-gray-400 mt-1">As categorias aparecem quando uma conta for cadastrada.</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-            </div>
-          </template>
+          </div>
         </div>
       </template>
 
