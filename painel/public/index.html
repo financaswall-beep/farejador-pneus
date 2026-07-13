@@ -2889,28 +2889,103 @@
 
       <!-- ═══════ SUB-ABA: COBRANÇAS (quem te deve) ═══════ -->
       <template x-if="financeiroVisao">
-        <div x-show="finTab === 'cobrancas'" class="w-full">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-1">Quem te deve</h3>
-            <p class="text-xs text-gray-500 mb-3">Fiado do atacado e comissão da rede — vencido primeiro. O botão “Cobrar” abre o WhatsApp com a mensagem pronta.</p>
-            <template x-for="item in financeiroVisao.a_receber.itens" :key="item.tipo + item.id">
-              <div class="flex items-center justify-between gap-2 border-b border-gray-100 py-2.5 text-sm">
-                <div class="min-w-0">
-                  <div class="font-medium text-gray-800 truncate" x-text="item.nome"></div>
-                  <div class="text-xs"
-                       :class="item.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                       x-text="(item.tipo === 'comissao' ? 'comissão · ' : 'fiado atacado · ') + finVence(item)"></div>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <span class="font-bold text-gray-900 num" x-text="formatCurrency(Number(item.valor))"></span>
-                  <a x-show="finWhatsLink(item)" :href="finWhatsLink(item)" target="_blank" rel="noopener"
-                     class="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">Cobrar</a>
-                  <button @click="finReceber(item)" :disabled="finQuitando"
-                          class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Recebi</button>
+        <div x-show="finTab === 'cobrancas'" class="w-full space-y-5">
+
+          <!-- Resumo: sempre visível, inclusive quando ainda não há cobranças. -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
+                <p class="text-2xl font-bold leading-tight num" :class="cobrancaPainel().cards.vencidas.total > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="formatCurrency(cobrancaPainel().cards.vencidas.total)"></p>
+                <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.vencidas.count"></span> cobrança(s)</p>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-5 h-5 text-amber-600"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p>
+                <p class="text-2xl font-bold leading-tight num" :class="cobrancaPainel().cards.hoje.total > 0 ? 'text-amber-600' : 'text-gray-900'" x-text="formatCurrency(cobrancaPainel().cards.hoje.total)"></p>
+                <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.hoje.count"></span> cobrança(s)</p>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="network" class="w-5 h-5 text-emerald-700"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Comissões da rede</p>
+                <p class="text-2xl font-bold leading-tight num text-emerald-800" x-text="formatCurrency(cobrancaPainel().cards.comissao.total)"></p>
+                <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.comissao.count"></span> parceiro(s)</p>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+              <div class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="wallet-cards" class="w-5 h-5 text-gray-600"></i></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Total a receber</p>
+                <p class="text-2xl font-bold leading-tight num text-gray-900" x-text="formatCurrency(cobrancaPainel().cards.aberto.total)"></p>
+                <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.aberto.count"></span> cobrança(s) em aberto</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+            <!-- Fila única: fiado do atacado + comissões da rede. -->
+            <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div><h3 class="text-base font-semibold">Fila de cobrança</h3><p class="text-xs text-gray-500 mt-0.5">Vencidas primeiro. O WhatsApp já abre com a mensagem pronta.</p></div>
+                <div x-show="cobrancaFiltro" class="flex items-center gap-2 text-xs">
+                  <span class="text-gray-500">Filtrando:</span>
+                  <span class="inline-flex items-center bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 font-medium" x-text="({ vencida: 'vencidas', hoje: 'vencem hoje', sete: 'próximos 7 dias', semfone: 'sem telefone', comissao: 'comissões da rede' })[cobrancaFiltro] || cobrancaFiltro"></span>
+                  <button @click="cobrancaFiltro = ''" class="text-gray-400 hover:text-rose-600 font-medium">limpar</button>
                 </div>
               </div>
-            </template>
-            <div x-show="!financeiroVisao.a_receber.itens.length" class="text-sm text-gray-400 py-6 text-center">Ninguém te devendo 👍</div>
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[790px] text-sm">
+                  <thead class="bg-gray-50/70 text-[11px] uppercase tracking-wide text-gray-400"><tr>
+                    <th class="px-5 py-3 text-left font-medium">Cliente / parceiro</th><th class="px-3 py-3 text-left font-medium">Origem</th><th class="px-3 py-3 text-left font-medium">Vencimento</th><th class="px-3 py-3 text-right font-medium">Valor</th><th class="px-3 py-3 text-left font-medium">Status</th><th class="px-5 py-3 text-right font-medium">Ação</th>
+                  </tr></thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <template x-for="item in cobrancaFila()" :key="item.tipo + item.id">
+                      <tr class="hover:bg-gray-50/60">
+                        <td class="px-5 py-3"><div class="flex items-center gap-3 min-w-0"><div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs font-bold flex-shrink-0" x-text="String(item.nome || '?').split(' ').slice(0, 2).map((p) => p.charAt(0)).join('').toUpperCase()"></div><div class="min-w-0"><p class="font-medium text-gray-800 truncate" x-text="item.nome"></p><p class="text-[11px] text-gray-400" x-text="item.phone ? item.phone : 'telefone não informado'"></p></div></div></td>
+                        <td class="px-3 py-3"><span class="inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 text-xs font-medium" x-text="cobrancaOrigem(item)"></span></td>
+                        <td class="px-3 py-3 text-xs text-gray-600" x-text="finVence(item)"></td>
+                        <td class="px-3 py-3 text-right font-semibold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
+                        <td class="px-3 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-xs whitespace-nowrap" :class="cobrancaStatus(item).cls" x-text="cobrancaStatus(item).label"></span></td>
+                        <td class="px-5 py-3"><div class="flex justify-end items-center gap-2">
+                          <a x-show="finWhatsLink(item)" :href="finWhatsLink(item)" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-700 text-emerald-700 hover:bg-emerald-50 font-medium whitespace-nowrap"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>Cobrar</a>
+                          <span x-show="!finWhatsLink(item)" class="text-[11px] text-gray-400 whitespace-nowrap">Sem telefone</span>
+                          <button @click="finReceber(item)" :disabled="finQuitando" class="text-xs px-3 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Recebi</button>
+                        </div></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div x-show="!financeiroVisao.a_receber.itens.length" class="py-10 text-center"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2"><i data-lucide="badge-check" class="w-5 h-5 text-emerald-600"></i></div><p class="text-sm font-medium text-gray-700">Nenhuma cobrança aberta.</p><p class="text-xs text-gray-400 mt-1">Fiados e comissões pendentes aparecerão nesta fila.</p></div>
+              <div x-show="financeiroVisao.a_receber.itens.length && !cobrancaFila().length" class="text-sm text-gray-400 py-7 text-center">Nenhuma cobrança nesse filtro — <button @click="cobrancaFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todas</button>.</div>
+            </div>
+
+            <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
+              <div class="space-y-4">
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center"><i data-lucide="alert-circle" class="w-4 h-4 text-rose-600"></i></div><div><p class="text-xs text-gray-500">Cobranças vencidas</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.vencidas.count"></p></div><button @click="cobrancaFiltro = 'vencida'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Vencem hoje</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.hoje.count"></p></div><button @click="cobrancaFiltro = 'hoje'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="network" class="w-4 h-4 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Comissões abertas</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.comissao.count"></p></div><button @click="cobrancaFiltro = 'comissao'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><i data-lucide="phone-off" class="w-4 h-4 text-gray-500"></i></div><div><p class="text-xs text-gray-500">Sem telefone</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.semfone.count"></p></div><button @click="cobrancaFiltro = 'semfone'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[220px]">
+              <h3 class="text-base font-semibold">Por origem</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">De onde vêm os valores que a Matriz tem para receber.</p>
+              <div class="space-y-4"><template x-for="origem in cobrancaPainel().origens" :key="origem.label"><div class="grid grid-cols-[130px_minmax(0,1fr)_100px_50px] items-center gap-3 text-sm"><div class="font-medium text-gray-700 truncate" x-text="origem.label"></div><div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-600 rounded-full" :style="'width:' + Math.max(origem.pct, origem.total > 0 ? 3 : 0) + '%' "></div></div><div class="text-right font-medium num" x-text="formatCurrency(origem.total)"></div><div class="text-right text-xs text-gray-400 num" x-text="String(origem.pct).replace('.', ',') + '%' "></div></div></template></div>
+              <div x-show="!cobrancaPainel().origens.length" class="text-sm text-gray-400 py-8 text-center">Ainda não há valores a receber por origem.</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[220px]">
+              <h3 class="text-base font-semibold">Agenda de cobrança</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">O que precisa de contato agora e nos próximos dias.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button @click="cobrancaFiltro = 'hoje'" class="text-left rounded-xl border border-amber-100 bg-amber-50/60 p-4 hover:bg-amber-50"><i data-lucide="sun" class="w-5 h-5 text-amber-600 mb-4"></i><p class="text-xs text-gray-500">Hoje</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.hoje.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.hoje.count"></span> cobrança(s)</p></button>
+                <button @click="cobrancaFiltro = 'sete'" class="text-left rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 hover:bg-emerald-50"><i data-lucide="calendar-days" class="w-5 h-5 text-emerald-700 mb-4"></i><p class="text-xs text-gray-500">Próximos 7 dias</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.sete.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.sete.count"></span> cobrança(s)</p></button>
+                <button @click="cobrancaFiltro = 'comissao'" class="text-left rounded-xl border border-gray-200 bg-gray-50/60 p-4 hover:bg-gray-50"><i data-lucide="landmark" class="w-5 h-5 text-gray-600 mb-4"></i><p class="text-xs text-gray-500">Sem vencimento</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.semdata.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.semdata.count"></span> cobrança(s)</p></button>
+              </div>
+            </div>
           </div>
         </div>
       </template>

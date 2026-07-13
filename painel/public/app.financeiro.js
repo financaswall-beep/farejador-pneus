@@ -72,6 +72,85 @@ window.PAINEL_MODULES.financeiro = function () {
       const vezes = Math.round((30 / dias) * 10) / 10;
       return String(vezes).replace('.', ',') + 'x';
     },
+    // ── Sub-aba Cobranças: derivados da lista real a_receber.itens ──
+    cobrancaDias(due) {
+      if (!due) return null;
+      const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+      const alvo = String(due).slice(0, 10);
+      return Math.round((new Date(alvo + 'T00:00:00Z') - new Date(hoje + 'T00:00:00Z')) / 86400000);
+    },
+    cobrancaClasse(item) {
+      if (item.tipo === 'comissao') return 'comissao';
+      if (item.overdue) return 'vencida';
+      const dias = this.cobrancaDias(item.due_date);
+      if (dias === null) return 'aberta';
+      if (dias < 0) return 'vencida';
+      if (dias === 0) return 'hoje';
+      if (dias <= 7) return 'sete';
+      return 'aberta';
+    },
+    cobrancaOrigem(item) {
+      return item.tipo === 'comissao' ? 'Comissão da rede' : 'Fiado atacado';
+    },
+    cobrancaSemTelefone(item) {
+      return !String(item.phone || '').replace(/\D/g, '');
+    },
+    cobrancaStatus(item) {
+      const classe = this.cobrancaClasse(item);
+      if (classe === 'comissao') {
+        const qtd = Number(item.count || 0);
+        return { label: qtd + ' venda' + (qtd === 1 ? '' : 's'), cls: 'bg-emerald-50 text-emerald-700 font-medium' };
+      }
+      if (classe === 'vencida') return { label: item.due_date ? 'Venceu ' + this.financeDate(item.due_date) : 'Vencida', cls: 'bg-rose-50 text-rose-600 font-semibold' };
+      if (classe === 'hoje') return { label: 'Vence hoje', cls: 'bg-amber-50 text-amber-700 font-medium' };
+      if (classe === 'sete') return { label: 'Próx. 7 dias', cls: 'bg-emerald-50 text-emerald-700 font-medium' };
+      return { label: 'Em aberto', cls: 'bg-gray-100 text-gray-600 font-medium' };
+    },
+    cobrancaFila() {
+      const itens = (this.financeiroVisao && this.financeiroVisao.a_receber.itens) || [];
+      const filtro = this.cobrancaFiltro || '';
+      if (!filtro) return itens;
+      if (filtro === 'semfone') return itens.filter((item) => this.cobrancaSemTelefone(item));
+      if (filtro === 'comissao') return itens.filter((item) => item.tipo === 'comissao');
+      return itens.filter((item) => this.cobrancaClasse(item) === filtro);
+    },
+    cobrancaPainel() {
+      const itens = (this.financeiroVisao && this.financeiroVisao.a_receber.itens) || [];
+      const cards = {
+        vencidas: { total: 0, count: 0 }, hoje: { total: 0, count: 0 },
+        sete: { total: 0, count: 0 }, comissao: { total: 0, count: 0 },
+        aberto: { total: 0, count: 0 }, semfone: { total: 0, count: 0 },
+        semdata: { total: 0, count: 0 },
+      };
+      const origemMap = new Map();
+      for (const item of itens) {
+        const valor = Number(item.valor || 0);
+        const classe = this.cobrancaClasse(item);
+        cards.aberto.total += valor;
+        cards.aberto.count += 1;
+        if (cards[classe]) {
+          cards[classe].total += valor;
+          cards[classe].count += 1;
+        }
+        if (this.cobrancaSemTelefone(item)) {
+          cards.semfone.total += valor;
+          cards.semfone.count += 1;
+        }
+        if (!item.due_date || item.tipo === 'comissao') {
+          cards.semdata.total += valor;
+          cards.semdata.count += 1;
+        }
+        const origem = this.cobrancaOrigem(item);
+        const atual = origemMap.get(origem) || { label: origem, total: 0, count: 0 };
+        atual.total += valor;
+        atual.count += 1;
+        origemMap.set(origem, atual);
+      }
+      const origens = [...origemMap.values()]
+        .sort((a, b) => b.total - a.total)
+        .map((item) => ({ ...item, pct: cards.aberto.total > 0 ? Math.round((item.total / cards.aberto.total) * 1000) / 10 : 0 }));
+      return { cards, origens };
+    },
     finWhatsLink(item) {
       const digits = String(item.phone || '').replace(/\D/g, '');
       if (!digits) return null;

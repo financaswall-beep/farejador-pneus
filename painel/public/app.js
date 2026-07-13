@@ -136,6 +136,9 @@ function painelApp() {
     // Sub-aba Contas a pagar (07-13): filtro da fila vindo do card Atenção rápida
     // ('' = tudo | 'vencida' | 'hoje' | 'sete'). Front-only, não vai pro servidor.
     pagarFiltro: '',
+    // Sub-aba Cobranças: filtro da fila a receber (fiado + comissão da rede).
+    // ('' = tudo | 'vencida' | 'hoje' | 'sete' | 'semfone' | 'comissao').
+    cobrancaFiltro: '',
     // Bootstrap das modalidades — o payload do GET (lista VIVA da 0130, com as do dono) sobrescreve.
     despesaCategorias: [
       { id: 'aluguel', label: 'Aluguel/galpão' },
