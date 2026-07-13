@@ -2792,17 +2792,14 @@
           </div>
 
           <!-- Resultado do período (barra) | Atenção rápida -->
-          <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr),340px] gap-4 items-stretch">
-            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+            <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <h3 class="text-base font-semibold mb-4">Resultado do período</h3>
-              <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-4 text-sm">
-                <div><p class="text-xs text-gray-500">Entrou</p><p class="text-lg font-semibold text-emerald-700 num" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
-                <span class="text-gray-300 text-lg pb-1">−</span>
-                <div><p class="text-xs text-gray-500">Custos</p><p class="text-lg font-semibold text-gray-700 num" x-text="formatCurrency(Number(financeiroVisao.mes.custo))"></p></div>
-                <span class="text-gray-300 text-lg pb-1">−</span>
-                <div><p class="text-xs text-gray-500">Despesas</p><p class="text-lg font-semibold text-rose-600 num" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
-                <span class="text-gray-300 text-lg pb-1">=</span>
-                <div><p class="text-xs text-gray-500">Lucro</p><p class="text-lg font-semibold num" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <div class="rounded-lg bg-emerald-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Entrou</p><p class="text-lg font-semibold text-emerald-700 num mt-0.5" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
+                <div class="rounded-lg bg-gray-50 px-3.5 py-3"><p class="text-xs text-gray-500">Custos</p><p class="text-lg font-semibold text-gray-700 num mt-0.5" x-text="formatCurrency(Number(financeiroVisao.mes.custo))"></p></div>
+                <div class="rounded-lg bg-rose-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Despesas</p><p class="text-lg font-semibold text-rose-600 num mt-0.5" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
+                <div class="rounded-lg bg-emerald-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Lucro</p><p class="text-lg font-semibold num mt-0.5" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
               </div>
               <div class="flex h-3.5 rounded-full overflow-hidden bg-gray-100">
                 <div class="bg-gray-400 h-full" :style="'width:' + finResSeg('custo')" title="custo do pneu"></div>
@@ -2818,22 +2815,22 @@
                  x-text="financeiroVisao.mes.itens_sem_custo + ' item(ns) do varejo sem custo congelado — o lucro sai parcial'"></p>
             </div>
 
-            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
               <div class="space-y-3">
-                <div class="flex items-center gap-3">
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-4 h-4 text-rose-600"></i></div>
-                  <div class="flex-1 min-w-0"><span class="font-semibold num" x-text="financeiroVisao.a_pagar.vencidos_count"></span> <span class="text-sm text-gray-600">conta(s) vencida(s)</span></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Contas vencidas</p><p class="text-base font-semibold num" x-text="financeiroVisao.a_pagar.vencidos_count"></p></div>
                   <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="hand-coins" class="w-4 h-4 text-amber-600"></i></div>
-                  <div class="flex-1 min-w-0"><span class="font-semibold num" x-text="finCobrancasAbertas()"></span> <span class="text-sm text-gray-600">cobrança(s) aberta(s)</span></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Cobranças abertas</p><p class="text-base font-semibold num" x-text="finCobrancasAbertas()"></p></div>
                   <button @click="finTab = 'cobrancas'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver cobranças</button>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                   <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="package" class="w-4 h-4 text-emerald-700"></i></div>
-                  <div class="flex-1 min-w-0"><span class="font-semibold num" x-text="financeiroVisao.indicadores.pneus_galpao"></span> <span class="text-sm text-gray-600">pneus, <span class="num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span> parado</span></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Capital parado</p><p class="text-base font-semibold"><span class="num" x-text="financeiroVisao.indicadores.pneus_galpao"></span> <span class="text-xs font-normal text-gray-500">pneus · </span><span class="num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span></p></div>
                   <button @click="currentPage = 'estoque'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver estoque</button>
                 </div>
               </div>
@@ -2842,23 +2839,25 @@
 
           <!-- De onde veio o dinheiro (valor + lucro por fonte) -->
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-4 max-w-6xl mx-auto">
               <h3 class="text-base font-semibold">De onde veio o dinheiro</h3>
-              <div class="hidden sm:flex gap-8 text-xs text-gray-400 pr-1"><span>Valor</span><span>Lucro bruto</span></div>
             </div>
-            <div class="space-y-3.5 text-sm">
+            <div class="hidden lg:grid lg:grid-cols-[220px_minmax(240px,1fr)_140px_190px] gap-5 items-center max-w-6xl mx-auto mb-3 text-xs text-gray-400">
+              <span></span><span></span><span class="text-right">Valor</span><span class="text-right">Lucro bruto</span>
+            </div>
+            <div class="space-y-3.5 text-sm max-w-6xl mx-auto">
               <template x-for="f in [
                 { id: 'atacado', label: 'Atacado', cor: 'bg-emerald-600', valor: Number(financeiroVisao.mes.pernas.atacado.faturamento), on: true },
                 { id: 'varejo', label: 'Varejo (bot + balcão)', cor: 'bg-emerald-500', valor: Number(financeiroVisao.mes.pernas.varejo.faturamento), on: true },
                 { id: 'frete', label: 'Frete de entrega', cor: 'bg-teal-500', valor: Number((financeiroVisao.mes.pernas.frete && financeiroVisao.mes.pernas.frete.recebido) || 0), on: !!financeiroVisao.mes.pernas.frete },
                 { id: 'comissao', label: 'Comissão da rede', cor: 'bg-lime-600', valor: Number((financeiroVisao.mes.pernas.comissao && financeiroVisao.mes.pernas.comissao.realizado) || 0), on: !!financeiroVisao.mes.pernas.comissao }
               ]" :key="f.id">
-                <div class="grid grid-cols-12 gap-3 items-center" x-show="f.on">
-                  <span class="col-span-4 sm:col-span-3 text-gray-600 flex items-center gap-2">
+                <div class="grid grid-cols-12 lg:grid-cols-[220px_minmax(240px,1fr)_140px_190px] gap-3 lg:gap-5 items-center" x-show="f.on">
+                  <span class="col-span-4 sm:col-span-3 lg:col-auto text-gray-600 flex items-center gap-2">
                     <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" :class="f.cor"></span><span x-text="f.label"></span></span>
-                  <div class="hidden sm:block col-span-4 bg-gray-100 rounded h-2.5"><div class="h-2.5 rounded" :class="f.cor" :style="'width:' + finBarWidth(f.valor)"></div></div>
-                  <span class="col-span-4 sm:col-span-2 text-right text-gray-900 num" x-text="formatCurrency(f.valor)"></span>
-                  <span class="col-span-4 sm:col-span-3 text-right text-emerald-700 num"
+                  <div class="hidden sm:block col-span-4 lg:col-auto bg-gray-100 rounded h-2.5"><div class="h-2.5 rounded" :class="f.cor" :style="'width:' + finBarWidth(f.valor)"></div></div>
+                  <span class="col-span-4 sm:col-span-2 lg:col-auto text-right text-gray-900 num" x-text="formatCurrency(f.valor)"></span>
+                  <span class="col-span-4 sm:col-span-3 lg:col-auto text-right text-emerald-700 num"
                         x-text="formatCurrency(finLucroPerna(f.id)) + (finPctLucro(f.valor, finLucroPerna(f.id)) !== null ? ' (' + String(finPctLucro(f.valor, finLucroPerna(f.id))).replace('.', ',') + '%)' : '')"></span>
                 </div>
               </template>
