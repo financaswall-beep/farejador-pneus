@@ -185,7 +185,11 @@ function painelApp() {
     colabSaving: false,
     colabMsg: null,
     colabShowForm: false,
-    colabForm: { display_name: '', username: '', password: '', job: 'vendedor', panel_role: null },
+    colabForm: { display_name: '', username: '', password: '', job: '', panel_role: null },
+    // redesign 07-12 (desenho do dono com GPT): busca + filtro ativos/revogados + olhinho da senha
+    colabBusca: '',
+    colabView: 'ativos',
+    colabSenhaVisivel: false,
 
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [

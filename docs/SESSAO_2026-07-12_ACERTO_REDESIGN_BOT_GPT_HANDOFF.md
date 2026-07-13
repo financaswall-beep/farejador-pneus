@@ -92,4 +92,46 @@
 - Recado dado ao dono: trabalho de outra LLM direto no main sem prova = os fiscais
   seguram, mas só se alguém RODAR. Combinado de sempre: prova antes do push.
 
+---
+
+## Parte 2 (mesma sessão) — ABA COLABORADORES redesenhada (desenho do dono com GPT, implementada pela casa)
+
+O dono mandou o GPT desenhar uma tela nova de Colaboradores (mockup em imagem) e escolheu
+implementá-la ("vamos nessa aqui, só mantenha o menu lateral existente"). **Obra 100%
+front-only** — todo o backend (criar/função/acesso/senha/revogar/reativar) já existia
+(0124+0132); a tela nova é vitrine nova pros mesmos endpoints. Menu lateral INTOCADO.
+
+**O que a aba ganhou** ([index.html](../painel/public/index.html) seção colaboradores +
+[app.colaboradores.js](../painel/public/app.colaboradores.js) 131→183):
+- Header com botão **"＋ Novo colaborador"** que abre **drawer lateral direito** (como no
+  desenho; backdrop clicável fecha) — o form saiu do miolo da página.
+- Banner verde: entregador usa /entregas sem financeiro; frente de caixa do vendedor futura.
+- **3 cards de contagem** (Ativos/Vendedores/Entregadores) + pill "N revogados" — getters
+  derivados da lista, zero estado duplicado.
+- **Tabela de verdade** (thead Colaborador/Função/Acesso/Status/Ações) com **avatar de
+  iniciais** (cor determinística por nome), @username, badges Ativo/Revogado.
+- **Busca** por nome/usuário + **filtros Ativos|Revogados** (revogado ganha ↻ Reativar).
+- **Cadeado do último proprietário**: o select de acesso do ÚNICO owner ativo fica
+  `disabled` + 🔒 com title "última chave da loja…" — espelho VISUAL da trava
+  `last_owner_required` do 0132 (o servidor continua sendo o freio de verdade).
+- Form: função nasce VAZIA ("Selecione a função" + validação); acesso nasce **"Sem acesso
+  ao painel"** de propósito (menor privilégio por padrão — divergência consciente do
+  mockup, que pedia "Selecione o acesso"); senha com olhinho (eye/eye-off).
+
+**⚠️ Lição nova de preview — x-transition trava em aba de fundo:** o drawer com
+`x-transition` (tanto classes Tailwind quanto o inline `.opacity`) ficou PRESO fechado no
+Browser pane: a transição do Alpine depende de `requestAnimationFrame`, que **congela em
+aba de fundo/headless** (mesma causa dos screenshots dando timeout na máquina). Em aba
+visível funcionaria — mas não dá pra PROVAR no pane, então o drawer ficou **sem transição
+de propósito** (x-show puro, comentado no HTML). Vale pra qualquer modal/drawer futuro
+do painel: transição só se puder provar.
+
+**Provas:** preview 4230 pelo clique real — login humano → cadastrou "João Preview"
+entregador pelo drawer (msg verde, drawer fechou, contadores 3→4 ao vivo) → revogou
+(confirm, ativos 4→3) → filtro Revogados mostrou ele → reativou ("mesma senha de antes")
+→ busca "joao" filtrou → cadeado do owner único provado disabled+🔒 → console zero erros
+→ João deixado REVOGADO (env test limpo). Fiscal [OK] (183/282), **paridade 398 regravada
+DE PROPÓSITO** (12 props novas: colabBusca/colabView/colabSenhaVisivel + 9 getters/helpers),
+565/565 unit. `?v=20260712-colab1` em app.colaboradores.js e app.js. SEM migration/flag.
+
 — Orquestrador (Claude Fable 5) — domínios `matriz`/`bot`/`parceiro`
