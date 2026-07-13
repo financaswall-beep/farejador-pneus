@@ -123,6 +123,42 @@ window.PAINEL_MODULES.financeiro = function () {
       const c = this.despesaCategorias.find((x) => x.id === catId);
       return c ? c.label : catId;
     },
+    // ── Sub-aba Despesas (redesign 07-13, desenho do dono): derivados de TELA ──
+    // Soma/conta o que a tela JÁ carregou (entries do período + agenda da visão);
+    // a régua do dinheiro segue no servidor — aqui é só agrupamento pra exibir.
+    despesaPorModalidade() {
+      const mapa = new Map();
+      for (const d of (this.matrizDespesas?.entries || [])) {
+        const atual = mapa.get(d.category) || { total: 0, count: 0 };
+        atual.total += Number(d.amount || 0);
+        atual.count += 1;
+        mapa.set(d.category, atual);
+      }
+      return [...mapa.entries()]
+        .map(([id, v]) => ({ id, label: this.despesaLabel(id), total: v.total, count: v.count }))
+        .sort((a, b) => b.total - a.total);
+    },
+    despesaModBarW(total) {
+      const linhas = this.despesaPorModalidade();
+      const max = linhas.length ? linhas[0].total : 0;
+      if (!(max > 0) || !(Number(total) > 0)) return '0%';
+      return Math.max(2, Math.round((Number(total) / max) * 100)) + '%';
+    },
+    // Pendentes que vencem em ATÉ 7 dias (inclui hoje) — mesma agenda da aba
+    // Contas a pagar (a_pagar.itens), só o tipo 'despesa'; vencida fica de fora.
+    despesaVence7Count() {
+      const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
+      const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+      const lim = new Date(hoje + 'T12:00:00Z');
+      lim.setUTCDate(lim.getUTCDate() + 7);
+      const teto = lim.toISOString().slice(0, 10);
+      return itens.filter((i) => i.tipo === 'despesa' && !i.overdue && i.due_date
+        && String(i.due_date).slice(0, 10) <= teto).length;
+    },
+    // Caíram em "Outros" no período — o balde genérico que o dono quer esvaziar (0130).
+    despesaOutrosCount() {
+      return (this.matrizDespesas?.entries || []).filter((d) => d.category === 'outros').length;
+    },
     // ── Modalidades vivas (0130): fábrica + as do dono; arquivada some do form ──
     despesaMesAtual() {
       // Mês corrente no fuso da operação (SP) — toISOString viraria o mês mais cedo à noite.

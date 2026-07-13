@@ -27,7 +27,7 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260712-fin1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260713-fin2"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
@@ -2972,91 +2972,116 @@
         </div>
       </template>
 
-      <!-- ═══════ SUB-ABA: DESPESAS ═══════ -->
-      <div x-show="finTab === 'despesas'" class="w-full">
+      <!-- ═══════ SUB-ABA: DESPESAS (redesign 07-13, desenho do dono — molde da tela Cobranças) ═══════ -->
+      <div x-show="finTab === 'despesas'" class="w-full space-y-5">
       <!-- Despesas dormentes (flag MATRIZ_EXPENSES off) → nota compacta; o resto da tela segue vivo. -->
       <div x-show="despesasLoaded && !matrizDespesas" class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-500">
         <i data-lucide="wallet" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
         <span>O lançamento de despesas está dormente — liga a chave <span class="font-mono text-xs bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">MATRIZ_EXPENSES</span> no Coolify pra registrar aluguel, funcionário, combustível…</span>
       </div>
 
-      <!-- DESPESAS da matriz (0120, flag MATRIZ_EXPENSES): a perna de SAÍDA que faltava.
-           matrizDespesas = null com a flag off → o bloco inteiro some. -->
-      <div x-show="matrizDespesas" class="bg-white border border-gray-200 rounded-xl p-5">
-        <div class="flex items-center gap-2 mb-1">
-          <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-            <i data-lucide="receipt" class="w-4 h-4 text-brand-600"></i>
-          </div>
-          <h3 class="text-base font-semibold">Despesas da matriz</h3>
+      <!-- 4 cards do topo (mesmo molde da Visão geral) — tudo dado REAL do servidor (0120/0130).
+           "A pagar" e "Vencidas" são GLOBAIS de propósito: dívida não some ao filtrar o mês. -->
+      <div x-show="matrizDespesas" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="receipt" class="w-5 h-5 text-rose-600"></i></div>
+          <div class="min-w-0"><p class="text-xs text-gray-500">Despesas do período</p>
+            <p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="formatCurrency(Number(matrizDespesas?.periodo?.total || 0))"></p>
+            <p class="text-xs text-gray-400 mt-0.5" x-text="(matrizDespesas?.periodo?.count || 0) + ' lançamento(s) no mês do filtro'"></p></div>
         </div>
-        <p class="text-xs text-gray-500 mb-4 ml-10">Aluguel, funcionário, combustível, frete… tudo que sai do caixa além da compra de pneu.</p>
-
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div class="border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">A pagar (despesas)</div>
-            <div class="text-base md:text-lg font-bold text-rose-600" x-text="formatCurrency(Number(matrizDespesas?.a_pagar_total || 0))"></div>
-            <div class="text-xs mt-1" :class="Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                 x-text="(matrizDespesas?.a_pagar_count || 0) + ' em aberto' + (Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? ' · ' + matrizDespesas.a_pagar_vencidos + ' vencida(s)' : '')"></div>
-          </div>
-          <div class="border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Pago este mês</div>
-            <div class="text-base md:text-lg font-bold text-gray-900" x-text="formatCurrency(Number(matrizDespesas?.pago_mes_total || 0))"></div>
-            <div class="text-xs text-gray-400 mt-1">despesas quitadas no mês</div>
-          </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="coins" class="w-5 h-5 text-emerald-700"></i></div>
+          <div class="min-w-0"><p class="text-xs text-gray-500">Pago este mês</p>
+            <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(matrizDespesas?.pago_mes_total || 0))"></p>
+            <p class="text-xs text-gray-400 mt-0.5">quitadas no mês corrente</p></div>
         </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i></div>
+          <div class="min-w-0"><p class="text-xs text-gray-500">A pagar (em aberto)</p>
+            <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(matrizDespesas?.a_pagar_total || 0))"></p>
+            <p class="text-xs text-gray-400 mt-0.5" x-text="(matrizDespesas?.a_pagar_count || 0) + ' conta(s) — todas, não só o período'"></p></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+          <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-5 h-5 text-rose-600"></i></div>
+          <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
+            <p class="text-2xl font-bold leading-tight num" :class="Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="matrizDespesas?.a_pagar_vencidos || 0"></p>
+            <p class="text-xs text-gray-400 mt-0.5" x-text="'de ' + (matrizDespesas?.a_pagar_count || 0) + ' em aberto'"></p></div>
+        </div>
+      </div>
 
-        <!-- Lançar despesa -->
-        <div class="border border-gray-200 rounded-xl p-4 mb-4">
-          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Lançar despesa</div>
-          <div class="grid grid-cols-12 gap-2 items-center">
-            <select x-model="despesaForm.category" @change="despesaCatSelect()" class="col-span-3 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white">
+      <!-- Lançar despesa (0120/0130 — mesmos campos e ações de antes, só o traje mudou) -->
+      <div x-show="matrizDespesas" class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <h3 class="text-base font-semibold mb-1">Lançar despesa</h3>
+        <p class="text-xs text-gray-500 mb-4">Aluguel, funcionário, combustível, frete… tudo que sai do caixa além da compra de pneu.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+          <label class="lg:col-span-3 block">
+            <span class="text-xs text-gray-500 mb-1 block">Modalidade</span>
+            <select x-model="despesaForm.category" @change="despesaCatSelect()" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white">
               <template x-for="c in despesaCatAtivas()" :key="c.id">
                 <option :value="c.id" x-text="c.label" :selected="despesaForm.category === c.id"></option>
               </template>
               <option value="__nova__">➕ Nova modalidade…</option>
             </select>
-            <input x-model="despesaForm.description" type="text" placeholder="Descrição (opcional)"
-                   class="col-span-4 border border-gray-200 rounded-lg px-2 py-2 text-sm" />
-            <input x-model="despesaForm.amount" type="text" inputmode="decimal" placeholder="Valor (R$)"
-                   class="col-span-2 border border-gray-200 rounded-lg px-2 py-2 text-sm" />
-            <select x-model="despesaForm.payment_status" class="col-span-3 border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white">
+          </label>
+          <label class="lg:col-span-4 block">
+            <span class="text-xs text-gray-500 mb-1 block">Descrição <span class="text-gray-300">(opcional)</span></span>
+            <input x-model="despesaForm.description" type="text" placeholder="ex.: conta de luz do galpão"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm" />
+          </label>
+          <label class="lg:col-span-2 block">
+            <span class="text-xs text-gray-500 mb-1 block">Valor (R$)</span>
+            <input x-model="despesaForm.amount" type="text" inputmode="decimal" placeholder="0,00"
+                   class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm" />
+          </label>
+          <label class="lg:col-span-3 block">
+            <span class="text-xs text-gray-500 mb-1 block">Pagamento</span>
+            <select x-model="despesaForm.payment_status" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white">
               <option value="paid">Pago na hora</option>
               <option value="pending">A pagar (depois)</option>
             </select>
-          </div>
-          <div class="grid grid-cols-12 gap-2 items-center mt-2">
-            <div class="col-span-3" x-show="despesaForm.payment_status === 'pending'">
-              <input x-model="despesaForm.due_date" type="date" class="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm" title="Vencimento (opcional)" />
-            </div>
-            <div class="col-span-6 text-xs" :class="despesaMsg?.ok ? 'text-emerald-700' : 'text-rose-600'" x-text="despesaMsg?.text || ''"></div>
-            <div class="col-span-3 text-right" :class="despesaForm.payment_status === 'pending' ? '' : 'col-start-10'">
-              <button @click="despesaSubmit()" :disabled="!!despesaSaving"
-                      class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                      x-text="despesaSaving ? 'Lançando...' : 'Lançar'"></button>
-            </div>
-          </div>
-          <!-- Modalidades do dono (0130): arquivar tira do form; as de fábrica ficam. -->
-          <div x-show="despesaCatCustom().length" class="flex items-center flex-wrap gap-1.5 mt-3 pt-3 border-t border-gray-100">
-            <span class="text-xs text-gray-400">Suas modalidades:</span>
-            <template x-for="c in despesaCatCustom()" :key="c.id">
-              <span class="inline-flex items-center gap-1 text-xs bg-gray-50 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5 text-gray-600">
-                <span x-text="c.label"></span>
-                <button @click="despesaArquivarCategoria(c)" title="Arquivar (some do formulário; despesas antigas ficam)"
-                        class="w-4 h-4 rounded-full hover:bg-rose-50 hover:text-rose-600 text-gray-400 leading-none">×</button>
-              </span>
-            </template>
-          </div>
+          </label>
         </div>
+        <div class="flex flex-wrap items-end gap-3 mt-3">
+          <label class="block" x-show="despesaForm.payment_status === 'pending'">
+            <span class="text-xs text-gray-500 mb-1 block">Vencimento <span class="text-gray-300">(opcional)</span></span>
+            <input x-model="despesaForm.due_date" type="date" class="border border-gray-200 rounded-lg px-2.5 py-2 text-sm" />
+          </label>
+          <p class="text-xs flex-1 min-w-[160px] pb-2.5" :class="despesaMsg?.ok ? 'text-emerald-700' : 'text-rose-600'" x-text="despesaMsg?.text || ''"></p>
+          <button @click="despesaSubmit()" :disabled="!!despesaSaving"
+                  class="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  x-text="despesaSaving ? 'Lançando...' : 'Lançar despesa'"></button>
+        </div>
+        <!-- Modalidades do dono (0130): arquivar tira do form; as de fábrica ficam. -->
+        <div x-show="despesaCatCustom().length" class="flex items-center flex-wrap gap-1.5 mt-4 pt-3 border-t border-gray-100">
+          <span class="text-xs text-gray-400">Suas modalidades:</span>
+          <template x-for="c in despesaCatCustom()" :key="c.id">
+            <span class="inline-flex items-center gap-1 text-xs bg-gray-50 border border-gray-200 rounded-full pl-2.5 pr-1 py-0.5 text-gray-600">
+              <span x-text="c.label"></span>
+              <button @click="despesaArquivarCategoria(c)" title="Arquivar (some do formulário; despesas antigas ficam)"
+                      class="w-4 h-4 rounded-full hover:bg-rose-50 hover:text-rose-600 text-gray-400 leading-none">×</button>
+            </span>
+          </template>
+        </div>
+      </div>
 
-        <!-- Despesas do período (0130): um mês por vez — a lista nunca vira rolo infinito. -->
-        <div>
-          <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide">Despesas do período</div>
+      <!-- Extrato do período (tabela) | Atenção rápida + Por modalidade -->
+      <div x-show="matrizDespesas" class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div class="flex items-start justify-between flex-wrap gap-3 mb-3">
+            <div>
+              <h3 class="text-base font-semibold">Despesas do período</h3>
+              <p class="text-xs text-gray-500 mt-0.5">
+                <span class="font-semibold text-gray-700" x-text="(matrizDespesas?.periodo?.count || 0) + ' despesa(s)'"></span>
+                · <span class="font-semibold text-gray-700 num" x-text="formatCurrency(Number(matrizDespesas?.periodo?.total || 0))"></span> no período
+                <span x-show="despesaFiltro.categoria" x-text="'em ' + despesaLabel(despesaFiltro.categoria)"></span>
+              </p>
+              <p x-show="matrizDespesas?.periodo?.truncado" class="text-xs text-amber-600 font-medium mt-0.5">lista grande — mostrando as 200 primeiras (o total acima é do período inteiro)</p>
+            </div>
             <div class="flex items-center gap-2">
               <input type="month" x-model="despesaFiltro.mes" @change="despesaFiltroMudou()"
-                     class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white" title="Mês (pela data do lançamento)" />
+                     class="border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white" title="Mês (pela data do lançamento)" />
               <select x-model="despesaFiltro.categoria" @change="despesaFiltroMudou()"
-                      class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white">
+                      class="border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white">
                 <option value="">Todas as modalidades</option>
                 <template x-for="c in despesaCatAtivas()" :key="c.id">
                   <option :value="c.id" x-text="c.label"></option>
@@ -3064,34 +3089,87 @@
               </select>
             </div>
           </div>
-          <div x-show="matrizDespesas?.periodo" class="text-xs text-gray-500 mb-2">
-            <span class="font-semibold text-gray-700" x-text="(matrizDespesas?.periodo?.count || 0) + ' despesa(s)'"></span>
-            · <span class="font-semibold text-gray-700" x-text="formatCurrency(Number(matrizDespesas?.periodo?.total || 0))"></span> no período
-            <span x-show="despesaFiltro.categoria" x-text="'em ' + despesaLabel(despesaFiltro.categoria)"></span>
-            <span x-show="matrizDespesas?.periodo?.truncado" class="text-amber-600 font-medium">· lista grande — mostrando as 200 primeiras</span>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr class="text-xs text-gray-400 border-b border-gray-100">
+                  <th class="text-left font-medium py-2 pr-3">Modalidade</th>
+                  <th class="text-left font-medium py-2 pr-3">Descrição</th>
+                  <th class="text-left font-medium py-2 pr-3">Lançada em</th>
+                  <th class="text-right font-medium py-2 pr-3">Valor</th>
+                  <th class="text-left font-medium py-2 pr-3">Situação</th>
+                  <th class="text-right font-medium py-2">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="d in (matrizDespesas?.entries || [])" :key="d.id">
+                  <tr class="border-b border-gray-100">
+                    <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="despesaLabel(d.category)"></span></td>
+                    <td class="py-2.5 pr-3 text-gray-600" x-text="d.description || '—'"></td>
+                    <td class="py-2.5 pr-3 text-gray-500 whitespace-nowrap" x-text="financeDate(d.occurred_at)"></td>
+                    <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(d.amount))"></td>
+                    <td class="py-2.5 pr-3 whitespace-nowrap">
+                      <span x-show="d.payment_status === 'paid'" class="inline-block text-xs bg-emerald-50 text-emerald-700 rounded-full px-2.5 py-0.5" x-text="'paga ' + financeDate(d.paid_at)"></span>
+                      <span x-show="d.payment_status === 'pending' && d.overdue" class="inline-block text-xs bg-rose-50 text-rose-600 font-semibold rounded-full px-2.5 py-0.5" x-text="'VENCEU ' + financeDate(d.due_date)"></span>
+                      <span x-show="d.payment_status === 'pending' && !d.overdue" class="inline-block text-xs bg-amber-50 text-amber-700 rounded-full px-2.5 py-0.5" x-text="d.due_date ? ('vence ' + financeDate(d.due_date)) : 'a pagar'"></span>
+                    </td>
+                    <td class="py-2.5 text-right whitespace-nowrap">
+                      <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)"
+                              class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
+                      <button @click="despesaRemove(d)" title="Remover (lançado errado)"
+                              class="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-rose-50 hover:text-rose-600 ml-1 align-middle">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
-          <template x-for="d in (matrizDespesas?.entries || [])" :key="d.id">
-            <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
-              <div>
-                <span class="font-medium text-gray-800" x-text="despesaLabel(d.category)"></span>
-                <span class="text-xs text-gray-400 ml-2" x-text="d.description || ''"></span>
-                <span class="text-xs ml-2" x-show="d.payment_status === 'pending'"
-                      :class="d.overdue ? 'text-rose-600 font-medium' : 'text-amber-600'"
-                      x-text="d.due_date ? ((d.overdue ? 'VENCEU ' : 'vence ') + financeDate(d.due_date)) : 'a pagar'"></span>
-                <span class="text-xs text-gray-400 ml-2" x-show="d.payment_status === 'paid'" x-text="'pago ' + financeDate(d.paid_at)"></span>
+          <div x-show="!(matrizDespesas?.entries || []).length" class="text-sm text-gray-400 py-6 text-center">Nenhuma despesa nesse período — troca o mês ali em cima pra ver as antigas.</div>
+        </div>
+
+        <div class="xl:col-span-4 space-y-4">
+          <!-- Atenção rápida (mesmo molde da Visão geral) -->
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
+            <div class="space-y-3">
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-4 h-4 text-rose-600"></i></div>
+                <div class="min-w-0"><p class="text-xs text-gray-500">Contas vencidas</p><p class="text-base font-semibold num" :class="Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600' : ''" x-text="matrizDespesas?.a_pagar_vencidos || 0"></p></div>
+                <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="font-bold text-gray-900" x-text="formatCurrency(Number(d.amount))"></span>
-                <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)"
-                        class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
-                <button @click="despesaRemove(d)" title="Remover (lançado errado)"
-                        class="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-rose-50 hover:text-rose-600">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clock" class="w-4 h-4 text-amber-600"></i></div>
+                <div class="min-w-0"><p class="text-xs text-gray-500">Vencem em até 7 dias</p><p class="text-base font-semibold num" x-text="despesaVence7Count()"></p></div>
+                <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
+              </div>
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="tag" class="w-4 h-4 text-gray-500"></i></div>
+                <div class="min-w-0"><p class="text-xs text-gray-500">Sem modalidade certa (em “Outros”)</p><p class="text-base font-semibold num" x-text="despesaOutrosCount()"></p></div>
+                <button @click="despesaFiltro.categoria = 'outros'; despesaFiltroMudou()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Filtrar</button>
               </div>
             </div>
-          </template>
-          <div x-show="!(matrizDespesas?.entries || []).length" class="text-sm text-gray-400 py-2">Nenhuma despesa nesse período — troca o mês ali em cima pra ver as antigas.</div>
+          </div>
+
+          <!-- Despesa por modalidade (soma dos lançamentos carregados — mesma régua da tabela) -->
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-1">Por modalidade</h3>
+            <p class="text-xs text-gray-500 mb-4">soma do período filtrado — mesma régua da tabela ao lado</p>
+            <div class="space-y-3">
+              <template x-for="m in despesaPorModalidade()" :key="m.id">
+                <div>
+                  <div class="flex items-center justify-between text-sm gap-2">
+                    <span class="text-gray-600 min-w-0" x-text="m.label + ' · ' + m.count"></span>
+                    <span class="text-gray-900 font-medium num whitespace-nowrap" x-text="formatCurrency(m.total)"></span>
+                  </div>
+                  <div class="bg-gray-100 rounded h-2 mt-1.5"><div class="h-2 rounded bg-rose-400" :style="'width:' + despesaModBarW(m.total)"></div></div>
+                </div>
+              </template>
+            </div>
+            <div x-show="!despesaPorModalidade().length" class="text-sm text-gray-400 py-4 text-center">Nenhuma despesa no período.</div>
+            <p x-show="matrizDespesas?.periodo?.truncado" class="text-xs text-amber-600 mt-3">período com mais de 200 lançamentos — a soma por modalidade aqui é parcial; filtra por modalidade pra ver o total exato.</p>
+          </div>
         </div>
       </div>
       </div><!-- /finTab despesas -->
