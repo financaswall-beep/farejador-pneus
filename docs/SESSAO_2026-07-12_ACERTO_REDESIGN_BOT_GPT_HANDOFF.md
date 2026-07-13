@@ -135,3 +135,57 @@ DE PROPÓSITO** (12 props novas: colabBusca/colabView/colabSenhaVisivel + 9 gett
 565/565 unit. `?v=20260712-colab1` em app.colaboradores.js e app.js. SEM migration/flag.
 
 — Orquestrador (Claude Fable 5) — domínios `matriz`/`bot`/`parceiro`
+
+---
+
+## Parte 3 (mesma sessão, modelo Opus 4.8) — ABA FINANCEIRO em 5 sub-abas (desenho do dono com GPT)
+
+O dono escolheu implementar a tela do GPT pro **Financeiro** — a aba mais sensível (dinheiro),
+que JÁ existia e JÁ tinha sido auditada (07-08b, ⭐⭐⭐⭐). Ele pediu "fale antes de montar" e
+perguntou se 4.8 dava conta ou se passava pro Fable 5. Parecer dado: **obra FRONT sobre um
+backend que eu mesmo construí/auditei** — o `getMatrizFinanceiroVisao` já entrega ~85% dos
+números. Risco não é raciocínio, é disciplina de não inventar número (lição do card 48h). 4.8
+com o contexto do financeiro é a escolha certa; Fable só se fosse reescrever o CÁLCULO do lucro.
+
+**Cruzamento imagem × servidor (feito ANTES de montar):** já vinham prontos — Resultado do
+mês, Entrou, Saiu, Custos, Despesas, Lucro, Margem, Capital parado, Ponto de equilíbrio, as 4
+pernas (valor), lucro de atacado/varejo, a_receber/a_pagar. **4 pontos que não batiam** e como
+resolvi (SEM inventar no front):
+1. **Giro "2,58x"** — servidor só dava `giro_dias`; adicionei `indicadores.giro_vezes` =
+   custo30d/capital (MESMA base do giro_dias, inverso × 30). ÚNICO toque no servidor.
+2. **Lucro do Frete** — não existe isolado; o frete entra CHEIO no lucro (a gasolina já desconta
+   na perna Despesas). Front mostra `recebido` como lucro bruto — e a conta FECHA (Σ lucro bruto
+   das 4 pernas − despesas = lucro líquido, exatamente o que o servidor já calcula).
+3. **Lucro da Comissão** — é lucro puro (valor = lucro bruto). Idem frete.
+4. **"12 pneus capital parado alto"** — não inventei o "alto": a Atenção rápida usa
+   `pneus_galpao` + `capital_parado` (já existem), texto "N pneus, R$ X parado → Ver estoque".
+
+**Seletor de período (Hoje/7d/30d da imagem) NÃO entrou** de propósito: o financeiro é
+competência MENSAL (decisão de arquitetura já auditada); multi-período mexe na régua do dinheiro
+e é obra de servidor própria (avisado ao dono). Em vez do seletor, selo "competência do mês
+corrente" no header. Menu lateral do mock (rebrand "Matriz Farejador/Admin Farejador") IGNORADO
+— mantido o menu da casa, como nas outras telas.
+
+**A tela** ([index.html](../painel/public/index.html) seção financeiro ·
+[app.financeiro.js](../painel/public/app.financeiro.js) 172→220 ·
+[queries-financeiro-visao.ts](../src/admin/painel/queries-financeiro-visao.ts)): 5 sub-abas
+(Visão geral | Cobranças | Contas a pagar | Despesas | Indicadores, mesmo padrão do Bot).
+Visão geral = 4 cards topo (Resultado/Entrou/Saiu/Atenção hoje) + Resultado do período com barra
+segmentada custo/despesa/lucro (fecha 100%) + Atenção rápida (3 atalhos pras sub-abas/estoque) +
+De onde veio o dinheiro (4 fontes com valor + lucro bruto %) + 4 indicadores (Margem/Capital/
+Giro x/Ponto). Cobranças←quem te deve · Contas a pagar←agenda · Despesas←bloco 0130 inteiro
+VERBATIM · Indicadores←4 cards + margem. Toda ação preservada (Recebi/Paguei/Cobrar/despesas).
+
+**Provas:** typecheck · fiscal [OK] (financeiro-visao 271 linhas, app.financeiro 220) ·
+**prova-financeiro-visao 30/30 ×2** (V6a novo: giro_vezes acompanha giro_dias) · 565 unit ·
+**paridade 404 regravada DE PROPÓSITO** (6 props: finTab + finLucroPerna/finPctLucro/finResSeg/
+finResPct/finCobrancasAbertas) · preview 4230 pelo clique (5 sub-abas trocam 1-a-1, barra
+47,5%custo+52,5%lucro=100%, lucro varejo 94,90+frete 10 batendo o dado, giro "—" honesto com
+galpão de teste vazio, console zero erros). `?v=20260712-fin1`. SEM migration, SEM flag nova.
+
+⚠️ Pendências pro dono (avisadas): (a) o **seletor de período** no financeiro é obra separada
+(régua de competência = dinheiro); (b) validar ao vivo com dado real de prod (o giro em x, as
+pernas com lucro); (c) as outras sub-abas hoje têm o conteúdo ATUAL — refinar quando o dono
+mandar o desenho de cada uma.
+
+— Orquestrador (Claude Opus 4.8) — domínio `matriz`

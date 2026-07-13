@@ -61,6 +61,7 @@ export interface FinanceiroVisao {
     capital_parado: string;   // Σ qty × custo médio do galpão
     pneus_galpao: number;
     giro_dias: number | null;         // capital / (custo vendido em 30d móveis / 30)
+    giro_vezes: number | null;        // custo vendido em 30d / capital = quantas vezes o galpão girou (mesma base do giro_dias)
     fiado_aberto_pct: number | null;  // % do faturamento do atacado do mês ainda pendente (clamp 100)
     ponto_equilibrio: number | null;  // despesas do mês / margem bruta do mês
   };
@@ -216,6 +217,10 @@ export async function getMatrizFinanceiroVisao(
   const custoJanela = Number(custo30d);
   const giroDias = capitalParado > 0 && custoJanela > 0
     ? Math.round(capitalParado / (custoJanela / 30)) : null;
+  // Giro em VEZES (mesma base, inverso × 30): quanto o galpão girou em 30 dias.
+  // 480k vendidos ÷ 186k parado = 2,58x. O card da tela nova mostra isto.
+  const giroVezes = capitalParado > 0 && custoJanela > 0
+    ? Math.round((custoJanela / capitalParado) * 100) / 100 : null;
   const fatAtacado = Number(atacado.faturamento);
   // Mesma base (line_total) nos dois lados + clamp em 100 (nunca > 100% do faturamento).
   const fiadoAbertoPct = fiadoAbertoMes !== null && fatAtacado > 0
@@ -259,6 +264,7 @@ export async function getMatrizFinanceiroVisao(
       capital_parado: capitalParado.toFixed(2),
       pneus_galpao: capital.pneus,
       giro_dias: giroDias,
+      giro_vezes: giroVezes,
       fiado_aberto_pct: fiadoAbertoPct,
       ponto_equilibrio: pontoEquilibrio,
     },

@@ -18,6 +18,51 @@ window.PAINEL_MODULES.financeiro = function () {
       if (!(max > 0) || !(Number(valor) > 0)) return '0%';
       return Math.max(2, Math.round((Number(valor) / max) * 100)) + '%';
     },
+
+    // ── redesign 07-12 (desenho do dono): helpers da Visão geral em sub-abas ──
+    // Lucro BRUTO por fonte. Atacado/varejo têm custo de pneu congelado; frete e
+    // comissão não têm custo de pneu (o custo do frete — gasolina — já mora na perna
+    // Despesas), então o recebido É o lucro bruto. Fecha a conta: Σ bruto − despesas = lucro.
+    finLucroPerna(chave) {
+      const p = this.financeiroVisao && this.financeiroVisao.mes.pernas;
+      if (!p) return 0;
+      if (chave === 'atacado') return Number(p.atacado.lucro || 0);
+      if (chave === 'varejo') return Number(p.varejo.lucro || 0);
+      if (chave === 'frete') return Number((p.frete && p.frete.recebido) || 0);
+      if (chave === 'comissao') return Number((p.comissao && p.comissao.realizado) || 0);
+      return 0;
+    },
+    finPctLucro(valor, lucro) {
+      const v = Number(valor || 0);
+      if (!(v > 0)) return null;
+      return Math.round((Number(lucro || 0) / v) * 1000) / 10;
+    },
+    // Barra "Resultado do período": o que ENTROU partido em custo / despesa / lucro.
+    finResSeg(qual) {
+      const m = this.financeiroVisao && this.financeiroVisao.mes;
+      if (!m) return '0%';
+      const entrou = Number(m.faturamento || 0);
+      if (!(entrou > 0)) return '0%';
+      const val = qual === 'custo' ? Number(m.custo || 0)
+        : qual === 'despesa' ? Number(m.despesas || 0)
+        : Math.max(0, Number(m.lucro || 0));
+      return (Math.round((val / entrou) * 1000) / 10) + '%';
+    },
+    // % de cada componente (rótulo embaixo da barra).
+    finResPct(qual) {
+      const m = this.financeiroVisao && this.financeiroVisao.mes;
+      if (!m) return 0;
+      const entrou = Number(m.faturamento || 0);
+      if (!(entrou > 0)) return 0;
+      const val = qual === 'custo' ? Number(m.custo || 0)
+        : qual === 'despesa' ? Number(m.despesas || 0)
+        : Math.max(0, Number(m.lucro || 0));
+      return Math.round((val / entrou) * 1000) / 10;
+    },
+    // Contadores da "Atenção rápida" (levam pras sub-abas / estoque).
+    finCobrancasAbertas() {
+      return (this.financeiroVisao && this.financeiroVisao.a_receber.itens.length) || 0;
+    },
     // "Cobrar no WhatsApp" da tela Financeiro (mesmo deep-link wa.me da página Rede).
     finWhatsLink(item) {
       const digits = String(item.phone || '').replace(/\D/g, '');

@@ -126,6 +126,7 @@ function painelApp() {
     matrizDespesas: null,
     despesasLoaded: false,
     financeiroVisao: null,
+    finTab: 'visao', // redesign 07-12 (desenho do dono): sub-abas visao|cobrancas|pagar|despesas|indicadores
     despesaSaving: false,
     despesaMsg: null,
     despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },

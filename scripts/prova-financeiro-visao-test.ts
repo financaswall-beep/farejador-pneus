@@ -194,6 +194,12 @@ async function main(): Promise<void> {
     check('V6 giro do estoque calculado (custo do mês > 0 → dias inteiros)',
       v.indicadores.giro_dias !== null && Number.isInteger(v.indicadores.giro_dias),
       String(v.indicadores.giro_dias));
+    // giro_vezes (redesign 07-12): inverso × 30 do giro_dias, mesma base — nunca
+    // divergem (dias>0 ⇒ vezes>0). O card "2,58x" da tela nova lê este campo.
+    check('V6a giro em vezes acompanha o giro em dias (mesma base, ambos > 0)',
+      v.indicadores.giro_vezes !== null && v.indicadores.giro_vezes > 0
+        && (v.indicadores.giro_dias !== null) === (v.indicadores.giro_vezes !== null),
+      String(v.indicadores.giro_vezes));
     check('V6b ponto de equilíbrio calculado (despesa e margem > 0)',
       v.indicadores.ponto_equilibrio !== null && v.indicadores.ponto_equilibrio > 0,
       String(v.indicadores.ponto_equilibrio));
