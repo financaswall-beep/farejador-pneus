@@ -18,9 +18,9 @@ export const resumoQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d', 'month']).default('7d'),
 });
 
-// Recorte dos cards financeiros (atacado e varejo da matriz): mês corrente ou desde sempre.
+// Recorte dos resumos de venda. Financeiro usa mês; Vendas usa hoje/7d/30d.
 export const financePeriodQuerySchema = z.object({
-  period: z.enum(['mes', 'tudo']).default('tudo'),
+  period: z.enum(['today', '7d', '30d', 'mes', 'tudo']).default('tudo'),
 });
 
 // Comissões da Rede (0118): quitar por parceiro + editor do modelo comercial.

@@ -16,9 +16,9 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.api.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.format.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.varejo.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.varejo.js?v=20260713-vendas1"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260706-sino1"></script>
+<script src="/admin/painel/app.atacado.js?v=20260713-vendas1"></script>
 <script src="/admin/painel/app.compras.js?v=20260713-compras1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
@@ -31,11 +31,11 @@
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.core.js?v=20260707-estoque1"></script>
+<script src="/admin/painel/app.core.js?v=20260713-vendas1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260713-compras1"></script>
+<script src="/admin/painel/app.js?v=20260713-vendas1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1507,79 +1507,122 @@
 
     <!-- ═══ TELA: PEDIDOS ═══ -->
     <div x-show="currentPage === 'vendas'" class="p-8">
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex flex-col gap-5 mb-5">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold tracking-tight">Vendas</h1>
-          <p class="text-sm text-gray-500 mt-1">O que a Matriz vende direto — varejo (cliente final) e atacado (parceiro)</p>
+          <p class="text-sm text-gray-500 mt-1">Acompanhe o ritmo das vendas — varejo e atacado</p>
         </div>
-        <button @click="openWalkinModal()"
-                class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          Nova venda
-        </button>
+        <div class="flex items-center gap-3">
+          <div class="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
+            <template x-for="periodo in [{ id: 'today', label: 'Hoje' }, { id: '7d', label: '7 dias' }, { id: '30d', label: '30 dias' }]" :key="periodo.id">
+              <button @click="setVendasPeriodo(periodo.id)" class="px-5 py-2.5 text-sm font-medium border-r border-gray-200 last:border-r-0 transition-colors"
+                      :class="vendasPeriodo === periodo.id ? 'bg-brand-700 text-white' : 'text-gray-600 hover:bg-gray-50'" x-text="periodo.label"></button>
+            </template>
+          </div>
+          <div class="relative" @click.outside="vendaMenuOpen = false">
+            <button @click="vendaMenuOpen = !vendaMenuOpen" class="inline-flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i><span>Nova venda</span><i data-lucide="chevron-down" class="w-4 h-4"></i>
+            </button>
+            <div x-show="vendaMenuOpen" x-transition class="absolute right-0 z-40 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg p-1.5">
+              <button @click="abrirNovaVenda('varejo')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-brand-50"><i data-lucide="shopping-bag" class="w-4 h-4 text-brand-700"></i><span><b class="block text-sm">Venda no varejo</b><small class="text-gray-400">cliente final · balcão</small></span></button>
+              <button @click="abrirNovaVenda('atacado')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-brand-50"><i data-lucide="warehouse" class="w-4 h-4 text-brand-700"></i><span><b class="block text-sm">Venda no atacado</b><small class="text-gray-400">borracheiro · parceiro</small></span></button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Sub-abas: Varejo | Atacado -->
-      <div class="inline-flex items-center gap-1 bg-gray-100 p-1 rounded-lg mb-6">
-        <button @click="vendasTab = 'varejo'"
-                :class="vendasTab === 'varejo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Varejo</button>
-        <button @click="vendasTab = 'atacado'; loadAtacado()"
-                :class="vendasTab === 'atacado' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Atacado</button>
+      <div class="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        <template x-for="tab in [{ id: 'visao', label: 'Visão geral' }, { id: 'varejo', label: 'Varejo' }, { id: 'atacado', label: 'Atacado' }, { id: 'historico', label: 'Histórico' }, { id: 'recompra', label: 'Recompra' }]" :key="tab.id">
+          <button @click="vendasTab = tab.id; if (tab.id !== 'varejo') loadAtacadoVendas()" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                  :class="vendasTab === tab.id ? 'border-brand-700 text-brand-800' : 'border-transparent text-gray-500 hover:text-gray-800'" x-text="tab.label"></button>
+        </template>
+      </div>
+      </div>
+
+      <!-- VISÃO GERAL: desempenho comercial. Caixa, custos e lucro ficam no Financeiro. -->
+      <div x-show="vendasTab === 'visao'" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="shopping-bag" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Vendas no período</p><p class="text-2xl font-bold num" x-text="vendasResumoGeral().vendas"></p><p class="text-xs text-gray-400 mt-1"><span x-text="vendasResumoGeral().varejoCount"></span> varejo · <span x-text="vendasResumoGeral().atacadoCount"></span> atacado</p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="ticket" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Ticket médio</p><p class="text-2xl font-bold num" x-text="formatCurrency(vendasResumoGeral().ticket)"></p><p class="text-xs text-gray-400 mt-1">valor médio por venda</p></div>
+          </div>
+          <button @click="vendasTab = 'historico'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-rose-200 hover:bg-rose-50/20">
+            <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="receipt-text" class="w-6 h-6 text-rose-600"></i></div>
+            <div><p class="text-xs text-gray-500">Canceladas</p><p class="text-2xl font-bold text-rose-600 num" x-text="vendasResumoGeral().canceladas"></p><p class="text-xs text-gray-400 mt-1" x-text="vendasResumoGeral().cancelPct.toFixed(1).replace('.', ',') + '% dos registros'"></p></div>
+          </button>
+          <button @click="vendasTab = 'recompra'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-amber-200 hover:bg-amber-50/20">
+            <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="users-round" class="w-6 h-6 text-amber-600"></i></div>
+            <div><p class="text-xs text-gray-500">Oportunidades de recompra</p><p class="text-2xl font-bold num" x-text="vendasInativos().length"></p><p class="text-xs text-gray-400 mt-1">sem comprar há 30 dias</p></div>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+          <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold">Desempenho por canal</h3>
+            <p class="text-xs text-gray-400 mt-1 mb-5">Participação no volume de vendas</p>
+            <div class="space-y-5">
+              <template x-for="canal in vendasCanais()" :key="canal.id">
+                <div class="grid grid-cols-[42px_minmax(0,1fr)] gap-3 items-center">
+                  <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i :data-lucide="canal.icon" class="w-5 h-5 text-emerald-700"></i></div>
+                  <div>
+                    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><span class="font-semibold" x-text="canal.label"></span><span class="text-sm"><b class="num" x-text="canal.vendas"></b> vendas</span><span class="text-sm num" x-text="formatCurrency(canal.valor) + ' vendidos'"></span><span class="text-xs text-gray-500 num" x-text="'Ticket ' + formatCurrency(canal.ticket)"></span></div>
+                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden mt-2"><div class="h-full bg-emerald-600 rounded-full" :style="'width:' + canal.barra + '%'"></div></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <p class="text-xs text-gray-400 mt-5 pt-3 border-t border-gray-100">Valores comerciais das vendas. Caixa, custos e lucro ficam no <button @click="currentPage = 'financeiro'; finTab = 'visao'" class="text-brand-700 font-medium hover:underline">Financeiro</button>.</p>
+          </div>
+
+          <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold mb-4">Atenção comercial</h3>
+            <div class="divide-y divide-gray-100">
+              <button @click="vendasTab = 'historico'" class="w-full py-3 flex items-center gap-3 text-left"><div class="w-9 h-9 rounded-full flex items-center justify-center" :class="vendasAguardando() ? 'bg-amber-50' : 'bg-emerald-50'"><i data-lucide="clock-3" class="w-4 h-4" :class="vendasAguardando() ? 'text-amber-600' : 'text-emerald-700'"></i></div><div class="flex-1"><p class="text-sm font-semibold" x-text="vendasAguardando() ? vendasAguardando() + ' pedido(s) aguardando confirmação' : 'Nenhum pedido aguardando confirmação'"></p><p class="text-xs text-gray-400">acompanhar no histórico</p></div><i data-lucide="chevron-right" class="w-4 h-4 text-brand-700"></i></button>
+              <button @click="vendasTab = 'recompra'" class="w-full py-3 flex items-center gap-3 text-left"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="user-plus" class="w-4 h-4 text-emerald-700"></i></div><div class="flex-1"><p class="text-sm font-semibold"><span x-text="vendasNuncaCompraram().length"></span> parceiro(s) ainda não compraram</p><p class="text-xs text-gray-400">primeira venda no atacado</p></div><i data-lucide="chevron-right" class="w-4 h-4 text-brand-700"></i></button>
+              <button @click="vendasTab = 'recompra'" class="w-full py-3 flex items-center gap-3 text-left"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-700"></i></div><div class="flex-1"><p class="text-sm font-semibold"><span x-text="vendasInativos().length"></span> cliente(s) sem comprar há 30 dias</p><p class="text-xs text-gray-400">oportunidades de recompra</p></div><i data-lucide="chevron-right" class="w-4 h-4 text-brand-700"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between"><h3 class="text-base font-semibold">Vendas recentes</h3><button @click="vendasTab = 'historico'" class="text-sm text-brand-700 font-medium hover:underline">Ver histórico completo</button></div>
+          <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500 uppercase tracking-wider"><th class="px-5 py-3 font-medium">Canal</th><th class="px-5 py-3 font-medium">Cliente</th><th class="px-5 py-3 font-medium">Itens</th><th class="px-5 py-3 font-medium">Pagamento</th><th class="px-5 py-3 font-medium text-right">Total</th><th class="px-5 py-3 font-medium">Status</th></tr></thead>
+            <tbody class="divide-y divide-gray-100"><template x-for="row in vendasHistorico().slice(0, 5)" :key="row.key"><tr class="hover:bg-gray-50"><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700" x-text="row.canal"></span></td><td class="px-5 py-3 font-medium" x-text="row.cliente"></td><td class="px-5 py-3 text-gray-600" x-text="row.itens"></td><td class="px-5 py-3 text-gray-600" x-text="row.pagto"></td><td class="px-5 py-3 text-right font-semibold num" x-text="row.total"></td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="row.statusClass" x-text="row.status"></span></td></tr></template><tr x-show="!vendasHistorico().length"><td colspan="6" class="px-5 py-10 text-center text-gray-400">Nenhuma venda neste período.</td></tr></tbody>
+          </table></div>
+        </div>
       </div>
 
       <!-- ─── VAREJO ─── -->
       <div x-show="vendasTab === 'varejo'">
 
-      <!-- Totalizadores (0117 — fatia 2): faturamento/custo/lucro com o custo CONGELADO na
-           venda, direto do servidor (sem o limite da lista); recorte Tudo × Esse mês.
-           Sem resumo carregado, faturamento/contagem caem no cálculo local da lista. -->
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-xs text-gray-500 font-medium">Financeiro do varejo (Matriz)</div>
-        <div class="inline-flex bg-gray-100 rounded-lg p-0.5">
-          <button @click="setVarejoPeriodo('tudo')"
-                  :class="varejoPeriodo === 'tudo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Tudo</button>
-          <button @click="setVarejoPeriodo('mes')"
-                  :class="varejoPeriodo === 'mes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                  class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Esse mês</button>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
+      <div class="flex items-center justify-between mb-3"><div><h2 class="text-lg font-semibold">Varejo</h2><p class="text-xs text-gray-400 mt-0.5">Venda direta da Matriz para o cliente final</p></div><button @click="abrirNovaVenda('varejo')" class="inline-flex items-center gap-2 border border-brand-700 text-brand-800 hover:bg-brand-50 rounded-lg px-4 py-2 text-sm font-medium"><i data-lucide="plus" class="w-4 h-4"></i>Nova venda no varejo</button></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Vendas no varejo</div>
           <div class="text-lg font-bold" x-text="varejoResumo ? Number(varejoResumo.vendas_count || 0) : vendasVarejoAtivas().length"></div>
           <div class="text-xs text-gray-400 mt-1 font-medium">cliente final · Matriz</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Faturamento</div>
+          <div class="text-xs text-gray-500 mb-1">Total vendido</div>
           <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(varejoResumo ? Number(varejoResumo.faturamento || 0) : vendasVarejoTotal())"></div>
-          <div class="text-xs text-gray-400 mt-1 font-medium">só pneus — frete fora (frete mora na Logística)</div>
+          <div class="text-xs text-gray-400 mt-1 font-medium">valor comercial · frete fora</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Custo (galpão)</div>
-          <div class="text-lg font-bold text-gray-700" x-text="varejoResumo ? formatCurrency(Number(varejoResumo.custo_total || 0)) : '—'"></div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Lucro</div>
-          <div class="text-lg font-bold"
-               :class="Number(varejoResumo?.lucro_total || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'"
-               x-text="varejoResumo ? formatCurrency(Number(varejoResumo.lucro_total || 0)) : '—'"></div>
+          <div class="text-xs text-gray-500 mb-1">Ticket médio</div>
+          <div class="text-lg font-bold" x-text="formatCurrency((varejoResumo ? Number(varejoResumo.faturamento || 0) : vendasVarejoTotal()) / Math.max(varejoResumo ? Number(varejoResumo.vendas_count || 0) : vendasVarejoAtivas().length, 1))"></div>
+          <div class="text-xs text-gray-400 mt-1">por venda confirmada</div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Canceladas</div>
-          <div class="text-lg font-bold text-rose-600" x-text="vendasVarejo().filter(p => p.status === 'Cancelado').length"></div>
+          <div class="text-lg font-bold text-rose-600" x-text="Number(varejoResumo?.cancelled_count ?? vendasVarejoPeriodo().filter(p => p.status === 'Cancelado').length)"></div>
+          <div class="text-xs text-gray-400 mt-1">mantidas na trilha</div>
         </div>
       </div>
-      <!-- Honestidade: item vendido SEM custo congelado (venda antiga, flag desligada ou
-           medida sem custo no galpão) fica FORA do Custo/Lucro acima — avisa, não chuta. -->
-      <div x-show="varejoResumo && Number(varejoResumo.itens_sem_custo || 0) > 0"
-           class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-        <span class="font-semibold" x-text="Number(varejoResumo?.itens_sem_custo || 0)"></span>
-        item(ns) vendido(s) sem custo congelado — o Custo/Lucro acima não conta esses itens.
-      </div>
-      <div class="mb-3"></div>
 
       <!-- Tabela -->
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -1593,10 +1636,11 @@
               <th class="px-5 py-3 font-medium">Operador</th>
               <th class="px-5 py-3 font-medium text-right">Total</th>
               <th class="px-5 py-3 font-medium">Status</th>
+              <th class="px-5 py-3 font-medium text-right">Ação</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <template x-for="pedido in vendasVarejo()">
+            <template x-for="pedido in vendasVarejoPeriodo()" :key="pedido.id">
               <tr class="hover:bg-gray-50">
                 <td class="px-5 py-3 text-gray-500" x-text="pedido.data"></td>
                 <td class="px-5 py-3 font-medium" x-text="pedido.cliente"></td>
@@ -1613,10 +1657,11 @@
                     <span x-text="pedido.status"></span>
                   </span>
                 </td>
+                <td class="px-5 py-3 text-right"><button x-show="pedido.status !== 'Cancelado'" @click="cancelarVarejo(pedido)" class="text-xs font-medium text-gray-400 hover:text-rose-600">Cancelar</button></td>
               </tr>
             </template>
-            <tr x-show="vendasVarejo().length === 0">
-              <td colspan="7" class="px-5 py-10 text-center text-sm text-gray-500">
+            <tr x-show="vendasVarejoPeriodo().length === 0">
+              <td colspan="8" class="px-5 py-10 text-center text-sm text-gray-500">
                 Nenhuma venda de varejo da Matriz ainda. Quando a Matriz atende um cliente direto, aparece aqui.
               </td>
             </tr>
@@ -1628,38 +1673,29 @@
       <!-- ─── ATACADO ─── -->
       <div x-show="vendasTab === 'atacado'" class="space-y-6">
 
-        <!-- Resumo do atacado (Fase 3): faturamento, custo, lucro — recorte Tudo × Esse mês (0117) -->
-        <div x-show="atacadoResumo" class="flex items-center justify-between -mb-3">
-          <div class="text-xs text-gray-500 font-medium">Financeiro do atacado</div>
-          <div class="inline-flex bg-gray-100 rounded-lg p-0.5">
-            <button @click="setAtacadoPeriodo('tudo')"
-                    :class="atacadoPeriodo === 'tudo' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                    class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Tudo</button>
-            <button @click="setAtacadoPeriodo('mes')"
-                    :class="atacadoPeriodo === 'mes' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'"
-                    class="px-3 py-1 rounded-md text-xs font-medium transition-colors">Esse mês</button>
-          </div>
-        </div>
-        <div x-show="atacadoResumo" class="grid grid-cols-3 gap-3">
+        <div class="flex items-center justify-between -mb-2"><div><h2 class="text-lg font-semibold">Atacado</h2><p class="text-xs text-gray-400 mt-0.5">Venda para borracheiros e parceiros</p></div></div>
+        <div x-show="atacadoResumo" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Faturamento</div>
-            <div class="text-base md:text-lg font-bold text-gray-900" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0))"></div>
+            <div class="text-xs text-gray-500 mb-1">Vendas no atacado</div>
+            <div class="text-base md:text-lg font-bold" x-text="Number(atacadoResumo?.vendas_count || 0)"></div><div class="text-xs text-gray-400 mt-1">borracheiros · parceiros</div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Custo</div>
-            <div class="text-base md:text-lg font-bold text-gray-700" x-text="formatCurrency(Number(atacadoResumo?.custo_total || 0))"></div>
+            <div class="text-xs text-gray-500 mb-1">Total vendido</div>
+            <div class="text-base md:text-lg font-bold text-emerald-700" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0))"></div><div class="text-xs text-gray-400 mt-1">valor comercial</div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Lucro</div>
-            <div class="text-base md:text-lg font-bold"
-                 :class="Number(atacadoResumo?.lucro_total || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'"
-                 x-text="formatCurrency(Number(atacadoResumo?.lucro_total || 0))"></div>
+            <div class="text-xs text-gray-500 mb-1">Ticket médio</div>
+            <div class="text-base md:text-lg font-bold" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0) / Math.max(Number(atacadoResumo?.vendas_count || 0), 1))"></div><div class="text-xs text-gray-400 mt-1">por venda confirmada</div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Canceladas</div>
+            <div class="text-base md:text-lg font-bold text-rose-600" x-text="Number(atacadoResumo?.cancelled_count || 0)"></div><div class="text-xs text-gray-400 mt-1">estoque devolvido</div>
           </div>
         </div>
 
         <!-- FINANCEIRO do galpão (0115, flag WHOLESALE_FINANCE): o fiado dos dois lados.
              atacadoFinance = null com a flag off → o bloco inteiro some. -->
-        <div x-show="atacadoFinance" class="bg-white border border-gray-200 rounded-xl p-5">
+        <div x-show="false" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center gap-2 mb-1">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
               <i data-lucide="wallet" class="w-4 h-4 text-brand-600"></i>
@@ -1835,8 +1871,8 @@
                x-text="atacadoMsg ? atacadoMsg.text : ''"></div>
         </div>
 
-        <!-- ÚLTIMAS VENDAS (0116): trilha visível + cancelar registro errado -->
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Histórico unificado fica na sub-aba Histórico. -->
+        <div x-show="false" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 class="text-base font-semibold">Últimas vendas</h3>
             <span class="text-xs text-gray-400">registrou errado? cancela aqui — sai do resumo e o estoque volta</span>
@@ -1880,8 +1916,8 @@
           </table>
         </div>
 
-        <!-- Ranking de recompra -->
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <!-- Ranking completo fica na sub-aba Recompra. -->
+        <div x-show="false" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 class="text-base font-semibold">Ranking de recompra</h3>
             <span class="text-xs text-gray-400">quem compra forte · quem sumiu</span>
@@ -1923,6 +1959,39 @@
           </table>
         </div>
 
+      </div>
+
+      <!-- HISTÓRICO COMERCIAL UNIFICADO -->
+      <div x-show="vendasTab === 'historico'" class="space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div><h2 class="text-lg font-semibold">Histórico de vendas</h2><p class="text-xs text-gray-400 mt-0.5">Varejo e atacado na mesma trilha operacional</p></div>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="vendasBusca" type="search" placeholder="Buscar cliente, item ou status" class="w-full sm:w-72 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-100"></div>
+            <div class="inline-flex bg-gray-100 p-1 rounded-lg"><template x-for="filtro in [{ id: 'todos', label: 'Todos' }, { id: 'varejo', label: 'Varejo' }, { id: 'atacado', label: 'Atacado' }]" :key="filtro.id"><button @click="vendasHistoricoCanal = filtro.id" class="px-3 py-1.5 rounded-md text-xs font-medium" :class="vendasHistoricoCanal === filtro.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'" x-text="filtro.label"></button></template></div>
+          </div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[980px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500 uppercase tracking-wider"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Canal</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Itens</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+            <tbody class="divide-y divide-gray-100"><template x-for="row in vendasHistoricoFiltrado()" :key="row.key"><tr class="hover:bg-gray-50"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="row.data"></td><td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700" x-text="row.canal"></span></td><td class="px-4 py-3 font-medium" x-text="row.cliente"></td><td class="px-4 py-3 text-gray-600 max-w-[260px] truncate" x-text="row.itens"></td><td class="px-4 py-3 text-gray-600" x-text="row.pagto"></td><td class="px-4 py-3 text-right font-semibold num" x-text="row.total"></td><td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="row.statusClass" x-text="row.status"></span></td><td class="px-5 py-3 text-right whitespace-nowrap"><a x-show="row.recibo" :href="row.recibo" target="_blank" rel="noopener" class="text-xs font-medium text-brand-700 hover:underline mr-3">Recibo</a><button x-show="row.cancelavel" @click="row.canalId === 'varejo' ? cancelarVarejo(row.varejo) : atacadoCancelSale(row.atacado)" class="text-xs font-medium text-gray-400 hover:text-rose-600">Cancelar</button></td></tr></template><tr x-show="!vendasHistoricoFiltrado().length"><td colspan="8" class="px-5 py-12 text-center text-gray-400">Nenhuma venda encontrada neste período.</td></tr></tbody>
+          </table></div>
+          <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">A lista reúne os pedidos recentes do varejo e as últimas vendas do atacado. Cancelamentos continuam visíveis para auditoria.</div>
+        </div>
+      </div>
+
+      <!-- RECOMPRA: relacionamento comercial do atacado -->
+      <div x-show="vendasTab === 'recompra'" class="space-y-4">
+        <div><h2 class="text-lg font-semibold">Recompra</h2><p class="text-xs text-gray-400 mt-0.5">Quem compra forte, quem sumiu e quem ainda não começou</p></div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-5 h-5 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Compradores ativos</p><p class="text-2xl font-bold num" x-text="atacadoRanking.length - vendasInativos().length - vendasNuncaCompraram().length"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="refresh-cw" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Sem comprar há 30 dias</p><p class="text-2xl font-bold text-amber-700 num" x-text="vendasInativos().length"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 shadow-sm"><div class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center"><i data-lucide="user-plus" class="w-5 h-5 text-gray-600"></i></div><div><p class="text-xs text-gray-500">Ainda não compraram</p><p class="text-2xl font-bold num" x-text="vendasNuncaCompraram().length"></p></div></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Carteira do atacado</h3></div>
+          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500 uppercase tracking-wider"><th class="px-5 py-3 font-medium">Borracheiro</th><th class="px-4 py-3 font-medium text-center">Compras</th><th class="px-4 py-3 font-medium text-right">Total comprado</th><th class="px-4 py-3 font-medium">Última compra</th><th class="px-4 py-3 font-medium">Situação</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+            <tbody class="divide-y divide-gray-100"><template x-for="b in atacadoRanking" :key="b.buyer_id || b.partner_id"><tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium"><span x-text="b.name"></span><span x-show="b.is_partner" class="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">parceiro</span></td><td class="px-4 py-3 text-center num" x-text="b.orders_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(b.total_bought || 0))"></td><td class="px-4 py-3 text-gray-500" x-text="atacadoLastPurchase(b)"></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full" :class="atacadoStatus(b).cls"><span class="w-1.5 h-1.5 rounded-full" :class="atacadoStatus(b).dot"></span><span x-text="atacadoStatus(b).label"></span></span></td><td class="px-5 py-3 text-right"><a x-show="recompraWhatsLink(b)" :href="recompraWhatsLink(b)" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-600 text-brand-700 text-xs font-medium hover:bg-brand-50"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>Chamar</a><span x-show="!recompraWhatsLink(b)" class="text-xs text-gray-400">sem telefone</span></td></tr></template><tr x-show="!atacadoRanking.length"><td colspan="6" class="px-5 py-12 text-center text-gray-400">Nenhum comprador cadastrado.</td></tr></tbody>
+          </table></div>
+        </div>
       </div>
     </div>
 
@@ -4412,17 +4481,9 @@
               <input type="number" min="0" step="0.01" x-model.number="saleForm.unit_price"
                      class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
             </div>
-            <div class="col-span-1">
-              <button class="w-full p-2 hover:bg-rose-50 text-rose-500 rounded transition-colors">
-                <i data-lucide="trash-2" class="w-4 h-4 mx-auto"></i>
-              </button>
-            </div>
+            <div class="col-span-1"></div>
           </div>
         </div>
-        <button class="mt-2 text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1 font-medium">
-          <i data-lucide="plus" class="w-3 h-3"></i>
-          Adicionar item
-        </button>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
@@ -4450,12 +4511,6 @@
         <label class="text-xs font-medium text-gray-700 mb-2 block">Endereço de entrega</label>
         <input type="text" x-model="saleForm.delivery_address"
                class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-      </div>
-
-      <div>
-        <label class="text-xs font-medium text-gray-700 mb-2 block">Observações (opcional)</label>
-        <textarea rows="2" x-model="saleForm.notes" placeholder="Anote algo relevante sobre este pedido..."
-                  class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900/10"></textarea>
       </div>
 
       <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">

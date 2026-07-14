@@ -1,13 +1,11 @@
-// Obra 300 (2026-07-05): fatia do painel da MATRIZ — pedidos do varejo + resumo do varejo (0117) + períodos.
-// VERBATIM das linhas 769-843 do app.js pré-obra (commit dd64a35).
-// Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
+// Vendas da Matriz: leitura comercial unificada de varejo + atacado.
+// O Financeiro continua dono de custos, lucro, cobranças, despesas e caixa.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.varejo = function () {
   return {
     applyPedidos(rows) {
       const deliveryLabels = { pending: 'Em separação', dispatched: 'Saiu pra entrega', delivered: 'Entregue', failed: 'Entrega falhou' };
       this.pedidos = (rows || []).map((row) => {
-        // Pedido de parceiro tem o ciclo de vida real no partner_orders; o espelho fica 'open'.
         const isPartner = !!row.is_partner;
         const cancelled = row.status === 'cancelled' || row.partner_status === 'cancelled';
         let status, statusClass, dotClass;
@@ -16,19 +14,25 @@ window.PAINEL_MODULES.varejo = function () {
         } else if (isPartner) {
           status = deliveryLabels[row.delivery_status] || row.partner_status || 'Pedido';
           const done = row.delivery_status === 'delivered';
-          statusClass = done ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700';
-          dotClass = done ? 'bg-emerald-500' : 'bg-indigo-500';
+          statusClass = done ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
+          dotClass = done ? 'bg-emerald-500' : 'bg-amber-500';
         } else {
           status = ({ open: 'Aberto', confirmed: 'Confirmado', pending: 'Pendente' })[row.status] || row.status || 'Aberto';
-          statusClass = 'bg-emerald-50 text-emerald-700'; dotClass = 'bg-emerald-500';
+          const waiting = row.status === 'open' || row.status === 'pending';
+          statusClass = waiting ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
+          dotClass = waiting ? 'bg-amber-500' : 'bg-emerald-500';
         }
+        const items = Array.isArray(row.items) ? row.items : [];
         const pagto = isPartner
           ? (row.payment_status === 'pago' ? 'Pago' : 'A receber')
           : (row.payment_method || '-');
         return {
+          id: row.order_id,
+          createdAt: row.created_at,
           data: this.formatDateTime(row.created_at),
           cliente: row.contact_name || 'Cliente',
-          itens: this.itemSummary(row.items),
+          itens: this.itemSummary(items),
+          itensCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           pagto,
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
@@ -42,42 +46,162 @@ window.PAINEL_MODULES.varejo = function () {
       });
     },
 
-    // Aba Vendas — Varejo = o que a MATRIZ (unit 'main') vende direto pro cliente final.
-    // Reusa this.pedidos (já carregado de /dashboard/pedidos) filtrando a unidade própria.
-    // Pedido roteado pro parceiro NÃO é venda da matriz — fica na aba Rede.
+    vendasInicioPeriodo() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      if (this.vendasPeriodo === '7d') d.setDate(d.getDate() - 6);
+      if (this.vendasPeriodo === '30d') d.setDate(d.getDate() - 29);
+      return d;
+    },
+    vendaNoPeriodo(value) {
+      const d = new Date(value);
+      return !Number.isNaN(d.getTime()) && d >= this.vendasInicioPeriodo();
+    },
+
+    // Varejo = pedido da própria Matriz. Pedido roteado ao parceiro permanece na Rede.
     vendasVarejo() {
       return this.pedidos.filter((p) => p.unitSlug === 'main');
     },
+    vendasVarejoPeriodo() {
+      return this.vendasVarejo().filter((p) => this.vendaNoPeriodo(p.createdAt));
+    },
     vendasVarejoAtivas() {
-      return this.vendasVarejo().filter((p) => p.status !== 'Cancelado');
+      return this.vendasVarejoPeriodo().filter((p) => p.status !== 'Cancelado');
     },
     vendasVarejoTotal() {
       return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
     },
-    // Resumo do varejo com custo CONGELADO na venda (0117): faturamento/custo/lucro vêm do
-    // SERVIDOR (mesma régua da lista — unit 'main', cancelado fora — mas sem o limite de
-    // linhas dela). A lista continua alimentando a tabela; o resumo alimenta os CARDS.
+
+    vendasInativos() {
+      return this.atacadoRanking.filter((b) => Number(b.orders_count || 0) > 0 && Number(b.days_since_last || 0) > this.atacadoStaleDays);
+    },
+    vendasNuncaCompraram() {
+      return this.atacadoRanking.filter((b) => Number(b.orders_count || 0) === 0);
+    },
+    recompraWhatsLink(b) {
+      const digits = String(b?.phone || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const tel = digits.startsWith('55') ? digits : `55${digits}`;
+      const msg = Number(b.orders_count || 0) > 0
+        ? `Oi, ${b.name}! Tudo bem? Passando para saber se está precisando repor algum pneu.`
+        : `Oi, ${b.name}! Tudo bem? Temos pneus para atacado na Matriz Farejador. Posso te ajudar com alguma medida?`;
+      return `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
+    },
+    vendasAguardando() {
+      if (this.varejoResumo && this.varejoResumo.pending_count != null) return Number(this.varejoResumo.pending_count || 0);
+      return this.vendasVarejoPeriodo().filter((p) => p.status === 'Aberto' || p.status === 'Pendente').length;
+    },
+    vendasResumoGeral() {
+      const varejoCount = this.varejoResumo
+        ? Number(this.varejoResumo.vendas_count || 0)
+        : this.vendasVarejoAtivas().length;
+      const atacadoCount = Number(this.atacadoResumo?.vendas_count || 0);
+      const varejoValor = this.varejoResumo
+        ? Number(this.varejoResumo.faturamento || 0)
+        : this.vendasVarejoTotal();
+      const atacadoValor = Number(this.atacadoResumo?.faturamento || 0);
+      const canceladas = Number(this.varejoResumo?.cancelled_count ?? this.vendasVarejoPeriodo().filter((p) => p.status === 'Cancelado').length)
+        + Number(this.atacadoResumo?.cancelled_count || 0);
+      const vendas = varejoCount + atacadoCount;
+      const valor = varejoValor + atacadoValor;
+      return {
+        vendas,
+        valor,
+        ticket: vendas > 0 ? valor / vendas : 0,
+        canceladas,
+        cancelPct: vendas + canceladas > 0 ? (canceladas / (vendas + canceladas)) * 100 : 0,
+        varejoCount,
+        varejoValor,
+        atacadoCount,
+        atacadoValor,
+      };
+    },
+    vendasCanais() {
+      const r = this.vendasResumoGeral();
+      const max = Math.max(r.varejoCount, r.atacadoCount, 1);
+      return [
+        { id: 'varejo', label: 'Varejo', vendas: r.varejoCount, valor: r.varejoValor, ticket: r.varejoCount ? r.varejoValor / r.varejoCount : 0, barra: (r.varejoCount / max) * 100, icon: 'user-round' },
+        { id: 'atacado', label: 'Atacado', vendas: r.atacadoCount, valor: r.atacadoValor, ticket: r.atacadoCount ? r.atacadoValor / r.atacadoCount : 0, barra: (r.atacadoCount / max) * 100, icon: 'warehouse' },
+      ];
+    },
+
+    vendasHistorico() {
+      const varejo = this.vendasVarejoPeriodo().map((p) => ({
+        key: `v:${p.id}`, id: p.id, canal: 'Varejo', canalId: 'varejo', createdAt: p.createdAt,
+        data: p.data, cliente: p.cliente, itens: p.itens, itensCount: p.itensCount, pagto: p.pagto,
+        total: p.total, totalAmount: p.totalAmount, status: p.status, statusClass: p.statusClass,
+        cancelavel: p.status !== 'Cancelado', varejo: p,
+      }));
+      const atacado = this.atacadoVendas
+        .filter((v) => this.vendaNoPeriodo(v.sold_at))
+        .map((v) => {
+          const cancelled = v.status === 'cancelled';
+          const qty = (v.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+          return {
+            key: `a:${v.id}`, id: v.id, canal: 'Atacado', canalId: 'atacado', createdAt: v.sold_at,
+            data: this.vendaData(v), cliente: v.buyer_name, itens: `${qty} pneu(s)`, itensCount: qty,
+            pagto: v.payment_status === 'pending' ? 'Fiado' : 'Pago',
+            total: this.formatCurrency(Number(v.total_amount || 0)), totalAmount: Number(v.total_amount || 0),
+            status: cancelled ? 'Cancelada' : 'Confirmada',
+            statusClass: cancelled ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
+            cancelavel: !cancelled, recibo: this.reciboWhatsLink(v), atacado: v,
+          };
+        });
+      return [...varejo, ...atacado].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+    vendasHistoricoFiltrado() {
+      const busca = this.vendasBusca.trim().toLocaleLowerCase('pt-BR');
+      return this.vendasHistorico().filter((row) => {
+        if (this.vendasHistoricoCanal !== 'todos' && row.canalId !== this.vendasHistoricoCanal) return false;
+        if (!busca) return true;
+        return `${row.cliente} ${row.itens} ${row.pagto} ${row.status}`.toLocaleLowerCase('pt-BR').includes(busca);
+      });
+    },
+
     async loadVarejoResumo() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
-        this.varejoResumo = (await this.apiGet('/admin/api/varejo/resumo?period=' + this.varejoPeriodo)) || null;
+        this.varejoResumo = (await this.apiGet('/admin/api/varejo/resumo?period=' + this.vendasPeriodo)) || null;
       } catch (err) {
-        this.varejoResumo = null; // cards caem no cálculo local da lista (fallback honesto)
+        this.varejoResumo = null;
       }
     },
-    async setVarejoPeriodo(p) {
-      this.varejoPeriodo = p;
-      await this.loadVarejoResumo();
+    async loadVendasData() {
+      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas()]);
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
-    async setAtacadoPeriodo(p) {
-      this.atacadoPeriodo = p;
-      try {
-        this.atacadoResumo = (await this.apiGet('/admin/api/wholesale/resumo?period=' + p)) || null;
-      } catch (err) { /* mantém o resumo anterior na tela */ }
+    async setVendasPeriodo(period) {
+      if (this.vendasPeriodo === period) return;
+      this.vendasPeriodo = period;
+      this.varejoPeriodo = period;
+      this.atacadoPeriodo = period;
+      await this.loadVendasData();
     },
+    async setVarejoPeriodo(period) { await this.setVendasPeriodo(period); },
+    async setAtacadoPeriodo(period) { await this.setVendasPeriodo(period); },
 
-    // ── REDE — comissões como lançamento (0118): o GET já roda a varredura no servidor
-    // (cria lançamento de venda 2W realizada; estorna o de venda cancelada). ──
+    abrirNovaVenda(tipo) {
+      this.vendaMenuOpen = false;
+      if (tipo === 'atacado') {
+        this.vendasTab = 'atacado';
+        void this.loadAtacadoVendas();
+        return;
+      }
+      this.openWalkinModal();
+    },
+    async cancelarVarejo(row) {
+      if (!row?.id || row.status === 'Cancelado') return;
+      const reason = window.prompt('Motivo do cancelamento da venda:');
+      if (reason === null) return;
+      if (!reason.trim()) { window.alert('Informe o motivo do cancelamento.'); return; }
+      try {
+        await this.apiPost(`/admin/api/orders/${row.id}/cancel`, { reason: reason.trim() });
+        await this.loadRealData();
+        await this.loadVendasData();
+      } catch (err) {
+        window.alert(`Não consegui cancelar: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
   };
 };

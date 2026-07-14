@@ -162,11 +162,26 @@ export async function listWholesaleMeasures(
 }
 
 // ─── ATACADO (Fase 3): resumo de custo + lucro ───────────────────────────────
+export type SalesPeriod = 'today' | '7d' | '30d' | 'mes' | 'tudo';
+
+function salesPeriodWhere(period: SalesPeriod): string {
+  if (period === 'tudo') return '';
+  if (period === 'today') {
+    return `AND o.created_at >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')`;
+  }
+  if (period === '7d' || period === '30d') {
+    const days = period === '7d' ? 6 : 29;
+    return `AND o.created_at >= ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '${days} days') AT TIME ZONE 'America/Sao_Paulo')`;
+  }
+  return `AND o.created_at >= (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')`;
+}
+
 export interface WholesaleResumoRow {
   faturamento: string;
   custo_total: string;
   lucro_total: string;
   vendas_count: number;
+  cancelled_count: number;
 }
 
 /** Totais do atacado (vendas confirmadas): faturamento, custo e lucro.
@@ -175,21 +190,20 @@ export interface WholesaleResumoRow {
 export async function getWholesaleResumo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
-  period: 'mes' | 'tudo' = 'tudo',
+  period: SalesPeriod = 'tudo',
 ): Promise<WholesaleResumoRow> {
-  const periodWhere = period === 'mes'
-    ? `AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`
-    : '';
+  const periodWhere = salesPeriodWhere(period);
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
-       COALESCE(SUM(oi.line_total), 0)              AS faturamento,
-       COALESCE(SUM(oi.unit_cost * oi.quantity), 0) AS custo_total,
-       COALESCE(SUM(oi.line_profit), 0)             AS lucro_total,
-       COUNT(DISTINCT o.id)                         AS vendas_count
+       COALESCE(SUM(oi.line_total) FILTER (WHERE o.status = 'confirmed'), 0)              AS faturamento,
+       COALESCE(SUM(oi.unit_cost * oi.quantity) FILTER (WHERE o.status = 'confirmed'), 0) AS custo_total,
+       COALESCE(SUM(oi.line_profit) FILTER (WHERE o.status = 'confirmed'), 0)             AS lucro_total,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'confirmed')::int                    AS vendas_count,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::int                    AS cancelled_count
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_order_items oi
          ON oi.order_id = o.id AND oi.environment = o.environment
-      WHERE o.environment = $1 AND o.status = 'confirmed' ${periodWhere}`,
+      WHERE o.environment = $1 ${periodWhere}`,
     [environment],
   );
   return r.rows[0]!;
@@ -202,6 +216,8 @@ export interface VarejoResumoRow {
   lucro_total: string;
   vendas_count: number;
   itens_sem_custo: number;
+  cancelled_count: number;
+  pending_count: number;
 }
 
 /** Totais do VAREJO da matriz (pedidos da unit 'main', cancelado fora) com o custo
@@ -211,28 +227,31 @@ export interface VarejoResumoRow {
  *  A régua de "venda do varejo" é a MESMA do card/tabela da aba Vendas (unit slug='main'
  *  e não-cancelado) — o resumo nunca diverge da lista. */
 export async function getVarejoResumo(
-  period: 'mes' | 'tudo' = 'tudo',
+  period: SalesPeriod = 'tudo',
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<VarejoResumoRow> {
-  const periodWhere = period === 'mes'
-    ? `AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`
-    : '';
+  const periodWhere = salesPeriodWhere(period);
   const r = await dbPool.query<VarejoResumoRow>(
     `SELECT
-       COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount), 0)  AS faturamento,
-       COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)                 AS custo_total,
+       COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount)
+         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS faturamento,
+       COALESCE(SUM(oi.matriz_unit_cost * oi.quantity)
+         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS custo_total,
        COALESCE(SUM(CASE WHEN oi.matriz_unit_cost IS NOT NULL
                          THEN (oi.quantity * oi.unit_price - oi.discount_amount)
-                              - oi.matriz_unit_cost * oi.quantity END), 0) AS lucro_total,
-       COUNT(DISTINCT o.id)::int                                           AS vendas_count,
-       COUNT(*) FILTER (WHERE oi.matriz_unit_cost IS NULL)::int            AS itens_sem_custo
+                               - oi.matriz_unit_cost * oi.quantity END)
+         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS lucro_total,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status <> 'cancelled')::int   AS vendas_count,
+       COUNT(*) FILTER (WHERE o.status <> 'cancelled' AND oi.matriz_unit_cost IS NULL)::int AS itens_sem_custo,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::int     AS cancelled_count,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status IN ('open', 'pending'))::int AS pending_count
        FROM commerce.orders o
        JOIN core.units u
          ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
        JOIN commerce.order_items oi
          ON oi.order_id = o.id AND oi.environment = o.environment
-      WHERE o.environment = $1 AND o.status <> 'cancelled' ${periodWhere}`,
+      WHERE o.environment = $1 ${periodWhere}`,
     [environment],
   );
   return r.rows[0]!;
@@ -242,4 +261,3 @@ export async function getVarejoResumo(
 // De quem o dono COMPRA o pneu usado. Cada COMPRA registra a origem E alimenta o
 // custo médio do galpão (addWholesaleStockEntry, mesma transação). Dado SÓ da matriz
 // (sem grant pro parceiro). Paga à vista hoje (payment_status default 'paid').
-

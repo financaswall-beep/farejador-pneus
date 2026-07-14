@@ -82,7 +82,11 @@ function painelApp() {
     liveRefreshId: null,
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
-    vendasTab: 'varejo',
+    vendasTab: 'visao', // sub-abas: visao | varejo | atacado | historico | recompra
+    vendasPeriodo: '30d', // recorte comercial compartilhado: today | 7d | 30d
+    vendasHistoricoCanal: 'todos',
+    vendasBusca: '',
+    vendaMenuOpen: false,
     comprasTab: 'visao', // sub-abas: visao | nova | historico | fornecedores | precos
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
     atacadoBuyers: [],

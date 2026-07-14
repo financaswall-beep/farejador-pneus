@@ -7,6 +7,43 @@ window.PAINEL_MODULES.atacado = function () {
     atacadoBuyerKey(b) {
       return b.customer_id ? `c:${b.customer_id}` : `p:${b.partner_id}`;
     },
+    // Carregador enxuto da tela Vendas. Compras e fornecedores ficam fora para uma
+    // falha neles não derrubar o caixa do atacado nem atrasar a visão comercial.
+    async loadAtacadoVendas() {
+      this.ensureCredentials();
+      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      this.atacadoLoading = true;
+      const jobs = [
+        ['buyers', this.apiGet('/admin/api/wholesale/buyers')],
+        ['ranking', this.apiGet('/admin/api/wholesale/ranking')],
+        ['measures', this.apiGet('/admin/api/wholesale/measures')],
+        ['stock', this.apiGet('/admin/api/wholesale/stock')],
+        ['resumo', this.apiGet('/admin/api/wholesale/resumo?period=' + this.vendasPeriodo)],
+        ['finance', this.apiGet('/admin/api/wholesale/finance')],
+        ['vendas', this.apiGet('/admin/api/wholesale/sales')],
+      ];
+      try {
+        const settled = await Promise.allSettled(jobs.map(([, request]) => request));
+        settled.forEach((result, index) => {
+          const key = jobs[index][0];
+          if (result.status === 'rejected') {
+            console.warn(`vendas atacado ${key} falhou:`, result.reason?.message || result.reason);
+            return;
+          }
+          const value = result.value;
+          if (key === 'buyers') this.atacadoBuyers = value.rows || [];
+          if (key === 'ranking') this.atacadoRanking = value.rows || [];
+          if (key === 'measures') this.atacadoMeasures = value.rows || [];
+          if (key === 'stock') this.atacadoStock = value.rows || [];
+          if (key === 'resumo') this.atacadoResumo = value || null;
+          if (key === 'finance') this.atacadoFinance = value && value.enabled ? value : null;
+          if (key === 'vendas') this.atacadoVendas = value.rows || [];
+        });
+      } finally {
+        this.atacadoLoading = false;
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      }
+    },
     async loadAtacado() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
@@ -156,7 +193,7 @@ window.PAINEL_MODULES.atacado = function () {
         const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
         this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.` };
         this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
-        await this.loadAtacado();
+        await this.loadAtacadoVendas();
       } catch (err) {
         this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };
       } finally {

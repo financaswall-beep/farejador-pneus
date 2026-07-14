@@ -113,8 +113,8 @@ window.PAINEL_MODULES.core = function () {
         if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(); }
         // Logística (0121): entregas da matriz + rota do dia do entregador.
         if (page === 'logistica') void this.loadLogistica();
-        // Vendas: os cards do varejo (custo congelado, 0117) vêm do servidor.
-        if (page === 'vendas') void this.loadVarejoResumo();
+        // Vendas: visão comercial unificada; custos e lucro permanecem no Financeiro.
+        if (page === 'vendas') void this.loadVendasData();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
         if (page === 'rede') void this.loadComissoes();
         // Colaboradores (0124): o staff da matriz — vendedor/entregador.
