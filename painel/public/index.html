@@ -16,7 +16,7 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.api.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.format.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.varejo.js?v=20260713-vendas1"></script>
+<script src="/admin/painel/app.varejo.js?v=20260714-varejo1"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260713-vendas1"></script>
 <script src="/admin/painel/app.compras.js?v=20260713-compras1"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260713-vendas1"></script>
+<script src="/admin/painel/app.js?v=20260714-varejo1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1598,76 +1598,85 @@
       </div>
 
       <!-- ─── VAREJO ─── -->
-      <div x-show="vendasTab === 'varejo'">
+      <div x-show="vendasTab === 'varejo'" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="shopping-cart" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Vendas no período</p><p class="text-2xl font-bold num" x-text="varejoResumoKpis().vendas"></p><p class="text-xs text-gray-400 mt-1">pedidos da Matriz</p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(varejoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">valor comercial</p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="chart-no-axes-column-increasing" class="w-6 h-6 text-emerald-700"></i></div>
+            <div><p class="text-xs text-gray-500">Ticket médio</p><p class="text-2xl font-bold num" x-text="formatCurrency(varejoResumoKpis().ticket)"></p><p class="text-xs text-gray-400 mt-1">por venda</p></div>
+          </div>
+          <button @click="varejoStatusFiltro = 'canceladas'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-rose-200 hover:bg-rose-50/20">
+            <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-x" class="w-6 h-6 text-rose-600"></i></div>
+            <div><p class="text-xs text-gray-500">Canceladas</p><p class="text-2xl font-bold text-rose-600 num" x-text="varejoResumoKpis().canceladas"></p><p class="text-xs text-gray-400 mt-1" x-text="varejoResumoKpis().cancelPct.toFixed(1).replace('.', ',') + '% das tentativas'"></p></div>
+          </button>
+        </div>
 
-      <div class="flex items-center justify-between mb-3"><div><h2 class="text-lg font-semibold">Varejo</h2><p class="text-xs text-gray-400 mt-0.5">Venda direta da Matriz para o cliente final</p></div><button @click="abrirNovaVenda('varejo')" class="inline-flex items-center gap-2 border border-brand-700 text-brand-800 hover:bg-brand-50 rounded-lg px-4 py-2 text-sm font-medium"><i data-lucide="plus" class="w-4 h-4"></i>Nova venda no varejo</button></div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Vendas no varejo</div>
-          <div class="text-lg font-bold" x-text="varejoResumo ? Number(varejoResumo.vendas_count || 0) : vendasVarejoAtivas().length"></div>
-          <div class="text-xs text-gray-400 mt-1 font-medium">cliente final · Matriz</div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Total vendido</div>
-          <div class="text-lg font-bold text-emerald-700" x-text="formatCurrency(varejoResumo ? Number(varejoResumo.faturamento || 0) : vendasVarejoTotal())"></div>
-          <div class="text-xs text-gray-400 mt-1 font-medium">valor comercial · frete fora</div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Ticket médio</div>
-          <div class="text-lg font-bold" x-text="formatCurrency((varejoResumo ? Number(varejoResumo.faturamento || 0) : vendasVarejoTotal()) / Math.max(varejoResumo ? Number(varejoResumo.vendas_count || 0) : vendasVarejoAtivas().length, 1))"></div>
-          <div class="text-xs text-gray-400 mt-1">por venda confirmada</div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Canceladas</div>
-          <div class="text-lg font-bold text-rose-600" x-text="Number(varejoResumo?.cancelled_count ?? vendasVarejoPeriodo().filter(p => p.status === 'Cancelado').length)"></div>
-          <div class="text-xs text-gray-400 mt-1">mantidas na trilha</div>
-        </div>
-      </div>
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+          <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div><h3 class="text-base font-semibold">Vendas do varejo</h3><p class="text-xs text-gray-400 mt-0.5">Pedidos diretos da Matriz no período</p></div>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <div class="relative"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="varejoBusca" type="search" placeholder="Buscar cliente ou pedido" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div>
+                <select x-model="varejoStatusFiltro" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none focus:ring-2 focus:ring-emerald-100"><option value="todos">Todos os status</option><option value="confirmadas">Confirmadas</option><option value="andamento">Em andamento</option><option value="canceladas">Canceladas</option></select>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm min-w-[900px]">
+                <thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Itens</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="pedido in vendasVarejoFiltradas()" :key="pedido.id"><tr class="hover:bg-gray-50"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="pedido.data"></td><td class="px-4 py-3 font-medium" x-text="pedido.cliente"></td><td class="px-4 py-3 text-gray-600 max-w-[240px] truncate" x-text="pedido.itens"></td><td class="px-4 py-3"><span class="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded" x-text="pedido.pagto"></span></td><td class="px-4 py-3 text-right font-semibold num" x-text="pedido.total"></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full" :class="pedido.statusClass"><span class="w-1.5 h-1.5 rounded-full" :class="pedido.dotClass"></span><span x-text="pedido.status"></span></span></td><td class="px-5 py-3 text-right"><button @click="vendaVarejoSelecionada = pedido" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-medium hover:bg-emerald-50">Ver</button></td></tr></template>
+                  <tr x-show="vendasVarejoFiltradas().length === 0"><td colspan="7" class="px-5 py-12 text-center text-gray-400">Nenhuma venda encontrada com esses filtros.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      <!-- Tabela -->
-      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200">
-            <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-              <th class="px-5 py-3 font-medium">Data</th>
-              <th class="px-5 py-3 font-medium">Cliente</th>
-              <th class="px-5 py-3 font-medium">Itens</th>
-              <th class="px-5 py-3 font-medium">Pagamento</th>
-              <th class="px-5 py-3 font-medium">Operador</th>
-              <th class="px-5 py-3 font-medium text-right">Total</th>
-              <th class="px-5 py-3 font-medium">Status</th>
-              <th class="px-5 py-3 font-medium text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <template x-for="pedido in vendasVarejoPeriodo()" :key="pedido.id">
-              <tr class="hover:bg-gray-50">
-                <td class="px-5 py-3 text-gray-500" x-text="pedido.data"></td>
-                <td class="px-5 py-3 font-medium" x-text="pedido.cliente"></td>
-                <td class="px-5 py-3 text-gray-700" x-text="pedido.itens"></td>
-                <td class="px-5 py-3">
-                  <span class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded" x-text="pedido.pagto"></span>
-                </td>
-                <td class="px-5 py-3 text-gray-500" x-text="pedido.operador"></td>
-                <td class="px-5 py-3 text-right font-semibold" x-text="pedido.total"></td>
-                <td class="px-5 py-3">
-                  <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full"
-                        :class="pedido.statusClass">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="pedido.dotClass"></span>
-                    <span x-text="pedido.status"></span>
-                  </span>
-                </td>
-                <td class="px-5 py-3 text-right"><button x-show="pedido.status !== 'Cancelado'" @click="cancelarVarejo(pedido)" class="text-xs font-medium text-gray-400 hover:text-rose-600">Cancelar</button></td>
-              </tr>
-            </template>
-            <tr x-show="vendasVarejoPeriodo().length === 0">
-              <td colspan="8" class="px-5 py-10 text-center text-sm text-gray-500">
-                Nenhuma venda de varejo da Matriz ainda. Quando a Matriz atende um cliente direto, aparece aqui.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          <div class="xl:col-span-4 space-y-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <h3 class="text-base font-semibold mb-2">Operação agora</h3>
+              <div class="divide-y divide-gray-100">
+                <button @click="varejoStatusFiltro = 'andamento'" class="w-full py-3.5 flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" :class="varejoResumoOperacional().aguardando ? 'bg-amber-50' : 'bg-emerald-50'"><i data-lucide="clipboard-clock" class="w-5 h-5" :class="varejoResumoOperacional().aguardando ? 'text-amber-600' : 'text-emerald-700'"></i></div><div class="flex-1"><p class="text-xl font-bold num" x-text="varejoResumoOperacional().aguardando"></p><p class="text-xs text-gray-500">aguardando confirmação</p></div><span class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600">Ver pedidos</span></button>
+                <button @click="currentPage = 'logistica'" class="w-full py-3.5 flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="package-check" class="w-5 h-5 text-amber-600"></i></div><div class="flex-1"><p class="text-xl font-bold num" x-text="varejoResumoOperacional().separacao"></p><p class="text-xs text-gray-500">pedidos em separação</p></div><span class="px-3 py-1.5 rounded-lg border border-amber-300 text-xs font-medium text-amber-700">Ver logística</span></button>
+                <button @click="currentPage = 'logistica'" class="w-full py-3.5 flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="truck" class="w-5 h-5 text-emerald-700"></i></div><div class="flex-1"><p class="text-xl font-bold num" x-text="varejoResumoOperacional().emRota"></p><p class="text-xs text-gray-500">entregas em rota</p></div><span class="px-3 py-1.5 rounded-lg border border-emerald-700 text-xs font-medium text-emerald-800">Acompanhar</span></button>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <h3 class="text-base font-semibold mb-3">Resumo operacional</h3>
+              <div class="divide-y divide-gray-100">
+                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-4 h-4 text-emerald-700"></i></div><p class="text-xl font-bold num" x-text="varejoResumoOperacional().clientes"></p><p class="text-xs text-gray-500">clientes atendidos</p></div>
+                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dot" class="w-4 h-4 text-emerald-700"></i></div><p class="text-xl font-bold num" x-text="varejoResumoOperacional().pneus"></p><p class="text-xs text-gray-500">pneus vendidos</p></div>
+                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="gauge" class="w-4 h-4 text-emerald-700"></i></div><p class="text-xl font-bold num" x-text="varejoResumoOperacional().pico"></p><p class="text-xs text-gray-500">itens na hora de pico</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold">Medidas mais vendidas</h3><p class="text-xs text-gray-400 mt-1 mb-4">Quantidade nos pedidos exibidos</p>
+            <div class="space-y-3"><template x-for="row in varejoMedidasMaisVendidas()" :key="row.nome"><div class="grid grid-cols-[minmax(110px,180px)_minmax(120px,1fr)_70px] gap-3 items-center"><span class="text-sm font-medium truncate" x-text="row.nome"></span><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + row.pct + '%'"></div></div><span class="text-xs text-gray-500 text-right num" x-text="row.quantidade + ' un'"></span></div></template><p x-show="varejoMedidasMaisVendidas().length === 0" class="py-8 text-center text-sm text-gray-400">As medidas aparecem depois das primeiras vendas.</p></div>
+          </div>
+          <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <h3 class="text-base font-semibold">Formas de pagamento</h3><p class="text-xs text-gray-400 mt-1 mb-4">Participação na quantidade de vendas</p>
+            <div class="flex flex-col sm:flex-row items-center gap-6"><div class="w-36 h-36 rounded-full flex items-center justify-center flex-shrink-0" :style="'background:' + varejoPagamentoGradient()"><div class="w-20 h-20 rounded-full bg-white flex items-center justify-center text-center"><span class="text-xs text-gray-400">pagamentos</span></div></div><div class="w-full space-y-2.5"><template x-for="g in varejoPagamentos()" :key="g.id"><div class="flex items-center gap-2 text-sm"><span class="w-2.5 h-2.5 rounded-full" :style="'background:' + g.cor"></span><span class="flex-1" x-text="g.label"></span><span class="font-semibold num" x-text="g.pct.toFixed(0) + '%'"></span></div></template></div></div>
+          </div>
+        </div>
+
+        <div x-show="vendaVarejoSelecionada" x-cloak @keydown.escape.window="vendaVarejoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/30" @click="vendaVarejoSelecionada = null"></div>
+          <div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaVarejoSelecionada?.data"></p></div><button @click="vendaVarejoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div>
+            <div class="p-6 space-y-4"><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Cliente</p><p class="font-semibold mt-1" x-text="vendaVarejoSelecionada?.cliente"></p></div><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaVarejoSelecionada?.pagto"></p></div></div><div><p class="text-xs text-gray-400">Itens</p><p class="text-sm mt-1" x-text="vendaVarejoSelecionada?.itens"></p></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Operador</p><p class="text-sm mt-1" x-text="vendaVarejoSelecionada?.operador"></p></div><div><p class="text-xs text-gray-400">Status</p><span class="inline-flex mt-1 text-xs px-2 py-1 rounded-full" :class="vendaVarejoSelecionada?.statusClass" x-text="vendaVarejoSelecionada?.status"></span></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="vendaVarejoSelecionada?.total"></span></div></div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between"><button x-show="vendaVarejoSelecionada?.status !== 'Cancelado'" @click="cancelarVarejo(vendaVarejoSelecionada); vendaVarejoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><button @click="vendaVarejoSelecionada = null" class="ml-auto px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Fechar</button></div>
+          </div>
+        </div>
       </div><!-- /varejo -->
 
       <!-- ─── ATACADO ─── -->

@@ -86,6 +86,9 @@ function painelApp() {
     vendasPeriodo: '30d', // recorte comercial compartilhado: today | 7d | 30d
     vendasHistoricoCanal: 'todos',
     vendasBusca: '',
+    varejoBusca: '',
+    varejoStatusFiltro: 'todos',
+    vendaVarejoSelecionada: null,
     vendaMenuOpen: false,
     comprasTab: 'visao', // sub-abas: visao | nova | historico | fornecedores | precos
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──

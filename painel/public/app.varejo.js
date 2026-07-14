@@ -17,7 +17,7 @@ window.PAINEL_MODULES.varejo = function () {
           statusClass = done ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
           dotClass = done ? 'bg-emerald-500' : 'bg-amber-500';
         } else {
-          status = ({ open: 'Aberto', confirmed: 'Confirmado', pending: 'Pendente' })[row.status] || row.status || 'Aberto';
+          status = ({ open: 'Aberto', confirmed: 'Confirmado', pending: 'Pendente', delivered: 'Entregue', paid: 'Pago' })[row.status] || row.status || 'Aberto';
           const waiting = row.status === 'open' || row.status === 'pending';
           statusClass = waiting ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
           dotClass = waiting ? 'bg-amber-500' : 'bg-emerald-500';
@@ -32,8 +32,10 @@ window.PAINEL_MODULES.varejo = function () {
           data: this.formatDateTime(row.created_at),
           cliente: row.contact_name || 'Cliente',
           itens: this.itemSummary(items),
+          rawItems: items,
           itensCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           pagto,
+          fulfillmentMode: row.fulfillment_mode || null,
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
           totalAmount: Number(row.total_amount || 0),
@@ -70,6 +72,73 @@ window.PAINEL_MODULES.varejo = function () {
     },
     vendasVarejoTotal() {
       return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
+    },
+    varejoResumoKpis() {
+      const vendas = this.varejoResumo ? Number(this.varejoResumo.vendas_count || 0) : this.vendasVarejoAtivas().length;
+      const total = this.varejoResumo ? Number(this.varejoResumo.faturamento || 0) : this.vendasVarejoTotal();
+      const canceladas = Number(this.varejoResumo?.cancelled_count ?? this.vendasVarejoPeriodo().filter((p) => p.status === 'Cancelado').length);
+      return {
+        vendas, total, canceladas,
+        ticket: vendas ? total / vendas : 0,
+        cancelPct: vendas + canceladas ? (canceladas / (vendas + canceladas)) * 100 : 0,
+      };
+    },
+    vendasVarejoFiltradas() {
+      const busca = this.varejoBusca.trim().toLocaleLowerCase('pt-BR');
+      return this.vendasVarejoPeriodo().filter((p) => {
+        const aguardando = p.status === 'Aberto' || p.status === 'Pendente';
+        if (this.varejoStatusFiltro === 'confirmadas' && (aguardando || p.status === 'Cancelado')) return false;
+        if (this.varejoStatusFiltro === 'andamento' && !aguardando) return false;
+        if (this.varejoStatusFiltro === 'canceladas' && p.status !== 'Cancelado') return false;
+        if (!busca) return true;
+        return `${p.cliente} ${p.itens} ${p.pagto} ${p.status}`.toLocaleLowerCase('pt-BR').includes(busca);
+      });
+    },
+    varejoResumoOperacional() {
+      const ativas = this.vendasVarejoAtivas();
+      const porHora = {};
+      ativas.forEach((p) => {
+        const hora = new Date(p.createdAt).getHours();
+        porHora[hora] = (porHora[hora] || 0) + p.itensCount;
+      });
+      const abertas = this.logistica?.abertas || [];
+      return {
+        clientes: new Set(ativas.map((p) => p.cliente).filter(Boolean)).size,
+        pneus: ativas.reduce((sum, p) => sum + p.itensCount, 0),
+        pico: Math.max(0, ...Object.values(porHora)),
+        aguardando: this.vendasAguardando(),
+        separacao: abertas.filter((d) => d.delivery_status === 'pending').length,
+        emRota: abertas.filter((d) => d.delivery_status === 'dispatched').length,
+      };
+    },
+    varejoMedidasMaisVendidas() {
+      const totais = new Map();
+      this.vendasVarejoAtivas().forEach((p) => (p.rawItems || []).forEach((item) => {
+        const nome = item.product_name || item.product_code || 'Produto';
+        totais.set(nome, (totais.get(nome) || 0) + Number(item.quantity || 0));
+      }));
+      const rows = [...totais].map(([nome, quantidade]) => ({ nome, quantidade })).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+      const max = rows[0]?.quantidade || 1;
+      return rows.map((row) => ({ ...row, pct: (row.quantidade / max) * 100 }));
+    },
+    varejoPagamentos() {
+      const grupos = [
+        { id: 'pix', label: 'PIX', cor: '#047857', valor: 0 },
+        { id: 'cartao', label: 'Cartão', cor: '#86d394', valor: 0 },
+        { id: 'dinheiro', label: 'Dinheiro', cor: '#f59e0b', valor: 0 },
+        { id: 'outros', label: 'Outros', cor: '#d1d5db', valor: 0 },
+      ];
+      this.vendasVarejoAtivas().forEach((p) => {
+        const nome = String(p.pagto || '').toLocaleLowerCase('pt-BR');
+        const id = nome.includes('pix') ? 'pix' : (nome.includes('cart') ? 'cartao' : (nome.includes('dinheiro') ? 'dinheiro' : 'outros'));
+        grupos.find((g) => g.id === id).valor += 1;
+      });
+      const total = grupos.reduce((sum, g) => sum + g.valor, 0) || 1;
+      return grupos.map((g) => ({ ...g, pct: (g.valor / total) * 100 }));
+    },
+    varejoPagamentoGradient() {
+      let inicio = 0;
+      return `conic-gradient(${this.varejoPagamentos().map((g) => { const fim = inicio + g.pct; const fatia = `${g.cor} ${inicio}% ${fim}%`; inicio = fim; return fatia; }).join(', ')})`;
     },
 
     vendasInativos() {
@@ -168,7 +237,7 @@ window.PAINEL_MODULES.varejo = function () {
       }
     },
     async loadVendasData() {
-      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas()]);
+      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas(), this.logisticaLoaded ? Promise.resolve() : this.loadLogistica()]);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async setVendasPeriodo(period) {
