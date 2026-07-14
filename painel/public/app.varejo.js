@@ -31,6 +31,7 @@ window.PAINEL_MODULES.varejo = function () {
           createdAt: row.created_at,
           data: this.formatDateTime(row.created_at),
           cliente: row.contact_name || 'Cliente',
+          telefone: row.contact_phone || row.phone || '',
           itens: this.itemSummary(items),
           rawItems: items,
           itensCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
@@ -198,6 +199,7 @@ window.PAINEL_MODULES.varejo = function () {
       const varejo = this.vendasVarejoPeriodo().map((p) => ({
         key: `v:${p.id}`, id: p.id, canal: 'Varejo', canalId: 'varejo', createdAt: p.createdAt,
         data: p.data, cliente: p.cliente, itens: p.itens, itensCount: p.itensCount, pagto: p.pagto,
+        telefone: p.telefone,
         total: p.total, totalAmount: p.totalAmount, status: p.status, statusClass: p.statusClass,
         cancelavel: p.status !== 'Cancelado', varejo: p,
       }));

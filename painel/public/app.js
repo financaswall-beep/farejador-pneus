@@ -73,7 +73,12 @@ function painelApp() {
     vendasTab: 'visao', // sub-abas: visao | varejo | atacado | historico | recompra
     vendasPeriodo: '30d', // recorte comercial compartilhado: today | 7d | 30d
     vendasHistoricoCanal: 'todos',
+    vendasHistoricoStatus: 'todos',
+    vendasHistoricoPagamento: 'todos',
+    vendasHistoricoPagina: 1,
+    vendasHistoricoPorPagina: 20,
     vendasBusca: '',
+    vendaHistoricoSelecionada: null,
     varejoBusca: '',
     varejoStatusFiltro: 'todos',
     vendaVarejoSelecionada: null,
