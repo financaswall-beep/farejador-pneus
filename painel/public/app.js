@@ -99,6 +99,9 @@ function painelApp() {
     stockSaving: false,
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
+    stockTab: 'visao',
+    stockFiltro: 'todos',
+    stockOperacao: null,
     stockBusca: '',
     stockBaixaForm: { measure: null, quantity: '', tipo: 'quebra', texto: '' },
     stockBaixaSaving: false,

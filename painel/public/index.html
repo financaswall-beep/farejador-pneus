@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260713-pagar2"></script>
+<script src="/admin/painel/app.js?v=20260713-estoque1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2168,220 +2168,200 @@
       </div><!-- /fornecedores -->
     </div>
 
-    <!-- ═══ TELA: ESTOQUE do galpão (obra 07-03 — saiu de Vendas → Atacado; mesmo dado, casa própria) ═══ -->
+    <!-- ═══ TELA: ESTOQUE do galpão — mesma fonte de atacado, varejo, compras, sino, Bot e Financeiro ═══ -->
     <div x-show="currentPage === 'estoque'" class="p-8">
-      <div class="mb-6">
-        <h1 class="text-2xl font-semibold tracking-tight">Estoque</h1>
-        <p class="text-sm text-gray-500 mt-1">O galpão da Matriz, por medida — atacado e varejo dão baixa daqui</p>
-      </div>
-
-      <!-- resumo do galpão (0128): a MESMA conta do "capital parado" do Financeiro, aqui na porta -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Pneus no galpão</p>
-          <p class="text-xl font-semibold mt-1" x-text="stockResumo().pneus"></p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Parado em R$</p>
-          <p class="text-xl font-semibold mt-1" x-text="formatCurrency(stockResumo().capital)"></p>
-          <p class="text-[10px] text-gray-400">unidades × custo médio</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Pra repor</p>
-          <p class="text-xl font-semibold mt-1" :class="stockResumo().repor > 0 ? 'text-amber-600' : ''" x-text="stockResumo().repor"></p>
-          <p class="text-[10px] text-gray-400">no mínimo ou abaixo</p>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Zeradas</p>
-          <p class="text-xl font-semibold mt-1" :class="stockResumo().zeradas > 0 ? 'text-rose-600' : ''" x-text="stockResumo().zeradas"></p>
-          <p class="text-[10px] text-gray-400">medidas sem nenhum pneu</p>
-        </div>
-      </div>
-
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
-        <div class="flex items-center gap-2 mb-1">
-          <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-            <i data-lucide="package" class="w-4 h-4 text-brand-600"></i>
+      <div class="flex flex-col gap-5 mb-5">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Estoque do galpão</h1>
+            <p class="text-sm text-gray-500 mt-1">O que tem, o que precisa repor e tudo que entrou ou saiu</p>
           </div>
-          <h3 class="text-base font-semibold">Estoque do galpão</h3>
-        </div>
-        <p class="text-xs text-gray-500 mb-4 ml-10">Quantas unidades você tem de cada medida. Quando ligado, a venda de atacado dá baixa daqui.</p>
-
-        <!-- adicionar / atualizar uma medida (MESMOS campos da tabela: medida + unidades) -->
-        <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-          <div class="col-span-4">Medida</div>
-          <div class="col-span-2 text-center">Unidades</div>
-          <div class="col-span-2 text-center">Custo R$</div>
-          <div class="col-span-2 text-center">Mínimo</div>
-          <div class="col-span-2"></div>
-        </div>
-        <div class="grid grid-cols-12 gap-2 items-center mb-2">
-          <div class="col-span-4 relative">
-            <input x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
-                   type="text" autocomplete="off" placeholder="90/90-18"
-                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-            <div x-show="measureBox.key === 'estoque' && measureBox.hits.length"
-                 class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-              <template x-for="m in measureBox.hits" :key="m.measure">
-                <button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)"
-                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-brand-50" x-text="m.measure"></button>
-              </template>
-            </div>
-          </div>
-          <input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="Qtd"
-                 class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
-          <input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$"
-                 class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
-          <input x-model="stockForm.min_quantity" type="number" min="0" placeholder="—"
-                 title="Avisar quando chegar em quantas? Vazio = sem aviso."
-                 class="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center">
-          <div class="col-span-2 flex flex-col gap-1">
-            <button @click="stockEntry()" :disabled="stockSaving"
-                    class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium px-2 py-1.5 rounded-lg disabled:opacity-50">
-              <span x-show="!stockSaving">+ Entrada</span><span x-show="stockSaving">…</span>
-            </button>
-            <button @click="stockSubmit()" :disabled="stockSaving"
-                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium px-2 py-1.5 rounded-lg disabled:opacity-50">Definir</button>
-          </div>
-        </div>
-        <p class="text-[11px] text-gray-400 mb-2 px-1"><b class="text-brand-600">+ Entrada</b> soma a compra e atualiza o custo médio. <b>Definir</b> grava direto (inventário inicial ou correção). <b>Mínimo</b> = avisar no sino quando a medida chegar nessa quantidade (vazio = sem aviso).</p>
-        <div x-show="stockMsg" class="mb-3 text-sm px-3 py-2 rounded-lg"
-             :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
-             x-text="stockMsg ? stockMsg.text : ''"></div>
-
-        <!-- BAIXA MANUAL com motivo (0128): quebrou/perdeu/uso — abre pelo botão "baixar" da linha -->
-        <div x-show="stockBaixaForm.measure" x-cloak class="mb-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
-          <p class="text-sm font-medium text-amber-800 mb-2">
-            Baixar <span class="font-semibold" x-text="stockBaixaForm.measure"></span> do galpão
-            <span class="font-normal text-amber-700">— sai do estoque com o motivo gravado no filme</span>
-          </p>
           <div class="flex flex-wrap items-center gap-2">
-            <input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="Qtd"
-                   class="w-24 border border-amber-300 rounded-lg px-3 py-2 text-sm text-center bg-white">
-            <select x-model="stockBaixaForm.tipo" class="border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white">
-              <option value="quebra">Quebra</option>
-              <option value="perda">Perda/sumiço</option>
-              <option value="uso interno">Uso interno</option>
-              <option value="outro">Outro</option>
-            </select>
-            <input x-model="stockBaixaForm.texto" type="text" placeholder="detalhe (opcional)"
-                   class="flex-1 min-w-40 border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white">
-            <button @click="stockBaixaSubmit()" :disabled="stockBaixaSaving"
-                    class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium px-3 py-2 rounded-lg disabled:opacity-50">
-              <span x-show="!stockBaixaSaving">Confirmar baixa</span><span x-show="stockBaixaSaving">…</span>
+            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                    class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
             </button>
-            <button @click="stockBaixaFechar()" class="text-xs text-gray-500 hover:text-gray-700 px-2 py-2">cancelar</button>
+            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                    class="inline-flex items-center gap-2 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-4 py-2.5 rounded-lg">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Ajustar estoque
+            </button>
           </div>
         </div>
 
-        <!-- lista do estoque atual (cabe ~10 na tela; o resto rola) + busca -->
-        <div class="mb-1 flex items-center justify-between gap-3">
-          <span class="text-xs font-medium text-gray-500" x-text="atacadoStock.length + ' medida(s) cadastrada(s)'"></span>
-          <input x-model="stockBusca" type="text" placeholder="buscar medida (ex.: 90 90 18)"
-                 class="w-56 border border-gray-200 rounded-lg px-3 py-1.5 text-xs">
-        </div>
-        <div class="border border-gray-100 rounded-lg overflow-hidden">
-          <div class="max-h-[380px] overflow-y-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
-                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                  <th class="px-4 py-2 font-medium">Medida</th>
-                  <th class="px-4 py-2 font-medium text-center">Unidades</th>
-                  <th class="px-4 py-2 font-medium text-center">Custo R$</th>
-                  <th class="px-4 py-2 font-medium text-center">Mínimo</th>
-                  <th class="px-4 py-2 font-medium text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="row in stockRowsView()" :key="row.measure">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 font-medium">
-                      <span x-text="row.measure"></span>
-                      <span x-show="row.quantity_on_hand === 0"
-                            class="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-semibold uppercase">zerou</span>
-                      <span x-show="row.quantity_on_hand > 0 && stockPrecisaRepor(row)"
-                            class="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold uppercase">repor</span>
-                    </td>
-                    <td class="px-4 py-2 text-center"
-                        :class="row.quantity_on_hand === 0 ? 'text-rose-500 font-semibold' : (stockPrecisaRepor(row) ? 'text-amber-600 font-semibold' : '')"
-                        x-text="row.quantity_on_hand"></td>
-                    <td class="px-4 py-2 text-center text-gray-600" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
-                    <td class="px-4 py-2 text-center text-gray-500" x-text="row.min_quantity == null ? '—' : row.min_quantity"></td>
-                    <td class="px-4 py-2 text-right whitespace-nowrap">
-                      <button @click="stockEdit(row)" class="text-xs text-brand-600 hover:text-brand-700 mr-3">editar</button>
-                      <button @click="stockBaixaOpen(row)" class="text-xs text-amber-600 hover:text-amber-700 mr-3">baixar</button>
-                      <button @click="filmeDaMedida(row.measure)" class="text-xs text-gray-500 hover:text-gray-700 mr-3">filme</button>
-                      <button @click="stockRemove(row.measure)" class="text-xs text-rose-500 hover:text-rose-600">remover</button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="atacadoStock.length === 0">
-                  <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
-                    Estoque vazio. Cadastre suas medidas acima (ex.: 15 de 90/90-18).
-                  </td>
-                </tr>
-                <tr x-show="atacadoStock.length > 0 && stockRowsView().length === 0">
-                  <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">
-                    Nenhuma medida bate com a busca.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="border-b border-gray-200 flex items-center gap-1 overflow-x-auto">
+          <button @click="stockTab = 'visao'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
+                  :class="stockTab === 'visao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
+          <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
+                  :class="stockTab === 'movimentacoes' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Movimentações</button>
+          <button @click="stockTab = 'reposicao'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
+                  :class="stockTab === 'reposicao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
+          <button @click="stockTab = 'custos'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
+                  :class="stockTab === 'custos' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
         </div>
       </div>
 
-      <!-- ═══ O FILME do galpão (0128): toda mexida no estoque, com origem e motivo ═══ -->
-      <div id="galpao-filme" class="bg-white border border-gray-200 rounded-xl p-5 mt-6">
-        <div class="flex items-center justify-between gap-3 mb-1">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-              <i data-lucide="history" class="w-4 h-4 text-brand-600"></i>
-            </div>
-            <h3 class="text-base font-semibold">Movimentação</h3>
-            <span x-show="galpaoFilme.measure" x-cloak
-                  class="text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 font-medium">
-              <span x-text="galpaoFilme.measure"></span>
-              <button @click="loadGalpaoFilme(null)" class="ml-1 text-brand-500 hover:text-brand-700">× ver todas</button>
-            </span>
-          </div>
-          <span class="text-xs text-gray-400" x-show="galpaoFilme.loading">carregando…</span>
+      <!-- Os quatro números vêm da mesma lista já carregada; nenhuma nova fonte paralela. -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
+          <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dot-dashed" class="w-6 h-6 text-brand-700"></i></div>
+          <div><p class="text-sm text-gray-500">Pneus no galpão</p><p class="text-2xl font-semibold mt-0.5 num" x-text="stockResumo().pneus"></p></div>
         </div>
-        <p class="text-xs text-gray-500 mb-3 ml-10">Entrou, saiu, quem mexeu e por quê — gravado sozinho a cada venda, compra, cancelamento ou ajuste. Últimos 50.</p>
-        <div class="border border-gray-100 rounded-lg overflow-hidden">
-          <div class="max-h-[340px] overflow-y-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
-                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                  <th class="px-4 py-2 font-medium">Quando</th>
-                  <th class="px-4 py-2 font-medium">Medida</th>
-                  <th class="px-4 py-2 font-medium text-center">Movimento</th>
-                  <th class="px-4 py-2 font-medium text-center">Saldo</th>
-                  <th class="px-4 py-2 font-medium text-center">Custo médio</th>
-                  <th class="px-4 py-2 font-medium">Origem</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="m in galpaoFilme.rows" :key="m.created_at + m.measure + m.op + m.qty_after">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2 text-gray-500 whitespace-nowrap" x-text="movQuando(m)"></td>
-                    <td class="px-4 py-2 font-medium" x-text="m.measure"></td>
-                    <td class="px-4 py-2 text-center font-semibold"
-                        :class="m.qty_delta > 0 ? 'text-emerald-600' : (m.qty_delta < 0 ? 'text-rose-600' : 'text-gray-400')"
-                        x-text="m.qty_delta > 0 ? '+' + m.qty_delta : (m.qty_delta < 0 ? String(m.qty_delta) : '—')"></td>
-                    <td class="px-4 py-2 text-center text-gray-600" x-text="m.qty_before + ' → ' + m.qty_after"></td>
-                    <td class="px-4 py-2 text-center text-gray-500" x-text="movCustoTexto(m)"></td>
-                    <td class="px-4 py-2 text-gray-600" x-text="movRotulo(m)"></td>
-                  </tr>
-                </template>
-                <tr x-show="!galpaoFilme.loading && galpaoFilme.rows.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">
-                    Nenhum movimento gravado ainda — o filme começou a rodar em 07/07/2026; a próxima venda, compra ou ajuste aparece aqui sozinho.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
+          <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-brand-700"></i></div>
+          <div><p class="text-sm text-gray-500">Capital em estoque</p><p class="text-2xl font-semibold mt-0.5 text-brand-700 num" x-text="formatCurrency(stockResumo().capital)"></p></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
+          <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clipboard-list" class="w-6 h-6 text-amber-600"></i></div>
+          <div><p class="text-sm text-gray-500">Para repor</p><p class="text-2xl font-semibold mt-0.5 num" :class="stockResumo().repor > 0 ? 'text-amber-600' : ''"><span x-text="stockResumo().repor"></span> <span class="text-base font-medium">medidas</span></p></div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
+          <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="triangle-alert" class="w-6 h-6 text-rose-600"></i></div>
+          <div><p class="text-sm text-gray-500">Zeradas</p><p class="text-2xl font-semibold mt-0.5 num" :class="stockResumo().zeradas > 0 ? 'text-rose-600' : ''"><span x-text="stockResumo().zeradas"></span> <span class="text-base font-medium">medidas</span></p></div>
+        </div>
+      </div>
+
+      <div x-show="stockMsg" x-cloak class="mb-4 text-sm px-4 py-3 rounded-xl border"
+           :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'"
+           x-text="stockMsg ? stockMsg.text : ''"></div>
+
+      <!-- VISÃO GERAL -->
+      <div x-show="stockTab === 'visao'" x-cloak class="space-y-5">
+        <!-- Ações existentes ficam recolhidas; os endpoints e os bindings são os mesmos. -->
+        <div x-show="stockOperacao" x-cloak class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 class="text-base font-semibold" x-text="stockOperacao === 'entrada' ? 'Registrar entrada' : 'Ajustar estoque'"></h3>
+              <p class="text-xs text-gray-500 mt-1" x-text="stockOperacao === 'entrada' ? 'Soma unidades e recalcula o custo médio ponderado.' : 'Define o saldo, o custo médio e o estoque mínimo diretamente.'"></p>
+            </div>
+            <button @click="stockOperacao = null" class="w-8 h-8 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center" aria-label="Fechar"><i data-lucide="x" class="w-4 h-4"></i></button>
           </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3 items-end">
+            <label class="xl:col-span-3 block relative">
+              <span class="block text-xs font-medium text-gray-600 mb-1.5">Medida</span>
+              <input id="estoque-medida" x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
+                     type="text" autocomplete="off" placeholder="Ex.: 185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
+              <div x-show="measureBox.key === 'estoque' && measureBox.hits.length" class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
+                <template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-brand-50" x-text="m.measure"></button></template>
+              </div>
+            </label>
+            <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Custo unitário</span><input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label x-show="stockOperacao === 'ajuste'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Estoque mínimo</span><input x-model="stockForm.min_quantity" type="number" min="0" placeholder="Sem aviso" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
+            <div :class="stockOperacao === 'ajuste' ? 'xl:col-span-3' : 'xl:col-span-5'" class="flex justify-end gap-2">
+              <button @click="stockOperacao = null" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button @click="stockOperacao === 'entrada' ? stockEntry() : stockSubmit()" :disabled="stockSaving" class="px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">
+                <span x-show="!stockSaving" x-text="stockOperacao === 'entrada' ? 'Confirmar entrada' : 'Salvar ajuste'"></span><span x-show="stockSaving">Salvando…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- BAIXA MANUAL: preserva o motivo e o registro no filme. -->
+        <div x-show="stockBaixaForm.measure" x-cloak class="border border-amber-200 bg-amber-50 rounded-xl p-4">
+          <div class="flex flex-col xl:flex-row xl:items-end gap-3">
+            <div class="xl:w-56"><p class="text-sm font-semibold text-amber-900">Baixar <span x-text="stockBaixaForm.measure"></span></p><p class="text-xs text-amber-700 mt-1">A saída ficará registrada no histórico.</p></div>
+            <label class="block"><span class="block text-xs font-medium text-amber-800 mb-1.5">Quantidade</span><input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="0" class="w-28 border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
+            <label class="block"><span class="block text-xs font-medium text-amber-800 mb-1.5">Motivo</span><select x-model="stockBaixaForm.tipo" class="border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="quebra">Quebra</option><option value="perda">Perda/sumiço</option><option value="uso interno">Uso interno</option><option value="outro">Outro</option></select></label>
+            <label class="block flex-1"><span class="block text-xs font-medium text-amber-800 mb-1.5">Detalhe</span><input x-model="stockBaixaForm.texto" type="text" placeholder="Opcional" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
+            <div class="flex gap-2"><button @click="stockBaixaSubmit()" :disabled="stockBaixaSaving" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"><span x-show="!stockBaixaSaving">Confirmar baixa</span><span x-show="stockBaixaSaving">Salvando…</span></button><button @click="stockBaixaFechar()" class="text-sm text-gray-600 px-3 py-2">Cancelar</button></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
+          <div class="2xl:col-span-9 bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100">
+              <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                <div><h3 class="text-base font-semibold">Estoque por medida</h3><p class="text-xs text-gray-500 mt-1"><span x-text="atacadoStock.length"></span> medida(s) cadastrada(s)</p></div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="relative"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i><input x-model="stockBusca" type="text" placeholder="Buscar medida" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm"></div>
+                  <div class="inline-flex border border-gray-200 rounded-lg p-0.5 bg-gray-50 overflow-x-auto">
+                    <button @click="stockFiltro = 'todos'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'todos' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Todos</button>
+                    <button @click="stockFiltro = 'em_dia'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'em_dia' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Em dia</button>
+                    <button @click="stockFiltro = 'repor'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'repor' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Repor</button>
+                    <button @click="stockFiltro = 'zerados'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'zerados' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Zerados</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm min-w-[930px]">
+                <thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-center">Mínimo</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Capital</th><th class="px-4 py-3 font-medium text-center">Status</th><th class="px-5 py-3 font-medium text-right">Ações</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="row in stockRowsView()" :key="row.measure">
+                    <tr x-show="stockFiltro === 'todos' || (stockFiltro === 'zerados' && Number(row.quantity_on_hand) === 0) || (stockFiltro === 'repor' && Number(row.quantity_on_hand) > 0 && stockPrecisaRepor(row)) || (stockFiltro === 'em_dia' && Number(row.quantity_on_hand) > 0 && !stockPrecisaRepor(row))" class="hover:bg-gray-50/80">
+                      <td class="px-5 py-3 font-medium" x-text="row.measure"></td>
+                      <td class="px-4 py-3 text-center font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : (stockPrecisaRepor(row) ? 'text-amber-600' : 'text-gray-900')" x-text="row.quantity_on_hand"></td>
+                      <td class="px-4 py-3 text-center text-gray-500 num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></td>
+                      <td class="px-4 py-3 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
+                      <td class="px-4 py-3 text-right font-medium num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td>
+                      <td class="px-4 py-3 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50 text-rose-700' : (stockPrecisaRepor(row) ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')" x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span></td>
+                      <td class="px-5 py-3 text-right whitespace-nowrap">
+                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="text-xs font-medium text-brand-700 hover:text-brand-800 mr-3">entrada</button>
+                        <button @click="stockEdit(row); stockOperacao = 'ajuste'" class="text-xs font-medium text-gray-600 hover:text-gray-900 mr-3">ajustar</button>
+                        <button @click="stockBaixaOpen(row)" class="text-xs font-medium text-amber-700 hover:text-amber-800 mr-3">baixar</button>
+                        <button @click="stockTab = 'movimentacoes'; filmeDaMedida(row.measure)" class="text-xs font-medium text-gray-500 hover:text-gray-800 mr-3">histórico</button>
+                        <button @click="stockRemove(row.measure)" class="text-xs font-medium text-rose-600 hover:text-rose-700">remover</button>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="atacadoStock.length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Estoque vazio. Use “Registrar entrada” para cadastrar a primeira medida.</td></tr>
+                  <tr x-show="atacadoStock.length > 0 && stockRowsView().length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Nenhuma medida corresponde à busca.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside class="2xl:col-span-3 bg-white border border-gray-200 rounded-xl p-5">
+            <div class="flex items-center justify-between gap-3 mb-4"><div><h3 class="text-base font-semibold">Atenção rápida</h3><p class="text-xs text-gray-500 mt-1">Prioridades do galpão</p></div><div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="bell-ring" class="w-4 h-4 text-amber-600"></i></div></div>
+            <div class="divide-y divide-gray-100">
+              <template x-for="row in stockRowsView().filter((r) => Number(r.quantity_on_hand) === 0 || stockPrecisaRepor(r)).slice(0, 3)" :key="'alerta-' + row.measure">
+                <div class="py-3.5 flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50' : 'bg-amber-50'"><i data-lucide="circle-alert" class="w-4 h-4" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : 'text-amber-600'"></i></div>
+                  <div class="min-w-0 flex-1"><p class="text-sm font-semibold" x-text="row.measure"></p><p class="text-xs text-gray-500 mt-0.5"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
+                  <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="px-3 py-1.5 rounded-lg border border-brand-600 text-brand-700 text-xs font-medium hover:bg-brand-50">Repor</button>
+                </div>
+              </template>
+              <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-8 text-center"><i data-lucide="circle-check-big" class="w-8 h-8 text-emerald-600 mx-auto mb-2"></i><p class="text-sm font-medium text-emerald-700">Tudo em dia</p><p class="text-xs text-gray-500 mt-1">Nenhuma medida pede reposição.</p></div>
+            </div>
+            <button @click="stockTab = 'reposicao'" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-brand-700 text-sm font-medium px-3 py-2.5 rounded-lg">Ver todas as prioridades</button>
+          </aside>
+        </div>
+      </div>
+
+      <!-- MOVIMENTAÇÕES: o mesmo filme e o mesmo filtro por medida. -->
+      <div x-show="stockTab === 'movimentacoes'" x-cloak id="galpao-filme" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div><div class="flex items-center gap-2"><h3 class="text-base font-semibold">Movimentações do galpão</h3><span x-show="galpaoFilme.measure" class="text-[11px] px-2 py-1 rounded-full bg-brand-50 text-brand-700 font-medium"><span x-text="galpaoFilme.measure"></span><button @click="loadGalpaoFilme(null)" class="ml-1 hover:text-brand-900">× ver todas</button></span></div><p class="text-xs text-gray-500 mt-1">Entradas, vendas, cancelamentos, baixas e ajustes. Últimos 50 registros.</p></div>
+          <span class="text-xs text-gray-400" x-show="galpaoFilme.loading">Carregando…</span>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-sm min-w-[900px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data e hora</th><th class="px-4 py-3 font-medium">Origem</th><th class="px-4 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Movimento</th><th class="px-4 py-3 font-medium text-center">Saldo</th><th class="px-5 py-3 font-medium text-right">Custo médio</th></tr></thead><tbody class="divide-y divide-gray-100">
+          <template x-for="m in galpaoFilme.rows" :key="m.created_at + m.measure + m.op + m.qty_after"><tr class="hover:bg-gray-50"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="movQuando(m)"></td><td class="px-4 py-3 text-gray-600" x-text="movRotulo(m)"></td><td class="px-4 py-3 font-medium" x-text="m.measure"></td><td class="px-4 py-3 text-center font-semibold num" :class="m.qty_delta > 0 ? 'text-emerald-600' : (m.qty_delta < 0 ? 'text-rose-600' : 'text-gray-400')" x-text="m.qty_delta > 0 ? '+' + m.qty_delta : (m.qty_delta < 0 ? String(m.qty_delta) : '—')"></td><td class="px-4 py-3 text-center text-gray-600 num" x-text="m.qty_before + ' → ' + m.qty_after"></td><td class="px-5 py-3 text-right text-gray-500 num" x-text="movCustoTexto(m) || '—'"></td></tr></template>
+          <tr x-show="!galpaoFilme.loading && galpaoFilme.rows.length === 0"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-500">Nenhum movimento gravado ainda.</td></tr>
+        </tbody></table></div>
+      </div>
+
+      <!-- REPOSIÇÃO: somente leitura da mesma lista; ação abre a entrada existente. -->
+      <div x-show="stockTab === 'reposicao'" x-cloak class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Prioridades de reposição</h3><p class="text-xs text-gray-500 mt-1">Medidas zeradas primeiro; depois as que chegaram ao mínimo.</p></div>
+        <div class="divide-y divide-gray-100">
+          <template x-for="row in stockRowsView().filter((r) => Number(r.quantity_on_hand) === 0 || stockPrecisaRepor(r))" :key="'repor-' + row.measure">
+            <div class="p-5 grid grid-cols-1 md:grid-cols-[minmax(150px,1fr)_repeat(3,minmax(100px,auto))_auto] gap-4 md:items-center">
+              <div><p class="font-semibold" x-text="row.measure"></p><span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'" x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : 'Repor'"></span></div>
+              <div><p class="text-xs text-gray-500">Em estoque</p><p class="text-lg font-semibold num" x-text="row.quantity_on_hand"></p></div>
+              <div><p class="text-xs text-gray-500">Mínimo</p><p class="text-lg font-semibold num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></p></div>
+              <div><p class="text-xs text-gray-500">Faltam para o mínimo</p><p class="text-lg font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : 'text-amber-600'" x-text="row.min_quantity == null ? '—' : Math.max(0, Number(row.min_quantity) - Number(row.quantity_on_hand))"></p></div>
+              <button @click="stockTab = 'visao'; stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="justify-self-start md:justify-self-end px-4 py-2 rounded-lg border border-brand-600 text-brand-700 text-sm font-medium hover:bg-brand-50">Registrar entrada</button>
+            </div>
+          </template>
+          <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="px-5 py-16 text-center"><i data-lucide="circle-check-big" class="w-10 h-10 text-emerald-600 mx-auto mb-3"></i><p class="font-semibold text-emerald-700">Estoque dentro dos mínimos</p><p class="text-sm text-gray-500 mt-1">Não há medidas para repor agora.</p></div>
+        </div>
+      </div>
+
+      <!-- CUSTOS: derivado localmente de quantidade × custo médio, igual ao Financeiro. -->
+      <div x-show="stockTab === 'custos'" x-cloak class="space-y-5">
+        <div class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4"><div><p class="text-sm text-gray-500">Capital total em estoque</p><p class="text-3xl font-semibold text-brand-700 mt-1 num" x-text="formatCurrency(stockResumo().capital)"></p><p class="text-xs text-gray-400 mt-2">Quantidade atual × custo médio de cada medida — a mesma conta mostrada no Financeiro.</p></div><div class="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center"><i data-lucide="wallet-cards" class="w-7 h-7 text-brand-700"></i></div></div>
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden"><div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><h3 class="text-base font-semibold">Capital por medida</h3><p class="text-xs text-gray-500 mt-1">Ordenação do estoque operacional; valores calculados em tempo real.</p></div><div class="relative"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i><input x-model="stockBusca" type="text" placeholder="Buscar medida" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm"></div></div>
+          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[760px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Capital</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="row in stockRowsView()" :key="'custo-' + row.measure"><tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.measure"></td><td class="px-4 py-3 text-center num" x-text="row.quantity_on_hand"></td><td class="px-4 py-3 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td><td class="px-5 py-3 text-right"><button @click="stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'" class="text-xs font-medium text-brand-700 hover:text-brand-900">ajustar custo</button></td></tr></template><tr x-show="atacadoStock.length === 0"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-500">Cadastre o estoque para acompanhar o capital por medida.</td></tr></tbody></table></div>
         </div>
       </div>
     </div>
