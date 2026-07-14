@@ -127,6 +127,8 @@ function painelApp() {
     despesasLoaded: false,
     financeiroVisao: null,
     finTab: 'visao', // redesign 07-12 (desenho do dono): sub-abas visao|cobrancas|pagar|despesas|indicadores
+    finIndicadorTab: 'fluxo', // Indicadores: fluxo|analise|inadimplencia (sem misturar assuntos no mesmo card)
+    finFluxoDias: 30, // horizonte da agenda real: 7|30|90 dias
     finQuitando: false, // trava anti-duplo-clique dos botões Recebi/Paguei (07-13); some o erro à toa
     despesaSaving: false,
     despesaMsg: null,

@@ -27,7 +27,7 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260713-pagar2"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260713-fluxo1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
@@ -3130,6 +3130,57 @@
       <!-- ═══════ SUB-ABA: INDICADORES ═══════ -->
       <template x-if="financeiroVisao">
         <div x-show="finTab === 'indicadores'" class="w-full space-y-5">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-gray-200">
+            <div class="flex items-center gap-1 overflow-x-auto">
+              <template x-for="t in [{ id: 'fluxo', label: 'Fluxo de caixa' }, { id: 'analise', label: 'Análise atual' }, { id: 'inadimplencia', label: 'Inadimplência' }]" :key="t.id">
+                <button type="button" @click="finIndicadorTab = t.id; $nextTick(() => window.lucide && window.lucide.createIcons())"
+                        :class="finIndicadorTab === t.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="px-4 py-2.5 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors" x-text="t.label"></button>
+              </template>
+            </div>
+            <div x-show="finIndicadorTab === 'fluxo'" class="flex rounded-lg border border-gray-200 overflow-hidden mb-2 lg:mb-1 self-start lg:self-auto">
+              <template x-for="dias in [7, 30, 90]" :key="dias">
+                <button type="button" @click="finFluxoDias = dias" :class="Number(finFluxoDias) === dias ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                        class="px-4 py-2 text-xs font-medium border-r border-gray-200 last:border-r-0 transition-colors" x-text="dias + ' dias'"></button>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="finIndicadorTab === 'fluxo'" class="space-y-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Resultado realizado</p><p class="text-2xl font-bold leading-tight num" :class="finFluxoPainel().resultado >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().resultado)"></p><p class="text-xs text-gray-400 mt-1">competência do mês atual</p></div></div>
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Entradas previstas</p><p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(finFluxoPainel().entradas)"></p><p class="text-xs text-gray-400 mt-1" x-text="'vencidas + próximos ' + finFluxoPainel().horizonte + ' dias'"></p></div></div>
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Saídas previstas</p><p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(finFluxoPainel().saidas)"></p><p class="text-xs text-gray-400 mt-1" x-text="'vencidas + próximos ' + finFluxoPainel().horizonte + ' dias'"></p></div></div>
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="finFluxoPainel().impacto >= 0 ? 'bg-emerald-50' : 'bg-rose-50'"><i data-lucide="scale" class="w-5 h-5" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Impacto líquido previsto</p><p class="text-2xl font-bold leading-tight num" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().impacto)"></p><p class="text-xs text-gray-400 mt-1">entradas previstas menos saídas previstas</p></div></div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
+              <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm min-h-[380px]">
+                <div class="flex items-start justify-between gap-4"><div><h3 class="text-base font-semibold" x-text="'Projeção dos próximos ' + finFluxoPainel().horizonte + ' dias'"></h3><p class="text-xs text-gray-500 mt-1">Títulos cadastrados, agrupados por vencimento.</p></div><div class="flex items-center gap-4 text-xs text-gray-500"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Entradas</span><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>Saídas</span></div></div>
+                <div class="h-[270px] mt-7 border-b border-gray-200 flex items-end justify-around gap-3 px-2">
+                  <template x-for="bucket in finFluxoPainel().buckets" :key="bucket.label"><div class="h-full flex-1 min-w-0 flex flex-col justify-end items-center"><div class="w-full max-w-[92px] h-[215px] flex items-end justify-center gap-1.5"><div class="w-[38%] bg-emerald-500/80 rounded-t-md transition-all" :style="'height:' + bucket.entradaPct + '%'" :title="'Entradas: ' + formatCurrency(bucket.entrada)"></div><div class="w-[38%] bg-rose-400/80 rounded-t-md transition-all" :style="'height:' + bucket.saidaPct + '%'" :title="'Saídas: ' + formatCurrency(bucket.saida)"></div></div><p class="text-[11px] text-gray-500 mt-2 mb-3 text-center leading-tight" x-text="bucket.label"></p></div></template>
+                </div>
+              </div>
+              <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-6 shadow-sm min-h-[380px]">
+                <h3 class="text-base font-semibold">Atenção no período</h3><p class="text-xs text-gray-500 mt-1">O que precisa de decisão antes de virar problema.</p>
+                <div class="mt-5 divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                  <button type="button" @click="finIndicadorTab = 'inadimplencia'" class="w-full p-4 flex items-center gap-3 text-left hover:bg-gray-50"><div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-alert" class="w-5 h-5 text-rose-600"></i></div><div><p class="text-sm font-semibold"><span x-text="finFluxoPainel().vencidosCount"></span> título(s) vencido(s)</p><p class="text-xs text-gray-500 num" x-text="formatCurrency(finFluxoPainel().vencidosTotal)"></p></div></button>
+                  <div class="p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-sm font-semibold"><span x-text="finFluxoPainel().amanhaCount"></span> título(s) vencem amanhã</p><p class="text-xs text-gray-500 num" x-text="formatCurrency(finFluxoPainel().amanhaTotal)"></p></div></div>
+                  <div class="p-4 flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-x" class="w-5 h-5 text-gray-600"></i></div><div><p class="text-sm font-semibold"><span x-text="finFluxoPainel().semDataCount"></span> título(s) sem vencimento</p><p class="text-xs text-gray-500 num" x-text="formatCurrency(finFluxoPainel().semDataTotal)"></p></div></div>
+                </div>
+                <button type="button" @click="finIndicadorTab = 'inadimplencia'" class="w-full mt-5 px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-semibold hover:bg-emerald-50">Ver detalhes</button>
+              </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div class="px-6 py-5 border-b border-gray-100"><h3 class="text-base font-semibold">Próximos movimentos</h3><p class="text-xs text-gray-500 mt-1">Agenda unificada de cobranças, fornecedores e despesas em aberto.</p></div>
+              <div class="overflow-x-auto"><table class="w-full min-w-[920px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-6 py-3 text-left font-medium">Vencimento</th><th class="px-4 py-3 text-left font-medium">Origem</th><th class="px-4 py-3 text-left font-medium">Descrição</th><th class="px-4 py-3 text-right font-medium">Entrada</th><th class="px-4 py-3 text-right font-medium">Saída</th><th class="px-4 py-3 text-left font-medium">Status</th><th class="px-6 py-3 text-right font-medium">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
+                <template x-for="item in finFluxoPainel().movimentos" :key="item.direcao + ':' + item.tipo + ':' + item.id"><tr class="hover:bg-gray-50/60"><td class="px-6 py-3 text-gray-600 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'Sem data'"></td><td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="item.origem"></td><td class="px-4 py-3 font-medium text-gray-800 max-w-[270px] truncate" x-text="item.descricao"></td><td class="px-4 py-3 text-right font-semibold text-emerald-700 num" x-text="item.direcao === 'entrada' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3 text-right font-semibold text-rose-600 num" x-text="item.direcao === 'saida' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></td><td class="px-6 py-3 text-right"><button type="button" @click="item.direcao === 'entrada' ? finReceber(item) : finPagar(item)" :disabled="finQuitando" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50" x-text="item.direcao === 'entrada' ? 'Receber' : 'Pagar'"></button></td></tr></template>
+              </tbody></table><div x-show="!finFluxoPainel().movimentos.length" class="py-12 text-center"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="badge-check" class="w-5 h-5 text-emerald-700"></i></div><p class="text-sm font-medium text-gray-700 mt-3">Nenhum movimento previsto.</p><p class="text-xs text-gray-400 mt-1">Contas e cobranças com vencimento aparecerão aqui.</p></div></div>
+            </div>
+          </div>
+
+          <div x-show="finIndicadorTab === 'analise'" class="space-y-5">
           <!-- Quatro sinais principais, todos calculados pelo backend financeiro atual. -->
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
@@ -3192,6 +3243,26 @@
               <p class="text-xs text-gray-400 mt-3" x-text="finIndicadoresPainel().cobertura !== null ? 'Os recebíveis cobrem ' + String(finIndicadoresPainel().cobertura).replace('.', ',') + 'x as contas abertas.' : 'Sem contas abertas para calcular cobertura.'"></p>
             </div>
 
+          </div>
+        </div>
+
+          <div x-show="finIndicadorTab === 'inadimplencia'" class="space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button type="button" @click="finTab = 'cobrancas'; cobrancaFiltro = 'vencida'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-rose-200 hover:bg-rose-50/20"><div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="user-x" class="w-5 h-5 text-rose-600"></i></div><div><p class="text-xs text-gray-500">A receber vencido</p><p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="formatCurrency(finAtrasosPainel().receberTotal)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="finAtrasosPainel().receberCount"></span> cobrança(s)</p></div></button>
+              <button type="button" @click="finTab = 'pagar'; pagarFiltro = 'vencida'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-amber-200 hover:bg-amber-50/20"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-xs text-gray-500">A pagar vencido</p><p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(finAtrasosPainel().pagarTotal)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="finAtrasosPainel().pagarCount"></span> conta(s)</p></div></button>
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="scale" class="w-5 h-5 text-gray-600"></i></div><div><p class="text-xs text-gray-500">Exposição líquida vencida</p><p class="text-2xl font-bold leading-tight num" :class="finAtrasosPainel().receberTotal - finAtrasosPainel().pagarTotal >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finAtrasosPainel().receberTotal - finAtrasosPainel().pagarTotal)"></p><p class="text-xs text-gray-400 mt-1">receber vencido menos pagar vencido</p></div></div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
+              <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm min-h-[320px]"><h3 class="text-base font-semibold">Tempo de atraso</h3><p class="text-xs text-gray-500 mt-1 mb-6">Faixas calculadas pela data de vencimento de cada título.</p><div class="space-y-6">
+                <template x-for="faixa in finAtrasosPainel().faixas" :key="faixa.label"><div><div class="flex items-center justify-between gap-3 mb-2"><div><span class="text-sm font-medium text-gray-700" x-text="faixa.label"></span><span class="text-xs text-gray-400 ml-2" x-text="faixa.count + ' título(s)'"></span></div><div class="text-xs"><span class="text-emerald-700 font-semibold num" x-text="formatCurrency(faixa.receber)"></span><span class="mx-2 text-gray-300">·</span><span class="text-rose-600 font-semibold num" x-text="formatCurrency(faixa.pagar)"></span></div></div><div class="grid grid-cols-2 gap-2"><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" :style="'width:' + faixa.receberPct + '%'"></div></div><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-rose-400 rounded-full" :style="'width:' + faixa.pagarPct + '%'"></div></div></div></div></template>
+              </div><div class="mt-7 pt-4 border-t border-gray-100 flex gap-5 text-xs text-gray-500"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>A receber</span><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-400"></span>A pagar</span></div></div>
+              <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-6 shadow-sm min-h-[320px]"><h3 class="text-base font-semibold">Ações recomendadas</h3><p class="text-xs text-gray-500 mt-1">Trate os títulos na tela certa.</p><div class="mt-6 space-y-3">
+                <button type="button" @click="finTab = 'cobrancas'; cobrancaFiltro = 'vencida'" class="w-full rounded-xl border border-gray-200 p-4 flex items-center justify-between text-left hover:bg-emerald-50/30"><div><p class="text-sm font-semibold">Cobrar clientes</p><p class="text-xs text-gray-500">WhatsApp e baixa de recebimentos</p></div><i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i></button>
+                <button type="button" @click="finTab = 'pagar'; pagarFiltro = 'vencida'" class="w-full rounded-xl border border-gray-200 p-4 flex items-center justify-between text-left hover:bg-emerald-50/30"><div><p class="text-sm font-semibold">Organizar pagamentos</p><p class="text-xs text-gray-500">Fornecedores e despesas vencidas</p></div><i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i></button>
+              </div></div>
+            </div>
+            <div x-show="!finAtrasosPainel().itens.length" class="bg-white border border-gray-200 rounded-xl p-10 text-center shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="badge-check" class="w-6 h-6 text-emerald-700"></i></div><p class="text-sm font-semibold text-gray-800 mt-3">Nenhum título vencido.</p><p class="text-xs text-gray-400 mt-1">Quando houver atraso, ele será separado por faixa de tempo aqui.</p></div>
           </div>
         </div>
       </template>
