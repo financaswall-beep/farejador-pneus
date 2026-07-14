@@ -97,6 +97,7 @@ function painelApp() {
     atacadoLoading: false,
     atacadoSaving: false,
     atacadoMsg: null,
+    vendaAtacadoSelecionada: null,
     atacadoStaleDays: 30,
     atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──

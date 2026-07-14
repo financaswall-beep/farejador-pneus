@@ -18,8 +18,8 @@
 <script src="/admin/painel/app.format.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.varejo.js?v=20260714-varejo1"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260713-vendas1"></script>
-<script src="/admin/painel/app.compras.js?v=20260713-compras1"></script>
+<script src="/admin/painel/app.atacado.js?v=20260714-atacado1"></script>
+<script src="/admin/painel/app.compras.js?v=20260714-atacado1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
@@ -35,7 +35,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260714-varejo1"></script>
+<script src="/admin/painel/app.js?v=20260714-atacado1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1680,294 +1680,57 @@
       </div><!-- /varejo -->
 
       <!-- ─── ATACADO ─── -->
-      <div x-show="vendasTab === 'atacado'" class="space-y-6">
-
-        <div class="flex items-center justify-between -mb-2"><div><h2 class="text-lg font-semibold">Atacado</h2><p class="text-xs text-gray-400 mt-0.5">Venda para borracheiros e parceiros</p></div></div>
-        <div x-show="atacadoResumo" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Vendas no atacado</div>
-            <div class="text-base md:text-lg font-bold" x-text="Number(atacadoResumo?.vendas_count || 0)"></div><div class="text-xs text-gray-400 mt-1">borracheiros · parceiros</div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Total vendido</div>
-            <div class="text-base md:text-lg font-bold text-emerald-700" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0))"></div><div class="text-xs text-gray-400 mt-1">valor comercial</div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Ticket médio</div>
-            <div class="text-base md:text-lg font-bold" x-text="formatCurrency(Number(atacadoResumo?.faturamento || 0) / Math.max(Number(atacadoResumo?.vendas_count || 0), 1))"></div><div class="text-xs text-gray-400 mt-1">por venda confirmada</div>
-          </div>
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="text-xs text-gray-500 mb-1">Canceladas</div>
-            <div class="text-base md:text-lg font-bold text-rose-600" x-text="Number(atacadoResumo?.cancelled_count || 0)"></div><div class="text-xs text-gray-400 mt-1">estoque devolvido</div>
-          </div>
+      <div x-show="vendasTab === 'atacado'" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="users-round" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Vendas no período</p><p class="text-2xl font-bold num" x-text="atacadoResumoKpis().vendas"></p><p class="text-xs text-gray-400 mt-1">borracheiros e parceiros</p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">valor comercial</p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="chart-no-axes-combined" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Ticket médio</p><p class="text-2xl font-bold num" x-text="formatCurrency(atacadoResumoKpis().ticket)"></p><p class="text-xs text-gray-400 mt-1">por venda</p></div></div>
+          <button @click="vendasHistoricoCanal = 'atacado'; vendasBusca = 'Cancelada'; vendasTab = 'historico'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-rose-200 hover:bg-rose-50/20"><div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-x" class="w-6 h-6 text-rose-600"></i></div><div><p class="text-xs text-gray-500">Canceladas</p><p class="text-2xl font-bold text-rose-600 num" x-text="atacadoResumoKpis().canceladas"></p><p class="text-xs text-gray-400 mt-1" x-text="atacadoResumoKpis().cancelPct.toFixed(1).replace('.', ',') + '% das tentativas'"></p></div></button>
         </div>
 
-        <!-- FINANCEIRO do galpão (0115, flag WHOLESALE_FINANCE): o fiado dos dois lados.
-             atacadoFinance = null com a flag off → o bloco inteiro some. -->
-        <div x-show="false" class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center gap-2 mb-1">
-            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-              <i data-lucide="wallet" class="w-4 h-4 text-brand-600"></i>
-            </div>
-            <h3 class="text-base font-semibold">Financeiro do galpão</h3>
-          </div>
-          <p class="text-xs text-gray-500 mb-4 ml-10">O fiado dos dois lados: quem te deve (borracheiro) e pra quem você deve (fornecedor).</p>
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+          <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
+            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Nova venda de atacado</h3><p class="text-xs text-gray-400 mt-1">Venda para borracheiro ou parceiro</p></div>
+            <div class="p-5 space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-end"><label class="block"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Comprador</span><select x-model="atacadoForm.buyerKey" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="">Selecione o comprador…</option><option value="new">+ Novo comprador</option><template x-for="b in atacadoBuyers" :key="b.customer_id || b.partner_id"><option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option></template></select></label><button @click="atacadoForm.buyerKey = 'new'" class="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50"><i data-lucide="user-plus" class="w-4 h-4"></i>Novo comprador</button></div>
+              <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl"><label><span class="text-xs text-gray-500 mb-1 block">Nome</span><input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label><label><span class="text-xs text-gray-500 mb-1 block">Telefone</span><input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label></div>
 
-          <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="border border-gray-200 rounded-xl p-4">
-              <div class="text-xs text-gray-500 mb-1">A receber (fiado)</div>
-              <div class="text-base md:text-lg font-bold text-emerald-700" x-text="formatCurrency(Number(atacadoFinance?.a_receber_total || 0))"></div>
-              <div class="text-xs mt-1" :class="Number(atacadoFinance?.a_receber_vencidos || 0) > 0 ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                   x-text="(atacadoFinance?.a_receber_count || 0) + ' em aberto' + (Number(atacadoFinance?.a_receber_vencidos || 0) > 0 ? ' · ' + atacadoFinance.a_receber_vencidos + ' vencido(s)' : '')"></div>
-            </div>
-            <div class="border border-gray-200 rounded-xl p-4">
-              <div class="text-xs text-gray-500 mb-1">A pagar (fornecedor)</div>
-              <div class="text-base md:text-lg font-bold text-rose-600" x-text="formatCurrency(Number(atacadoFinance?.a_pagar_total || 0))"></div>
-              <div class="text-xs mt-1" :class="Number(atacadoFinance?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                   x-text="(atacadoFinance?.a_pagar_count || 0) + ' em aberto' + (Number(atacadoFinance?.a_pagar_vencidos || 0) > 0 ? ' · ' + atacadoFinance.a_pagar_vencidos + ' vencido(s)' : '')"></div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Quem te deve</div>
-              <template x-for="r in (atacadoFinance?.receivables || [])" :key="r.id">
-                <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
-                  <div>
-                    <span class="font-medium text-gray-800" x-text="r.counterparty"></span>
-                    <span class="text-xs ml-2" :class="r.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                          x-text="r.due_date ? ((r.overdue ? 'VENCEU ' : 'vence ') + financeDate(r.due_date)) : 'sem vencimento'"></span>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="font-bold text-gray-900" x-text="formatCurrency(Number(r.total_amount))"></span>
-                    <button @click="financeSettle('sale', r)"
-                            class="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">Recebi</button>
-                  </div>
-                </div>
-              </template>
-              <div x-show="!(atacadoFinance?.receivables || []).length" class="text-sm text-gray-400 py-2">Ninguém te devendo 👍</div>
-            </div>
-            <div>
-              <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Pra quem você deve</div>
-              <template x-for="p in (atacadoFinance?.payables || [])" :key="p.id">
-                <div class="flex items-center justify-between border-b border-gray-100 py-2 text-sm">
-                  <div>
-                    <span class="font-medium text-gray-800" x-text="p.counterparty"></span>
-                    <span class="text-xs ml-2" :class="p.overdue ? 'text-rose-600 font-medium' : 'text-gray-400'"
-                          x-text="p.due_date ? ((p.overdue ? 'VENCEU ' : 'vence ') + financeDate(p.due_date)) : 'sem vencimento'"></span>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <span class="font-bold text-gray-900" x-text="formatCurrency(Number(p.total_amount))"></span>
-                    <button @click="financeSettle('purchase', p)"
-                            class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium">Paguei</button>
-                  </div>
-                </div>
-              </template>
-              <div x-show="!(atacadoFinance?.payables || []).length" class="text-sm text-gray-400 py-2">Nenhuma conta com fornecedor.</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Nova venda de atacado -->
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center gap-2 mb-4">
-            <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
-              <i data-lucide="package-plus" class="w-4 h-4 text-brand-600"></i>
-            </div>
-            <h3 class="text-base font-semibold">Nova venda de atacado</h3>
-          </div>
-
-          <!-- Cabeçalho das colunas (borracheiro + pneu lado a lado, compacto) -->
-          <div class="grid grid-cols-12 gap-2 px-1 mb-1 text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-            <div class="col-span-3">Borracheiro</div>
-            <div class="col-span-3">Medida</div>
-            <div class="col-span-2">Marca</div>
-            <div class="col-span-1 text-center">Un</div>
-            <div class="col-span-2">Preço</div>
-            <div class="col-span-1"></div>
-          </div>
-          <div class="space-y-2 mb-2">
-            <template x-for="(it, i) in atacadoForm.items" :key="i">
-              <div>
-                <div class="grid grid-cols-12 gap-2 items-center">
-                  <!-- borracheiro: só na 1ª linha; nas demais o espaço fica vazio pra alinhar -->
-                  <div class="col-span-3">
-                    <select x-show="i === 0" x-model="atacadoForm.buyerKey"
-                            class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-                      <option value="">Selecione…</option>
-                      <option value="new">+ Novo (só atacado)</option>
-                      <template x-for="b in atacadoBuyers" :key="(b.customer_id || b.partner_id)">
-                        <option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option>
-                      </template>
-                    </select>
-                  </div>
-                  <!-- medida com autocomplete: filtra SÓ ao digitar -->
-                  <div class="col-span-3 relative">
-                    <input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()"
-                           type="text" autocomplete="off" placeholder="90/90-18"
-                           class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                    <div x-show="measureBox.key === 'v'+i && measureBox.hits.length"
-                         class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-                      <template x-for="m in measureBox.hits" :key="m.measure">
-                        <button type="button" @mousedown.prevent="measurePick(m.measure, it)"
-                                class="w-full text-left px-3 py-1.5 text-sm hover:bg-brand-50 flex items-center justify-between">
-                          <span x-text="m.measure"></span>
-                          <span x-show="m.quantity_on_hand != null" class="text-xs text-emerald-600" x-text="m.quantity_on_hand + ' un'"></span>
-                        </button>
-                      </template>
-                    </div>
-                  </div>
-                  <input x-model="it.brand" type="text" placeholder="Marca"
-                         class="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                  <input x-model.number="it.quantity" type="number" min="1" placeholder="Qtd"
-                         class="col-span-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                  <input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="0,00"
-                         class="col-span-2 border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
-                  <button @click="atacadoRemoveItem(i)" x-show="atacadoForm.items.length > 1"
-                          class="col-span-1 flex justify-center text-gray-400 hover:text-rose-500" title="Remover">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                  </button>
-                </div>
-                <p x-show="measureOnHand(it.measure) !== null || itemProfit(it) !== null" class="text-xs mt-0.5 ml-1 flex flex-wrap gap-x-4">
-                  <span x-show="measureOnHand(it.measure) !== null" class="text-emerald-600" x-text="'✓ ' + measureOnHand(it.measure) + ' em estoque'"></span>
-                  <span x-show="itemProfit(it) !== null" :class="itemProfit(it) >= 0 ? 'text-emerald-700 font-medium' : 'text-rose-600 font-medium'" x-text="'lucro: ' + formatCurrency(itemProfit(it))"></span>
-                </p>
+              <div class="border border-gray-200 rounded-xl overflow-visible">
+                <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2 text-center">Estoque</div><div class="col-span-1 text-center">Qtd.</div><div class="col-span-2">Preço unitário</div><div class="col-span-2 text-right">Subtotal</div></div>
+                <div class="divide-y divide-gray-100"><template x-for="(it, i) in atacadoForm.items" :key="i"><div class="grid grid-cols-1 lg:grid-cols-12 gap-2 p-3 items-center">
+                  <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-400">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><div x-show="measureBox.key === 'v'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center justify-between"><span x-text="m.measure"></span><span class="text-xs text-emerald-700" x-text="m.quantity_on_hand + ' un'"></span></button></template></div></div>
+                  <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Marca</label><input x-model="it.brand" type="text" placeholder="Marca" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                  <div class="lg:col-span-2 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="measureOnHand(it.measure) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="measureOnHand(it.measure) === null ? 'não cadastrado' : measureOnHand(it.measure) + ' un'"></span></div>
+                  <div class="lg:col-span-1"><label class="lg:hidden text-xs text-gray-400">Qtd.</label><input x-model.number="it.quantity" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"></div>
+                  <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Preço unitário</label><input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+                  <div class="lg:col-span-2 flex items-center justify-end gap-2"><span class="font-semibold num" x-text="formatCurrency((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))"></span><button x-show="atacadoForm.items.length > 1" @click="atacadoRemoveItem(i)" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50" title="Remover"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
+                </div></template></div>
+                <div class="px-4 py-3 border-t border-gray-100"><button @click="atacadoAddItem()" class="inline-flex items-center gap-1.5 text-sm text-emerald-700 font-medium hover:underline"><i data-lucide="plus" class="w-4 h-4"></i>Adicionar pneu</button></div>
               </div>
-            </template>
-          </div>
-          <!-- novo cliente só-atacado: nome + telefone -->
-          <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-2 gap-2 mb-3">
-            <input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro"
-                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-            <input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)"
-                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-          </div>
-          <button @click="atacadoAddItem()"
-                  class="text-sm text-brand-600 hover:text-brand-700 font-medium mb-4 inline-flex items-center gap-1">
-            <i data-lucide="plus" class="w-4 h-4"></i> Adicionar pneu
-          </button>
 
-          <!-- FINANCEIRO (0115): recebido agora × fiado — só com o financeiro ligado -->
-          <div x-show="atacadoFinance" class="grid grid-cols-2 gap-2 mb-4">
-            <select x-model="atacadoForm.payment_status"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              <option value="paid">Recebido agora (à vista)</option>
-              <option value="pending">Fiado — fica no a receber</option>
-            </select>
-            <input x-show="atacadoForm.payment_status === 'pending'" x-model="atacadoForm.due_date" type="date"
-                   title="Vencimento (opcional)"
-                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          </div>
-
-          <!-- Observação opcional -->
-          <input x-model="atacadoForm.notes" type="text" placeholder="Observação (opcional)"
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4">
-
-          <!-- Total + registrar -->
-          <div class="flex items-center justify-between border-t border-gray-100 pt-4">
-            <div class="text-sm text-gray-500">Total:
-              <span class="text-lg font-bold text-gray-900" x-text="formatCurrency(atacadoFormTotal())"></span>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div x-show="atacadoFinance"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Pagamento</span><div class="inline-flex rounded-lg border border-gray-200 overflow-hidden"><button @click="atacadoForm.payment_status = 'paid'" class="px-5 py-2 text-sm font-medium" :class="atacadoForm.payment_status === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">À vista</button><button @click="atacadoForm.payment_status = 'pending'" class="px-5 py-2 text-sm font-medium border-l border-gray-200" :class="atacadoForm.payment_status === 'pending' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">Fiado</button></div></div><label x-show="atacadoFinance && atacadoForm.payment_status === 'pending'"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Vencimento</span><input x-model="atacadoForm.due_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><div x-show="!atacadoFinance" class="text-sm text-gray-500 flex items-center gap-2"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Venda registrada como recebida à vista</div></div>
+              <input x-model="atacadoForm.notes" type="text" placeholder="Observação da venda (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
-            <button @click="atacadoSubmit()" :disabled="atacadoSaving"
-                    class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-5 py-2 rounded-lg disabled:opacity-50">
-              <span x-show="!atacadoSaving">Registrar venda</span>
-              <span x-show="atacadoSaving">Salvando…</span>
-            </button>
+            <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p class="text-xs text-gray-400">Total do pedido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoFormTotal())"></p></div><button @click="atacadoSubmit()" :disabled="atacadoSaving" class="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50"><span x-show="!atacadoSaving">Registrar venda</span><span x-show="atacadoSaving">Salvando…</span></button></div>
+            <div x-show="atacadoMsg" class="mx-5 mb-4 mt-3 text-sm px-3 py-2 rounded-lg" :class="atacadoMsg?.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'" x-text="atacadoMsg?.text"></div>
           </div>
 
-          <div x-show="atacadoMsg" class="mt-3 text-sm px-3 py-2 rounded-lg"
-               :class="atacadoMsg && atacadoMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
-               x-text="atacadoMsg ? atacadoMsg.text : ''"></div>
-        </div>
-
-        <!-- Histórico unificado fica na sub-aba Histórico. -->
-        <div x-show="false" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold">Últimas vendas</h3>
-            <span class="text-xs text-gray-400">registrou errado? cancela aqui — sai do resumo e o estoque volta</span>
+          <div class="xl:col-span-4 space-y-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[244px]">
+              <h3 class="text-base font-semibold mb-4">Comprador selecionado</h3>
+              <div x-show="atacadoBuyerSelecionado()"><div class="flex items-center gap-3 pb-4 border-b border-gray-100"><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center text-xl font-bold text-emerald-800" x-text="atacadoBuyerInitials(atacadoBuyerSelecionado())"></div><div class="min-w-0"><p class="font-semibold truncate" x-text="atacadoBuyerSelecionado()?.name"></p><span class="inline-flex mt-1 text-xs px-2 py-1 rounded-full" :class="atacadoStatus(atacadoBuyerSelecionado()).cls" x-text="atacadoStatus(atacadoBuyerSelecionado()).label"></span></div></div><div class="grid grid-cols-2 gap-4 py-4"><div><p class="text-xl font-bold num" x-text="Number(atacadoBuyerSelecionado()?.orders_count || 0)"></p><p class="text-xs text-gray-400">compras</p></div><div><p class="font-semibold" x-text="atacadoLastPurchase(atacadoBuyerSelecionado())"></p><p class="text-xs text-gray-400">última compra</p></div><div><p class="font-semibold num" x-text="formatCurrency(Number(atacadoBuyerSelecionado()?.total_bought || 0))"></p><p class="text-xs text-gray-400">total comprado</p></div><div><p class="font-semibold num" x-text="formatCurrency(Number(atacadoBuyerSelecionado()?.total_bought || 0) / Math.max(Number(atacadoBuyerSelecionado()?.orders_count || 0), 1))"></p><p class="text-xs text-gray-400">ticket médio</p></div></div><button @click="abrirHistoricoAtacado(atacadoBuyerSelecionado())" class="w-full px-3 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Ver histórico do cliente</button></div>
+              <div x-show="!atacadoBuyerSelecionado()" class="py-8 text-center"><div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3"><i data-lucide="user-round-search" class="w-5 h-5 text-gray-500"></i></div><p class="text-sm font-medium">Selecione um comprador</p><p class="text-xs text-gray-400 mt-1">O relacionamento comercial aparece aqui.</p></div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm"><h3 class="text-base font-semibold mb-2">Atenção comercial</h3><div class="divide-y divide-gray-100"><button @click="vendasTab = 'recompra'" class="w-full py-3.5 flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-amber-600"></i></div><div class="flex-1"><p class="text-sm font-semibold"><span x-text="vendasInativos().length"></span> clientes sem comprar há 30 dias</p><p class="text-xs text-gray-400">oportunidades de recompra</p></div><span class="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-xs font-medium">Ver</span></button><button @click="vendasTab = 'recompra'" class="w-full py-3.5 flex items-center gap-3 text-left"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="user-plus" class="w-5 h-5 text-emerald-700"></i></div><div class="flex-1"><p class="text-sm font-semibold"><span x-text="vendasNuncaCompraram().length"></span> compradores ainda não estrearam</p><p class="text-xs text-gray-400">primeira venda pendente</p></div><span class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-medium">Chamar</span></button></div></div>
           </div>
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-200">
-              <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                <th class="px-5 py-3 font-medium">Data</th>
-                <th class="px-5 py-3 font-medium">Borracheiro</th>
-                <th class="px-5 py-3 font-medium text-right">Total</th>
-                <th class="px-5 py-3 font-medium">Pagamento</th>
-                <th class="px-5 py-3 font-medium text-right">Ação</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <template x-for="v in atacadoVendas" :key="v.id">
-                <tr :class="v.status === 'cancelled' ? 'opacity-50' : ''">
-                  <td class="px-5 py-3 text-gray-500" x-text="vendaData(v)"></td>
-                  <td class="px-5 py-3 font-medium text-gray-800" x-text="v.buyer_name"></td>
-                  <td class="px-5 py-3 text-right font-bold text-gray-900" x-text="formatCurrency(Number(v.total_amount))"></td>
-                  <td class="px-5 py-3">
-                    <span x-show="v.payment_status === 'pending'"
-                          class="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700">fiado</span>
-                    <span x-show="v.payment_status === 'paid'" class="text-xs text-gray-400">pago</span>
-                  </td>
-                  <td class="px-5 py-3 text-right whitespace-nowrap">
-                    <span x-show="v.status === 'cancelled'"
-                          class="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600">cancelada</span>
-                    <a x-show="reciboWhatsLink(v)" :href="reciboWhatsLink(v)" target="_blank" rel="noopener"
-                       title="Mandar o recibo no WhatsApp do borracheiro"
-                       class="text-xs px-2.5 py-1 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium mr-1">Recibo</a>
-                    <button x-show="v.status === 'confirmed'" @click="atacadoCancelSale(v)"
-                            class="text-xs px-2.5 py-1 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 font-medium">Cancelar</button>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="atacadoVendas.length === 0">
-                <td colspan="5" class="px-5 py-6 text-center text-sm text-gray-400">Nenhuma venda registrada ainda.</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
 
-        <!-- Ranking completo fica na sub-aba Recompra. -->
-        <div x-show="false" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold">Ranking de recompra</h3>
-            <span class="text-xs text-gray-400">quem compra forte · quem sumiu</span>
-          </div>
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-200">
-              <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                <th class="px-5 py-3 font-medium">Borracheiro</th>
-                <th class="px-5 py-3 font-medium text-center">Compras</th>
-                <th class="px-5 py-3 font-medium text-right">Total comprado</th>
-                <th class="px-5 py-3 font-medium">Última compra</th>
-                <th class="px-5 py-3 font-medium">Situação</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <template x-for="b in atacadoRanking" :key="(b.buyer_id || b.partner_id)">
-                <tr class="hover:bg-gray-50">
-                  <td class="px-5 py-3 font-medium">
-                    <span x-text="b.name"></span>
-                    <span x-show="b.is_partner" class="ml-1.5 text-xs px-1.5 py-0.5 bg-brand-50 text-brand-600 rounded">parceiro</span>
-                  </td>
-                  <td class="px-5 py-3 text-center text-gray-700" x-text="b.orders_count"></td>
-                  <td class="px-5 py-3 text-right font-semibold" x-text="formatCurrency(Number(b.total_bought || 0))"></td>
-                  <td class="px-5 py-3 text-gray-500" x-text="atacadoLastPurchase(b)"></td>
-                  <td class="px-5 py-3">
-                    <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full" :class="atacadoStatus(b).cls">
-                      <span class="w-1.5 h-1.5 rounded-full" :class="atacadoStatus(b).dot"></span>
-                      <span x-text="atacadoStatus(b).label"></span>
-                    </span>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="atacadoRanking.length === 0">
-                <td colspan="5" class="px-5 py-10 text-center text-sm text-gray-500">
-                  Nenhum comprador ainda. Registre uma venda acima — os parceiros da rede já aparecem aqui pra você vender.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+          <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm"><div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between"><div><h3 class="text-base font-semibold">Últimas vendas do atacado</h3><p class="text-xs text-gray-400 mt-1">Registros recentes do canal</p></div><button @click="vendasHistoricoCanal = 'atacado'; vendasBusca = ''; vendasTab = 'historico'" class="text-sm text-emerald-700 font-medium hover:underline">Ver todas</button></div><div class="overflow-x-auto"><table class="w-full text-sm min-w-[760px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Comprador</th><th class="px-4 py-3 font-medium">Itens</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="v in atacadoVendasPeriodo().slice(0, 5)" :key="v.id"><tr class="hover:bg-gray-50"><td class="px-5 py-3 text-gray-500" x-text="vendaData(v)"></td><td class="px-4 py-3 font-medium" x-text="v.buyer_name"></td><td class="px-4 py-3 text-gray-600 max-w-[200px] truncate" x-text="atacadoVendaItens(v)"></td><td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="v.payment_status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="v.payment_status === 'pending' ? 'Fiado' : 'Pago'"></span></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(v.total_amount))"></td><td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="v.status === 'cancelled' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'" x-text="v.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></span></td><td class="px-5 py-3 text-right whitespace-nowrap"><button @click="vendaAtacadoSelecionada = v" class="text-xs px-2.5 py-1 rounded-lg border border-emerald-700 text-emerald-800 font-medium mr-1">Ver</button><a x-show="reciboWhatsLink(v)" :href="reciboWhatsLink(v)" target="_blank" rel="noopener" class="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 font-medium">Recibo</a></td></tr></template><tr x-show="!atacadoVendasPeriodo().length"><td colspan="7" class="px-5 py-10 text-center text-gray-400">Nenhuma venda neste período.</td></tr></tbody></table></div></div>
+          <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm"><h3 class="text-base font-semibold">Medidas mais vendidas</h3><p class="text-xs text-gray-400 mt-1 mb-4">Nas vendas recentes do atacado</p><div class="space-y-3"><template x-for="row in atacadoMedidasMaisVendidas()" :key="row.medida"><div class="grid grid-cols-[100px_minmax(100px,1fr)_55px] gap-3 items-center"><span class="text-sm font-medium" x-text="row.medida"></span><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + row.pct + '%'"></div></div><span class="text-xs text-gray-500 text-right num" x-text="row.quantidade + ' un'"></span></div></template><p x-show="!atacadoMedidasMaisVendidas().length" class="py-8 text-center text-sm text-gray-400">As medidas aparecem depois das primeiras vendas.</p></div></div>
         </div>
 
+        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
       </div>
 
       <!-- HISTÓRICO COMERCIAL UNIFICADO -->

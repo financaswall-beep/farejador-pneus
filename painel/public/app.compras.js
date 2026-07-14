@@ -175,7 +175,8 @@ window.PAINEL_MODULES.compras = function () {
       const reason = window.prompt('Motivo (opcional):') || null;
       try {
         await this.apiPost('/admin/api/wholesale/sales/cancel', { order_id: v.id, reason });
-        await this.loadAtacado();
+        if (this.currentPage === 'vendas') await this.loadAtacadoVendas();
+        else await this.loadAtacado();
       } catch (err) {
         const msg = err.message === 'sale_already_cancelled' ? 'Essa venda já estava cancelada.' : `Não consegui cancelar (${err.message}).`;
         window.alert(msg);

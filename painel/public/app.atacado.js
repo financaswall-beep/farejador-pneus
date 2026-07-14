@@ -104,6 +104,45 @@ window.PAINEL_MODULES.atacado = function () {
         (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0,
       );
     },
+    atacadoResumoKpis() {
+      const vendas = Number(this.atacadoResumo?.vendas_count || 0);
+      const total = Number(this.atacadoResumo?.faturamento || 0);
+      const canceladas = Number(this.atacadoResumo?.cancelled_count || 0);
+      return { vendas, total, canceladas, ticket: vendas ? total / vendas : 0, cancelPct: vendas + canceladas ? (canceladas / (vendas + canceladas)) * 100 : 0 };
+    },
+    atacadoBuyerSelecionado() {
+      const key = this.atacadoForm.buyerKey;
+      if (!key || key === 'new') return null;
+      const buyer = this.atacadoBuyers.find((b) => this.atacadoBuyerKey(b) === key);
+      const id = key.slice(2);
+      const ranking = this.atacadoRanking.find((b) => key.startsWith('c:') ? b.buyer_id === id : b.partner_id === id);
+      return buyer ? { ...buyer, ...(ranking || {}) } : (ranking || null);
+    },
+    atacadoBuyerInitials(b) {
+      return String(b?.name || 'AT').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+    },
+    atacadoVendasPeriodo() {
+      return this.atacadoVendas.filter((v) => this.vendaNoPeriodo(v.sold_at));
+    },
+    atacadoVendaItens(v) {
+      const items = v?.items || [];
+      const quantidade = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      return `${quantidade} pneu(s) · ${items.map((item) => item.measure).filter(Boolean).join(', ') || 'sem medida'}`;
+    },
+    atacadoMedidasMaisVendidas() {
+      const totais = new Map();
+      this.atacadoVendasPeriodo().filter((v) => v.status === 'confirmed').forEach((v) => (v.items || []).forEach((item) => {
+        totais.set(item.measure, (totais.get(item.measure) || 0) + Number(item.quantity || 0));
+      }));
+      const rows = [...totais].map(([medida, quantidade]) => ({ medida, quantidade })).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
+      const max = rows[0]?.quantidade || 1;
+      return rows.map((row) => ({ ...row, pct: (row.quantidade / max) * 100 }));
+    },
+    abrirHistoricoAtacado(b) {
+      this.vendasHistoricoCanal = 'atacado';
+      this.vendasBusca = b?.name || '';
+      this.vendasTab = 'historico';
+    },
     atacadoLastPurchase(b) {
       if (!b.last_purchase_at) return '—';
       const d = new Date(b.last_purchase_at);
