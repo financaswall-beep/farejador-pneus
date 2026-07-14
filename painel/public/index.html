@@ -2785,7 +2785,7 @@
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="bell" class="w-5 h-5 text-amber-600"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Atenção hoje</p>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Pendências abertas</p>
                 <p class="text-sm font-semibold text-gray-900 mt-0.5">
                   <span x-text="financeiroVisao.a_pagar.vencidos_count"></span> vencido(s) + <span x-text="finCobrancasAbertas()"></span> cobrança(s)</p></div>
             </div>
@@ -2795,12 +2795,7 @@
           <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
             <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <h3 class="text-base font-semibold mb-4">Resultado do período</h3>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                <div class="rounded-lg bg-emerald-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Entrou</p><p class="text-lg font-semibold text-emerald-700 num mt-0.5" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
-                <div class="rounded-lg bg-gray-50 px-3.5 py-3"><p class="text-xs text-gray-500">Custos</p><p class="text-lg font-semibold text-gray-700 num mt-0.5" x-text="formatCurrency(Number(financeiroVisao.mes.custo))"></p></div>
-                <div class="rounded-lg bg-rose-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Despesas</p><p class="text-lg font-semibold text-rose-600 num mt-0.5" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
-                <div class="rounded-lg bg-emerald-50/70 px-3.5 py-3"><p class="text-xs text-gray-500">Lucro</p><p class="text-lg font-semibold num mt-0.5" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
-              </div>
+              <p class="text-xs text-gray-500 mb-5">Como cada real faturado se divide entre custo dos pneus, despesas e resultado.</p>
               <div class="flex h-3.5 rounded-full overflow-hidden bg-gray-100">
                 <div class="bg-gray-400 h-full" :style="'width:' + finResSeg('custo')" title="custo do pneu"></div>
                 <div class="bg-rose-500 h-full" :style="'width:' + finResSeg('despesa')" title="despesas"></div>
@@ -2865,25 +2860,6 @@
             <p class="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">Lucro <b>bruto</b> por fonte (antes de ratear as despesas gerais). Frete e comissão entram cheios — o custo do frete, a gasolina, já desconta na perna Despesas.</p>
           </div>
 
-          <!-- 4 indicadores de dono -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="percent" class="w-5 h-5 text-emerald-700"></i></div>
-              <div><p class="text-lg font-bold num" x-text="financeiroVisao.mes.margem_pct !== null ? String(financeiroVisao.mes.margem_pct).replace('.', ',') + '%' : '—'"></p><p class="text-xs text-gray-500">Margem do mês · sobre o faturamento</p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="coins" class="w-5 h-5 text-emerald-700"></i></div>
-              <div><p class="text-lg font-bold num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></p><p class="text-xs text-gray-500">Capital parado · em estoque</p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="refresh-cw" class="w-5 h-5 text-emerald-700"></i></div>
-              <div><p class="text-lg font-bold num" x-text="finGiroTexto()"></p><p class="text-xs text-gray-500">Giro do estoque · no mês</p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[118px] flex items-center gap-5 shadow-sm">
-              <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="scale" class="w-5 h-5 text-emerald-700"></i></div>
-              <div><p class="text-lg font-bold num" x-text="financeiroVisao.indicadores.ponto_equilibrio !== null ? formatCurrency(financeiroVisao.indicadores.ponto_equilibrio) : '—'"></p><p class="text-xs text-gray-500">Ponto de equilíbrio · faturamento necessário</p></div>
-            </div>
-          </div>
         </div>
       </template>
 
@@ -2893,39 +2869,39 @@
 
           <!-- Resumo: sempre visível, inclusive quando ainda não há cobranças. -->
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+            <button type="button" @click="cobrancaFiltro = 'vencida'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-rose-200 hover:bg-rose-50/20 transition-colors">
               <div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
                 <p class="text-2xl font-bold leading-tight num" :class="cobrancaPainel().cards.vencidas.total > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="formatCurrency(cobrancaPainel().cards.vencidas.total)"></p>
                 <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.vencidas.count"></span> cobrança(s)</p>
               </div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+            </button>
+            <button type="button" @click="cobrancaFiltro = 'hoje'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-amber-200 hover:bg-amber-50/20 transition-colors">
               <div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-5 h-5 text-amber-600"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p>
                 <p class="text-2xl font-bold leading-tight num" :class="cobrancaPainel().cards.hoje.total > 0 ? 'text-amber-600' : 'text-gray-900'" x-text="formatCurrency(cobrancaPainel().cards.hoje.total)"></p>
                 <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.hoje.count"></span> cobrança(s)</p>
               </div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+            </button>
+            <button type="button" @click="cobrancaFiltro = 'comissao'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-emerald-200 hover:bg-emerald-50/20 transition-colors">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="network" class="w-5 h-5 text-emerald-700"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Comissões da rede</p>
                 <p class="text-2xl font-bold leading-tight num text-emerald-800" x-text="formatCurrency(cobrancaPainel().cards.comissao.total)"></p>
                 <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.comissao.count"></span> parceiro(s)</p>
               </div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+            </button>
+            <button type="button" @click="cobrancaFiltro = ''" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-gray-300 hover:bg-gray-50/40 transition-colors">
               <div class="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="wallet-cards" class="w-5 h-5 text-gray-600"></i></div>
               <div class="min-w-0"><p class="text-xs text-gray-500">Total a receber</p>
                 <p class="text-2xl font-bold leading-tight num text-gray-900" x-text="formatCurrency(cobrancaPainel().cards.aberto.total)"></p>
                 <p class="text-xs text-gray-400 mt-1"><span class="num" x-text="cobrancaPainel().cards.aberto.count"></span> cobrança(s) em aberto</p>
               </div>
-            </div>
+            </button>
           </div>
 
           <div class="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
             <!-- Fila única: fiado do atacado + comissões da rede. -->
-            <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="xl:col-span-12 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div><h3 class="text-base font-semibold">Fila de cobrança</h3><p class="text-xs text-gray-500 mt-0.5">Vencidas primeiro. O WhatsApp já abre com a mensagem pronta.</p></div>
                 <div x-show="cobrancaFiltro" class="flex items-center gap-2 text-xs">
@@ -2961,15 +2937,6 @@
               <div x-show="financeiroVisao.a_receber.itens.length && !cobrancaFila().length" class="text-sm text-gray-400 py-7 text-center">Nenhuma cobrança nesse filtro — <button @click="cobrancaFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todas</button>.</div>
             </div>
 
-            <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
-              <div class="space-y-4">
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center"><i data-lucide="alert-circle" class="w-4 h-4 text-rose-600"></i></div><div><p class="text-xs text-gray-500">Cobranças vencidas</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.vencidas.count"></p></div><button @click="cobrancaFiltro = 'vencida'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Vencem hoje</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.hoje.count"></p></div><button @click="cobrancaFiltro = 'hoje'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="network" class="w-4 h-4 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Comissões abertas</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.comissao.count"></p></div><button @click="cobrancaFiltro = 'comissao'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3"><div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><i data-lucide="phone-off" class="w-4 h-4 text-gray-500"></i></div><div><p class="text-xs text-gray-500">Sem telefone</p><p class="text-base font-semibold num" x-text="cobrancaPainel().cards.semfone.count"></p></div><button @click="cobrancaFiltro = 'semfone'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Ver</button></div>
-              </div>
-            </div>
           </div>
 
           <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -2979,9 +2946,9 @@
               <div x-show="!cobrancaPainel().origens.length" class="text-sm text-gray-400 py-8 text-center">Ainda não há valores a receber por origem.</div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[220px]">
-              <h3 class="text-base font-semibold">Agenda de cobrança</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">O que precisa de contato agora e nos próximos dias.</p>
+              <h3 class="text-base font-semibold">Próximos contatos</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">Pendências que não estão resumidas nos cards do topo.</p>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button @click="cobrancaFiltro = 'hoje'" class="text-left rounded-xl border border-amber-100 bg-amber-50/60 p-4 hover:bg-amber-50"><i data-lucide="sun" class="w-5 h-5 text-amber-600 mb-4"></i><p class="text-xs text-gray-500">Hoje</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.hoje.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.hoje.count"></span> cobrança(s)</p></button>
+                <button @click="cobrancaFiltro = 'semfone'" class="text-left rounded-xl border border-gray-200 bg-gray-50/60 p-4 hover:bg-gray-50"><i data-lucide="phone-off" class="w-5 h-5 text-gray-600 mb-4"></i><p class="text-xs text-gray-500">Sem telefone</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.semfone.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.semfone.count"></span> cobrança(s)</p></button>
                 <button @click="cobrancaFiltro = 'sete'" class="text-left rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 hover:bg-emerald-50"><i data-lucide="calendar-days" class="w-5 h-5 text-emerald-700 mb-4"></i><p class="text-xs text-gray-500">Próximos 7 dias</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.sete.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.sete.count"></span> cobrança(s)</p></button>
                 <button @click="cobrancaFiltro = 'comissao'" class="text-left rounded-xl border border-gray-200 bg-gray-50/60 p-4 hover:bg-gray-50"><i data-lucide="landmark" class="w-5 h-5 text-gray-600 mb-4"></i><p class="text-xs text-gray-500">Sem vencimento</p><p class="text-xl font-bold num" x-text="formatCurrency(cobrancaPainel().cards.semdata.total)"></p><p class="text-xs text-gray-400 mt-1"><span x-text="cobrancaPainel().cards.semdata.count"></span> cobrança(s)</p></button>
               </div>
@@ -3002,30 +2969,30 @@
 
               <!-- 4 cards do topo (molde da Visão geral) -->
               <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                <button type="button" @click="pagarFiltro = 'vencida'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-rose-200 hover:bg-rose-50/20 transition-colors">
                   <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i></div>
                   <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
                     <p class="text-2xl font-bold leading-tight num" :class="pagarPainel().cards.vencidas.total > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="formatCurrency(pagarPainel().cards.vencidas.total)"></p>
                     <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.vencidas.count + ' título' + (pagarPainel().cards.vencidas.count === 1 ? '' : 's')"></p></div>
-                </div>
-                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                </button>
+                <button type="button" @click="pagarFiltro = 'hoje'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-amber-200 hover:bg-amber-50/20 transition-colors">
                   <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar" class="w-5 h-5 text-amber-600"></i></div>
                   <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p>
                     <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(pagarPainel().cards.hoje.total)"></p>
                     <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.hoje.count + ' título' + (pagarPainel().cards.hoje.count === 1 ? '' : 's')"></p></div>
-                </div>
-                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                </button>
+                <button type="button" @click="pagarFiltro = 'sete'" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-emerald-200 hover:bg-emerald-50/20 transition-colors">
                   <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-check" class="w-5 h-5 text-emerald-700"></i></div>
                   <div class="min-w-0"><p class="text-xs text-gray-500">Próximos 7 dias</p>
                     <p class="text-2xl font-bold leading-tight text-emerald-700 num" x-text="formatCurrency(pagarPainel().cards.sete.total)"></p>
                     <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.sete.count + ' título' + (pagarPainel().cards.sete.count === 1 ? '' : 's')"></p></div>
-                </div>
-                <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
+                </button>
+                <button type="button" @click="pagarFiltro = ''" class="text-left bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm hover:border-gray-300 hover:bg-gray-50/40 transition-colors">
                   <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="receipt" class="w-5 h-5 text-gray-600"></i></div>
                   <div class="min-w-0"><p class="text-xs text-gray-500">Total em aberto</p>
                     <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(pagarPainel().cards.aberto.total)"></p>
                     <p class="text-xs text-gray-400 mt-0.5" x-text="pagarPainel().cards.aberto.count + ' título' + (pagarPainel().cards.aberto.count === 1 ? '' : 's')"></p></div>
-                </div>
+                </button>
               </div>
 
               <!-- Fila de pagamento (tabela) | Atenção rápida -->
@@ -3082,18 +3049,9 @@
                 </div>
 
                 <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
+                  <h3 class="text-base font-semibold mb-1">Ações rápidas</h3>
+                  <p class="text-xs text-gray-500 mb-4">Atalhos operacionais; os vencimentos já estão nos cards e no calendário.</p>
                   <div class="space-y-3">
-                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                      <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="alert-circle" class="w-4 h-4 text-rose-600"></i></div>
-                      <div class="min-w-0"><p class="text-xs text-gray-500">Títulos vencidos</p><p class="text-base font-semibold num" :class="pagarPainel().cards.vencidas.count > 0 ? 'text-rose-600' : ''" x-text="pagarPainel().cards.vencidas.count"></p></div>
-                      <button @click="pagarFiltro = 'vencida'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver títulos</button>
-                    </div>
-                    <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                      <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar" class="w-4 h-4 text-amber-600"></i></div>
-                      <div class="min-w-0"><p class="text-xs text-gray-500">Vencem hoje</p><p class="text-base font-semibold num" x-text="pagarPainel().cards.hoje.count"></p></div>
-                      <button @click="pagarFiltro = 'hoje'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver títulos</button>
-                    </div>
                     <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                       <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="users" class="w-4 h-4 text-gray-500"></i></div>
                       <div class="min-w-0"><p class="text-xs text-gray-500">Negociar com fornecedores</p><p class="text-xs text-gray-400">abrir a tela de Compras</p></div>
@@ -3211,15 +3169,14 @@
               <h3 class="text-base font-semibold">Saúde financeira</h3><p class="text-xs text-gray-500 mt-0.5">Leitura direta dos números, sem nota artificial.</p>
               <div class="mt-5 rounded-xl p-4 flex items-center gap-4" :class="finIndicadoresPainel().saude.bg"><div class="w-12 h-12 rounded-full bg-white/80 flex items-center justify-center"><i data-lucide="activity" class="w-6 h-6" :class="finIndicadoresPainel().saude.cls"></i></div><div><p class="text-xs text-gray-500">Situação do período</p><p class="text-xl font-bold" :class="finIndicadoresPainel().saude.cls" x-text="finIndicadoresPainel().saude.label"></p></div></div>
               <div class="mt-5 divide-y divide-gray-100">
-                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Lucro do período</span><span class="font-semibold num" :class="finIndicadoresPainel().lucro >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finIndicadoresPainel().lucro)"></span></div>
-                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Ponto de equilíbrio</span><span class="font-semibold num" x-text="finIndicadoresPainel().pontoPct !== null ? String(finIndicadoresPainel().pontoPct).replace('.', ',') + '%' : '—'"></span></div>
                 <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Títulos vencidos</span><span class="font-semibold num" :class="finIndicadoresPainel().vencidos > 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="finIndicadoresPainel().vencidos"></span></div>
                 <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Capital parado</span><span class="font-semibold num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span></div>
+                <div class="py-3 flex items-center justify-between gap-3"><span class="text-sm text-gray-500">Pneus no galpão</span><span class="font-semibold num" x-text="financeiroVisao.indicadores.pneus_galpao"></span></div>
               </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
             <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[260px]">
               <h3 class="text-base font-semibold">Margem bruta por operação</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">Antes do rateio das despesas gerais.</p>
               <div class="space-y-4"><template x-for="fonte in finIndicadoresPainel().fontes" :key="fonte.label"><div class="grid grid-cols-[125px_minmax(0,1fr)_48px] items-center gap-3"><span class="text-xs text-gray-600 truncate" x-text="fonte.label"></span><div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-600 rounded-full" :style="'width:' + Math.max(fonte.barra, fonte.valor > 0 ? 3 : 0) + '%' "></div></div><span class="text-xs font-semibold text-right num" x-text="fonte.margem !== null ? String(fonte.margem).replace('.', ',') + '%' : '—'"></span></div></template></div>
@@ -3235,10 +3192,6 @@
               <p class="text-xs text-gray-400 mt-3" x-text="finIndicadoresPainel().cobertura !== null ? 'Os recebíveis cobrem ' + String(finIndicadoresPainel().cobertura).replace('.', ',') + 'x as contas abertas.' : 'Sem contas abertas para calcular cobertura.'"></p>
             </div>
 
-            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm min-h-[260px]">
-              <h3 class="text-base font-semibold">Leitura do período</h3><p class="text-xs text-gray-500 mt-0.5 mb-5">Os três sinais mais importantes agora.</p>
-              <div class="space-y-5"><template x-for="(texto, idx) in finIndicadoresPainel().leituras" :key="idx"><div class="flex items-start gap-3"><div class="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-700"></i></div><p class="text-sm text-gray-600 leading-relaxed" x-text="texto"></p></div></template></div>
-            </div>
           </div>
         </div>
       </template>
@@ -3268,13 +3221,13 @@
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
           <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clock" class="w-5 h-5 text-amber-600"></i></div>
-          <div class="min-w-0"><p class="text-xs text-gray-500">A pagar (em aberto)</p>
+          <div class="min-w-0"><p class="text-xs text-gray-500">Despesas a pagar</p>
             <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(matrizDespesas?.a_pagar_total || 0))"></p>
             <p class="text-xs text-gray-400 mt-0.5" x-text="(matrizDespesas?.a_pagar_count || 0) + ' conta(s) — todas, não só o período'"></p></div>
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
           <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-5 h-5 text-rose-600"></i></div>
-          <div class="min-w-0"><p class="text-xs text-gray-500">Vencidas</p>
+          <div class="min-w-0"><p class="text-xs text-gray-500">Despesas vencidas</p>
             <p class="text-2xl font-bold leading-tight num" :class="Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600' : 'text-gray-900'" x-text="matrizDespesas?.a_pagar_vencidos || 0"></p>
             <p class="text-xs text-gray-400 mt-0.5" x-text="'de ' + (matrizDespesas?.a_pagar_count || 0) + ' em aberto'"></p></div>
         </div>
@@ -3401,20 +3354,11 @@
         </div>
 
         <div class="xl:col-span-4 space-y-4">
-          <!-- Atenção rápida (mesmo molde da Visão geral) -->
+          <!-- Organização: só o que é específico desta aba. -->
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
+            <h3 class="text-base font-semibold mb-1">Organização</h3>
+            <p class="text-xs text-gray-500 mb-4">Pendências de classificação das despesas.</p>
             <div class="space-y-3">
-              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-4 h-4 text-rose-600"></i></div>
-                <div class="min-w-0"><p class="text-xs text-gray-500">Contas vencidas</p><p class="text-base font-semibold num" :class="Number(matrizDespesas?.a_pagar_vencidos || 0) > 0 ? 'text-rose-600' : ''" x-text="matrizDespesas?.a_pagar_vencidos || 0"></p></div>
-                <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
-              </div>
-              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clock" class="w-4 h-4 text-amber-600"></i></div>
-                <div class="min-w-0"><p class="text-xs text-gray-500">Vencem em até 7 dias</p><p class="text-base font-semibold num" x-text="despesaVence7Count()"></p></div>
-                <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
-              </div>
               <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"><i data-lucide="tag" class="w-4 h-4 text-gray-500"></i></div>
                 <div class="min-w-0"><p class="text-xs text-gray-500">Sem modalidade certa (em “Outros”)</p><p class="text-base font-semibold num" x-text="despesaOutrosCount()"></p></div>

@@ -117,24 +117,10 @@ window.PAINEL_MODULES.financeiro = function () {
         label: critico ? 'Resultado negativo' : saudavel ? 'Saudável' : 'Pede atenção',
         cls: critico ? 'text-rose-600' : saudavel ? 'text-emerald-700' : 'text-amber-600',
         bg: critico ? 'bg-rose-50' : saudavel ? 'bg-emerald-50' : 'bg-amber-50',
-        icon: critico ? 'trending-down' : saudavel ? 'badge-check' : 'circle-alert',
       };
-      const leituras = [
-        lucro >= 0
-          ? 'O período gerou ' + this.formatCurrency(lucro) + ' de lucro.'
-          : 'O período está com ' + this.formatCurrency(Math.abs(lucro)) + ' de prejuízo.',
-        pontoPct === null
-          ? 'Ainda não há base suficiente para calcular o ponto de equilíbrio.'
-          : pontoPct >= 100
-            ? 'O faturamento atingiu ' + String(pontoPct).replace('.', ',') + '% do ponto de equilíbrio.'
-            : 'Faltam ' + this.formatCurrency(Math.max(0, pontoEquilibrio - faturamento)) + ' para o ponto de equilíbrio.',
-        saldoAberto >= 0
-          ? 'Há ' + this.formatCurrency(saldoAberto) + ' a mais para receber do que para pagar.'
-          : 'As contas a pagar superam os recebíveis em ' + this.formatCurrency(Math.abs(saldoAberto)) + '.',
-      ];
       return {
-        faturamento, custo, despesas, lucro, margem, pontoEquilibrio, pontoPct,
-        receber, pagar, saldoAberto, cobertura, resultados, fontes, vencidos, saude, leituras,
+        lucro, margem, pontoEquilibrio, pontoPct,
+        receber, pagar, saldoAberto, cobertura, resultados, fontes, vencidos, saude,
       };
     },
     cobrancaDias(due) {
@@ -296,17 +282,6 @@ window.PAINEL_MODULES.financeiro = function () {
       const max = linhas.length ? linhas[0].total : 0;
       if (!(max > 0) || !(Number(total) > 0)) return '0%';
       return Math.max(2, Math.round((Number(total) / max) * 100)) + '%';
-    },
-    // Pendentes que vencem em ATÉ 7 dias (inclui hoje) — mesma agenda da aba
-    // Contas a pagar (a_pagar.itens), só o tipo 'despesa'; vencida fica de fora.
-    despesaVence7Count() {
-      const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
-      const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-      const lim = new Date(hoje + 'T12:00:00Z');
-      lim.setUTCDate(lim.getUTCDate() + 7);
-      const teto = lim.toISOString().slice(0, 10);
-      return itens.filter((i) => i.tipo === 'despesa' && !i.overdue && i.due_date
-        && String(i.due_date).slice(0, 10) <= teto).length;
     },
     // Caíram em "Outros" no período — o balde genérico que o dono quer esvaziar (0130).
     despesaOutrosCount() {
