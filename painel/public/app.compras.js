@@ -16,6 +16,7 @@ window.PAINEL_MODULES.compras = function () {
         (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_cost) || 0), 0,
       );
     },
+    comprasResumo() { const ativas = this.compras.filter((c) => c.status === 'confirmed'); return { registradas: this.fornecedorRanking.reduce((n, f) => n + Number(f.purchases_count || 0), 0), pneus: this.fornecedorBreakdown.reduce((n, r) => n + Number(r.qty_total || 0), 0), total: this.fornecedorRanking.reduce((n, f) => n + Number(f.total_spent || 0), 0), prazo: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_total || 0) : ativas.filter((c) => c.payment_status === 'pending').reduce((n, c) => n + Number(c.total_amount || 0), 0), prazoCount: this.atacadoFinance ? Number(this.atacadoFinance.a_pagar_count || 0) : ativas.filter((c) => c.payment_status === 'pending').length }; },
     fornecedorLastPurchase(s) {
       if (!s.last_purchase_at) return '—';
       const d = new Date(s.last_purchase_at);

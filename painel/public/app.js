@@ -83,7 +83,7 @@ function painelApp() {
     selectedParceiroIndex: 0,
     unidadeTab: 'visao',
     vendasTab: 'varejo',
-    comprasTab: 'comprar', // sub-abas da tela Compras: 'comprar' | 'fornecedores'
+    comprasTab: 'visao', // sub-abas: visao | nova | historico | fornecedores | precos
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
     atacadoBuyers: [],
     atacadoRanking: [],
