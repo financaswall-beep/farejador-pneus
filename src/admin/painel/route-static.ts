@@ -23,9 +23,11 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.nav.js', 'app.rede.kpis.js', 'app.unidade.kpis.js', 'app.venda.modal.js', 'app.api.js',
     'app.format.js', 'app.varejo.js', 'app.comissoes.js', 'app.atacado.js', 'app.compras.js',
     'app.logistica.js', 'app.logistica.acoes.js', 'app.colaboradores.js', 'app.sino.js', 'app.financeiro.js',
+    'app.financeiro.indicadores.js', 'app.financeiro.despesas.js', // fatia 07-14 do financeiro (fiscal 300)
     'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js',
+    'app.montagem.js', // fatia 07-14: compositor + lista de fábricas (app.js ficou só o estado)
   ];
   for (const modulo of painelModulos) {
     fastify.get(`/admin/painel/${modulo}`, async (_request, reply) => sendStatic(reply, modulo, 'text/javascript; charset=utf-8'));

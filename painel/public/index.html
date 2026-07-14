@@ -23,11 +23,13 @@
 <script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
-<script src="/admin/painel/app.sino.js?v=20260713-pagar2"></script>
+<script src="/admin/painel/app.sino.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260713-fluxo1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.financeiro.indicadores.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.financeiro.despesas.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
@@ -35,7 +37,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.js?v=20260714-atacado1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.js?v=20260714-fiscal1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2911,7 +2914,8 @@
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="refresh-cw" class="w-5 h-5 text-emerald-700"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Giro do estoque</p><p class="text-2xl font-bold leading-tight num" x-text="finGiroTexto()"></p><p class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? String(financeiroVisao.indicadores.giro_dias).replace('.', ',') + ' dias em média · base 30d' : 'sem base para calcular'"></p></div>
+              <!-- Giro em VEZES vem PRONTO do servidor (giro_vezes, 07-12c) — recalcular na UI divergia por arredondamento. -->
+              <div class="min-w-0"><p class="text-xs text-gray-500">Giro do estoque</p><p class="text-2xl font-bold leading-tight num" x-text="financeiroVisao.indicadores.giro_vezes !== null ? String(financeiroVisao.indicadores.giro_vezes).replace('.', ',') + 'x' : '—'"></p><p class="text-xs text-gray-400 mt-1" x-text="financeiroVisao.indicadores.giro_dias !== null ? String(financeiroVisao.indicadores.giro_dias).replace('.', ',') + ' dias em média · base 30d' : 'sem base para calcular'"></p></div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="Number(financeiroVisao.indicadores.fiado_aberto_pct || 0) > 20 ? 'bg-rose-50' : 'bg-amber-50'"><i data-lucide="clock-3" class="w-5 h-5" :class="Number(financeiroVisao.indicadores.fiado_aberto_pct || 0) > 20 ? 'text-rose-600' : 'text-amber-600'"></i></div>

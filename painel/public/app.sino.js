@@ -53,7 +53,7 @@ window.PAINEL_MODULES.sino = function () {
             title: 'Fiado vencido no atacado',
             desc: s.fiado_vencido.count + ' venda(s) vencida(s), ' +
               this.formatCurrency(Number(s.fiado_vencido.total)) + ' pra cobrar.',
-            page: 'financeiro', tab: 'cobrancas', time: 'abrir Cobranças →',
+            page: 'financeiro', tab: 'cobrancas', filter: 'vencida', time: 'abrir Cobranças →',
           });
         }
         if (s.a_pagar_vencido && s.a_pagar_vencido.count > 0) {
@@ -104,9 +104,13 @@ window.PAINEL_MODULES.sino = function () {
       else if (notif.page) {
         this.currentPage = notif.page;
         // Financeiro tem sub-abas: a notificação leva DIRETO na certa, já filtrada
-        // (conta vencida → Contas a pagar/vencidas; fiado → Cobranças).
-        if (notif.tab) this.finTab = notif.tab;
-        this.pagarFiltro = notif.filter || '';
+        // (conta vencida → Contas a pagar/vencidas; fiado → Cobranças/vencidas).
+        // O filtro aplicado é o da ABA DESTINO — o da outra fica como estava.
+        if (notif.tab) {
+          this.finTab = notif.tab;
+          if (notif.tab === 'cobrancas') this.cobrancaFiltro = notif.filter || '';
+          if (notif.tab === 'pagar') this.pagarFiltro = notif.filter || '';
+        }
       }
       this.$nextTick(() => lucide.createIcons());
     },
