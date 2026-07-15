@@ -165,11 +165,12 @@ function painelApp() {
     logisticaSaving: false,
     logisticaMsg: null,
     logisticaTab: 'visao',
+    logisticaRotaSelecionadaId: null, // detalhe financeiro aberto dentro da subaba Rotas
     logisticaPeriodo: 'hoje',
     logisticaFiltro: 'todas',
     logisticaBusca: '',
     rotaForm: { courier_name: '', km_start: '', selecionadas: {} },
-    fecharForm: { km_end: '', fuel_spent: '', notes: '' },
+    fecharForm: { km_end: '', notes: '' },
     logisticaCouriers: {}, // rascunho de entregador por pedido (entrega avulsa)
     logisticaPays: {},     // forma de pagamento por pedido (só no Entregue)
     uploadingReceipt: false,

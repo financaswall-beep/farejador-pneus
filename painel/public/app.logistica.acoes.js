@@ -59,16 +59,16 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
       if (abertasNaRota > 0 && !window.confirm(`Ainda tem ${abertasNaRota} entrega(s) em aberto nessa rota. Fechar mesmo assim?`)) return;
       this.logisticaSaving = true;
       try {
-        const r = await this.apiPost('/admin/api/logistica/rotas/fechar', {
+        await this.apiPost('/admin/api/logistica/rotas/fechar', {
           trip_id: t.id,
           km_end: this.fecharForm.km_end === '' ? null : Number(this.fecharForm.km_end),
-          fuel_spent: this.fecharForm.fuel_spent === '' ? null : Number(this.fecharForm.fuel_spent),
+          // Combustível nasce do comprovante anexado e lido; não existe valor fixo
+          // nem digitação paralela no fechamento (evita divergência/duplicidade).
+          fuel_spent: null,
           notes: (this.fecharForm.notes || '').trim() || null,
         });
-        this.logisticaMsg = r.fuel_expense_id
-          ? { ok: true, text: 'Rota fechada — gasolina lançada como despesa no Financeiro.' }
-          : { ok: true, text: 'Rota fechada.' };
-        this.fecharForm = { km_end: '', fuel_spent: '', notes: '' };
+        this.logisticaMsg = { ok: true, text: 'Rota fechada — despesas entram pelos comprovantes vinculados.' };
+        this.fecharForm = { km_end: '', notes: '' };
         await this.loadLogistica();
       } catch (err) {
         this.logisticaMsg = { ok: false, text: `Não consegui fechar a rota (${err.message}).` };
