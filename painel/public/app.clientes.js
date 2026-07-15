@@ -117,6 +117,13 @@ window.PAINEL_MODULES.clientes = function () {
     clienteOrigemLabel(source) {
       return ({ chatwoot: 'Chatwoot', balcao: 'Balcão', parceiro: 'Loja parceira', atacado: 'Atacado' })[source] || source;
     },
+    clienteOrigemIcone(c) {
+      const origem = this.clienteTexto(c?.origin);
+      if (origem.includes('instagram')) return '/assets/brands/instagram.svg';
+      if (/facebook|meta ads/.test(origem)) return '/assets/brands/facebook.svg';
+      if (/whatsapp|whats app/.test(origem)) return '/assets/brands/whatsapp.svg';
+      return '';
+    },
     clienteData(value) {
       if (!value) return '—';
       const d = new Date(value);
