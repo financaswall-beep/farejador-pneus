@@ -20,8 +20,23 @@ window.PAINEL_MODULES.clientes = function () {
     },
     setClientesTab(tab) {
       this.clientesTab = tab;
-      this.clientesBusca = '';
+      this.limparClientesFiltros();
+      this.clientesPeriodo = tab === 'leads' ? '30' : (tab === 'recompra' || tab === 'parceiros' ? 'todos' : '90');
+      const first = tab === 'leads'
+        ? ['novo', 'atendimento', 'orcamento', 'perdido'].flatMap((lane) => this.clientesLeads(lane))[0]
+        : tab === 'compradores' ? this.clientesCompradores()[0]
+          : tab === 'recompra' ? this.clientesRecompra()[0] : this.clientesFiltrados()[0];
+      if (first) this.clienteSelecionadoId = first.id;
       this.$nextTick(() => lucide.createIcons());
+    },
+    limparClientesFiltros() {
+      this.clientesBusca = '';
+      this.clientesTipo = 'todos';
+      this.clientesOrigem = 'todos';
+      this.clientesStatus = 'todos';
+      this.clientesClasse = 'todos';
+      this.clientesPeriodo = '90';
+      this.clientesPagina = 1;
     },
     clienteTexto(v) {
       return String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -33,8 +48,21 @@ window.PAINEL_MODULES.clientes = function () {
         const tipo = this.clientesTipo === 'todos' || c.kind === this.clientesTipo;
         const origem = this.clientesOrigem === 'todos' || c.source === this.clientesOrigem;
         const status = this.clientesStatus === 'todos' || c.status === this.clientesStatus;
-        return hit && tipo && origem && status;
+        const classe = this.clientesClasse === 'todos' || (this.clientesClasse === 'vip' ? c.is_vip : !c.is_vip);
+        const dias = this.clienteDias(c.last_interaction_at || c.last_purchase_at);
+        const periodo = this.clientesPeriodo === 'todos' || dias === null || dias <= Number(this.clientesPeriodo);
+        return hit && tipo && origem && status && classe && periodo;
       });
+    },
+    clientesPaginados(rows) {
+      const inicio = (this.clientesPagina - 1) * this.clientesPorPagina;
+      return rows.slice(inicio, inicio + this.clientesPorPagina);
+    },
+    clientesTotalPaginas(rows) {
+      return Math.max(1, Math.ceil(rows.length / this.clientesPorPagina));
+    },
+    clientesMudarPagina(delta, rows) {
+      this.clientesPagina = Math.min(this.clientesTotalPaginas(rows), Math.max(1, this.clientesPagina + delta));
     },
     clientesResumo() {
       const rows = this.clientes;
@@ -47,6 +75,26 @@ window.PAINEL_MODULES.clientes = function () {
         compradores: rows.filter((c) => Number(c.purchases || 0) > 0).length,
       };
     },
+    clientesLeadsResumo() {
+      const todos = this.clientes.filter((c) => Number(c.purchases || 0) === 0 && c.source === 'chatwoot');
+      const compradores = this.clientes.filter((c) => Number(c.purchases || 0) > 0 && c.source === 'chatwoot').length;
+      const orcamentos = todos.filter((c) => this.clienteLeadLane(c) === 'orcamento').length;
+      const semResposta = todos.filter((c) => (this.clienteDias(c.last_interaction_at) ?? 0) >= 3 && this.clienteLeadLane(c) !== 'perdido').length;
+      return { novos: this.clientesLeads('novo').length, orcamentos, semResposta, conversao: todos.length + compradores ? (compradores / (todos.length + compradores)) * 100 : 0 };
+    },
+    clientesCompradoresResumo() {
+      const rows = this.clientes.filter((c) => Number(c.purchases || 0) > 0);
+      const vendas = rows.reduce((s, c) => s + Number(c.total_spent || 0), 0);
+      const compras = rows.reduce((s, c) => s + Number(c.purchases || 0), 0);
+      const lucro = rows.reduce((s, c) => s + Number(c.gross_profit || 0), 0);
+      return { total: rows.length, ticket: compras ? vendas / compras : 0, margem: vendas && lucro ? (lucro / vendas) * 100 : null, recorrentes: rows.filter((c) => Number(c.purchases || 0) >= 2).length };
+    },
+    clientesRecompraResumo() {
+      const rows = this.clientesRecompra();
+      const valor = rows.reduce((s, c) => s + Number(c.avg_ticket || 0), 0);
+      const hoje = rows.filter((c) => (this.clienteDias(c.last_purchase_at) ?? 0) === 30).length;
+      return { oportunidades: rows.length, valor, hoje };
+    },
     clienteSelecionado() {
       return this.clientes.find((c) => c.id === this.clienteSelecionadoId) || null;
     },
@@ -56,6 +104,15 @@ window.PAINEL_MODULES.clientes = function () {
     },
     clienteTipoLabel(kind) {
       return ({ pessoa_fisica: 'Pessoa física', borracharia: 'Borracharia', parceiro: 'Parceiro', nao_classificado: 'Não classificado' })[kind] || 'Não classificado';
+    },
+    clienteClasseLabel(c) {
+      return c?.is_vip ? 'VIP' : 'Normal';
+    },
+    clienteProximaAcao(c) {
+      if (!c) return '—';
+      if (Number(c.purchases || 0) === 0) return this.clienteLeadLane(c) === 'perdido' ? 'Reavaliar' : 'Continuar atendimento';
+      const dias = this.clienteDias(c.last_purchase_at);
+      return dias !== null && dias >= 30 ? 'Enviar recompra' : 'Acompanhar';
     },
     clienteOrigemLabel(source) {
       return ({ chatwoot: 'Chatwoot', balcao: 'Balcão', parceiro: 'Loja parceira', atacado: 'Atacado' })[source] || source;
@@ -79,27 +136,35 @@ window.PAINEL_MODULES.clientes = function () {
       return 'novo';
     },
     clientesLeads(lane) {
-      const q = this.clienteTexto(this.clientesBusca);
-      return this.clientes.filter((c) => Number(c.purchases || 0) === 0 && c.source === 'chatwoot')
-        .filter((c) => this.clienteLeadLane(c) === lane)
-        .filter((c) => !q || this.clienteTexto([c.name, c.phone, c.origin].join(' ')).includes(q));
+      return this.clientesFiltrados()
+        .filter((c) => Number(c.purchases || 0) === 0 && c.source === 'chatwoot')
+        .filter((c) => this.clienteLeadLane(c) === lane);
+    },
+    clienteLeadSelecionado() {
+      const c = this.clienteSelecionado();
+      return c && Number(c.purchases || 0) === 0 ? c : null;
     },
     clientesCompradores() {
-      const q = this.clienteTexto(this.clientesBusca);
-      return this.clientes.filter((c) => Number(c.purchases || 0) > 0)
-        .filter((c) => this.clientesTipo === 'todos' || c.kind === this.clientesTipo)
-        .filter((c) => !q || this.clienteTexto([c.name, c.phone, c.origin].join(' ')).includes(q))
+      return this.clientesFiltrados().filter((c) => Number(c.purchases || 0) > 0)
         .sort((a, b) => Number(b.total_spent || 0) - Number(a.total_spent || 0));
     },
     clientesRecompra() {
-      const q = this.clienteTexto(this.clientesBusca);
-      return this.clientes.filter((c) => Number(c.purchases || 0) > 0 && (this.clienteDias(c.last_purchase_at) ?? 0) >= 30)
-        .filter((c) => !q || this.clienteTexto([c.name, c.phone].join(' ')).includes(q))
+      return this.clientesFiltrados().filter((c) => Number(c.purchases || 0) > 0 && (this.clienteDias(c.last_purchase_at) ?? 0) >= 30)
         .sort((a, b) => (this.clienteDias(b.last_purchase_at) ?? 0) - (this.clienteDias(a.last_purchase_at) ?? 0));
+    },
+    abrirHistoricoCliente(c) {
+      this.vendasBusca = c?.phone || c?.name || '';
+      this.vendasTab = 'historico';
+      this.currentPage = 'vendas';
     },
     clienteMensagem(c) {
       const primeiro = String(c?.name || 'cliente').trim().split(/\s+/)[0];
       return `Olá, ${primeiro}! Tudo bem? Passando para saber se está precisando repor algum pneu. Posso verificar as medidas e condições para você.`;
+    },
+    clienteOfertaMensagem(c) {
+      const primeiro = String(c?.name || 'cliente').trim().split(/\s+/)[0];
+      const medida = c?.last_item ? ` para a medida ${c.last_item}` : '';
+      return `Olá, ${primeiro}! Separei uma condição de pneu${medida}. Posso te enviar os valores e opções disponíveis?`;
     },
     abrirWhatsAppCliente(c, mensagem = '') {
       const phone = String(c?.phone || '').replace(/\D/g, '');

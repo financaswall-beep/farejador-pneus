@@ -49,6 +49,9 @@ describe('painel de clientes', () => {
     for (const label of ['Todos', 'Leads', 'Compradores', 'Recompra', 'Parceiros']) {
       expect(html).toContain(`label:'${label}'`);
     }
+    for (const bloco of ['versão fiel ao board aprovado', 'Lead selecionado', 'Margem estimada', 'Mensagem sugerida', 'Vínculo com parceiro']) {
+      expect(html).toContain(bloco);
+    }
     expect(app).toContain("{ id: 'clientes',   label: 'Clientes',   icon: 'users' }");
     expect(staticRoute).toContain("'app.clientes.js'");
   });
