@@ -50,8 +50,11 @@ window.PAINEL_MODULES.varejo = function () {
     },
 
     vendasInicioPeriodo() {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
+      // Meia-noite de SÃO PAULO (mesma régua do servidor em salesPeriodWhere) — não a do
+      // navegador; PC com fuso errado fazia card (servidor) e lista (local) divergirem.
+      // SP não tem horário de verão desde 2019 → offset fixo -03:00.
+      const hojeSP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+      const d = new Date(hojeSP + 'T00:00:00-03:00');
       if (this.vendasPeriodo === '7d') d.setDate(d.getDate() - 6);
       if (this.vendasPeriodo === '30d') d.setDate(d.getDate() - 29);
       return d;
@@ -220,14 +223,9 @@ window.PAINEL_MODULES.varejo = function () {
         });
       return [...varejo, ...atacado].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     },
-    vendasHistoricoFiltrado() {
-      const busca = this.vendasBusca.trim().toLocaleLowerCase('pt-BR');
-      return this.vendasHistorico().filter((row) => {
-        if (this.vendasHistoricoCanal !== 'todos' && row.canalId !== this.vendasHistoricoCanal) return false;
-        if (!busca) return true;
-        return `${row.cliente} ${row.itens} ${row.pagto} ${row.status}`.toLocaleLowerCase('pt-BR').includes(busca);
-      });
-    },
+    // vendasHistoricoFiltrado mora em app.vendas.historico.js (versão com status/
+    // pagamento/ordem). A cópia antiga daqui SAIU (07-14): era sombreada na montagem
+    // e virava armadilha — quem mexesse nela não via efeito nenhum.
 
     async loadVarejoResumo() {
       this.ensureCredentials();

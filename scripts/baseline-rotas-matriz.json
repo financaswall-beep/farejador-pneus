@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-14T04:29:10.909Z",
-  "total": 106,
+  "geradoEm": "2026-07-14T23:45:23.127Z",
+  "total": 107,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -62,6 +62,7 @@
     "GET /admin/painel/app.unidade.kpis.js PUBLICA",
     "GET /admin/painel/app.varejo.js PUBLICA",
     "GET /admin/painel/app.venda.modal.js PUBLICA",
+    "GET /admin/painel/app.vendas.historico.js PUBLICA",
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",
     "GET /admin/painel/style.css PUBLICA",

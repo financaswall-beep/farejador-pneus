@@ -16,7 +16,7 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.api.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.format.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.varejo.js?v=20260714-varejo1"></script>
+<script src="/admin/painel/app.varejo.js?v=20260714-vendas2"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260714-historico2"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260714-atacado1"></script>
@@ -1610,7 +1610,7 @@
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(varejoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">valor comercial</p></div>
+            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(varejoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">só pneus — frete fora (frete no Financeiro)</p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="chart-no-axes-column-increasing" class="w-6 h-6 text-emerald-700"></i></div>
@@ -1689,7 +1689,7 @@
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="users-round" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Vendas no período</p><p class="text-2xl font-bold num" x-text="atacadoResumoKpis().vendas"></p><p class="text-xs text-gray-400 mt-1">borracheiros e parceiros</p></div></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">valor comercial</p></div></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="chart-no-axes-combined" class="w-6 h-6 text-emerald-700"></i></div><div><p class="text-xs text-gray-500">Ticket médio</p><p class="text-2xl font-bold num" x-text="formatCurrency(atacadoResumoKpis().ticket)"></p><p class="text-xs text-gray-400 mt-1">por venda</p></div></div>
-          <button @click="vendasHistoricoCanal = 'atacado'; vendasBusca = 'Cancelada'; vendasTab = 'historico'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-rose-200 hover:bg-rose-50/20"><div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-x" class="w-6 h-6 text-rose-600"></i></div><div><p class="text-xs text-gray-500">Canceladas</p><p class="text-2xl font-bold text-rose-600 num" x-text="atacadoResumoKpis().canceladas"></p><p class="text-xs text-gray-400 mt-1" x-text="atacadoResumoKpis().cancelPct.toFixed(1).replace('.', ',') + '% das tentativas'"></p></div></button>
+          <button @click="vendasHistoricoCanal = 'atacado'; vendasHistoricoStatus = 'cancelada'; vendasBusca = ''; vendasHistoricoPagina = 1; vendasTab = 'historico'" class="text-left bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm hover:border-rose-200 hover:bg-rose-50/20"><div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-x" class="w-6 h-6 text-rose-600"></i></div><div><p class="text-xs text-gray-500">Canceladas</p><p class="text-2xl font-bold text-rose-600 num" x-text="atacadoResumoKpis().canceladas"></p><p class="text-xs text-gray-400 mt-1" x-text="atacadoResumoKpis().cancelPct.toFixed(1).replace('.', ',') + '% das tentativas'"></p></div></button>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
@@ -1745,7 +1745,7 @@
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="shopping-cart" class="w-6 h-6 text-emerald-700"></i></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 min-h-[104px] flex items-center justify-between gap-4 shadow-sm">
-            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-xl font-bold text-emerald-800 num mt-1" x-text="formatCurrency(vendasHistoricoResumo().total)"></p></div>
+            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-xl font-bold text-emerald-800 num mt-1" x-text="formatCurrency(vendasHistoricoResumo().total)"></p><p class="text-xs text-gray-400 mt-0.5">pedido cheio — inclui frete</p></div>
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="banknote" class="w-6 h-6 text-emerald-700"></i></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl px-5 py-4 min-h-[104px] flex items-center justify-between gap-4 shadow-sm">
