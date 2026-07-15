@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 
 async function loadQuery() {
@@ -39,6 +39,11 @@ describe('painel de clientes', () => {
     expect(sql).toContain('commerce.partner_customers');
     expect(sql).toContain('commerce.wholesale_buyer_summary');
     expect(sql).toContain('network.partners');
+    expect(sql).toContain('latest_conversation');
+    expect(sql).toContain("THEN 'convertido'");
+    expect(sql).toContain("current_status = 'resolved'");
+    expect(sql).toContain('source_conversation_id = lc.conversation_id');
+    expect(sql).not.toContain("max(ac.value) FILTER (WHERE ac.dimension = 'stage_reached')");
   });
 
   it('entrega as cinco subabas e mantém Clientes como item do menu existente', () => {
@@ -54,5 +59,41 @@ describe('painel de clientes', () => {
     }
     expect(app).toContain("{ id: 'clientes',   label: 'Clientes',   icon: 'users' }");
     expect(staticRoute).toContain("'app.clientes.js'");
+    expect(html).toContain("id:'convertido',label:'Convertidos'");
+    expect(html).toContain("id:'perdido',label:'Perdidos'");
+    expect(html).toContain("panel:'bg-rose-100 border-rose-300'");
+    expect(html).toContain("panel:'bg-emerald-100 border-emerald-300'");
+  });
+
+  it('emite a invalidação do Kanban com ambiente, conversa e motivo', async () => {
+    Object.assign(process.env, {
+      NODE_ENV: 'test', FAREJADOR_ENV: 'test',
+      DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
+      CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin-token',
+    });
+    const { notifyClientesKanban } = await import('../../../src/shared/clientes-kanban.notify.js');
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const client = { query } as unknown as PoolClient;
+
+    await notifyClientesKanban(client, 'prod', 'conv-123', 'agent_turn');
+
+    expect(query).toHaveBeenCalledWith('SELECT pg_notify($1, $2)', [
+      'clientes_kanban',
+      JSON.stringify({ environment: 'prod', conversation_id: 'conv-123', reason: 'agent_turn' }),
+    ]);
+  });
+
+  it('liga SSE com debounce de um segundo e fallback sem tirar os cards da tela', () => {
+    const clientes = readFileSync('painel/public/app.clientes.js', 'utf8');
+    const core = readFileSync('painel/public/app.core.js', 'utf8');
+    const route = readFileSync('src/admin/painel/route-clientes.ts', 'utf8');
+
+    expect(clientes).toContain("new EventSource('/admin/api/clientes/stream')");
+    expect(clientes).toContain('setTimeout(() => { void app.loadClientes(true); }, 1000)');
+    expect(clientes).toContain('}, 15000)');
+    expect(core).toContain('this.startClientesLive()');
+    expect(core).toContain('this.stopClientesLive()');
+    expect(route).toContain("'Content-Type': 'text/event-stream'");
+    expect(route).toContain("event: kanban");
   });
 });

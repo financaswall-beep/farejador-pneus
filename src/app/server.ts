@@ -11,6 +11,7 @@ import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 import { startPartnerPushFanout } from '../parceiro/push.js';
 import { registerSecurityHeaders } from './security-headers.js';
+import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -48,6 +49,8 @@ async function start(): Promise<void> {
   stopPartnerChatReconciler = startPartnerChatReconciler();
   // Hub de tempo real do chat (LISTEN partner_chat -> SSE). Fatia 3.
   startPartnerChatNotifyHub();
+  // CRM da matriz: invalida o Kanban quando conversa, bot ou pedido mudam.
+  startClientesKanbanNotifyHub();
   // Foto sob demanda (0094): expira pendentes + fallback. No-op com a flag off.
   stopPhotoExpirer = startPhotoRequestExpirer();
   // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.

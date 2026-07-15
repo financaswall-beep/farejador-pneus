@@ -24,6 +24,7 @@ import {
   ensureAtendenteSession,
 } from '../shared/repositories/ops-atendente.repository.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 
 export interface RawEvent {
   id: number;
@@ -166,6 +167,8 @@ export async function dispatch(
         }
       }
 
+      await notifyClientesKanban(client, environment, conversationId, 'conversation');
+
       break;
     }
 
@@ -190,6 +193,7 @@ export async function dispatch(
         statusChange?.previous_value ?? null,
       );
       await insertStatusEvent(client, statusEvent, conversationId);
+      await notifyClientesKanban(client, environment, conversationId, 'conversation');
       break;
     }
 
@@ -287,6 +291,8 @@ export async function dispatch(
           );
         }
       }
+
+      await notifyClientesKanban(client, environment, upsertedMessage.conversationId, 'message');
 
       break;
     }

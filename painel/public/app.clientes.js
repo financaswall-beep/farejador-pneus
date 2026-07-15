@@ -1,10 +1,13 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
+let clientesEventSource = null;
+let clientesRefreshTimer = null;
+let clientesFallbackTimer = null;
 window.PAINEL_MODULES.clientes = function () {
   return {
-    async loadClientes() {
+    async loadClientes(silent = false) {
       if (this.clientesLoading || !this.adminAuthenticated) return;
-      this.clientesLoading = true;
-      this.clientesError = null;
+      if (!silent) this.clientesLoading = true;
+      if (!silent || !this.clientes.length) this.clientesError = null;
       try {
         const payload = await this.apiGet('/admin/api/clientes');
         this.clientes = Array.isArray(payload.rows) ? payload.rows : [];
@@ -12,18 +15,52 @@ window.PAINEL_MODULES.clientes = function () {
         if (!this.clienteSelecionadoId && this.clientes[0]) this.clienteSelecionadoId = this.clientes[0].id;
         if (!this.clienteParceiroSelecionadoId && this.clientesParceiros[0]) this.clienteParceiroSelecionadoId = this.clientesParceiros[0].partner_id;
       } catch (err) {
-        this.clientesError = err instanceof Error ? err.message : String(err);
+        if (!silent || !this.clientes.length) this.clientesError = err instanceof Error ? err.message : String(err);
+        else this.clientesLiveStatus = 'reconectando';
       } finally {
-        this.clientesLoading = false;
+        if (!silent) this.clientesLoading = false;
         this.$nextTick(() => lucide.createIcons());
       }
+    },
+    startClientesLive() {
+      if (!this.adminAuthenticated || this.currentPage !== 'clientes' || clientesEventSource) return;
+      const app = this;
+      this.clientesLiveStatus = 'conectando';
+      clientesEventSource = new EventSource('/admin/api/clientes/stream');
+      clientesEventSource.onopen = () => {
+        app.clientesLiveStatus = 'ao_vivo';
+        if (clientesFallbackTimer) clearInterval(clientesFallbackTimer);
+        clientesFallbackTimer = null;
+      };
+      clientesEventSource.addEventListener('kanban', () => {
+        if (clientesRefreshTimer) clearTimeout(clientesRefreshTimer);
+        clientesRefreshTimer = setTimeout(() => { void app.loadClientes(true); }, 1000);
+      });
+      clientesEventSource.onerror = () => {
+        if (app.currentPage !== 'clientes') return;
+        app.clientesLiveStatus = 'reconectando';
+        if (!clientesFallbackTimer) {
+          clientesFallbackTimer = setInterval(() => {
+            if (app.currentPage === 'clientes' && document.visibilityState === 'visible') void app.loadClientes(true);
+          }, 15000);
+        }
+      };
+    },
+    stopClientesLive() {
+      clientesEventSource?.close();
+      clientesEventSource = null;
+      if (clientesRefreshTimer) clearTimeout(clientesRefreshTimer);
+      if (clientesFallbackTimer) clearInterval(clientesFallbackTimer);
+      clientesRefreshTimer = null;
+      clientesFallbackTimer = null;
+      this.clientesLiveStatus = 'parado';
     },
     setClientesTab(tab) {
       this.clientesTab = tab;
       this.limparClientesFiltros();
       this.clientesPeriodo = tab === 'leads' ? '30' : (tab === 'recompra' || tab === 'parceiros' ? 'todos' : '90');
       const first = tab === 'leads'
-        ? ['novo', 'atendimento', 'orcamento', 'perdido'].flatMap((lane) => this.clientesLeads(lane))[0]
+        ? ['novo', 'atendimento', 'orcamento', 'perdido', 'convertido'].flatMap((lane) => this.clientesLeads(lane))[0]
         : tab === 'compradores' ? this.clientesCompradores()[0]
           : tab === 'recompra' ? this.clientesRecompra()[0] : this.clientesFiltrados()[0];
       if (first) this.clienteSelecionadoId = first.id;
@@ -76,11 +113,11 @@ window.PAINEL_MODULES.clientes = function () {
       };
     },
     clientesLeadsResumo() {
-      const todos = this.clientes.filter((c) => Number(c.purchases || 0) === 0 && c.source === 'chatwoot');
-      const compradores = this.clientes.filter((c) => Number(c.purchases || 0) > 0 && c.source === 'chatwoot').length;
-      const orcamentos = todos.filter((c) => this.clienteLeadLane(c) === 'orcamento').length;
-      const semResposta = todos.filter((c) => (this.clienteDias(c.last_interaction_at) ?? 0) >= 3 && this.clienteLeadLane(c) !== 'perdido').length;
-      return { novos: this.clientesLeads('novo').length, orcamentos, semResposta, conversao: todos.length + compradores ? (compradores / (todos.length + compradores)) * 100 : 0 };
+      const lanes = ['novo', 'atendimento', 'orcamento', 'perdido', 'convertido'];
+      const todos = lanes.flatMap((lane) => this.clientesLeads(lane));
+      const convertidos = todos.filter((c) => this.clienteLeadLane(c) === 'convertido').length;
+      const semResposta = todos.filter((c) => c.lead_waiting_on === 'equipe' && (this.clienteDias(c.lead_last_message_at) ?? 0) >= 3).length;
+      return { novos: this.clientesLeads('novo').length, orcamentos: this.clientesLeads('orcamento').length, semResposta, conversao: todos.length ? (convertidos / todos.length) * 100 : 0 };
     },
     clientesCompradoresResumo() {
       const rows = this.clientes.filter((c) => Number(c.purchases || 0) > 0);
@@ -136,21 +173,43 @@ window.PAINEL_MODULES.clientes = function () {
       return Math.max(0, Math.floor(ms / 86400000));
     },
     clienteLeadLane(c) {
+      if (['novo', 'atendimento', 'orcamento', 'perdido', 'convertido'].includes(c?.lead_lane)) return c.lead_lane;
+      if (Number(c?.lead_order_amount || 0) > 0) return 'convertido';
       const outcome = this.clienteTexto(c.lead_outcome);
       const stage = this.clienteTexto(c.lead_stage);
       if (/(perd|lost|cancel|sem interesse)/.test(outcome)) return 'perdido';
-      if (/(orc|cot|propost|offer)/.test(stage)) return 'orcamento';
+      if (/(orc|cot|quote|propost|offer|frete|bairro|pedido)/.test(stage)) return 'orcamento';
       if (stage) return 'atendimento';
       return 'novo';
     },
     clientesLeads(lane) {
       return this.clientesFiltrados()
-        .filter((c) => Number(c.purchases || 0) === 0 && c.source === 'chatwoot')
-        .filter((c) => this.clienteLeadLane(c) === lane);
+        .filter((c) => c.source === 'chatwoot' && c.lead_conversation_id)
+        .filter((c) => this.clienteLeadLane(c) === lane)
+        .sort((a, b) => {
+          const pa = a.lead_waiting_on === 'equipe' ? 0 : 1;
+          const pb = b.lead_waiting_on === 'equipe' ? 0 : 1;
+          if (pa !== pb) return pa - pb;
+          const ta = new Date(a.lead_last_message_at || a.last_interaction_at || 0).getTime();
+          const tb = new Date(b.lead_last_message_at || b.last_interaction_at || 0).getTime();
+          return pa === 0 ? ta - tb : tb - ta;
+        });
     },
     clienteLeadSelecionado() {
       const c = this.clienteSelecionado();
-      return c && Number(c.purchases || 0) === 0 ? c : null;
+      return c?.source === 'chatwoot' && c.lead_conversation_id ? c : null;
+    },
+    clienteLeadTempo(c) {
+      const seconds = Math.max(0, Math.floor((Date.now() - new Date(c?.lead_last_message_at || c?.last_interaction_at).getTime()) / 1000));
+      if (!Number.isFinite(seconds) || seconds < 60) return 'Agora';
+      if (seconds < 3600) return `Há ${Math.floor(seconds / 60)}min`;
+      if (seconds < 86400) return `Há ${Math.floor(seconds / 3600)}h`;
+      return `Há ${Math.floor(seconds / 86400)}d`;
+    },
+    clienteLeadEspera(c) {
+      if (c?.lead_waiting_on === 'equipe') return 'Aguardando equipe';
+      if (c?.lead_waiting_on === 'cliente') return 'Aguardando cliente';
+      return this.clienteLeadLane(c) === 'convertido' ? 'Pedido confirmado' : 'Conversa encerrada';
     },
     clientesCompradores() {
       return this.clientesFiltrados().filter((c) => Number(c.purchases || 0) > 0)

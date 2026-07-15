@@ -262,6 +262,7 @@ function painelApp() {
     clientesParceiros: [],
     clientesLoading: false,
     clientesError: null,
+    clientesLiveStatus: 'parado',
     clientesTab: 'todos',
     clientesBusca: '',
     clientesTipo: 'todos',

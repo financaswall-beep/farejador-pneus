@@ -15,6 +15,7 @@ import { ensurePickupMap, extractPickupCardFromActions } from './pickup-map.js';
 import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 
 const MAX_TOOL_ROUNDS = 5;
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -262,6 +263,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
             await client.query('ROLLBACK');
             throw err;
           }
+          await notifyClientesKanban(client, environment, conversationId, 'order');
         } else {
           result = await executeTool(client, environment as Environment, conversationId, toolCall.function.name, toolArgs);
         }
@@ -337,6 +339,7 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
         Date.now() - start,
       ],
     );
+    await notifyClientesKanban(client, environment, conversationId, 'agent_turn');
 
     const cacheHitRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
     logger.info(

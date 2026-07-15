@@ -23,6 +23,14 @@ export interface ClientePainelRow {
   last_interaction_at: string | null;
   lead_stage: string | null;
   lead_outcome: string | null;
+  lead_lane: 'novo' | 'atendimento' | 'orcamento' | 'perdido' | 'convertido' | null;
+  lead_conversation_id: string | null;
+  lead_created_at: string | null;
+  lead_last_message_at: string | null;
+  lead_waiting_on: 'equipe' | 'cliente' | 'nenhum' | null;
+  lead_location: string | null;
+  lead_quote_amount: number | null;
+  lead_order_amount: number | null;
   partner_id: string | null;
   partner_name: string | null;
 }
@@ -60,15 +68,22 @@ export async function getClientesPainel(
              ON ac.conversation_id = cv.id AND ac.environment = cv.environment
           WHERE cv.environment = $1 AND ac.dimension = 'customer_type'
           ORDER BY cv.contact_id, ac.created_at DESC
-       ), latest_funnel AS (
-         SELECT cv.contact_id,
-                max(ac.value) FILTER (WHERE ac.dimension = 'stage_reached') AS stage,
-                max(ac.value) FILTER (WHERE ac.dimension = 'final_outcome') AS outcome
+       ), latest_conversation AS (
+         SELECT DISTINCT ON (cv.contact_id)
+                cv.contact_id, cv.id AS conversation_id, cv.current_status,
+                cv.started_at, cv.last_activity_at, cv.updated_at
            FROM core.conversations cv
-           JOIN analytics.conversation_classifications ac
-             ON ac.conversation_id = cv.id AND ac.environment = cv.environment
-          WHERE cv.environment = $1 AND ac.dimension IN ('stage_reached', 'final_outcome')
-          GROUP BY cv.contact_id
+          WHERE cv.environment = $1 AND cv.deleted_at IS NULL AND cv.contact_id IS NOT NULL
+          ORDER BY cv.contact_id, COALESCE(cv.last_activity_at, cv.updated_at, cv.started_at) DESC, cv.id DESC
+       ), latest_funnel AS (
+         SELECT lc.contact_id,
+                (SELECT ac.value FROM analytics.conversation_classifications ac
+                  WHERE ac.environment = $1 AND ac.conversation_id = lc.conversation_id AND ac.dimension = 'stage_reached'
+                  ORDER BY ac.created_at DESC, ac.id DESC LIMIT 1) AS stage,
+                (SELECT ac.value FROM analytics.conversation_classifications ac
+                  WHERE ac.environment = $1 AND ac.conversation_id = lc.conversation_id AND ac.dimension = 'final_outcome'
+                  ORDER BY ac.created_at DESC, ac.id DESC LIMIT 1) AS outcome
+           FROM latest_conversation lc
        )
        SELECT 'chatwoot:' || c.id AS id, 'chatwoot' AS source, c.id::text AS source_id,
               COALESCE(NULLIF(c.name, ''), 'Cliente sem nome') AS name,
@@ -79,15 +94,73 @@ export async function getClientesPainel(
               COALESCE(cp.total_spent, 0)::float8 AS total_spent,
               COALESCE(cp.avg_ticket, 0)::float8 AS avg_ticket,
               COALESCE(fin.gross_profit, 0)::float8 AS gross_profit,
-              last_product.label AS last_item,
+              COALESCE(lead_interest.value, last_product.label) AS last_item,
               cp.first_order_at::text AS first_purchase_at, cp.last_order_at::text AS last_purchase_at,
-              COALESCE(c.last_seen_at, c.updated_at)::text AS last_interaction_at,
+              COALESCE(lc.last_activity_at, lc.updated_at, c.last_seen_at, c.updated_at)::text AS last_interaction_at,
               lf.stage AS lead_stage, lf.outcome AS lead_outcome,
+              CASE
+                WHEN lead_order.order_id IS NOT NULL THEN 'convertido'
+                WHEN lc.current_status = 'resolved' THEN 'perdido'
+                WHEN lead_quote.amount IS NOT NULL OR lower(COALESCE(lf.stage, '')) ~ 'cot|orc|propost|offer|frete|bairro|pedido' THEN 'orcamento'
+                WHEN lead_message.has_reply OR COALESCE(lf.stage, '') NOT IN ('', 'abriu_conversa') THEN 'atendimento'
+                ELSE 'novo'
+              END AS lead_lane,
+              lc.conversation_id::text AS lead_conversation_id,
+              lc.started_at::text AS lead_created_at,
+              lead_message.sent_at::text AS lead_last_message_at,
+              CASE
+                WHEN lead_order.order_id IS NOT NULL OR lc.current_status = 'resolved' THEN 'nenhum'
+                WHEN lead_message.sender_type = 'contact' THEN 'equipe'
+                WHEN lead_message.sender_type IS NOT NULL THEN 'cliente'
+                ELSE 'equipe'
+              END AS lead_waiting_on,
+              lead_location.value AS lead_location,
+              lead_quote.amount::float8 AS lead_quote_amount,
+              lead_order.total_amount::float8 AS lead_order_amount,
               NULL::text AS partner_id, NULL::text AS partner_name
          FROM core.contacts c
          LEFT JOIN commerce.customer_profile cp ON cp.contact_id = c.id AND cp.environment = c.environment
          LEFT JOIN latest_type lt ON lt.contact_id = c.id
+         LEFT JOIN latest_conversation lc ON lc.contact_id = c.id
          LEFT JOIN latest_funnel lf ON lf.contact_id = c.id
+         LEFT JOIN LATERAL (
+           SELECT m.sender_type, m.sent_at,
+                  EXISTS(SELECT 1 FROM core.messages mx
+                          WHERE mx.environment = c.environment AND mx.conversation_id = lc.conversation_id
+                            AND mx.sender_type IN ('user', 'agent_bot') AND mx.is_private = false AND mx.deleted_at IS NULL) AS has_reply
+             FROM core.messages m
+            WHERE m.environment = c.environment AND m.conversation_id = lc.conversation_id
+              AND m.is_private = false AND m.deleted_at IS NULL
+            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1
+         ) lead_message ON true
+         LEFT JOIN LATERAL (
+           SELECT cf.fact_value #>> '{}' AS value
+             FROM analytics.conversation_facts cf
+            WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
+              AND cf.fact_key IN ('medida_consultada', 'medida_pneu', 'produto_cotado', 'moto_modelo_consultado')
+            ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1
+         ) lead_interest ON true
+         LEFT JOIN LATERAL (
+           SELECT cf.fact_value #>> '{}' AS value
+             FROM analytics.conversation_facts cf
+            WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
+              AND cf.fact_key IN ('bairro_canonico', 'bairro_consultado', 'municipio_entrega')
+            ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1
+         ) lead_location ON true
+         LEFT JOIN LATERAL (
+           SELECT CASE WHEN raw_value ~ '^[0-9]+([.,][0-9]+)?$' THEN replace(raw_value, ',', '.')::numeric END AS amount
+             FROM (SELECT cf.fact_value #>> '{}' AS raw_value
+                     FROM analytics.conversation_facts cf
+                    WHERE cf.environment = c.environment AND cf.conversation_id = lc.conversation_id
+                      AND cf.fact_key = 'preco_cotado'
+                    ORDER BY COALESCE(cf.observed_at, cf.created_at) DESC, cf.created_at DESC LIMIT 1) q
+         ) lead_quote ON true
+         LEFT JOIN LATERAL (
+           SELECT o.id AS order_id, o.total_amount
+             FROM commerce.orders o
+            WHERE o.environment = c.environment AND o.source_conversation_id = lc.conversation_id AND o.status <> 'cancelled'
+            ORDER BY o.created_at DESC LIMIT 1
+         ) lead_order ON true
          LEFT JOIN LATERAL (
            SELECT sum(((oi.unit_price - COALESCE(oi.matriz_unit_cost, oi.unit_price)) * oi.quantity) - oi.discount_amount) AS gross_profit
              FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
@@ -128,7 +201,10 @@ export async function getClientesPainel(
               min(o.created_at) FILTER (WHERE o.status <> 'cancelled')::text AS first_purchase_at,
               max(o.created_at) FILTER (WHERE o.status <> 'cancelled')::text AS last_purchase_at,
               COALESCE(max(o.created_at), c.updated_at)::text AS last_interaction_at,
-              NULL::text AS lead_stage, NULL::text AS lead_outcome,
+              NULL::text AS lead_stage, NULL::text AS lead_outcome, NULL::text AS lead_lane,
+              NULL::text AS lead_conversation_id, NULL::text AS lead_created_at, NULL::text AS lead_last_message_at,
+              NULL::text AS lead_waiting_on, NULL::text AS lead_location,
+              NULL::float8 AS lead_quote_amount, NULL::float8 AS lead_order_amount,
               NULL::text AS partner_id, NULL::text AS partner_name
          FROM commerce.customers c
          LEFT JOIN commerce.orders o ON o.customer_id = c.id AND o.environment = c.environment
@@ -155,7 +231,10 @@ export async function getClientesPainel(
               min(po.created_at) FILTER (WHERE po.status <> 'cancelled')::text AS first_purchase_at,
               max(po.created_at) FILTER (WHERE po.status <> 'cancelled')::text AS last_purchase_at,
               pc.updated_at::text AS last_interaction_at,
-              NULL::text AS lead_stage, NULL::text AS lead_outcome,
+              NULL::text AS lead_stage, NULL::text AS lead_outcome, NULL::text AS lead_lane,
+              NULL::text AS lead_conversation_id, NULL::text AS lead_created_at, NULL::text AS lead_last_message_at,
+              NULL::text AS lead_waiting_on, NULL::text AS lead_location,
+              NULL::float8 AS lead_quote_amount, NULL::float8 AS lead_order_amount,
               np.id::text AS partner_id, np.trade_name AS partner_name
          FROM commerce.partner_customers pc
          JOIN network.partner_units pu ON pu.unit_id = pc.unit_id AND pu.environment = pc.environment AND pu.deleted_at IS NULL
@@ -183,7 +262,10 @@ export async function getClientesPainel(
                ORDER BY wo.sold_at DESC, woi.created_at DESC LIMIT 1) AS last_item,
               NULL::text AS first_purchase_at, s.last_purchase_at::text AS last_purchase_at,
               COALESCE(s.last_purchase_at, wc.updated_at)::text AS last_interaction_at,
-              NULL::text AS lead_stage, NULL::text AS lead_outcome,
+              NULL::text AS lead_stage, NULL::text AS lead_outcome, NULL::text AS lead_lane,
+              NULL::text AS lead_conversation_id, NULL::text AS lead_created_at, NULL::text AS lead_last_message_at,
+              NULL::text AS lead_waiting_on, NULL::text AS lead_location,
+              NULL::float8 AS lead_quote_amount, NULL::float8 AS lead_order_amount,
               s.partner_id::text AS partner_id, np.trade_name AS partner_name
          FROM commerce.wholesale_buyer_summary s
          JOIN commerce.wholesale_customers wc ON wc.id = s.buyer_id

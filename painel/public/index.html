@@ -28,19 +28,19 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.clientes.js?v=20260715-clientes1"></script>
+<script src="/admin/painel/app.clientes.js?v=20260715-kanban1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.core.js?v=20260713-vendas1"></script>
+<script src="/admin/painel/app.core.js?v=20260715-kanban1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.montagem.js?v=20260714-fiscal1"></script>
-<script src="/admin/painel/app.js?v=20260714-logistica2"></script>
+<script src="/admin/painel/app.js?v=20260715-kanban1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -4692,10 +4692,70 @@
 
         <!-- 2. LEADS -->
         <section x-show="clientesTab==='leads'">
-          <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4"><div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Leads novos</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().novos"></p></div><div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Orçamentos enviados</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().orcamentos"></p></div><div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Sem resposta</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().semResposta"></p></div><div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Conversão</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().conversao.toFixed(1).replace('.',',')+'%'"></p></div></div>
-          <div class="bg-white border rounded-lg p-3 mb-4 flex flex-wrap gap-2"><label class="relative flex-[1_1_220px]"><i data-lucide="search" class="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400"></i><input x-model.debounce.200ms="clientesBusca" placeholder="Buscar lead" class="w-full h-9 border rounded-md pl-9 pr-3 text-xs"></label><select x-model="clientesOrigem" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Origem: Todas</option><option value="chatwoot">Chatwoot</option></select><select x-model="clientesTipo" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Tipo: Todos</option><option value="pessoa_fisica">Pessoa física</option><option value="borracharia">Borracharia</option><option value="nao_classificado">Não classificado</option></select><select x-model="clientesClasse" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Classe: Todas</option><option value="vip">VIP</option><option value="normal">Normal</option></select><select x-model="clientesPeriodo" class="h-9 border rounded-md px-3 text-xs"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="todos">Todo período</option></select><button @click="loadClientes()" class="ml-auto h-9 px-4 rounded-md bg-emerald-700 text-white text-xs inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Atualizar</button></div>
-          <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_300px] gap-4"><div class="grid grid-cols-1 xl:grid-cols-4 gap-3"><template x-for="lane in [{id:'novo',label:'Novo',tone:'bg-blue-50 text-blue-700'},{id:'atendimento',label:'Em atendimento',tone:'bg-gray-100 text-gray-700'},{id:'orcamento',label:'Orçamento enviado',tone:'bg-amber-50 text-amber-700'},{id:'perdido',label:'Perdido',tone:'bg-rose-50 text-rose-700'}]" :key="'kanban-'+lane.id"><div class="border border-gray-200 rounded-lg bg-gray-50/60 p-2.5 min-h-[430px]"><div class="flex items-center justify-between mb-2.5"><p class="text-xs font-semibold" x-text="lane.label"></p><span class="text-[10px] px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div><div class="space-y-2"><template x-for="c in clientesLeads(lane.id).slice(0,8)" :key="'lead-'+c.id"><button @click="selecionarCliente(c)" class="w-full bg-white border rounded-md p-3 text-left hover:border-emerald-300"><p class="text-xs font-medium truncate" x-text="c.name"></p><p class="text-[10px] text-gray-400 mt-0.5" x-text="clienteTipoLabel(c.kind)"></p><div class="flex items-center justify-between mt-3 text-[10px]"><span class="inline-flex items-center gap-1.5 text-emerald-700"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5"></template><span x-text="c.origin"></span></span><span class="text-gray-400" x-text="clienteDias(c.last_interaction_at)===0?'Hoje':('Há '+clienteDias(c.last_interaction_at)+'d')"></span></div></button></template><p x-show="!clientesLeads(lane.id).length" class="text-[10px] text-gray-400 text-center py-8">Nenhum lead</p></div></div></template></div>
-            <aside class="bg-white border rounded-lg p-4 h-fit" x-show="clienteLeadSelecionado()"><div class="flex justify-between"><p class="text-sm font-semibold">Lead selecionado</p><button @click="clienteSelecionadoId=null" class="text-gray-400">×</button></div><div class="flex items-center gap-3 py-4"><div class="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-semibold" x-text="initials(clienteLeadSelecionado()?.name||'')"></div><div><p class="font-semibold text-sm" x-text="clienteLeadSelecionado()?.name"></p><p class="text-[10px] text-gray-400" x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></p></div></div><dl class="space-y-2 text-xs border-y py-3"><div class="flex justify-between"><dt class="text-gray-500">Origem</dt><dd class="inline-flex items-center gap-1.5"><template x-if="clienteOrigemIcone(clienteLeadSelecionado())"><img :src="clienteOrigemIcone(clienteLeadSelecionado())" alt="" class="w-3.5 h-3.5"></template><span x-text="clienteLeadSelecionado()?.origin"></span></dd></div><div class="flex justify-between"><dt class="text-gray-500">Criado em</dt><dd x-text="clienteData(clienteLeadSelecionado()?.last_interaction_at)"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Classe</dt><dd x-text="clienteClasseLabel(clienteLeadSelecionado())"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Interesse</dt><dd x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Status</dt><dd class="text-amber-700" x-text="clienteLeadSelecionado()?.lead_stage||'Novo'"></dd></div></dl><p class="text-[10px] text-gray-400 mt-4 mb-2">Próxima ação sugerida</p><button @click="abrirWhatsAppCliente(clienteLeadSelecionado())" class="w-full h-9 bg-emerald-700 text-white rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4 bg-white rounded-full">Continuar conversa</button><button @click="abrirWhatsAppCliente(clienteLeadSelecionado(),clienteOfertaMensagem(clienteLeadSelecionado()))" class="w-full h-9 border border-emerald-700 text-emerald-800 rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4">Enviar oferta</button><button @click="abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full text-xs text-emerald-800 py-2">Ver histórico do lead</button></aside>
+          <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Leads novos</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().novos"></p></div>
+            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Orçamentos enviados</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().orcamentos"></p></div>
+            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Sem resposta</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesLeadsResumo().semResposta"></p></div>
+            <div class="bg-white border rounded-lg p-4"><p class="text-xs text-gray-500">Conversão</p><p class="text-2xl font-semibold mt-1.5 text-emerald-800" x-text="clientesLeadsResumo().conversao.toFixed(1).replace('.',',')+'%'"></p></div>
+          </div>
+          <div class="bg-white border rounded-lg p-3 mb-4 flex flex-wrap gap-2 items-center">
+            <label class="relative flex-[1_1_220px]"><i data-lucide="search" class="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400"></i><input x-model.debounce.200ms="clientesBusca" placeholder="Buscar lead" class="w-full h-9 border rounded-md pl-9 pr-3 text-xs"></label>
+            <select x-model="clientesOrigem" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Origem: Todas</option><option value="chatwoot">Chatwoot</option></select>
+            <select x-model="clientesTipo" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Tipo: Todos</option><option value="pessoa_fisica">Pessoa física</option><option value="borracharia">Borracharia</option><option value="nao_classificado">Não classificado</option></select>
+            <select x-model="clientesClasse" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Classe: Todas</option><option value="vip">VIP</option><option value="normal">Normal</option></select>
+            <select x-model="clientesPeriodo" class="h-9 border rounded-md px-3 text-xs"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="todos">Todo período</option></select>
+            <span class="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'"><span class="w-1.5 h-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-500':'bg-amber-500'"></span><span x-text="clientesLiveStatus==='ao_vivo'?'Ao vivo':'Reconectando'"></span></span>
+            <button @click="loadClientes()" class="h-9 px-4 rounded-md bg-emerald-700 text-white text-xs inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Atualizar</button>
+          </div>
+          <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
+            <div class="overflow-x-auto pb-2">
+              <div class="grid grid-cols-5 gap-3 min-w-[1050px]">
+                <template x-for="lane in [
+                  {id:'novo',label:'Novo',tone:'bg-blue-100 text-blue-700',panel:'bg-slate-50 border-slate-200',card:'bg-white border-slate-200 hover:border-blue-300'},
+                  {id:'atendimento',label:'Em atendimento',tone:'bg-gray-200 text-gray-700',panel:'bg-gray-50 border-gray-200',card:'bg-white border-gray-200 hover:border-gray-400'},
+                  {id:'orcamento',label:'Orçamento enviado',tone:'bg-amber-100 text-amber-700',panel:'bg-amber-50/60 border-amber-200',card:'bg-white border-amber-200 hover:border-amber-400'},
+                  {id:'perdido',label:'Perdidos',tone:'bg-rose-600 text-white',panel:'bg-rose-100 border-rose-300',card:'bg-rose-50 border-rose-300 hover:border-rose-500'},
+                  {id:'convertido',label:'Convertidos',tone:'bg-emerald-700 text-white',panel:'bg-emerald-100 border-emerald-300',card:'bg-emerald-50 border-emerald-300 hover:border-emerald-600'}
+                ]" :key="'kanban-'+lane.id">
+                  <div class="border rounded-lg p-2.5 min-h-[470px]" :class="lane.panel">
+                    <div class="flex items-center justify-between mb-2.5"><p class="text-xs font-semibold" x-text="lane.label"></p><span class="text-[10px] px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div>
+                    <div class="space-y-2">
+                      <template x-for="c in clientesLeads(lane.id).slice(0,30)" :key="'lead-'+c.id">
+                        <button @click="selecionarCliente(c)" class="w-full border rounded-md p-3 text-left shadow-sm transition-colors" :class="lane.card">
+                          <div class="flex justify-between gap-2"><p class="text-xs font-semibold truncate" x-text="c.name"></p><span x-show="c.is_vip" class="text-[9px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">VIP</span></div>
+                          <p class="text-[10px] text-gray-500 mt-0.5" x-text="clienteTipoLabel(c.kind)"></p>
+                          <p class="text-[10px] mt-2 truncate" x-show="c.last_item"><span class="text-gray-400">Interesse: </span><span class="font-medium" x-text="c.last_item"></span></p>
+                          <p class="text-[10px] mt-1 truncate" x-show="c.lead_location"><span class="text-gray-400">Local: </span><span x-text="c.lead_location"></span></p>
+                          <p class="text-[11px] font-semibold mt-2" x-show="lane.id==='orcamento' && c.lead_quote_amount" x-text="formatCurrency(c.lead_quote_amount)"></p>
+                          <p class="text-[11px] font-semibold text-emerald-800 mt-2" x-show="lane.id==='convertido' && c.lead_order_amount" x-text="formatCurrency(c.lead_order_amount)"></p>
+                          <div class="flex items-center justify-between mt-3 text-[10px]"><span class="inline-flex items-center gap-1.5 text-gray-600"><template x-if="clienteOrigemIcone(c)"><img :src="clienteOrigemIcone(c)" alt="" class="w-3.5 h-3.5"></template><span class="truncate max-w-[85px]" x-text="c.origin"></span></span><span class="text-gray-500" x-text="clienteLeadTempo(c)"></span></div>
+                          <p class="text-[9px] mt-2 font-medium" :class="c.lead_waiting_on==='equipe'?'text-rose-700':(lane.id==='convertido'?'text-emerald-800':'text-gray-500')" x-text="clienteLeadEspera(c)"></p>
+                        </button>
+                      </template>
+                      <p x-show="!clientesLeads(lane.id).length" class="text-[10px] text-gray-400 text-center py-8">Nenhum lead</p>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <aside class="bg-white border rounded-lg p-4 h-fit" x-show="clienteLeadSelecionado()">
+              <div class="flex justify-between"><p class="text-sm font-semibold">Lead selecionado</p><button @click="clienteSelecionadoId=null" class="text-gray-400">×</button></div>
+              <div class="flex items-center gap-3 py-4"><div class="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-semibold" x-text="initials(clienteLeadSelecionado()?.name||'')"></div><div><p class="font-semibold text-sm" x-text="clienteLeadSelecionado()?.name"></p><p class="text-[10px] text-gray-400" x-text="clienteLeadSelecionado()?.phone||'Sem telefone'"></p></div></div>
+              <dl class="space-y-2 text-xs border-y py-3">
+                <div class="flex justify-between"><dt class="text-gray-500">Origem</dt><dd class="inline-flex items-center gap-1.5"><template x-if="clienteOrigemIcone(clienteLeadSelecionado())"><img :src="clienteOrigemIcone(clienteLeadSelecionado())" alt="" class="w-3.5 h-3.5"></template><span x-text="clienteLeadSelecionado()?.origin"></span></dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Criado em</dt><dd x-text="clienteData(clienteLeadSelecionado()?.lead_created_at)"></dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Classe</dt><dd x-text="clienteClasseLabel(clienteLeadSelecionado())"></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500">Interesse</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.last_item||'Não informado'"></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500">Local</dt><dd class="text-right" x-text="clienteLeadSelecionado()?.lead_location||'Não informado'"></dd></div>
+                <div class="flex justify-between"><dt class="text-gray-500">Situação</dt><dd class="font-medium" :class="clienteLeadSelecionado()?.lead_waiting_on==='equipe'?'text-rose-700':'text-emerald-700'" x-text="clienteLeadEspera(clienteLeadSelecionado())"></dd></div>
+                <div class="flex justify-between" x-show="clienteLeadSelecionado()?.lead_quote_amount"><dt class="text-gray-500">Cotação</dt><dd class="font-semibold" x-text="formatCurrency(clienteLeadSelecionado()?.lead_quote_amount)"></dd></div>
+                <div class="flex justify-between" x-show="clienteLeadSelecionado()?.lead_order_amount"><dt class="text-gray-500">Pedido</dt><dd class="font-semibold text-emerald-800" x-text="formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></dd></div>
+              </dl>
+              <p class="text-[10px] text-gray-400 mt-4 mb-2">Próxima ação sugerida</p>
+              <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado())" class="w-full h-9 bg-emerald-700 text-white rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4 bg-white rounded-full">Continuar conversa</button>
+              <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado(),clienteOfertaMensagem(clienteLeadSelecionado()))" class="w-full h-9 border border-emerald-700 text-emerald-800 rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4">Enviar oferta</button>
+              <button @click="abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full text-xs text-emerald-800 py-2">Ver histórico do lead</button>
+            </aside>
           </div>
         </section>
 
