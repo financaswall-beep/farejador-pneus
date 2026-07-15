@@ -120,6 +120,7 @@ window.PAINEL_MODULES.clientes = function () {
     clienteOrigemIcone(c) {
       const origem = this.clienteTexto(c?.origin);
       if (origem.includes('instagram')) return '/assets/brands/instagram.svg';
+      if (origem.includes('google')) return '/assets/brands/google-ads.svg';
       if (/facebook|meta ads/.test(origem)) return '/assets/brands/facebook.svg';
       if (/whatsapp|whats app/.test(origem)) return '/assets/brands/whatsapp.svg';
       return '';
