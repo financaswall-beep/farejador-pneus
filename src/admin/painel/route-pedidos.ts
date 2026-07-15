@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { cancelManualOrder, registerManualOrder, registerWalkinOrder } from './queries.js';
@@ -21,6 +21,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
       const result = await registerManualOrder({
         ...parsed.data,
         actor_label: operatorLabel(request),
+        seller_collaborator_id: getAdminContext(request).collaboratorId,
       });
       return reply.status(200).send(result);
     } catch (err) {
@@ -40,6 +41,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
       const result = await registerWalkinOrder({
         ...parsed.data,
         actor_label: operatorLabel(request),
+        seller_collaborator_id: getAdminContext(request).collaboratorId,
       });
       return reply.status(200).send(result);
     } catch (err) {

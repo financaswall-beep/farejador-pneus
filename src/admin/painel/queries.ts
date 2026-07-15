@@ -26,6 +26,8 @@ export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendu
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)
 export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): cadastro (list/criar/função)
 export * from './queries-colaboradores-acesso.js'; // ciclo de acesso (0132): papel do painel, revogar/reativar, senha
+export * from './queries-colaboradores-gestao.js'; // visão integrada: equipe/remuneração/comissão/desempenho
+export * from './queries-colaboradores-folha.js'; // ajustes, fechamento e pagamento conciliado com Financeiro
 export * from './queries-notificacoes.js'; // sino do painel: entregas falhadas + vencidos + galpão pra repor
 export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando agora)
 export * from './queries-clientes.js'; // CRM da matriz: clientes/leads/compradores/recompra/parceiros

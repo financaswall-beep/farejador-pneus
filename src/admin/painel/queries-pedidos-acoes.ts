@@ -97,6 +97,15 @@ export async function registerManualOrder(
   );
   const orderId = result.rows[0]!.order_id;
 
+  if (input.seller_collaborator_id) {
+    await dbPool.query(
+      `UPDATE commerce.orders o SET seller_collaborator_id=mc.id
+        FROM network.matriz_collaborators mc
+       WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3 AND mc.environment=o.environment AND mc.revoked_at IS NULL`,
+      [orderId, environment, input.seller_collaborator_id],
+    );
+  }
+
   // Venda MANUAL que cai na MATRIZ (unit vazia → 'main' dentro da função SQL) também congela
   // o custo do galpão nos itens (0117). NÃO baixa estoque aqui (comportamento de hoje: só
   // walk-in e bot baixam) — este é só o retrato do custo pro lucro do varejo sair certo.
@@ -147,6 +156,15 @@ export async function registerWalkinOrder(
     ],
   );
   const orderId = result.rows[0]!.order_id;
+
+  if (input.seller_collaborator_id) {
+    await dbPool.query(
+      `UPDATE commerce.orders o SET seller_collaborator_id=mc.id
+        FROM network.matriz_collaborators mc
+       WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3 AND mc.environment=o.environment AND mc.revoked_at IS NULL`,
+      [orderId, environment, input.seller_collaborator_id],
+    );
+  }
 
   // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock) e CONGELA
   // o custo médio nos itens (0117 — fatia 2: lucro real do varejo). Best-effort FORA da

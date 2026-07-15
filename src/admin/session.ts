@@ -193,8 +193,8 @@ export async function bootstrapMatrizOwner(
     );
     const collaborator = await client.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment, person_id, display_name, job, panel_role, created_by)
-       VALUES ($1, $2, $3, 'vendedor', 'owner', 'bootstrap-admin-login')
+         (environment, person_id, display_name, job, job_title, work_area, panel_role, created_by)
+       VALUES ($1, $2, $3, 'colaborador', 'Proprietário', 'administrative', 'owner', 'bootstrap-admin-login')
        RETURNING id`,
       [environment, person.rows[0]!.id, input.displayName.trim()],
     );

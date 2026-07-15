@@ -26,7 +26,7 @@ export interface FinanceiroReceivableItem {
 }
 
 export interface FinanceiroPayableItem {
-  tipo: 'fornecedor' | 'despesa';
+  tipo: 'fornecedor' | 'despesa' | 'folha';
   id: string;
   nome: string;
   categoria?: string;         // despesa: categoria (pro rótulo da agenda)
@@ -198,7 +198,7 @@ export async function getMatrizFinanceiroVisao(
   if (despesas) {
     for (const d of despesas.entries) {
       if (d.payment_status !== 'pending') continue;
-      pagaveis.push({ tipo: 'despesa', id: d.id, nome: d.description || d.category,
+      pagaveis.push({ tipo: d.payroll_item_id ? 'folha' : 'despesa', id: d.id, nome: d.description || d.category,
         categoria: d.category, valor: d.amount, due_date: d.due_date, overdue: d.overdue });
     }
   }
@@ -278,4 +278,3 @@ export async function getMatrizFinanceiroVisao(
 // Termômetro NÃO mexe na régua de faturamento (0117 conta não-cancelado);
 // "não entregue" CANCELA no caminho atômico (galpão volta pela trilha fdd9148).
 // Guard em toda escrita: só pedido de ENTREGA da unit 'main' (parceiro intocado).
-

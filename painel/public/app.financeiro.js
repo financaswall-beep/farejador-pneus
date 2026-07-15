@@ -191,7 +191,7 @@ window.PAINEL_MODULES.financeiro = function () {
       if (!window.confirm(`Pagar ${this.formatCurrency(Number(item.valor))} (${item.nome})?`)) return;
       this.finQuitando = true;
       try {
-        if (item.tipo === 'despesa') {
+        if (item.tipo === 'despesa' || item.tipo === 'folha') {
           await this.apiPost('/admin/api/matriz/despesas/settle', { id: item.id });
         } else {
           await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'purchase', id: item.id });

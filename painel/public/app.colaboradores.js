@@ -7,16 +7,24 @@ window.PAINEL_MODULES.colaboradores = function () {
     async loadColaboradores() {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
-        const payload = await this.apiGet('/admin/api/colaboradores');
+        const payload = await this.apiGet(`/admin/api/colaboradores/gestao?competencia=${encodeURIComponent(this.colabMes + '-01')}`);
         this.colaboradores = payload.collaborators || [];
+        this.colabSummary = payload.summary || {};
         this.colabLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       } catch (err) {
         console.error('colaboradores load failed', err);
       }
     },
-    colabJobLabel(job) {
-      return job === 'entregador' ? 'Entregador' : 'Vendedor';
+    colabJobLabel(value) {
+      if (value && typeof value === 'object') return value.job_title || 'Colaborador';
+      return value === 'entregador' ? 'Entregador' : value === 'vendedor' ? 'Vendedor' : 'Colaborador';
+    },
+    colabAreaLabel(area) {
+      return ({ sales: 'Vendas', delivery: 'Entregas', administrative: 'Administrativo', workshop: 'Oficina', other: 'Outros' })[area] || 'Outros';
+    },
+    colabOperationalJob(area) {
+      return area === 'sales' ? 'vendedor' : area === 'delivery' ? 'entregador' : 'colaborador';
     },
     colabAccessLabel(role) {
       if (role === 'owner') return 'Proprietário';
@@ -31,11 +39,11 @@ window.PAINEL_MODULES.colaboradores = function () {
     get colabRevogadosLista() {
       return this.colaboradores.filter((c) => !c.active);
     },
-    get colabVendedoresCount() {
-      return this.colabAtivos.filter((c) => c.job === 'vendedor').length;
+    get colabCargosCount() {
+      return new Set(this.colabAtivos.map((c) => c.job_title)).size;
     },
-    get colabEntregadoresCount() {
-      return this.colabAtivos.filter((c) => c.job === 'entregador').length;
+    get colabAcessoCount() {
+      return this.colabAtivos.filter((c) => c.panel_role).length;
     },
     /** Quantos proprietários ATIVOS existem — com 1 só, o select dele tranca
      *  (espelho visual da trava last_owner_required do servidor, 0132). */
@@ -45,10 +53,12 @@ window.PAINEL_MODULES.colaboradores = function () {
     get colabFiltrados() {
       const base = this.colabView === 'revogados' ? this.colabRevogadosLista : this.colabAtivos;
       const busca = String(this.colabBusca || '').trim().toLowerCase();
-      if (!busca) return base;
-      return base.filter((c) =>
+      return base.filter((c) => (!this.colabCargoFiltro || c.job_title === this.colabCargoFiltro)
+        && (!this.colabAcessoFiltro || (this.colabAcessoFiltro === 'sim' ? !!c.panel_role : !c.panel_role))
+        && (!busca || (
         String(c.display_name || '').toLowerCase().includes(busca)
-        || String(c.username || '').toLowerCase().includes(busca));
+        || String(c.username || '').toLowerCase().includes(busca)
+        || String(c.job_title || '').toLowerCase().includes(busca))));
     },
     colabIniciais(nome) {
       const partes = String(nome || '?').trim().split(/\s+/);
@@ -77,8 +87,8 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabMsg = { ok: false, text: 'Preenche nome, usuário e senha.' };
         return;
       }
-      if (!f.job) {
-        this.colabMsg = { ok: false, text: 'Escolhe a função: vendedor ou entregador.' };
+      if (!f.job_title.trim()) {
+        this.colabMsg = { ok: false, text: 'Informe o cargo do colaborador.' };
         return;
       }
       this.colabSaving = true;
@@ -88,11 +98,13 @@ window.PAINEL_MODULES.colaboradores = function () {
           display_name: f.display_name.trim(),
           username: f.username.trim(),
           password: f.password,
-          job: f.job,
+          job: this.colabOperationalJob(f.work_area),
+          job_title: f.job_title.trim(),
+          work_area: f.work_area,
           panel_role: f.panel_role || null,
         });
-        this.colabMsg = { ok: true, text: `${f.display_name.trim()} cadastrado como ${this.colabJobLabel(f.job).toLowerCase()}.` };
-        this.colabForm = { display_name: '', username: '', password: '', job: '', panel_role: null };
+        this.colabMsg = { ok: true, text: `${f.display_name.trim()} cadastrado como ${f.job_title.trim()}.` };
+        this.colabForm = { display_name: '', username: '', password: '', job_title: '', work_area: 'other', panel_role: null };
         this.colabShowForm = false;
         await this.loadColaboradores();
       } catch (err) {
@@ -103,12 +115,14 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabSaving = false;
       }
     },
-    async mudarFuncaoColaborador(c, job) {
-      if (c.job === job) return;
+    async mudarFuncaoColaborador(c, jobTitle, workArea) {
+      if (!jobTitle || !jobTitle.trim()) return;
       this.colabSaving = true;
       try {
-        await this.apiPost('/admin/api/colaboradores/funcao', { id: c.id, job });
-        this.colabMsg = { ok: true, text: `${c.display_name} agora é ${this.colabJobLabel(job).toLowerCase()}.` };
+        await this.apiPost('/admin/api/colaboradores/funcao', {
+          id: c.id, job: this.colabOperationalJob(workArea), job_title: jobTitle.trim(), work_area: workArea,
+        });
+        this.colabMsg = { ok: true, text: `Cargo de ${c.display_name} atualizado.` };
         await this.loadColaboradores();
       } catch (err) {
         this.colabMsg = { ok: false, text: `Não consegui mudar a função (${err.message}).` };

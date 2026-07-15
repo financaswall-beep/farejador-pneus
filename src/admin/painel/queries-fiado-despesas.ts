@@ -129,6 +129,7 @@ export interface MatrizExpenseRow {
   due_date: string | null;
   paid_at: string | null;
   overdue: boolean;
+  payroll_item_id: string | null;
 }
 
 export interface MatrizExpensesFiltro {
@@ -174,6 +175,7 @@ export async function getMatrizExpenses(
     : `(payment_status = 'pending') DESC, (due_date IS NULL), due_date, occurred_at DESC`;
   const rows = await dbPool.query<MatrizExpenseRow>(
     `SELECT id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
+            (SELECT i.id FROM finance.matriz_payroll_items i WHERE i.source_expense_id=matriz_expenses.id) AS payroll_item_id,
             (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue
        FROM commerce.matriz_expenses
       WHERE ${where.join(' AND ')}
@@ -232,6 +234,7 @@ export async function createMatrizExpense(
       WHERE EXISTS (SELECT 1 FROM commerce.matriz_expense_categories c
                      WHERE c.environment = $1::env_t AND c.slug = $2 AND c.archived_at IS NULL)
      RETURNING id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
+               NULL::uuid AS payroll_item_id,
                (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue`,
     [environment, input.category, input.description ?? null, input.amount,
      paymentStatus, paymentStatus === 'pending' ? (input.due_date ?? null) : null,
@@ -280,4 +283,3 @@ export async function removeMatrizExpense(
 // O balcão não tinha como desfazer registro errado (o varejo tem; o atacado não).
 // Cancelar corrige SOZINHO ranking/resumo/fiado (tudo filtra status='confirmed');
 // o estoque é DEVOLVIDO por código (espelho da baixa, flag WHOLESALE_STOCK_DECREMENT).
-

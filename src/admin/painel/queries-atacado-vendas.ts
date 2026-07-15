@@ -79,6 +79,7 @@ export interface RegisterWholesaleSaleInput {
   sold_at?: string | null;
   notes?: string | null;
   created_by: string;
+  seller_collaborator_id?: string | null;
   allow_oversell?: boolean; // caixa confirmou vender acima do estoque (avisar+confirmar)
   // FINANCEIRO (0115, flag WHOLESALE_FINANCE): 'pending' = fiado (A RECEBER do
   // borracheiro), com vencimento opcional. Ignorado com a flag off (nasce 'paid').
@@ -169,9 +170,12 @@ export async function registerWholesaleSale(
     const paidAt = env.WHOLESALE_FINANCE && !fiado ? new Date().toISOString() : null;
     const dueDate = fiado ? (input.due_date ?? null) : null;
     const ord = await client.query<{ id: string }>(
-      `INSERT INTO commerce.wholesale_orders (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at)
-       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz) RETURNING id`,
-      [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt],
+      `INSERT INTO commerce.wholesale_orders
+         (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at, seller_collaborator_id)
+       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz,
+         (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1 AND revoked_at IS NULL)) RETURNING id`,
+      [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt,
+       input.seller_collaborator_id ?? null],
     );
     const orderId = ord.rows[0]!.id;
 
@@ -253,4 +257,3 @@ export async function registerWholesaleSale(
 // do estoque do varejo (commerce.stock_levels). Tabela commerce.wholesale_stock (0111),
 // dado SÓ da matriz (sem grant pro parceiro). Leitura/escrita aqui; a BAIXA na venda
 // é plugada em registerWholesaleSale atrás de flag (Fase 2b).
-

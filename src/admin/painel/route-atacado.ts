@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { getCommissionLedger, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listWholesaleBuyers, listWholesaleMeasures, registerWholesaleSale, settleCommissionEntries, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
@@ -27,7 +27,8 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request) });
+      const result = await registerWholesaleSale({ ...parsed.data, created_by: operatorLabel(request),
+        seller_collaborator_id: getAdminContext(request).collaboratorId });
       return reply.status(201).send(result);
     } catch (err) {
       // Oversell: 409 com a lista de medidas que estouraram — o front avisa e reenvia com

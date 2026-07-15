@@ -8,14 +8,23 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hashPassword } from '../../parceiro/password.js';
 
-export type MatrizCollaboratorJob = 'vendedor' | 'entregador';
+export type MatrizCollaboratorJob = 'vendedor' | 'entregador' | 'colaborador';
+export type MatrizCollaboratorWorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
 export type MatrizPanelRole = 'owner' | 'admin';
+
+function operationalJob(workArea: MatrizCollaboratorWorkArea): MatrizCollaboratorJob {
+  if (workArea === 'sales') return 'vendedor';
+  if (workArea === 'delivery') return 'entregador';
+  return 'colaborador';
+}
 
 export interface MatrizCollaborator {
   id: string;
   display_name: string;
   username: string;
   job: MatrizCollaboratorJob;
+  job_title: string;
+  work_area: MatrizCollaboratorWorkArea;
   panel_role: MatrizPanelRole | null;
   active: boolean;
   created_at: string;
@@ -41,10 +50,12 @@ export async function listMatrizCollaborators(
 ): Promise<MatrizCollaborator[]> {
   const res = await dbPool.query<{
     id: string; display_name: string; username: string; job: MatrizCollaboratorJob;
+    job_title: string; work_area: MatrizCollaboratorWorkArea;
     panel_role: MatrizPanelRole | null;
     created_at: string; revoked_at: string | null;
   }>(
-    `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.panel_role, mc.created_at, mc.revoked_at
+    `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
+            mc.panel_role, mc.created_at, mc.revoked_at
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp ON pp.id = mc.person_id
       WHERE mc.environment = $1
@@ -60,6 +71,8 @@ export interface CreateMatrizCollaboratorInput {
   username: string;
   password: string;
   job: MatrizCollaboratorJob;
+  job_title: string;
+  work_area: MatrizCollaboratorWorkArea;
   panel_role?: MatrizPanelRole | null;
   actor_label?: string | null;
 }
@@ -82,10 +95,12 @@ export async function createMatrizCollaborator(
       [environment, cleanUsername, passwordHash],
     );
     const collab = await client.query<{ id: string }>(
-      `INSERT INTO network.matriz_collaborators (environment, person_id, display_name, job, panel_role, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO network.matriz_collaborators
+         (environment, person_id, display_name, job, job_title, work_area, panel_role, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id`,
-      [environment, person.rows[0]!.id, input.display_name.trim(), input.job, input.panel_role ?? null, input.actor_label ?? null],
+      [environment, person.rows[0]!.id, input.display_name.trim(), operationalJob(input.work_area),
+       input.job_title.trim(), input.work_area, input.panel_role ?? null, input.actor_label ?? null],
     );
     await client.query('COMMIT');
     return { id: collab.rows[0]!.id, username: cleanUsername };
@@ -99,15 +114,16 @@ export async function createMatrizCollaborator(
 }
 
 export async function updateMatrizCollaboratorJob(
-  input: { environment?: 'prod' | 'test'; id: string; job: MatrizCollaboratorJob },
+  input: { environment?: 'prod' | 'test'; id: string; job: MatrizCollaboratorJob;
+    job_title: string; work_area: MatrizCollaboratorWorkArea },
   dbPool: Pool = defaultPool,
 ): Promise<{ updated: boolean }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const res = await dbPool.query(
     `UPDATE network.matriz_collaborators
-        SET job = $3
+        SET job = $3, job_title = $4, work_area = $5
       WHERE id = $2 AND environment = $1 AND revoked_at IS NULL`,
-    [environment, input.id, input.job],
+    [environment, input.id, operationalJob(input.work_area), input.job_title.trim(), input.work_area],
   );
   return { updated: (res.rowCount ?? 0) > 0 };
 }

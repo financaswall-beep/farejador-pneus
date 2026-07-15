@@ -209,11 +209,11 @@ function painelApp() {
     colabSaving: false,
     colabMsg: null,
     colabShowForm: false,
-    colabForm: { display_name: '', username: '', password: '', job: '', panel_role: null },
-    // redesign 07-12 (desenho do dono com GPT): busca + filtro ativos/revogados + olhinho da senha
+    colabForm: { display_name: '', username: '', password: '', job_title: '', work_area: 'other', panel_role: null },
     colabBusca: '',
     colabView: 'ativos',
-    colabSenhaVisivel: false,
+    colabSenhaVisivel: false, colabTab: 'equipe', colabMes: new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date()), colabSummary: {}, colabCargoFiltro: '', colabAcessoFiltro: '', colabSelectedId: null, colabDrawer: null,
+    colabRemForm: { employment_type: 'clt', base_salary: '', payment_day: 5, payment_method: 'pix', payment_note: '', starts_on: '' }, colabComForm: { kind: 'percent', basis: 'margin', value: '', starts_on: '', active: true }, colabAjusteForm: { kind: 'addition', description: '', amount: '' }, colabPerfilForm: { job_title: '', work_area: 'other' },
 
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [

@@ -20,6 +20,7 @@ import { registerPainelParceiros } from './route-parceiros.js';
 import { registerPainelCandidaturas } from './route-candidaturas.js';
 import { registerPainelPedidos } from './route-pedidos.js';
 import { registerPainelColaboradores } from './route-colaboradores.js';
+import { registerPainelColaboradoresGestao } from './route-colaboradores-gestao.js';
 import { registerPainelNotificacoes } from './route-notificacoes.js';
 import { registerPainelBot } from './route-bot.js';
 import { registerPainelClientes } from './route-clientes.js';
@@ -38,6 +39,7 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   await registerPainelCandidaturas(fastify); // seja-parceiro (público) + fila de candidaturas (linhas 1162-1225 pré-obra)
   await registerPainelPedidos(fastify); // pedido manual/walk-in + cancelar (linhas 1226-1283 pré-obra)
   await registerPainelColaboradores(fastify); // colaboradores da matriz (0124) (linhas 1284-1398 pré-obra)
+  await registerPainelColaboradoresGestao(fastify); // remuneração, comissão, folha e desempenho (0133)
   await registerPainelNotificacoes(fastify); // sino do painel (2026-07-06): notificações reais
   await registerPainelBot(fastify); // tela do Bot (2026-07-06): campainha + mapa + radar
   await registerPainelClientes(fastify); // CRM da matriz: leitura unificada sem duplicar Vendas/Rede

@@ -54,6 +54,10 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     return { status: 409, error: err.message };
   }
 
+  if (err.message.includes('payroll_expense_locked')) {
+    return { status: 409, error: 'payroll_expense_locked' };
+  }
+
   return { status: 500, error: 'internal_server_error' };
 }
 

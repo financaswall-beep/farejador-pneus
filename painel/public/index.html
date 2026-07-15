@@ -23,7 +23,8 @@
 <script src="/admin/painel/app.compras.js?v=20260714-atacado1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260714-logistica2"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260714-logistica2"></script>
-<script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
+<script src="/admin/painel/app.colaboradores.js?v=20260715-colab2"></script>
+<script src="/admin/painel/app.colaboradores.gestao.js?v=20260715-colab2"></script>
 <script src="/admin/painel/app.sino.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
@@ -39,8 +40,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.montagem.js?v=20260714-fiscal1"></script>
-<script src="/admin/painel/app.js?v=20260715-kanban1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260715-colab2"></script>
+<script src="/admin/painel/app.js?v=20260715-colab2"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -263,6 +264,7 @@
             </div>
           </div>
         </div>
+
       </div>
 
       <!-- Separador vertical -->
@@ -3323,7 +3325,7 @@
                         <template x-for="item in pagarFila()" :key="item.tipo + item.id">
                           <tr class="border-b border-gray-100">
                             <td class="py-2.5 pr-3 font-medium text-gray-800" x-text="item.nome"></td>
-                            <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="item.tipo === 'fornecedor' ? 'Fornecedor de pneus' : despesaLabel(item.categoria || 'outros')"></span></td>
+                            <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="item.tipo === 'fornecedor' ? 'Fornecedor de pneus' : item.tipo === 'folha' ? 'Folha salarial' : despesaLabel(item.categoria || 'outros')"></span></td>
                             <td class="py-2.5 pr-3 text-gray-500 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'sem vencimento'"></td>
                             <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
                             <td class="py-2.5 pr-3 whitespace-nowrap"><span class="inline-block text-xs rounded-full px-2.5 py-0.5" :class="pagarStatus(item).cls" x-text="pagarStatus(item).label"></span></td>
@@ -3708,7 +3710,7 @@
                     <td class="py-2.5 text-right whitespace-nowrap">
                       <button x-show="d.payment_status === 'pending'" @click="despesaSettle(d)" :disabled="finQuitando"
                               class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
-                      <button @click="despesaRemove(d)" title="Remover (lançado errado)"
+                      <button x-show="!d.payroll_item_id" @click="despesaRemove(d)" title="Remover (lançado errado)"
                               class="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-rose-50 hover:text-rose-600 ml-1 align-middle">
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                       </button>
@@ -3758,13 +3760,12 @@
       </div><!-- /finTab despesas -->
     </div>
 
-    <!-- ═══ TELA: COLABORADORES da matriz (0124 — cadastro; entregador já loga em /entregas (0125); frente de caixa do vendedor vem depois) ═══ -->
-    <div x-show="currentPage === 'colaboradores'" class="p-8">
-      <!-- redesign 07-12 (desenho do dono com GPT): header + banner + 3 cards + tabela + drawer lateral -->
+    <!-- ═══ TELA: COLABORADORES — equipe, remuneração, comissão, folha e desempenho (0133) ═══ -->
+    <div x-show="currentPage === 'colaboradores'" class="p-8 bg-gray-50/30 min-h-screen">
       <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="text-2xl font-semibold tracking-tight">Colaboradores</h1>
-          <p class="text-sm text-gray-500 mt-1">O pessoal da Matriz — vendedores, entregadores e acesso ao painel</p>
+          <p class="text-sm text-gray-500 mt-1">Equipe, remuneração, comissões e desempenho da Matriz</p>
         </div>
         <button @click="abrirNovoColaborador()"
                 class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
@@ -3772,44 +3773,62 @@
         </button>
       </div>
 
-      <div class="space-y-4 max-w-5xl">
+      <div class="flex items-center gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
+        <template x-for="tab in [
+          {id:'equipe',label:'Equipe'}, {id:'remuneracao',label:'Remuneração'},
+          {id:'comissoes',label:'Comissões'}, {id:'folha',label:'Folha'}, {id:'desempenho',label:'Desempenho'}
+        ]" :key="tab.id">
+          <button @click="colabSetTab(tab.id)" class="px-5 py-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors"
+                  :class="colabTab === tab.id ? 'text-emerald-800 border-emerald-700 bg-emerald-50/40' : 'text-gray-500 border-transparent hover:text-gray-800 hover:bg-gray-50'"
+                  x-text="tab.label"></button>
+        </template>
+      </div>
+
+      <div class="space-y-4 max-w-[1500px]">
         <div x-show="colabMsg" class="text-sm px-3 py-2 rounded-lg"
              :class="colabMsg && colabMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
              x-text="colabMsg ? colabMsg.text : ''"></div>
 
-        <!-- banner: o que cada função abre (0125 /entregas; frente de caixa futura) -->
-        <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-600">
+        <div x-show="colabTab === 'equipe'" class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-600">
           <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <i data-lucide="bike" class="w-5 h-5 text-emerald-800"></i>
           </div>
-          <span>O <span class="font-semibold text-gray-800">Entregador</span> usa <span class="font-semibold text-emerald-800">/entregas</span> no celular para ver a rota do dia, sem dados financeiros.<br>
-          A tela do <span class="font-semibold text-gray-800">Vendedor</span> (frente de caixa) chega em uma fase posterior.</span>
+          <span><span class="font-semibold text-gray-800">Cargo</span> é livre (secretária, borracheiro, gerente…); a <span class="font-semibold text-gray-800">área operacional</span> liga somente os recursos necessários. Entregas continuam protegidas no portal <span class="font-semibold text-emerald-800">/entregas</span>.</span>
         </div>
 
-        <!-- contadores -->
-        <div class="flex flex-wrap items-center gap-3">
+        <!-- indicadores neutros da equipe: não assumem quais cargos existem -->
+        <div x-show="colabTab === 'equipe'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 flex-1 min-w-[160px]">
             <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-5 h-5 text-emerald-800"></i></div>
-            <div><p class="text-xs text-gray-500">Ativos</p><p class="text-xl font-semibold" x-text="colabAtivos.length"></p></div>
+            <div><p class="text-xs text-gray-500">Colaboradores ativos</p><p class="text-xl font-semibold" x-text="colabAtivos.length"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 flex-1 min-w-[160px]">
             <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="user" class="w-5 h-5 text-emerald-800"></i></div>
-            <div><p class="text-xs text-gray-500">Vendedores</p><p class="text-xl font-semibold" x-text="colabVendedoresCount"></p></div>
+            <div><p class="text-xs text-gray-500">Cargos cadastrados</p><p class="text-xl font-semibold" x-text="colabCargosCount"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 flex-1 min-w-[160px]">
             <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="bike" class="w-5 h-5 text-emerald-800"></i></div>
-            <div><p class="text-xs text-gray-500">Entregadores</p><p class="text-xl font-semibold" x-text="colabEntregadoresCount"></p></div>
+            <div><p class="text-xs text-gray-500">Com acesso ao painel</p><p class="text-xl font-semibold" x-text="colabAcessoCount"></p></div>
           </div>
-          <span class="text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1.5"
-                x-text="colabRevogadosLista.length + ' revogado' + (colabRevogadosLista.length === 1 ? '' : 's')"></span>
+          <div class="bg-white border border-gray-200 rounded-xl px-5 py-3 flex items-center gap-4 min-w-[160px]">
+            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><i data-lucide="user-x" class="w-5 h-5 text-gray-500"></i></div>
+            <div><p class="text-xs text-gray-500">Inativos / revogados</p><p class="text-xl font-semibold" x-text="colabRevogadosLista.length"></p></div>
+          </div>
         </div>
 
         <!-- EQUIPE -->
-        <div class="bg-white border border-gray-200 rounded-xl">
+        <div x-show="colabTab === 'equipe'" class="bg-white border border-gray-200 rounded-xl">
           <div class="flex flex-wrap items-center gap-3 p-5 pb-3">
             <h3 class="text-base font-semibold mr-auto">Equipe da Matriz</h3>
             <input type="text" x-model="colabBusca" placeholder="Buscar por nome ou usuário"
                    class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-emerald-200">
+            <select x-model="colabCargoFiltro" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">Todos os cargos</option>
+              <template x-for="cargo in colabCargos" :key="cargo"><option :value="cargo" x-text="cargo"></option></template>
+            </select>
+            <select x-model="colabAcessoFiltro" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+              <option value="">Todos os acessos</option><option value="sim">Com acesso</option><option value="nao">Sem acesso</option>
+            </select>
             <div class="flex items-center gap-1.5">
               <button @click="colabView = 'ativos'"
                       :class="colabView === 'ativos' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
@@ -3844,13 +3863,11 @@
                       </div>
                     </td>
                     <td class="px-3 py-3.5">
-                      <select x-show="c.active" :value="c.job" :disabled="!!colabSaving"
-                              @change="mudarFuncaoColaborador(c, $event.target.value)"
-                              class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white">
-                        <option value="vendedor">Vendedor</option>
-                        <option value="entregador">Entregador</option>
-                      </select>
-                      <span x-show="!c.active" class="text-xs text-gray-500" x-text="colabJobLabel(c.job)"></span>
+                      <button x-show="c.active" @click="colabOpen(c, 'perfil')" class="text-left group">
+                        <span class="block text-xs font-medium text-gray-700 group-hover:text-emerald-800" x-text="c.job_title"></span>
+                        <span class="block text-[10px] text-gray-400" x-text="colabAreaLabel(c.work_area)"></span>
+                      </button>
+                      <span x-show="!c.active" class="text-xs text-gray-500" x-text="c.job_title"></span>
                     </td>
                     <td class="px-3 py-3.5">
                       <span class="inline-flex items-center gap-1.5">
@@ -3877,6 +3894,7 @@
                       <div class="flex items-center justify-end gap-2 whitespace-nowrap">
                         <button x-show="c.active" @click="trocarSenhaColaborador(c)" :disabled="!!colabSaving"
                                 class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium">Trocar senha</button>
+                        <button x-show="c.active" @click="colabOpen(c, 'perfil')" class="text-xs px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-medium">Editar</button>
                         <button x-show="c.active" @click="revogarColaborador(c)" :disabled="!!colabSaving"
                                 class="text-xs px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium">Revogar</button>
                         <button x-show="!c.active" @click="reativarColaborador(c)" :disabled="!!colabSaving"
@@ -3890,11 +3908,130 @@
           </div>
           <div x-show="colabLoaded && !colabFiltrados.length" class="text-sm text-gray-400 px-5 py-6">
             <span x-show="colabView === 'revogados' && !colabBusca">Ninguém revogado — a equipe tá toda na ativa.</span>
-            <span x-show="colabView === 'ativos' && !colabBusca && !colaboradores.length">Ninguém cadastrado ainda — clica em “＋ Novo colaborador” pra colocar teu primeiro vendedor ou entregador.</span>
+            <span x-show="colabView === 'ativos' && !colabBusca && !colaboradores.length">Ninguém cadastrado ainda — clica em “＋ Novo colaborador” para cadastrar a equipe.</span>
             <span x-show="!!colabBusca">Ninguém com esse nome neste filtro.</span>
           </div>
         </div>
+        <div id="colab-gestao-secoes" x-show="colabTab !== 'equipe'" class="w-full space-y-4">
+        <!-- competência comum às abas financeiras e de desempenho -->
+        <div x-show="colabTab !== 'equipe'" class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs text-gray-500">Competência</p>
+            <input type="month" x-model="colabMes" @change="colabMesMudou()" class="mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+          </div>
+          <span class="text-xs px-3 py-1.5 rounded-full border"
+                :class="colabSummary.payroll_period_status === 'preview' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'"
+                x-text="colabSummary.payroll_period_status === 'preview' ? 'Competência aberta' : (colabSummary.payroll_period_status === 'paid' ? 'Folha paga' : 'Folha fechada')"></span>
+        </div>
+
+        <!-- REMUNERAÇÃO: cadastro permanente, sem repetir pagamento da Folha -->
+        <div x-show="colabTab === 'remuneracao'" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Configurados</p><p class="text-2xl font-semibold mt-2" x-text="colabSummary.configured_count + ' de ' + colabSummary.active_count"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Salários base</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.base_salary_total || 0)"></p></div>
+            <div class="bg-white border border-amber-100 rounded-xl p-5"><p class="text-xs text-gray-500">Sem configuração</p><p class="text-2xl font-semibold text-amber-600 mt-2" x-text="colabSummary.unconfigured_count || 0"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Forma de pagamento</p><p class="text-base font-semibold mt-2">PIX, conta ou dinheiro</p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="p-5 flex flex-wrap gap-3 items-center"><h3 class="font-semibold mr-auto">Configuração de remuneração</h3><input x-model="colabBusca" placeholder="Buscar colaborador" class="border border-gray-200 rounded-lg px-3 py-2 text-sm"><select x-model="colabCargoFiltro" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option value="">Todos os cargos</option><template x-for="cargo in colabCargos" :key="'rem-'+cargo"><option :value="cargo" x-text="cargo"></option></template></select></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y border-gray-100"><th class="p-4">Colaborador</th><th>Cargo</th><th>Vínculo</th><th>Salário base</th><th>Pagamento</th><th>Forma</th><th>Situação</th><th class="pr-4 text-right">Ação</th></tr></thead>
+              <tbody><template x-for="c in colabRemuneracaoRows" :key="'rem-'+c.id"><tr class="border-b border-gray-100"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.job_title"></td><td x-text="colabEmploymentLabel(c.employment_type)"></td><td class="tabular-nums" x-text="formatCurrency(c.base_salary)"></td><td x-text="c.payment_day ? 'Dia '+c.payment_day : '—'"></td><td x-text="colabPaymentLabel(c.payment_method)"></td><td><span class="text-xs px-2 py-1 rounded-full" :class="c.employment_type ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="c.employment_type ? 'Ativo' : 'Pendente'"></span></td><td class="pr-4 text-right"><button @click="colabOpen(c,'remuneracao')" class="text-emerald-700 text-xs font-medium">Configurar</button></td></tr></template></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- COMISSÕES: regra e prévia; pagamento continua exclusivamente na Folha -->
+        <div x-show="colabTab === 'comissoes'" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Comissão prevista</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.commission_total || 0)"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Vendas elegíveis</p><p class="text-2xl font-semibold mt-2" x-text="colabSummary.sales_eligible || 0"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Entregas elegíveis</p><p class="text-2xl font-semibold mt-2" x-text="colabSummary.deliveries_eligible || 0"></p></div>
+            <div class="bg-white border border-amber-100 rounded-xl p-5"><p class="text-xs text-gray-500">Sem regra</p><p class="text-2xl font-semibold text-amber-600 mt-2" x-text="colabSummary.without_rule || 0"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="p-5"><h3 class="font-semibold">Regras individuais</h3><p class="text-xs text-gray-500 mt-1">Vendas canceladas não entram; entrega só conta quando concluída.</p></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y border-gray-100"><th class="p-4">Colaborador</th><th>Cargo</th><th>Regra</th><th>Produção no mês</th><th>Comissão prevista</th><th>Situação</th><th class="pr-4 text-right">Ação</th></tr></thead>
+              <tbody><template x-for="c in colabComissaoRows" :key="'com-'+c.id"><tr class="border-b border-gray-100"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.job_title"></td><td x-text="colabCommissionLabel(c)"></td><td x-text="c.commission_basis === 'delivery' ? c.deliveries_count+' entregas' : c.commission_basis === 'trip' ? c.trips_count+' rotas' : c.sales_count+' vendas'"></td><td class="font-medium tabular-nums" x-text="formatCurrency(c.commission_amount)"></td><td><span class="text-xs px-2 py-1 rounded-full" :class="c.commission_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="c.commission_active ? 'Calculada' : 'Sem regra'"></span></td><td class="pr-4 text-right"><button @click="colabOpen(c,'comissao')" class="text-emerald-700 text-xs font-medium">Editar regra</button></td></tr></template></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- FOLHA: única tela que fecha competência e confirma pagamento -->
+        <div x-show="colabTab === 'folha'" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Folha prevista</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.payroll_total || 0)"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Comissões</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.commission_total || 0)"></p></div>
+            <div class="bg-white border border-amber-100 rounded-xl p-5"><p class="text-xs text-gray-500">A pagar</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.payroll_payable || 0)"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Pagos</p><p class="text-2xl font-semibold mt-2" x-text="(colabSummary.paid_count || 0)+' de '+(colabSummary.payroll_count || 0)"></p><p class="text-xs text-gray-400 mt-1" x-text="formatCurrency(colabSummary.payroll_paid || 0)"></p></div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="p-5 flex flex-wrap items-center gap-3"><div class="mr-auto"><h3 class="font-semibold">Folha de pagamento</h3><p class="text-xs text-gray-500 mt-1">Ao fechar, os títulos entram automaticamente no Financeiro.</p></div><button x-show="colabSummary.payroll_period_status === 'preview'" @click="colabFecharFolha()" :disabled="colabSaving" class="bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Fechar competência</button></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y border-gray-100"><th class="p-4">Colaborador</th><th>Cargo</th><th>Salário base</th><th>Comissão</th><th>Extras / descontos</th><th>Total do mês</th><th>Status</th><th class="pr-4 text-right">Ação</th></tr></thead>
+              <tbody><template x-for="c in colabFolhaRows" :key="'folha-'+c.id"><tr class="border-b border-gray-100"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.job_title"></td><td x-text="formatCurrency(c.base_salary)"></td><td x-text="formatCurrency(c.commission_amount)"></td><td><span class="text-emerald-700" x-text="c.additions ? '+ '+formatCurrency(c.additions) : ''"></span><span class="text-rose-600 ml-1" x-text="c.deductions ? '− '+formatCurrency(c.deductions) : (!c.additions ? '—' : '')"></span></td><td class="font-semibold" x-text="formatCurrency(c.total_due)"></td><td><span class="text-xs px-2 py-1 rounded-full" :class="c.payroll_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : c.payroll_status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'" x-text="colabStatusLabel(c)"></span></td><td class="pr-4 text-right"><button @click="colabOpen(c,'folha')" class="text-emerald-700 text-xs font-medium">Ver cálculo</button></td></tr></template></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <!-- DESEMPENHO: somente operação; sem salário e sem ações de pagamento -->
+        <div x-show="colabTab === 'desempenho'" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Vendas confirmadas</p><p class="text-2xl font-semibold mt-2" x-text="colabSummary.sales_eligible || 0"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Faturamento atribuído</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.revenue || 0)"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Margem gerada</p><p class="text-2xl font-semibold mt-2" x-text="formatCurrency(colabSummary.margin || 0)"></p></div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Rotas fechadas</p><p class="text-2xl font-semibold mt-2" x-text="colabSummary.trips_count || 0"></p></div>
+          </div>
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="bg-white border border-gray-200 rounded-xl overflow-hidden"><div class="p-5"><h3 class="font-semibold">Desempenho de vendas</h3></div><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y"><th class="p-4">Colaborador</th><th>Vendas</th><th>Faturamento</th><th>Margem</th><th>Ticket</th></tr></thead><tbody><template x-for="c in colabVendasRanking" :key="'v-'+c.id"><tr class="border-b"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.sales_count"></td><td x-text="formatCurrency(c.revenue)"></td><td x-text="formatCurrency(c.margin)"></td><td x-text="formatCurrency(c.sales_count ? c.revenue/c.sales_count : 0)"></td></tr></template></tbody></table></div>
+            <div class="bg-white border border-gray-200 rounded-xl overflow-hidden"><div class="p-5"><h3 class="font-semibold">Desempenho de entregas</h3></div><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y"><th class="p-4">Colaborador</th><th>Entregas</th><th>Rotas</th><th>Km</th><th>Pontualidade</th></tr></thead><tbody><template x-for="c in colabEntregasRanking" :key="'e-'+c.id"><tr class="border-b"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.deliveries_count"></td><td x-text="c.trips_count"></td><td x-text="Number(c.distance_km).toLocaleString('pt-BR')"></td><td x-text="c.on_time_pct === null ? '—' : c.on_time_pct+'%'"></td></tr></template></tbody></table></div>
+          </div>
+          <p class="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-4 py-3">Resultados operacionais; valores de pagamento ficam exclusivamente na Folha. Vendas passam a ser atribuídas automaticamente ao colaborador logado que as registra.</p>
+        </div>
+        </div>
       </div>
+
+      <!-- DRAWER contextual: perfil, remuneração, regra de comissão ou memória da folha -->
+      <div x-show="colabDrawer" @click="colabCloseDrawer()" class="fixed inset-0 bg-black/10 z-40"></div>
+      <aside x-show="colabDrawer && colabSelected" class="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-gray-200 shadow-2xl z-50 p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold" x-text="colabDrawer === 'perfil' ? 'Perfil do colaborador' : colabDrawer === 'remuneracao' ? 'Remuneração' : colabDrawer === 'comissao' ? 'Regra de comissão' : 'Memória de cálculo'"></h3><button @click="colabCloseDrawer()" class="text-xl text-gray-400">×</button></div>
+        <template x-if="colabSelected"><div>
+          <div class="flex items-center gap-3 mb-6"><span class="w-12 h-12 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold" x-text="colabIniciais(colabSelected.display_name)"></span><div><p class="font-semibold" x-text="colabSelected.display_name"></p><p class="text-xs text-gray-500" x-text="colabSelected.job_title+' · '+colabEmploymentLabel(colabSelected.employment_type)"></p></div><span class="ml-auto text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Ativo</span></div>
+
+          <div x-show="colabDrawer === 'perfil'" class="space-y-4">
+            <label class="block"><span class="text-xs font-medium text-gray-600">Cargo</span><input x-model="colabPerfilForm.job_title" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Área operacional</span><select x-model="colabPerfilForm.work_area" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="other">Outros</option><option value="administrative">Administrativo</option><option value="workshop">Oficina</option><option value="sales">Vendas</option><option value="delivery">Entregas</option></select></label>
+            <div class="rounded-lg border border-gray-200 p-4 text-sm space-y-2"><div class="flex justify-between"><span class="text-gray-500">Usuário</span><span x-text="'@'+colabSelected.username"></span></div><div class="flex justify-between"><span class="text-gray-500">Acesso</span><span x-text="colabAccessLabel(colabSelected.panel_role)"></span></div></div>
+            <button @click="colabSalvarPerfil()" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Salvar perfil</button>
+          </div>
+
+          <div x-show="colabDrawer === 'remuneracao'" class="space-y-4">
+            <label class="block"><span class="text-xs font-medium text-gray-600">Vínculo</span><select x-model="colabRemForm.employment_type" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Salário base</span><input x-model="colabRemForm.base_salary" inputmode="decimal" placeholder="0,00" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <div class="grid grid-cols-2 gap-3"><label><span class="text-xs font-medium text-gray-600">Dia do pagamento</span><input type="number" min="1" max="28" x-model.number="colabRemForm.payment_day" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label><label><span class="text-xs font-medium text-gray-600">Forma</span><select x-model="colabRemForm.payment_method" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="pix">PIX</option><option value="transferencia">Conta bancária</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></label></div>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Referência de pagamento</span><input x-model="colabRemForm.payment_note" maxlength="160" placeholder="Identificação curta; evite dados bancários completos" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Vigência</span><input type="date" x-model="colabRemForm.starts_on" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <p class="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">Esses dados alimentam o cálculo da Folha. Não substituem a folha contábil.</p>
+            <button @click="colabSalvarRemuneracao()" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Salvar configuração</button>
+          </div>
+
+          <div x-show="colabDrawer === 'comissao'" class="space-y-4">
+            <label class="block"><span class="text-xs font-medium text-gray-600">Tipo</span><select x-model="colabComForm.kind" @change="colabComKindChanged()" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="percent">Percentual</option><option value="fixed">Valor fixo</option></select></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Base</span><select x-show="colabComForm.kind === 'percent'" x-model="colabComForm.basis" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="margin">Margem realizada</option><option value="revenue">Faturamento confirmado</option></select><select x-show="colabComForm.kind === 'fixed'" x-model="colabComForm.basis" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="sale">Por venda</option><option value="delivery">Por entrega concluída</option><option value="trip">Por rota fechada</option></select></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600" x-text="colabComForm.kind === 'percent' ? 'Percentual' : 'Valor por unidade'"></span><input x-model="colabComForm.value" inputmode="decimal" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label class="block"><span class="text-xs font-medium text-gray-600">Início da vigência</span><input type="date" x-model="colabComForm.starts_on" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label class="flex items-center justify-between border border-gray-200 rounded-lg p-3 text-sm"><span>Regra ativa</span><input type="checkbox" x-model="colabComForm.active" class="accent-emerald-700"></label>
+            <p class="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg p-3">Canceladas ficam fora. Vendas só entram confirmadas; entregas, somente concluídas.</p>
+            <button @click="colabSalvarComissao()" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Salvar regra</button>
+          </div>
+
+          <div x-show="colabDrawer === 'folha'" class="space-y-4">
+            <div class="border border-gray-200 rounded-xl p-4 space-y-3 text-sm"><div class="flex justify-between"><span>Salário base</span><span x-text="formatCurrency(colabSelected.base_salary)"></span></div><div class="flex justify-between"><span>Comissão apurada</span><span x-text="formatCurrency(colabSelected.commission_amount)"></span></div><div class="flex justify-between text-emerald-700"><span>Adições</span><span x-text="'+ '+formatCurrency(colabSelected.additions)"></span></div><div class="flex justify-between text-rose-600"><span>Descontos</span><span x-text="'− '+formatCurrency(colabSelected.deductions)"></span></div><div class="border-t pt-3 flex justify-between font-semibold text-base"><span>Total a pagar</span><span class="text-emerald-700" x-text="formatCurrency(colabSelected.total_due)"></span></div></div>
+            <div class="border border-gray-200 rounded-xl p-4"><p class="text-xs text-gray-500">Regra da comissão</p><p class="font-semibold mt-1" x-text="colabCommissionLabel(colabSelected)"></p><div class="grid grid-cols-3 gap-2 text-center mt-4"><div><p class="font-semibold" x-text="colabSelected.sales_count"></p><p class="text-[10px] text-gray-500">vendas</p></div><div><p class="font-semibold" x-text="colabSelected.deliveries_count"></p><p class="text-[10px] text-gray-500">entregas</p></div><div><p class="font-semibold" x-text="colabSelected.trips_count"></p><p class="text-[10px] text-gray-500">rotas</p></div></div></div>
+            <div x-show="colabSummary.payroll_period_status === 'preview'" class="border border-gray-200 rounded-xl p-4 space-y-3"><p class="font-medium text-sm">Adicionar bônus ou desconto</p><select x-model="colabAjusteForm.kind" class="w-full border rounded-lg px-3 py-2 text-sm bg-white"><option value="addition">Adição / bônus</option><option value="deduction">Desconto / adiantamento</option></select><input x-model="colabAjusteForm.description" placeholder="Motivo" class="w-full border rounded-lg px-3 py-2 text-sm"><input x-model="colabAjusteForm.amount" inputmode="decimal" placeholder="Valor" class="w-full border rounded-lg px-3 py-2 text-sm"><button @click="colabAdicionarAjuste()" class="w-full border border-emerald-700 text-emerald-700 rounded-lg py-2 text-sm font-medium">Incluir ajuste</button></div>
+            <button x-show="colabSelected.payroll_status === 'pending'" @click="colabPagar(colabSelected)" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Marcar como pago</button>
+            <p x-show="colabSelected.payroll_status === 'paid'" class="text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3 text-center">Pagamento conciliado com o Financeiro.</p>
+          </div>
+        </div></template>
+      </aside>
 
       <!-- DRAWER: novo colaborador (painel lateral direito, como no desenho) -->
       <div x-show="colabShowForm" @click="colabShowForm = false" class="fixed inset-0 bg-black/10 z-40"></div>
@@ -3913,14 +4050,17 @@
                    class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200">
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-600">Função</label>
-            <select x-model="colabForm.job"
-                    class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                    :class="!colabForm.job && 'text-gray-400'">
-              <option value="">Selecione a função</option>
-              <option value="vendedor">Vendedor (frente de caixa)</option>
-              <option value="entregador">Entregador (rota do dia em /entregas)</option>
+            <label class="text-xs font-medium text-gray-600">Cargo</label>
+            <input type="text" x-model="colabForm.job_title" placeholder="Ex.: Secretária, borracheiro, vendedor"
+                   class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200">
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-600">Área operacional</label>
+            <select x-model="colabForm.work_area" class="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white">
+              <option value="other">Outros</option><option value="administrative">Administrativo</option>
+              <option value="workshop">Oficina</option><option value="sales">Vendas</option><option value="delivery">Entregas</option>
             </select>
+            <p class="text-[11px] text-gray-400 mt-1">A área libera somente as integrações operacionais necessárias.</p>
           </div>
           <div>
             <label class="text-xs font-medium text-gray-600">Acesso ao painel da Matriz</label>

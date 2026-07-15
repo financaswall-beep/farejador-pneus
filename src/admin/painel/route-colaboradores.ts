@@ -18,12 +18,16 @@ export async function registerPainelColaboradores(fastify: FastifyInstance): Pro
     display_name: z.string().trim().min(2).max(120),
     username: colaboradorUsernameField,
     password: z.string().min(12).max(200),
-    job: z.enum(['vendedor', 'entregador']),
+    job: z.enum(['vendedor', 'entregador', 'colaborador']),
+    job_title: z.string().trim().min(2).max(60),
+    work_area: z.enum(['sales', 'delivery', 'administrative', 'workshop', 'other']),
     panel_role: z.enum(['owner', 'admin']).nullable().default(null),
   });
   const funcaoColaboradorSchema = z.object({
     id: z.string().uuid(),
-    job: z.enum(['vendedor', 'entregador']),
+    job: z.enum(['vendedor', 'entregador', 'colaborador']),
+    job_title: z.string().trim().min(2).max(60),
+    work_area: z.enum(['sales', 'delivery', 'administrative', 'workshop', 'other']),
   });
   const idColaboradorSchema = z.object({ id: z.string().uuid() });
   const acessoColaboradorSchema = z.object({

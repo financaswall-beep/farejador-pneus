@@ -30,6 +30,7 @@ export interface RegisterManualOrderInput {
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   actor_label: string;
+  seller_collaborator_id?: string | null;
   idempotency_key: string;
   source_tag?: SourceTagChatwoot | null;
 }
@@ -49,6 +50,7 @@ export interface RegisterWalkinOrderInput {
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   actor_label: string;
+  seller_collaborator_id?: string | null;
   idempotency_key: string;
   source_tag: SourceTagWalkin;
 }
@@ -129,4 +131,3 @@ export function resolveRedePeriodStartSql(period: PainelRedePeriod): string {
   }
   return `(date_trunc('month', now() AT TIME ZONE '${PAINEL_TZ}') AT TIME ZONE '${PAINEL_TZ}')`;
 }
-
