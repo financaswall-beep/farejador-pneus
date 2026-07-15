@@ -107,6 +107,125 @@ window.PAINEL_MODULES.logistica = function () {
         semCusto: Number(r.itens_sem_custo || 0),
       };
     },
+    logisticaDateISO(value) {
+      if (!value) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+    logisticaPeriodoFinalISO() {
+      const d = new Date();
+      d.setDate(d.getDate() + 6);
+      return this.logisticaDateISO(d);
+    },
+    logisticaDataOperacional(d) {
+      if (d?.delivery_status === 'delivered' && d.delivered_at) return this.logisticaDateISO(d.delivered_at);
+      return this.logisticaDateISO(d?.scheduled_date || d?.created_at);
+    },
+    logisticaDentroPeriodo(d) {
+      const data = this.logisticaDataOperacional(d);
+      if (!data) return true;
+      if (this.logisticaPeriodo === 'amanha') return data === this.amanhaISO();
+      if (this.logisticaPeriodo === '7dias') return data >= this.hojeISO() && data <= this.logisticaPeriodoFinalISO();
+      return data === this.hojeISO();
+    },
+    logisticaPeriodoLabel() {
+      if (this.logisticaPeriodo === 'amanha') return 'Amanhã';
+      if (this.logisticaPeriodo === '7dias') return 'Próximos 7 dias';
+      return 'Hoje';
+    },
+    setLogisticaPeriodo(periodo) {
+      this.logisticaPeriodo = periodo;
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    setLogisticaFiltro(filtro, abrirEntregas = false) {
+      this.logisticaFiltro = filtro;
+      if (abrirEntregas) this.logisticaTab = 'entregas';
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    setLogisticaTab(tab) {
+      this.logisticaTab = tab;
+      this.$nextTick(() => window.lucide && window.lucide.createIcons());
+    },
+    logisticaTodasEntregas() {
+      const rows = [
+        ...(this.logistica?.reportadas || []),
+        ...(this.logistica?.abertas || []),
+        ...(this.logistica?.finalizadas || []),
+      ];
+      const seen = new Set();
+      return rows.filter((d) => {
+        if (!d?.order_id || seen.has(d.order_id)) return false;
+        seen.add(d.order_id);
+        return true;
+      });
+    },
+    logisticaBuscaMatch(d) {
+      const q = String(this.logisticaBusca || '').trim().toLocaleLowerCase('pt-BR');
+      if (!q) return true;
+      const text = [d?.order_number, d?.order_id, d?.customer_name, d?.customer_phone, d?.delivery_address, this.logisticaItens(d)]
+        .filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+      return text.includes(q);
+    },
+    logisticaEntregasView() {
+      let rows;
+      if (this.logisticaFiltro === 'problemas') {
+        return (this.logistica?.reportadas || []).filter((d) => this.logisticaBuscaMatch(d));
+      }
+      else {
+        rows = [...(this.logistica?.abertas || []), ...(this.logistica?.reportadas || [])];
+        if (this.logisticaFiltro === 'aguardando') rows = rows.filter((d) => d.delivery_status === 'pending');
+        if (this.logisticaFiltro === 'rota') rows = rows.filter((d) => d.delivery_status === 'dispatched');
+      }
+      return rows.filter((d) => this.logisticaDentroPeriodo(d) && this.logisticaBuscaMatch(d));
+    },
+    logisticaFinalizadasView() {
+      return (this.logistica?.finalizadas || []).filter((d) => this.logisticaDentroPeriodo(d) && this.logisticaBuscaMatch(d));
+    },
+    logisticaResumoCards() {
+      const noPeriodo = this.logisticaTodasEntregas().filter((d) => this.logisticaDentroPeriodo(d));
+      return {
+        total: noPeriodo.length,
+        aguardando: noPeriodo.filter((d) => d.delivery_status === 'pending').length,
+        rota: noPeriodo.filter((d) => d.delivery_status === 'dispatched').length,
+        problemas: (this.logistica?.reportadas || []).length,
+      };
+    },
+    logisticaOrderLabel(d) {
+      if (d?.order_number) return String(d.order_number).startsWith('#') ? d.order_number : `#${d.order_number}`;
+      return d?.order_id ? `#${String(d.order_id).slice(0, 8).toUpperCase()}` : '—';
+    },
+    logisticaPagamentoLabel(d) {
+      const value = String(d?.payment_method || '').trim();
+      const labels = { pix: 'Pix', cash: 'Dinheiro', dinheiro: 'Dinheiro', card: 'Cartão', cartao: 'Cartão', 'pix_on_delivery': 'Pix na entrega', 'cash_on_delivery': 'Dinheiro na entrega' };
+      return labels[value.toLowerCase()] || value || 'Não informado';
+    },
+    logisticaStatusClass(d) {
+      if (d?.delivery_status === 'failed') return 'bg-rose-50 text-rose-700 border-rose-100';
+      if (d?.delivery_status === 'dispatched') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      if (d?.delivery_status === 'delivered') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      return 'bg-amber-50 text-amber-700 border-amber-100';
+    },
+    logisticaRotaAtual() {
+      return (this.logistica?.rotas_abertas || [])[0] || null;
+    },
+    logisticaEntregasDaRota(t) {
+      if (!t?.id) return [];
+      return this.logisticaTodasEntregas().filter((d) => d.trip_id === t.id);
+    },
+    logisticaRotaProgresso(t) {
+      const rows = this.logisticaEntregasDaRota(t);
+      const entregues = rows.filter((d) => d.delivery_status === 'delivered').length;
+      const total = Math.max(Number(t?.deliveries_count || 0), rows.length);
+      return { entregues, total, percentual: total ? Math.round((entregues / total) * 100) : 0 };
+    },
+    logisticaRotaRestantes(t) {
+      return this.logisticaEntregasDaRota(t).filter((d) => d.delivery_status === 'pending' || d.delivery_status === 'dispatched').length;
+    },
+    logisticaRotaTotal(t) {
+      return this.logisticaEntregasDaRota(t).reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
+    },
     async logisticaStatus(d, status) {
       this.logisticaSaving = true;
       try {

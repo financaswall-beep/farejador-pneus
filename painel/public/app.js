@@ -164,6 +164,10 @@ function painelApp() {
     logisticaLoaded: false,
     logisticaSaving: false,
     logisticaMsg: null,
+    logisticaTab: 'visao',
+    logisticaPeriodo: 'hoje',
+    logisticaFiltro: 'todas',
+    logisticaBusca: '',
     rotaForm: { courier_name: '', km_start: '', selecionadas: {} },
     fecharForm: { km_end: '', fuel_spent: '', notes: '' },
     logisticaCouriers: {}, // rascunho de entregador por pedido (entrega avulsa)

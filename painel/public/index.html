@@ -21,7 +21,7 @@
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260714-atacado1"></script>
 <script src="/admin/painel/app.compras.js?v=20260714-atacado1"></script>
-<script src="/admin/painel/app.logistica.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.logistica.js?v=20260714-logistica1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260708-logistica6"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260712-colab1"></script>
 <script src="/admin/painel/app.sino.js?v=20260714-fiscal1"></script>
@@ -39,7 +39,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.montagem.js?v=20260714-fiscal1"></script>
-<script src="/admin/painel/app.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.js?v=20260714-logistica1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2200,8 +2200,383 @@
       </div>
     </div>
 
-    <!-- ═══ TELA: LOGÍSTICA da matriz (0121 — entregas nos moldes do parceiro + rota do dia) ═══ -->
-    <div x-show="currentPage === 'logistica'" class="p-8">
+    <!-- ═══ TELA: LOGÍSTICA da matriz — cockpit operacional ═══ -->
+    <div x-show="currentPage === 'logistica'" class="p-8" x-cloak>
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between mb-5">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Logística</h1>
+          <p class="text-sm text-gray-500 mt-1">Organize as entregas da Matriz e acompanhe as rotas</p>
+        </div>
+        <div class="inline-flex self-start rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+          <button @click="setLogisticaPeriodo('hoje')"
+                  :class="logisticaPeriodo === 'hoje' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
+                  class="px-4 py-2 rounded-md text-xs font-medium transition-colors">Hoje</button>
+          <button @click="setLogisticaPeriodo('amanha')"
+                  :class="logisticaPeriodo === 'amanha' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
+                  class="px-4 py-2 rounded-md text-xs font-medium transition-colors">Amanhã</button>
+          <button @click="setLogisticaPeriodo('7dias')"
+                  :class="logisticaPeriodo === '7dias' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'"
+                  class="px-4 py-2 rounded-md text-xs font-medium transition-colors">7 dias</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1 border-b border-gray-200 mb-5 overflow-x-auto">
+        <template x-for="tab in [
+          { id: 'visao', label: 'Visão geral' },
+          { id: 'entregas', label: 'Entregas' },
+          { id: 'rotas', label: 'Rotas' },
+          { id: 'historico', label: 'Histórico' }
+        ]" :key="tab.id">
+          <button @click="setLogisticaTab(tab.id)"
+                  :class="logisticaTab === tab.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-800'"
+                  class="px-4 py-3 border-b-2 text-sm whitespace-nowrap transition-colors" x-text="tab.label"></button>
+        </template>
+      </div>
+
+      <div x-show="logisticaMsg" class="mb-4 text-sm px-4 py-3 rounded-xl border flex items-center gap-2"
+           :class="logisticaMsg && logisticaMsg.ok ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'">
+        <i :data-lucide="logisticaMsg && logisticaMsg.ok ? 'circle-check' : 'circle-alert'" class="w-4 h-4 flex-shrink-0"></i>
+        <span x-text="logisticaMsg ? logisticaMsg.text : ''"></span>
+      </div>
+
+      <div x-show="logisticaLoaded && !logistica" class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-3 text-sm text-gray-500">
+        <i data-lucide="truck" class="w-5 h-5 text-gray-300 flex-shrink-0"></i>
+        <span>A Logística está indisponível neste ambiente. Ative <span class="font-mono text-xs bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">MATRIZ_LOGISTICS</span>.</span>
+      </div>
+
+      <div x-show="logistica" class="space-y-5">
+        <!-- Os cards são filtros reais da fila. -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <button @click="setLogisticaFiltro('todas', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-emerald-200 hover:shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-medium text-gray-500" x-text="'Entregas · ' + logisticaPeriodoLabel()"></p>
+                <p class="text-3xl font-semibold text-emerald-800 tabular-nums mt-2" x-text="logisticaResumoCards().total"></p>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="package" class="w-6 h-6 text-emerald-700"></i></div>
+            </div>
+          </button>
+          <button @click="setLogisticaFiltro('aguardando', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-amber-200 hover:shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-medium text-gray-500">Aguardando saída</p>
+                <p class="text-3xl font-semibold text-amber-600 tabular-nums mt-2" x-text="logisticaResumoCards().aguardando"></p>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="package-clock" class="w-6 h-6 text-amber-600"></i></div>
+            </div>
+          </button>
+          <button @click="setLogisticaFiltro('rota', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-emerald-200 hover:shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-medium text-gray-500">Em rota</p>
+                <p class="text-3xl font-semibold text-emerald-800 tabular-nums mt-2" x-text="logisticaResumoCards().rota"></p>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="truck" class="w-6 h-6 text-emerald-700"></i></div>
+            </div>
+          </button>
+          <button @click="setLogisticaFiltro('problemas', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-rose-200 hover:shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-medium text-gray-500">Com problema</p>
+                <p class="text-3xl font-semibold text-rose-600 tabular-nums mt-2" x-text="logisticaResumoCards().problemas"></p>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center"><i data-lucide="triangle-alert" class="w-6 h-6 text-rose-600"></i></div>
+            </div>
+          </button>
+        </div>
+
+        <!-- Visão e Entregas compartilham a mesma fila; em Entregas ela ocupa a largura toda. -->
+        <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas' || logisticaTab === 'rotas'" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <section x-show="logisticaTab !== 'rotas'"
+                   :class="logisticaTab === 'entregas' ? 'lg:col-span-12' : 'lg:col-span-8'"
+                   class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="p-5 border-b border-gray-100">
+              <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div>
+                  <h2 class="text-base font-semibold">Fila de entregas</h2>
+                  <p class="text-xs text-gray-400 mt-0.5" x-text="logisticaEntregasView().length + ' pedido(s) no filtro'"></p>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                  <label class="relative block">
+                    <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
+                    <input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido ou cliente"
+                           class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50">
+                  </label>
+                  <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+                    <template x-for="f in [
+                      { id: 'todas', label: 'Todas' },
+                      { id: 'aguardando', label: 'Aguardando' },
+                      { id: 'rota', label: 'Em rota' },
+                      { id: 'problemas', label: 'Problemas' }
+                    ]" :key="f.id">
+                      <button @click="setLogisticaFiltro(f.id)"
+                              :class="logisticaFiltro === f.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                              class="px-3 py-2 text-xs font-medium border-r border-gray-200 last:border-r-0 transition-colors" x-text="f.label"></button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[980px] text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide">
+                  <tr>
+                    <th class="px-4 py-3 font-medium">Pedido</th>
+                    <th class="px-4 py-3 font-medium">Cliente e endereço</th>
+                    <th class="px-4 py-3 font-medium">Entrega</th>
+                    <th class="px-4 py-3 font-medium">Pagamento</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="d in logisticaEntregasView()" :key="d.order_id">
+                    <tr class="hover:bg-gray-50/70 transition-colors align-top">
+                      <td class="px-4 py-3.5">
+                        <div class="font-semibold text-gray-800 tabular-nums" x-text="logisticaOrderLabel(d)"></div>
+                        <div class="text-[11px] text-gray-400 mt-1" x-text="logisticaItens(d)"></div>
+                      </td>
+                      <td class="px-4 py-3.5">
+                        <div class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></div>
+                        <div class="text-xs text-gray-500 mt-0.5 max-w-[260px] truncate" x-text="d.delivery_address || 'Sem endereço'"></div>
+                        <div class="flex items-center gap-1.5 mt-2">
+                          <a x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido.')" target="_blank" rel="noopener"
+                             class="p-1.5 rounded-md border border-gray-200 text-emerald-700 hover:bg-emerald-50" title="WhatsApp"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></a>
+                          <a x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"
+                             class="p-1.5 rounded-md border border-gray-200 text-sky-700 hover:bg-sky-50" title="Waze"><i data-lucide="navigation" class="w-3.5 h-3.5"></i></a>
+                          <a x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"
+                             class="p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" title="Google Maps"><i data-lucide="map" class="w-3.5 h-3.5"></i></a>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3.5">
+                        <span class="inline-flex px-2 py-1 rounded-md text-[11px] font-medium" :class="dataEntregaClass(d)" x-text="dataEntregaLabel(d) || 'sem data'"></span>
+                        <input x-show="d.delivery_status === 'pending'" type="date" :value="d.scheduled_date"
+                               @change="remarcarEntrega(d, $event.target.value)" :disabled="logisticaSaving"
+                               class="block mt-1.5 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-600 outline-none focus:border-emerald-600">
+                      </td>
+                      <td class="px-4 py-3.5">
+                        <div class="text-xs text-gray-600" x-text="logisticaPagamentoLabel(d)"></div>
+                        <div class="font-semibold text-gray-800 tabular-nums mt-1" x-text="formatCurrency(Number(d.total_amount || 0))"></div>
+                      </td>
+                      <td class="px-4 py-3.5">
+                        <span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium"
+                              :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span>
+                        <div x-show="d.trip_id && rotaDoPedido(d)" class="text-[11px] text-gray-400 mt-1" x-text="rotaDoPedido(d) ? rotaDoPedido(d).trip_number : ''"></div>
+                        <div x-show="d.delivery_failure_reason" class="text-[11px] text-rose-600 mt-1 max-w-[150px]" x-text="d.delivery_failure_reason"></div>
+                      </td>
+                      <td class="px-4 py-3.5">
+                        <div class="flex flex-col items-end gap-1.5">
+                          <input x-show="d.delivery_status === 'pending' && !d.trip_id" x-model="logisticaCouriers[d.order_id]"
+                                 placeholder="Entregador (opcional)" class="w-36 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] outline-none focus:border-emerald-600">
+                          <div class="flex items-center justify-end gap-1.5 flex-wrap">
+                            <button x-show="d.delivery_status === 'pending' && !d.trip_id && logisticaRotaAtual()" @click="pendurarNaRota(d)" :disabled="logisticaSaving"
+                                    class="px-2.5 py-1.5 rounded-md border border-emerald-700 text-emerald-800 text-[11px] font-medium hover:bg-emerald-50 disabled:opacity-50">Pôr na rota</button>
+                            <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving"
+                                    class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Saiu</button>
+                            <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]"
+                                    class="border border-gray-200 rounded-md px-1.5 py-1.5 text-[11px] outline-none focus:border-emerald-600">
+                              <option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option>
+                            </select>
+                            <button x-show="d.delivery_status === 'dispatched'" @click="logisticaStatus(d, 'delivered')" :disabled="logisticaSaving"
+                                    class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Entregue</button>
+                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaRecolocar(d)" :disabled="logisticaSaving"
+                                    class="px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 text-[11px] font-medium hover:bg-gray-50 disabled:opacity-50">Recolocar</button>
+                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaConfirmarFalha(d)" :disabled="logisticaSaving"
+                                    class="px-2.5 py-1.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium hover:bg-rose-100 disabled:opacity-50">Confirmar falha</button>
+                            <button x-show="d.delivery_status !== 'failed'" @click="logisticaFalhou(d)" :disabled="logisticaSaving"
+                                    class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50" title="Marcar como não entregue"><i data-lucide="circle-x" class="w-4 h-4"></i></button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="!logisticaEntregasView().length">
+                    <td colspan="6" class="px-5 py-14 text-center">
+                      <i data-lucide="package-check" class="w-9 h-9 text-gray-300 mx-auto mb-2"></i>
+                      <p class="text-sm font-medium text-gray-600">Nenhuma entrega neste filtro</p>
+                      <p class="text-xs text-gray-400 mt-1">Troque o período ou limpe a busca.</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Rota atual / abertura de rota: usa a mesma máquina já existente. -->
+          <aside x-show="logisticaTab === 'visao' || logisticaTab === 'rotas'"
+                 :class="logisticaTab === 'rotas' ? 'lg:col-span-12' : 'lg:col-span-4'"
+                 class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <template x-if="logisticaRotaAtual()">
+              <div>
+                <div class="p-5 border-b border-gray-100">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-xs text-gray-400 uppercase tracking-wide">Rota atual</p>
+                      <h2 class="text-lg font-semibold text-gray-900 mt-1" x-text="logisticaRotaAtual().trip_number"></h2>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 text-xs font-semibold">Em andamento</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3 mt-4 text-xs">
+                    <div class="flex items-center gap-2 text-gray-600"><i data-lucide="user-round" class="w-4 h-4 text-gray-400"></i><span x-text="logisticaRotaAtual().courier_name"></span></div>
+                    <div class="text-right text-gray-500">KM inicial <span class="font-semibold text-gray-800 tabular-nums ml-1" x-text="logisticaRotaAtual().km_start ?? '—'"></span></div>
+                  </div>
+                  <div class="mt-4">
+                    <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+                      <span>Progresso</span>
+                      <span class="tabular-nums" x-text="logisticaRotaProgresso(logisticaRotaAtual()).entregues + ' de ' + logisticaRotaProgresso(logisticaRotaAtual()).total + ' entregas'"></span>
+                    </div>
+                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full transition-all" :style="'width:' + logisticaRotaProgresso(logisticaRotaAtual()).percentual + '%'"></div></div>
+                  </div>
+                </div>
+
+                <div class="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                  <template x-for="(d, index) in logisticaEntregasDaRota(logisticaRotaAtual())" :key="d.order_id">
+                    <div class="px-5 py-3 flex items-start gap-3">
+                      <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
+                           :class="d.delivery_status === 'delivered' ? 'bg-emerald-700 text-white' : d.delivery_status === 'failed' ? 'bg-rose-100 text-rose-700' : 'border-2 border-emerald-700 text-emerald-800'"
+                           x-text="d.delivery_status === 'delivered' ? '✓' : index + 1"></div>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-sm font-medium text-gray-800 truncate" x-text="d.customer_name || 'Cliente'"></p>
+                          <span class="text-[10px] text-gray-400" x-text="logisticaStatusLabel(d.delivery_status)"></span>
+                        </div>
+                        <p class="text-xs text-gray-400 truncate mt-0.5" x-text="d.delivery_address || 'Sem endereço'"></p>
+                      </div>
+                    </div>
+                  </template>
+                  <div x-show="!logisticaEntregasDaRota(logisticaRotaAtual()).length" class="px-5 py-8 text-center text-sm text-gray-400">As entregas da rota não estão mais na janela recente.</div>
+                </div>
+
+                <div class="p-5 border-t border-gray-100 space-y-4">
+                  <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="rounded-lg bg-gray-50 p-3"><p class="text-gray-400">Restantes</p><p class="text-lg font-semibold text-gray-800 tabular-nums mt-1" x-text="logisticaRotaRestantes(logisticaRotaAtual())"></p></div>
+                    <div class="rounded-lg bg-gray-50 p-3"><p class="text-gray-400">Total dos pedidos</p><p class="text-sm font-semibold text-gray-800 tabular-nums mt-2" x-text="formatCurrency(logisticaRotaTotal(logisticaRotaAtual()))"></p></div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <label class="flex-1 cursor-pointer inline-flex items-center justify-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      <i data-lucide="paperclip" class="w-4 h-4"></i><span x-text="uploadingReceipt ? 'Enviando...' : 'Comprovante'"></span>
+                      <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="enviarComprovante(logisticaRotaAtual(), $event)" :disabled="uploadingReceipt">
+                    </label>
+                    <button @click="setLogisticaTab('rotas')" class="flex-1 inline-flex items-center justify-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"><i data-lucide="route" class="w-4 h-4"></i>Ver rota</button>
+                  </div>
+
+                  <div class="border-t border-gray-100 pt-4">
+                    <p class="text-xs font-semibold text-gray-700 mb-2">Fechamento da rota</p>
+                    <div class="grid grid-cols-2 gap-2">
+                      <input x-model="fecharForm.km_end" type="number" min="0" placeholder="KM final" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                      <input x-model="fecharForm.fuel_spent" type="number" min="0" step="0.01" placeholder="Gasolina R$" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                      <input x-model="fecharForm.notes" type="text" placeholder="Observação opcional" class="col-span-2 border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                    </div>
+                    <button @click="fecharRota(logisticaRotaAtual())" :disabled="logisticaSaving"
+                            class="w-full mt-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg px-3 py-2.5 text-xs font-semibold disabled:opacity-50">Fechar rota</button>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <template x-if="!logisticaRotaAtual()">
+              <div class="p-5">
+                <div class="flex items-center gap-3 mb-1">
+                  <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="route" class="w-5 h-5 text-emerald-700"></i></div>
+                  <div><p class="text-xs text-gray-400 uppercase tracking-wide">Rota atual</p><h2 class="text-base font-semibold">Abrir nova rota</h2></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2 mb-4">Escolha o entregador, informe o odômetro e marque os pedidos que sairão juntos.</p>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                  <input x-model="rotaForm.courier_name" type="text" placeholder="Nome do entregador" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                  <input x-model="rotaForm.km_start" type="number" min="0" placeholder="KM inicial" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                </div>
+                <div class="max-h-64 overflow-y-auto space-y-1.5 mb-3">
+                  <template x-for="d in entregasSemRota()" :key="d.order_id">
+                    <label class="flex items-start gap-2 border border-gray-100 rounded-lg p-2.5 cursor-pointer hover:bg-gray-50">
+                      <input type="checkbox" x-model="rotaForm.selecionadas[d.order_id]" class="mt-0.5 rounded border-gray-300 text-emerald-700">
+                      <span class="min-w-0"><span class="block text-xs font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></span><span class="block text-[11px] text-gray-400 truncate" x-text="d.delivery_address || 'Sem endereço'"></span></span>
+                    </label>
+                  </template>
+                  <p x-show="!entregasSemRota().length" class="text-sm text-gray-400 text-center py-8">Nenhuma entrega aguardando rota.</p>
+                </div>
+                <button @click="abrirRota()" :disabled="logisticaSaving || !Object.values(rotaForm.selecionadas).some(Boolean)"
+                        class="w-full bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg px-4 py-2.5 text-xs font-semibold disabled:opacity-50">Abrir rota</button>
+              </div>
+            </template>
+          </aside>
+        </div>
+
+        <!-- Decisões pendentes: aparece na visão sem esconder o motivo real. -->
+        <button x-show="logisticaTab === 'visao' && (logistica?.reportadas || []).length"
+                @click="setLogisticaFiltro('problemas', true)"
+                class="w-full bg-white border border-rose-100 rounded-xl p-4 flex items-center gap-4 text-left hover:border-rose-200 hover:shadow-sm transition">
+          <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="triangle-alert" class="w-5 h-5 text-rose-600"></i></div>
+          <div class="flex-1"><p class="text-sm font-semibold text-gray-800">Entregas com problema</p><p class="text-xs text-gray-500 mt-0.5" x-text="(logistica?.reportadas || []).length + ' precisam de decisão'"></p></div>
+          <span class="px-3 py-2 rounded-lg border border-rose-200 text-xs font-medium text-rose-700">Resolver agora</span>
+        </button>
+
+        <!-- Rotas recentes: operacional, com comprovantes e custo real já existente. -->
+        <section x-show="logisticaTab === 'rotas' || logisticaTab === 'historico'" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div><h2 class="text-base font-semibold">Rotas recentes</h2><p class="text-xs text-gray-400 mt-0.5">KM, combustível e comprovantes das últimas saídas</p></div>
+            <span class="text-xs text-gray-400 tabular-nums" x-text="(logistica?.rotas_recentes || []).length + ' rota(s)'"></span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[760px] text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide">
+                <tr><th class="px-4 py-3 font-medium">Rota</th><th class="px-4 py-3 font-medium">Entregador</th><th class="px-4 py-3 font-medium text-center">Entregas</th><th class="px-4 py-3 font-medium text-center">KM</th><th class="px-4 py-3 font-medium text-right">Gasolina</th><th class="px-4 py-3 font-medium">Comprovantes</th></tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
+                  <tr class="align-top hover:bg-gray-50/70">
+                    <td class="px-4 py-3"><p class="font-semibold text-emerald-800" x-text="t.trip_number"></p><p class="text-[11px] text-gray-400 mt-1" x-text="new Date(t.started_at).toLocaleDateString('pt-BR')"></p></td>
+                    <td class="px-4 py-3 text-gray-700" x-text="t.courier_name"></td>
+                    <td class="px-4 py-3 text-center tabular-nums" x-text="t.deliveries_count"></td>
+                    <td class="px-4 py-3 text-center tabular-nums" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></td>
+                    <td class="px-4 py-3 text-right font-medium tabular-nums" x-text="t.fuel_spent != null ? formatCurrency(Number(t.fuel_spent)) : '—'"></td>
+                    <td class="px-4 py-3">
+                      <div class="space-y-1">
+                        <template x-for="r in (t.receipts || [])" :key="r.id">
+                          <div class="flex items-center gap-2 text-[11px]">
+                            <a x-show="receiptUrls[r.id]" :href="receiptUrls[r.id]" target="_blank"><img :src="receiptUrls[r.id]" class="w-7 h-7 object-cover rounded border border-gray-200" alt="comprovante"></a>
+                            <span :class="r.ai_status === 'parsed' ? 'text-emerald-700' : r.ai_status === 'unreadable' ? 'text-amber-700' : 'text-gray-400'"
+                                  x-text="r.ai_status === 'parsed' ? 'Lido e lançado' : r.ai_status === 'unreadable' ? 'Revisar leitura' : 'Aguardando leitura'"></span>
+                            <button x-show="logistica?.receipt_ai && (r.ai_status === 'pending' || r.ai_status === 'unreadable')" @click="lerComprovante(r)" :disabled="logisticaSaving"
+                                    class="px-2 py-1 rounded bg-emerald-50 text-emerald-800 font-medium">Ler de novo</button>
+                          </div>
+                        </template>
+                        <span x-show="!(t.receipts || []).length" class="text-xs text-gray-400">Nenhum</span>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!(logistica?.rotas_recentes || []).length"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma rota fechada ainda.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Histórico de entregas sem misturar com a fila operacional. -->
+        <section x-show="logisticaTab === 'historico'" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div><h2 class="text-base font-semibold">Entregas finalizadas</h2><p class="text-xs text-gray-400 mt-0.5" x-text="logisticaFinalizadasView().length + ' resultado(s) em ' + logisticaPeriodoLabel().toLowerCase()"></p></div>
+            <label class="relative block"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i><input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido ou cliente" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-600"></label>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[720px] text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide"><tr><th class="px-4 py-3 font-medium">Pedido</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Itens</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium text-right">Resultado</th></tr></thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="d in logisticaFinalizadasView()" :key="d.order_id">
+                  <tr><td class="px-4 py-3 font-semibold tabular-nums" x-text="logisticaOrderLabel(d)"></td><td class="px-4 py-3"><p class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></p><p class="text-xs text-gray-400 truncate max-w-[260px]" x-text="d.delivery_address || 'Sem endereço'"></p></td><td class="px-4 py-3 text-xs text-gray-500" x-text="logisticaItens(d)"></td><td class="px-4 py-3 text-right font-semibold tabular-nums" x-text="formatCurrency(Number(d.total_amount || 0))"></td><td class="px-4 py-3 text-right"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span></td></tr>
+                </template>
+                <tr x-show="!logisticaFinalizadasView().length"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma entrega finalizada neste período.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Legado preservado como referência inerte durante a troca visual; não é montado pelo Alpine. -->
+    <template x-if="false">
+    <div class="p-8">
       <div class="mb-6">
         <h1 class="text-2xl font-semibold tracking-tight">Logística</h1>
         <p class="text-sm text-gray-500 mt-1">As entregas da Matriz e a rota do entregador — km, gasolina e comprovante viram custo sozinhos</p>
@@ -2553,6 +2928,8 @@
         </div>
       </div>
     </div>
+
+    </template>
 
     <!-- ═══ TELA: FINANCEIRO da matriz (Onda 1 — visão consolidada SÓ-LEITURA + despesas 0120) ═══ -->
     <div x-show="currentPage === 'financeiro'" class="p-8">

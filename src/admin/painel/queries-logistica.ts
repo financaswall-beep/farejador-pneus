@@ -18,10 +18,12 @@ export const MAIN_DELIVERY_GUARD = `
 
 export interface MatrizDeliveryRow {
   order_id: string;
+  order_number: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
   total_amount: string;
+  payment_method: string | null;
   status: string;
   delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
   delivery_courier: string | null;
@@ -96,8 +98,8 @@ export async function getMatrizLogistica(
   dbPool: Pool = defaultPool,
 ): Promise<MatrizLogistica> {
   const deliverySelect = `
-    SELECT o.id AS order_id, c.name AS customer_name, c.phone_e164 AS customer_phone,
-           o.delivery_address, o.total_amount::text, o.status, o.delivery_status,
+    SELECT o.id AS order_id, o.order_number, c.name AS customer_name, c.phone_e164 AS customer_phone,
+           o.delivery_address, o.total_amount::text, o.payment_method, o.status, o.delivery_status,
            o.delivery_courier, o.delivery_failure_reason, o.trip_id, o.created_at, o.dispatched_at, o.delivered_at,
            o.scheduled_delivery_date::text AS scheduled_raw,
            COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
