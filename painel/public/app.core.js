@@ -115,6 +115,8 @@ window.PAINEL_MODULES.core = function () {
         if (page === 'logistica') void this.loadLogistica();
         // Vendas: visão comercial unificada; custos e lucro permanecem no Financeiro.
         if (page === 'vendas') void this.loadVendasData();
+        // Clientes: consolida Chatwoot, balcão, compradores, VIPs e parceiros existentes.
+        if (page === 'clientes') void this.loadClientes();
         // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
         if (page === 'rede') void this.loadComissoes();
         // Colaboradores (0124): o staff da matriz — vendedor/entregador.

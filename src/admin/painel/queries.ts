@@ -28,4 +28,5 @@ export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): c
 export * from './queries-colaboradores-acesso.js'; // ciclo de acesso (0132): papel do painel, revogar/reativar, senha
 export * from './queries-notificacoes.js'; // sino do painel: entregas falhadas + vencidos + galpão pra repor
 export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando agora)
+export * from './queries-clientes.js'; // CRM da matriz: clientes/leads/compradores/recompra/parceiros
 export * from './queries-bot-visao.js'; // tela do Bot fatia 2: visão (cards/funil/mapa/boca/radar)
