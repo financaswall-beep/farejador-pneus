@@ -43,23 +43,27 @@ window.PAINEL_MODULES.financeiro = function () {
     // Barra "Resultado do período": o que ENTROU partido em custo / despesa / lucro.
     finResSeg(qual) {
       const m = this.financeiroVisao && this.financeiroVisao.mes;
-      if (!m) return '0%';
-      const entrou = Number(m.faturamento || 0);
+      const verdade = this.financeiroVisao && this.financeiroVisao.verdade;
+      if (!m || !verdade) return '0%';
+      const entrou = Number(verdade.competencia.receita_total || 0);
       if (!(entrou > 0)) return '0%';
-      const val = qual === 'custo' ? Number(m.custo || 0)
-        : qual === 'despesa' ? Number(m.despesas || 0)
-        : Math.max(0, Number(m.lucro || 0));
+      const val = qual === 'custo' ? Number(verdade.competencia.custo_conhecido || 0)
+        : qual === 'despesa' ? Number(verdade.competencia.despesas || 0)
+        : qual === 'pendente' ? Number(verdade.competencia.receita_custo_pendente || 0)
+        : Math.max(0, Number(verdade.competencia.lucro_confirmado || 0));
       return (Math.round((val / entrou) * 1000) / 10) + '%';
     },
     // % de cada componente (rótulo embaixo da barra).
     finResPct(qual) {
       const m = this.financeiroVisao && this.financeiroVisao.mes;
-      if (!m) return 0;
-      const entrou = Number(m.faturamento || 0);
+      const verdade = this.financeiroVisao && this.financeiroVisao.verdade;
+      if (!m || !verdade) return 0;
+      const entrou = Number(verdade.competencia.receita_total || 0);
       if (!(entrou > 0)) return 0;
-      const val = qual === 'custo' ? Number(m.custo || 0)
-        : qual === 'despesa' ? Number(m.despesas || 0)
-        : Math.max(0, Number(m.lucro || 0));
+      const val = qual === 'custo' ? Number(verdade.competencia.custo_conhecido || 0)
+        : qual === 'despesa' ? Number(verdade.competencia.despesas || 0)
+        : qual === 'pendente' ? Number(verdade.competencia.receita_custo_pendente || 0)
+        : Math.max(0, Number(verdade.competencia.lucro_confirmado || 0));
       return Math.round((val / entrou) * 1000) / 10;
     },
     // Contadores da "Atenção rápida" (levam pras sub-abas / estoque).

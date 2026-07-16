@@ -13,18 +13,19 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
       const v = this.financeiroVisao;
       if (!v) return null;
       const m = v.mes;
+      const verdade = v.verdade.competencia;
       const ind = v.indicadores;
-      const faturamento = Number(m.faturamento || 0);
-      const custo = Number(m.custo || 0);
-      const despesas = Number(m.despesas || 0);
-      const lucro = Number(m.lucro || 0);
+      const faturamento = Number(verdade.receita_total || 0);
+      const custo = Number(verdade.custo_conhecido || 0);
+      const despesas = Number(verdade.despesas || 0);
+      const lucro = Number(verdade.lucro_confirmado || 0);
       const margem = m.margem_pct === null ? null : Number(m.margem_pct);
       const pontoEquilibrio = ind.ponto_equilibrio === null ? null : Number(ind.ponto_equilibrio);
       const pontoPct = pontoEquilibrio && pontoEquilibrio > 0
         ? Math.round((faturamento / pontoEquilibrio) * 1000) / 10
         : null;
-      const receber = Number(v.a_receber.total || 0);
-      const pagar = Number(v.a_pagar.total || 0);
+      const receber = Number(v.verdade.posicao.a_receber || 0);
+      const pagar = Number(v.verdade.posicao.a_pagar || 0);
       const saldoAberto = receber - pagar;
       const cobertura = pagar > 0 ? Math.round((receber / pagar) * 100) / 100 : null;
       const maxResultado = Math.max(faturamento, custo, despesas, Math.abs(lucro), 1);
@@ -98,7 +99,7 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
       const noHorizonte = itens.filter((item) => item.dias !== null && item.dias <= horizonte);
       const entradas = noHorizonte.filter((item) => item.direcao === 'entrada').reduce((s, item) => s + Number(item.valor || 0), 0);
       const saidas = noHorizonte.filter((item) => item.direcao === 'saida').reduce((s, item) => s + Number(item.valor || 0), 0);
-      const resultado = Number(v.mes.lucro || 0);
+      const movimento = Number(v.verdade.caixa.movimento_liquido || 0);
       const impacto = entradas - saidas;
       const defs = horizonte === 7
         ? [
@@ -145,7 +146,7 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
       const vencidos = itens.filter((item) => item.dias !== null && item.dias < 0);
       const amanha = itens.filter((item) => item.dias === 1);
       return {
-        horizonte, resultado, entradas, saidas, impacto,
+        horizonte, movimento, entradas, saidas, impacto,
         buckets,
         movimentos: itens.filter((item) => item.dias === null || item.dias <= horizonte).slice(0, 8),
         vencidosTotal: vencidos.reduce((s, item) => s + Number(item.valor || 0), 0),

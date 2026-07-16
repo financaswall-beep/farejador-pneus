@@ -16,8 +16,8 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.varejo.js?v=20260714-vendas2"></script>
-<script src="/admin/painel/app.vendas.historico.js?v=20260714-historico2"></script>
+<script src="/admin/painel/app.varejo.js?v=20260716-etapa4"></script>
+<script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260714-atacado1"></script>
 <script src="/admin/painel/app.compras.js?v=20260714-atacado1"></script>
@@ -31,8 +31,8 @@
 <script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260715-kanban1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260714-fiscal1"></script>
-<script src="/admin/painel/app.financeiro.indicadores.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260716-etapa4"></script>
+<script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
@@ -1614,7 +1614,7 @@
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-700"></i></div>
-            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(varejoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">só pneus — frete fora (frete no Financeiro)</p></div>
+            <div><p class="text-xs text-gray-500">Total vendido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(varejoResumoKpis().total)"></p><p class="text-xs text-gray-400 mt-1">pedido cheio — inclui frete</p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 min-h-[126px] flex items-center gap-4 shadow-sm">
             <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="chart-no-axes-column-increasing" class="w-6 h-6 text-emerald-700"></i></div>
@@ -2749,24 +2749,23 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Resultado do mês</p>
-                <p class="text-2xl font-bold leading-tight num" :class="Number(financeiroVisao.mes.lucro) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.mes.lucro))"></p></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Lucro confirmado</p>
+                <p class="text-2xl font-bold leading-tight num" :class="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.lucro_confirmado))"></p><p class="text-xs text-gray-400 mt-1">competência do mês</p></div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Entrou</p>
-                <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(financeiroVisao.mes.faturamento))"></p></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Receita por competência</p>
+                <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_total))"></p></div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Saiu (despesas)</p>
-                <p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="financeiroVisao.mes.despesas !== null ? formatCurrency(Number(financeiroVisao.mes.despesas)) : '—'"></p></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Entradas registradas</p>
+                <p class="text-2xl font-bold leading-tight text-emerald-700 num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></p><p class="text-xs text-gray-400 mt-1">movimento de caixa do mês</p></div>
             </div>
             <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
               <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="bell" class="w-5 h-5 text-amber-600"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Pendências abertas</p>
-                <p class="text-sm font-semibold text-gray-900 mt-0.5">
-                  <span x-text="financeiroVisao.a_pagar.vencidos_count"></span> vencido(s) + <span x-text="finCobrancasAbertas()"></span> cobrança(s)</p></div>
+              <div class="min-w-0"><p class="text-xs text-gray-500">Saídas registradas</p>
+                <p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></p><p class="text-xs text-gray-400 mt-1">pagamentos do mês</p></div>
             </div>
           </div>
 
@@ -2774,19 +2773,21 @@
           <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
             <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <h3 class="text-base font-semibold mb-4">Resultado do período</h3>
-              <p class="text-xs text-gray-500 mb-5">Como cada real faturado se divide entre custo dos pneus, despesas e resultado.</p>
+              <p class="text-xs text-gray-500 mb-5">Competência: custo conhecido, custo pendente, despesas e lucro confirmado.</p>
               <div class="flex h-3.5 rounded-full overflow-hidden bg-gray-100">
                 <div class="bg-gray-400 h-full" :style="'width:' + finResSeg('custo')" title="custo do pneu"></div>
+                <div class="bg-amber-400 h-full" :style="'width:' + finResSeg('pendente')" title="receita com custo pendente"></div>
                 <div class="bg-rose-500 h-full" :style="'width:' + finResSeg('despesa')" title="despesas"></div>
                 <div class="bg-emerald-600 h-full" :style="'width:' + finResSeg('lucro')" title="lucro"></div>
               </div>
               <div class="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs text-gray-500">
                 <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-gray-400"></span>Custo <span class="text-gray-700 font-medium num" x-text="finResPct('custo') + '%'"></span></span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>Custo pendente <span class="text-gray-700 font-medium num" x-text="finResPct('pendente') + '%'"></span></span>
                 <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>Despesas <span class="text-gray-700 font-medium num" x-text="finResPct('despesa') + '%'"></span></span>
                 <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-600"></span>Lucro <span class="text-gray-700 font-medium num" x-text="finResPct('lucro') + '%'"></span></span>
               </div>
-              <p class="text-xs text-amber-600 mt-3" x-show="financeiroVisao.mes.itens_sem_custo > 0"
-                 x-text="financeiroVisao.mes.itens_sem_custo + ' item(ns) do varejo sem custo congelado — o lucro sai parcial'"></p>
+              <p class="text-xs text-amber-600 mt-3" x-show="financeiroVisao.verdade.competencia.receita_custo_pendente !== '0.00'"
+                 x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente)) + ' de receita está com custo pendente e ficou fora do lucro.'"></p>
             </div>
 
             <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -2807,6 +2808,14 @@
                   <div class="min-w-0"><p class="text-xs text-gray-500">Capital parado</p><p class="text-base font-semibold"><span class="num" x-text="financeiroVisao.indicadores.pneus_galpao"></span> <span class="text-xs font-normal text-gray-500">pneus · </span><span class="num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span></p></div>
                   <button @click="currentPage = 'estoque'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver estoque</button>
                 </div>
+                <div x-show="Number(financeiroVisao.verdade.caixa.recebimento_pendente) > 0" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-4 h-4 text-amber-600"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Recebimento ainda não comprovado</p><p class="text-base font-semibold num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.recebimento_pendente))"></p></div>
+                </div>
+                <div x-show="Number(financeiroVisao.verdade.posicao.varejo_a_receber_sem_baixa) > 0" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-alert" class="w-4 h-4 text-rose-600"></i></div>
+                  <div class="min-w-0"><p class="text-xs text-gray-500">Varejo “A receber” sem baixa financeira</p><p class="text-base font-semibold num" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.varejo_a_receber_sem_baixa))"></p></div>
+                </div>
               </div>
             </div>
           </div>
@@ -2814,7 +2823,7 @@
           <!-- De onde veio o dinheiro (valor + lucro por fonte) -->
           <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             <div class="flex items-center justify-between mb-4 max-w-6xl mx-auto">
-              <h3 class="text-base font-semibold">De onde veio o dinheiro</h3>
+              <h3 class="text-base font-semibold">Composição da receita por competência</h3>
             </div>
             <div class="hidden lg:grid lg:grid-cols-[220px_minmax(240px,1fr)_140px_190px] gap-5 items-center max-w-6xl mx-auto mb-3 text-xs text-gray-400">
               <span></span><span></span><span class="text-right">Valor</span><span class="text-right">Lucro bruto</span>
@@ -2837,6 +2846,16 @@
               </template>
             </div>
             <p class="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">Lucro <b>bruto</b> por fonte (antes de ratear as despesas gerais). Frete e comissão entram cheios — o custo do frete, a gasolina, já desconta na perna Despesas.</p>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+              <div><h3 class="text-base font-semibold">Conciliação por origem</h3><p class="text-xs text-gray-500 mt-1">Compara o total da fonte com o valor usado nas contas, centavo a centavo.</p></div>
+              <span class="text-xs font-semibold rounded-full px-3 py-1" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'Tudo conciliado' : 'Revisão necessária'"></span>
+            </div>
+            <div class="overflow-x-auto"><table class="w-full min-w-[680px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-5 py-3 text-left font-medium">Origem</th><th class="px-4 py-3 text-right font-medium">Na fonte</th><th class="px-4 py-3 text-right font-medium">Contabilizado</th><th class="px-5 py-3 text-right font-medium">Diferença</th></tr></thead><tbody class="divide-y divide-gray-100">
+              <template x-for="linha in financeiroVisao.verdade.conciliacao.origens" :key="linha.origem"><tr><td class="px-5 py-3 font-medium capitalize" x-text="linha.origem"></td><td class="px-4 py-3 text-right num" x-text="formatCurrency(Number(linha.origem_total))"></td><td class="px-4 py-3 text-right num" x-text="formatCurrency(Number(linha.contabilizado))"></td><td class="px-5 py-3 text-right font-semibold num" :class="Number(linha.diferenca) === 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(linha.diferenca))"></td></tr></template>
+            </tbody></table></div>
           </div>
 
         </div>
@@ -3127,7 +3146,7 @@
 
           <div x-show="finIndicadorTab === 'fluxo'" class="space-y-5">
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Resultado realizado</p><p class="text-2xl font-bold leading-tight num" :class="finFluxoPainel().resultado >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().resultado)"></p><p class="text-xs text-gray-400 mt-1">competência do mês atual</p></div></div>
+              <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Movimento líquido registrado</p><p class="text-2xl font-bold leading-tight num" :class="finFluxoPainel().movimento >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().movimento)"></p><p class="text-xs text-gray-400 mt-1">entradas − saídas; não é saldo bancário</p></div></div>
               <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Entradas previstas</p><p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(finFluxoPainel().entradas)"></p><p class="text-xs text-gray-400 mt-1" x-text="'vencidas + próximos ' + finFluxoPainel().horizonte + ' dias'"></p></div></div>
               <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Saídas previstas</p><p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(finFluxoPainel().saidas)"></p><p class="text-xs text-gray-400 mt-1" x-text="'vencidas + próximos ' + finFluxoPainel().horizonte + ' dias'"></p></div></div>
               <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm"><div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="finFluxoPainel().impacto >= 0 ? 'bg-emerald-50' : 'bg-rose-50'"><i data-lucide="scale" class="w-5 h-5" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Impacto líquido previsto</p><p class="text-2xl font-bold leading-tight num" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().impacto)"></p><p class="text-xs text-gray-400 mt-1">entradas previstas menos saídas previstas</p></div></div>

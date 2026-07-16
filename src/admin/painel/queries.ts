@@ -23,6 +23,7 @@ export * from './queries-despesas-categorias.js'; // modalidades de despesa cada
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)
 export * from './queries-comissoes.js'; // comissões como lançamento (0118): varredura, livro, quitar, termos
 export * from './queries-financeiro-visao.js'; // visão consolidada do Financeiro da matriz (só leitura)
+export * from './queries-financeiro-verdade.js'; // Etapa 4: competência × caixa × posição + conciliação
 export * from './queries-logistica.js'; // logística (0121) leitura: entregas, rotas, status, falha
 export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendurar/remarcar/recolocar/fechar rota
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)

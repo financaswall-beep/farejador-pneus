@@ -212,10 +212,15 @@ export async function getWholesaleResumo(
 // ─── VAREJO DA MATRIZ (0117 — fatia 2): resumo com custo CONGELADO + recorte por mês ─
 export interface VarejoResumoRow {
   faturamento: string;
+  faturamento_total: string;
+  frete_total: string;
+  receita_custo_conhecido: string;
+  receita_custo_pendente: string;
   custo_total: string;
   lucro_total: string;
   vendas_count: number;
   itens_sem_custo: number;
+  pedidos_custo_pendente: number;
   cancelled_count: number;
   pending_count: number;
 }
@@ -234,24 +239,35 @@ export async function getVarejoResumo(
   const periodWhere = salesPeriodWhere(period);
   const r = await dbPool.query<VarejoResumoRow>(
     `SELECT
-       COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount)
-         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS faturamento,
-       COALESCE(SUM(oi.matriz_unit_cost * oi.quantity)
-         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS custo_total,
-       COALESCE(SUM(CASE WHEN oi.matriz_unit_cost IS NOT NULL
-                         THEN (oi.quantity * oi.unit_price - oi.discount_amount)
-                               - oi.matriz_unit_cost * oi.quantity END)
-         FILTER (WHERE o.status <> 'cancelled'), 0)                       AS lucro_total,
-       COUNT(DISTINCT o.id) FILTER (WHERE o.status <> 'cancelled')::int   AS vendas_count,
-       COUNT(*) FILTER (WHERE o.status <> 'cancelled' AND oi.matriz_unit_cost IS NULL)::int AS itens_sem_custo,
-       COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::int     AS cancelled_count,
-       COUNT(DISTINCT o.id) FILTER (WHERE o.status IN ('open', 'pending'))::int AS pending_count
-       FROM commerce.orders o
-       JOIN core.units u
-         ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
-       JOIN commerce.order_items oi
-         ON oi.order_id = o.id AND oi.environment = o.environment
-      WHERE o.environment = $1 ${periodWhere}`,
+       COALESCE(SUM(x.item_total) FILTER (WHERE x.status <> 'cancelled'),0) AS faturamento,
+       COALESCE(SUM(x.total_amount) FILTER (WHERE x.status <> 'cancelled'),0) AS faturamento_total,
+       COALESCE(SUM(GREATEST(x.total_amount-x.item_total,0))
+         FILTER (WHERE x.status <> 'cancelled' AND x.fulfillment_mode='delivery'),0) AS frete_total,
+       COALESCE(SUM(x.known_revenue) FILTER (WHERE x.status <> 'cancelled'),0) AS receita_custo_conhecido,
+       COALESCE(SUM(x.pending_revenue) FILTER (WHERE x.status <> 'cancelled'),0) AS receita_custo_pendente,
+       COALESCE(SUM(x.known_cost) FILTER (WHERE x.status <> 'cancelled'),0) AS custo_total,
+       COALESCE(SUM(x.known_revenue-x.known_cost) FILTER (WHERE x.status <> 'cancelled'),0) AS lucro_total,
+       COUNT(*) FILTER (WHERE x.status <> 'cancelled')::int AS vendas_count,
+       COALESCE(SUM(x.pending_items) FILTER (WHERE x.status <> 'cancelled'),0)::int AS itens_sem_custo,
+       COUNT(*) FILTER (WHERE x.status <> 'cancelled' AND x.pending_items>0)::int AS pedidos_custo_pendente,
+       COUNT(*) FILTER (WHERE x.status = 'cancelled')::int AS cancelled_count,
+       COUNT(*) FILTER (WHERE x.status IN ('open','pending'))::int AS pending_count
+      FROM (
+        SELECT o.id,o.status,o.total_amount,o.fulfillment_mode,
+               SUM(oi.quantity*oi.unit_price-oi.discount_amount) item_total,
+               COALESCE(SUM(oi.quantity*oi.unit_price-oi.discount_amount)
+                 FILTER (WHERE oi.matriz_unit_cost IS NOT NULL),0) known_revenue,
+               COALESCE(SUM(oi.quantity*oi.unit_price-oi.discount_amount)
+                 FILTER (WHERE oi.matriz_unit_cost IS NULL),0) pending_revenue,
+               COALESCE(SUM(oi.matriz_unit_cost*oi.quantity)
+                 FILTER (WHERE oi.matriz_unit_cost IS NOT NULL),0) known_cost,
+               COUNT(*) FILTER (WHERE oi.matriz_unit_cost IS NULL)::int pending_items
+          FROM commerce.orders o
+          JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
+          JOIN commerce.order_items oi ON oi.order_id=o.id AND oi.environment=o.environment
+         WHERE o.environment=$1 ${periodWhere}
+         GROUP BY o.id
+      ) x`,
     [environment],
   );
   return r.rows[0]!;

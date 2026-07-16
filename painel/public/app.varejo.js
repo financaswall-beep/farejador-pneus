@@ -40,6 +40,8 @@ window.PAINEL_MODULES.varejo = function () {
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
           totalAmount: Number(row.total_amount || 0),
+          itemsAmount: Number(row.items_amount || 0),
+          freightAmount: Number(row.freight_amount || 0),
           unitSlug: row.unit_slug || null,
           isPartner,
           status,
@@ -79,7 +81,7 @@ window.PAINEL_MODULES.varejo = function () {
     },
     varejoResumoKpis() {
       const vendas = this.varejoResumo ? Number(this.varejoResumo.vendas_count || 0) : this.vendasVarejoAtivas().length;
-      const total = this.varejoResumo ? Number(this.varejoResumo.faturamento || 0) : this.vendasVarejoTotal();
+      const total = this.varejoResumo ? Number(this.varejoResumo.faturamento_total || 0) : this.vendasVarejoTotal();
       const canceladas = Number(this.varejoResumo?.cancelled_count ?? this.vendasVarejoPeriodo().filter((p) => p.status === 'Cancelado').length);
       return {
         vendas, total, canceladas,
@@ -170,7 +172,7 @@ window.PAINEL_MODULES.varejo = function () {
         : this.vendasVarejoAtivas().length;
       const atacadoCount = Number(this.atacadoResumo?.vendas_count || 0);
       const varejoValor = this.varejoResumo
-        ? Number(this.varejoResumo.faturamento || 0)
+        ? Number(this.varejoResumo.faturamento_total || 0)
         : this.vendasVarejoTotal();
       const atacadoValor = Number(this.atacadoResumo?.faturamento || 0);
       const canceladas = Number(this.varejoResumo?.cancelled_count ?? this.vendasVarejoPeriodo().filter((p) => p.status === 'Cancelado').length)
@@ -204,6 +206,7 @@ window.PAINEL_MODULES.varejo = function () {
         data: p.data, cliente: p.cliente, itens: p.itens, itensCount: p.itensCount, pagto: p.pagto,
         telefone: p.telefone,
         total: p.total, totalAmount: p.totalAmount, status: p.status, statusClass: p.statusClass,
+        itemsAmount: p.itemsAmount, freightAmount: p.freightAmount,
         cancelavel: p.status !== 'Cancelado', varejo: p,
       }));
       const atacado = this.atacadoVendas
@@ -216,6 +219,7 @@ window.PAINEL_MODULES.varejo = function () {
             data: this.vendaData(v), cliente: v.buyer_name, itens: `${qty} pneu(s)`, itensCount: qty,
             pagto: v.payment_status === 'pending' ? 'Fiado' : 'Pago',
             total: this.formatCurrency(Number(v.total_amount || 0)), totalAmount: Number(v.total_amount || 0),
+            itemsAmount: Number(v.total_amount || 0), freightAmount: 0,
             status: cancelled ? 'Cancelada' : 'Confirmada',
             statusClass: cancelled ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
             cancelavel: !cancelled, recibo: this.reciboWhatsLink(v), atacado: v,

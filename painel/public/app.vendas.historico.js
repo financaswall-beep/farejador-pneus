@@ -172,10 +172,12 @@ window.PAINEL_MODULES.vendasHistorico = function () {
 
     vendasHistoricoExportar() {
       const rows = this.vendasHistoricoFiltrado();
-      const cabecalho = ['Data', 'Venda', 'Cliente', 'Canal', 'Itens', 'Pagamento', 'Total', 'Status'];
+      const cabecalho = ['Data', 'Venda', 'Cliente', 'Canal', 'Itens', 'Pagamento', 'Pneus', 'Frete', 'Total', 'Status'];
       const linhas = rows.map((row) => [
         row.data, this.vendasHistoricoNumero(row), row.cliente, row.canal,
-        row.itens, row.pagto, Number(row.totalAmount || 0).toFixed(2).replace('.', ','), row.status,
+        row.itens, row.pagto, Number(row.itemsAmount || 0).toFixed(2).replace('.', ','),
+        Number(row.freightAmount || 0).toFixed(2).replace('.', ','),
+        Number(row.totalAmount || 0).toFixed(2).replace('.', ','), row.status,
       ]);
       const csv = '\ufeff' + [cabecalho, ...linhas].map((linha) => linha.map(this.vendasHistoricoCsvCell).join(';')).join('\r\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));

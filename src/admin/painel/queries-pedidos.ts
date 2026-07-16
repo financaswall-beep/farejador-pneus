@@ -73,10 +73,19 @@ function clampLimit(limit?: number): number {
 
 export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
   const result = await dbPool.query(
-    `SELECT *
-     FROM dashboard.pedidos_recentes
-     WHERE environment = $1
-     ORDER BY created_at DESC
+    `SELECT pr.*,
+            COALESCE(amounts.items_amount,0) AS items_amount,
+            CASE WHEN pr.fulfillment_mode='delivery'
+                 THEN GREATEST(pr.total_amount-COALESCE(amounts.items_amount,0),0)
+                 ELSE 0 END AS freight_amount
+     FROM dashboard.pedidos_recentes pr
+     LEFT JOIN LATERAL (
+       SELECT SUM(oi.quantity*oi.unit_price-oi.discount_amount) AS items_amount
+         FROM commerce.order_items oi
+        WHERE oi.environment=pr.environment AND oi.order_id=pr.order_id
+     ) amounts ON true
+     WHERE pr.environment = $1
+     ORDER BY pr.created_at DESC
      LIMIT $2`,
     [env.FAREJADOR_ENV, clampLimit(limit)],
   );

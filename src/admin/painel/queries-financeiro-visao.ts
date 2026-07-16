@@ -13,6 +13,7 @@ import { hashPassword } from '../../parceiro/password.js';
 import { getWholesaleResumo, getVarejoResumo } from './queries-galpao.js';
 import { getWholesaleFinance, getMatrizExpenses } from './queries-fiado-despesas.js';
 import { getCommissionLedger } from './queries-comissoes.js';
+import { getMatrizFinancialTruth, type MatrizFinancialTruth } from './queries-financeiro-verdade.js';
 
 export interface FinanceiroReceivableItem {
   tipo: 'fiado' | 'comissao';
@@ -37,6 +38,7 @@ export interface FinanceiroPayableItem {
 
 export interface FinanceiroVisao {
   fontes: { fiado: boolean; comissao: boolean; despesas: boolean };
+  verdade: MatrizFinancialTruth;
   mes: {
     faturamento: string;      // pernas somadas + frete de entrega (recorte mês São Paulo, régua 0117)
     custo: string;            // custo do pneu vendido (atacado + varejo congelado)
@@ -74,7 +76,7 @@ export async function getMatrizFinanceiroVisao(
   dbPool: Pool = defaultPool,
 ): Promise<FinanceiroVisao> {
   const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
-  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes] =
+  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes, verdade] =
     await Promise.all([
       getWholesaleResumo(environment, dbPool, 'mes'),
       getVarejoResumo('mes', environment, dbPool),
@@ -156,6 +158,7 @@ export async function getMatrizFinanceiroVisao(
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
         [environment],
       ).then((r) => r.rows[0]!.frete),
+      getMatrizFinancialTruth(environment, dbPool),
     ]);
 
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
@@ -230,6 +233,7 @@ export async function getMatrizFinanceiroVisao(
     ? Math.round(despesasMes / margemBrutaFrac) : null;
 
   return {
+    verdade,
     fontes: {
       fiado: Boolean(env.WHOLESALE_FINANCE),
       comissao: Boolean(env.NETWORK_COMMISSION_LEDGER),
