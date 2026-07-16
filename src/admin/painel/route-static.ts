@@ -22,7 +22,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   const painelModulos = [
     'app.nav.js', 'app.rede.kpis.js', 'app.unidade.kpis.js', 'app.venda.modal.js', 'app.api.js',
     'app.format.js', 'app.varejo.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.compras.js',
-    'app.logistica.js', 'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.gestao.js', 'app.sino.js', 'app.financeiro.js',
+    'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.gestao.js', 'app.sino.js', 'app.financeiro.js',
     'app.financeiro.indicadores.js', 'app.financeiro.despesas.js', // fatia 07-14 do financeiro (fiscal 300)
     'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
@@ -34,6 +34,10 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   }
   fastify.get('/admin/painel/rede-fallback.js', async (_request, reply) => sendStatic(reply, 'rede-fallback.js', 'text/javascript; charset=utf-8'));
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
+  for (const brand of ['facebook.svg', 'google-ads.svg', 'instagram.svg', 'whatsapp.svg']) {
+    fastify.get(`/assets/brands/${brand}`, async (_request, reply) =>
+      sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), `assets/brands/${brand}`, 'image/svg+xml'));
+  }
   fastify.get('/seja-parceiro-2w.png', async (_request, reply) => sendStatic(reply, 'seja-parceiro-2w.png', 'image/png'));
 
 }

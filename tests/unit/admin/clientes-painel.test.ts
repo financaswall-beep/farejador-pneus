@@ -83,6 +83,18 @@ describe('painel de clientes', () => {
     ]);
   });
 
+  it('nao derruba o fluxo principal quando o aviso do Kanban falha', async () => {
+    Object.assign(process.env, {
+      NODE_ENV: 'test', FAREJADOR_ENV: 'test',
+      DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
+      CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'test-admin-token',
+    });
+    const { notifyClientesKanban } = await import('../../../src/shared/clientes-kanban.notify.js');
+    const client = { query: vi.fn().mockRejectedValue(new Error('notify offline')) } as unknown as PoolClient;
+
+    await expect(notifyClientesKanban(client, 'test', 'conv-erro', 'order')).resolves.toBeUndefined();
+  });
+
   it('liga SSE com debounce de um segundo e fallback sem tirar os cards da tela', () => {
     const clientes = readFileSync('painel/public/app.clientes.js', 'utf8');
     const core = readFileSync('painel/public/app.core.js', 'utf8');

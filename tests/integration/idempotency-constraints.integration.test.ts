@@ -32,7 +32,9 @@ describe('migration 0008 — status_events_dedup_key', () => {
       INSERT INTO core.conversation_status_events
         (environment, conversation_id, chatwoot_conversation_id,
          event_type, occurred_at)
-      VALUES ('test', $1, 99, 'status_changed', $2)
+      VALUES ('test', $1,
+              (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1),
+              'status_changed', $2)
     `;
     await db.pool.query(insert, [conversationId, occurredAt]);
     await expect(db.pool.query(insert, [conversationId, occurredAt])).rejects.toMatchObject({
@@ -47,7 +49,9 @@ describe('migration 0008 — status_events_dedup_key', () => {
       INSERT INTO core.conversation_status_events
         (environment, conversation_id, chatwoot_conversation_id,
          event_type, occurred_at)
-      VALUES ('test', $1, 99, 'status_changed', $2)
+      VALUES ('test', $1,
+              (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1),
+              'status_changed', $2)
       ON CONFLICT ON CONSTRAINT status_events_dedup_key DO NOTHING
     `;
     await db.pool.query(insert, [conversationId, occurredAt]);

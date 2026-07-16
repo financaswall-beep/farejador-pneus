@@ -107,8 +107,8 @@ async function seedScenario(q: Q, f: PartnerFixture): Promise<string> {
   const fO = await mk('pickup', M, 1, 300); await setOrderDates(fO.order_id, { created_at: '2026-03-12T12:00:00Z' });
   await q.cancelPartnerSale(f.ctx, fO.order_id);
 
-  await q.registerPartnerExpense(f.ctx, { expense_date: '2026-03-05', category: 'outros', description: 'dentro', amount: 50, payment_method: 'pix', idempotency_key: `e1-${randomUUID()}` });
-  await q.registerPartnerExpense(f.ctx, { expense_date: '2026-04-02', category: 'outros', description: 'fora', amount: 70, payment_method: 'pix', idempotency_key: `e2-${randomUUID()}` });
+  await q.registerPartnerExpense(f.ctx, { expense_date: '2026-03-05', category: 'other', description: 'dentro', amount: 50, payment_method: 'pix', idempotency_key: `e1-${randomUUID()}` });
+  await q.registerPartnerExpense(f.ctx, { expense_date: '2026-04-02', category: 'other', description: 'fora', amount: 70, payment_method: 'pix', idempotency_key: `e2-${randomUUID()}` });
 
   await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-03-08', items: [{ item_name: 'Pneu X', quantity: 2, unit_cost: 40 }], payment_method: 'pix', payment_status: 'payable', payable_due_date: '2026-04-08', idempotency_key: `p1-${randomUUID()}` });
   await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-04-10', items: [{ item_name: 'Pneu Y', quantity: 1, unit_cost: 90 }], payment_method: 'pix', payment_status: 'paid_now', idempotency_key: `p2-${randomUUID()}` });

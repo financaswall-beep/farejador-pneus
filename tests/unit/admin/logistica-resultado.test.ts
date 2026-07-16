@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getMatrizLogistica } from '../../../src/admin/painel/queries-logistica.js';
+
+let getMatrizLogistica: typeof import('../../../src/admin/painel/queries-logistica.js').getMatrizLogistica;
+
+beforeAll(async () => {
+  Object.assign(process.env, {
+    NODE_ENV: 'test', FAREJADOR_ENV: 'prod', DATABASE_URL: 'postgres://test',
+    CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
+  });
+  ({ getMatrizLogistica } = await import('../../../src/admin/painel/queries-logistica.js'));
+});
 
 describe('getMatrizLogistica — resultado real por rota', () => {
   it('busca custo congelado por pedido e despesas vinculadas sem usar valor fixo de combustível', async () => {

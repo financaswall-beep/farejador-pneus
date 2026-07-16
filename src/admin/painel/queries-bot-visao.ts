@@ -80,7 +80,8 @@ export async function getBotVisao(
          COALESCE(sum(conv_tarde), 0)::int AS conv_tarde,
          COALESCE(sum(conv_noite), 0)::int AS conv_noite
        FROM analytics.v_daily_metrics
-       WHERE dia >= ${sinceSql}`,
+       WHERE environment = $1 AND dia >= ${sinceSql}`,
+      [environment],
     );
     out.cards = r.rows[0] ?? null;
     if (out.cards) {

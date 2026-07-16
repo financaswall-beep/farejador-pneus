@@ -13,7 +13,7 @@ export interface IntegrationDb {
   connectionString: string;
 }
 
-export async function startPostgres(): Promise<IntegrationDb> {
+export async function startPostgres(options: { throughMigration?: string } = {}): Promise<IntegrationDb> {
   // Imagem alinhada com prod (Supabase usa Postgres 17.x).
   const container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('farejador_test')
@@ -28,7 +28,7 @@ export async function startPostgres(): Promise<IntegrationDb> {
   const connectionString = container.getConnectionUri().replace('@localhost:', '@127.0.0.1:');
   const pool = new Pool({ connectionString, max: 5 });
 
-  await applyMigrations(pool);
+  await applyMigrations(pool, options.throughMigration);
 
   return { container, pool, connectionString };
 }
@@ -38,9 +38,10 @@ export async function stopPostgres(db: IntegrationDb): Promise<void> {
   await db.container.stop();
 }
 
-async function applyMigrations(pool: Pool): Promise<void> {
+async function applyMigrations(pool: Pool, throughMigration?: string): Promise<void> {
   const files = (await readdir(MIGRATIONS_DIR))
     .filter((f) => f.endsWith('.sql'))
+    .filter((f) => !throughMigration || f <= throughMigration)
     .sort();
 
   const client = await pool.connect();
@@ -78,6 +79,13 @@ async function applyMigrations(pool: Pool): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/** Aplica um unico arquivo para provar sequencias de deploy/hotfix. */
+export async function applyMigrationFile(pool: Pool, file: string): Promise<void> {
+  if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(file)) throw new Error('invalid_migration_file');
+  const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
+  await pool.query(patchKnownIssues(file, raw));
 }
 
 /**

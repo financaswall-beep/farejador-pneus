@@ -74,6 +74,7 @@ export interface MatrizResumo {
 export async function getMatrizResumo(
   period: PainelRedePeriod = '7d',
   dbPool: Pool = defaultPool,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
 ): Promise<MatrizResumo> {
   // Janela por `dia` (date). Expressao constante (sem input) -> sem injection.
   const sinceSql =
@@ -102,7 +103,8 @@ export async function getMatrizResumo(
               THEN round(sum(faturamento) / sum(fecharam), 2)
               ELSE 0 END AS ticket_medio
        FROM analytics.v_daily_metrics
-       WHERE dia >= ${sinceSql}`,
+       WHERE environment = $1 AND dia >= ${sinceSql}`,
+      [environment],
     );
     metrics = r.rows[0] ?? null;
   } catch { /* bloco vazio se a view faltar */ }
@@ -115,8 +117,9 @@ export async function getMatrizResumo(
               faturamento::numeric AS faturamento,
               custo_bot_brl::numeric AS custo_bot
        FROM analytics.v_daily_metrics
-       WHERE dia >= ${sinceSql}
+       WHERE environment = $1 AND dia >= ${sinceSql}
        ORDER BY dia`,
+      [environment],
     );
     series = r.rows;
   } catch { /* bloco vazio */ }
@@ -127,12 +130,13 @@ export async function getMatrizResumo(
               etapa_atingida, provavel_motivo, horas_sem_resposta::numeric AS horas,
               reclamou_preco, mencionou_concorrente
        FROM analytics.v_clientes_pra_recuperar
+       WHERE environment = $1
        ORDER BY started_at DESC NULLS LAST
        LIMIT 12`,
+      [environment],
     );
     leads = r.rows;
   } catch { /* bloco vazio */ }
 
   return { metrics, series, leads };
 }
-

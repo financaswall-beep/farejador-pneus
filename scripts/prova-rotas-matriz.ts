@@ -13,12 +13,17 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { registerPainelRoute } from '../src/admin/painel/route.js';
+
+Object.assign(process.env, {
+  NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
+  CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
+});
 
 const BASELINE = path.join(process.cwd(), 'scripts', 'baseline-rotas-matriz.json');
 const gravar = process.argv.includes('--gravar-baseline');
 
 async function main() {
+  const { registerPainelRoute } = await import('../src/admin/painel/route.js');
   const rotas: string[] = [];
   const app = Fastify({ logger: false });
   app.addHook('onRoute', (r) => {

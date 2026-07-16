@@ -37,7 +37,7 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
       this.colabPerfilForm = { job_title: c.job_title || '', work_area: c.work_area || 'other' };
       this.colabRemForm = {
-        employment_type: c.employment_type || 'clt', base_salary: c.base_salary || '',
+        employment_type: c.employment_type || 'clt', base_salary: c.monthly_base_salary || c.base_salary || '',
         payment_day: c.payment_day || 5, payment_method: c.payment_method || 'pix',
         payment_note: c.payment_note || '', starts_on: c.compensation_starts_on ? String(c.compensation_starts_on).slice(0, 10) : today,
       };

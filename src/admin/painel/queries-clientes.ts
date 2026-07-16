@@ -162,7 +162,8 @@ export async function getClientesPainel(
             ORDER BY o.created_at DESC LIMIT 1
          ) lead_order ON true
          LEFT JOIN LATERAL (
-           SELECT sum(((oi.unit_price - COALESCE(oi.matriz_unit_cost, oi.unit_price)) * oi.quantity) - oi.discount_amount) AS gross_profit
+           SELECT sum(((oi.unit_price - oi.matriz_unit_cost) * oi.quantity) - oi.discount_amount)
+                    FILTER (WHERE oi.matriz_unit_cost IS NOT NULL) AS gross_profit
              FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
             WHERE ox.contact_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'
          ) fin ON true
@@ -189,7 +190,8 @@ export async function getClientesPainel(
               count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS purchases,
               COALESCE(sum(o.total_amount) FILTER (WHERE o.status <> 'cancelled'), 0)::float8 AS total_spent,
               COALESCE(avg(o.total_amount) FILTER (WHERE o.status <> 'cancelled'), 0)::float8 AS avg_ticket,
-              COALESCE((SELECT sum(((oi.unit_price - COALESCE(oi.matriz_unit_cost, oi.unit_price)) * oi.quantity) - oi.discount_amount)
+              COALESCE((SELECT sum(((oi.unit_price - oi.matriz_unit_cost) * oi.quantity) - oi.discount_amount)
+                                  FILTER (WHERE oi.matriz_unit_cost IS NOT NULL)
                           FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
                          WHERE ox.customer_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'), 0)::float8 AS gross_profit,
               (SELECT COALESCE(ts.tire_size, p.product_name)

@@ -5,68 +5,75 @@ import { isStaleTrigger } from '../../src/atendente-v2/stale-trigger';
 
 let db: IntegrationDb;
 
-beforeAll(async () => {
-  db = await startPostgres();
-});
-
-afterAll(async () => {
-  if (db) await stopPostgres(db);
-});
+beforeAll(async () => { db = await startPostgres(); });
+afterAll(async () => { if (db) await stopPostgres(db); });
 
 async function newConversation(): Promise<string> {
-  const r = await db.pool.query<{ id: string }>(
+  const result = await db.pool.query<{ id: string }>(
     `INSERT INTO core.conversations
        (environment, chatwoot_conversation_id, chatwoot_account_id, current_status, started_at)
-     VALUES ('test', $1, 1, 'open', now())
-     RETURNING id`,
+     VALUES ('test', $1, 1, 'open', now()) RETURNING id`,
     [Math.floor(Math.random() * 1_000_000_000)],
   );
-  return r.rows[0].id;
+  return result.rows[0].id;
 }
 
-/** Insere uma mensagem com created_at controlado por offset (segundos atrás de agora). */
 async function insertMessage(
   conversationId: string,
   opts: { senderType: 'contact' | 'user'; typeName: 'incoming' | 'outgoing'; secondsAgo: number },
 ): Promise<string> {
-  const r = await db.pool.query<{ id: string }>(
+  const result = await db.pool.query<{ id: string }>(
     `INSERT INTO core.messages
-       (environment, conversation_id, chatwoot_message_id, sender_type, message_type_name,
-        is_private, content, sent_at, created_at)
-     VALUES ('test', $1, $2, $3, $4, false, 'x', now(), now() - ($5 || ' seconds')::interval)
+       (environment, conversation_id, chatwoot_conversation_id, chatwoot_message_id,
+        sender_type, message_type, is_private, content, sent_at, created_at)
+     VALUES ('test', $1,
+             (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1),
+             $2, $3, $4, false, 'x', now(), now() - ($5 || ' seconds')::interval)
      RETURNING id`,
-    [conversationId, Math.floor(Math.random() * 1_000_000_000), opts.senderType, opts.typeName, String(opts.secondsAgo)],
+    [conversationId, Math.floor(Math.random() * 1_000_000_000), opts.senderType,
+     opts.typeName === 'incoming' ? 0 : 1, String(opts.secondsAgo)],
   );
-  return r.rows[0].id;
+  return result.rows[0].id;
 }
 
-describe('loadStaleTriggerCheck + isStaleTrigger (trava anti-requentado)', () => {
-  it('REQUENTADO: resposta nossa DEPOIS do gatilho → obsoleto', async () => {
-    const conv = await newConversation();
-    const trigger = await insertMessage(conv, { senderType: 'contact', typeName: 'incoming', secondsAgo: 30 });
-    await insertMessage(conv, { senderType: 'user', typeName: 'outgoing', secondsAgo: 10 }); // resposta depois
+describe('loadStaleTriggerCheck + isStaleTrigger', () => {
+  it('descarta o gatilho que ja possui turno entregue', async () => {
+    const conversationId = await newConversation();
+    const triggerId = await insertMessage(conversationId, {
+      senderType: 'contact', typeName: 'incoming', secondsAgo: 30,
+    });
+    await db.pool.query(
+      `INSERT INTO agent.turns
+         (environment,conversation_id,trigger_message_id,agent_version,context_hash,status)
+       VALUES ('test',$1,$2,'integration-test','hash','delivered')`,
+      [conversationId, triggerId],
+    );
 
-    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conv, trigger);
-    expect(check.triggerCreatedAt).not.toBeNull();
-    expect(check.latestOutgoingAt).not.toBeNull();
-    expect(isStaleTrigger(check.triggerCreatedAt, check.latestOutgoingAt)).toBe(true);
+    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conversationId, triggerId);
+    expect(check.thisTriggerAt).not.toBeNull();
+    expect(check.lastAnsweredTriggerAt).not.toBeNull();
+    expect(isStaleTrigger(check.thisTriggerAt, check.lastAnsweredTriggerAt)).toBe(true);
   });
 
-  it('NOVO: nenhuma resposta depois do gatilho → responde', async () => {
-    const conv = await newConversation();
-    await insertMessage(conv, { senderType: 'user', typeName: 'outgoing', secondsAgo: 30 }); // resposta ANTES
-    const trigger = await insertMessage(conv, { senderType: 'contact', typeName: 'incoming', secondsAgo: 10 });
+  it('nao confunde uma mensagem de saida sem turno entregue com resposta ao gatilho', async () => {
+    const conversationId = await newConversation();
+    await insertMessage(conversationId, { senderType: 'user', typeName: 'outgoing', secondsAgo: 30 });
+    const triggerId = await insertMessage(conversationId, {
+      senderType: 'contact', typeName: 'incoming', secondsAgo: 10,
+    });
 
-    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conv, trigger);
-    expect(isStaleTrigger(check.triggerCreatedAt, check.latestOutgoingAt)).toBe(false);
+    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conversationId, triggerId);
+    expect(isStaleTrigger(check.thisTriggerAt, check.lastAnsweredTriggerAt)).toBe(false);
   });
 
-  it('conversa sem nenhuma resposta nossa → responde (latestOutgoing nulo)', async () => {
-    const conv = await newConversation();
-    const trigger = await insertMessage(conv, { senderType: 'contact', typeName: 'incoming', secondsAgo: 5 });
+  it('responde quando a conversa nunca teve turno entregue', async () => {
+    const conversationId = await newConversation();
+    const triggerId = await insertMessage(conversationId, {
+      senderType: 'contact', typeName: 'incoming', secondsAgo: 5,
+    });
 
-    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conv, trigger);
-    expect(check.latestOutgoingAt).toBeNull();
-    expect(isStaleTrigger(check.triggerCreatedAt, check.latestOutgoingAt)).toBe(false);
+    const check = await loadStaleTriggerCheck(db.pool as never, 'test', conversationId, triggerId);
+    expect(check.lastAnsweredTriggerAt).toBeNull();
+    expect(isStaleTrigger(check.thisTriggerAt, check.lastAnsweredTriggerAt)).toBe(false);
   });
 });

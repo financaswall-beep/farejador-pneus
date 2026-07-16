@@ -26,9 +26,11 @@ beforeEach(async () => {
 
   const message = await db.pool.query<{ id: string }>(
     `INSERT INTO core.messages
-       (environment, conversation_id, chatwoot_message_id, sender_type,
-        content, sent_at)
-     VALUES ('test', $1, $2, 'contact', 'mensagem de teste', '2026-04-15T10:01:00Z')
+       (environment, conversation_id, chatwoot_conversation_id, chatwoot_message_id,
+        sender_type, message_type, content, sent_at)
+     VALUES ('test', $1,
+             (SELECT chatwoot_conversation_id FROM core.conversations WHERE id=$1),
+             $2, 'contact', 0, 'mensagem de teste', '2026-04-15T10:01:00Z')
      RETURNING id`,
     [conversationId, Math.floor(Math.random() * 1_000_000_000)],
   );

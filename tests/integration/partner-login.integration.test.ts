@@ -8,8 +8,7 @@
  *   3. Primeiro acesso do dono (set-credentials por token cru) → login do dono.
  *   4. Revogar o funcionário mata a sessão dele na hora.
  *   5. Sessão expirada não valida.
- *   6. Usuário é único por unidade (mesma unidade duplica → conflito; outra
- *      unidade pode repetir).
+ *   6. Usuário é globalmente único na porta de entrada do portal parceiro.
  *   7. Isolamento: credenciais da unidade A não logam na unidade B.
  *   8. set-credentials por sessão num login que já tem senha → erro (use reset).
  *   9. Logout revoga a sessão no servidor.
@@ -161,12 +160,14 @@ describe('Login — unicidade do usuário', () => {
       .rejects.toBeInstanceOf(q.PartnerUsernameConflictError);
   });
 
-  it('unidades diferentes podem ter o mesmo usuário', async () => {
+  it('a porta unica nao permite duas pessoas ativas com o mesmo usuario', async () => {
     const q = await importQueries();
     const a = await createPartnerFixture(db.pool);
     const b = await createPartnerFixture(db.pool);
-    await q.createPartnerFuncionario(a.ctx, null, 'joao', 'senha123');
-    await expect(q.createPartnerFuncionario(b.ctx, null, 'joao', 'senha123')).resolves.toBeTruthy();
+    const username = `porta-${Math.random().toString(36).slice(2, 10)}`;
+    await q.createPartnerFuncionario(a.ctx, null, username, 'senha123');
+    await expect(q.createPartnerFuncionario(b.ctx, null, username, 'senha123'))
+      .rejects.toMatchObject({ code: 'username_taken' });
   });
 });
 

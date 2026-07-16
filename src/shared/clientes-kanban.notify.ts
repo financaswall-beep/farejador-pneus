@@ -111,5 +111,11 @@ export async function notifyClientesKanban(
     conversation_id: conversationId,
     reason,
   };
-  await client.query('SELECT pg_notify($1, $2)', [CHANNEL, JSON.stringify(payload)]);
+  try {
+    await client.query('SELECT pg_notify($1, $2)', [CHANNEL, JSON.stringify(payload)]);
+  } catch (err) {
+    // O Kanban e acessorio: uma queda no NOTIFY nunca pode desfazer/repetir
+    // pedido, mensagem ou normalizacao ja concluida.
+    logger.warn({ err, environment: payload.environment, reason }, 'clientes kanban notify: aviso ignorado');
+  }
 }

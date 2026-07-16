@@ -12,11 +12,16 @@ import { operatorLabel } from './route-helpers.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
 const money = z.number().finite().min(0).max(10_000_000);
+const safePaymentReference = z.string().trim().max(160).nullable().optional().refine((value) => {
+  if (!value) return true;
+  return !/@/.test(value) && !/\d{6,}/.test(value)
+    && !/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i.test(value);
+}, 'payment_reference_must_be_masked');
 const compensationSchema = z.object({
   collaborator_id: z.string().uuid(), employment_type: z.enum(['clt', 'mei', 'autonomo', 'outro']),
   base_salary: money, payment_day: z.number().int().min(1).max(28),
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
-  payment_note: z.string().trim().max(160).nullable().optional(), starts_on: z.string().date(),
+  payment_note: safePaymentReference, starts_on: z.string().date(),
 });
 const commissionSchema = z.object({
   collaborator_id: z.string().uuid(), kind: z.enum(['percent', 'fixed']),
@@ -43,6 +48,9 @@ function managementError(reply: any, err: unknown, label: string) {
     'adjustment_not_found_or_period_closed', 'nothing_to_close',
   ]);
   if (clientErrors.has(message)) return reply.status(400).send({ error: message });
+  if (message === 'collaborator_management_unavailable') {
+    return reply.status(409).send({ error: message });
+  }
   if (message === 'period_already_closed') return reply.status(409).send({ error: message });
   if (message === 'payroll_item_not_found' || message === 'payroll_expense_not_found') {
     return reply.status(404).send({ error: message });

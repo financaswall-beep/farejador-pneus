@@ -14,17 +14,25 @@ beforeAll(async () => {
 });
 
 describe('gestão de colaboradores da matriz', () => {
+  it('bloqueia a tela com erro controlado enquanto a migration ainda nao terminou', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
+    await expect(getManagement('2026-07-01', 'prod', { query } as unknown as Pool))
+      .rejects.toThrow('collaborator_management_unavailable');
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('aceita cargos dinâmicos e calcula prévia sem misturar competência com caixa', async () => {
     const query = vi.fn(async (sql: string) => {
+      if (sql.includes("to_regclass('finance.matriz_payroll_items')")) return { rows: [{ ready: true }] };
       if (sql.includes('FROM network.matriz_collaborators mc')) return { rows: [
         { id: 'c1', display_name: 'João', username: 'joao', job: 'vendedor', job_title: 'Consultor', work_area: 'sales', panel_role: null, active: true,
-          employment_type: 'clt', base_salary: '2200', payment_day: 5, payment_method: 'pix', payment_note: null, compensation_starts_on: '2026-07-01',
+          employment_type: 'clt', base_salary: '2200', monthly_base_salary: '2200', payment_day: 5, payment_method: 'pix', payment_note: null, compensation_starts_on: '2026-07-01',
           commission_kind: 'percent', commission_basis: 'margin', commission_value: '2', commission_starts_on: '2026-07-01', commission_active: true },
         { id: 'c2', display_name: 'Ana', username: 'ana', job: 'colaborador', job_title: 'Secretária', work_area: 'administrative', panel_role: 'admin', active: true,
-          employment_type: 'clt', base_salary: '2100', payment_day: 5, payment_method: 'transferencia', payment_note: null, compensation_starts_on: '2026-07-01',
+          employment_type: 'clt', base_salary: '2100', monthly_base_salary: '2100', payment_day: 5, payment_method: 'transferencia', payment_note: null, compensation_starts_on: '2026-07-01',
           commission_kind: null, commission_basis: null, commission_value: '0', commission_starts_on: null, commission_active: false },
       ] };
-      if (sql.includes('WITH retail AS')) return { rows: [{ id: 'c1', sales_count: 10, revenue: '12000', margin: '5000', deliveries_count: 0, trips_count: 0, distance_km: 0, on_time_pct: null }] };
+      if (sql.includes('WITH retail AS')) return { rows: [{ id: 'c1', sales_count: 10, revenue: '12000', margin: '5000', items_without_cost: 0, commission_amount: '100', deliveries_count: 0, trips_count: 0, distance_km: 0, on_time_pct: null }] };
       if (sql.includes('matriz_payroll_adjustments')) return { rows: [{ collaborator_id: 'c1', additions: '300', deductions: '120' }] };
       if (sql.includes('matriz_payroll_periods p')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql.slice(0, 40)}`);

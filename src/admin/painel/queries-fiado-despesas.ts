@@ -10,6 +10,7 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
+import { hasMatrizPayrollSchema } from './payroll-schema.js';
 
 export interface WholesaleFinanceOpenRow {
   id: string;
@@ -157,6 +158,7 @@ export async function getMatrizExpenses(
   dbPool: Pool = defaultPool,
   filtro?: MatrizExpensesFiltro,
 ): Promise<MatrizExpensesResumo> {
+  const payrollReady = await hasMatrizPayrollSchema(dbPool);
   const where: string[] = ['environment = $1', 'deleted_at IS NULL'];
   const params: unknown[] = [environment];
   if (filtro?.month) {
@@ -173,9 +175,12 @@ export async function getMatrizExpenses(
   const orderBy = temFiltro
     ? `occurred_at DESC`
     : `(payment_status = 'pending') DESC, (due_date IS NULL), due_date, occurred_at DESC`;
+  const payrollItemProjection = payrollReady
+    ? `(SELECT i.id FROM finance.matriz_payroll_items i WHERE i.source_expense_id=matriz_expenses.id)`
+    : `NULL::uuid`;
   const rows = await dbPool.query<MatrizExpenseRow>(
     `SELECT id, category, description, amount, occurred_at, payment_status, due_date, paid_at,
-            (SELECT i.id FROM finance.matriz_payroll_items i WHERE i.source_expense_id=matriz_expenses.id) AS payroll_item_id,
+            ${payrollItemProjection} AS payroll_item_id,
             (payment_status = 'pending' AND due_date IS NOT NULL AND due_date < current_date) AS overdue
        FROM commerce.matriz_expenses
       WHERE ${where.join(' AND ')}

@@ -13,7 +13,7 @@ import { hashPassword } from '../../parceiro/password.js';
 import type { RegisterManualOrderInput, RegisterWalkinOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
 
 async function resolveContactId(
-  dbPool: Pool,
+  dbPool: Pick<Pool, 'query'>,
   environment: 'prod' | 'test',
   conversationId: string,
   contactId?: string,
@@ -74,37 +74,35 @@ export async function registerManualOrder(
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const contactId = await resolveContactId(dbPool, environment, input.conversation_id, input.contact_id);
-
-  const result = await dbPool.query<{ order_id: string }>(
-    `SELECT commerce.register_manual_order(
-       $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12
-     ) AS order_id`,
-    [
-      environment,
-      contactId,
-      input.conversation_id,
-      input.draft_id ?? null,
-      input.unit_id ?? null,
-      JSON.stringify(input.items),
-      input.payment_method,
-      input.fulfillment_mode,
-      input.delivery_address ?? null,
-      input.actor_label,
-      input.idempotency_key,
-      input.source_tag ?? null,
-    ],
-  );
-  const orderId = result.rows[0]!.order_id;
-
-  if (input.seller_collaborator_id) {
-    await dbPool.query(
-      `UPDATE commerce.orders o SET seller_collaborator_id=mc.id
-        FROM network.matriz_collaborators mc
-       WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3 AND mc.environment=o.environment AND mc.revoked_at IS NULL`,
-      [orderId, environment, input.seller_collaborator_id],
+  const client = await dbPool.connect();
+  let orderId: string;
+  try {
+    await client.query('BEGIN');
+    const contactId = await resolveContactId(client as unknown as Pool, environment, input.conversation_id, input.contact_id);
+    const result = await client.query<{ order_id: string }>(
+      `SELECT commerce.register_manual_order(
+         $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12
+       ) AS order_id`,
+      [environment, contactId, input.conversation_id, input.draft_id ?? null, input.unit_id ?? null,
+       JSON.stringify(input.items), input.payment_method, input.fulfillment_mode,
+       input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag ?? null],
     );
-  }
+    orderId = result.rows[0]!.order_id;
+    if (input.seller_collaborator_id) {
+      const seller = await client.query(
+        `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)
+          FROM network.matriz_collaborators mc
+         WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3
+           AND mc.environment=o.environment AND mc.revoked_at IS NULL RETURNING o.id`,
+        [orderId, environment, input.seller_collaborator_id],
+      );
+      if (!seller.rows[0]) throw new Error('seller_collaborator_not_found');
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally { client.release(); }
 
   // Venda MANUAL que cai na MATRIZ (unit vazia → 'main' dentro da função SQL) também congela
   // o custo do galpão nos itens (0117). NÃO baixa estoque aqui (comportamento de hoje: só
@@ -137,34 +135,34 @@ export async function registerWalkinOrder(
 
   // S4 da auditoria 2026-05-21: normaliza telefone pra E.164 antes de gravar.
   const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
-  const result = await dbPool.query<{ order_id: string }>(
-    `SELECT commerce.register_walkin_order(
-       $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11
-     ) AS order_id`,
-    [
-      environment,
-      input.customer_name ?? null,
-      normalizedPhone,
-      input.unit_id ?? null,
-      JSON.stringify(input.items),
-      input.payment_method,
-      input.fulfillment_mode,
-      input.delivery_address ?? null,
-      input.actor_label,
-      input.idempotency_key,
-      input.source_tag,
-    ],
-  );
-  const orderId = result.rows[0]!.order_id;
-
-  if (input.seller_collaborator_id) {
-    await dbPool.query(
-      `UPDATE commerce.orders o SET seller_collaborator_id=mc.id
-        FROM network.matriz_collaborators mc
-       WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3 AND mc.environment=o.environment AND mc.revoked_at IS NULL`,
-      [orderId, environment, input.seller_collaborator_id],
+  const client = await dbPool.connect();
+  let orderId: string;
+  try {
+    await client.query('BEGIN');
+    const result = await client.query<{ order_id: string }>(
+      `SELECT commerce.register_walkin_order(
+         $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11
+       ) AS order_id`,
+      [environment, input.customer_name ?? null, normalizedPhone, input.unit_id ?? null,
+       JSON.stringify(input.items), input.payment_method, input.fulfillment_mode,
+       input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag],
     );
-  }
+    orderId = result.rows[0]!.order_id;
+    if (input.seller_collaborator_id) {
+      const seller = await client.query(
+        `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)
+          FROM network.matriz_collaborators mc
+         WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3
+           AND mc.environment=o.environment AND mc.revoked_at IS NULL RETURNING o.id`,
+        [orderId, environment, input.seller_collaborator_id],
+      );
+      if (!seller.rows[0]) throw new Error('seller_collaborator_not_found');
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally { client.release(); }
 
   // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock) e CONGELA
   // o custo médio nos itens (0117 — fatia 2: lucro real do varejo). Best-effort FORA da

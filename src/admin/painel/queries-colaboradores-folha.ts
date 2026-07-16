@@ -16,10 +16,10 @@ export async function saveMatrizCollaboratorCompensation(input: MatrizCompensati
        (collaborator_id, environment, employment_type, base_salary, payment_day, payment_method, payment_note, starts_on, updated_by)
      SELECT mc.id, mc.environment, $3, $4, $5, $6, $7, $8::date, $9
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
-     ON CONFLICT (collaborator_id) DO UPDATE SET
+     ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET
        employment_type=EXCLUDED.employment_type, base_salary=EXCLUDED.base_salary,
        payment_day=EXCLUDED.payment_day, payment_method=EXCLUDED.payment_method,
-       payment_note=EXCLUDED.payment_note, starts_on=EXCLUDED.starts_on,
+       payment_note=EXCLUDED.payment_note,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.employment_type, input.base_salary, input.payment_day,
@@ -42,8 +42,8 @@ export async function saveMatrizCollaboratorCommission(input: MatrizCommissionIn
        (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by)
      SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
-     ON CONFLICT (collaborator_id) DO UPDATE SET kind=EXCLUDED.kind, basis=EXCLUDED.basis,
-       value=EXCLUDED.value, starts_on=EXCLUDED.starts_on, active=EXCLUDED.active,
+     ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET kind=EXCLUDED.kind, basis=EXCLUDED.basis,
+       value=EXCLUDED.value, active=EXCLUDED.active,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.kind, input.basis, input.value, input.starts_on,
@@ -111,8 +111,13 @@ export async function closeMatrizPayroll(input: {
     for (const row of eligible) {
       const dueDate = payrollDueDate(input.competence, row.payment_day);
       const calculation = {
+        competence: input.competence,
+        configured_base_salary: row.base_salary,
+        salary_rule: 'full_configured_monthly_amount',
+        commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
         rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis, value: row.commission_value } : null,
-        production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin, deliveries: row.deliveries_count, trips: row.trips_count },
+        production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin,
+          items_without_cost: row.items_without_cost, deliveries: row.deliveries_count, trips: row.trips_count },
       };
       const item = await client.query<{ id: string }>(
         `INSERT INTO finance.matriz_payroll_items

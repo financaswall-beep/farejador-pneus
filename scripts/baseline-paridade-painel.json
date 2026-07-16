@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-06-17T04:34:06.584Z",
+  "geradoEm": "2026-07-16T02:05:30.634Z",
   "commitBase": "c0d7913",
-  "total": 527,
+  "total": 528,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -458,6 +458,7 @@
     "startChatPolling": "function",
     "startChatSse": "function",
     "startPhotoGlobal": "function",
+    "startPhotoSse": "function",
     "statusKind": "value:string",
     "statusMessage": "value:string",
     "statusTimer": "value:null",

@@ -163,7 +163,7 @@ describe('Portal Parceiro — cancelamento restaura estoque', () => {
 
     expect(await getStockQty(db.pool, f.stockId)).toBe(5);
 
-    const cancel = await q.cancelPartnerSale(f.ctx, sale.order_id, db.pool);
+    const cancel = await q.cancelPartnerSale(f.ctx, sale.order_id);
     expect(cancel.cancelled).toBe(true);
     expect(await getStockQty(db.pool, f.stockId)).toBe(8);
   });

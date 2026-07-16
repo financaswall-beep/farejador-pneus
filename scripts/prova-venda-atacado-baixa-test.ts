@@ -9,9 +9,9 @@
  * Escreve e COMITA (registerWholesaleSale não dá pra BEGIN/ROLLBACK por fora) → seeda uma
  * medida descartável ('99/99-99') e um cliente de prova, e LIMPA tudo no finally.
  */
-import { pool } from '../src/persistence/db.js';
-import { env } from '../src/shared/config/env.js';
-import { registerWholesaleSale } from '../src/admin/painel/queries.js';
+// A configuracao e validada no primeiro import de env. A flag precisa nascer
+// antes dele; import estatico tornava esta prova falsamente vermelha.
+process.env.WHOLESALE_STOCK_DECREMENT = 'true';
 
 const ENV = 'test' as const;
 const MEASURE = '99/99-99';
@@ -24,6 +24,10 @@ async function stockQty(client: import('pg').PoolClient): Promise<number | null>
 }
 
 async function main(): Promise<void> {
+  const { pool } = await import('../src/persistence/db.js');
+  const { env } = await import('../src/shared/config/env.js');
+  const { registerWholesaleSale } = await import('../src/admin/painel/queries.js');
+  if (env.FAREJADOR_ENV !== ENV) throw new Error('ABORTADO: esta prova so roda em test.');
   console.log('=== PROVA VENDA ATACADO → BAIXA (test) ===');
   console.log(`    flag WHOLESALE_STOCK_DECREMENT = ${env.WHOLESALE_STOCK_DECREMENT}`);
   if (!env.WHOLESALE_STOCK_DECREMENT) {
