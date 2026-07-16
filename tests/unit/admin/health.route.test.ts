@@ -5,6 +5,7 @@ const baseEnv = {
   NODE_ENV: 'test',
   FAREJADOR_ENV: 'prod',
   DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
+  APP_COMMIT_SHA: 'a'.repeat(40),
   CHATWOOT_HMAC_SECRET: 'test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
 };
@@ -87,7 +88,7 @@ describe('registerHealthRoute', () => {
     await fastify._routes['/healthz'].handler({}, reply);
 
     expect(reply.statusCode).toBe(200);
-    expect(reply.payload).toEqual({ status: 'ok' });
+    expect(reply.payload).toEqual({ status: 'ok', commit: 'a'.repeat(40) });
   });
 
   it('returns 503 when DB rejects', async () => {
@@ -100,7 +101,11 @@ describe('registerHealthRoute', () => {
     await fastify._routes['/healthz'].handler({}, reply);
 
     expect(reply.statusCode).toBe(503);
-    expect(reply.payload).toEqual({ status: 'error', reason: 'database_unavailable' });
+    expect(reply.payload).toEqual({
+      status: 'error',
+      reason: 'database_unavailable',
+      commit: 'a'.repeat(40),
+    });
   });
 
   it('returns 503 when DB timeout exceeds 2s', async () => {
@@ -119,6 +124,10 @@ describe('registerHealthRoute', () => {
     await promise;
 
     expect(reply.statusCode).toBe(503);
-    expect(reply.payload).toEqual({ status: 'error', reason: 'database_unavailable' });
+    expect(reply.payload).toEqual({
+      status: 'error',
+      reason: 'database_unavailable',
+      commit: 'a'.repeat(40),
+    });
   });
 });

@@ -4,8 +4,11 @@ const baseEnv = {
   NODE_ENV: 'test',
   FAREJADOR_ENV: 'prod',
   DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
+  PARTNER_DATABASE_URL: 'postgresql://farejador_partner_app.projectref:password@example.test:6543/postgres',
+  APP_COMMIT_SHA: 'a'.repeat(40),
   CHATWOOT_HMAC_SECRET: 'test-secret',
   ADMIN_AUTH_TOKEN: 'test-admin-token',
+  ADMIN_BEARER_FALLBACK_ENABLED: 'false',
 };
 
 let parseEnv: typeof import('../../../src/shared/config/env.js').parseEnv;
@@ -34,6 +37,59 @@ describe('environment security validation', () => {
     });
 
     expect(parsed.CHATWOOT_HMAC_SECRET).toHaveLength(24);
+  });
+
+  it('fails closed when the restricted partner database URL is missing in production', () => {
+    const { PARTNER_DATABASE_URL: _missing, ...withoutPartnerUrl } = baseEnv;
+    expect(() => parseEnv({
+      ...withoutPartnerUrl,
+      NODE_ENV: 'production',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/PARTNER_DATABASE_URL.*required in production/);
+  });
+
+  it('rejects an admin or unexpected role in PARTNER_DATABASE_URL in production', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      PARTNER_DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/PARTNER_DATABASE_URL.*restricted farejador_partner_app role/);
+  });
+
+  it('rejects the emergency bearer in production after owner bootstrap', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      ADMIN_BEARER_FALLBACK_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/ADMIN_BEARER_FALLBACK_ENABLED.*false in production/);
+  });
+
+  it('requires an exact deployed commit SHA in production', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      APP_COMMIT_SHA: 'unknown',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/APP_COMMIT_SHA.*40-character deployed commit SHA/);
+  });
+
+  it('uses Coolify SOURCE_COMMIT for a Dockerfile deployment', () => {
+    const { APP_COMMIT_SHA: _missing, ...withoutExplicitCommit } = baseEnv;
+    const parsed = parseEnv({
+      ...withoutExplicitCommit,
+      NODE_ENV: 'production',
+      SOURCE_COMMIT: 'b'.repeat(40),
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    });
+
+    expect(parsed.APP_COMMIT_SHA).toBe('b'.repeat(40));
   });
 
   it('caps the webhook replay window at 15 minutes', () => {

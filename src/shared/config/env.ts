@@ -1,14 +1,7 @@
 import { z } from 'zod';
+import { validateProductionEnv } from './env-production-validation.js';
 
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
-
-// Piso de COMPRIMENTO dos segredos em produção (ADMIN_AUTH_TOKEN / CHATWOOT_HMAC_SECRET).
-// ⚠️ Mede tamanho, NÃO aleatoriedade: barra o segredo curto/óbvio ("123456"), mas não
-// impede um longo-e-fraco ("aaaa..."). A força real vem de GERAR aleatório (crypto/openssl).
-// 24 chars gerados ao acaso já dão >128 bits = forte. Mantido em 24 (não 32) pra NÃO
-// obrigar rotação de segredo já em uso e casado com terceiros (o HMAC é compartilhado com
-// o webhook do Chatwoot; trocar exige atualizar os DOIS lados juntos, senão o bot fica surdo).
-const MIN_SECRET_BYTES = 24;
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -27,6 +20,11 @@ const envSchema = z.object({
   // role sem BYPASSRLS. Opcional pra nao quebrar ambientes que ainda nao
   // configuraram (dev/test/staging). Em prod, deve estar setado.
   PARTNER_DATABASE_URL: z.string().min(1).optional(),
+  // SHA do commit publicado. No Coolify, o compose recebe SOURCE_COMMIT e o
+  // repassa como APP_COMMIT_SHA; deploys por Dockerfile recebem SOURCE_COMMIT
+  // diretamente. parseEnv normaliza ambos para APP_COMMIT_SHA no /healthz.
+  SOURCE_COMMIT: z.string().min(1).optional(),
+  APP_COMMIT_SHA: z.string().min(1).default('unknown').transform((value) => value.toLowerCase()),
   DATABASE_POOL_MAX: z.string().transform(Number).pipe(z.number().int().min(1)).default('10'),
   DATABASE_SSL: booleanStringSchema,
   CHATWOOT_HMAC_SECRET: z.string().min(1),
@@ -37,7 +35,7 @@ const envSchema = z.object({
   ADMIN_AUTH_TOKEN: z.string().min(1),
   // Transição do login humano: true mantém Bearer emergencial; desligar após
   // criar e validar a primeira conta owner da Matriz.
-  ADMIN_BEARER_FALLBACK_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+  ADMIN_BEARER_FALLBACK_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   SIGNAL_TIMEZONE: z.string().min(1).default('America/Sao_Paulo'),
   // OpenAI (usado pelo Agent V2)
@@ -264,30 +262,16 @@ const envSchema = z.object({
         .map((part) => part.trim())
         .filter((part) => part.length > 0),
     ),
-}).superRefine((value, ctx) => {
-  // Em producao, segredo curto e configuracao invalida: melhor falhar no boot.
-  if (value.NODE_ENV === 'production' && value.FAREJADOR_ENV === 'prod') {
-    if (Buffer.byteLength(value.ADMIN_AUTH_TOKEN, 'utf8') < MIN_SECRET_BYTES) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['ADMIN_AUTH_TOKEN'],
-        message: `must contain at least ${MIN_SECRET_BYTES} bytes in production`,
-      });
-    }
-    if (Buffer.byteLength(value.CHATWOOT_HMAC_SECRET, 'utf8') < MIN_SECRET_BYTES) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['CHATWOOT_HMAC_SECRET'],
-        message: `must contain at least ${MIN_SECRET_BYTES} bytes in production`,
-      });
-    }
-  }
-});
+}).superRefine(validateProductionEnv);
 
 export type Env = z.infer<typeof envSchema>;
 
 export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(source);
+  const normalizedSource = {
+    ...source,
+    APP_COMMIT_SHA: source.APP_COMMIT_SHA || source.SOURCE_COMMIT,
+  };
+  const parsed = envSchema.safeParse(normalizedSource);
 
   if (!parsed.success) {
     const issues = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n');

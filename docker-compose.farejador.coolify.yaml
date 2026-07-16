@@ -13,6 +13,10 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-loopback, linklocal, uniquelocal}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      PARTNER_DATABASE_URL: ${PARTNER_DATABASE_URL:?PARTNER_DATABASE_URL is required}
+      # SOURCE_COMMIT e uma variavel predefinida do Coolify. Expor no healthz
+      # permite provar exatamente qual backend esta rodando sem abrir o servidor.
+      APP_COMMIT_SHA: ${SOURCE_COMMIT:?SOURCE_COMMIT is required}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
       DATABASE_SSL: ${DATABASE_SSL:-true}
       CHATWOOT_HMAC_SECRET: ${CHATWOOT_HMAC_SECRET:?CHATWOOT_HMAC_SECRET is required}
@@ -21,7 +25,7 @@ services:
       CHATWOOT_API_TOKEN: ${CHATWOOT_API_TOKEN:?CHATWOOT_API_TOKEN is required}
       CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:?CHATWOOT_ACCOUNT_ID is required}
       ADMIN_AUTH_TOKEN: ${ADMIN_AUTH_TOKEN:?ADMIN_AUTH_TOKEN is required}
-      ADMIN_BEARER_FALLBACK_ENABLED: ${ADMIN_BEARER_FALLBACK_ENABLED:-true}
+      ADMIN_BEARER_FALLBACK_ENABLED: ${ADMIN_BEARER_FALLBACK_ENABLED:-false}
     restart: always
     healthcheck:
       test:
