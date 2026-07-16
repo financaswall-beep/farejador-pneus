@@ -2,6 +2,10 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { getMatrizCollaboratorManagement } from './queries-colaboradores-gestao.js';
+import {
+  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  operationFingerprint, recordIntegrityEvent,
+} from './stage5-integrity.js';
 
 export interface MatrizCompensationInput {
   collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
@@ -145,27 +149,67 @@ export async function closeMatrizPayroll(input: {
 
 export async function payMatrizPayrollItem(input: {
   item_id: string; environment?: 'prod' | 'test'; actor_label?: string | null;
+  idempotency_key: string;
 }, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
+  const operation = { environment, domain: 'matriz_payroll.pay',
+    idempotencyKey: input.idempotency_key,
+    fingerprint: operationFingerprint({ item_id: input.item_id }) };
   try {
     await client.query('BEGIN');
-    const item = await client.query<{ id: string; source_expense_id: string; payroll_period_id: string }>(
-      `SELECT id,source_expense_id,payroll_period_id FROM finance.matriz_payroll_items
-        WHERE id=$2 AND environment=$1 AND payment_status='pending' FOR UPDATE`, [environment, input.item_id]);
-    if (!item.rows[0]) throw new Error('payroll_item_not_found');
-    const paid = await client.query(
+    const started = await beginIntegrityOperation<{
+      paid: true; item_id: string; paid_at: string;
+    }>(client, operation);
+    if (started.replayed) {
+      await client.query('COMMIT');
+      return started.result;
+    }
+    const located = await client.query<{ source_expense_id: string }>(
+      `SELECT source_expense_id FROM finance.matriz_payroll_items
+        WHERE id=$2 AND environment=$1`, [environment, input.item_id]);
+    if (!located.rows[0]) throw new Error('payroll_item_not_found');
+    const expense = await client.query<{ payment_status: string; deleted_at: string | null }>(
+      `SELECT payment_status,deleted_at FROM commerce.matriz_expenses
+        WHERE id=$1 AND environment=$2 FOR UPDATE`,
+      [located.rows[0].source_expense_id, environment]);
+    const item = await client.query<{
+      id: string; source_expense_id: string; payroll_period_id: string;
+      payment_status: string; total_due: string;
+    }>(
+      `SELECT id,source_expense_id,payroll_period_id,payment_status,total_due
+         FROM finance.matriz_payroll_items
+        WHERE id=$2 AND environment=$1 FOR UPDATE`, [environment, input.item_id]);
+    if (!item.rows[0] || item.rows[0].payment_status !== 'pending') throw new Error('payroll_item_not_found');
+    if (!expense.rows[0] || expense.rows[0].deleted_at
+      || expense.rows[0].payment_status !== 'pending') throw new Error('payroll_expense_not_found');
+    const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=now()
-        WHERE id=$1 AND environment=$2 AND payment_status='pending' AND deleted_at IS NULL RETURNING id`,
+        WHERE id=$1 AND environment=$2 AND payment_status='pending' AND deleted_at IS NULL
+        RETURNING id,paid_at`,
       [item.rows[0].source_expense_id, environment]);
     if (!paid.rows[0]) throw new Error('payroll_expense_not_found');
-    await client.query(`UPDATE finance.matriz_payroll_items SET payment_status='paid',paid_at=now(),paid_by=$2 WHERE id=$1`, [input.item_id, input.actor_label ?? null]);
+    await client.query(
+      `UPDATE finance.matriz_payroll_items
+          SET payment_status='paid',paid_at=$2::timestamptz,paid_by=$3 WHERE id=$1`,
+      [input.item_id, paid.rows[0].paid_at, input.actor_label ?? null]);
     await client.query(
       `UPDATE finance.matriz_payroll_periods SET status=CASE WHEN EXISTS
         (SELECT 1 FROM finance.matriz_payroll_items WHERE payroll_period_id=$1 AND payment_status='pending') THEN 'partial' ELSE 'paid' END
        WHERE id=$1`, [item.rows[0].payroll_period_id]);
+    const result = integrityResult({ paid: true as const, item_id: input.item_id,
+      paid_at: paid.rows[0].paid_at });
+    await recordIntegrityEvent(client, { environment, domain: 'matriz_payroll',
+      entityTable: 'finance.matriz_payroll_items', entityId: input.item_id,
+      eventType: 'payment_settled', actorLabel: input.actor_label,
+      idempotencyKey: operation.idempotencyKey,
+      before: { payment_status: 'pending', total_due: item.rows[0].total_due },
+      after: { payment_status: 'paid', paid_at: paid.rows[0].paid_at,
+        source_expense_id: item.rows[0].source_expense_id } });
+    await completeIntegrityOperation(client, operation,
+      'finance.matriz_payroll_items', input.item_id, result);
     await client.query('COMMIT');
-    return { paid: true, item_id: input.item_id };
+    return result;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined); throw err;
   } finally { client.release(); }

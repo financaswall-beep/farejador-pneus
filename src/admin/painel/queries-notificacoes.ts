@@ -56,7 +56,7 @@ export async function getMatrizNotificacoes(
                                    AND e.payment_status = 'pending'
                                    AND e.due_date IS NOT NULL AND e.due_date < current_date)
           FROM commerce.wholesale_purchases p
-         WHERE p.environment = $1 AND p.status = 'confirmed' AND p.payment_status = 'pending'
+         WHERE p.environment = $1 AND p.status <> 'cancelled' AND p.payment_status = 'pending'
            AND p.due_date IS NOT NULL AND p.due_date < current_date) AS pagar_count,
        (SELECT (COALESCE(sum(p.total_amount), 0)
                 + (SELECT COALESCE(sum(e.amount), 0) FROM commerce.matriz_expenses e
@@ -64,7 +64,7 @@ export async function getMatrizNotificacoes(
                       AND e.payment_status = 'pending'
                       AND e.due_date IS NOT NULL AND e.due_date < current_date))::text
           FROM commerce.wholesale_purchases p
-         WHERE p.environment = $1 AND p.status = 'confirmed' AND p.payment_status = 'pending'
+         WHERE p.environment = $1 AND p.status <> 'cancelled' AND p.payment_status = 'pending'
            AND p.due_date IS NOT NULL AND p.due_date < current_date) AS pagar_total,
 
        (SELECT json_agg(json_build_object(

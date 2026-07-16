@@ -40,6 +40,8 @@ async function main(): Promise<void> {
   let fails = 0;
   let productId = '';
   const auditOrderIds: string[] = [];
+  const operationKeys: string[] = [];
+  const operationKey = () => { const value = randomUUID(); operationKeys.push(value); return value; };
   const check = (name: string, ok: boolean, extra = ''): void => {
     if (!ok) fails++;
     console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
@@ -49,6 +51,16 @@ async function main(): Promise<void> {
   const topo = async () => (await filme())[0];
 
   const limpar = async (): Promise<void> => {
+    await client.query(`DELETE FROM audit.events
+      WHERE environment=$1 AND actor_label='prova-filme'`, [ENV]);
+    await client.query(`DELETE FROM audit.operation_idempotency WHERE environment=$1 AND entity_id IN (
+      SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND created_by='prova-filme'
+      UNION ALL
+      SELECT id FROM commerce.wholesale_purchases WHERE environment=$1 AND created_by='prova-filme')`, [ENV]);
+    if (operationKeys.length > 0) {
+      await client.query(`DELETE FROM audit.operation_idempotency
+        WHERE environment=$1 AND idempotency_key=ANY($2)`, [ENV, operationKeys]);
+    }
     await client.query(`DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN (
        SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND buyer_id IN (
          SELECT id FROM commerce.wholesale_customers WHERE environment=$1 AND name='PROVA-FILME-BORRACHEIRO'))`, [ENV]);
@@ -112,13 +124,16 @@ async function main(): Promise<void> {
     // ── M5: venda de ATACADO → source='venda_atacado' ref=order_id (16→13) ──
     const venda = await registerWholesaleSale(
       { new_customer: { name: 'PROVA-FILME-BORRACHEIRO', phone: null },
-        items: [{ measure: MEASURE, quantity: 3, unit_price: 60 }], created_by: 'prova-filme', environment: ENV }, pool);
+        items: [{ measure: MEASURE, quantity: 3, unit_price: 60 }],
+        created_by: 'prova-filme', environment: ENV, idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M5 venda de atacado → venda_atacado 16→13 ref=order', !!m && m.source === 'venda_atacado'
       && m.qty_before === 16 && m.qty_after === 13 && m.ref === venda.order_id, JSON.stringify(m ?? null));
 
     // ── M6: cancelar a venda → source='cancelamento_venda' devolve 13→16 ──
-    await cancelWholesaleSale({ order_id: venda.order_id, cancelled_by: 'prova-filme', environment: ENV }, pool);
+    await cancelWholesaleSale({ order_id: venda.order_id, cancelled_by: 'prova-filme',
+      reason: 'reversão da prova do filme', environment: ENV,
+      idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M6 cancelar venda → cancelamento_venda 13→16 (espelho)', !!m && m.source === 'cancelamento_venda'
       && m.qty_before === 13 && m.qty_after === 16 && m.ref === venda.order_id, JSON.stringify(m ?? null));
@@ -126,14 +141,17 @@ async function main(): Promise<void> {
     // ── M7: COMPRA de fornecedor → source='compra' ref=purchase reason=fornecedor (16→20) ──
     const compra = await registerWholesalePurchase(
       { new_supplier: { name: 'PROVA-FILME-FORN', phone: null },
-        items: [{ measure: MEASURE, quantity: 4, unit_cost: 25 }], created_by: 'prova-filme', environment: ENV }, pool);
+        items: [{ measure: MEASURE, quantity: 4, unit_cost: 25 }],
+        created_by: 'prova-filme', environment: ENV, idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M7 compra → compra 16→20 ref=purchase reason=fornecedor', !!m && m.source === 'compra'
       && m.qty_before === 16 && m.qty_after === 20 && m.ref === compra.purchase_id && m.reason === 'PROVA-FILME-FORN',
       JSON.stringify(m ?? null));
 
     // ── M8: CANCELAR a compra → source='cancelamento_compra' (20→16, média reversa) ──
-    await cancelWholesalePurchase({ purchase_id: compra.purchase_id, cancelled_by: 'prova-filme', environment: ENV }, pool);
+    await cancelWholesalePurchase({ purchase_id: compra.purchase_id, cancelled_by: 'prova-filme',
+      reason: 'reversão da compra de prova', environment: ENV,
+      idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M8 cancelar compra → cancelamento_compra 20→16', !!m && m.source === 'cancelamento_compra'
       && m.qty_before === 20 && m.qty_after === 16 && m.ref === compra.purchase_id, JSON.stringify(m ?? null));

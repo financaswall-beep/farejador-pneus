@@ -9,6 +9,7 @@
 import type { FastifyInstance } from 'fastify';
 import { registerPainelStatic } from './route-static.js';
 import { registerPainelDashboard } from './route-dashboard.js';
+import { registerPainelIntegrity } from './route-integrity.js';
 import { registerPainelAtacado } from './route-atacado.js';
 import { registerPainelGalpao } from './route-galpao.js';
 import { registerPainelFornecedores } from './route-fornecedores.js';
@@ -28,6 +29,7 @@ import { registerPainelClientes } from './route-clientes.js';
 export async function registerPainelRoute(fastify: FastifyInstance): Promise<void> {
   await registerPainelStatic(fastify); // estáticos do painel (index/app.js/módulos/css) (linhas 377-394 pré-obra)
   await registerPainelDashboard(fastify); // dashboard: pedidos/produtos/rede/matriz-resumo (linhas 395-437 pré-obra)
+  await registerPainelIntegrity(fastify); // Etapa 5: recupera operação após reload/resposta perdida
   await registerPainelAtacado(fastify); // atacado: venda/ranking/medidas/resumos + comissões/termos (linhas 438-542 pré-obra)
   await registerPainelGalpao(fastify); // estoque do galpão (entrada/definir/remover) (linhas 543-599 pré-obra)
   await registerPainelFornecedores(fastify); // fornecedores + compras (linhas 600-654 pré-obra)

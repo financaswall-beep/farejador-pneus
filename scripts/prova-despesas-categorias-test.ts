@@ -26,6 +26,9 @@ process.env.NETWORK_COMMISSION_LEDGER = 'true';
 const ENV = 'test' as const;
 const CREATED_BY = 'prova-desp-cat';
 const SLUGS_PROVA = ['pedagio_prova', 'alimentacao_prova', 'cat_periodo_prova'];
+const RUN_ID = `prova-desp-cat-${Date.now()}`;
+let operationSequence = 0;
+const operationKey = () => `${RUN_ID}-${++operationSequence}`;
 
 async function main(): Promise<void> {
   const { pool } = await import('../src/persistence/db.js');
@@ -48,6 +51,10 @@ async function main(): Promise<void> {
   };
   const cents = (v: string | number): number => Math.round(Number(v) * 100);
   const limpar = async (): Promise<void> => {
+    await client.query(`DELETE FROM audit.events
+      WHERE environment=$1 AND actor_label LIKE $2`, [ENV, CREATED_BY + '%']);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
     await client.query(`DELETE FROM commerce.matriz_expenses WHERE environment=$1 AND created_by LIKE $2`, [ENV, CREATED_BY + '%']);
     await client.query(`DELETE FROM commerce.matriz_expense_categories WHERE environment=$1 AND slug = ANY($2)`, [ENV, SLUGS_PROVA]);
   };
@@ -86,11 +93,14 @@ async function main(): Promise<void> {
     check('8. mesmo nome (até sem acento) já ativo → category_exists', duplicou === 'category_exists');
 
     // ── 4. lançar despesa SÓ em modalidade ativa ──
-    const desp1 = await createMatrizExpense({ category: 'pedagio_prova', amount: 7.1, description: 'pedágio da prova', created_by: CREATED_BY, environment: ENV });
+    const desp1 = await createMatrizExpense({ category: 'pedagio_prova', amount: 7.1,
+      description: 'pedágio da prova', created_by: CREATED_BY, environment: ENV,
+      idempotency_key: operationKey() });
     check('9. despesa nasce na modalidade do dono', desp1.category === 'pedagio_prova' && cents(desp1.amount) === 710);
 
     let fantasma = '';
-    try { await createMatrizExpense({ category: 'fantasma_prova', amount: 5, created_by: CREATED_BY, environment: ENV }); }
+    try { await createMatrizExpense({ category: 'fantasma_prova', amount: 5,
+      created_by: CREATED_BY, environment: ENV, idempotency_key: operationKey() }); }
     catch (err) { fantasma = err instanceof Error ? err.message : String(err); }
     check('10. modalidade inexistente → category_invalid (nada gravado)', fantasma === 'category_invalid');
 
@@ -101,7 +111,8 @@ async function main(): Promise<void> {
       !ativas2.some((c) => c.id === 'pedagio_prova') && todas.some((c) => c.id === 'pedagio_prova' && c.archived));
 
     let emArquivada = '';
-    try { await createMatrizExpense({ category: 'pedagio_prova', amount: 3, created_by: CREATED_BY, environment: ENV }); }
+    try { await createMatrizExpense({ category: 'pedagio_prova', amount: 3,
+      created_by: CREATED_BY, environment: ENV, idempotency_key: operationKey() }); }
     catch (err) { emArquivada = err instanceof Error ? err.message : String(err); }
     check('12. lançar em modalidade ARQUIVADA → category_invalid', emArquivada === 'category_invalid');
 
@@ -116,9 +127,12 @@ async function main(): Promise<void> {
 
     // ── 6. filtro de período (régua SP idêntica à do consolidado) ──
     await createMatrizExpenseCategory({ label: 'Cat Periodo Prova', created_by: CREATED_BY, environment: ENV });
-    const dMes = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 100, created_by: CREATED_BY + '-p', environment: ENV });
-    const dMes2 = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 23.45, created_by: CREATED_BY + '-p', environment: ENV });
-    const dFora = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 999, created_by: CREATED_BY + '-p', environment: ENV });
+    const dMes = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 100,
+      created_by: CREATED_BY + '-p', environment: ENV, idempotency_key: operationKey() });
+    const dMes2 = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 23.45,
+      created_by: CREATED_BY + '-p', environment: ENV, idempotency_key: operationKey() });
+    const dFora = await createMatrizExpense({ category: 'cat_periodo_prova', amount: 999,
+      created_by: CREATED_BY + '-p', environment: ENV, idempotency_key: operationKey() });
     // dFora vai pra 23:30 SP do ÚLTIMO dia do mês PASSADO (borda de fuso: em UTC já é o mês corrente!)
     await client.query(
       `UPDATE commerce.matriz_expenses

@@ -62,11 +62,8 @@ window.PAINEL_MODULES.compras = function () {
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       if (f.supplierKey === 'new') {
         if (!f.newName.trim()) { this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' }; return; }
-        // Auditoria 07-06: nome repetido cria OUTRA ficha e polui o ranking — perguntar antes.
-        const nomeNovo = f.newName.trim().toLowerCase();
-        if (this.fornecedores.some((s) => s.name.trim().toLowerCase() === nomeNovo)
-            && !window.confirm(`Já existe um fornecedor chamado "${f.newName.trim()}".\n\nCriar OUTRO com o mesmo nome? Se é o mesmo, cancela e escolhe ele na lista.`)) return;
-        body.new_supplier = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
+        body.new_supplier = { name: f.newName.trim(), phone: f.newPhone.trim() || null,
+          document: f.newDocument.trim() || null };
       } else if (f.supplierKey) {
         body.supplier_id = f.supplierKey;
       } else {
@@ -102,14 +99,19 @@ window.PAINEL_MODULES.compras = function () {
         body.payment_status = 'pending';
         if (f.due_date) body.due_date = f.due_date;
       }
+      body.receipt_status = f.receipt_status;
+      f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;
+      body.idempotency_key = f.idempotency_key;
 
       this.compraSaving = true;
       this.compraMsg = null;
       try {
         const result = await this.apiPost('/admin/api/wholesale/purchases', body);
-        const fiadoTxt = body.payment_status === 'pending' ? ' (A PRAZO — foi pro a pagar)' : '';
-        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}. O galpão já recebeu.` };
-        this.compraForm = { supplierKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
+        const fiadoTxt = body.payment_status === 'pending' ? ' (A PRAZO)' : '';
+        const estoqueTxt = result.stock_applied ? ' O galpão já recebeu.' : ' Aguardando recebimento; o galpão não mudou.';
+        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}` };
+        window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
+        this.compraForm = { supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '', payment_status: 'paid', due_date: '', receipt_status: 'received', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
         await this.loadAtacado();
       } catch (err) {
         this.compraMsg = { ok: false, text: this.compraErrText(err.message) };
@@ -124,80 +126,10 @@ window.PAINEL_MODULES.compras = function () {
         items_required: 'Adicione ao menos um pneu.',
         measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
         quantidade_inteira: 'Quantidade tem que ser número inteiro (sem vírgula).',
+        supplier_duplicate: 'Esse fornecedor já está cadastrado (nome, documento ou telefone equivalente). Escolha a ficha existente.',
+        idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
-    },
-
-    // ── COMPRAS — ÚLTIMAS COMPRAS + CANCELAR (0127): registro errado sai sem apagar ──
-    compraData(c) {
-      if (!c.purchased_at) return '—';
-      const d = new Date(c.purchased_at);
-      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
-    },
-    async compraCancel(c) {
-      const pago = c.payment_status === 'paid';
-      const aviso = pago
-        ? '\n\n⚠️ Essa compra consta como PAGA — se o dinheiro já saiu, o acerto com o fornecedor é por fora.'
-        : '\n\nOs pneus saem do galpão e o custo médio recalcula; se estava a prazo, sai do a pagar.';
-      if (!window.confirm(`Cancelar a compra de ${c.supplier_name} (${this.formatCurrency(Number(c.total_amount))})?${aviso}`)) return;
-      const reason = window.prompt('Motivo (opcional):') || null;
-      try {
-        await this.apiPost('/admin/api/wholesale/purchases/cancel', { purchase_id: c.id, reason });
-        await this.loadAtacado();
-      } catch (err) {
-        const msg = err.message === 'purchase_already_cancelled' ? 'Essa compra já estava cancelada.' : `Não consegui cancelar (${err.message}).`;
-        window.alert(msg);
-      }
-    },
-    // ── FORNECEDOR — ARQUIVAR (soft): some da lista/ranking; compras e dívidas ficam ──
-    async fornecedorArchive(s) {
-      if (!window.confirm(`Arquivar o fornecedor ${s.name}?\n\nEle some da lista e do ranking. As compras antigas continuam no histórico e dívida pendente continua no Financeiro.`)) return;
-      try {
-        await this.apiPost('/admin/api/wholesale/suppliers/archive', { supplier_id: s.supplier_id });
-        await this.loadAtacado();
-      } catch (err) {
-        window.alert(`Não consegui arquivar (${err.message}).`);
-      }
-    },
-
-    // ── ATACADO — CANCELAR VENDA (0116): registro errado sai sem apagar ──
-    vendaData(v) {
-      if (!v.sold_at) return '—';
-      const d = new Date(v.sold_at);
-      return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
-    },
-    async atacadoCancelSale(v) {
-      const pago = v.payment_status === 'paid';
-      const aviso = pago
-        ? '\n\n⚠️ Essa venda consta como PAGA — se o dinheiro já entrou, o acerto com o borracheiro é por fora.'
-        : '\n\nEla sai do ranking, do resumo e do a receber; o estoque volta pro galpão.';
-      if (!window.confirm(`Cancelar a venda de ${v.buyer_name} (${this.formatCurrency(Number(v.total_amount))})?${aviso}`)) return;
-      const reason = window.prompt('Motivo (opcional):') || null;
-      try {
-        await this.apiPost('/admin/api/wholesale/sales/cancel', { order_id: v.id, reason });
-        if (this.currentPage === 'vendas') await this.loadAtacadoVendas();
-        else await this.loadAtacado();
-      } catch (err) {
-        const msg = err.message === 'sale_already_cancelled' ? 'Essa venda já estava cancelada.' : `Não consegui cancelar (${err.message}).`;
-        window.alert(msg);
-      }
-    },
-
-    // ── ATACADO — FINANCEIRO (0115): fiado a receber/a pagar + quitar ──
-    financeDate(d) {
-      if (!d) return 'sem data';
-      const dt = new Date(d + (String(d).length === 10 ? 'T12:00:00' : ''));
-      return isNaN(dt.getTime()) ? 'sem data' : dt.toLocaleDateString('pt-BR');
-    },
-    async financeSettle(kind, row) {
-      const rotulo = kind === 'sale' ? `receber de ${row.counterparty}` : `pagar pra ${row.counterparty}`;
-      if (!window.confirm(`Quitar ${this.formatCurrency(Number(row.total_amount))} (${rotulo})?`)) return;
-      try {
-        await this.apiPost('/admin/api/wholesale/finance/settle', { kind, id: row.id });
-        await this.loadAtacado();
-      } catch (err) {
-        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
-      }
     },
 
     // ── MATRIZ — DESPESAS GERAIS (0120): lançar / quitar / remover ──

@@ -52,6 +52,9 @@ function managementError(reply: any, err: unknown, label: string) {
     return reply.status(409).send({ error: message });
   }
   if (message === 'period_already_closed') return reply.status(409).send({ error: message });
+  if (['idempotency_conflict', 'idempotency_incomplete', 'payroll_payment_conflict'].includes(message)) {
+    return reply.status(409).send({ error: message });
+  }
   if (message === 'payroll_item_not_found' || message === 'payroll_expense_not_found') {
     return reply.status(404).send({ error: message });
   }
@@ -106,7 +109,7 @@ export async function registerPainelColaboradoresGestao(fastify: FastifyInstance
   });
 
   fastify.post('/admin/api/colaboradores/folha/pagar', { preHandler: requireAdminOwner }, async (request, reply) => {
-    const parsed = z.object({ item_id: z.string().uuid() }).safeParse(request.body);
+    const parsed = z.object({ item_id: z.string().uuid(), idempotency_key: z.string().min(8).max(200) }).safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
     try { return reply.status(200).send(await payMatrizPayrollItem({ ...parsed.data, actor_label: operatorLabel(request) })); }
     catch (err) { return managementError(reply, err, 'payroll payment failed'); }

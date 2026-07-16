@@ -12,6 +12,8 @@
  *   npx tsx --env-file=.env.pooler scripts/prova-cancelar-atacado-test.ts
  */
 
+import { randomUUID } from 'node:crypto';
+
 process.env.WHOLESALE_FINANCE = 'true';
 process.env.WHOLESALE_STOCK_DECREMENT = 'true';
 
@@ -34,6 +36,8 @@ async function main(): Promise<void> {
   const client = await pool.connect();
   let fails = 0;
   let buyerId = '';
+  const keys: string[] = [];
+  const key = () => { const value = randomUUID(); keys.push(value); return value; };
   const check = (name: string, ok: boolean, extra = ''): void => {
     if (!ok) fails++;
     console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
@@ -58,10 +62,12 @@ async function main(): Promise<void> {
     // ── C1: venda FIADA 4un baixa o galpão; CANCELAR grava trilha ──
     const v1 = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 4, unit_price: 25 }],
-        created_by: CREATED_BY, environment: ENV, payment_status: 'pending' }, pool);
+        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', idempotency_key: key() }, pool);
     check('C1 venda fiada 4un (R$100) baixou 30 → 26', (await stockQty()) === 26, `${await stockQty()}un`);
-    const c1 = await cancelWholesaleSale(
-      { order_id: v1.order_id, cancelled_by: CREATED_BY, reason: 'registro errado (prova)', environment: ENV }, pool);
+    const cancelInput = { order_id: v1.order_id, cancelled_by: CREATED_BY,
+      reason: 'registro errado (prova)', environment: ENV, idempotency_key: key() };
+    const c1 = await cancelWholesaleSale(cancelInput, pool);
+    const c1Replay = await cancelWholesaleSale(cancelInput, pool);
     const t1 = await client.query<{ status: string; cancelled_at: string | null; cancelled_by: string | null; cancel_reason: string | null }>(
       `SELECT status, cancelled_at, cancelled_by, cancel_reason FROM commerce.wholesale_orders WHERE id=$1`, [v1.order_id]);
     check('C1b cancelou: status=cancelled + trilha (quem/quando/por quê)',
@@ -69,6 +75,7 @@ async function main(): Promise<void> {
       t1.rows[0]?.cancelled_by === CREATED_BY && t1.rows[0]?.cancel_reason === 'registro errado (prova)',
       `status=${t1.rows[0]?.status} by=${t1.rows[0]?.cancelled_by}`);
     check('C1c payment_status devolvido no resultado', c1.payment_status === 'pending', c1.payment_status);
+    check('C1d replay devolve o cancelamento original', c1Replay.cancelled_at === c1.cancelled_at);
 
     // ── C2: estoque DEVOLVIDO (26 → 30, espelho da baixa) ──
     check('C2 estoque devolvido ao galpão (26 → 30)', (await stockQty()) === 30, `${await stockQty()}un`);
@@ -85,11 +92,14 @@ async function main(): Promise<void> {
 
     // ── C5: cancelar 2x barra; id inexistente barra ──
     let dupla = false;
-    try { await cancelWholesaleSale({ order_id: v1.order_id, cancelled_by: CREATED_BY, environment: ENV }, pool); }
+    try { await cancelWholesaleSale({ order_id: v1.order_id, cancelled_by: CREATED_BY,
+      reason: 'segunda operação de prova', environment: ENV, idempotency_key: key() }, pool); }
     catch (e) { dupla = (e as Error).message === 'sale_already_cancelled'; }
     check('C5 cancelar 2x → sale_already_cancelled (trilha original preservada)', dupla);
     let sumiu = false;
-    try { await cancelWholesaleSale({ order_id: '00000000-0000-0000-0000-000000000000', cancelled_by: CREATED_BY, environment: ENV }, pool); }
+    try { await cancelWholesaleSale({ order_id: '00000000-0000-0000-0000-000000000000',
+      cancelled_by: CREATED_BY, reason: 'id inexistente', environment: ENV,
+      idempotency_key: key() }, pool); }
     catch (e) { sumiu = (e as Error).message === 'sale_not_found'; }
     check('C5b id inexistente → sale_not_found', sumiu);
 
@@ -102,9 +112,10 @@ async function main(): Promise<void> {
     // ── C7: venda PAGA também cancela (e devolve estoque) ──
     const v2 = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 2, unit_price: 30 }],
-        created_by: CREATED_BY, environment: ENV }, pool); // sem payment → paid
+        created_by: CREATED_BY, environment: ENV, idempotency_key: key() }, pool); // sem payment → paid
     check('C7 venda paga 2un baixou 30 → 28', (await stockQty()) === 28, `${await stockQty()}un`);
-    await cancelWholesaleSale({ order_id: v2.order_id, cancelled_by: CREATED_BY, reason: null, environment: ENV }, pool);
+    await cancelWholesaleSale({ order_id: v2.order_id, cancelled_by: CREATED_BY,
+      reason: 'venda paga lançada para prova', environment: ENV, idempotency_key: key() }, pool);
     const resumoFim = await getWholesaleResumo(ENV, pool);
     check('C7b cancelou venda paga: estoque 28 → 30 e resumo de volta ao base',
       (await stockQty()) === 30 && Number(resumoFim.faturamento) === Number(resumoBase.faturamento),
@@ -119,6 +130,9 @@ async function main(): Promise<void> {
 
     console.log(`\n${fails === 0 ? '✅ CANCELAMENTO PROVADO (trilha + devolução + fiado some + resumo/ranking corrigem + 2x barra)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
+    await client.query(`DELETE FROM audit.events WHERE environment=$1 AND actor_label=$2`, [ENV, CREATED_BY]);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key=ANY($2)`, [ENV, keys]);
     await client.query(
       `DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN
          (SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND created_by=$2)`, [ENV, CREATED_BY]);

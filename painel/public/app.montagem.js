@@ -19,6 +19,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.comissoes, // app.comissoes.js (linhas 844-914 pré-obra): comissões da Rede (0118): carregar/quitar/alarme/termos
     window.PAINEL_MODULES.atacado, // app.atacado.js (linhas 915-1058 pré-obra): venda de atacado: form, status, submit, ranking de recompra
     window.PAINEL_MODULES.compras, // app.compras.js (linhas 1059-1232 pré-obra): compras/fornecedores + fiado (0115) + loads financeiro/despesas
+    window.PAINEL_MODULES.comprasAcoes, // Etapa 5: mutacoes com idempotencia persistente
     window.PAINEL_MODULES.logistica, // app.logistica.js (linhas 1233-1405 pré-obra): logística (0121) leitura: cards, rota, datas D+1, deep-links
     window.PAINEL_MODULES.logisticaResultado, // memória de cálculo e detalhamento do resultado por rota
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA

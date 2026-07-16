@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-16T16:19:51.058Z",
-  "total": 124,
+  "geradoEm": "2026-07-16T21:25:44.800Z",
+  "total": 127,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -49,6 +49,7 @@
     "GET /admin/painel/app.colaboradores.gestao.js PUBLICA",
     "GET /admin/painel/app.colaboradores.js PUBLICA",
     "GET /admin/painel/app.comissoes.js PUBLICA",
+    "GET /admin/painel/app.compras.acoes.js PUBLICA",
     "GET /admin/painel/app.compras.js PUBLICA",
     "GET /admin/painel/app.core.js PUBLICA",
     "GET /admin/painel/app.financeiro.despesas.js PUBLICA",
@@ -91,6 +92,7 @@
     "POST /admin/api/colaboradores/remuneracao AUTH(1)",
     "POST /admin/api/colaboradores/revogar AUTH(1)",
     "POST /admin/api/colaboradores/senha AUTH(1)",
+    "POST /admin/api/integrity/resolve AUTH(1)",
     "POST /admin/api/logistica/comprovantes/ler AUTH(1)",
     "POST /admin/api/logistica/entregas/falhou AUTH(1)",
     "POST /admin/api/logistica/entregas/recolocar AUTH(1)",
@@ -116,6 +118,7 @@
     "POST /admin/api/wholesale/finance/settle AUTH(1)",
     "POST /admin/api/wholesale/purchases AUTH(1)",
     "POST /admin/api/wholesale/purchases/cancel AUTH(1)",
+    "POST /admin/api/wholesale/purchases/confirm AUTH(1)",
     "POST /admin/api/wholesale/sales AUTH(1)",
     "POST /admin/api/wholesale/sales/cancel AUTH(1)",
     "POST /admin/api/wholesale/stock AUTH(1)",

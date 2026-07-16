@@ -61,7 +61,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      await deleteWholesaleStockComRotulo(parsed.data.measure, parsed.data.environment);
+      await deleteWholesaleStockComRotulo(parsed.data.measure);
       return reply.status(200).send({ ok: true });
     } catch (err) {
       const mapped = mapWriteError(err);
