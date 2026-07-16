@@ -2,6 +2,21 @@ import type { Pool } from 'pg';
 
 type Queryable = Pick<Pool, 'query'>;
 
+export async function hasMatrizSellerColumn(
+  db: Queryable,
+  table: 'orders' | 'wholesale_orders',
+): Promise<boolean> {
+  const result = await db.query<{ ready: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema='commerce' AND table_name=$1
+          AND column_name='seller_collaborator_id'
+     ) AS ready`,
+    [table],
+  );
+  return Boolean(result.rows[0]?.ready);
+}
+
 /**
  * A migration 0133 foi publicada junto da tela. Durante o intervalo entre
  * deploy do codigo e aplicacao da migration, Financeiro nao pode cair por

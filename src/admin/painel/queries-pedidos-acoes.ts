@@ -11,6 +11,7 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import type { RegisterManualOrderInput, RegisterWalkinOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
+import { hasMatrizSellerColumn } from './payroll-schema.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -88,7 +89,7 @@ export async function registerManualOrder(
        input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag ?? null],
     );
     orderId = result.rows[0]!.order_id;
-    if (input.seller_collaborator_id) {
+    if (input.seller_collaborator_id && await hasMatrizSellerColumn(client, 'orders')) {
       const seller = await client.query(
         `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)
           FROM network.matriz_collaborators mc
@@ -148,7 +149,7 @@ export async function registerWalkinOrder(
        input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag],
     );
     orderId = result.rows[0]!.order_id;
-    if (input.seller_collaborator_id) {
+    if (input.seller_collaborator_id && await hasMatrizSellerColumn(client, 'orders')) {
       const seller = await client.query(
         `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)
           FROM network.matriz_collaborators mc

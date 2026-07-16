@@ -10,6 +10,7 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
+import { hasMatrizSellerColumn } from './payroll-schema.js';
 
 export interface WholesaleBuyerRow {
   customer_id: string | null; // ficha já existente (null = parceiro ainda sem ficha)
@@ -169,14 +170,23 @@ export async function registerWholesaleSale(
     const paymentStatus = fiado ? 'pending' : 'paid';
     const paidAt = env.WHOLESALE_FINANCE && !fiado ? new Date().toISOString() : null;
     const dueDate = fiado ? (input.due_date ?? null) : null;
-    const ord = await client.query<{ id: string }>(
-      `INSERT INTO commerce.wholesale_orders
-         (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at, seller_collaborator_id)
-       VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz,
-         (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1 AND revoked_at IS NULL)) RETURNING id`,
-      [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt,
-       input.seller_collaborator_id ?? null],
-    );
+    const sellerColumnReady = await hasMatrizSellerColumn(client, 'wholesale_orders');
+    const ord = sellerColumnReady
+      ? await client.query<{ id: string }>(
+        `INSERT INTO commerce.wholesale_orders
+           (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at, seller_collaborator_id)
+         VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz,
+           (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1 AND revoked_at IS NULL)) RETURNING id`,
+        [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt,
+         input.seller_collaborator_id ?? null],
+      )
+      : await client.query<{ id: string }>(
+        `INSERT INTO commerce.wholesale_orders
+           (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at)
+         VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz)
+         RETURNING id`,
+        [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt],
+      );
     const orderId = ord.rows[0]!.id;
 
     // 3. Disponibilidade + custo (com LOCK). Agrega a qtd pedida por medida, lê o estoque

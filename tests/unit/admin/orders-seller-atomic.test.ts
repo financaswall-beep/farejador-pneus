@@ -27,6 +27,7 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
       if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };
       if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
       if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('information_schema.columns')) return { rows: [{ ready: true }] };
       if (sql.includes('UPDATE commerce.orders')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
@@ -44,6 +45,7 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
       if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
       if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
       if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('information_schema.columns')) return { rows: [{ ready: true }] };
       if (sql.includes('UPDATE commerce.orders')) return { rows: [{ id: 'order-1' }] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
@@ -53,5 +55,22 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
 
     await expect(registerManualOrder(input, pool)).resolves.toEqual({ order_id: 'order-1' });
     expect(query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  it('mantem a venda viva durante deploy anterior a migration 0133', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
+      if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('information_schema.columns')) return { rows: [{ ready: false }] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const pool = {
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }), query: vi.fn(),
+    } as unknown as Pool;
+
+    await expect(registerManualOrder(input, pool)).resolves.toEqual({ order_id: 'order-1' });
+    expect(query).toHaveBeenCalledWith('COMMIT');
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('UPDATE commerce.orders'))).toBe(false);
   });
 });
