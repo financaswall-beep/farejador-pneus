@@ -3,6 +3,18 @@
 // Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.pedidosParceiros = function () {
+  const walkinOrderErrText = (err) => {
+    const code = err instanceof Error ? err.message : String(err);
+    const messages = {
+      walkin_measure_not_found: 'Esse pneu não está cadastrado no estoque do galpão.',
+      walkin_cost_missing: 'Essa medida está sem custo no galpão. Cadastre o custo antes de vender.',
+      walkin_stock_insufficient: 'Não há pneus suficientes dessa medida no galpão. Confira o estoque e tente novamente.',
+      walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpão. Corrija o estoque antes de vender.',
+      walkin_idempotency_conflict: 'Os dados dessa venda mudaram durante o envio. Feche, abra novamente e confira antes de finalizar.',
+    };
+    return messages[code] || 'Não consegui registrar a venda. Confira os dados e tente novamente.';
+  };
+
   return {
     async submitManualOrder() {
       if (this.orderSubmitting) return;
@@ -56,7 +68,9 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         await this.loadRealData();
         void this.loadVarejoResumo(); // venda nova entra nos cards do varejo (0117)
       } catch (err) {
-        this.orderError = err instanceof Error ? err.message : String(err);
+        this.orderError = this.modalConv
+          ? (err instanceof Error ? err.message : String(err))
+          : walkinOrderErrText(err);
       } finally {
         this.orderSubmitting = false;
       }
