@@ -55,6 +55,28 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     return { status: 409, error: err.message };
   }
 
+  // Venda walk-in atomica: conflitos de saldo/custo/idempotencia sao estados
+  // comerciais corrigiveis, nao falhas internas do servidor.
+  if ([
+    'walkin_measure_not_found',
+    'walkin_cost_missing',
+    'walkin_stock_insufficient',
+    'walkin_stock_ambiguous',
+    'walkin_idempotency_conflict',
+  ].includes(err.message)) {
+    return { status: 409, error: err.message };
+  }
+
+  if ([
+    'walkin_items_required',
+    'walkin_idempotency_required',
+    'walkin_item_invalid',
+    'walkin_total_invalid',
+    'walkin_unit_not_found',
+  ].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
+
   if (err.message.includes('payroll_expense_locked')) {
     return { status: 409, error: 'payroll_expense_locked' };
   }

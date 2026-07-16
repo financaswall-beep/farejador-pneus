@@ -5,12 +5,11 @@ import type { Pool, PoolClient } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
-import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
+import { applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
-import type { RegisterManualOrderInput, RegisterWalkinOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
+import type { RegisterManualOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
 
 async function resolveContactId(
@@ -128,75 +127,7 @@ export async function registerManualOrder(
   return { order_id: orderId };
 }
 
-export async function registerWalkinOrder(
-  input: RegisterWalkinOrderInput,
-  dbPool: Pool = defaultPool,
-): Promise<{ order_id: string }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-
-  // S4 da auditoria 2026-05-21: normaliza telefone pra E.164 antes de gravar.
-  const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
-  const client = await dbPool.connect();
-  let orderId: string;
-  try {
-    await client.query('BEGIN');
-    const result = await client.query<{ order_id: string }>(
-      `SELECT commerce.register_walkin_order(
-         $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11
-       ) AS order_id`,
-      [environment, input.customer_name ?? null, normalizedPhone, input.unit_id ?? null,
-       JSON.stringify(input.items), input.payment_method, input.fulfillment_mode,
-       input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag],
-    );
-    orderId = result.rows[0]!.order_id;
-    if (input.seller_collaborator_id && await hasMatrizSellerColumn(client, 'orders')) {
-      const seller = await client.query(
-        `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)
-          FROM network.matriz_collaborators mc
-         WHERE o.id=$1 AND o.environment=$2 AND mc.id=$3
-           AND mc.environment=o.environment AND mc.revoked_at IS NULL RETURNING o.id`,
-        [orderId, environment, input.seller_collaborator_id],
-      );
-      if (!seller.rows[0]) throw new Error('seller_collaborator_not_found');
-    }
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally { client.release(); }
-
-  // Balcão da MATRIZ vende do GALPÃO → abate o estoque (commerce.wholesale_stock) e CONGELA
-  // o custo médio nos itens (0117 — fatia 2: lucro real do varejo). Best-effort FORA da
-  // transação SQL (a venda já commitou; a baixa tem clamp em 0 e NUNCA trava; item sem custo
-  // fica NULL). SÓ quando a unit é a matriz (slug='main'; null no balcão = matriz). Cada
-  // efeito atrás da própria flag (WHOLESALE_MATRIZ_DECREMENT / WHOLESALE_MATRIZ_RETAIL_COST).
-  if (env.WHOLESALE_MATRIZ_DECREMENT || env.WHOLESALE_MATRIZ_RETAIL_COST) {
-    const m = await dbPool.query<{ id: string }>(
-      `SELECT id FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
-      [environment],
-    );
-    const matrizId = m.rows[0]?.id ?? null;
-    if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
-      const items = input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity }));
-      await applyMatrizGalpaoDecrement(
-        dbPool as unknown as PoolClient,
-        environment,
-        items,
-        env.WHOLESALE_MATRIZ_DECREMENT,
-        orderId,
-      );
-      await applyMatrizRetailCostSnapshot(
-        dbPool as unknown as PoolClient,
-        environment,
-        orderId,
-        items,
-        env.WHOLESALE_MATRIZ_RETAIL_COST,
-      );
-    }
-  }
-
-  return { order_id: orderId };
-}
+export { registerWalkinOrder } from './walkin-order.js';
 
 export async function cancelManualOrder(
   input: CancelManualOrderInput,
