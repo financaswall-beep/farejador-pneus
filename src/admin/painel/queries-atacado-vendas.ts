@@ -175,8 +175,8 @@ export async function registerWholesaleSale(
       ? await client.query<{ id: string }>(
         `INSERT INTO commerce.wholesale_orders
            (environment, buyer_id, sold_at, total_amount, created_by, notes, payment_status, due_date, paid_at, seller_collaborator_id)
-         VALUES ($1, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz,
-           (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1 AND revoked_at IS NULL)) RETURNING id`,
+         VALUES ($1::env_t, $2, COALESCE($3::timestamptz, now()), 0, $4, $5, $6, $7::date, $8::timestamptz,
+           (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1::env_t AND revoked_at IS NULL)) RETURNING id`,
         [environment, buyerId, input.sold_at ?? null, input.created_by, input.notes ?? null, paymentStatus, dueDate, paidAt,
          input.seller_collaborator_id ?? null],
       )

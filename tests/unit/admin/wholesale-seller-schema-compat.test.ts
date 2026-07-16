@@ -38,4 +38,29 @@ describe('compatibilidade da venda de atacado antes da migration 0133', () => {
     expect(orderInsert).not.toContain('seller_collaborator_id');
     expect(query).toHaveBeenCalledWith('COMMIT');
   });
+
+  it('tipa o ambiente explicitamente quando atribui o vendedor', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('INSERT INTO commerce.wholesale_customers')) return { rows: [{ id: 'buyer-1', name: 'Cliente' }] };
+      if (sql.includes('information_schema.columns')) return { rows: [{ ready: true }] };
+      if (sql.includes('INSERT INTO commerce.wholesale_orders')) return { rows: [{ id: 'order-1' }] };
+      if (sql.includes('FROM commerce.wholesale_stock')) return { rows: [{ quantity_on_hand: '10', unit_cost: '20' }] };
+      if (sql.includes('INSERT INTO commerce.wholesale_order_items')) return { rows: [] };
+      if (sql.includes('UPDATE commerce.wholesale_orders')) return { rows: [{ total_amount: '50.00' }] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const pool = {
+      connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }), query: vi.fn(),
+    } as unknown as Pool;
+
+    await registerWholesaleSale({
+      environment: 'test', new_customer: { name: 'Cliente' }, created_by: 'teste',
+      seller_collaborator_id: '33333333-3333-4333-8333-333333333333',
+      items: [{ measure: '90/90-18', quantity: 1, unit_price: 50 }],
+    }, pool);
+
+    const orderInsert = query.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO commerce.wholesale_orders'))?.[0];
+    expect(orderInsert).toContain('$1::env_t');
+  });
 });
