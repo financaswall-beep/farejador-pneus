@@ -34,7 +34,15 @@ export async function startPostgres(options: { throughMigration?: string } = {})
 }
 
 export async function stopPostgres(db: IntegrationDb): Promise<void> {
-  await db.pool.end();
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    db.pool.end(),
+    new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(
+        `postgres_pool_end_timeout:total=${db.pool.totalCount},idle=${db.pool.idleCount},waiting=${db.pool.waitingCount}`,
+      )), 10_000);
+    }),
+  ]).finally(() => { if (timer) clearTimeout(timer); });
   await db.container.stop();
 }
 

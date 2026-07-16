@@ -31,8 +31,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
         seller_collaborator_id: getAdminContext(request).collaboratorId });
       return reply.status(201).send(result);
     } catch (err) {
-      // Oversell: 409 com a lista de medidas que estouraram — o front avisa e reenvia com
-      // allow_oversell se o caixa confirmar vender assim mesmo.
+      // Oversell: 409 com a lista real. Não existe caminho de confirmação forçada.
       if (err instanceof Error && err.message.startsWith('oversell:')) {
         return reply.status(409).send({ error: 'oversell', items: JSON.parse(err.message.slice(9)) });
       }
@@ -43,7 +42,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
   });
 
   // ── ATACADO (Fase 2): estoque do galpão por medida + autocomplete de medidas ──
-  // Admin-only (dado SÓ da matriz). A baixa na venda é Fase 2b (atrás de flag).
+  // Admin-only (dado SÓ da matriz). Toda venda confirmada baixa estoque estritamente.
 
   // Medidas pro autocomplete da venda (catálogo ∪ estoque), com quantidade e custo.
   fastify.get('/admin/api/wholesale/measures', { preHandler: requireAdminAuth }, async (_request, reply) => {

@@ -133,7 +133,11 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       if (!c.payroll_item_id || !confirm(`Confirmar pagamento de ${this.formatCurrency(c.total_due)} para ${c.display_name}?`)) return;
       this.colabSaving = true;
       try {
-        await this.apiPost('/admin/api/colaboradores/folha/pagar', { item_id: c.payroll_item_id });
+        const operation = window.PAINEL_INTEGRITY.operation('matriz-payroll-payment', c.payroll_item_id);
+        await this.apiPost('/admin/api/colaboradores/folha/pagar', {
+          item_id: c.payroll_item_id, idempotency_key: operation.key,
+        });
+        window.PAINEL_INTEGRITY.complete('matriz-payroll-payment', c.payroll_item_id);
         this.colabMsg = { ok: true, text: 'Pagamento confirmado no Colaboradores e no Financeiro.' };
         await Promise.all([this.loadColaboradores(), this.loadFinanceiro()]); this.colabCloseDrawer();
       } catch (err) { this.colabMsg = { ok: false, text: `Não consegui pagar (${err.message}).` }; }

@@ -4,6 +4,17 @@
 import path from 'node:path';
 import { z } from 'zod';
 
+const idempotencyKeySchema = z.string().min(8).max(200);
+
+export const resolveIntegrityOperationSchema = z.object({
+  domain: z.enum([
+    'wholesale_sale.create',
+    'wholesale_purchase.create',
+    'matriz_expense.create',
+  ]),
+  idempotency_key: idempotencyKeySchema,
+});
+
 export const publicDir = path.join(process.cwd(), 'painel', 'public');
 
 export const limitQuerySchema = z.object({
@@ -71,7 +82,6 @@ export const wholesaleItemSchema = z.object({
 });
 export const registerWholesaleSaleSchema = z
   .object({
-    environment: z.enum(['prod', 'test']).optional(),
     customer_id: z.string().uuid().nullable().optional(),
     partner_id: z.string().uuid().nullable().optional(),
     new_customer: z
@@ -81,7 +91,7 @@ export const registerWholesaleSaleSchema = z
     items: z.array(wholesaleItemSchema).min(1).max(50),
     sold_at: z.string().min(1).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
-    allow_oversell: z.boolean().optional(),
+    idempotency_key: idempotencyKeySchema,
     // FINANCEIRO (0115): 'pending' = fiado (a receber), vencimento opcional.
     // Ignorados com WHOLESALE_FINANCE off (a venda nasce 'paid', como hoje).
     payment_status: z.enum(['paid', 'pending']).optional(),
@@ -94,7 +104,6 @@ export const registerWholesaleSaleSchema = z
 
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
 export const setWholesaleStockSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
   quantity_on_hand: z.number().int().min(0).max(1000000),
   unit_cost: z.number().min(0).max(9999999.99).optional(),
@@ -102,31 +111,23 @@ export const setWholesaleStockSchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
 });
 export const removeWholesaleStockSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
 });
 // Entrada de compra (custo médio): soma quantidade + recalcula o custo médio ponderado.
 export const entryWholesaleStockSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
 });
 // Baixa MANUAL com motivo (0128 — quebra/perda/uso interno): recusa acima do saldo.
 export const baixaWholesaleStockSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   measure: z.string().min(1).max(60),
   quantity: z.number().int('quantidade_inteira').positive().max(1000000),
   reason: z.string().min(2).max(300),
 });
 
 // ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.
-export const registerSupplierSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
-  name: z.string().min(1).max(200),
-  phone: z.string().max(40).nullable().optional(),
-  notes: z.string().max(1000).nullable().optional(),
-});
+export const registerSupplierSchema = z.object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(), notes: z.string().max(1000).nullable().optional() });
 export const purchaseItemSchema = z.object({
   measure: z.string().min(1).max(60),
   brand: z.string().min(1).max(60).nullable().optional(),
@@ -136,10 +137,10 @@ export const purchaseItemSchema = z.object({
 });
 export const registerPurchaseSchema = z
   .object({
-    environment: z.enum(['prod', 'test']).optional(),
     supplier_id: z.string().uuid().nullable().optional(),
     new_supplier: z
-      .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional() })
+      .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(),
+        document: z.string().max(30).nullable().optional() })
       .nullable()
       .optional(),
     items: z.array(purchaseItemSchema).min(1).max(50),
@@ -148,35 +149,32 @@ export const registerPurchaseSchema = z
     // FINANCEIRO (0115): 'pending' = compra fiada (a pagar ao fornecedor).
     payment_status: z.enum(['paid', 'pending']).optional(),
     due_date: z.string().date().nullable().optional(),
+    receipt_status: z.enum(['pending', 'received']).default('received'),
+    idempotency_key: idempotencyKeySchema,
   })
   .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
     message: 'supplier_required',
   });
 
-// CANCELAR compra (0127): espelho do cancelamento da venda — sai sem apagar,
-// o galpão reverte pelo inverso ponderado. Motivo opcional (trilha).
-export const cancelWholesalePurchaseSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
-  purchase_id: z.string().uuid(),
-  reason: z.string().max(300).nullable().optional(),
-});
+// Cancelar compra: sai sem apagar; motivo obrigatório fica na trilha.
+export const cancelWholesalePurchaseSchema = z.object({ purchase_id: z.string().uuid(), reason: z.string().trim().min(2).max(300), idempotency_key: idempotencyKeySchema });
+
+export const confirmWholesalePurchaseSchema = z.object({ purchase_id: z.string().uuid(), idempotency_key: idempotencyKeySchema });
 
 // ARQUIVAR fornecedor (soft delete): some do form/ranking; compras e dívida ficam.
 export const archiveWholesaleSupplierSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   supplier_id: z.string().uuid(),
 });
 
 // FINANCEIRO do atacado (0115): quitar um fiado — venda (a receber) ou compra (a pagar).
 export const settleWholesaleFinanceSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   kind: z.enum(['sale', 'purchase']),
   id: z.string().uuid(),
+  idempotency_key: idempotencyKeySchema,
 });
 
 // DESPESAS da matriz (0120): lançar (à vista × a pagar), quitar e remover (soft).
 export const createMatrizExpenseSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   // 0130: modalidade virou lista viva — o formato valida aqui; existir E estar
   // ativa valida no banco (guard + FK). z.enum fixo barraria as do dono.
   category: z.string().regex(/^[a-z0-9_]{2,40}$/),
@@ -184,20 +182,23 @@ export const createMatrizExpenseSchema = z.object({
   amount: z.number().positive(),
   payment_status: z.enum(['paid', 'pending']).optional(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  idempotency_key: idempotencyKeySchema,
 });
 
 export const matrizExpenseIdSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   id: z.string().uuid(),
+  idempotency_key: idempotencyKeySchema,
+});
+
+export const matrizExpenseRemoveSchema = matrizExpenseIdSchema.extend({
+  reason: z.string().trim().min(2).max(300),
 });
 
 // 0130: modalidades de despesa cadastráveis + filtro de período da lista.
 export const matrizExpenseCategoryCreateSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   label: z.string().trim().min(2).max(40),
 });
 export const matrizExpenseCategoryArchiveSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   slug: z.string().regex(/^[a-z0-9_]{2,40}$/),
 });
 export const matrizExpensesQuerySchema = z.object({
@@ -205,12 +206,12 @@ export const matrizExpensesQuerySchema = z.object({
   categoria: z.string().regex(/^[a-z0-9_]{2,40}$/).optional(),
 });
 
-// CANCELAR venda de atacado (0116): registro errado sai do ranking/resumo/fiado
-// e devolve o estoque (espelho da baixa). Motivo opcional (trilha).
+// Cancelar venda: sai do ranking/resumo/fiado, devolve a baixa comprovada e
+// exige motivo para a trilha.
 export const cancelWholesaleSaleSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   order_id: z.string().uuid(),
-  reason: z.string().max(300).nullable().optional(),
+  reason: z.string().trim().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
 });
 
 // Etapa 3: candidatura pública "quero ser parceiro". 'website' é honeypot anti-spam.

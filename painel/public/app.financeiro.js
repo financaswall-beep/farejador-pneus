@@ -179,7 +179,11 @@ window.PAINEL_MODULES.financeiro = function () {
         if (item.tipo === 'comissao') {
           await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: item.id });
         } else {
-          await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'sale', id: item.id });
+          const operation = window.PAINEL_INTEGRITY.operation('wholesale-sale-payment', item.id);
+          await this.apiPost('/admin/api/wholesale/finance/settle', {
+            kind: 'sale', id: item.id, idempotency_key: operation.key,
+          });
+          window.PAINEL_INTEGRITY.complete('wholesale-sale-payment', item.id);
         }
         await this.loadFinanceiro();
         await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
@@ -196,9 +200,17 @@ window.PAINEL_MODULES.financeiro = function () {
       this.finQuitando = true;
       try {
         if (item.tipo === 'despesa' || item.tipo === 'folha') {
-          await this.apiPost('/admin/api/matriz/despesas/settle', { id: item.id });
+          const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-payment', item.id);
+          await this.apiPost('/admin/api/matriz/despesas/settle', {
+            id: item.id, idempotency_key: operation.key,
+          });
+          window.PAINEL_INTEGRITY.complete('matriz-expense-payment', item.id);
         } else {
-          await this.apiPost('/admin/api/wholesale/finance/settle', { kind: 'purchase', id: item.id });
+          const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-payment', item.id);
+          await this.apiPost('/admin/api/wholesale/finance/settle', {
+            kind: 'purchase', id: item.id, idempotency_key: operation.key,
+          });
+          window.PAINEL_INTEGRITY.complete('wholesale-purchase-payment', item.id);
         }
         await this.loadFinanceiro();
         await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)

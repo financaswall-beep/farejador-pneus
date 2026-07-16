@@ -145,7 +145,10 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     expect(payroll.rows[0]).toMatchObject({
       total_due: '6200.00', payment_status: 'pending', amount: '6200.00', expense_status: 'pending',
     });
-    await payPayrollItem({ item_id: payroll.rows[0].id, environment: 'test' }, db.pool);
+    const paymentInput = { item_id: payroll.rows[0].id, environment: 'test' as const,
+      actor_label: 'dono-teste', idempotency_key: 'payroll-etapa5-2026-08' };
+    const firstPayment = await payPayrollItem(paymentInput, db.pool);
+    expect(await payPayrollItem(paymentInput, db.pool)).toEqual(firstPayment);
     const paid = await db.pool.query(
       `SELECT i.payment_status,p.status,e.payment_status expense_status
          FROM finance.matriz_payroll_items i

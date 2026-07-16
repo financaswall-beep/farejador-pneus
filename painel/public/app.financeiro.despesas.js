@@ -98,13 +98,17 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
           amount: valor,
           payment_status: this.despesaForm.payment_status,
         };
+        this.despesaForm.idempotency_key = this.despesaForm.idempotency_key
+          || window.PAINEL_INTEGRITY.operation('matriz-expense-create', 'form').key;
+        body.idempotency_key = this.despesaForm.idempotency_key;
         if (body.payment_status === 'pending' && this.despesaForm.due_date) {
           body.due_date = this.despesaForm.due_date;
         }
         await this.apiPost('/admin/api/matriz/despesas', body);
         const fiadoTxt = body.payment_status === 'pending' ? ' (foi pro A PAGAR)' : '';
         this.despesaMsg = { ok: true, text: `Despesa lançada — ${this.formatCurrency(valor)}${fiadoTxt}.` };
-        this.despesaForm = { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' };
+        window.PAINEL_INTEGRITY.complete('matriz-expense-create', 'form');
+        this.despesaForm = { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '', idempotency_key: '' };
         await this.loadFinanceiro();
       } catch (err) {
         this.despesaMsg = { ok: false, text: `Não consegui lançar (${err.message}).` };
@@ -117,7 +121,11 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
       if (!window.confirm(`Pagar ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})?`)) return;
       this.finQuitando = true;
       try {
-        await this.apiPost('/admin/api/matriz/despesas/settle', { id: row.id });
+        const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-payment', row.id);
+        await this.apiPost('/admin/api/matriz/despesas/settle', {
+          id: row.id, idempotency_key: operation.key,
+        });
+        window.PAINEL_INTEGRITY.complete('matriz-expense-payment', row.id);
         await this.loadFinanceiro();
         await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
       } catch (err) {
@@ -128,8 +136,19 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
     },
     async despesaRemove(row) {
       if (!window.confirm(`Remover a despesa de ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})? Ela some das contas (a trilha fica no banco).`)) return;
+      const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-remove', row.id);
+      if (!Object.hasOwn(operation, 'reason')) {
+        const reason = window.prompt('Motivo da remoção (obrigatório):');
+        if (reason === null) { window.PAINEL_INTEGRITY.complete('matriz-expense-remove', row.id); return; }
+        if (reason.trim().length < 2) { window.alert('Informe um motivo com pelo menos 2 caracteres.'); return; }
+        operation.reason = reason.trim();
+        window.PAINEL_INTEGRITY.save();
+      }
       try {
-        await this.apiPost('/admin/api/matriz/despesas/remove', { id: row.id });
+        await this.apiPost('/admin/api/matriz/despesas/remove', {
+          id: row.id, reason: operation.reason, idempotency_key: operation.key,
+        });
+        window.PAINEL_INTEGRITY.complete('matriz-expense-remove', row.id);
         await this.loadFinanceiro();
       } catch (err) {
         window.alert(`Não consegui remover (${err.message}).`);

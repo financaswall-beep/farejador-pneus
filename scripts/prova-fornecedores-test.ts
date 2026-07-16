@@ -22,6 +22,9 @@ import {
 const ENV = 'test' as const;
 const MEASURE = '99/99-99';                 // medida descartável (única)
 const SUPPLIER = 'PROVA-FORNECEDOR-' + Date.now();
+const RUN_ID = `prova-fornecedor-${Date.now()}`;
+let operationSequence = 0;
+const operationKey = () => `${RUN_ID}-${++operationSequence}`;
 
 async function main(): Promise<void> {
   console.log('=== PROVA FORNECEDORES (test) ===');
@@ -50,7 +53,8 @@ async function main(): Promise<void> {
 
     // 2. compra 1 — 10 un a R$20 → galpão 10un, custo 20
     const p1 = await registerWholesalePurchase(
-      { supplier_id: sup.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 20 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
+      { supplier_id: sup.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 20 }],
+        created_by: 'prova-fornecedor', environment: ENV, idempotency_key: operationKey() }, pool);
     check('2 compra 1: total R$200', p1.total_amount === '200.00', p1.total_amount);
     const r1 = (await listWholesaleStock(ENV, pool)).find((r) => r.measure === MEASURE);
     check('2b galpão recebeu 10un @ custo 20', r1?.quantity_on_hand === 10 && Number(r1?.unit_cost) === 20,
@@ -58,7 +62,8 @@ async function main(): Promise<void> {
 
     // 3. compra 2 — 10 un a R$30 → custo MÉDIO ponderado (10*20+10*30)/20 = 25
     const p2 = await registerWholesalePurchase(
-      { supplier_id: sup.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 30 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
+      { supplier_id: sup.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 30 }],
+        created_by: 'prova-fornecedor', environment: ENV, idempotency_key: operationKey() }, pool);
     check('3 compra 2: total R$300', p2.total_amount === '300.00', p2.total_amount);
     const r2 = (await listWholesaleStock(ENV, pool)).find((r) => r.measure === MEASURE);
     check('3b CUSTO MÉDIO ponderado = 25 (20un)', r2?.quantity_on_hand === 20 && Number(r2?.unit_cost) === 25,
@@ -78,7 +83,8 @@ async function main(): Promise<void> {
     let rejeitou = false;
     try {
       await registerWholesalePurchase(
-        { supplier_id: sup.id, items: [{ measure: 'LIXO-123', quantity: 1, unit_cost: 5 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
+        { supplier_id: sup.id, items: [{ measure: 'LIXO-123', quantity: 1, unit_cost: 5 }],
+          created_by: 'prova-fornecedor', environment: ENV, idempotency_key: operationKey() }, pool);
     } catch (e) { rejeitou = (e as Error).message === 'measure_not_in_catalog'; }
     check('6 medida fora do catálogo → rejeita (rollback)', rejeitou);
 
@@ -91,7 +97,8 @@ async function main(): Promise<void> {
     // 8. segundo fornecedor MAIS BARATO na mesma medida → tem que vir NA FRENTE (régua do ★)
     const sup2 = await registerWholesaleSupplier({ name: SUPPLIER + '-B', environment: ENV }, pool);
     await registerWholesalePurchase(
-      { supplier_id: sup2.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 15 }], created_by: 'prova-fornecedor', environment: ENV }, pool);
+      { supplier_id: sup2.id, items: [{ measure: MEASURE, quantity: 10, unit_cost: 15 }],
+        created_by: 'prova-fornecedor', environment: ENV, idempotency_key: operationKey() }, pool);
     const bd2 = (await getWholesaleSupplierMeasureBreakdown(ENV, pool)) as Array<{ supplier_id: string; measure: string; avg_cost: string }>;
     const forMeasure = bd2.filter((r) => r.measure === MEASURE && (r.supplier_id === sup.id || r.supplier_id === sup2.id));
     check('8 breakdown ordena do mais barato (sup2 R$15 antes do sup1 R$25)',
@@ -102,6 +109,10 @@ async function main(): Promise<void> {
     console.log(`\n${fails === 0 ? '✅ TODOS OS CASOS DE FORNECEDOR PASSARAM' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
     // cleanup — apaga tudo que a prova criou (purchase_items caem por cascade)
+    await client.query(`DELETE FROM audit.events
+      WHERE environment=$1 AND actor_label='prova-fornecedor'`, [ENV]);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
     await client.query(`DELETE FROM commerce.wholesale_purchases WHERE environment=$1 AND created_by='prova-fornecedor'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_suppliers WHERE environment=$1 AND name LIKE 'PROVA-FORNECEDOR-%'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);

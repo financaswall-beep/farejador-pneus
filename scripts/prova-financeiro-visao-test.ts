@@ -28,6 +28,9 @@ process.env.NETWORK_COMMISSION_LEDGER = 'true';
 const ENV = 'test' as const;
 const MEASURE = '97/97-97'; // descartável ('98' é do fiado, '99' das outras provas)
 const CREATED_BY = 'prova-fin-visao';
+const RUN_ID = `prova-fin-visao-${Date.now()}`;
+let operationSequence = 0;
+const operationKey = () => `${RUN_ID}-${++operationSequence}`;
 
 function isoDate(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86400000);
@@ -123,7 +126,7 @@ async function main(): Promise<void> {
     // ── V2: despesa À VISTA 120 → competência do mês (despesas +120, lucro −120) ──
     const d1 = await createMatrizExpense(
       { category: 'combustivel', description: 'PROVA gasolina', amount: 120,
-        created_by: CREATED_BY, environment: ENV }, pool);
+        created_by: CREATED_BY, environment: ENV, idempotency_key: operationKey() }, pool);
     let v = await getMatrizFinanceiroVisao(ENV, pool);
     check('V2 despesa à vista soma na competência do mês (+120)',
       cents(Number(v.mes.despesas ?? 0) - baseDespesas) === 12000, `${baseDespesas} → ${v.mes.despesas}`);
@@ -137,7 +140,8 @@ async function main(): Promise<void> {
     // ── V3: despesa A PAGAR 800 (vence em 5d) → agenda ──
     const d2 = await createMatrizExpense(
       { category: 'aluguel', description: 'PROVA aluguel', amount: 800,
-        payment_status: 'pending', due_date: isoDate(5), created_by: CREATED_BY, environment: ENV }, pool);
+        payment_status: 'pending', due_date: isoDate(5), created_by: CREATED_BY,
+        environment: ENV, idempotency_key: operationKey() }, pool);
     v = await getMatrizFinanceiroVisao(ENV, pool);
     const ag1 = v.a_pagar.itens.find((x) => x.tipo === 'despesa' && x.id === d2.id);
     check('V3 despesa pendente entra no A PAGAR (+800)',
@@ -149,7 +153,8 @@ async function main(): Promise<void> {
     // ── V4: venda FIADA já VENCIDA (2×R$50, venceu ontem) → A RECEBER com telefone ──
     const venda = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 2, unit_price: 50 }],
-        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', due_date: isoDate(-1) }, pool);
+        created_by: CREATED_BY, environment: ENV, payment_status: 'pending',
+        due_date: isoDate(-1), idempotency_key: operationKey() }, pool);
     v = await getMatrizFinanceiroVisao(ENV, pool);
     const rec1 = v.a_receber.itens.find((x) => x.tipo === 'fiado' && x.id === venda.order_id);
     check('V4 fiado entra no A RECEBER (+100)',
@@ -207,7 +212,8 @@ async function main(): Promise<void> {
       v.mes.margem_pct === null || Number.isFinite(v.mes.margem_pct), String(v.mes.margem_pct));
 
     // ── V7: QUITAR o fiado → some do A RECEBER da visão (fica só a comissão) ──
-    await settleWholesaleOrderPayment(venda.order_id, ENV, pool);
+    await settleWholesaleOrderPayment(venda.order_id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY });
     v = await getMatrizFinanceiroVisao(ENV, pool);
     check('V7 fiado quitado sai da visão (sobra só a comissão = +100)',
       cents(Number(v.a_receber.total) - baseReceber) === 10000, `${v.a_receber.total}`);
@@ -215,8 +221,10 @@ async function main(): Promise<void> {
       v.a_receber.vencidos_count === baseVencReceber, String(v.a_receber.vencidos_count));
 
     // ── V8: REMOVER a despesa pendente → a pagar volta ao base ──
-    await removeMatrizExpense(d2.id, ENV, pool);
-    await removeMatrizExpense(d1.id, ENV, pool);
+    await removeMatrizExpense(d2.id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY, reason: 'limpeza da prova' });
+    await removeMatrizExpense(d1.id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY, reason: 'limpeza da prova' });
     v = await getMatrizFinanceiroVisao(ENV, pool);
     check('V8 despesas removidas → a pagar volta ao base',
       cents(Number(v.a_pagar.total) - basePagar) === 0, `${v.a_pagar.total}`);
@@ -256,6 +264,9 @@ async function main(): Promise<void> {
 
     console.log(`\n${fails === 0 ? '✅ VISÃO DO FINANCEIRO PROVADA (3 pernas + FRETE de entrega + a receber/a pagar juntos + telefone + indicadores + quitações refletem)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
+    await client.query(`DELETE FROM audit.events WHERE environment=$1 AND actor_label=$2`, [ENV, CREATED_BY]);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
     if (comissaoId) await client.query(`DELETE FROM network.commission_entries WHERE id=$1`, [comissaoId]);
     await client.query(
       `DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN

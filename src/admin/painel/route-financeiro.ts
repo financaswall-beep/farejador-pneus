@@ -8,7 +8,7 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseCategory, getMatrizExpenses, getMatrizFinanceiroVisao, listMatrizExpenseCategories, removeMatrizExpense, settleMatrizExpense, sweepCommissionEntries } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpensesQuerySchema } from './route-schemas.js';
+import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpenseRemoveSchema, matrizExpensesQuerySchema } from './route-schemas.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -59,7 +59,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
     try {
       const result = await createMatrizExpenseCategory({
         label: parsed.data.label,
-        environment: parsed.data.environment,
+        environment: env.FAREJADOR_ENV,
         created_by: operatorLabel(request),
       });
       return reply.status(201).send({ created: true, ...result });
@@ -84,7 +84,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await archiveMatrizExpenseCategory(parsed.data.slug, parsed.data.environment);
+      const result = await archiveMatrizExpenseCategory(parsed.data.slug, env.FAREJADOR_ENV);
       return reply.status(200).send({ archived: true, ...result });
     } catch (err) {
       if (err instanceof Error && err.message === 'category_not_archivable') {
@@ -120,7 +120,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
     }
   });
 
-  // QUITA uma despesa a pagar (pending → paid). Quitar 2x → 404 (não sobrescreve).
+  // Quita despesa. Replay devolve o resultado original sem sobrescrever paid_at.
   fastify.post('/admin/api/matriz/despesas/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = matrizExpenseIdSchema.safeParse(request.body);
@@ -128,7 +128,8 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await settleMatrizExpense(parsed.data.id, parsed.data.environment);
+      const result = await settleMatrizExpense(parsed.data.id, env.FAREJADOR_ENV, undefined,
+        { idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request) });
       return reply.status(200).send({ settled: true, ...result });
     } catch (err) {
       if (err instanceof Error && err.message === 'expense_not_found') {
@@ -143,12 +144,14 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   // REMOVE despesa lançada errada (soft delete — trilha preservada).
   fastify.post('/admin/api/matriz/despesas/remove', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
-    const parsed = matrizExpenseIdSchema.safeParse(request.body);
+    const parsed = matrizExpenseRemoveSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await removeMatrizExpense(parsed.data.id, parsed.data.environment);
+      const result = await removeMatrizExpense(parsed.data.id, env.FAREJADOR_ENV, undefined,
+        { idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request),
+          reason: parsed.data.reason });
       return reply.status(200).send({ removed: true, ...result });
     } catch (err) {
       if (err instanceof Error && err.message === 'expense_not_found') {

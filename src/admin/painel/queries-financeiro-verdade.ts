@@ -120,8 +120,8 @@ export async function getMatrizFinancialTruth(
                   WHERE environment=$1 AND status<>'reversed' AND realized_at>=month_start),0) commission_revenue,
        COALESCE((SELECT SUM(amount) FROM commerce.matriz_expenses,bounds
                   WHERE environment=$1 AND deleted_at IS NULL AND occurred_at>=month_start),0) expenses_competence,
-       COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status='confirmed' AND created_at>=month_start),0) purchases_header,
-       COALESCE((SELECT SUM(item_total) FROM purchases,bounds WHERE status='confirmed' AND created_at>=month_start),0) purchases_items,
+       COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start),0) purchases_header,
+       COALESCE((SELECT SUM(item_total) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start),0) purchases_items,
        COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status<>'cancelled'
                   AND payment_method IS NOT NULL AND lower(trim(payment_method))<>'a receber'
                   AND ((fulfillment_mode='delivery' AND delivery_status='delivered' AND COALESCE(delivered_at,closed_at,created_at)>=month_start)
@@ -130,7 +130,7 @@ export async function getMatrizFinancialTruth(
                   AND COALESCE(paid_at,sold_at)>=month_start),0) cash_wholesale,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries,bounds
                   WHERE environment=$1 AND status='settled' AND settled_at>=month_start),0) cash_commission,
-       COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status='confirmed' AND payment_status='paid'
+       COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status<>'cancelled' AND payment_status='paid'
                   AND COALESCE(paid_at,purchased_at)>=month_start),0) cash_purchases,
        COALESCE((SELECT SUM(amount) FROM commerce.matriz_expenses,bounds WHERE environment=$1
                   AND deleted_at IS NULL AND payment_status='paid' AND COALESCE(paid_at,occurred_at)>=month_start),0) cash_expenses,
@@ -141,7 +141,7 @@ export async function getMatrizFinancialTruth(
        COALESCE((SELECT SUM(total_amount) FROM retail WHERE status<>'cancelled' AND lower(trim(COALESCE(payment_method,'')))='a receber'),0) receivable_retail,
        COALESCE((SELECT SUM(total_amount) FROM wholesale WHERE status='confirmed' AND payment_status='pending'),0) receivable_wholesale,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries WHERE environment=$1 AND status='open'),0) receivable_commission,
-       COALESCE((SELECT SUM(total_amount) FROM purchases WHERE status='confirmed' AND payment_status='pending'),0) payable_purchases,
+       COALESCE((SELECT SUM(total_amount) FROM purchases WHERE status<>'cancelled' AND payment_status='pending'),0) payable_purchases,
        COALESCE((SELECT SUM(amount) FROM commerce.matriz_expenses WHERE environment=$1 AND deleted_at IS NULL AND payment_status='pending'),0) payable_expenses,
        (SELECT COUNT(*) FROM retail WHERE status='cancelled')::int cancelled_retail,
        (SELECT COUNT(*) FROM wholesale WHERE status='cancelled')::int cancelled_wholesale,
@@ -149,7 +149,7 @@ export async function getMatrizFinancialTruth(
        (SELECT COUNT(*) FROM network.commission_entries WHERE environment=$1 AND status='reversed')::int reversed_commissions,
        (SELECT COUNT(*) FROM commerce.matriz_expenses WHERE environment=$1 AND deleted_at IS NOT NULL)::int deleted_expenses,
        ((SELECT COUNT(*) FROM wholesale WHERE status='confirmed' AND payment_status='paid' AND paid_at IS NULL)
-        +(SELECT COUNT(*) FROM purchases WHERE status='confirmed' AND payment_status='paid' AND paid_at IS NULL)
+        +(SELECT COUNT(*) FROM purchases WHERE status<>'cancelled' AND payment_status='paid' AND paid_at IS NULL)
         +(SELECT COUNT(*) FROM commerce.matriz_expenses WHERE environment=$1 AND deleted_at IS NULL AND payment_status='paid' AND paid_at IS NULL))::int inferred_cash_dates,
        (SELECT COUNT(*) FROM network.commission_entries WHERE environment=$1 AND status='reversed' AND settled_at IS NOT NULL)::int reversed_after_settlement,
        ((SELECT COUNT(*) FROM retail WHERE lower(COALESCE(closed_by,'')) ~ '(test|teste|prova|demo)')

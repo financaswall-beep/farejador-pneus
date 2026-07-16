@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { archiveWholesaleSupplier, cancelWholesalePurchase, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
+import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
+import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -46,7 +46,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     return reply.status(200).send(dashboardPayload(await listWholesalePurchases()));
   });
 
-  // Registra uma COMPRA (entrada) → alimenta o custo médio do galpão (mesma transação).
+  // Registra compra: recebida alimenta o galpão na transação; pendente não toca estoque.
   fastify.post('/admin/api/wholesale/purchases', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = registerPurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -62,8 +62,30 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     }
   });
 
-  // CANCELA uma compra (0127): confirmed → cancelled + trilha + galpão reverte
-  // pelo inverso ponderado. Espelho da rota de cancelar venda (0116).
+  // Confirma recebimento pendente; a entrada no galpao acontece uma unica vez.
+  fastify.post('/admin/api/wholesale/purchases/confirm', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = confirmWholesalePurchaseSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await confirmWholesalePurchase({ ...parsed.data, confirmed_by: operatorLabel(request) });
+      return reply.status(200).send({ confirmed: true, ...result });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'purchase_not_found') {
+        return reply.status(404).send({ error: err.message });
+      }
+      if (err instanceof Error && ['purchase_already_confirmed', 'purchase_already_cancelled'].includes(err.message)) {
+        return reply.status(409).send({ error: err.message });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel wholesale purchase confirm failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // Cancela com trilha. Recebida só reverte se saldo e custo ainda coincidirem
+  // exatamente com o movimento original; pendente não toca estoque.
   fastify.post('/admin/api/wholesale/purchases/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = cancelWholesalePurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -73,7 +95,8 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
       const result = await cancelWholesalePurchase({
         purchase_id: parsed.data.purchase_id,
         reason: parsed.data.reason ?? null,
-        environment: parsed.data.environment,
+        environment: env.FAREJADOR_ENV,
+        idempotency_key: parsed.data.idempotency_key,
         cancelled_by: operatorLabel(request),
       });
       return reply.status(200).send({ cancelled: true, ...result });
@@ -97,7 +120,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await archiveWholesaleSupplier(parsed.data.supplier_id, parsed.data.environment);
+      const result = await archiveWholesaleSupplier(parsed.data.supplier_id, env.FAREJADOR_ENV);
       return reply.status(200).send({ archived: true, ...result });
     } catch (err) {
       if (err instanceof Error && err.message === 'supplier_not_found') {

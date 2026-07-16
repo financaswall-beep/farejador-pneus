@@ -208,30 +208,17 @@ window.PAINEL_MODULES.atacado = function () {
         body.payment_status = 'pending';
         if (f.due_date) body.due_date = f.due_date;
       }
+      f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-sale-create', 'form').key;
+      body.idempotency_key = f.idempotency_key;
 
       this.atacadoSaving = true;
       this.atacadoMsg = null;
       try {
-        let result;
-        try {
-          result = await this.apiPost('/admin/api/wholesale/sales', body);
-        } catch (err) {
-          // Trava de oversell (409): avisa o que faltou e, se o caixa confirmar, reenvia.
-          if (err.payload && err.payload.error === 'oversell') {
-            const lista = (err.payload.items || [])
-              .map((x) => `${x.measure} (tem ${x.available}, pediu ${x.requested})`).join('; ');
-            if (!window.confirm(`Estoque insuficiente — ${lista}.\n\nVender assim mesmo? O galpão vai a zero nessas medidas.`)) {
-              this.atacadoMsg = { ok: false, text: 'Venda cancelada — sem estoque suficiente.' };
-              return;
-            }
-            result = await this.apiPost('/admin/api/wholesale/sales', { ...body, allow_oversell: true });
-          } else {
-            throw err;
-          }
-        }
+        const result = await this.apiPost('/admin/api/wholesale/sales', body);
         const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
         this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.` };
-        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
+        window.PAINEL_INTEGRITY.complete('wholesale-sale-create', 'form');
+        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
         await this.loadAtacadoVendas();
       } catch (err) {
         this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };
@@ -245,6 +232,8 @@ window.PAINEL_MODULES.atacado = function () {
         items_required: 'Adicione ao menos um pneu.',
         partner_not_found: 'Parceiro não encontrado.',
         buyer_not_found: 'Cliente não encontrado.',
+        oversell: 'Estoque insuficiente. A venda não foi registrada; confira o galpão.',
+        idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },

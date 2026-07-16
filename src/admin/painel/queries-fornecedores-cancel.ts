@@ -1,111 +1,159 @@
-// Auditoria da aba Compras (2026-07-06): fatia do banco da MATRIZ — cancelar compra (0127)
-// + arquivar fornecedor. Espelho do cancelamento da venda (0116, queries-atacado-cancelar.ts):
-// a compra registrada errada era invisível e irreversível; agora sai sem apagar.
-// Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
+import {
+  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  operationFingerprint, recordIntegrityEvent,
+} from './stage5-integrity.js';
 
 export interface CancelWholesalePurchaseInput {
   purchase_id: string;
   cancelled_by: string;
-  reason?: string | null;
+  reason: string;
   environment?: 'prod' | 'test';
+  idempotency_key: string;
 }
 
-/** CANCELA uma compra de atacado (confirmed → cancelled, sem apagar). Transacional:
- *  trava a compra (FOR UPDATE), grava a trilha (0127) e TIRA do galpão o que a compra
- *  tinha colocado, revertendo o custo MÉDIO pelo inverso ponderado —
- *  novo = (qty*custo − qty_item*custo_item)/(qty − qty_item).
- *  A reversão é INCONDICIONAL (a entrada da compra também é — simetria exata; a venda
- *  usa flag porque a baixa dela usa). Clamps honestos, mesma família do 0116:
- *  já vendeu parte → quantidade clampa em 0 e não fica negativa; média mudou no meio
- *  (vendas/entradas) → custo clampa em 0; quantidade zerou → mantém o último custo.
- *  Corrigir a assimetria de verdade exige livro-razão (Fase B, adiada de propósito).
- *  Ranking/preço por medida/a pagar se corrigem SOZINHOS (tudo filtra status='confirmed').
- *  Cancelar 2x → purchase_already_cancelled (a trilha original não é sobrescrita). */
+interface CancelWholesalePurchaseResult {
+  purchase_id: string;
+  cancelled_at: string;
+  payment_status: string;
+}
+
+interface PurchaseStockRemoval {
+  measure: string;
+  quantity: number;
+  movement_count: number;
+  before_quantity: number | null;
+  before_cost: string | null;
+  applied_quantity: number | null;
+  applied_cost: string | null;
+}
+
+async function reversePurchaseStock(
+  client: PoolClient,
+  environment: 'prod' | 'test',
+  purchaseId: string,
+): Promise<PurchaseStockRemoval[]> {
+  const items = await client.query<PurchaseStockRemoval>(
+    `WITH purchased AS (
+       SELECT measure,sum(quantity)::int AS quantity
+         FROM commerce.wholesale_purchase_items
+        WHERE environment=$1 AND purchase_id=$2 GROUP BY measure
+     )
+     SELECT p.measure,p.quantity,count(m.id)::int AS movement_count,
+            min(m.qty_before)::int AS before_quantity,min(m.cost_before)::text AS before_cost,
+            min(m.qty_after)::int AS applied_quantity,min(m.cost_after)::text AS applied_cost
+       FROM purchased p
+       LEFT JOIN commerce.wholesale_stock_movements m
+         ON m.environment=$1 AND m.measure=p.measure AND m.source='compra'
+        AND m.ref=$2::text AND m.qty_delta>0
+      GROUP BY p.measure,p.quantity ORDER BY p.measure`, [environment, purchaseId]);
+  const problems: Array<{ measure: string; available: number; required: number; reason: string }> = [];
+  for (const item of items.rows) {
+    const stock = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
+      `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
+        WHERE environment=$1 AND measure=$2 FOR UPDATE`, [environment, item.measure]);
+    const quantity = Number(stock.rows[0]?.quantity_on_hand ?? 0);
+    const cost = Number(stock.rows[0]?.unit_cost ?? 0);
+    if (item.movement_count !== 1 || item.before_quantity === null
+      || item.applied_quantity === null || item.applied_cost === null
+      || item.applied_quantity - item.before_quantity !== item.quantity) {
+      problems.push({ measure: item.measure, available: quantity,
+        required: item.quantity, reason: 'movement_history_missing' });
+    } else if (!stock.rows[0] || quantity !== item.applied_quantity) {
+      problems.push({ measure: item.measure, available: quantity,
+        required: item.quantity, reason: 'quantity_consumed' });
+    } else if (Math.abs(cost - Number(item.applied_cost)) > 0.001) {
+      problems.push({ measure: item.measure, available: quantity,
+        required: item.quantity, reason: 'inventory_cost_changed' });
+    }
+  }
+  if (problems.length) throw new Error('purchase_stock_consumed:' + JSON.stringify(problems));
+
+  await setGalpaoMovContext(client, { source: 'cancelamento_compra', ref: purchaseId });
+  for (const item of items.rows) {
+    const changed = await client.query(
+      `UPDATE commerce.wholesale_stock
+          SET quantity_on_hand=$3,
+              unit_cost=COALESCE($4::numeric,unit_cost)
+        WHERE environment=$1 AND measure=$2 AND quantity_on_hand=$5 AND unit_cost=$6::numeric
+        RETURNING quantity_on_hand`,
+      [environment, item.measure, item.before_quantity, item.before_cost,
+       item.applied_quantity, item.applied_cost],
+    );
+    if (!changed.rows[0]) throw new Error(`purchase_stock_changed:${item.measure}`);
+  }
+  return items.rows;
+}
+
+/** Compra pendente cancela sem estoque. Compra recebida so cancela se quantidade
+ * e valor contabil do galpao comportarem a reversao integral. */
 export async function cancelWholesalePurchase(
   input: CancelWholesalePurchaseInput,
   dbPool: Pool = defaultPool,
-): Promise<{ purchase_id: string; cancelled_at: string; payment_status: string }> {
+): Promise<CancelWholesalePurchaseResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const client: PoolClient = await dbPool.connect();
+  const reason = input.reason?.trim();
+  if (!reason || reason.length < 2) throw new Error('reason_required');
+  const client = await dbPool.connect();
+  const operation = { environment, domain: 'wholesale_purchase.cancel',
+    idempotencyKey: input.idempotency_key, fingerprint: operationFingerprint({
+      purchase_id: input.purchase_id, reason,
+    }) };
   try {
     await client.query('BEGIN');
-
-    const cur = await client.query<{ status: string; payment_status: string }>(
-      `SELECT status, payment_status FROM commerce.wholesale_purchases
-        WHERE id = $1 AND environment = $2 LIMIT 1 FOR UPDATE`,
-      [input.purchase_id, environment],
-    );
-    if (!cur.rows[0]) throw new Error('purchase_not_found');
-    if (cur.rows[0].status !== 'confirmed') throw new Error('purchase_already_cancelled');
-
-    const upd = await client.query<{ cancelled_at: string }>(
-      `UPDATE commerce.wholesale_purchases
-          SET status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4
-        WHERE id = $1 AND environment = $2
-        RETURNING cancelled_at`,
-      [input.purchase_id, environment, input.cancelled_by, input.reason?.slice(0, 300) ?? null],
-    );
-
-    // rótulo pro filme do galpão (0128): a reversão sai como 'cancelamento_compra'
-    await setGalpaoMovContext(client, { source: 'cancelamento_compra', ref: input.purchase_id });
-
-    // Reverte o galpão item a item (a medida gravada no item é a CANÔNICA do galpão).
-    // Linha a linha em sequência: cada UPDATE lê o estado que a linha anterior deixou.
-    const items = await client.query<{ measure: string; quantity: number; unit_cost: string }>(
-      `SELECT measure, quantity, unit_cost FROM commerce.wholesale_purchase_items
-        WHERE environment = $1 AND purchase_id = $2`,
-      [environment, input.purchase_id],
-    );
-    for (const it of items.rows) {
-      await client.query(
-        `UPDATE commerce.wholesale_stock
-            SET unit_cost = CASE
-                  WHEN quantity_on_hand - $3 > 0 THEN
-                    round(GREATEST(quantity_on_hand * unit_cost - $3 * $4, 0)
-                          / (quantity_on_hand - $3), 2)
-                  ELSE unit_cost
-                END,
-                quantity_on_hand = GREATEST(0, quantity_on_hand - $3)
-          WHERE environment = $1 AND measure = $2`,
-        [environment, it.measure, it.quantity, Number(it.unit_cost)],
-      );
+    const started = await beginIntegrityOperation<CancelWholesalePurchaseResult>(client, operation);
+    if (started.replayed) {
+      await client.query('COMMIT');
+      return started.result;
     }
-
+    const current = await client.query<{
+      status: 'pending' | 'confirmed' | 'cancelled'; payment_status: string; stock_applied: boolean;
+    }>(
+      `SELECT status,payment_status,stock_applied FROM commerce.wholesale_purchases
+        WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.purchase_id, environment]);
+    if (!current.rows[0]) throw new Error('purchase_not_found');
+    if (current.rows[0].status === 'cancelled') throw new Error('purchase_already_cancelled');
+    const reversed = current.rows[0].stock_applied
+      ? await reversePurchaseStock(client, environment, input.purchase_id) : [];
+    const updated = await client.query<{ cancelled_at: string }>(
+      `UPDATE commerce.wholesale_purchases
+          SET status='cancelled',cancelled_at=now(),cancelled_by=$3,cancel_reason=$4
+        WHERE id=$1 AND environment=$2 RETURNING cancelled_at`,
+      [input.purchase_id, environment, input.cancelled_by, reason.slice(0, 300)]);
+    const result = integrityResult({ purchase_id: input.purchase_id,
+      cancelled_at: updated.rows[0]!.cancelled_at,
+      payment_status: current.rows[0].payment_status });
+    await recordIntegrityEvent(client, { environment, domain: 'wholesale_purchase',
+      entityTable: 'commerce.wholesale_purchases', entityId: input.purchase_id,
+      eventType: 'cancelled', actorLabel: input.cancelled_by,
+      idempotencyKey: operation.idempotencyKey,
+      before: { status: current.rows[0].status, stock_applied: current.rows[0].stock_applied },
+      after: { status: 'cancelled', reason,
+        reversed_stock: reversed } });
+    await completeIntegrityOperation(client, operation,
+      'commerce.wholesale_purchases', input.purchase_id, result);
     await client.query('COMMIT');
-    return {
-      purchase_id: input.purchase_id,
-      cancelled_at: upd.rows[0]!.cancelled_at,
-      payment_status: cur.rows[0].payment_status,
-    };
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
   } finally {
     client.release();
   }
 }
 
-/** ARQUIVA um fornecedor (soft delete — deleted_at, nunca DELETE). Some do formulário,
- *  do ranking e do preço por medida (todos filtram deleted_at IS NULL); as compras
- *  dele CONTINUAM no histórico (JOIN por id) e dívida pendente CONTINUA no a pagar
- *  (getWholesaleFinance não filtra deleted — dívida não some com o fornecedor).
- *  Arquivar 2x → supplier_not_found. */
 export async function archiveWholesaleSupplier(
   supplierId: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<{ id: string }> {
-  const r = await dbPool.query<{ id: string }>(
-    `UPDATE commerce.wholesale_suppliers
-        SET deleted_at = now()
-      WHERE id = $1 AND environment = $2 AND deleted_at IS NULL
-      RETURNING id`,
-    [supplierId, environment],
-  );
-  if (!r.rows[0]) throw new Error('supplier_not_found');
-  return r.rows[0];
+  const result = await dbPool.query<{ id: string }>(
+    `UPDATE commerce.wholesale_suppliers SET deleted_at=now()
+      WHERE id=$1 AND environment=$2 AND deleted_at IS NULL RETURNING id`,
+    [supplierId, environment]);
+  if (!result.rows[0]) throw new Error('supplier_not_found');
+  return result.rows[0];
 }

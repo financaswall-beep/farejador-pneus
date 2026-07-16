@@ -97,7 +97,7 @@ function painelApp() {
     atacadoMsg: null,
     vendaAtacadoSelecionada: null,
     atacadoStaleDays: 30,
-    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
+    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
@@ -139,10 +139,10 @@ function painelApp() {
     finTab: 'visao', // redesign 07-12 (desenho do dono): sub-abas visao|cobrancas|pagar|despesas|indicadores
     finIndicadorTab: 'fluxo', // Indicadores: fluxo|analise|inadimplencia (sem misturar assuntos no mesmo card)
     finFluxoDias: 30, // horizonte da agenda real: 7|30|90 dias
-    finQuitando: false, // trava anti-duplo-clique dos botões Recebi/Paguei (07-13); some o erro à toa
+    finQuitando: false, // a chave de cada mutacao vive no gerenciador global da API
     despesaSaving: false,
     despesaMsg: null,
-    despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '' },
+    despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '', idempotency_key: '' },
     // Recorte da lista (0130): mês (competência SP — preenchido no 1º load) × modalidade.
     despesaFiltro: { mes: '', categoria: '' },
     // Sub-aba Contas a pagar (07-13): filtro da fila vindo do card Atenção rápida
@@ -186,7 +186,7 @@ function painelApp() {
     compras: [],
     compraSaving: false,
     compraMsg: null,
-    compraForm: { supplierKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
+    compraForm: { supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '', payment_status: 'paid', due_date: '', receipt_status: 'received', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
     redePeriods: [

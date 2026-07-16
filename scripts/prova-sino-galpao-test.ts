@@ -24,6 +24,7 @@ function isoDate(offsetDays: number): string {
 }
 
 async function main(): Promise<void> {
+  const { randomUUID } = await import('node:crypto');
   const { pool } = await import('../src/persistence/db.js');
   const { env } = await import('../src/shared/config/env.js');
   const {
@@ -40,6 +41,8 @@ async function main(): Promise<void> {
   let contactId = '';
   let buyerId = '';
   const orderIds: string[] = [];
+  const operationKeys: string[] = [];
+  const operationKey = () => { const value = randomUUID(); operationKeys.push(value); return value; };
   const check = (name: string, ok: boolean, extra = ''): void => {
     if (!ok) fails++;
     console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
@@ -48,6 +51,14 @@ async function main(): Promise<void> {
     .find((m) => m.measure === MEASURE);
 
   const limpar = async (): Promise<void> => {
+    await client.query(`DELETE FROM audit.events
+      WHERE environment=$1 AND actor_label='prova-sino'`, [ENV]);
+    await client.query(`DELETE FROM audit.operation_idempotency WHERE environment=$1 AND entity_id IN (
+      SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND created_by='prova-sino')`, [ENV]);
+    if (operationKeys.length > 0) {
+      await client.query(`DELETE FROM audit.operation_idempotency
+        WHERE environment=$1 AND idempotency_key=ANY($2)`, [ENV, operationKeys]);
+    }
     await client.query(`DELETE FROM commerce.order_items WHERE environment=$1 AND order_id IN (
        SELECT id FROM commerce.orders WHERE environment=$1 AND delivery_address LIKE '%PROVA-SINO%')`, [ENV]);
     await client.query(`DELETE FROM commerce.orders WHERE environment=$1 AND delivery_address LIKE '%PROVA-SINO%'`, [ENV]);
@@ -135,7 +146,8 @@ async function main(): Promise<void> {
     await setWholesaleStock({ measure: MEASURE, quantity_on_hand: 20, unit_cost: 20, environment: ENV }, pool);
     const venda = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 2, unit_price: 50 }],
-        created_by: 'prova-sino', environment: ENV, payment_status: 'pending', due_date: isoDate(-1) }, pool);
+        created_by: 'prova-sino', environment: ENV, payment_status: 'pending',
+        due_date: isoDate(-1), idempotency_key: operationKey() }, pool);
     let s = await getMatrizNotificacoes(ENV, pool);
     check('F1 fiado vencido (+1, +R$100) entra no sino',
       s.fiado_vencido.count === baseFiadoCount + 1
@@ -143,7 +155,8 @@ async function main(): Promise<void> {
       `${baseFiadoCount}/${baseFiadoTotal} → ${s.fiado_vencido.count}/${s.fiado_vencido.total}`);
 
     // ── F2: quitou → sai do sino ──
-    await settleWholesaleOrderPayment(venda.order_id, ENV, pool);
+    await settleWholesaleOrderPayment(venda.order_id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: 'prova-sino' });
     s = await getMatrizNotificacoes(ENV, pool);
     check('F2 fiado quitado sai do sino', s.fiado_vencido.count === baseFiadoCount);
 

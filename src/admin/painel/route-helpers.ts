@@ -30,6 +30,23 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     return { status: 500, error: 'internal_server_error' };
   }
 
+  const dbError = err as Error & { code?: string; constraint?: string };
+  if (dbError.code === '23505' && dbError.constraint?.startsWith('wholesale_suppliers_normalized_')) {
+    return { status: 409, error: 'supplier_duplicate' };
+  }
+  if (['idempotency_conflict', 'idempotency_incomplete'].includes(err.message)) {
+    return { status: 409, error: err.message };
+  }
+  if (err.message === 'idempotency_key_required') {
+    return { status: 400, error: err.message };
+  }
+  if (err.message.startsWith('purchase_stock_consumed')
+      || err.message.startsWith('purchase_stock_changed')
+      || err.message.startsWith('stock_measure_missing')
+      || err.message === 'payroll_payment_conflict') {
+    return { status: 409, error: err.message };
+  }
+
   if (err.message.includes('conversation_contact_not_found')) {
     return { status: 400, error: 'conversation_contact_not_found' };
   }
@@ -46,7 +63,7 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (['measure_not_in_catalog', 'measure_required', 'quantity_invalid', 'cost_invalid',
        'name_required', 'supplier_required', 'supplier_not_found', 'items_required',
        'measure_not_found', 'reason_required', 'min_invalid',
-       'seller_collaborator_not_found'].includes(err.message)) {
+       'seller_collaborator_not_found', 'price_invalid'].includes(err.message)) {
     return { status: 400, error: err.message };
   }
 

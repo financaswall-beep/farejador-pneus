@@ -33,7 +33,8 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
       const result = await cancelWholesaleSale({
         order_id: parsed.data.order_id,
         reason: parsed.data.reason ?? null,
-        environment: parsed.data.environment,
+        environment: env.FAREJADOR_ENV,
+        idempotency_key: parsed.data.idempotency_key,
         cancelled_by: operatorLabel(request),
       });
       return reply.status(200).send({ cancelled: true, ...result });
@@ -44,13 +45,18 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
       if (err instanceof Error && err.message === 'sale_already_cancelled') {
         return reply.status(409).send({ error: 'sale_already_cancelled' });
       }
+      if (err instanceof Error && err.message.startsWith('sale_stock_history_missing:')) {
+        let items: Array<{ measure: string; quantity: number }> = [];
+        try { items = JSON.parse(err.message.slice('sale_stock_history_missing:'.length)); } catch { /* vazio */ }
+        return reply.status(409).send({ error: 'sale_stock_history_missing', items });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale sale cancel failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
 
-  // QUITA um fiado (venda a receber OU compra a pagar). Quitar 2x → 404 (não sobrescreve).
+  // Quita um fiado. Replay devolve o resultado original; nova operação após pago dá 404.
   fastify.post('/admin/api/wholesale/finance/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!env.WHOLESALE_FINANCE) return reply.status(404).send({ error: 'finance_disabled' });
     const parsed = settleWholesaleFinanceSchema.safeParse(request.body);
@@ -59,8 +65,10 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
     }
     try {
       const result = parsed.data.kind === 'sale'
-        ? await settleWholesaleOrderPayment(parsed.data.id, parsed.data.environment)
-        : await settleWholesalePurchasePayment(parsed.data.id, parsed.data.environment);
+        ? await settleWholesaleOrderPayment(parsed.data.id, env.FAREJADOR_ENV, undefined,
+          { idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request) })
+        : await settleWholesalePurchasePayment(parsed.data.id, env.FAREJADOR_ENV, undefined,
+          { idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request) });
       return reply.status(200).send({ settled: true, ...result });
     } catch (err) {
       if (err instanceof Error && (err.message === 'receivable_not_found' || err.message === 'payable_not_found')) {

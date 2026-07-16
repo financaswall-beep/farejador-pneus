@@ -18,6 +18,9 @@ process.env.MATRIZ_EXPENSES = 'true';
 
 const ENV = 'test' as const;
 const CREATED_BY = 'prova-despesas';
+const RUN_ID = `prova-despesas-${Date.now()}`;
+let operationSequence = 0;
+const operationKey = () => `${RUN_ID}-${++operationSequence}`;
 
 function isoDate(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86400000);
@@ -50,7 +53,7 @@ async function main(): Promise<void> {
     // ── D1: despesa À VISTA → nasce paid + paid_at, NÃO entra no a pagar, soma no mês ──
     const d1 = await createMatrizExpense(
       { category: 'combustivel', description: 'PROVA gasolina kombi', amount: 120,
-        created_by: CREATED_BY, environment: ENV }, pool);
+        created_by: CREATED_BY, environment: ENV, idempotency_key: operationKey() }, pool);
     check('D1 à vista nasce paid com paid_at carimbado',
       d1.payment_status === 'paid' && d1.paid_at != null, `status=${d1.payment_status}`);
     let r = await getMatrizExpenses(ENV, pool);
@@ -62,7 +65,8 @@ async function main(): Promise<void> {
     // ── D2: despesa A PAGAR sem vencimento → entra no A PAGAR, não vencida ──
     const d2 = await createMatrizExpense(
       { category: 'aluguel', description: 'PROVA aluguel galpão', amount: 800,
-        payment_status: 'pending', created_by: CREATED_BY, environment: ENV }, pool);
+        payment_status: 'pending', created_by: CREATED_BY, environment: ENV,
+        idempotency_key: operationKey() }, pool);
     r = await getMatrizExpenses(ENV, pool);
     const d2row = r.entries.find((x) => x.id === d2.id);
     check('D2 pending entra no A PAGAR (+800)', Math.round((Number(r.a_pagar_total) - basePagar) * 100) === 80000,
@@ -72,26 +76,36 @@ async function main(): Promise<void> {
     // ── D3: despesa A PAGAR já VENCIDA (venceu ontem) → overdue + contador ──
     const d3 = await createMatrizExpense(
       { category: 'funcionario', description: 'PROVA diária borracheiro', amount: 150,
-        payment_status: 'pending', due_date: isoDate(-1), created_by: CREATED_BY, environment: ENV }, pool);
+        payment_status: 'pending', due_date: isoDate(-1), created_by: CREATED_BY,
+        environment: ENV, idempotency_key: operationKey() }, pool);
     r = await getMatrizExpenses(ENV, pool);
     const d3row = r.entries.find((x) => x.id === d3.id);
     check('D3 vencida marca overdue', !!d3row && d3row.overdue === true, d3row ? `due=${d3row.due_date}` : 'NÃO ACHOU');
     check('D3b contador de vencidas ≥ 1', r.a_pagar_vencidos >= 1, String(r.a_pagar_vencidos));
 
     // ── D4: QUITAR a D2 → sai do a pagar, paid_at carimbado; 2x → erro ──
-    const q1 = await settleMatrizExpense(d2.id, ENV, pool);
+    const settleKey = operationKey();
+    const q1 = await settleMatrizExpense(d2.id, ENV, pool,
+      { idempotency_key: settleKey, actor_label: CREATED_BY });
     check('D4 quitou (paid_at carimbado)', !!q1.paid_at, String(q1.paid_at));
     r = await getMatrizExpenses(ENV, pool);
     const d2after = r.entries.find((x) => x.id === d2.id);
     check('D4b saiu do A PAGAR (sobrou só a D3 = 150)',
       Math.round((Number(r.a_pagar_total) - basePagar) * 100) === 15000, `${r.a_pagar_total}`);
     check('D4c linha virou paid na lista', d2after?.payment_status === 'paid');
+    const replay = await settleMatrizExpense(d2.id, ENV, pool,
+      { idempotency_key: settleKey, actor_label: CREATED_BY });
+    check('D4d replay não sobrescreve paid_at', replay.paid_at === q1.paid_at);
     let dupla = false;
-    try { await settleMatrizExpense(d2.id, ENV, pool); } catch (e) { dupla = (e as Error).message === 'expense_not_found'; }
-    check('D4d quitar 2x NÃO sobrescreve (expense_not_found)', dupla);
+    try { await settleMatrizExpense(d2.id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY }); }
+    catch (e) { dupla = (e as Error).message === 'expense_not_found'; }
+    check('D4e nova operação sobre despesa paga é recusada', dupla);
 
     // ── D5: REMOVER a D3 (soft) → some das contas, trilha fica no banco ──
-    await removeMatrizExpense(d3.id, ENV, pool);
+    const removeOptions = { idempotency_key: operationKey(), actor_label: CREATED_BY,
+      reason: 'lançamento de prova removido' };
+    const removed = await removeMatrizExpense(d3.id, ENV, pool, removeOptions);
     r = await getMatrizExpenses(ENV, pool);
     check('D5 removida some da lista', !r.entries.some((x) => x.id === d3.id));
     check('D5b a pagar zerou de volta ao base', Math.round((Number(r.a_pagar_total) - basePagar) * 100) === 0,
@@ -99,12 +113,19 @@ async function main(): Promise<void> {
     const trilha = await client.query<{ deleted_at: string | null }>(
       `SELECT deleted_at FROM commerce.matriz_expenses WHERE id = $1`, [d3.id]);
     check('D5c trilha no banco (deleted_at preenchido, linha NÃO apagada)', trilha.rows[0]?.deleted_at != null);
+    const removedReplay = await removeMatrizExpense(d3.id, ENV, pool, removeOptions);
+    check('D5d replay da remoção devolve a mesma despesa', removedReplay.id === removed.id);
     let dupla2 = false;
-    try { await removeMatrizExpense(d3.id, ENV, pool); } catch (e) { dupla2 = (e as Error).message === 'expense_not_found'; }
-    check('D5d remover 2x → expense_not_found', dupla2);
+    try { await removeMatrizExpense(d3.id, ENV, pool,
+      { ...removeOptions, idempotency_key: operationKey() }); }
+    catch (e) { dupla2 = (e as Error).message === 'expense_not_found'; }
+    check('D5e nova remoção é recusada', dupla2);
 
     console.log(`\n${fails === 0 ? '✅ DESPESAS DA MATRIZ PROVADAS (à vista + a pagar + vencida + quitar + soft delete)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
+    await client.query(`DELETE FROM audit.events WHERE environment=$1 AND actor_label=$2`, [ENV, CREATED_BY]);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
     await client.query(`DELETE FROM commerce.matriz_expenses WHERE environment = $1 AND created_by = $2`, [ENV, CREATED_BY]);
     client.release();
     await pool.end();

@@ -19,6 +19,9 @@ process.env.WHOLESALE_FINANCE = 'true';
 const ENV = 'test' as const;
 const MEASURE = '98/98-98'; // medida descartável (a '99/99-99' é das outras provas)
 const CREATED_BY = 'prova-fin-atacado';
+const RUN_ID = `prova-fin-atacado-${Date.now()}`;
+let operationSequence = 0;
+const operationKey = () => `${RUN_ID}-${++operationSequence}`;
 
 function isoDate(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86400000);
@@ -72,7 +75,7 @@ async function main(): Promise<void> {
     // ── F1: venda FIADO sem vencimento → A RECEBER ──
     const v1 = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 2, unit_price: 50 }],
-        created_by: CREATED_BY, environment: ENV, payment_status: 'pending' }, pool);
+        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', idempotency_key: operationKey() }, pool);
     const r1 = await client.query<{ payment_status: string; paid_at: string | null; due_date: string | null }>(
       `SELECT payment_status, paid_at, due_date FROM commerce.wholesale_orders WHERE id=$1`, [v1.order_id]);
     check('F1 venda fiada nasce pending, sem paid_at', r1.rows[0]?.payment_status === 'pending' && r1.rows[0]?.paid_at == null,
@@ -88,7 +91,7 @@ async function main(): Promise<void> {
     // ── F2: venda FIADO já VENCIDA (venceu ontem) → vencidos conta ──
     const v2 = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 1, unit_price: 80 }],
-        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', due_date: isoDate(-1) }, pool);
+        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', due_date: isoDate(-1), idempotency_key: operationKey() }, pool);
     fin = await getWholesaleFinance(ENV, pool);
     const f2row = fin.receivables.find((x) => x.id === v2.order_id);
     check('F2 fiado vencido marca overdue', !!f2row && f2row.overdue === true, f2row ? `due=${f2row.due_date}` : 'NÃO ACHOU');
@@ -97,7 +100,7 @@ async function main(): Promise<void> {
     // ── F3: venda SEM payment_status → nasce 'paid' (caminho de hoje intacto) ──
     const v3 = await registerWholesaleSale(
       { customer_id: buyerId, items: [{ measure: MEASURE, quantity: 1, unit_price: 60 }],
-        created_by: CREATED_BY, environment: ENV }, pool);
+        created_by: CREATED_BY, environment: ENV, idempotency_key: operationKey() }, pool);
     const r3 = await client.query<{ payment_status: string; paid_at: string | null }>(
       `SELECT payment_status, paid_at FROM commerce.wholesale_orders WHERE id=$1`, [v3.order_id]);
     fin = await getWholesaleFinance(ENV, pool);
@@ -106,18 +109,25 @@ async function main(): Promise<void> {
     check('F3b venda à vista NÃO entra no a receber', !fin.receivables.some((x) => x.id === v3.order_id));
 
     // ── F4: QUITAR o fiado F1 → sai da lista, paid_at carimbado; 2x → erro ──
-    const q1 = await settleWholesaleOrderPayment(v1.order_id, ENV, pool);
+    const paymentKey = operationKey();
+    const q1 = await settleWholesaleOrderPayment(v1.order_id, ENV, pool,
+      { idempotency_key: paymentKey, actor_label: CREATED_BY });
     check('F4 quitou o fiado (paid_at carimbado)', !!q1.paid_at, String(q1.paid_at));
     fin = await getWholesaleFinance(ENV, pool);
     check('F4b saiu do A RECEBER', !fin.receivables.some((x) => x.id === v1.order_id));
-    let dupla = false;
-    try { await settleWholesaleOrderPayment(v1.order_id, ENV, pool); } catch (e) { dupla = (e as Error).message === 'receivable_not_found'; }
-    check('F4c quitar 2x NÃO sobrescreve (receivable_not_found)', dupla);
+    const replay = await settleWholesaleOrderPayment(v1.order_id, ENV, pool,
+      { idempotency_key: paymentKey, actor_label: CREATED_BY });
+    check('F4c replay não sobrescreve paid_at', replay.paid_at === q1.paid_at);
+    let nova = false;
+    try { await settleWholesaleOrderPayment(v1.order_id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY }); }
+    catch (e) { nova = (e as Error).message === 'receivable_not_found'; }
+    check('F4d nova operação sobre dívida paga é recusada', nova);
 
     // ── F5: COMPRA a prazo → A PAGAR; quitar → sai ──
     const c1 = await registerWholesalePurchase(
       { supplier_id: supplierId, items: [{ measure: MEASURE, quantity: 5, unit_cost: 10 }],
-        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', due_date: isoDate(7) }, pool);
+        created_by: CREATED_BY, environment: ENV, payment_status: 'pending', due_date: isoDate(7), idempotency_key: operationKey() }, pool);
     fin = await getWholesaleFinance(ENV, pool);
     const f5row = fin.payables.find((x) => x.id === c1.purchase_id);
     check('F5 compra a prazo aparece no A PAGAR (R$50, vence em 7d)',
@@ -125,12 +135,16 @@ async function main(): Promise<void> {
       f5row ? `${f5row.counterparty} R$${f5row.total_amount} due=${f5row.due_date}` : 'NÃO ACHOU');
     check('F5b total a pagar somou +50', Math.round((Number(fin.a_pagar_total) - basePay) * 100) === 5000,
       `base ${basePay} → ${fin.a_pagar_total}`);
-    await settleWholesalePurchasePayment(c1.purchase_id, ENV, pool);
+    await settleWholesalePurchasePayment(c1.purchase_id, ENV, pool,
+      { idempotency_key: operationKey(), actor_label: CREATED_BY });
     fin = await getWholesaleFinance(ENV, pool);
     check('F5c quitou → saiu do A PAGAR', !fin.payables.some((x) => x.id === c1.purchase_id));
 
     console.log(`\n${fails === 0 ? '✅ FINANCEIRO DO ATACADO PROVADO (fiado dos dois lados + vencido + quitar + caminho de hoje intacto)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
+    await client.query(`DELETE FROM audit.events WHERE environment=$1 AND actor_label=$2`, [ENV, CREATED_BY]);
+    await client.query(`DELETE FROM audit.operation_idempotency
+      WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
     await client.query(
       `DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN
          (SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND created_by=$2)`, [ENV, CREATED_BY]);
