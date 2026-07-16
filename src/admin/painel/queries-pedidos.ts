@@ -10,6 +10,7 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
+import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -83,17 +84,50 @@ export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPoo
 }
 
 export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT product_id, product_code, product_name, product_type, brand,
-            tire_size, tire_position, price_amount, currency,
-            total_stock_available
-     FROM commerce.product_full
-     WHERE environment = $1
-     ORDER BY total_stock_available DESC, price_amount NULLS LAST, product_name ASC
-     LIMIT $2`,
-    [env.FAREJADOR_ENV, clampLimit(limit)],
+  const catalog = await dbPool.query<{
+    product_id: string; product_code: string; product_name: string; product_type: string;
+    brand: string | null; tire_size: string | null; tire_position: string | null;
+    price_amount: number | string | null; currency: string | null;
+  }>(
+    `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type, p.brand,
+            ts.tire_size, ts.position AS tire_position, cp.price_amount, cp.currency
+       FROM commerce.products p
+       LEFT JOIN commerce.tire_specs ts
+         ON ts.product_id = p.id AND ts.environment = p.environment
+       LEFT JOIN commerce.current_prices cp
+         ON cp.product_id = p.id AND cp.environment = p.environment
+      WHERE p.environment = $1 AND p.deleted_at IS NULL`,
+    [env.FAREJADOR_ENV],
   );
-  return result.rows;
+  const stock = await dbPool.query<{
+    measure: string; quantity_on_hand: number | string; unit_cost: number | string | null;
+  }>(
+    `SELECT measure, quantity_on_hand, unit_cost
+       FROM commerce.wholesale_stock
+      WHERE environment = $1`,
+    [env.FAREJADOR_ENV],
+  );
+  const stockIndex = buildMatrizStockIndex(stock.rows);
+  return catalog.rows.map((product) => {
+    const official = matrizStockForMeasure(stockIndex, product.tire_size);
+    return {
+      ...product,
+      total_stock_available: official.sellable ? official.quantity_on_hand : 0,
+      official_quantity_on_hand: official.quantity_on_hand,
+      official_unit_cost: official.unit_cost,
+      stock_source: 'commerce.wholesale_stock',
+      walkin_sellable: official.sellable,
+      walkin_block_reason: official.block_reason,
+    };
+  }).sort((a, b) => {
+    if (a.walkin_sellable !== b.walkin_sellable) return a.walkin_sellable ? -1 : 1;
+    if (a.total_stock_available !== b.total_stock_available) {
+      return b.total_stock_available - a.total_stock_available;
+    }
+    const priceA = a.price_amount === null ? Number.POSITIVE_INFINITY : Number(a.price_amount);
+    const priceB = b.price_amount === null ? Number.POSITIVE_INFINITY : Number(b.price_amount);
+    return priceA - priceB || a.product_name.localeCompare(b.product_name, 'pt-BR');
+  }).slice(0, clampLimit(limit));
 }
 
 export type PainelRedePeriod = 'today' | '7d' | '30d' | 'month';

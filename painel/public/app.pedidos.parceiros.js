@@ -22,6 +22,11 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         this.orderError = 'Escolha um produto do catalogo.';
         return;
       }
+      const stockError = typeof this.saleStockError === 'function' ? this.saleStockError() : null;
+      if (stockError) {
+        this.orderError = stockError;
+        return;
+      }
       if (this.saleForm.fulfillment_mode === 'delivery' && !this.saleForm.delivery_address.trim()) {
         this.orderError = 'Informe o endereco de entrega ou troque para retirada.';
         return;

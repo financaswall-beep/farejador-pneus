@@ -13,9 +13,9 @@
 <script src="/admin/painel/app.nav.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260710-rede1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260710-rede2"></script>
-<script src="/admin/painel/app.venda.modal.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.format.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260714-vendas2"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260714-historico2"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
@@ -34,15 +34,15 @@
 <script src="/admin/painel/app.financeiro.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260714-fiscal1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260714-fiscal1"></script>
-<script src="/admin/painel/app.galpao.js?v=20260707-estoque1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
-<script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-walkin-erros1"></script>
-<script src="/admin/painel/app.core.js?v=20260715-kanban1"></script>
+<script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
+<script src="/admin/painel/app.core.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.montagem.js?v=20260715-colab2"></script>
-<script src="/admin/painel/app.js?v=20260715-colab2"></script>
+<script src="/admin/painel/app.js?v=20260716-stock-source1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2035,6 +2035,8 @@
                   :class="stockTab === 'reposicao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
           <button @click="stockTab = 'custos'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
                   :class="stockTab === 'custos' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
+          <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
+                  :class="stockTab === 'conciliacao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">ConciliaÃ§Ã£o</button>
         </div>
       </div>
 
@@ -2205,6 +2207,41 @@
     </div>
 
     <!-- ═══ TELA: LOGÍSTICA da matriz — cockpit operacional ═══ -->
+    <div x-show="currentPage === 'estoque' && stockTab === 'conciliacao'" class="px-8 pb-8" x-cloak>
+      <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+          <div>
+            <h3 class="text-base font-semibold">Estoque oficial x cadastro antigo</h3>
+            <p class="text-xs text-gray-500 mt-1">RelatÃ³rio somente leitura. O saldo usado para vender e calcular custo Ã© commerce.wholesale_stock.</p>
+          </div>
+          <button @click="loadStockReconciliation()" :disabled="stockReconciliation.loading" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Atualizar</button>
+        </div>
+        <div x-show="stockReconciliation.loading" class="p-6 text-sm text-gray-500">Comparando as duas fontesâ€¦</div>
+        <div x-show="stockReconciliation.error" class="m-5 px-4 py-3 rounded-lg bg-rose-50 text-rose-700 text-sm">NÃ£o foi possÃ­vel carregar a conciliaÃ§Ã£o.</div>
+        <template x-if="stockReconciliation.summary">
+          <div>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 p-5 bg-gray-50/70 border-b border-gray-100">
+              <div><p class="text-xs text-gray-500">Medidas comparadas</p><p class="text-xl font-semibold num" x-text="stockReconciliation.summary.total"></p></div>
+              <div><p class="text-xs text-gray-500">Alinhadas</p><p class="text-xl font-semibold text-emerald-700 num" x-text="stockReconciliation.summary.aligned"></p></div>
+              <div><p class="text-xs text-gray-500">Divergentes</p><p class="text-xl font-semibold text-amber-700 num" x-text="stockReconciliation.summary.divergent"></p></div>
+              <div><p class="text-xs text-gray-500">Sem linha oficial</p><p class="text-xl font-semibold text-rose-700 num" x-text="stockReconciliation.summary.catalog_only"></p></div>
+            </div>
+            <p class="px-5 pt-4 text-xs text-gray-500">Marcas sÃ£o apenas referÃªncia do catÃ¡logo. O galpÃ£o controla quantidade e custo por medida, sem inventar divisÃ£o por marca.</p>
+            <div class="overflow-x-auto mt-3">
+              <table class="w-full text-sm min-w-[920px]">
+                <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Marcas no catÃ¡logo</th><th class="px-4 py-3 font-medium text-center">Oficial</th><th class="px-4 py-3 font-medium text-center">Antigo</th><th class="px-4 py-3 font-medium text-right">Custo oficial</th><th class="px-5 py-3 font-medium">SituaÃ§Ã£o</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="row in stockReconciliation.rows" :key="row.key">
+                    <tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.catalog_measures[0] || row.key"></td><td class="px-4 py-3 text-gray-500" x-text="row.catalog_brands.join(', ') || 'â€”'"></td><td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity == null ? 'â€”' : row.official_quantity"></td><td class="px-4 py-3 text-center text-gray-500 num" x-text="row.legacy_quantity == null ? 'â€”' : row.legacy_quantity"></td><td class="px-4 py-3 text-right num" x-text="row.official_unit_cost == null ? 'â€”' : formatCurrency(row.official_unit_cost)"></td><td class="px-5 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium" :class="row.status === 'aligned' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="reconciliationStatusText(row.status)"></span></td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
     <div x-show="currentPage === 'logistica'" class="p-8" x-cloak>
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between mb-5">
         <div>
@@ -4737,7 +4774,7 @@
                       @change="onProductChanged()"
                       class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10">
                 <template x-for="produto in produtos">
-                  <option :value="produto.product_id"
+                  <option :value="produto.product_id" :disabled="!produto.walkin_sellable"
                           x-text="[produto.product_code, produto.product_name, produto.tire_size].filter(Boolean).join(' · ')"></option>
                 </template>
               </select>
@@ -4754,6 +4791,9 @@
             </div>
             <div class="col-span-1"></div>
           </div>
+          <p x-show="saleForm.product_id" class="mt-2 text-xs"
+             :class="saleStockError() ? 'text-rose-600' : 'text-emerald-700'"
+             x-text="saleStockError() || ('DisponÃ­vel no galpÃ£o: ' + selectedProduct()?.official_quantity_on_hand + ' un')"></p>
         </div>
       </div>
 
@@ -4802,7 +4842,7 @@
         <button @click="saleModalOpen = false"
                 class="px-4 py-2 hover:bg-gray-100 rounded-lg text-sm font-medium">Cancelar</button>
         <button @click="submitManualOrder()"
-                :disabled="orderSubmitting || !saleForm.product_id"
+                :disabled="orderSubmitting || !saleCanSubmit()"
                 class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span x-text="orderSubmitting ? 'Registrando...' : 'Confirmar venda'">Confirmar venda</span>

@@ -1,4 +1,7 @@
 import type { PoolClient } from 'pg';
+import { tireSizeKey } from '../shared/tire-size.js';
+import { buildMatrizStockIndex, matrizStockForMeasure } from '../shared/matriz-stock-source.js';
+export { tireSizeKey } from '../shared/tire-size.js';
 
 /**
  * Unificação atacado×varejo (Fase 1 — LEITURA). Quando o bot roteia pra MATRIZ, o estoque
@@ -14,12 +17,6 @@ import type { PoolClient } from 'pg';
  * '90/90-18 62P', e cobre polegada ('3.00-10' → '3-00-10') e radial ('150/60ZR17' →
  * '150-60-17'). Vazio ('') quando não há números → não casa NADA (seguro). PURA.
  */
-export function tireSizeKey(measure: string | null | undefined): string {
-  const nums = (measure ?? '').match(/\d+/g);
-  if (!nums || nums.length === 0) return '';
-  return nums.slice(0, 3).join('-');
-}
-
 /**
  * Estoque do GALPÃO do atacado para o produto pedido — a "ponte" produto→medida→galpão.
  * 1) acha a MEDIDA do produto (commerce.tire_specs.tire_size);
@@ -40,15 +37,12 @@ export async function getMatrizWholesaleStockQty(
   const key = tireSizeKey(spec.rows[0]?.tire_size);
   if (!key) return 0; // produto sem medida casável → não inventa estoque (nem consulta o galpão)
 
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string }>(
-    `SELECT measure, quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1`,
+  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
+    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
     [environment],
   );
-  let total = 0;
-  for (const row of stock.rows) {
-    if (tireSizeKey(row.measure) === key) total += Number(row.quantity_on_hand) || 0;
-  }
-  return total;
+  const state = matrizStockForMeasure(buildMatrizStockIndex(stock.rows), key);
+  return state.sellable ? state.quantity_on_hand : 0;
 }
 
 /**
@@ -69,19 +63,14 @@ export async function getMatrizWholesaleStockMap(
     `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
     [environment, productIds],
   );
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string }>(
-    `SELECT measure, quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1`,
+  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
+    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
     [environment],
   );
-  // soma o galpão por chave canônica de medida (uma vez), depois aponta cada produto
-  const byKey = new Map<string, number>();
-  for (const row of stock.rows) {
-    const k = tireSizeKey(row.measure);
-    if (k) byKey.set(k, (byKey.get(k) ?? 0) + (Number(row.quantity_on_hand) || 0));
-  }
+  const stockIndex = buildMatrizStockIndex(stock.rows);
   for (const s of specs.rows) {
-    const k = tireSizeKey(s.tire_size);
-    out.set(s.product_id, k ? byKey.get(k) ?? 0 : 0);
+    const state = matrizStockForMeasure(stockIndex, s.tire_size);
+    out.set(s.product_id, state.sellable ? state.quantity_on_hand : 0);
   }
   return out;
 }
@@ -143,19 +132,16 @@ export async function checkMatrizGalpaoShortfall(
   if (requestedByKey.size === 0) return shortfalls;
 
   // 3. soma o disponível no galpão por chave — COM FOR UPDATE (trava a corrida até o commit)
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string }>(
-    `SELECT measure, quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1 FOR UPDATE`,
+  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
+    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1 FOR UPDATE`,
     [environment],
   );
-  const availByKey = new Map<string, number>();
-  for (const row of stock.rows) {
-    const k = tireSizeKey(row.measure);
-    if (k) availByKey.set(k, (availByKey.get(k) ?? 0) + (Number(row.quantity_on_hand) || 0));
-  }
+  const stockIndex = buildMatrizStockIndex(stock.rows);
 
   // 4. compara pedido × disponível por chave → falta quando disponível < pedido
   for (const [key, requested] of requestedByKey) {
-    const available = availByKey.get(key) ?? 0;
+    const state = matrizStockForMeasure(stockIndex, key);
+    const available = state.sellable ? state.quantity_on_hand : 0;
     if (available < requested) {
       shortfalls.push({ measure: labelByKey.get(key) ?? key, available, requested });
     }
@@ -167,8 +153,8 @@ export async function checkMatrizGalpaoShortfall(
  * Baixa no GALPÃO da matriz (commerce.wholesale_stock) quando a MATRIZ vende no VAREJO —
  * balcão ou bot. É a "outra metade" da unificação: a leitura já existia, esta é a ESCRITA.
  * Recebe os itens por PRODUTO (product_id), resolve a medida (tire_specs) e abate por
- * tireSizeKey (a MESMA régua da leitura — robusta a formato), com CLAMP em 0 (a venda
- * NUNCA trava por estoque; medida sem linha no galpão simplesmente não baixa).
+ * tireSizeKey (a MESMA régua da leitura — robusta a formato). Falha fechada quando
+ * falta medida, saldo ou custo, ou quando a medida oficial está duplicada.
  *
  * ⚠️ SÓ a MATRIZ chama isto — o estoque dos PARCEIROS (partner_stock_levels) JAMAIS é
  * tocado aqui (trava do dono). `enabled` = flag (passada por quem chama, testável sem env).
@@ -195,12 +181,33 @@ export async function applyMatrizGalpaoDecrement(
     `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
     [environment, [...qtyByProduct.keys()]],
   );
+  const sizeByProduct = new Map(specs.rows.map((row) => [row.product_id, row.tire_size]));
   const qtyByKey = new Map<string, number>();
-  for (const s of specs.rows) {
-    const key = tireSizeKey(s.tire_size);
-    if (key) qtyByKey.set(key, (qtyByKey.get(key) ?? 0) + (qtyByProduct.get(s.product_id) ?? 0));
+  for (const [productId, quantity] of qtyByProduct) {
+    const key = tireSizeKey(sizeByProduct.get(productId));
+    if (!key) throw new Error('walkin_measure_not_found');
+    qtyByKey.set(key, (qtyByKey.get(key) ?? 0) + quantity);
   }
-  if (qtyByKey.size === 0) return;
+
+  // 3. trava e valida a mesma linha oficial usada pelas demais leituras.
+  const stock = await client.query<{
+    measure: string; quantity_on_hand: number | string; unit_cost: number | string | null;
+  }>(
+    `SELECT measure, quantity_on_hand, unit_cost
+       FROM commerce.wholesale_stock
+      WHERE environment = $1
+      ORDER BY measure
+      FOR UPDATE`,
+    [environment],
+  );
+  const stockIndex = buildMatrizStockIndex(stock.rows);
+  const plan: Array<{ measure: string; qty: number }> = [];
+  for (const [key, qty] of qtyByKey) {
+    const state = matrizStockForMeasure(stockIndex, key);
+    if (state.block_reason) throw new Error(state.block_reason);
+    if (state.quantity_on_hand < qty) throw new Error('walkin_stock_insufficient');
+    plan.push({ measure: state.measure!, qty });
+  }
 
   // rótulo pro filme do galpão (0128): o trigger grava a baixa com origem 'varejo'
   await client.query(
@@ -208,35 +215,17 @@ export async function applyMatrizGalpaoDecrement(
     [orderId ?? null],
   );
 
-  // 3. abate a linha do galpão que casa por chave (uma por chave; clamp em 0). Captura o
-  //    delta REAL (antes − depois): sob clamp, "pedi 5 mas só tinha 3" registra 3 removidos,
-  //    não 5 — a devolução no cancelamento nunca infla o estoque (fura o clamp assimétrico).
-  const stock = await client.query<{ measure: string }>(
-    `SELECT measure FROM commerce.wholesale_stock WHERE environment = $1`,
-    [environment],
-  );
-  const done = new Set<string>();
   const movements: Array<{ measure: string; qty: number }> = [];
-  for (const row of stock.rows) {
-    const key = tireSizeKey(row.measure);
-    if (!key || done.has(key)) continue;
-    const qty = qtyByKey.get(key);
-    if (!qty) continue;
-    const upd = await client.query<{ old_qty: string; new_qty: string }>(
-      `WITH antes AS (
-         SELECT quantity_on_hand AS q FROM commerce.wholesale_stock
-          WHERE environment = $1 AND measure = $2 FOR UPDATE
-       )
-       UPDATE commerce.wholesale_stock s
-          SET quantity_on_hand = GREATEST(0, s.quantity_on_hand - $3)
-         FROM antes
-        WHERE s.environment = $1 AND s.measure = $2
-        RETURNING antes.q AS old_qty, s.quantity_on_hand AS new_qty`,
-      [environment, row.measure, qty],
+  for (const line of plan) {
+    const updated = await client.query(
+      `UPDATE commerce.wholesale_stock
+          SET quantity_on_hand = quantity_on_hand - $3
+        WHERE environment = $1 AND measure = $2 AND quantity_on_hand >= $3
+        RETURNING quantity_on_hand`,
+      [environment, line.measure, line.qty],
     );
-    done.add(key);
-    const removed = Number(upd.rows[0]?.old_qty ?? 0) - Number(upd.rows[0]?.new_qty ?? 0);
-    if (removed > 0) movements.push({ measure: row.measure, qty: removed });
+    if (updated.rowCount !== 1) throw new Error('walkin_stock_insufficient');
+    movements.push(line);
   }
 
   // 4. trilha da baixa (audit.events) pra o cancelamento devolver EXATAMENTE o que saiu.
@@ -257,7 +246,7 @@ export async function applyMatrizGalpaoDecrement(
  * 'matriz_galpao_decrement'), não pelos itens do pedido nem pela flag atual: devolve
  * EXATAMENTE o que a baixa registrou ter tirado. Consequências (todas desejadas):
  *   - venda que não baixou (flag off na hora) → sem trilha → devolve nada (não inventa);
- *   - venda sob clamp (tirou menos que o pedido) → devolve só o que saiu;
+ *   - venda antiga sob clamp → devolve só o que a trilha diz que saiu;
  *   - segundo cancelamento → grava 'matriz_galpao_return', o guard abaixo corta (idempotente).
  * Deve rodar na MESMA transação do cancelamento (rollback desfaz cancelamento + devolução).
  */
@@ -311,8 +300,7 @@ export async function applyMatrizGalpaoReturn(
  * Custo médio do GALPÃO por produto (0117) — a MESMA ponte produto→medida→galpão da
  * leitura/baixa (tire_specs → tireSizeKey → wholesale_stock), devolvendo o unit_cost
  * (custo MÉDIO ponderado, mantido pelas entradas) em vez da quantidade. Entre linhas que
- * casam a mesma chave vale a de MAIOR quantity_on_hand COM custo preenchido
- * (determinístico; na prática o galpão tem uma linha por medida desde a 0113).
+ * uma chave canônica duplicada fica fora do mapa, sem escolher custo arbitrário.
  * Produto sem medida casável, sem spec, ou medida sem custo → fica FORA do mapa
  * (não inventa custo — o chamador trata ausência como "sem custo congelado").
  */
@@ -333,18 +321,12 @@ export async function getMatrizGalpaoCostByProduct(
     [environment],
   );
 
-  const bestByKey = new Map<string, { qty: number; cost: number }>();
-  for (const row of stock.rows) {
-    const key = tireSizeKey(row.measure);
-    if (!key || row.unit_cost === null || row.unit_cost === undefined) continue;
-    const qty = Number(row.quantity_on_hand) || 0;
-    const cur = bestByKey.get(key);
-    if (!cur || qty > cur.qty) bestByKey.set(key, { qty, cost: Number(row.unit_cost) });
-  }
+  const stockIndex = buildMatrizStockIndex(stock.rows);
   for (const s of specs.rows) {
     const key = tireSizeKey(s.tire_size);
-    const best = key ? bestByKey.get(key) : undefined;
-    if (best) out.set(s.product_id, best.cost);
+    const matches = key ? stockIndex.get(key) ?? [] : [];
+    const cost = matches.length === 1 ? Number(matches[0]?.unit_cost) : Number.NaN;
+    if (Number.isFinite(cost) && cost > 0) out.set(s.product_id, cost);
   }
   return out;
 }

@@ -11,6 +11,10 @@ describe('venda walk-in atomica da Matriz', () => {
   let registerWalkinOrder: typeof import('../../src/admin/painel/queries-pedidos-acoes.js').registerWalkinOrder;
   let cancelManualOrder: typeof import('../../src/admin/painel/queries-pedidos-acoes.js').cancelManualOrder;
   let getVarejoResumo: typeof import('../../src/admin/painel/queries-galpao.js').getVarejoResumo;
+  let addWholesaleStockEntry: typeof import('../../src/admin/painel/queries-galpao.js').addWholesaleStockEntry;
+  let setWholesaleStock: typeof import('../../src/admin/painel/queries-galpao.js').setWholesaleStock;
+  let getMatrizFinanceiroVisao: typeof import('../../src/admin/painel/queries-financeiro-visao.js').getMatrizFinanceiroVisao;
+  let getMatrizStockReconciliation: typeof import('../../src/admin/painel/queries-stock-reconciliation.js').getMatrizStockReconciliation;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -22,7 +26,9 @@ describe('venda walk-in atomica da Matriz', () => {
     });
     db = await startPostgres();
     ({ registerWalkinOrder, cancelManualOrder } = await import('../../src/admin/painel/queries-pedidos-acoes.js'));
-    ({ getVarejoResumo } = await import('../../src/admin/painel/queries-galpao.js'));
+    ({ getVarejoResumo, addWholesaleStockEntry, setWholesaleStock } = await import('../../src/admin/painel/queries-galpao.js'));
+    ({ getMatrizFinanceiroVisao } = await import('../../src/admin/painel/queries-financeiro-visao.js'));
+    ({ getMatrizStockReconciliation } = await import('../../src/admin/painel/queries-stock-reconciliation.js'));
 
     await db.pool.query(
       `INSERT INTO core.units (environment, slug, name, is_active)
@@ -383,6 +389,51 @@ describe('venda walk-in atomica da Matriz', () => {
       { qty_delta: -1, source: 'varejo' },
       { qty_delta: 1, source: 'cancelamento_varejo' },
     ]);
+  });
+
+  it('entrada calcula custo medio, ajuste redefine saldo e Financeiro usa a fonte oficial', async () => {
+    const before = await getMatrizFinanceiroVisao('test', db.pool);
+    const fixture = await createProduct({ quantity: 10, cost: 10 });
+
+    const entry = await addWholesaleStockEntry({
+      environment: 'test', measure: fixture.measure, quantity_in: 10, unit_cost: 30,
+    }, db.pool);
+    expect(entry).toMatchObject({ quantity_on_hand: 20, unit_cost: '20.00' });
+
+    const adjusted = await setWholesaleStock({
+      environment: 'test', measure: fixture.measure, quantity_on_hand: 7, unit_cost: 20,
+    }, db.pool);
+    expect(adjusted).toMatchObject({ quantity_on_hand: 7, unit_cost: '20.00' });
+
+    const after = await getMatrizFinanceiroVisao('test', db.pool);
+    expect(Number(after.indicadores.capital_parado) - Number(before.indicadores.capital_parado)).toBe(140);
+    expect(after.indicadores.pneus_galpao - before.indicadores.pneus_galpao).toBe(7);
+  });
+
+  it('concilia produto sem estoque, estoque sem produto e isola prod de test', async () => {
+    const aligned = await createProduct({ quantity: 4, cost: 12 });
+    await db.pool.query(
+      `INSERT INTO commerce.stock_levels (environment, product_id, quantity_available, location)
+       VALUES ('test', $1, 4, 'main')`,
+      [aligned.productId],
+    );
+    const catalogOnly = await createProduct({ withStock: false });
+    const testOnlyMeasure = `${170 + sequence}/${60 + sequence}-${15 + sequence}`;
+    const prodOnlyMeasure = `${190 + sequence}/${70 + sequence}-${16 + sequence}`;
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost)
+       VALUES ('test', $1, 3, 22), ('prod', $2, 9, 50)`,
+      [testOnlyMeasure, prodOnlyMeasure],
+    );
+
+    const testReport = await getMatrizStockReconciliation('test', db.pool);
+    const prodReport = await getMatrizStockReconciliation('prod', db.pool);
+    expect(testReport.rows.find((row) => row.official_measures.includes(aligned.measure))?.status).toBe('aligned');
+    expect(testReport.rows.find((row) => row.catalog_measures.includes(catalogOnly.measure))?.status).toBe('catalog_only');
+    expect(testReport.rows.find((row) => row.official_measures.includes(testOnlyMeasure))?.status).toBe('official_only');
+    expect(testReport.rows.some((row) => row.official_measures.includes(prodOnlyMeasure))).toBe(false);
+    expect(prodReport.rows.some((row) => row.official_measures.includes(prodOnlyMeasure))).toBe(true);
+    expect(prodReport.rows.some((row) => row.official_measures.includes(testOnlyMeasure))).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import { tireSizeKey } from '../../atendente-v2/wholesale-stock-read.js';
+import { tireSizeKey } from '../../shared/tire-size.js';
 
 /**
  * Casamento de uma medida DIGITADA no galpão (atacado) com o CATÁLOGO (commerce.tire_specs).

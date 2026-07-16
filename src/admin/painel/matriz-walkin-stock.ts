@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
-import { tireSizeKey } from '../../atendente-v2/wholesale-stock-read.js';
+import { tireSizeKey } from '../../shared/tire-size.js';
+import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 
 export interface MatrizWalkinStockPlan {
   lines: Array<{ measure: string; quantity: number }>;
@@ -59,33 +60,16 @@ export async function prepareMatrizWalkinStock(
       FOR UPDATE`,
     [environment],
   );
-  const stockByKey = new Map<string, StockRow[]>();
-  for (const row of stock.rows) {
-    const key = tireSizeKey(row.measure);
-    if (key) stockByKey.set(key, [...(stockByKey.get(key) ?? []), row]);
-  }
+  const stockIndex = buildMatrizStockIndex(stock.rows);
 
   const lines: MatrizWalkinStockPlan['lines'] = [];
   const costByProduct = new Map<string, number>();
   for (const [key, quantity] of requestedByKey) {
-    const matches = stockByKey.get(key) ?? [];
-    if (matches.length === 0) throw new Error('walkin_measure_not_found');
-    if (matches.length !== 1) throw new Error('walkin_stock_ambiguous');
-    const row = matches[0]!;
-    const available = Number(row.quantity_on_hand);
-    if (!Number.isFinite(available) || available < quantity) {
-      throw new Error('walkin_stock_insufficient');
-    }
-    if (row.unit_cost === null || row.unit_cost === undefined || row.unit_cost === '') {
-      throw new Error('walkin_cost_missing');
-    }
-    const unitCost = Number(row.unit_cost);
-    // A migration 0112 preencheu custo desconhecido com DEFAULT 0. Zero nao
-    // pode virar lucro ficticio em uma venda comercial normal.
-    if (!Number.isFinite(unitCost) || unitCost <= 0) throw new Error('walkin_cost_missing');
-
-    lines.push({ measure: row.measure, quantity });
-    for (const productId of productsByKey.get(key) ?? []) costByProduct.set(productId, unitCost);
+    const state = matrizStockForMeasure(stockIndex, key);
+    if (state.block_reason) throw new Error(state.block_reason);
+    if (state.quantity_on_hand < quantity) throw new Error('walkin_stock_insufficient');
+    lines.push({ measure: state.measure!, quantity });
+    for (const productId of productsByKey.get(key) ?? []) costByProduct.set(productId, state.unit_cost!);
   }
 
   return { lines, costByProduct };

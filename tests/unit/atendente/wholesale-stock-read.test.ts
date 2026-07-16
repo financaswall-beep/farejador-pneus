@@ -38,17 +38,17 @@ describe('getMatrizWholesaleStockQty — ponte produto→medida→galpão', () =
     const query = vi
       .fn()
       .mockResolvedValueOnce({ rows: [{ tire_size: tireSize }] })
-      .mockResolvedValueOnce({ rows: stockRows });
+      .mockResolvedValueOnce({ rows: stockRows.map((row) => ({ ...row, unit_cost: 20 })) });
     return { client: { query } as unknown as PoolClient, query };
   }
 
-  it('soma as linhas do galpão que batem a medida — inclusive formato diferente', async () => {
+  it('bloqueia duas linhas oficiais para a mesma medida canonica', async () => {
     const { client } = mockClient('90/90-18', [
       { measure: '90/90-18', quantity_on_hand: 10 },
       { measure: '90/90R18', quantity_on_hand: 5 }, // mesmo pneu, outro formato → conta
       { measure: '100/90-18', quantity_on_hand: 7 }, // outra medida → NÃO conta
     ]);
-    expect(await getMatrizWholesaleStockQty(client, 'prod', 'pid-1')).toBe(15);
+    expect(await getMatrizWholesaleStockQty(client, 'prod', 'pid-1')).toBe(0);
   });
 
   it('produto sem medida → 0 e nem consulta o galpão', async () => {
@@ -77,14 +77,14 @@ describe('getMatrizWholesaleStockMap — lote pra a busca (vários produtos)', (
       })
       .mockResolvedValueOnce({
         rows: [
-          { measure: '90/90-18', quantity_on_hand: 10 },
-          { measure: '90/90R18', quantity_on_hand: 5 }, // mesmo pneu de p1 → soma
-          { measure: '100/90-18', quantity_on_hand: 3 },
+          { measure: '90/90-18', quantity_on_hand: 10, unit_cost: 20 },
+          { measure: '90/90R18', quantity_on_hand: 5, unit_cost: 20 },
+          { measure: '100/90-18', quantity_on_hand: 3, unit_cost: 21 },
         ],
       });
     const client = { query } as unknown as PoolClient;
     const map = await getMatrizWholesaleStockMap(client, 'prod', ['p1', 'p2', 'p3']);
-    expect(map.get('p1')).toBe(15); // 10 + 5 (formatos diferentes do mesmo pneu)
+    expect(map.get('p1')).toBe(0); // duplicidade canonica falha fechada
     expect(map.get('p2')).toBe(3);
     expect(map.get('p3')).toBe(0); // galpão não tem essa medida
   });
@@ -107,7 +107,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
     const query = vi
       .fn()
       .mockResolvedValueOnce({ rows: specRows })
-      .mockResolvedValueOnce({ rows: stockRows });
+      .mockResolvedValueOnce({ rows: stockRows.map((row) => ({ ...row, unit_cost: 20 })) });
     return { client: { query } as unknown as PoolClient, query };
   }
 
@@ -129,7 +129,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
     ]);
   });
 
-  it('formatos diferentes do mesmo pneu somam → suficiente', async () => {
+  it('formatos diferentes da mesma medida bloqueiam por ambiguidade', async () => {
     const { client } = mockClient(
       [{ product_id: 'p1', tire_size: '90/90-18' }],
       [
@@ -137,7 +137,9 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
         { measure: '90/90R18', quantity_on_hand: 5 }, // mesmo pneu → soma 15
       ],
     );
-    expect(await checkMatrizGalpaoShortfall(client, 'prod', [{ productId: 'p1', quantity: 12 }])).toEqual([]);
+    expect(await checkMatrizGalpaoShortfall(client, 'prod', [{ productId: 'p1', quantity: 12 }])).toEqual([
+      { measure: '90/90-18', available: 0, requested: 12 },
+    ]);
   });
 
   it('galpão vazio → falta tudo (não vende do vazio)', async () => {
@@ -221,7 +223,7 @@ describe('getMatrizGalpaoCostByProduct — custo médio do galpão por produto (
     expect(map.get('p1')).toBe(21.25);
   });
 
-  it('duas linhas na mesma chave → vale a de MAIOR quantidade COM custo', async () => {
+  it('duas linhas na mesma chave nao escolhem custo arbitrario', async () => {
     const { client } = mockClient(
       [{ product_id: 'p1', tire_size: '90/90-18' }],
       [
@@ -230,7 +232,7 @@ describe('getMatrizGalpaoCostByProduct — custo médio do galpão por produto (
         { measure: '90/90 - 18', quantity_on_hand: 99, unit_cost: null }, // sem custo não concorre
       ],
     );
-    expect((await getMatrizGalpaoCostByProduct(client, 'prod', ['p1'])).get('p1')).toBe(20);
+    expect((await getMatrizGalpaoCostByProduct(client, 'prod', ['p1'])).has('p1')).toBe(false);
   });
 
   it('medida sem custo no galpão → produto fica FORA do mapa (não inventa custo)', async () => {

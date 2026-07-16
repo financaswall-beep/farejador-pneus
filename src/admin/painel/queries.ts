@@ -1,3 +1,5 @@
+export * from './queries-stock-reconciliation.js';
+
 /**
  * Banco da MATRIZ — PORTA DE ENTRADA (obra 300, 2026-07-05).
  *

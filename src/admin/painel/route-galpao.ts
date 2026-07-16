@@ -8,7 +8,7 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
   addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, deleteWholesaleStockComRotulo,
-  listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
+  getMatrizStockReconciliation, listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
 } from './queries.js';
 import { dashboardPayload, mapWriteError } from './route-helpers.js';
 import { baixaWholesaleStockSchema, entryWholesaleStockSchema, removeWholesaleStockSchema, setWholesaleStockSchema } from './route-schemas.js';
@@ -16,6 +16,10 @@ import { baixaWholesaleStockSchema, entryWholesaleStockSchema, removeWholesaleSt
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleStock()));
+  });
+
+  fastify.get('/admin/api/wholesale/stock/reconciliation', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(await getMatrizStockReconciliation());
   });
 
   // ENTRADA de compra: soma a quantidade e recalcula o custo MÉDIO ponderado da medida.

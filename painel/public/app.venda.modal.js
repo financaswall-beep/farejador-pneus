@@ -6,7 +6,7 @@ window.PAINEL_MODULES.vendaModal = function () {
   return {
     openSaleModal(conv) {
       this.modalConv = conv;
-      const firstProduct = this.produtos[0] || null;
+      const firstProduct = this.produtos.find((product) => product.walkin_sellable) || null;
       const hasDraft = Boolean(conv?.draft_id);
       this.saleForm = {
         product_id: firstProduct?.product_id || '',
@@ -27,7 +27,7 @@ window.PAINEL_MODULES.vendaModal = function () {
 
     openWalkinModal() {
       this.modalConv = null;
-      const firstProduct = this.produtos[0] || null;
+      const firstProduct = this.produtos.find((product) => product.walkin_sellable) || null;
       this.saleForm = {
         product_id: firstProduct?.product_id || '',
         quantity: 1,

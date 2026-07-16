@@ -59,6 +59,29 @@ window.PAINEL_MODULES.format = function () {
       return this.produtos.find((product) => product.product_id === this.saleForm.product_id) || null;
     },
 
+    saleStockError() {
+      const product = this.selectedProduct();
+      if (!product) return 'Escolha um produto do catÃ¡logo.';
+      const messages = {
+        walkin_measure_not_found: 'Esse pneu nÃ£o estÃ¡ cadastrado no estoque do galpÃ£o.',
+        walkin_cost_missing: 'Essa medida estÃ¡ sem custo no galpÃ£o. Cadastre o custo antes de vender.',
+        walkin_stock_insufficient: 'Essa medida estÃ¡ sem saldo no galpÃ£o.',
+        walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpÃ£o. Corrija o estoque antes de vender.',
+      };
+      if (!product.walkin_sellable) {
+        return messages[product.walkin_block_reason] || 'Esse produto nÃ£o pode ser vendido agora.';
+      }
+      const requested = Number(this.saleForm.quantity || 0);
+      const available = Number(product.official_quantity_on_hand || 0);
+      if (!Number.isInteger(requested) || requested <= 0) return 'Informe uma quantidade vÃ¡lida.';
+      if (requested > available) return `SÃ³ tem ${available} dessa medida no galpÃ£o.`;
+      return null;
+    },
+
+    saleCanSubmit() {
+      return this.saleStockError() === null;
+    },
+
     saleTotal() {
       return this.formatCurrency(Number(this.saleForm.quantity || 0) * Number(this.saleForm.unit_price || 0));
     },
@@ -66,6 +89,7 @@ window.PAINEL_MODULES.format = function () {
     onProductChanged() {
       const product = this.selectedProduct();
       this.saleForm.unit_price = Number(product?.price_amount || 0);
+      this.orderError = null;
     },
 
   };

@@ -10,6 +10,11 @@ import {
   calcularFrete,
   verificarEstoque,
 } from '../../src/atendente/tools/commerce-tools.js';
+import {
+  buscarCompatibilidadeMatriz,
+  buscarProdutoMatriz,
+  verificarEstoqueMatriz,
+} from '../../src/atendente-v2/matriz-product-search.js';
 
 let db: IntegrationDb;
 let client: PoolClient;
@@ -117,6 +122,26 @@ describe('Atendente commerce tools - integracao Postgres', () => {
     ]);
   });
 
+  it('tools oficiais da Matriz leem catalogo, fitment e wholesale_stock reais', async () => {
+    const produtos = await buscarProdutoMatriz(client, {
+      environment: 'test', medida_pneu: '100/90 R17', apenas_com_estoque: true, limit: 10,
+    });
+    expect(produtos[0]).toMatchObject({
+      product_id: productId, total_stock_available: 3,
+      stock_source: 'commerce.wholesale_stock', stock_block_reason: null,
+    });
+
+    const estoque = await verificarEstoqueMatriz(client, { environment: 'test', product_id: productId });
+    expect(estoque).toMatchObject({
+      disponivel: true, quantidade_total: 3, stock_source: 'commerce.wholesale_stock',
+    });
+
+    const compatibilidade = await buscarCompatibilidadeMatriz(client, {
+      environment: 'test', moto_modelo: motoModelo, moto_ano: 2020, posicao_pneu: 'rear', limit: 10,
+    });
+    expect(compatibilidade[0]?.produtos[0]).toMatchObject({ product_id: productId, total_stock: 3 });
+  });
+
   it('calcularFrete executa commerce.resolve_neighborhood e delivery_zones reais', async () => {
     const result = await calcularFrete(client, {
       environment: 'test',
@@ -198,6 +223,11 @@ async function seedCommerceFixtures(
   );
 
   await client.query(
+    `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost)
+     VALUES ('test', '100/90 R17', 3, 40)`,
+  );
+
+  await client.query(
     `INSERT INTO commerce.product_prices
        (environment, product_id, price_amount, currency, price_type, valid_from)
      VALUES ('test', $1, 175.00, 'BRL', 'regular', '2026-01-01T00:00:00Z')`,
@@ -259,6 +289,7 @@ async function cleanupCommerceFixtures(
   client: PoolClient,
   ids: { productId: string; geoId: string; vehicleId: string; policyKey: string; policyVersion: string },
 ): Promise<void> {
+  await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment='test' AND measure='100/90 R17'`);
   await client.query(
     `DELETE FROM commerce.store_policies WHERE environment = 'test' AND policy_key = $1 AND policy_version = $2`,
     [ids.policyKey, ids.policyVersion],

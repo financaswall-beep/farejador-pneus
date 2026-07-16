@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-16T02:05:33.128Z",
-  "total": 123,
+  "geradoEm": "2026-07-16T16:19:51.058Z",
+  "total": 124,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -29,6 +29,7 @@
     "GET /admin/api/wholesale/sales AUTH(1)",
     "GET /admin/api/wholesale/stock AUTH(1)",
     "GET /admin/api/wholesale/stock/movimentos AUTH(1)",
+    "GET /admin/api/wholesale/stock/reconciliation AUTH(1)",
     "GET /admin/api/wholesale/suppliers AUTH(1)",
     "GET /admin/api/wholesale/suppliers/breakdown AUTH(1)",
     "GET /admin/api/wholesale/suppliers/ranking AUTH(1)",

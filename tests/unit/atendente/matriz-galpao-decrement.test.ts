@@ -22,7 +22,9 @@ function mockClient(
       audits.push({ sql, params });
       return { rows: [] };
     }
-    if (sql.includes('SELECT measure')) return { rows: stock };
+    if (sql.includes('SELECT measure')) {
+      return { rows: stock.map((row) => ({ ...row, quantity_on_hand: onHand, unit_cost: 20 })) };
+    }
     return { rows: [] };
   });
   return { client: { query } as unknown as PoolClient, query, updates, audits };
@@ -70,12 +72,14 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
     expect(updates).toEqual([['prod', '90/90-12', 3]]);
   });
 
-  it('produto sem medida no galpão (ex.: carro): NÃO baixa nada (não trava a venda)', async () => {
+  it('produto sem medida no galpao falha fechado', async () => {
     const { client, updates } = mockClient(
       [{ product_id: 'p1', tire_size: '175/70-13' }],
       [{ measure: '90/90-12' }],
     );
-    await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 1 }], true);
+    await expect(applyMatrizGalpaoDecrement(
+      client, 'prod', [{ productId: 'p1', quantity: 1 }], true,
+    )).rejects.toThrow('walkin_measure_not_found');
     expect(updates).toEqual([]);
   });
 
@@ -92,15 +96,16 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
     expect(payload.movements).toEqual([{ measure: '90/90-12', qty: 2 }]);
   });
 
-  it('clamp: vende 15 com 10 → trilha registra 10 (não 15)', async () => {
+  it('recusa venda acima do saldo em vez de aplicar clamp', async () => {
     const { client, audits } = mockClient(
       [{ product_id: 'p1', tire_size: '90/90-12' }],
       [{ measure: '90/90-12' }],
       10, // tinha 10; vende 15 → clamp em 0, delta real 10
     );
-    await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 15 }], true, 'ord-2');
-    const payload = JSON.parse(audits[0]!.params[2] as string);
-    expect(payload.movements).toEqual([{ measure: '90/90-12', qty: 10 }]);
+    await expect(applyMatrizGalpaoDecrement(
+      client, 'prod', [{ productId: 'p1', quantity: 15 }], true, 'ord-2',
+    )).rejects.toThrow('walkin_stock_insufficient');
+    expect(audits).toHaveLength(0);
   });
 
   it('sem orderId: baixa mas NÃO grava trilha (comportamento antigo preservado)', async () => {

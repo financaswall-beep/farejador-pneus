@@ -4,6 +4,27 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
+    async loadStockReconciliation() {
+      this.stockReconciliation.loading = true;
+      this.stockReconciliation.error = null;
+      try {
+        const report = await this.apiGet('/admin/api/wholesale/stock/reconciliation');
+        this.stockReconciliation.summary = report.summary || null;
+        this.stockReconciliation.rows = report.rows || [];
+      } catch (err) {
+        this.stockReconciliation.error = err instanceof Error ? err.message : String(err);
+      } finally {
+        this.stockReconciliation.loading = false;
+      }
+    },
+    reconciliationStatusText(status) {
+      const labels = {
+        aligned: 'Alinhado', quantity_divergent: 'Saldo diferente', catalog_only: 'SÃ³ no catÃ¡logo legado',
+        official_only: 'SÃ³ no estoque oficial', official_ambiguous: 'Cadastro oficial duplicado',
+        official_cost_missing: 'Custo oficial ausente',
+      };
+      return labels[status] || status;
+    },
     measureOnHand(measure) {
       // Quanto tem de uma medida (pro form de venda mostrar "em estoque"). null = não cadastrada.
       const m = (measure || '').trim();
@@ -88,6 +109,7 @@ window.PAINEL_MODULES.galpao = function () {
         this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
         this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
         await this.loadAtacado();
+        void this.loadStockReconciliation();
         void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
       } catch (err) {
         this.stockMsg = { ok: false, text: this.stockErrText(err.message) };
@@ -114,6 +136,7 @@ window.PAINEL_MODULES.galpao = function () {
         this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
         this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
         await this.loadAtacado();
+        void this.loadStockReconciliation();
         void this.loadSino(); // entrada pode ter tirado a medida do "repor"
       } catch (err) {
         this.stockMsg = { ok: false, text: this.stockErrText(err.message, 'entrada') };
@@ -126,6 +149,7 @@ window.PAINEL_MODULES.galpao = function () {
       try {
         await this.apiPost('/admin/api/wholesale/stock/remove', { measure });
         await this.loadAtacado();
+        void this.loadStockReconciliation();
         void this.loadGalpaoFilme(); // a remoção entra no filme
       } catch (err) {
         this.stockMsg = { ok: false, text: `Não consegui remover (${err.message}).` };
@@ -178,6 +202,7 @@ window.PAINEL_MODULES.galpao = function () {
         this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${f.tipo}) — sobraram ${row.quantity_on_hand} un.` };
         this.stockBaixaFechar();
         await this.loadAtacado();
+        void this.loadStockReconciliation();
         void this.loadSino(); // a baixa pode ter posto a medida no "repor"
         void this.loadGalpaoFilme();
       } catch (err) {

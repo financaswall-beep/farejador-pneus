@@ -30,7 +30,9 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockMap, getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, verificarEstoqueMatriz } from './matriz-product-search.js';
+import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
 import { getRecentProductIds } from './conversation-products.js';
 import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
@@ -523,22 +525,21 @@ export async function executeTool(
   try {
     switch (name) {
       case 'buscar_compatibilidade': {
-        const result = await buscarCompatibilidade(client, {
+        const compatInput = {
           environment,
           moto_modelo: args.moto_modelo as string,
           moto_ano: args.moto_ano as number | undefined,
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
           limit: 10,
-        });
+        };
+        if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
+        const result = env.WHOLESALE_UNIFIED_STOCK
+          ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
+          : await buscarCompatibilidade(client, compatInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
         // Unificação atacado×varejo (flag WHOLESALE_UNIFIED_STOCK): o estoque BASE da matriz
         // vem do GALPÃO (por medida), não da view genérica. Os overrides de loja perto abaixo
         // mandam por cima — parceiro perto que TEM o pneu ganha (trava do dono). OFF = view, hoje.
-        if (env.WHOLESALE_UNIFIED_STOCK) {
-          const prods = result.flatMap((v) => v.produtos);
-          const galpao = await getMatrizWholesaleStockMap(client, environment, prods.map((p) => p.product_id));
-          for (const p of prods) p.total_stock = galpao.get(p.product_id) ?? 0;
-        }
         // C2: estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM bairro/localização não
         // há loja resolvida → marca precisa_localizacao (furo #4): o bot pede o bairro antes
         // de prometer estoque, em vez de cravar "tenho" sem saber a loja perto do cliente.
@@ -592,6 +593,12 @@ export async function executeTool(
             lojaResolvidaCompat = true;
           }
         }
+        if (env.WHOLESALE_UNIFIED_STOCK) {
+          for (const vehicle of result) {
+            vehicle.produtos.sort((a, b) => b.total_stock - a.total_stock);
+            vehicle.produtos = vehicle.produtos.slice(0, compatInput.limit);
+          }
+        }
         // sem_estoque_loja_perto: sei a localização, mas NENHUMA loja perto tem o item — o
         // total_stock mostrado é o da REDE/matriz (backstop), não de uma loja perto confirmada.
         // O bot NÃO pode cravar "tenho na tua loja" nesse caso (furo: confirmava estoque local
@@ -605,21 +612,21 @@ export async function executeTool(
       }
 
       case 'buscar_produto': {
-        const result = await buscarProduto(client, {
+        const productInput = {
           environment,
           medida_pneu: args.medida_pneu as string | undefined,
           marca: args.marca as string | undefined,
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
           apenas_com_estoque: (args.apenas_com_estoque as boolean | undefined) ?? false,
           limit: 10,
-        });
+        };
+        if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_produto', environment);
+        let result = env.WHOLESALE_UNIFIED_STOCK
+          ? await buscarProdutoMatriz(client, productInput, { deferAvailabilityFilter: true })
+          : await buscarProduto(client, productInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
         // Unificação atacado×varejo (flag): estoque BASE da matriz vem do GALPÃO (por medida);
         // os overrides de loja perto abaixo mandam por cima (parceiro que tem ganha). OFF = view, hoje.
-        if (env.WHOLESALE_UNIFIED_STOCK) {
-          const galpao = await getMatrizWholesaleStockMap(client, environment, result.map((p) => p.product_id));
-          for (const p of result) p.total_stock_available = galpao.get(p.product_id) ?? 0;
-        }
         // C2: a busca mostra o estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM
         // bairro/localização não há loja resolvida → o estoque é o da matriz (genérico) e
         // marcamos precisa_localizacao (furo #4): o bot pede o bairro antes de prometer
@@ -683,6 +690,14 @@ export async function executeTool(
             }
             lojaResolvida = true;
           }
+        }
+        if (env.WHOLESALE_UNIFIED_STOCK && productInput.apenas_com_estoque) {
+          result = result.filter((product) => product.total_stock_available > 0);
+        }
+        result = result.sort((a, b) => b.total_stock_available - a.total_stock_available)
+          .slice(0, productInput.limit);
+        if (result.length === 0) {
+          return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto com estoque encontrado.' });
         }
         // sem_estoque_loja_perto: ver buscar_compatibilidade — sei a localização, mas nenhuma
         // loja perto tem o item; o estoque exibido é o da REDE/matriz, não de loja perto.
@@ -775,11 +790,15 @@ export async function executeTool(
       }
 
       case 'verificar_estoque': {
-        const result = await verificarEstoque(client, {
+        const stockInput = {
           environment,
           product_id: args.product_id as string | undefined,
           product_code: args.product_code as string | undefined,
-        });
+        };
+        if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.verificar_estoque', environment);
+        const result = env.WHOLESALE_UNIFIED_STOCK
+          ? await verificarEstoqueMatriz(client, stockInput)
+          : await verificarEstoque(client, stockInput);
         if (!result) return JSON.stringify({ encontrado: false });
         return JSON.stringify(result);
       }

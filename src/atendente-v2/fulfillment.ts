@@ -27,6 +27,7 @@ import { logger } from '../shared/logger.js';
 import { env } from '../shared/config/env.js';
 import { rankUnitsByFairnessFromDb } from './fairness.js';
 import { getMatrizWholesaleStockQty } from './wholesale-stock-read.js';
+import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { GEO_PICKUP_RING_KM, GEO_RING_KM, selectWithinExpandingRing } from '../shared/geo/ring.js';
 import { cachedRoadDistanceKm, cachedMatrizRoadInfo, type RoadInfo } from '../shared/geo/geo-cache.js';
@@ -681,6 +682,7 @@ export async function decideStoreForOrder(
     if (env.WHOLESALE_UNIFIED_STOCK) {
       return (await getMatrizWholesaleStockQty(client, environment, pid)) > 0;
     }
+    recordMatrizLegacyStockRead('routing.matriz_has_stock', environment);
     const r = await client.query<{ q: string }>(
       `SELECT COALESCE(quantity_available, 0)::text AS q
        FROM commerce.stock_levels

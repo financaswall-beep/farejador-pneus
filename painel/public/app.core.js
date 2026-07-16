@@ -110,7 +110,7 @@ window.PAINEL_MODULES.core = function () {
         if (page === 'compras') void this.loadAtacado();
         // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
         // O filme (0128) carrega junto — é a mesma visita à aba.
-        if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(); }
+        if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(); void this.loadStockReconciliation(); }
         // Logística (0121): entregas da matriz + rota do dia do entregador.
         if (page === 'logistica') void this.loadLogistica();
         // Vendas: visão comercial unificada; custos e lucro permanecem no Financeiro.
