@@ -13,6 +13,12 @@ vi.mock('../../../src/shared/geo/geo-cache.js', () => ({
   cachedGeocodeAddress: vi.fn(),
 }));
 
+// A janela de frescor lê env.ts (LOCATION_FRESHNESS_HOURS); mockar mantém o default
+// "sem janela" (null) pros testes de sempre e deixa cada teste passar a janela explícita.
+vi.mock('../../../src/atendente-v2/location-freshness.js', () => ({
+  locationFreshnessHours: () => null,
+}));
+
 const geocodeMock = vi.mocked(cachedGeocodeAddress);
 
 interface QueryCall {
@@ -61,6 +67,26 @@ describe('getLatestCustomerLocation', () => {
     const client = clientWithRows([[{ coordinates_lat: 'abc', coordinates_lng: '-43.1' }]]);
     expect(await getLatestCustomerLocation(client, 'test', 'conv1')).toBeNull();
   });
+
+  it('JANELA 6h: filtra por created_at e passa a janela como $3 (só usa pino recente)', async () => {
+    const client = clientWithRows([[{ coordinates_lat: -22.9, coordinates_lng: -43.1 }]]);
+    await getLatestCustomerLocation(client, 'test', 'conv1', 6);
+    const call = client.calls[0]!;
+    expect(call.text).toContain('make_interval(hours => $3::int)');
+    expect(call.values).toEqual(['test', 'conv1', 6]);
+  });
+
+  it('SEM janela (0 ou null): NÃO filtra por tempo — pino vale pra sempre (retrocompat)', async () => {
+    const zero = clientWithRows([[{ coordinates_lat: -22.9, coordinates_lng: -43.1 }]]);
+    await getLatestCustomerLocation(zero, 'test', 'conv1', 0);
+    expect(zero.calls[0]!.text).not.toContain('make_interval');
+    expect(zero.calls[0]!.values).toEqual(['test', 'conv1']);
+
+    const nulo = clientWithRows([[{ coordinates_lat: -22.9, coordinates_lng: -43.1 }]]);
+    await getLatestCustomerLocation(nulo, 'test', 'conv1', null);
+    expect(nulo.calls[0]!.text).not.toContain('make_interval');
+    expect(nulo.calls[0]!.values).toEqual(['test', 'conv1']);
+  });
 });
 
 describe('isPreciseGeocode', () => {
@@ -87,6 +113,17 @@ describe('resolveCustomerLocation (camadas: pino → endereço → bairro)', () 
     });
     expect(loc).toEqual({ lat: -22.9, lng: -43.1 });
     expect(geocodeMock).not.toHaveBeenCalled();
+  });
+
+  it('1b) propaga a janela do pino: freshnessHours das opts vira filtro de tempo na busca do pino', async () => {
+    geocodeMock.mockReset();
+    const client = clientWithRows([[]]); // sem pino DENTRO da janela → cai adiante
+    await resolveCustomerLocation(client, 'test', 'c1', {
+      municipio: 'rio de janeiro', bairro: 'Lapa', apiKey: 'KEY', freshnessHours: 6,
+    });
+    const pinoCall = client.calls[0]!; // 1ª query é sempre a busca do pino
+    expect(pinoCall.text).toContain('make_interval(hours => $3::int)');
+    expect(pinoCall.values).toEqual(['test', 'c1', 6]);
   });
 
   it('2) sem pino e sem chave → null (não inventa coordenada)', async () => {

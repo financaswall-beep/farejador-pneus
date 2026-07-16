@@ -240,6 +240,12 @@ const envSchema = z.object({
   // mede a RUA só das K mais próximas em LINHA RETA dentro do teto (a rua nunca é
   // menor que a reta). Com ≤K lojas no teto não muda NADA (hoje: 7 lojas, neutro).
   GEO_ROAD_TOPK: z.string().transform(Number).pipe(z.number().int().min(1)).default('12'),
+  // Validade da LOCALIZAÇÃO do cliente (o pino do WhatsApp) em HORAS. 0 = desligado
+  // (comportamento de sempre: o pino da conversa vale pra sempre — foi o furo achado
+  // 2026-07-16: o bot cravou 21 km com um pino de 11 dias). >0 = o bot só usa pino
+  // mandado nas últimas N horas; mais velho vira null e ele pede a localização de novo
+  // (decisão Wallace: cliente pode ter se mudado / estar em outro lugar). Sobe DORMENTE.
+  LOCATION_FRESHNESS_HOURS: z.string().transform(Number).pipe(z.number().int().min(0)).default('0'),
   AGENT_V2_POLL_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(1000)).default('5000'),
   // Coalescing window: segundos de pausa do cliente antes do bot responder.
   // A cada nova mensagem o timer RESETA. So responde quando o cliente para

@@ -3,6 +3,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import type { GeoPoint } from '../shared/geo/haversine.js';
 import { type GeocodeResult } from '../shared/geo/google-maps.js';
 import { cachedGeocodeAddress } from '../shared/geo/geo-cache.js';
+import { locationFreshnessHours } from './location-freshness.js';
 
 /**
  * Coordenada do CLIENTE a partir do anexo de localização mais recente da
@@ -17,6 +18,12 @@ import { cachedGeocodeAddress } from '../shared/geo/geo-cache.js';
  * `file_type='location'` é como o Chatwoot marca o pino. NUMERIC volta como
  * string do pg → `Number()`. Sem pino na conversa → `null` (chamador geocoda o
  * endereço digitado ou cai no fallback por cidade — caso F).
+ *
+ * `freshnessHours` (default = config `LOCATION_FRESHNESS_HOURS`): quando > 0, só
+ * considera o pino mandado nas últimas N horas — mais velho é tratado como "sem
+ * pino" (o bot pede a localização de novo). null/0 = sem janela (o pino vale pra
+ * sempre; comportamento até 2026-07-16). O default puxa a config aqui pra que os
+ * chamadores existentes (agent.ts, tools.ts) herdem a régua sem mudar assinatura.
  */
 interface LocationRow {
   coordinates_lat: string | number;
@@ -27,7 +34,18 @@ export async function getLatestCustomerLocation(
   client: PoolClient,
   environment: Environment,
   conversationId: string,
+  freshnessHours: number | null = locationFreshnessHours(),
 ): Promise<GeoPoint | null> {
+  const fresh = typeof freshnessHours === 'number' && Number.isFinite(freshnessHours) && freshnessHours > 0
+    ? freshnessHours
+    : null;
+  const params: unknown[] = [environment, conversationId];
+  let freshClause = '';
+  if (fresh !== null) {
+    params.push(fresh);
+    // make_interval(hours => N) é seguro (N é parâmetro, não interpolado).
+    freshClause = '\n        AND created_at > now() - make_interval(hours => $3::int)';
+  }
   const r = await client.query<LocationRow>(
     `SELECT coordinates_lat, coordinates_lng
        FROM core.message_attachments
@@ -35,10 +53,10 @@ export async function getLatestCustomerLocation(
         AND conversation_id = $2
         AND file_type = 'location'
         AND coordinates_lat IS NOT NULL
-        AND coordinates_lng IS NOT NULL
+        AND coordinates_lng IS NOT NULL${freshClause}
       ORDER BY created_at DESC
       LIMIT 1`,
-    [environment, conversationId],
+    params,
   );
 
   const row = r.rows[0];
@@ -92,10 +110,14 @@ export async function resolveCustomerLocation(
     /** Endereço completo digitado (rua+número) — existe na ENTREGA. */
     fullAddress?: string | null;
     apiKey: string | undefined;
+    /** Janela do pino (default = config). O endereço/bairro digitado é da mensagem
+     *  ATUAL — já é fresco por natureza; a janela só vale pro pino persistido. */
+    freshnessHours?: number | null;
   },
 ): Promise<GeoPoint | null> {
-  // 1) pino — ponto exato, de graça, sempre vence.
-  const pin = await getLatestCustomerLocation(client, environment, conversationId);
+  // 1) pino — ponto exato, de graça, sempre vence (respeitando a validade da localização).
+  const freshnessHours = opts.freshnessHours !== undefined ? opts.freshnessHours : locationFreshnessHours();
+  const pin = await getLatestCustomerLocation(client, environment, conversationId, freshnessHours);
   if (pin) return pin;
 
   const { municipio, bairro, fullAddress, apiKey } = opts;
