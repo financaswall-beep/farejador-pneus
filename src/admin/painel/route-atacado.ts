@@ -6,11 +6,45 @@ import { z } from 'zod';
 import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { getCommissionLedger, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listWholesaleBuyers, listWholesaleMeasures, registerWholesaleSale, settleCommissionEntries, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
+import { getCommissionLedger, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema } from './route-schemas.js';
 
 export async function registerPainelAtacado(fastify: FastifyInstance): Promise<void> {
+  const reconcilePartnerCostSchema = z.object({
+    item_id: z.string().uuid(),
+    unit_cost: z.number().nonnegative(),
+    reason: z.string().trim().min(5).max(500),
+    evidence: z.string().trim().min(1).max(1000).nullable().optional(),
+    idempotency_key: z.string().trim().min(8).max(200),
+  });
+
+  fastify.get('/admin/api/rede/custos-pendentes', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send({ ...dashboardPayload([]), items: await listPartnerPendingCosts() });
+  });
+
+  fastify.post('/admin/api/rede/custos/reconcile', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = reconcilePartnerCostSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      return reply.status(200).send(await reconcilePartnerItemCost({
+        ...parsed.data, actor_label: operatorLabel(request),
+      }));
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message === 'partner_order_item_not_found') return reply.status(404).send({ error: message });
+      if (message === 'cost_invalid' || message === 'cost_evidence_required') {
+        return reply.status(400).send({ error: message });
+      }
+      if (message === 'cost_already_known' || message === 'cost_reconciliation_conflict') {
+        return reply.status(409).send({ error: message });
+      }
+      const mapped = mapWriteError(error);
+      logger.error({ err: error, status: mapped.status }, 'partner cost reconciliation failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
   fastify.get('/admin/api/wholesale/buyers', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesaleBuyers()));
   });
@@ -82,12 +116,13 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
     const parsed = settleComissaoSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
     try {
-      const result = await settleCommissionEntries({ partner_id: parsed.data.partner_id, settled_by: 'matriz-painel' });
+      const result = await settleCommissionEntries({ ...parsed.data, settled_by: operatorLabel(request) });
       return reply.status(200).send(result);
     } catch (err) {
       if ((err as Error).message === 'nothing_open') return reply.status(404).send({ error: 'nothing_open' });
-      logger.error({ err }, 'painel commission settle failed');
-      return reply.status(500).send({ error: 'internal_error' });
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel commission settle failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
 
@@ -103,15 +138,17 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
         commercial_model: parsed.data.commercial_model,
         commission_percent: parsed.data.commission_percent,
         monthly_fee: parsed.data.monthly_fee,
-        actor_label: 'matriz-painel',
+        idempotency_key: parsed.data.idempotency_key,
+        actor_label: operatorLabel(request),
       });
       return reply.status(200).send(result);
     } catch (err) {
       const msg = (err as Error).message;
       if (msg === 'partner_not_found') return reply.status(404).send({ error: msg });
       if (msg === 'invalid_percent' || msg === 'invalid_fee') return reply.status(400).send({ error: msg });
-      logger.error({ err }, 'painel partner terms update failed');
-      return reply.status(500).send({ error: 'internal_error' });
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel partner terms update failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
 

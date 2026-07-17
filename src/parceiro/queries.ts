@@ -451,11 +451,23 @@ export async function getPartnerRelatorioVendas(ctx: PartnerContext, opts: Relat
     const res = await client.query(
       `SELECT pof.order_id, pof.created_at, pof.contact_name AS customer_name,
               pof.fulfillment_mode, pof.status, pof.delivery_status, pof.awaiting_pickup,
-              pof.total_amount, pof.source_tag,
+               pof.total_amount, pof.source_tag,
+               COALESCE(costs.known_cost, 0) AS known_cost,
+               COALESCE(costs.pending_cost_items, 0) AS pending_cost_items,
+               CASE WHEN COALESCE(costs.pending_cost_items, 0) = 0
+                    THEN pof.total_amount - COALESCE(costs.known_cost, 0)
+                    ELSE NULL::numeric END AS gross_result,
               EXISTS (SELECT 1 FROM commerce.partner_dismissed_items d
                        WHERE d.environment = $1 AND d.unit_id = $2
                          AND d.item_type = 'order' AND d.item_id = pof.order_id::text) AS arquivado
          FROM commerce.partner_orders_full pof
+         LEFT JOIN LATERAL (
+           SELECT COALESCE(sum(poi.quantity::numeric * poi.unit_cost_snapshot)
+                    FILTER (WHERE poi.cost_status='known'), 0) AS known_cost,
+                  count(*) FILTER (WHERE poi.cost_status='pending')::int AS pending_cost_items
+             FROM commerce.partner_order_items poi
+            WHERE poi.environment=pof.environment AND poi.order_id=pof.order_id
+         ) costs ON true
         WHERE pof.environment = $1 AND pof.unit_id = $2
           AND ($3::timestamptz IS NULL OR pof.created_at >= $3::timestamptz)
           AND ($4::timestamptz IS NULL OR pof.created_at <  $4::timestamptz)
@@ -487,14 +499,23 @@ export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: Relato
       `SELECT COALESCE(NULLIF(TRIM(poi.tire_size), ''), poi.item_name) AS medida,
               COALESCE(NULLIF(TRIM(poi.brand), ''), '') AS marca,
               SUM(poi.quantity)::int AS qtd,
-              SUM(poi.quantity * poi.unit_price - poi.discount_amount) AS faturamento
+               SUM(poi.quantity * poi.unit_price - poi.discount_amount) AS faturamento,
+               COALESCE(SUM(poi.quantity::numeric * poi.unit_cost_snapshot) FILTER (WHERE poi.cost_status='known'), 0) AS custo_conhecido,
+               COUNT(*) FILTER (WHERE poi.cost_status='pending')::int AS itens_custo_pendente,
+               CASE WHEN COUNT(*) FILTER (WHERE poi.cost_status='pending') = 0
+                    THEN SUM(poi.quantity * poi.unit_price - poi.discount_amount) - COALESCE(SUM(poi.quantity::numeric * poi.unit_cost_snapshot), 0)
+                    ELSE NULL::numeric END AS resultado_bruto
          FROM commerce.partner_order_items poi
          JOIN commerce.partner_orders_full pof
            ON pof.order_id = poi.order_id AND pof.environment = poi.environment
         WHERE pof.environment = $1 AND pof.unit_id = $2
-          AND pof.status <> 'cancelled'
-          AND ($3::timestamptz IS NULL OR pof.created_at >= $3::timestamptz)
-          AND ($4::timestamptz IS NULL OR pof.created_at <  $4::timestamptz)
+           AND pof.status <> 'cancelled'
+          AND NOT (pof.fulfillment_mode='delivery' AND pof.delivery_status<>'delivered')
+          AND NOT pof.awaiting_pickup
+          AND ($3::timestamptz IS NULL OR (CASE WHEN pof.fulfillment_mode='delivery'
+                  THEN pof.delivered_at ELSE COALESCE(pof.retrieved_at,pof.created_at) END) >= $3::timestamptz)
+          AND ($4::timestamptz IS NULL OR (CASE WHEN pof.fulfillment_mode='delivery'
+                  THEN pof.delivered_at ELSE COALESCE(pof.retrieved_at,pof.created_at) END) < $4::timestamptz)
         GROUP BY 1, 2
         ORDER BY qtd DESC, faturamento DESC
         LIMIT 100`,
@@ -1097,6 +1118,7 @@ export async function cancelPartnerSale(
     // Motivo do cancelamento (free-text do parceiro). Fica gravado no audit e alimenta
     // o antifraude da matriz (2w cancelado + venda porta do mesmo cliente).
     const motivo = (reason ?? '').trim().slice(0, 500) || 'cancelado pelo portal parceiro';
+    await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [`partner:${ctx.slug}`]);
     await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
       orderId,
       `partner:${ctx.slug}`,
@@ -1264,6 +1286,7 @@ export async function updatePartnerDeliveryStatus(
     if (input.delivery_status === 'failed') {
       if (existing.rows[0]!.status !== 'cancelled') {
         const motivoFalha = (input.reason ?? '').trim().slice(0, 500) || 'entrega nao realizada (nao entregue/devolvido)';
+        await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [`partner:${ctx.slug}`]);
         await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
           orderId,
           `partner:${ctx.slug}`,

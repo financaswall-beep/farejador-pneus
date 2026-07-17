@@ -16,16 +16,10 @@ export async function getPainelRede(
   period: PainelRedePeriod = 'month',
   dbPool: Pool = defaultPool,
 ): Promise<unknown[]> {
-  // Computa janela do periodo direto no banco com AT TIME ZONE PAINEL_TZ.
-  // Expressao e constante hard-coded (sem input de usuario) -> sem risco
-  // de injection apesar de interpolada como string.
+  // Janela calculada no banco; expressão/PAINEL_TZ são constantes sem input do usuário.
   const periodStartSql = resolveRedePeriodStartSql(period);
   const todayStartSql = `(date_trunc('day', now() AT TIME ZONE '${PAINEL_TZ}') AT TIME ZONE '${PAINEL_TZ}')`;
-  // 0077: venda do parceiro SÓ "realiza" na entrega (delivery → delivered_at) ou no fechamento
-  // no balcão (pickup → created_at). Pedido de entrega aberto/em separação NÃO é venda realizada
-  // (mesma regra da view network.partner_unit_summary). Fragmentos reusados nos laterais de venda.
-  // 0090: retirada reservada do bot (awaiting_pickup) ainda NÃO é venda; vira venda na retirada
-  // (retrieved_at). Balcão segue por created_at. Mesma régua da view network.partner_unit_summary.
+  // 0077/0090: entrega conta em delivered_at; retirada reservada só em retrieved_at.
   const realizedWhere = `po.status <> 'cancelled' AND po.deleted_at IS NULL AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered') AND NOT po.awaiting_pickup`;
   const realizedDate = `(CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE COALESCE(po.retrieved_at, po.created_at) END)`;
   // Pedido de ENTREGA ainda não entregue (ou retirada aguardando) NÃO é venda — no feed aparece com o status atual.
@@ -51,10 +45,16 @@ export async function getPainelRede(
        s.low_stock_items,
        satisfaction.avg_rating AS satisfaction_avg,
        COALESCE(satisfaction.n, 0) AS satisfaction_count,
-       COALESCE(period_sales.sales_total, 0)
-         - COALESCE(period_purchases.purchases_total, 0)
-         - COALESCE(employee_expenses.employee_total, 0)
-         - COALESCE(other_expenses.other_total, 0) AS estimated_result_month,
+       COALESCE(period_costs.known_cost_total, 0) AS cogs_month,
+       COALESCE(period_costs.pending_cost_items, 0) AS pending_cost_items_month,
+       COALESCE(period_costs.pending_cost_revenue, 0) AS pending_cost_revenue_month,
+       COALESCE(period_costs.pending_cost_items, 0) > 0 AS has_pending_cost_month,
+       CASE WHEN COALESCE(period_costs.pending_cost_items, 0) = 0 THEN
+         COALESCE(period_sales.sales_total, 0)
+           - COALESCE(period_costs.known_cost_total, 0)
+           - COALESCE(employee_expenses.employee_total, 0)
+           - COALESCE(other_expenses.other_total, 0)
+       ELSE NULL::numeric END AS estimated_result_month,
        p.document_number,
        p.responsible_name,
        p.whatsapp_phone,
@@ -108,7 +108,22 @@ export async function getPainelRede(
          AND po.unit_id = s.unit_id
          AND ${realizedWhere}
          AND ${realizedDate} >= ${periodStartSql}::timestamptz
-     ) period_sales ON true
+      ) period_sales ON true
+     LEFT JOIN LATERAL (
+       SELECT
+         COALESCE(sum(oi.quantity::numeric * oi.unit_cost_snapshot)
+           FILTER (WHERE oi.cost_status = 'known'), 0) AS known_cost_total,
+         count(*) FILTER (WHERE oi.cost_status = 'pending')::int AS pending_cost_items,
+         COALESCE(sum(oi.quantity::numeric * oi.unit_price - oi.discount_amount)
+           FILTER (WHERE oi.cost_status = 'pending'), 0) AS pending_cost_revenue
+       FROM commerce.partner_orders po
+       JOIN commerce.partner_order_items oi
+         ON oi.order_id = po.id AND oi.environment = po.environment
+       WHERE po.environment = s.environment
+         AND po.unit_id = s.unit_id
+         AND ${realizedWhere}
+         AND ${realizedDate} >= ${periodStartSql}::timestamptz
+     ) period_costs ON true
      LEFT JOIN LATERAL (
        SELECT COALESCE(sum(total_amount), 0) AS purchases_total
        FROM commerce.partner_purchases pp
@@ -281,4 +296,3 @@ export async function getPainelRede(
   );
   return result.rows;
 }
-

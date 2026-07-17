@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-16T21:25:44.800Z",
-  "total": 127,
+  "geradoEm": "2026-07-17T00:31:07.310Z",
+  "total": 130,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -19,6 +19,7 @@
     "GET /admin/api/matriz/notificacoes AUTH(1)",
     "GET /admin/api/partner-applications AUTH(1)",
     "GET /admin/api/rede/comissoes AUTH(1)",
+    "GET /admin/api/rede/custos-pendentes AUTH(1)",
     "GET /admin/api/varejo/resumo AUTH(1)",
     "GET /admin/api/wholesale/buyers AUTH(1)",
     "GET /admin/api/wholesale/finance AUTH(1)",
@@ -112,9 +113,11 @@
     "POST /admin/api/orders/register-walkin AUTH(1)",
     "POST /admin/api/partner-applications/:id/approve AUTH(1)",
     "POST /admin/api/partner-applications/:id/reject AUTH(1)",
+    "POST /admin/api/partner-units/:id/reissue-token AUTH(1)",
     "POST /admin/api/partners AUTH(1)",
     "POST /admin/api/partners/:partner_id/terms AUTH(1)",
     "POST /admin/api/rede/comissoes/settle AUTH(1)",
+    "POST /admin/api/rede/custos/reconcile AUTH(1)",
     "POST /admin/api/wholesale/finance/settle AUTH(1)",
     "POST /admin/api/wholesale/purchases AUTH(1)",
     "POST /admin/api/wholesale/purchases/cancel AUTH(1)",

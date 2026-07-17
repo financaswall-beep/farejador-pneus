@@ -141,7 +141,10 @@ window.PAINEL_MODULES.redeKpis = function () {
     },
 
     rankingLucro() {
-      return [...this.parceirosRede].sort((a, b) => Number(b.lucroEstimado || 0) - Number(a.lucroEstimado || 0)).slice(0, 4);
+      return this.parceirosRede
+        .filter((parceiro) => !parceiro.custoPendente && parceiro.lucroEstimado !== null)
+        .sort((a, b) => Number(b.lucroEstimado) - Number(a.lucroEstimado))
+        .slice(0, 4);
     },
 
     rankingSaude() {
@@ -178,6 +181,9 @@ window.PAINEL_MODULES.redeKpis = function () {
     redeAlertasOperacionais() {
       const alerts = [];
       for (const parceiro of this.parceirosRede) {
+        if (parceiro.custoPendente) {
+          alerts.push({ tipo: 'Custo pendente', texto: `${parceiro.nome}: ${parceiro.custoPendenteItens} item(ns) sem custo histórico`, tom: 'text-amber-700 bg-amber-50' });
+        }
         if (Number(parceiro.estoqueBaixo || 0) > 0) {
           alerts.push({ tipo: 'Estoque crítico', texto: `${parceiro.nome}: ${parceiro.estoqueBaixo} item(ns) baixo/zerado`, tom: 'text-amber-700 bg-amber-50' });
         }
@@ -187,7 +193,7 @@ window.PAINEL_MODULES.redeKpis = function () {
         if (parceiro.diasSemAtualizar === null || Number(parceiro.diasSemAtualizar) >= 4) {
           alerts.push({ tipo: 'Sem atualização', texto: `${parceiro.nome}: ${parceiro.ultimaAtualizacao || 'sem registro recente'}`, tom: 'text-blue-700 bg-blue-50' });
         }
-        if (Number(parceiro.lucroEstimado || 0) < 0) {
+        if (!parceiro.custoPendente && Number(parceiro.lucroEstimado) < 0) {
           alerts.push({ tipo: 'Resultado negativo', texto: `${parceiro.nome}: ${this.formatCurrency(parceiro.lucroEstimado)} no mês`, tom: 'text-rose-700 bg-rose-50' });
         }
         if (Number(parceiro.percentual2w || 0) >= 70) {

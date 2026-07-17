@@ -1772,6 +1772,7 @@ async function cancelarPedido(
     const reason = detalhes ? `${motivo}: ${detalhes}` : motivo;
     try {
       await client.query('BEGIN');
+      await client.query("SELECT set_config('app.partner_actor_label',$1,true)", ['agent_v2_bot']);
       await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
         order.partner_order_id,
         'agent_v2_bot',

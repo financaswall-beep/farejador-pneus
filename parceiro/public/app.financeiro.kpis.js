@@ -23,7 +23,9 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
 
     get estimatedMargin() {
       const sales = this.num(this.resumo?.sales_month);
-      if (sales <= 0) return 0;
+      const costPending = this.num(this.resumo?.pending_cost_items_month) > 0
+        || this.resumo?.has_pending_cost_month === true;
+      if (sales <= 0 || costPending) return 0;
       return (this.num(this.resumo?.estimated_result_month) / sales) * 100;
     },
 
@@ -178,7 +180,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
 
     get financeCostSplit() {
       return [
-        { label: 'Custo dos pneus vendidos', value: this.num(this.resumo?.cogs_month), color: '#7f8f83' },
+        { label: this.num(this.resumo?.pending_cost_items_month) > 0 ? 'Custo confirmado dos pneus' : 'Custo dos pneus vendidos', value: this.num(this.resumo?.cogs_month), color: '#7f8f83' },
         { label: 'Despesas/contas', value: this.costExpensesCommitted, color: '#dc3f4d' },
       ];
     },

@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-16T16:19:49.074Z",
+  "geradoEm": "2026-07-17T01:30:08.501Z",
   "commitBase": "dd64a35",
-  "total": 635,
+  "total": 636,
   "propriedades": {
     "abrirHistoricoAtacado": "function",
     "abrirHistoricoCliente": "function",
@@ -464,6 +464,7 @@
     "redeTotalPorta": "function",
     "redeTotalVendas": "function",
     "redeTotalVendasValor": "function",
+    "reissueApproveToken": "function",
     "rejectApplication": "function",
     "remarcarEntrega": "function",
     "renderBotMapa": "function",

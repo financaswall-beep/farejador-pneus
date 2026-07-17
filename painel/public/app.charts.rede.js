@@ -92,8 +92,9 @@ window.PAINEL_MODULES.chartsRede = function () {
       if (!ctx) return;
       if (window._redeLucroChart) window._redeLucroChart.destroy();
 
-      const parceiros = [...this.parceirosRede]
-        .sort((a, b) => Number(b.lucroEstimado || 0) - Number(a.lucroEstimado || 0));
+      const parceiros = this.parceirosRede
+        .filter((parceiro) => !parceiro.custoPendente && parceiro.lucroEstimado !== null)
+        .sort((a, b) => Number(b.lucroEstimado) - Number(a.lucroEstimado));
 
       window._redeLucroChart = new Chart(ctx, {
         type: 'bar',

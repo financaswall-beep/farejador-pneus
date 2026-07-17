@@ -35,9 +35,11 @@ export const financePeriodQuerySchema = z.object({
 });
 
 // Comissões da Rede (0118): quitar por parceiro + editor do modelo comercial.
-export const settleComissaoSchema = z.object({ partner_id: z.string().uuid() });
+export const settleComissaoSchema = z.object({ partner_id: z.string().uuid(),
+  idempotency_key: idempotencyKeySchema, reason: z.string().trim().min(2).max(300) });
 export const partnerIdParamSchema = z.object({ partner_id: z.string().uuid() });
 export const partnerTermsSchema = z.object({
+  idempotency_key: idempotencyKeySchema,
   commercial_model: z.enum(['commission', 'monthly', 'hybrid']),
   commission_percent: z.number().min(0).max(100).nullable(),
   monthly_fee: z.number().min(0).nullable(),
@@ -237,6 +239,7 @@ export const applicationsQuerySchema = z.object({
 
 // Aprovação: termos comerciais e cobertura REAL são definidos pelo dono aqui.
 export const approveApplicationSchema = z.object({
+  idempotency_key: idempotencyKeySchema,
   municipios: z.array(z.string().min(1)).min(1),
   commission_percent: z.number().min(0).max(100).nullable().optional(),
   monthly_fee: z.number().min(0).nullable().optional(),

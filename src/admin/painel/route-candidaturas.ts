@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { approvePartnerApplication, createPartnerApplication, listPartnerApplications, rejectPartnerApplication } from './queries.js';
+import { approvePartnerApplication, createPartnerApplication, listPartnerApplications, reissuePartnerCredential, rejectPartnerApplication } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel, sendStatic } from './route-helpers.js';
 import { applicationsQuerySchema, approveApplicationSchema, partnerApplicationSchema } from './route-schemas.js';
 import { rateLimitHit } from '../../shared/rate-limit.js';
@@ -15,6 +15,11 @@ const APPLICATION_MAX_PER_IP = 5;
 const APPLICATION_WINDOW_MS = 60 * 60 * 1000;
 
 export async function registerPainelCandidaturas(fastify: FastifyInstance): Promise<void> {
+  const reissueCredentialSchema = z.object({
+    idempotency_key: z.string().trim().min(8).max(200),
+    reason: z.string().trim().min(5).max(500),
+  });
+
   fastify.post('/api/seja-parceiro', async (request, reply) => {
     const parsed = partnerApplicationSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -62,6 +67,12 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
       if (result.already_exists) return reply.status(409).send({ error: 'slug_already_exists', slug: result.slug });
       return reply.status(200).send(result);
     } catch (err) {
+      const message = (err as Error).message;
+      if (message === 'application_not_found') return reply.status(404).send({ error: message });
+      if (['application_not_pending','slug_already_exists','application_transition_conflict',
+        'approved_application_unit_missing'].includes(message)) {
+        return reply.status(409).send({ error: message });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'partner application approve failed');
       return reply.status(mapped.status).send({ error: mapped.error });
@@ -78,6 +89,25 @@ export async function registerPainelCandidaturas(fastify: FastifyInstance): Prom
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'partner application reject failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/partner-units/:id/reissue-token', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = reissueCredentialSchema.safeParse(request.body);
+    const { id } = request.params as { id: string };
+    if (!parsed.success || !z.string().uuid().safeParse(id).success) {
+      return reply.status(400).send({ error: 'invalid_body' });
+    }
+    try {
+      return reply.status(200).send(await reissuePartnerCredential({ ...parsed.data,
+        partner_unit_id: id,actor_label: operatorLabel(request) }));
+    } catch (error) {
+      if ((error as Error).message === 'partner_unit_not_found') {
+        return reply.status(404).send({ error: 'partner_unit_not_found' });
+      }
+      const mapped = mapWriteError(error);
+      logger.error({ err: error,status: mapped.status }, 'partner credential reissue failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
