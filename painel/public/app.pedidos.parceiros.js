@@ -141,7 +141,8 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       this.approvingApp = app;
       this.approveResult = null;
       this.approveError = null;
-      this.approveForm = { municipios: app.municipios || '', commission_percent: '', slug: '' };
+      this.approveForm = { municipios: app.municipios || '', commission_percent: '', slug: '',
+        idempotency_key: `approve-${app.id}-${crypto.randomUUID()}` };
     },
 
     async confirmApprove() {
@@ -152,12 +153,40 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       this.approveError = null;
       try {
         const result = await this.apiPost(`/admin/api/partner-applications/${this.approvingApp.id}/approve`, {
+          idempotency_key: this.approveForm.idempotency_key,
           municipios,
           commission_percent: this.approveForm.commission_percent === '' ? null : Number(this.approveForm.commission_percent),
           slug: this.approveForm.slug.trim() || null,
         });
         this.approveResult = result; // { slug, token, ... } — login mostrado UMA vez
         await this.loadApplications();
+      } catch (err) {
+        this.approveError = err instanceof Error ? err.message : String(err);
+      } finally {
+        this.approveSubmitting = false;
+      }
+    },
+
+    async reissueApproveToken() {
+      if (this.approveSubmitting || !this.approveResult?.partner_unit_id) return;
+      this.approveSubmitting = true;
+      this.approveError = null;
+      const current = this.approveResult;
+      current._reissueKey = current._reissueKey
+        || `partner-credential-${current.partner_unit_id}-${crypto.randomUUID()}`;
+      try {
+        const result = await this.apiPost(
+          `/admin/api/partner-units/${current.partner_unit_id}/reissue-token`, {
+            idempotency_key: current._reissueKey,
+            reason: 'Reemissão solicitada após aprovação sem token recuperável',
+          });
+        if (!result.token) {
+          delete current._reissueKey;
+          this.approveError = 'A reemissão anterior foi concluída, mas o login não é recuperável. Clique novamente para gerar outro.';
+          return;
+        }
+        this.approveResult = { ...current, ...result, credential_reissue_required: false };
+        delete this.approveResult._reissueKey;
       } catch (err) {
         this.approveError = err instanceof Error ? err.message : String(err);
       } finally {

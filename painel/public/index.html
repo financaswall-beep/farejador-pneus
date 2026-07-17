@@ -1004,7 +1004,7 @@
                 </div>
                 <div class="flex items-center justify-between px-3 py-2 text-sm bg-gray-50">
                   <span class="font-medium">Resultado estimado</span>
-                  <span class="font-bold" :class="parceiroLucroClass()" x-text="formatCurrency(selectedParceiro()?.lucroEstimado)"></span>
+                  <span class="font-bold" :class="parceiroLucroClass()" x-text="selectedParceiro()?.custoPendente ? 'Custo pendente' : formatCurrency(selectedParceiro()?.lucroEstimado)"></span>
                 </div>
               </div>
             </div>
@@ -1190,7 +1190,7 @@
         </div>
         <div class="bg-white border border-gray-200 rounded-xl p-4">
           <div class="text-xs text-gray-500 mb-1">Resultado</div>
-          <div class="text-lg font-bold" :class="parceiroLucroClass()" x-text="formatCurrency(selectedParceiro()?.lucroEstimado)"></div>
+          <div class="text-lg font-bold" :class="parceiroLucroClass()" x-text="selectedParceiro()?.custoPendente ? 'Custo pendente' : formatCurrency(selectedParceiro()?.lucroEstimado)"></div>
         </div>
       </div>
 
@@ -1319,7 +1319,7 @@
             </div>
             <div class="border-t border-gray-100 pt-3 flex items-center justify-between text-sm">
               <span class="font-medium">Resultado estimado</span>
-              <span class="font-bold" :class="parceiroLucroClass()" x-text="formatCurrency(selectedParceiro()?.lucroEstimado)"></span>
+              <span class="font-bold" :class="parceiroLucroClass()" x-text="selectedParceiro()?.custoPendente ? 'Custo pendente' : formatCurrency(selectedParceiro()?.lucroEstimado)"></span>
             </div>
           </div>
 
@@ -4619,12 +4619,19 @@
                 <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
                   Parceiro criado ✅ — slug <span class="font-mono" x-text="approveResult.slug"></span>
                 </div>
-                <div class="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                <div x-show="approveResult.token" class="rounded-lg bg-amber-50 border border-amber-200 p-3">
                   <div class="text-xs font-semibold text-amber-800 mb-1">⚠️ Login (copie agora — não some de novo)</div>
                   <div class="font-mono text-xs break-all bg-white border border-amber-200 rounded p-2" x-text="approveResult.token"></div>
                   <button @click="navigator.clipboard && navigator.clipboard.writeText(approveResult.token)"
                           class="mt-2 text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg">Copiar login</button>
                 </div>
+                <div x-show="!approveResult.token" class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                  O parceiro foi criado, mas o login puro não pode ser recuperado com segurança.
+                  <button @click="reissueApproveToken()" :disabled="approveSubmitting"
+                          class="mt-2 w-full px-3 py-2 bg-amber-600 text-white rounded-lg disabled:opacity-50"
+                          x-text="approveSubmitting ? 'Gerando...' : 'Gerar novo login auditado'"></button>
+                </div>
+                <div x-show="approveError" class="text-sm text-rose-600" x-text="approveError"></div>
                 <button @click="approvingApp = null; approveResult = null" class="w-full px-3 py-2 bg-gray-900 text-white rounded-lg text-sm">Pronto</button>
               </div>
             </template>

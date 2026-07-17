@@ -414,7 +414,7 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="percent"></i></div>
-          <div><small>Lucro do mês</small><strong x-text="money(resumo?.estimated_result_month)"></strong><span x-text="'margem ' + estimatedMargin.toFixed(1).replace('.', ',') + '%'"></span></div>
+          <div><small x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Resultado pendente' : 'Lucro do mês'"></small><strong x-text="num(resumo?.pending_cost_items_month) > 0 ? 'Custo pendente' : money(resumo?.estimated_result_month)"></strong><span x-text="num(resumo?.pending_cost_items_month) > 0 ? num(resumo?.pending_cost_items_month) + ' item(ns) sem custo confirmado' : 'margem ' + estimatedMargin.toFixed(1).replace('.', ',') + '%'"></span></div>
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="wallet"></i></div>
@@ -2381,7 +2381,7 @@
               </div>
               <div class="rel-table-wrap">
                 <table class="rel-table">
-                  <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Status</th><th class="r">Valor</th><th></th></tr></thead>
+                  <thead><tr><th>Data</th><th>Cliente</th><th>Tipo</th><th>Status</th><th class="r">Valor</th><th class="r">Custo histórico</th><th class="r">Resultado bruto</th><th></th></tr></thead>
                   <tbody>
                     <template x-for="r in relRows" :key="r.order_id">
                       <tr :class="r.arquivado && 'is-arq'">
@@ -2390,11 +2390,13 @@
                         <td x-text="r.fulfillment_mode === 'delivery' ? 'Entrega' : (r.fulfillment_mode === 'pickup' ? 'Retirada' : '—')"></td>
                         <td><span x-text="relLinhaStatus(r)"></span> <span class="rel-arq-tag" x-show="r.arquivado">arquivado</span></td>
                         <td class="r" x-text="money(r.total_amount)"></td>
+                        <td class="r" :class="num(r.pending_cost_items) > 0 && 'cost-pending'" x-text="num(r.pending_cost_items) > 0 ? num(r.pending_cost_items) + ' pendente(s)' : money(r.known_cost)"></td>
+                        <td class="r" :class="num(r.pending_cost_items) > 0 && 'cost-pending'" x-text="num(r.pending_cost_items) > 0 ? 'Pendente' : money(r.gross_result)"></td>
                         <td class="r"><button type="button" class="rel-undo" x-show="r.arquivado" @click="desarquivarVenda(r)" title="Trazer de volta pra tela"><i data-lucide="undo-2"></i> voltar</button></td>
                       </tr>
                     </template>
-                    <tr x-show="!relRows.length && !relLoading"><td colspan="6" class="rel-empty">Nada nesse período. Tenta outro filtro.</td></tr>
-                    <tr x-show="relLoading"><td colspan="6" class="rel-empty">Carregando…</td></tr>
+                    <tr x-show="!relRows.length && !relLoading"><td colspan="8" class="rel-empty">Nada nesse período. Tenta outro filtro.</td></tr>
+                    <tr x-show="relLoading"><td colspan="8" class="rel-empty">Carregando…</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2407,11 +2409,12 @@
               <div class="rel-kpis">
                 <div class="rel-kpi"><small>Itens vendidos</small><strong x-text="relPneusUnidades"></strong></div>
                 <div class="rel-kpi"><small>Faturamento</small><strong x-text="money(relPneusFaturamento)"></strong></div>
+                <div class="rel-kpi"><small>Custo confirmado</small><strong x-text="money(relPneusRows.reduce((s, r) => s + num(r.custo_conhecido), 0))"></strong><span x-show="relPneusRows.some((r) => num(r.itens_custo_pendente) > 0)" x-text="relPneusRows.reduce((s, r) => s + num(r.itens_custo_pendente), 0) + ' pendente(s)'"></span></div>
                 <div class="rel-kpi"><small>Modelos diferentes</small><strong x-text="relPneusRows.length"></strong></div>
               </div>
               <div class="rel-table-wrap">
                 <table class="rel-table">
-                  <thead><tr><th>#</th><th>Medida</th><th>Marca</th><th class="r">Qtd</th><th class="r">Faturamento</th></tr></thead>
+                  <thead><tr><th>#</th><th>Medida</th><th>Marca</th><th class="r">Qtd</th><th class="r">Faturamento</th><th class="r">Custo</th><th class="r">Resultado bruto</th></tr></thead>
                   <tbody>
                     <template x-for="(p, i) in relPneusRows" :key="(p.medida || '') + '|' + (p.marca || '') + '|' + i">
                       <tr>
@@ -2420,10 +2423,12 @@
                         <td x-text="p.marca || '—'"></td>
                         <td class="r" x-text="p.qtd"></td>
                         <td class="r" x-text="money(p.faturamento)"></td>
+                        <td class="r" :class="num(p.itens_custo_pendente) > 0 && 'cost-pending'" x-text="num(p.itens_custo_pendente) > 0 ? num(p.itens_custo_pendente) + ' pendente(s)' : money(p.custo_conhecido)"></td>
+                        <td class="r" :class="num(p.itens_custo_pendente) > 0 && 'cost-pending'" x-text="num(p.itens_custo_pendente) > 0 ? 'Pendente' : money(p.resultado_bruto)"></td>
                       </tr>
                     </template>
-                    <tr x-show="!relPneusRows.length && !relPneusLoading"><td colspan="5" class="rel-empty">Nenhuma venda nesse período.</td></tr>
-                    <tr x-show="relPneusLoading"><td colspan="5" class="rel-empty">Carregando…</td></tr>
+                    <tr x-show="!relPneusRows.length && !relPneusLoading"><td colspan="7" class="rel-empty">Nenhuma venda nesse período.</td></tr>
+                    <tr x-show="relPneusLoading"><td colspan="7" class="rel-empty">Carregando…</td></tr>
                   </tbody>
                 </table>
               </div>

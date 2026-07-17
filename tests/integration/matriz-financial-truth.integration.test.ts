@@ -111,14 +111,22 @@ describe('Etapa 4 — verdade financeira da Matriz', () => {
     await wholesale('50.50', '20.20', 'pending');
     await purchase('80.08', 'paid');
     await purchase('30.03', 'pending');
+    const commissionOrders = await db.pool.query<{ id: string; total_amount: string }>(
+      `INSERT INTO commerce.partner_orders
+         (environment,unit_id,total_amount,status,fulfillment_mode,source_tag,closed_at)
+       VALUES ('test',$1,100.10,'confirmed','pickup','financial_truth_fixture',now()),
+              ('test',$1,50.50,'confirmed','pickup','financial_truth_fixture',now())
+       RETURNING id,total_amount`, [mainUnitId]);
+    const settledOrderId = commissionOrders.rows.find((row) => Number(row.total_amount) === 100.10)!.id;
+    const openOrderId = commissionOrders.rows.find((row) => Number(row.total_amount) === 50.50)!.id;
     await db.pool.query(
       `INSERT INTO network.commission_entries
          (environment,partner_id,unit_id,partner_order_id,order_total,commission_percent,
           commission_amount,status,realized_at,settled_at)
        VALUES
-         ('test',$1,$2,gen_random_uuid(),100.10,10,10.01,'settled',now(),now()),
-         ('test',$1,$2,gen_random_uuid(),50.50,10,5.05,'open',now(),NULL)`,
-      [partnerId, mainUnitId],
+         ('test',$1,$2,$3,100.10,10,10.01,'settled',now(),now()),
+         ('test',$1,$2,$4,50.50,10,5.05,'open',now(),NULL)`,
+      [partnerId, mainUnitId,settledOrderId,openOrderId],
     );
     await db.pool.query(
       `INSERT INTO commerce.matriz_expenses

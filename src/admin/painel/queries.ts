@@ -1,4 +1,5 @@
 export * from './queries-stock-reconciliation.js';
+export * from './queries-rede-custos.js';
 
 /**
  * Banco da MATRIZ — PORTA DE ENTRADA (obra 300, 2026-07-05).
@@ -12,7 +13,8 @@ export * from './queries-pedidos.js'; // tipos de pedido + getPainelPedidos/Prod
 export * from './queries-rede.js'; // getPainelRede — o agregado por parceiro da página Rede
 export * from './queries-rede-resumo.js'; // funil da Rede + resumo da matriz (getMatrizResumo)
 export * from './queries-pedidos-acoes.js'; // registrar pedido manual/walk-in + cancelar + raio de entrega
-export * from './queries-parceiros.js'; // criar parceiro + candidaturas (aprovar/rejeitar)
+export * from './queries-parceiros.js'; // criação transacional de parceiro
+export * from './queries-candidaturas.js'; // candidatura atômica/idempotente (Etapa 6)
 export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo
 export * from './queries-galpao-movimentos.js'; // filme do galpão (0128): rótulo, baixa manual c/ motivo, leitura
@@ -22,6 +24,7 @@ export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despes
 export * from './queries-despesas-categorias.js'; // modalidades de despesa cadastráveis pelo dono (0130)
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)
 export * from './queries-comissoes.js'; // comissões como lançamento (0118): varredura, livro, quitar, termos
+export * from './queries-comissoes-acoes.js'; // Etapa 6: liquidação/termos atômicos e idempotentes
 export * from './queries-financeiro-visao.js'; // visão consolidada do Financeiro da matriz (só leitura)
 export * from './queries-financeiro-verdade.js'; // Etapa 4: competência × caixa × posição + conciliação
 export * from './queries-logistica.js'; // logística (0121) leitura: entregas, rotas, status, falha

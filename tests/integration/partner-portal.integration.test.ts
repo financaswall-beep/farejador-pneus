@@ -119,6 +119,157 @@ describe('Portal Parceiro — venda baixa estoque', () => {
 });
 
 // --------------------------------------------------------------
+// Etapa 6 — custo histórico imutável
+// --------------------------------------------------------------
+describe('Portal Parceiro — custo histórico da venda', () => {
+  it('congela o custo do item e compra futura não reprecifica a venda passada', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 10 });
+
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Custo histórico',
+      customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 150 }],
+      payment_method: 'pix',
+      fulfillment_mode: 'pickup',
+      source_tag: 'porta',
+      idempotency_key: `cost-sale-${randomUUID()}`,
+    }, db.pool);
+
+    const before = await db.pool.query<{
+      unit_cost_snapshot: string; cost_status: string; estimated_result_month: string;
+    }>(
+      `SELECT oi.unit_cost_snapshot, oi.cost_status, s.estimated_result_month
+         FROM commerce.partner_order_items oi
+         JOIN commerce.partner_orders po ON po.id=oi.order_id AND po.environment=oi.environment
+         JOIN network.partner_unit_summary s ON s.unit_id=po.unit_id AND s.environment=po.environment
+        WHERE oi.order_id=$1`,
+      [sale.order_id],
+    );
+    expect(before.rows[0]).toMatchObject({
+      unit_cost_snapshot: '80.00',
+      cost_status: 'known',
+      estimated_result_month: '70.00',
+    });
+
+    await q.registerPartnerPurchase(f.ctx, {
+      supplier_name: null,
+      purchased_at: null,
+      payment_method: 'pix',
+      payment_status: 'paid_now',
+      payable_due_date: null,
+      notes: null,
+      idempotency_key: `cost-purchase-${randomUUID()}`,
+      items: [{
+        product_id: null,
+        item_name: f.stockItemName,
+        tire_size: '90/90-18',
+        brand: 'Michelin',
+        quantity: 10,
+        unit_cost: 120,
+        sale_price: 150,
+      }],
+    }, db.pool);
+
+    const after = await db.pool.query<{
+      unit_cost_snapshot: string; average_cost: string; estimated_result_month: string;
+    }>(
+      `SELECT oi.unit_cost_snapshot, ps.average_cost, s.estimated_result_month
+         FROM commerce.partner_order_items oi
+         JOIN commerce.partner_orders po ON po.id=oi.order_id AND po.environment=oi.environment
+         JOIN commerce.partner_stock_levels ps ON ps.id=oi.partner_stock_id
+         JOIN network.partner_unit_summary s ON s.unit_id=po.unit_id AND s.environment=po.environment
+        WHERE oi.order_id=$1`,
+      [sale.order_id],
+    );
+    expect(after.rows[0]?.average_cost).not.toBe('80.00');
+    expect(after.rows[0]?.unit_cost_snapshot).toBe('80.00');
+    expect(after.rows[0]?.estimated_result_month).toBe('70.00');
+  });
+
+  it('marca custo ausente como pendente e não inventa lucro', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 3 });
+    await db.pool.query('UPDATE commerce.partner_stock_levels SET average_cost=NULL WHERE id=$1', [f.stockId]);
+
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Custo pendente',
+      customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 150 }],
+      payment_method: 'pix',
+      fulfillment_mode: 'pickup',
+      source_tag: 'porta',
+      idempotency_key: `pending-cost-${randomUUID()}`,
+    }, db.pool);
+
+    const result = await db.pool.query<{
+      id: string;
+      unit_cost_snapshot: string | null; cost_status: string;
+      estimated_result_month: string | null; pending_cost_items_month: number;
+    }>(
+      `SELECT oi.id, oi.unit_cost_snapshot, oi.cost_status, s.estimated_result_month,
+              s.pending_cost_items_month
+         FROM commerce.partner_order_items oi
+         JOIN commerce.partner_orders po ON po.id=oi.order_id AND po.environment=oi.environment
+         JOIN network.partner_unit_summary s ON s.unit_id=po.unit_id AND s.environment=po.environment
+        WHERE oi.order_id=$1`,
+      [sale.order_id],
+    );
+    expect(result.rows[0]).toMatchObject({
+      unit_cost_snapshot: null,
+      cost_status: 'pending',
+      estimated_result_month: null,
+      pending_cost_items_month: 1,
+    });
+
+    const admin = await import('../../src/admin/painel/queries-rede-custos.js');
+    const key = `cost-reconcile-${randomUUID()}`;
+    const reconciled = await admin.reconcilePartnerItemCost({
+      item_id: result.rows[0]!.id, unit_cost: 42.5,
+      reason: 'nota fiscal original conferida', evidence: 'NF fixture 123',
+      actor_label: 'admin:test', idempotency_key: key, environment: 'test',
+    }, db.pool);
+    expect(reconciled).toMatchObject({ unit_cost_snapshot: '42.50', cost_status: 'known' });
+    const replay = await admin.reconcilePartnerItemCost({
+      item_id: result.rows[0]!.id, unit_cost: 42.5,
+      reason: 'nota fiscal original conferida', evidence: 'NF fixture 123',
+      actor_label: 'admin:test', idempotency_key: key, environment: 'test',
+    }, db.pool);
+    expect(replay).toMatchObject({ unit_cost_snapshot: '42.50', replayed: true });
+
+    const after = await db.pool.query(
+      `SELECT s.estimated_result_month,s.pending_cost_items_month,
+              e.actor_label,e.payload_before,e.payload_after
+         FROM commerce.partner_order_items oi
+         JOIN commerce.partner_orders po ON po.id=oi.order_id AND po.environment=oi.environment
+         JOIN network.partner_unit_summary s ON s.unit_id=po.unit_id AND s.environment=po.environment
+         JOIN audit.events e ON e.entity_id=oi.id AND e.event_type='partner_item_cost_reconciled'
+        WHERE oi.id=$1`, [result.rows[0]!.id]);
+    expect(after.rows[0]).toMatchObject({ estimated_result_month: '107.50',
+      pending_cost_items_month: 0, actor_label: 'admin:test' });
+    expect(after.rows[0].payload_before.cost_status).toBe('pending');
+    expect(after.rows[0].payload_after).toMatchObject({ reason: 'nota fiscal original conferida',
+      evidence: 'NF fixture 123' });
+  });
+
+  it('impede alteração direta do snapshot depois da venda', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool);
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Imutável', customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 150 }],
+      payment_method: 'pix', fulfillment_mode: 'pickup', source_tag: 'porta',
+      idempotency_key: `immutable-cost-${randomUUID()}`,
+    }, db.pool);
+
+    await expect(db.pool.query(
+      `UPDATE commerce.partner_order_items SET unit_cost_snapshot=999 WHERE order_id=$1`,
+      [sale.order_id],
+    )).rejects.toThrow(/partner_order_item_cost_snapshot_immutable/);
+  });
+});
+
+// --------------------------------------------------------------
 // 2. Estoque insuficiente → erro controlado (BUG #2 da 0042)
 // --------------------------------------------------------------
 describe('Portal Parceiro — estoque insuficiente', () => {

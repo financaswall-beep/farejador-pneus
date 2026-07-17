@@ -32,10 +32,11 @@ window.PAINEL_MODULES.unidadeKpis = function () {
 
     parceiroTotalCustos(parceiro = this.selectedParceiro()) {
       if (!parceiro) return 0;
-      return Number(parceiro.comprasPneus || 0) + Number(parceiro.folha || 0) + Number(parceiro.despesasExtras || 0);
+      return Number(parceiro.cogsValor || 0) + Number(parceiro.folha || 0) + Number(parceiro.despesasExtras || 0);
     },
 
     parceiroLucroClass(parceiro = this.selectedParceiro()) {
+      if (parceiro?.custoPendente) return 'text-amber-700';
       return Number(parceiro?.lucroEstimado || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700';
     },
 
@@ -65,14 +66,18 @@ window.PAINEL_MODULES.unidadeKpis = function () {
       const estoqueItens = parceiro.estoqueItens || [];
       const margemValor = parceiro.margemValor ?? (Number(String(parceiro.margem || '0').replace('%', '')) || 0);
       const checks = [
-        { label: 'Resultado positivo', ok: Number(parceiro.lucroEstimado || 0) >= 0, peso: 20 },
         { label: 'Vendeu hoje', ok: this.parceiroVendaHojeValor(parceiro) > 0, peso: 15 },
         { label: 'Estoque atualizado', ok: Number(parceiro.diasSemAtualizar ?? 99) <= 3, peso: 15 },
         { label: 'Estoque saudável', ok: estoqueItens.length > 0 && !estoqueItens.some((item) => ['zerado', 'baixo'].includes(item.status)), peso: 15 },
-        { label: 'Margem boa', ok: margemValor >= 20, peso: 15 },
         { label: 'Custos registrados', ok: Number(parceiro.comprasPneus || 0) > 0 || Number(parceiro.despesasExtras || 0) > 0 || Number(parceiro.folha || 0) > 0, peso: 10 },
         { label: 'Parceria 2W ativa', ok: Number(parceiro.vendas2w || 0) > 0, peso: 10 },
       ];
+      if (parceiro.custoPendente) {
+        checks.unshift({ label: 'Custo histórico confirmado', ok: false, peso: 35 });
+      } else {
+        checks.unshift({ label: 'Resultado positivo', ok: Number(parceiro.lucroEstimado || 0) >= 0, peso: 20 });
+        checks.push({ label: 'Margem boa', ok: margemValor >= 20, peso: 15 });
+      }
       // Nota do cliente (0105/0131): só entra quando HÁ amostra — o único sinal que o
       // parceiro não falsifica. Sem nota ainda → o check não aparece (não pune a amostra
       // vazia; o saudeScore normaliza pelos pesos presentes).

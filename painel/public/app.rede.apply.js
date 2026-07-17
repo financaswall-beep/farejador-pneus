@@ -80,7 +80,10 @@ window.PAINEL_MODULES.redeApply = function () {
         const comprasPneus = Number(row.purchases_month || 0);
         const folha = Number(row.employee_total || 0);
         const despesasExtras = Number(row.other_expenses_total || 0);
-        const lucroEstimado = Number(row.estimated_result_month || 0);
+        const custoPendenteItens = Number(row.pending_cost_items_month || 0);
+        const custoPendente = custoPendenteItens > 0 || row.has_pending_cost_month === true;
+        const lucroEstimado = custoPendente || row.estimated_result_month === null
+          || row.estimated_result_month === undefined ? null : Number(row.estimated_result_month);
         const ticket = pedidos > 0 ? vendasValor / pedidos : 0;
         const estoqueRows = Array.isArray(row.stock_rows) ? row.stock_rows : [];
         const events = Array.isArray(row.recent_events) ? row.recent_events : [];
@@ -91,7 +94,8 @@ window.PAINEL_MODULES.redeApply = function () {
         const seriePedidos = Array.isArray(row.order_series) && row.order_series.length > 0
           ? row.order_series.map((value) => Number(value || 0))
           : [0, 0, 0, 0, 0, 0, Number(row.orders_today || 0)];
-        const margem = vendasValor > 0 ? Math.round((lucroEstimado / vendasValor) * 100) : null;
+        const margem = vendasValor > 0 && lucroEstimado !== null
+          ? Math.round((lucroEstimado / vendasValor) * 100) : null;
         const lastActivityTimes = [
           ...estoqueRows.map((item) => item.updated_at),
           ...events.map((event) => event.event_at),
@@ -159,9 +163,13 @@ window.PAINEL_MODULES.redeApply = function () {
           margem: margem === null ? '-' : `${margem}%`,
           margemValor: margem,
           comprasPneus,
+          cogsValor: Number(row.cogs_month || 0),
           folha,
           despesasExtras,
           lucroEstimado,
+          custoPendente,
+          custoPendenteItens,
+          custoPendenteReceita: Number(row.pending_cost_revenue_month || 0),
           vendas2w,
           vendasPorta,
           pedidos2w,
@@ -180,7 +188,9 @@ window.PAINEL_MODULES.redeApply = function () {
           comissaoDevida,
           mensalidadeDevida,
           devidoMatriz,
-          alerta: Number(row.low_stock_items || 0) > 0
+          alerta: custoPendente
+            ? `${custoPendenteItens} custo(s) pendente(s)`
+            : Number(row.low_stock_items || 0) > 0
             ? `${row.low_stock_items} baixos`
             : Number(row.orders_today || 0) <= 0
               ? 'sem venda hoje'

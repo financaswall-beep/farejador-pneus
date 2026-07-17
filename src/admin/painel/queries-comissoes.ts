@@ -1,15 +1,9 @@
 // Obra 300 (2026-07-05): fatia do banco da MATRIZ — comissões como lançamento (0118): varredura, livro, quitar, termos.
 // VERBATIM das linhas 2006-2207 do queries.ts pré-obra (commit 2628748).
 // Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
-import type { Pool, PoolClient } from 'pg';
-import { randomBytes } from 'node:crypto';
+import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-import { normalizeBrazilianPhone } from '../../shared/phone.js';
-import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
-import { resolveMeasureInCatalog } from './wholesale-catalog.js';
-import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
-import { hashPassword } from '../../parceiro/password.js';
 
 export interface CommissionSweepResult {
   created: number;
@@ -24,7 +18,10 @@ export async function sweepCommissionEntries(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<CommissionSweepResult> {
-  const ins = await dbPool.query(
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const ins = await client.query<{ id: string; partner_order_id: string }>(
     `INSERT INTO network.commission_entries
        (environment, partner_id, partner_unit_id, unit_id, partner_order_id,
         order_total, commission_percent, commission_amount, realized_at)
@@ -46,27 +43,68 @@ export async function sweepCommissionEntries(
         AND NOT po.awaiting_pickup
         AND p.commercial_model IN ('commission', 'hybrid')
         AND COALESCE(p.commission_percent, 0) > 0
-     ON CONFLICT (environment, partner_order_id) DO NOTHING`,
+     ON CONFLICT (environment, partner_order_id) DO NOTHING
+     RETURNING id,partner_order_id`,
     [environment],
   );
+    for (const row of ins.rows) {
+      await client.query(
+        `INSERT INTO network.commission_entry_events
+          (environment,commission_entry_id,partner_order_id,event_type,previous_status,
+           new_status,actor_label,reason,idempotency_key,payload)
+         VALUES ($1,$2,$3,'created',NULL,'open','commission-reconciler',
+           'reconciliação de venda realizada anterior ao gatilho',$4,'{}'::jsonb)
+         ON CONFLICT DO NOTHING`,
+        [environment,row.id,row.partner_order_id,`commission-created-${row.partner_order_id}`],
+      );
+    }
 
-  const rev = await dbPool.query(
-    `UPDATE network.commission_entries ce
-        SET status = 'reversed', reversed_at = now(),
-            reversed_reason = 'venda cancelada/desfeita'
-      WHERE ce.environment = $1
-        AND ce.status IN ('open', 'settled')
-        AND (
-          NOT EXISTS (SELECT 1 FROM commerce.partner_orders po
-                       WHERE po.id = ce.partner_order_id AND po.environment = ce.environment)
-          OR EXISTS (SELECT 1 FROM commerce.partner_orders po
-                      WHERE po.id = ce.partner_order_id AND po.environment = ce.environment
-                        AND (po.status = 'cancelled' OR po.deleted_at IS NOT NULL))
-        )`,
+    const rev = await client.query<{
+      id: string; partner_order_id: string; previous_status: string; order_exists: boolean;
+    }>(
+    `WITH targets AS (
+       SELECT ce.id,ce.partner_order_id,ce.status AS previous_status
+         FROM network.commission_entries ce
+        WHERE ce.environment=$1 AND ce.status IN ('open','settled')
+          AND (NOT EXISTS (SELECT 1 FROM commerce.partner_orders po
+                 WHERE po.id=ce.partner_order_id AND po.environment=ce.environment)
+            OR EXISTS (SELECT 1 FROM commerce.partner_orders po
+                 WHERE po.id=ce.partner_order_id AND po.environment=ce.environment
+                   AND (po.status='cancelled' OR po.deleted_at IS NOT NULL)))
+        FOR UPDATE
+     )
+     UPDATE network.commission_entries ce
+         SET status = 'reversed', reversed_at = now(),
+             reversed_reason = 'venda cancelada/desfeita'
+        FROM targets t WHERE ce.id=t.id
+      RETURNING ce.id,ce.partner_order_id,t.previous_status,
+        EXISTS (SELECT 1 FROM commerce.partner_orders po
+          WHERE po.environment=ce.environment AND po.id=ce.partner_order_id) AS order_exists`,
     [environment],
-  );
-
-  return { created: ins.rowCount ?? 0, reversed: rev.rowCount ?? 0 };
+    );
+    for (const row of rev.rows) {
+      // Órfãos legados já são preservados pela FK NOT VALID da 0139; não se
+      // fabrica evento causal apontando para uma venda que não existe mais.
+      if (!row.order_exists) continue;
+      await client.query(
+        `INSERT INTO network.commission_entry_events
+          (environment,commission_entry_id,partner_order_id,event_type,previous_status,
+           new_status,actor_label,reason,idempotency_key,payload)
+         VALUES ($1,$2,$3,'reversed',$4,'reversed','commission-reconciler',
+           'venda cancelada/desfeita',$5,'{}'::jsonb)
+         ON CONFLICT DO NOTHING`,
+        [environment,row.id,row.partner_order_id,row.previous_status,
+         `commission-reversed-${row.partner_order_id}`],
+      );
+    }
+    await client.query('COMMIT');
+    return { created: ins.rowCount ?? 0, reversed: rev.rowCount ?? 0 };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export interface CommissionLedger {
@@ -133,75 +171,6 @@ export async function getCommissionLedger(
   };
 }
 
-/** "Recebi": quita TODOS os lançamentos em aberto de um parceiro (open → settled).
- *  Nada em aberto → nothing_open (não inventa quitação). */
-export async function settleCommissionEntries(
-  input: { partner_id: string; settled_by: string; environment?: 'prod' | 'test' },
-  dbPool: Pool = defaultPool,
-): Promise<{ settled_count: number; settled_total: string }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const r = await dbPool.query<{ commission_amount: string }>(
-    `UPDATE network.commission_entries
-        SET status = 'settled', settled_at = now(), settled_by = $3
-      WHERE environment = $1 AND partner_id = $2 AND status = 'open'
-      RETURNING commission_amount`,
-    [environment, input.partner_id, input.settled_by],
-  );
-  if ((r.rowCount ?? 0) === 0) throw new Error('nothing_open');
-  const total = r.rows.reduce((sum, row) => sum + Number(row.commission_amount), 0);
-  return { settled_count: r.rowCount ?? 0, settled_total: total.toFixed(2) };
-}
-
-/** Editor do MODELO COMERCIAL do parceiro (pendência de 06-01): grava modelo + % +
- *  mensalidade na FICHA (network.partners) com trilha em audit.events. Vale pra
- *  lançamentos NOVOS — o que já foi lançado fica com o % da época (congelado, regra
- *  do dono). SEM flag: é edição de cadastro, aditiva. */
-export async function updatePartnerCommercialTerms(
-  input: {
-    partner_id: string;
-    commercial_model: 'commission' | 'monthly' | 'hybrid';
-    commission_percent: number | null;
-    monthly_fee: number | null;
-    actor_label: string;
-    environment?: 'prod' | 'test';
-  },
-  dbPool: Pool = defaultPool,
-): Promise<{ updated: true }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  if (input.commission_percent !== null && (input.commission_percent < 0 || input.commission_percent > 100)) {
-    throw new Error('invalid_percent');
-  }
-  if (input.monthly_fee !== null && input.monthly_fee < 0) throw new Error('invalid_fee');
-
-  const before = await dbPool.query(
-    `SELECT commercial_model, commission_percent, monthly_fee FROM network.partners
-      WHERE id = $1 AND environment = $2 AND deleted_at IS NULL`,
-    [input.partner_id, environment],
-  );
-  if (!before.rows[0]) throw new Error('partner_not_found');
-
-  await dbPool.query(
-    `UPDATE network.partners
-        SET commercial_model = $3, commission_percent = $4, monthly_fee = $5, updated_at = now()
-      WHERE id = $1 AND environment = $2 AND deleted_at IS NULL`,
-    [input.partner_id, environment, input.commercial_model, input.commission_percent, input.monthly_fee],
-  );
-  await dbPool.query(
-    `INSERT INTO audit.events (environment, domain, entity_table, entity_id, event_type, actor_label, idempotency_key, payload_after)
-     VALUES ($1, 'network', 'network.partners', $2, 'partner_terms_updated', $3, $4, $5::jsonb)`,
-    [environment, input.partner_id, input.actor_label, `terms-${input.partner_id}-${Date.now()}`,
-     JSON.stringify({
-       before: before.rows[0],
-       after: {
-         commercial_model: input.commercial_model,
-         commission_percent: input.commission_percent,
-         monthly_fee: input.monthly_fee,
-       },
-     })],
-  );
-  return { updated: true };
-}
-
 // ─── FINANCEIRO DA MATRIZ — VISÃO CONSOLIDADA (Onda 1: SÓ LEITURA) ────────────
 // A tela Financeiro num payload só: consolidado do MÊS das 3 pernas (atacado +
 // varejo 0117 + comissão 0118) menos as despesas (0120), A RECEBER e A PAGAR
@@ -212,4 +181,3 @@ export async function updatePartnerCommercialTerms(
 // comissão NÃO roda aqui de propósito (roda na PORTA: boot do painel, GET da
 // Rede e — desde a auditoria 07-08 — GET do Financeiro; a visão continua leitura
 // barata e sem efeito colateral, testável a seco).
-

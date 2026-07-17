@@ -18,7 +18,10 @@ window.PAINEL_MODULES.comissoes = function () {
       if (!confirm(`Confirmar RECEBIDO de ${p.partner_name}?\n\n${p.open_count} lançamento(s) em aberto, total ${total}, viram "recebido" agora.`)) return;
       this.comissaoSettling = p.partner_id;
       try {
-        await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: p.partner_id });
+        p._settleIdempotencyKey = p._settleIdempotencyKey || `commission-settle-${p.partner_id}-${crypto.randomUUID()}`;
+        await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: p.partner_id,
+          idempotency_key: p._settleIdempotencyKey, reason: 'Recebimento confirmado no painel' });
+        delete p._settleIdempotencyKey;
         await this.loadComissoes();
       } catch (err) {
         alert('Não deu pra quitar: ' + (err instanceof Error ? err.message : err));
@@ -51,6 +54,7 @@ window.PAINEL_MODULES.comissoes = function () {
         model: p.modeloComercialRaw || 'commission',
         percent: p.comissaoPercentRaw === null || p.comissaoPercentRaw === undefined ? '' : p.comissaoPercentRaw,
         fee: p.mensalidadeRaw === null || p.mensalidadeRaw === undefined ? '' : p.mensalidadeRaw,
+        idempotency_key: `partner-terms-${p.partnerId}-${crypto.randomUUID()}`,
       };
     },
     async salvarTerms() {
@@ -60,11 +64,13 @@ window.PAINEL_MODULES.comissoes = function () {
       this.termsMsg = null;
       try {
         await this.apiPost(`/admin/api/partners/${p.partnerId}/terms`, {
+          idempotency_key: this.termsForm.idempotency_key,
           commercial_model: this.termsForm.model,
           commission_percent: this.termsForm.percent === '' ? null : Number(this.termsForm.percent),
           monthly_fee: this.termsForm.fee === '' ? null : Number(this.termsForm.fee),
         });
         this.termsMsg = 'Salvo ✓';
+        this.termsForm.idempotency_key = `partner-terms-${p.partnerId}-${crypto.randomUUID()}`;
         await this.loadRealData(); // a ficha muda o rótulo da Rede (comissão %)
       } catch (err) {
         this.termsMsg = 'Erro: ' + (err instanceof Error ? err.message : err);

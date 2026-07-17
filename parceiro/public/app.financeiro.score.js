@@ -12,13 +12,17 @@ window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.financeiroScore = () => ({
     get healthChecks() {
       const stock = this.stockBreakdown;
+      const costPending = this.num(this.resumo?.pending_cost_items_month) > 0
+        || this.resumo?.has_pending_cost_month === true;
       const recentStockUpdate = this.estoque.some((item) => {
         if (!item.updated_at) return false;
         return Date.now() - new Date(item.updated_at).getTime() < 7 * 24 * 60 * 60 * 1000;
       });
       return [
         { label: 'Venda registrada hoje',         ok: this.salesTodayCount > 0 },
-        { label: 'Resultado mensal positivo',     ok: this.num(this.resumo?.estimated_result_month) > 0 },
+        costPending
+          ? { label: 'Custo histórico pendente', ok: false }
+          : { label: 'Resultado mensal positivo', ok: this.num(this.resumo?.estimated_result_month) > 0 },
         { label: 'Estoque cadastrado',            ok: this.num(this.resumo?.stock_items) > 0 },
         { label: 'Sem item zerado',               ok: stock.out_of_stock === 0 },
         { label: 'Estoque atualizado na semana',  ok: recentStockUpdate },
@@ -42,15 +46,19 @@ window.PARCEIRO_MODULES.financeiroScore = () => ({
       const overdueOut = this.num(this.fluxoCaixa?.overdue_out);
       const stockItems = this.num(this.resumo?.stock_items);
       const lowStockItems = this.num(this.resumo?.low_stock_items);
+      const costPending = this.num(this.resumo?.pending_cost_items_month) > 0
+        || this.resumo?.has_pending_cost_month === true;
       let score = 500;
 
-      if (result > 0) score += 120;
-      if (result < 0) score -= 120;
+      if (!costPending) {
+        if (result > 0) score += 120;
+        if (result < 0) score -= 120;
 
-      if (margin >= 25) score += 140;
-      else if (margin >= 15) score += 100;
-      else if (margin > 0) score += 50;
-      else if (sales > 0) score -= 80;
+        if (margin >= 25) score += 140;
+        else if (margin >= 15) score += 100;
+        else if (margin > 0) score += 50;
+        else if (sales > 0) score -= 80;
+      }
 
       if (cashNet >= 0) score += 90;
       else score -= 120;
@@ -70,8 +78,8 @@ window.PARCEIRO_MODULES.financeiroScore = () => ({
       if (this.avgTicket > 0) score += 45;
       else score -= 20;
 
-      if (sales > 0 && breakEven > 0 && sales >= breakEven) score += 70;
-      if (sales > 0 && breakEven > 0 && sales < breakEven) score -= 70;
+      if (!costPending && sales > 0 && breakEven > 0 && sales >= breakEven) score += 70;
+      if (!costPending && sales > 0 && breakEven > 0 && sales < breakEven) score -= 70;
 
       if (stockItems > 0) score += 55;
       else score -= 50;
@@ -114,25 +122,27 @@ window.PARCEIRO_MODULES.financeiroScore = () => ({
       const futureNet = this.num(this.resumo?.net_future_position);
       const stockItems = this.num(this.resumo?.stock_items);
       const lowStockItems = this.num(this.resumo?.low_stock_items);
+      const costPending = this.num(this.resumo?.pending_cost_items_month) > 0
+        || this.resumo?.has_pending_cost_month === true;
 
       return [
         {
           label: 'Resultado',
-          ok: result >= 0,
-          value: this.money(result),
-          hint: result >= 0 ? 'Venda cobre CMV e despesas.' : 'Revise preço, custo ou despesas.',
+          ok: !costPending && result >= 0,
+          value: costPending ? 'Pendente' : this.money(result),
+          hint: costPending ? 'Há item vendido sem custo histórico confirmado.' : (result >= 0 ? 'Venda cobre CMV e despesas.' : 'Revise preço, custo ou despesas.'),
         },
         {
           label: 'Margem',
-          ok: this.estimatedMargin >= 15 || sales <= 0,
-          value: `${this.estimatedMargin.toFixed(1).replace('.', ',')}%`,
-          hint: sales <= 0 ? 'Sem vendas no mês.' : (this.estimatedMargin >= 15 ? 'Margem saudável.' : 'Margem baixa para o mês.'),
+          ok: !costPending && (this.estimatedMargin >= 15 || sales <= 0),
+          value: costPending ? 'Pendente' : `${this.estimatedMargin.toFixed(1).replace('.', ',')}%`,
+          hint: costPending ? 'A margem não é calculada com custo incompleto.' : (sales <= 0 ? 'Sem vendas no mês.' : (this.estimatedMargin >= 15 ? 'Margem saudável.' : 'Margem baixa para o mês.')),
         },
         {
           label: 'Custo do mês',
-          ok: sales >= breakEven || breakEven <= 0,
-          value: this.money(breakEven),
-          hint: breakEven <= 0 ? 'Sem custos lançados.' : (sales >= breakEven ? 'Vendas cobrem o custo do mês.' : `Faltam ${this.money(Math.max(0, breakEven - sales))} em vendas.`),
+          ok: !costPending && (sales >= breakEven || breakEven <= 0),
+          value: costPending ? `${this.money(breakEven)} confirmado` : this.money(breakEven),
+          hint: costPending ? `${this.num(this.resumo?.pending_cost_items_month)} item(ns) aguardando custo.` : (breakEven <= 0 ? 'Sem custos lançados.' : (sales >= breakEven ? 'Vendas cobrem o custo do mês.' : `Faltam ${this.money(Math.max(0, breakEven - sales))} em vendas.`)),
         },
         {
           label: 'Vencidos',
@@ -163,12 +173,15 @@ window.PARCEIRO_MODULES.financeiroScore = () => ({
       const overdueIn = this.num(this.fluxoCaixa?.overdue_in);
       const futureNet = this.num(this.resumo?.net_future_position);
       const lowStockItems = this.num(this.resumo?.low_stock_items);
+      const costPending = this.num(this.resumo?.pending_cost_items_month) > 0
+        || this.resumo?.has_pending_cost_month === true;
 
+      if (costPending) tips.push(`Confirme o custo histórico de ${this.num(this.resumo?.pending_cost_items_month)} item(ns) vendido(s).`);
       if (overdueOut > 0) tips.push(`Pague ou renegocie ${this.money(overdueOut)} vencidos.`);
       if (overdueIn > 0) tips.push(`Cobre ${this.money(overdueIn)} de clientes vencidos.`);
       if (sales <= 0) tips.push('Registre as vendas do dia para o score sair do modo inicial.');
-      if (breakEven > 0 && sales < breakEven) tips.push(`Venda mais ${this.money(breakEven - sales)} para cobrir o custo do mês.`);
-      if (this.estimatedMargin > 0 && this.estimatedMargin < 15) tips.push('Aumente preço ou reduza custo: margem abaixo de 15%.');
+      if (!costPending && breakEven > 0 && sales < breakEven) tips.push(`Venda mais ${this.money(breakEven - sales)} para cobrir o custo do mês.`);
+      if (!costPending && this.estimatedMargin > 0 && this.estimatedMargin < 15) tips.push('Aumente preço ou reduza custo: margem abaixo de 15%.');
       if (futureNet < 0) tips.push('Evite nova compra a prazo até o futuro ficar positivo.');
       if (lowStockItems > 0) tips.push(`Reponha ${lowStockItems} item(ns) abaixo do mínimo.`);
       if (!tips.length) tips.push('Continue registrando vendas, compras e recebimentos no mesmo dia.');
