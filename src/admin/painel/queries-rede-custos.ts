@@ -116,3 +116,19 @@ export async function reconcilePartnerItemCost(
     throw error;
   } finally { client.release(); }
 }
+
+// O guard da 0137 só aceita reconciliação quando a conexão é a DONA física da
+// tabela (current_user == owner), não bastando a variável de sessão. Se a
+// blindagem futura trocar a role do app, a reconciliação para de funcionar —
+// esta checagem existe para o boot GRITAR nesse dia, em vez de falhar em
+// silêncio na primeira tentativa de reconciliar.
+export async function costReconciliationOwnershipOk(
+  dbPool: Pool = defaultPool,
+): Promise<boolean> {
+  const r = await dbPool.query<{ ok: boolean }>(
+    `SELECT current_user = pg_catalog.pg_get_userbyid(c.relowner) AS ok
+       FROM pg_catalog.pg_class c
+      WHERE c.oid = 'commerce.partner_order_items'::regclass`,
+  );
+  return r.rows[0]?.ok === true;
+}

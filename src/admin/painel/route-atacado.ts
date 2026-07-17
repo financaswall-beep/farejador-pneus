@@ -39,6 +39,12 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
       if (message === 'cost_already_known' || message === 'cost_reconciliation_conflict') {
         return reply.status(409).send({ error: message });
       }
+      if (message.includes('partner_order_item_cost_snapshot_immutable')) {
+        // Guard da 0137: a conexão do app deixou de ser a dona da tabela
+        // (ex.: blindagem trocou a role). Sem tradução isto viraria 500 opaco.
+        logger.error({ err: error }, 'reconciliacao recusada: conexao nao e a dona de partner_order_items (guard 0137)');
+        return reply.status(503).send({ error: 'reconciliation_connection_not_owner' });
+      }
       const mapped = mapWriteError(error);
       logger.error({ err: error, status: mapped.status }, 'partner cost reconciliation failed');
       return reply.status(mapped.status).send({ error: mapped.error });
