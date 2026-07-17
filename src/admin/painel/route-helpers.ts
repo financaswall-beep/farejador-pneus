@@ -40,6 +40,24 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (err.message === 'idempotency_key_required') {
     return { status: 400, error: err.message };
   }
+  if (['receipt_not_reviewable', 'receipt_processing', 'receipt_suggestion_stale',
+       'receipt_possible_duplicate_confirmation_required',
+       'receipt_legacy_expense_confirmation_required',
+       'receipt_legacy_expense_conflict'].includes(err.message)) {
+    return { status: 409, error: err.message };
+  }
+  if (['receipt_amount_invalid', 'receipt_amount_above_limit',
+       'receipt_document_date_future', 'receipt_competence_confirmation_required',
+       'receipt_retroactive_confirmation_required', 'receipt_payment_date_required',
+       'receipt_payment_date_future', 'receipt_competence_future',
+       'receipt_due_date_required', 'receipt_actor_required', 'category_invalid',
+       'reason_required'].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
+  if (['receipt_not_found', 'receipt_blob_not_found', 'receipt_attempt_not_found']
+    .includes(err.message)) {
+    return { status: 404, error: 'receipt_not_found' };
+  }
   if (err.message.startsWith('purchase_stock_consumed')
       || err.message.startsWith('purchase_stock_changed')
       || err.message.startsWith('stock_measure_missing')

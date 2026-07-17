@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { failMatrizDelivery, getMatrizLogistica, requeueMatrizDelivery, rescheduleMatrizDelivery, setMatrizDeliveryStatus } from './queries.js';
+import { failMatrizDelivery, getMatrizLogistica, listMatrizExpenseCategories,
+  requeueMatrizDelivery, rescheduleMatrizDelivery, setMatrizDeliveryStatus } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 
 export const logisticaStatusSchema = z.object({
@@ -46,14 +47,38 @@ export const remarcarEntregaSchema = z.object({
 export const comprovanteParamsSchema = z.object({ tripId: z.string().uuid() });
 export const comprovanteIdParamsSchema = z.object({ receiptId: z.string().uuid() });
 export const lerComprovanteSchema = z.object({ receipt_id: z.string().uuid() });
+const receiptDecisionBaseSchema = z.object({
+  receipt_id: z.string().uuid(),
+  ai_attempt_id: z.string().uuid().optional().nullable(),
+  idempotency_key: z.string().trim().min(8).max(200),
+});
+export const aprovarComprovanteSchema = receiptDecisionBaseSchema.extend({
+  amount: z.coerce.number().positive(),
+  suggested_amount: z.coerce.number().positive().optional().nullable(),
+  category: z.string().trim().min(1).max(80),
+  merchant: z.string().trim().max(200).optional().nullable(),
+  document_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  competence_month: z.string().regex(/^\d{4}-\d{2}-01$/),
+  payment_status: z.enum(['paid', 'pending']),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+  retroactive_confirmed: z.boolean().optional(),
+  competence_confirmed: z.boolean().optional(),
+  possible_duplicate_confirmed: z.boolean().optional(),
+  legacy_expense_confirmed: z.boolean().optional(),
+});
+export const rejeitarComprovanteSchema = receiptDecisionBaseSchema.extend({
+  reason: z.string().trim().min(2).max(500),
+});
 
 export async function registerPainelLogistica(fastify: FastifyInstance): Promise<void> {
   // ── MATRIZ — LOGÍSTICA (0121, flag MATRIZ_LOGISTICS) ─────────────────────────
   // Entregas da 'main' nos moldes do parceiro + diário de rota do entregador
   // (km inicial/final, gasolina, comprovantes). "Não entregue" CANCELA no caminho
   // atômico (galpão volta pela trilha — fdd9148). IA do comprovante atrás de
-  // MATRIZ_RECEIPT_AI: leu com certeza → despesa 0120 ('ia-comprovante'); sem
-  // certeza → 'unreadable' (lançar na mão); erro de rede → fica 'pending' (ler de novo).
+  // MATRIZ_RECEIPT_AI apenas sugere; sem certeza → alerta; erro de rede → tentativa
+  // falha e pode ser refeita. Somente aprovação administrativa cria a despesa.
 
   // Parser de imagem: corpo cru como Buffer (mesmo funil do upload de foto do parceiro).
   for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
@@ -70,11 +95,19 @@ export async function registerPainelLogistica(fastify: FastifyInstance): Promise
     if (!env.MATRIZ_LOGISTICS) {
       return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
     }
+    const [logistica, categories] = await Promise.all([
+      getMatrizLogistica(),
+      env.MATRIZ_RECEIPT_APPROVAL ? listMatrizExpenseCategories() : Promise.resolve([]),
+    ]);
     return reply.status(200).send({
       ...dashboardPayload([]),
       enabled: true,
       receipt_ai: env.MATRIZ_RECEIPT_AI,
-      ...(await getMatrizLogistica()),
+      receipt_approval: env.MATRIZ_RECEIPT_APPROVAL,
+      receipt_approval_finance: env.MATRIZ_EXPENSES,
+      receipt_approval_max_amount: env.MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT,
+      expense_categories: categories.filter((category) => !category.archived),
+      ...logistica,
     });
   });
 

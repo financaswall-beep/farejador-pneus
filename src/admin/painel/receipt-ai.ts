@@ -3,12 +3,12 @@
  *
  * O comprovante que o entregador anexa (cupom de posto, recibo de oficina)
  * passa pela visão da OpenAI, que devolve categoria + valor + estabelecimento
- * em JSON estrito. Quem LANÇA a despesa é recordReceiptAiResult (queries.ts),
- * na mesma transação que marca o comprovante — este módulo só LÊ.
+ * em JSON estrito. Este módulo só extrai uma sugestão; a revisão humana é a
+ * única porta que pode transformar o documento em despesa financeira.
  *
  * Regras de dinheiro (inegociáveis):
  *   - NUNCA inventa valor: sem clareza → 'unreadable' (lançar na mão).
- *   - Confiança mínima 0.7; valor tem que ser finito, > 0 e < R$ 10.000
+ *   - Confiança sinalizada abaixo de 0.7; valor tem que ser finito, > 0 e ≤ R$ 10.000
  *     (comprovante de rota acima disso é leitura errada, não gasto).
  *   - Erro de TRANSPORTE (rede/5xx/timeout) NÃO vira 'unreadable': estoura
  *     pra rota deixar o comprovante 'pending' com botão "ler de novo".
@@ -24,9 +24,21 @@ import { env } from '../../shared/config/env.js';
 import { MATRIZ_EXPENSE_CATEGORIES, type MatrizExpenseCategory } from './queries-fiado-despesas.js';
 import { listActiveExpenseCategorySlugs } from './queries-despesas-categorias.js';
 
-export type ReceiptReading =
-  | { kind: 'parsed'; category: MatrizExpenseCategory; amount: number; summary: string }
-  | { kind: 'unreadable'; summary: string };
+export const RECEIPT_EXTRACTOR_VERSION = 'receipt-extractor-v2';
+export const RECEIPT_PROMPT_VERSION = '2026-07-17-human-review-v1';
+
+interface ReceiptReadingMetadata {
+  model: string;
+  extractor_version: string;
+  prompt_version: string;
+}
+
+export type ReceiptReading = ReceiptReadingMetadata & (
+  | { kind: 'parsed'; category: MatrizExpenseCategory; amount: number;
+      merchant: string | null; document_date: string | null;
+      confidence: number | null; summary: string }
+  | { kind: 'unreadable'; summary: string }
+);
 
 export interface ReceiptCategoryOption {
   id: string;    // slug ('pedagio')
@@ -125,32 +137,47 @@ export async function readReceiptWithAI(bytes: Buffer, mime: string): Promise<Re
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return { kind: 'unreadable', summary: 'IA não devolveu leitura válida' };
+    return withMetadata({ kind: 'unreadable', summary: 'IA não devolveu leitura válida' });
   }
 
   if (parsed.ok !== true) {
     const reason = typeof parsed.reason === 'string' && parsed.reason.trim()
       ? parsed.reason.trim() : 'não deu pra ler o valor com clareza';
-    return { kind: 'unreadable', summary: reason };
+    return withMetadata({ kind: 'unreadable', summary: reason });
   }
 
   const amount = Number(parsed.amount);
   const confidence = Number(parsed.confidence);
-  if (!Number.isFinite(amount) || amount <= 0 || amount >= MAX_PLAUSIBLE_AMOUNT) {
-    return { kind: 'unreadable', summary: `valor lido fora do esperado (${String(parsed.amount)})` };
-  }
-  if (!Number.isFinite(confidence) || confidence < MIN_CONFIDENCE) {
-    return { kind: 'unreadable', summary: 'IA leu mas sem certeza suficiente — confere e lança na mão' };
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_PLAUSIBLE_AMOUNT) {
+    return withMetadata({ kind: 'unreadable',
+      summary: `valor lido fora do esperado (${String(parsed.amount)})` });
   }
 
   const category = resolveReceiptCategory(parsed.category, categories.map((c) => c.id));
-  const merchant = typeof parsed.merchant === 'string' && parsed.merchant.trim() ? parsed.merchant.trim() : 'estabelecimento';
-  const date = typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? ` · ${parsed.date}` : '';
+  const merchant = typeof parsed.merchant === 'string' && parsed.merchant.trim()
+    ? parsed.merchant.trim() : null;
+  const documentDate = typeof parsed.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)
+    ? parsed.date : null;
+  const confidenceValue = Number.isFinite(confidence) ? confidence : null;
+  const confidenceWarning = confidenceValue === null || confidenceValue < MIN_CONFIDENCE
+    ? ' · baixa confiança — confira com atenção' : '';
 
-  return {
+  return withMetadata({
     kind: 'parsed',
     category,
     amount: Math.round(amount * 100) / 100,
-    summary: `${merchant} · R$ ${amount.toFixed(2)}${date} (lido pela IA)`,
-  };
+    merchant,
+    document_date: documentDate,
+    confidence: confidenceValue,
+    summary: `${merchant ?? 'estabelecimento'} · R$ ${amount.toFixed(2)}`
+      + `${documentDate ? ` · ${documentDate}` : ''}${confidenceWarning} (sugestão da IA)`,
+  });
+}
+
+function withMetadata<T extends { kind: 'parsed' | 'unreadable'; summary: string }>(
+  reading: T,
+): T & ReceiptReadingMetadata {
+  return { ...reading, model: env.OPENAI_MODEL,
+    extractor_version: RECEIPT_EXTRACTOR_VERSION,
+    prompt_version: RECEIPT_PROMPT_VERSION };
 }

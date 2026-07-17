@@ -67,7 +67,7 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
           fuel_spent: null,
           notes: (this.fecharForm.notes || '').trim() || null,
         });
-        this.logisticaMsg = { ok: true, text: 'Rota fechada — despesas entram pelos comprovantes vinculados.' };
+        this.logisticaMsg = { ok: true, text: 'Rota fechada. Gasolina anotada só entra no resultado após comprovante aprovado.' };
         this.fecharForm = { km_end: '', notes: '' };
         await this.loadLogistica();
       } catch (err) {
@@ -93,17 +93,20 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
           body: file,
         });
         const payload = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(payload.error || `api_${resp.status}`);
-        if (payload.ai_status === 'parsed' && payload.linked_existing) {
-          this.logisticaMsg = { ok: true, text: `Comprovante lido: ${payload.ai_summary} — amarrado à despesa que o fechamento já lançou (não duplica).` };
+        if (!resp.ok) {
+          this.logisticaMsg = { ok: false, text: this.receiptUploadErrorMessage(payload) };
+          return;
+        }
+        if (payload.duplicate) {
+          this.logisticaMsg = { ok: true, text: 'Este comprovante já estava nesta rota; nenhum arquivo ou lançamento foi duplicado.' };
         } else if (payload.ai_status === 'parsed') {
-          this.logisticaMsg = { ok: true, text: `Comprovante lido: ${payload.ai_summary} — despesa JÁ lançada no Financeiro.` };
+          this.logisticaMsg = { ok: true, text: `Sugestão da IA pronta: ${payload.ai_summary}. Confira e aprove; nenhum valor entrou no Financeiro.` };
         } else if (payload.ai_status === 'unreadable') {
-          this.logisticaMsg = { ok: false, text: `Comprovante guardado, mas a IA não teve certeza (${payload.ai_summary || 'ilegível'}) — lança a despesa na mão no Financeiro.` };
+          this.logisticaMsg = { ok: true, text: `Comprovante guardado sem leitura confiável (${payload.ai_summary || 'ilegível'}). Preencha e aprove manualmente.` };
         } else if (payload.ai_status === 'pending') {
-          this.logisticaMsg = { ok: false, text: 'Comprovante guardado; a leitura falhou agora — clica em "ler de novo".' };
+          this.logisticaMsg = { ok: false, text: 'Comprovante guardado; a leitura falhou agora. Ele continua aguardando revisão e pode ser relido.' };
         } else {
-          this.logisticaMsg = { ok: true, text: 'Comprovante guardado (leitura por IA desligada).' };
+          this.logisticaMsg = { ok: true, text: 'Comprovante guardado. A IA está desligada; revise os campos manualmente.' };
         }
         await this.loadLogistica();
       } catch (err) {
@@ -118,10 +121,8 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
       try {
         const res = await this.apiPost('/admin/api/logistica/comprovantes/ler', { receipt_id: r.id });
         this.logisticaMsg = res.ai_status === 'parsed'
-          ? (res.linked_existing
-            ? { ok: true, text: `Comprovante lido: ${res.ai_summary} — amarrado à despesa que o fechamento já lançou (não duplica).` }
-            : { ok: true, text: `Comprovante lido: ${res.ai_summary} — despesa lançada.` })
-          : { ok: false, text: `A IA ainda não teve certeza (${res.ai_summary || 'ilegível'}) — lança na mão.` };
+          ? { ok: true, text: `Nova sugestão pronta: ${res.ai_summary}. Nada foi lançado; revise e aprove.` }
+          : { ok: false, text: `A IA não conseguiu concluir (${res.ai_summary || 'ilegível'}). O comprovante continua revisável.` };
         await this.loadLogistica();
       } catch (err) {
         this.logisticaMsg = { ok: false, text: 'A leitura falhou (IA fora do ar?) — tenta de novo daqui a pouco.' };

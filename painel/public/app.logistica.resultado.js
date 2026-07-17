@@ -43,7 +43,9 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       const resultado = Math.round((frete + lucroPneus - despesas) * 100) / 100;
       const entregues = Number(r.entregues || 0);
       const comprovantesPendentes = (t.receipts || []).filter((receipt) =>
-        receipt.ai_status !== 'parsed' || (receipt.ai_expense_id && receipt.expense_amount == null));
+        ['uploaded', 'processing', 'review_required'].includes(receipt.workflow_status)
+        || (['linked', 'legacy_linked'].includes(receipt.workflow_status) && receipt.expense_removed));
+      const fuelPending = !!t.fuel_spent_without_approved_expense;
       const semCusto = Number(r.itens_sem_custo || 0);
       return {
         faturamento,
@@ -57,7 +59,9 @@ window.PAINEL_MODULES.logisticaResultado = function () {
         resultadoPorEntrega: entregues > 0 ? resultado / entregues : 0,
         semCusto,
         comprovantesPendentes,
-        completo: semCusto === 0 && comprovantesPendentes.length === 0,
+        fuelPending,
+        fuelWarning: fuelPending ? 'Gasolina anotada sem comprovante aprovado.' : null,
+        completo: semCusto === 0 && comprovantesPendentes.length === 0 && !fuelPending,
         pedidos: Array.isArray(t.pedidos_resultado) ? t.pedidos_resultado : [],
         despesasDetalhadas: Array.isArray(t.despesas) ? t.despesas : [],
       };
@@ -98,10 +102,12 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       return found?.label || String(category || 'Despesa');
     },
     logisticaComprovanteStatusLabel(receipt) {
-      if (receipt?.ai_status === 'parsed' && receipt.expense_amount != null) return 'Lido e lançado';
-      if (receipt?.ai_status === 'unreadable') return 'Revisar leitura';
-      if (receipt?.ai_status === 'skipped') return 'Aguardando lançamento';
-      return 'Aguardando leitura';
+      if (receipt?.workflow_status === 'linked') return 'Aprovado e vinculado';
+      if (receipt?.workflow_status === 'legacy_linked') return 'Legado — sem aprovação humana registrada';
+      if (receipt?.workflow_status === 'rejected') return 'Rejeitado — nenhum lançamento';
+      if (receipt?.workflow_status === 'processing') return 'IA lendo; ainda sem lançamento';
+      if (receipt?.workflow_status === 'review_required') return 'Aguardando aprovação humana';
+      return 'Aguardando leitura; ainda sem lançamento';
     },
   };
 };

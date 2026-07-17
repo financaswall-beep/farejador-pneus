@@ -151,10 +151,9 @@ export async function requeueMatrizDelivery(
   return r.rows[0];
 }
 
-/** FECHA a rota: km final + gasolina + observação. Se informou gasolina E nenhum
- *  comprovante desta rota já virou despesa (IA), lança a despesa 'combustivel'
- *  (0120) na MESMA transação — anti-dupla-contagem por desenho. Respeita a flag
- *  MATRIZ_EXPENSES (off = diário grava, lançamento não nasce). */
+/** FECHA a rota: km final + gasolina + observação. Gasolina é apenas um dado
+ *  operacional. Esta função nunca cria despesa; o Financeiro só recebe valor
+ *  pela decisão humana, atômica e auditada, sobre um comprovante. */
 export async function closeMatrizTrip(
   input: {
     trip_id: string;
@@ -169,52 +168,28 @@ export async function closeMatrizTrip(
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const trip = await client.query<{ id: string; trip_number: string; courier_name: string; km_start: string | null; started_at: string }>(
-      `SELECT id, trip_number, courier_name, km_start::text, started_at
+    const trip = await client.query<{ id: string; fuel_expense_id: string | null }>(
+      `SELECT id,fuel_expense_id
          FROM commerce.matriz_delivery_trips
         WHERE id = $2 AND environment = $1 AND status = 'open' AND deleted_at IS NULL
         FOR UPDATE`,
       [environment, input.trip_id],
     );
     if (!trip.rows[0]) throw new Error('trip_not_found');
-    const t = trip.rows[0];
-
     const fuel = input.fuel_spent != null && Number(input.fuel_spent) > 0 ? Number(input.fuel_spent) : null;
-    let fuelExpenseId: string | null = null;
-    if (fuel !== null && env.MATRIZ_EXPENSES) {
-      const parsed = await client.query(
-        `SELECT 1 FROM commerce.matriz_trip_receipts
-          WHERE trip_id = $1 AND ai_expense_id IS NOT NULL LIMIT 1`,
-        [input.trip_id],
-      );
-      if (!parsed.rows[0]) {
-        const kmLabel = input.km_end != null && t.km_start != null
-          ? ` (km ${Number(t.km_start)}–${Number(input.km_end)})` : '';
-        const exp = await client.query<{ id: string }>(
-          `INSERT INTO commerce.matriz_expenses
-             (environment, category, description, amount, payment_status, paid_at, created_by)
-           VALUES ($1, 'combustivel', $2, $3, 'paid', now(), 'logistica-fechamento')
-           RETURNING id`,
-          [environment,
-           `${t.trip_number} · ${new Date(t.started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${t.courier_name}${kmLabel}`,
-           fuel],
-        );
-        fuelExpenseId = exp.rows[0]!.id;
-      }
-    }
 
     await client.query(
       `UPDATE commerce.matriz_delivery_trips
           SET status = 'closed', ended_at = now(),
               km_end = COALESCE($3, km_end),
               fuel_spent = COALESCE($4, fuel_spent),
-              notes = COALESCE(NULLIF($5, ''), notes),
-              fuel_expense_id = COALESCE($6, fuel_expense_id)
+              notes = COALESCE(NULLIF($5, ''), notes)
         WHERE id = $2 AND environment = $1`,
-      [environment, input.trip_id, input.km_end ?? null, fuel, input.notes ?? null, fuelExpenseId],
+      [environment, input.trip_id, input.km_end ?? null, fuel, input.notes ?? null],
     );
     await client.query('COMMIT');
-    return { trip_id: input.trip_id, fuel_expense_id: fuelExpenseId };
+    return { trip_id: input.trip_id,
+      fuel_expense_id: trip.rows[0].fuel_expense_id };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

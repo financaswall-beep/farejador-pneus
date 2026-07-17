@@ -4,9 +4,9 @@
  *   fila só enxerga entrega da MAIN (pickup/outra unit ficam fora, leitura E escrita) ·
  *   termômetro (saiu → entregue fecha o pedido) · NÃO ENTREGUE cancela e o galpão
  *   VOLTA (caminho fdd9148) · rota abre com as entregas certas (inválidas ficam fora) ·
- *   fechar rota com gasolina lança despesa 'combustivel' UMA vez (fechar 2x barra) ·
- *   ANTI-DUPLA-CONTAGEM: comprovante lido pela IA ganha do fechamento (fuel não relança) ·
- *   leitura idempotente (2ª chamada não duplica despesa) · unreadable NÃO lança ·
+ *   fechar rota com gasolina só anota e nunca lança despesa (fechar 2x barra) ·
+ *   IA só sugere; dinheiro nasce apenas após decisão humana autenticada ·
+ *   sugestão e aprovação são idempotentes · unreadable NÃO lança ·
  *   blob do comprovante salva e volta byte a byte · "A ROTA SE PAGOU?" (frete
  *   embutido + lucro pela régua 0117 + despesas amarradas; falha fora; soft
  *   delete de despesa reflete).
@@ -20,6 +20,7 @@
 process.env.MATRIZ_LOGISTICS = 'true';
 process.env.MATRIZ_EXPENSES = 'true';
 process.env.MATRIZ_RECEIPT_AI = 'true';
+process.env.MATRIZ_RECEIPT_APPROVAL = 'true';
 
 const ENV = 'test' as const;
 const MEASURE = '95/95-95';
@@ -31,7 +32,8 @@ async function main(): Promise<void> {
   const {
     getMatrizLogistica, setMatrizDeliveryStatus, failMatrizDelivery, requeueMatrizDelivery,
     openMatrizTrip, attachOrderToMatrizTrip, rescheduleMatrizDelivery, closeMatrizTrip, addMatrizTripReceipt,
-    getMatrizTripReceiptImage, recordReceiptAiResult,
+    getMatrizTripReceiptImage, beginReceiptAiAttempt, completeReceiptAiAttempt,
+    approveMatrizTripReceipt,
   } = await import('../src/admin/painel/queries.js');
 
   if (env.FAREJADOR_ENV !== 'test') throw new Error('ABORTADO: só roda em test.');
@@ -44,6 +46,50 @@ async function main(): Promise<void> {
   let mainUnitId = '';
   const orderIds: string[] = [];
   const tripIds: string[] = [];
+  const runMarker = `PROVA-LOG-${Date.now()}`;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const competenceMonth = `${today.slice(0, 7)}-01`;
+  let savepointSequence = 0;
+  let transactionQueryQueue: Promise<unknown> = Promise.resolve();
+  const queuedQuery = (text: string, values?: unknown[]) => {
+    const result = transactionQueryQueue.then(() => client.query(text, values));
+    transactionQueryQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
+  const transactionPool = {
+    query: queuedQuery,
+    connect: async () => {
+      const savepoint = `prova_log_${++savepointSequence}`;
+      let active = false;
+      return {
+        query: async (text: string, values?: unknown[]) => {
+          const command = text.trim().toUpperCase();
+          if (command === 'BEGIN') {
+            active = true;
+            return queuedQuery(`SAVEPOINT ${savepoint}`);
+          }
+          if (command === 'COMMIT') {
+            active = false;
+            return queuedQuery(`RELEASE SAVEPOINT ${savepoint}`);
+          }
+          if (command === 'ROLLBACK') {
+            if (!active) return queuedQuery('SELECT 1');
+            await queuedQuery(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+            active = false;
+            return queuedQuery(`RELEASE SAVEPOINT ${savepoint}`);
+          }
+          return queuedQuery(text, values);
+        },
+        release: () => undefined,
+      };
+    },
+  } as unknown as typeof pool;
+  const migration = await client.query<{ installed: string | null }>(
+    `SELECT to_regclass('commerce.matriz_trip_receipt_decisions')::text AS installed`);
+  if (!migration.rows[0]?.installed) {
+    throw new Error('ABORTADO: migration 0140 ainda não aplicada no banco de teste.');
+  }
   const check = (name: string, ok: boolean, extra = ''): void => {
     if (!ok) fails++;
     console.log(`  [${ok ? 'OK ' : 'XX '}] ${name}${extra ? ' — ' + extra : ''}`);
@@ -57,8 +103,8 @@ async function main(): Promise<void> {
     const r = await client.query<{ n: string }>(
       `SELECT count(*) AS n FROM commerce.matriz_expenses
         WHERE environment=$1 AND deleted_at IS NULL
-          AND created_by IN ('logistica-fechamento','ia-comprovante')
-          AND description LIKE '%PROVA-LOG%'`, [ENV]);
+          AND created_by LIKE 'comprovante:%'
+          AND description LIKE $2`, [ENV, `%${runMarker}%`]);
     return Number(r.rows[0]!.n);
   };
   const seedOrder = async (opts: { mode?: 'delivery' | 'pickup'; unitId?: string | null; qty?: number; total?: number; unitCost?: number | null; discount?: number }): Promise<string> => {
@@ -185,96 +231,141 @@ async function main(): Promise<void> {
       && rotaRow.trip_id === trip1.trip_id && rotaRow.delivery_courier === 'Zé da Moto',
       `entraram=${trip1.deliveries_count}`);
 
-    // ── L7: comprovante — blob salva e volta byte a byte ──
-    const fakeJpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from('PROVA-LOG-RECIBO'.repeat(10))]);
-    const rec1 = await addMatrizTripReceipt({ trip_id: trip1.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
-    const img = await getMatrizTripReceiptImage(rec1.receipt_id, ENV);
-    check('L7 comprovante guardado (pending, IA ligada) e blob volta byte a byte',
-      rec1.ai_status === 'pending' && img !== null && Buffer.compare(img!.bytes, fakeJpeg) === 0);
+    // ── L7-L14: contrato 0140. A seção roda numa transação externa e sempre
+    // desfaz seus registros append-only; as transações reais viram savepoints. ──
+    const fakeReceipt = (label: string): Buffer => Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.from(`${runMarker}-${label}`.repeat(10)),
+    ]);
+    const fakeJpeg = fakeReceipt('RECIBO-1');
+    await client.query('BEGIN');
+    try {
+      const rec1 = await addMatrizTripReceipt({ trip_id: trip1.trip_id,
+        bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV }, transactionPool);
+      const img = await getMatrizTripReceiptImage(rec1.receipt_id, ENV, transactionPool);
+      check('L7 comprovante guardado (uploaded/pending) e blob volta byte a byte',
+        rec1.ai_status === 'pending' && img !== null && Buffer.compare(img!.bytes, fakeJpeg) === 0);
 
-    // ── L8: IA leu → despesa nasce UMA vez, amarrada ao comprovante ──
-    const antes = await despesasProva();
-    const parsed1 = await recordReceiptAiResult({
-      receipt_id: rec1.receipt_id,
-      result: { kind: 'parsed', category: 'combustivel', amount: 187.3, summary: 'Posto PROVA-LOG · R$ 187.30' },
-      environment: ENV,
-    });
-    check('L8 IA lançou a despesa (parsed + expense_id)',
-      parsed1.ai_status === 'parsed' && parsed1.ai_expense_id !== null && (await despesasProva()) === antes + 1);
+      const antes = await despesasProva();
+      const attempt1 = await beginReceiptAiAttempt({ receipt_id: rec1.receipt_id,
+        environment: ENV, model: 'prova-log-model', extractor_version: 'prova-v1',
+        prompt_version: 'prova-p1' }, transactionPool);
+      const suggested1 = await completeReceiptAiAttempt({ attempt_id: attempt1.attempt_id,
+        environment: ENV, result: { status: 'suggested', category: 'combustivel',
+          amount: 187.3, merchant: `Posto ${runMarker}`, document_date: today,
+          confidence: 0.93, summary: `Posto ${runMarker} · R$ 187,30` } }, transactionPool);
+      const afterSuggestion = (await client.query<{ workflow_status: string; ai_expense_id: string | null }>(
+        `SELECT workflow_status,ai_expense_id FROM commerce.matriz_trip_receipts WHERE id=$1`,
+        [rec1.receipt_id])).rows[0]!;
+      check('L8 IA só sugere: review_required, zero expense_id e zero dinheiro',
+        suggested1.status === 'suggested' && afterSuggestion.workflow_status === 'review_required'
+        && afterSuggestion.ai_expense_id === null && (await despesasProva()) === antes);
 
-    // ── L9: leitura repetida NÃO duplica ──
-    const parsed2 = await recordReceiptAiResult({
-      receipt_id: rec1.receipt_id,
-      result: { kind: 'parsed', category: 'combustivel', amount: 187.3, summary: 'Posto PROVA-LOG · R$ 187.30' },
-      environment: ENV,
-    });
-    check('L9 re-leitura idempotente (mesma despesa, não duplica)',
-      parsed2.ai_expense_id === parsed1.ai_expense_id && (await despesasProva()) === antes + 1);
+      const attempt2 = await beginReceiptAiAttempt({ receipt_id: rec1.receipt_id,
+        environment: ENV, model: 'prova-log-model', extractor_version: 'prova-v1',
+        prompt_version: 'prova-p1' }, transactionPool);
+      await completeReceiptAiAttempt({ attempt_id: attempt2.attempt_id, environment: ENV,
+        result: { status: 'suggested', category: 'combustivel', amount: 187.3,
+          merchant: `Posto ${runMarker}`, document_date: today, confidence: 0.95,
+          summary: `Releitura ${runMarker} · R$ 187,30` } }, transactionPool);
+      const attemptCount = Number((await client.query<{ n: string }>(
+        `SELECT count(*) AS n FROM commerce.matriz_trip_receipt_ai_attempts WHERE receipt_id=$1`,
+        [rec1.receipt_id])).rows[0]!.n);
+      check('L9 re-leitura cria histórico imutável, mas continua sem lançar dinheiro',
+        attemptCount === 2 && (await despesasProva()) === antes);
 
-    // ── L10: ANTI-DUPLA-CONTAGEM — fechar com gasolina NÃO relança (comprovante ganhou) ──
-    const fech1 = await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080, fuel_spent: 187.3, environment: ENV });
-    const t1 = (await client.query(`SELECT status, km_end, fuel_spent, fuel_expense_id FROM commerce.matriz_delivery_trips WHERE id=$1`, [trip1.trip_id])).rows[0] as { status: string; km_end: string; fuel_spent: string; fuel_expense_id: string | null };
-    check('L10 fechar rota com comprovante-despesa NÃO relança (anti-dupla)',
-      fech1.fuel_expense_id === null && t1.status === 'closed' && Number(t1.km_end) === 45080
-      && Number(t1.fuel_spent) === 187.3 && t1.fuel_expense_id === null && (await despesasProva()) === antes + 1);
+      const approval1 = { receipt_id: rec1.receipt_id, ai_attempt_id: attempt2.attempt_id,
+        amount: 187.3, suggested_amount: 187.3, category: 'combustivel',
+        merchant: `Posto ${runMarker}`, document_date: today,
+        competence_month: competenceMonth, payment_status: 'paid' as const,
+        payment_date: today, possible_duplicate_confirmed: true,
+        idempotency_key: `${runMarker}-approve-1`, actor_label: 'prova-logistica',
+        note: `${runMarker} aprovação humana`, environment: ENV };
+      const approved1 = await approveMatrizTripReceipt(approval1, transactionPool);
+      check('L10a só a aprovação humana cria e liga UMA despesa',
+        approved1.workflow_status === 'linked' && (await despesasProva()) === antes + 1);
+      const replay1 = await approveMatrizTripReceipt(approval1, transactionPool);
+      check('L10b retry da aprovação devolve a mesma decisão e a mesma despesa',
+        replay1.decision_id === approved1.decision_id && replay1.expense_id === approved1.expense_id
+        && (await despesasProva()) === antes + 1);
+      const fech1 = await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080,
+        fuel_spent: 187.3, environment: ENV }, transactionPool);
+      const t1 = (await client.query(`SELECT status,km_end,fuel_spent,fuel_expense_id
+        FROM commerce.matriz_delivery_trips WHERE id=$1`, [trip1.trip_id])).rows[0] as {
+          status: string; km_end: string; fuel_spent: string; fuel_expense_id: string | null };
+      check('L10c fechamento só anota gasolina e não cria uma segunda despesa',
+        fech1.fuel_expense_id === null && t1.status === 'closed' && Number(t1.km_end) === 45080
+        && Number(t1.fuel_spent) === 187.3 && t1.fuel_expense_id === null
+        && (await despesasProva()) === antes + 1);
 
-    // ── L11: fechar 2ª vez barra ──
-    let barrou2 = false;
-    try { await closeMatrizTrip({ trip_id: trip1.trip_id, environment: ENV }); }
-    catch (e) { barrou2 = (e as Error).message === 'trip_not_found'; }
-    check('L11 fechar rota 2x barrado (trip_not_found)', barrou2);
+      let barrou2 = false;
+      try { await closeMatrizTrip({ trip_id: trip1.trip_id, environment: ENV }, transactionPool); }
+      catch (e) { barrou2 = (e as Error).message === 'trip_not_found'; }
+      check('L11 fechar rota 2x barrado (trip_not_found)', barrou2);
 
-    // ── L12: rota SEM comprovante lido → fechamento LANÇA a despesa ──
-    // (07-03c) rota não abre vazia → a rota técnica leva 1 entrega descartável.
-    const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
-    tripIds.push(trip2.trip_id);
-    const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
-    const unread = await recordReceiptAiResult({
-      receipt_id: rec2.receipt_id,
-      result: { kind: 'unreadable', summary: 'cupom amassado PROVA-LOG' },
-      environment: ENV,
-    });
-    check('L12a unreadable NÃO lança despesa', unread.ai_expense_id === null && (await despesasProva()) === antes + 1);
-    const fech2 = await closeMatrizTrip({ trip_id: trip2.trip_id, km_end: 180, fuel_spent: 95.5, notes: 'PROVA-LOG', environment: ENV });
-    const desp2 = fech2.fuel_expense_id
-      ? (await client.query(`SELECT category, amount, created_by, description FROM commerce.matriz_expenses WHERE id=$1`, [fech2.fuel_expense_id])).rows[0] as { category: string; amount: string; created_by: string; description: string }
-      : null;
-    check('L12b fechamento lança combustivel R$95.50 (created_by logistica-fechamento)',
-      desp2 !== null && desp2.category === 'combustivel' && Number(desp2.amount) === 95.5
-      && desp2.created_by === 'logistica-fechamento' && desp2.description.includes('PROVA-LOG')
-      && (await despesasProva()) === antes + 2);
+      const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100,
+        order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV }, transactionPool);
+      tripIds.push(trip2.trip_id);
+      const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id,
+        bytes: fakeReceipt('RECIBO-2'), mime: 'image/jpeg', environment: ENV }, transactionPool);
+      const unreadAttempt = await beginReceiptAiAttempt({ receipt_id: rec2.receipt_id,
+        environment: ENV, model: 'prova-log-model', extractor_version: 'prova-v1',
+        prompt_version: 'prova-p1' }, transactionPool);
+      const unread = await completeReceiptAiAttempt({ attempt_id: unreadAttempt.attempt_id,
+        environment: ENV, result: { status: 'unreadable',
+          summary: `cupom amassado ${runMarker}` } }, transactionPool);
+      check('L12a unreadable fica para revisão e NÃO lança despesa',
+        unread.workflow_status === 'review_required' && (await despesasProva()) === antes + 1);
+      const fech2 = await closeMatrizTrip({ trip_id: trip2.trip_id, km_end: 180,
+        fuel_spent: 95.5, notes: runMarker, environment: ENV }, transactionPool);
+      check('L12b fechamento sem aprovação só anota R$95,50 e NÃO lança despesa',
+        fech2.fuel_expense_id === null && (await despesasProva()) === antes + 1);
 
-    // ── L13: rota fechada aparece nas recentes com comprovantes ──
-    log = await getMatrizLogistica(ENV);
-    const rec = log.rotas_recentes.find((t) => t.id === trip1.trip_id);
-    check('L13 rota fechada nas recentes, com comprovante e leitura',
-      !!rec && rec.receipts.length === 1 && rec.receipts[0]!.ai_status === 'parsed' && rec.deliveries_count === 1);
+      log = await getMatrizLogistica(ENV, transactionPool);
+      const rec = log.rotas_recentes.find((t) => t.id === trip1.trip_id);
+      check('L13 rota recente expõe sugestão + decisão humana + despesa ligada',
+        !!rec && rec.receipts.length === 1 && rec.receipts[0]!.ai_status === 'parsed'
+        && rec.receipts[0]!.workflow_status === 'linked' && !!rec.receipts[0]!.decision
+        && rec.deliveries_count === 1);
 
-    // ── L14 (P1 da banca 07-03): ordem INVERSA — fecha lançando manual, LÊ depois →
-    // o comprovante COLA na despesa do fechamento (não nasce a 2ª da mesma gasolina) ──
-    const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG', km_start: 200, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
-    tripIds.push(trip3.trip_id);
-    const rec3 = await addMatrizTripReceipt({ trip_id: trip3.trip_id, bytes: fakeJpeg, mime: 'image/jpeg', environment: ENV });
-    const antes3 = await despesasProva();
-    const fech3 = await closeMatrizTrip({ trip_id: trip3.trip_id, km_end: 260, fuel_spent: 120, notes: 'PROVA-LOG fecha antes', environment: ENV });
-    check('L14a fechou ANTES da leitura → despesa manual nasceu',
-      fech3.fuel_expense_id !== null && (await despesasProva()) === antes3 + 1);
-    const parsed3 = await recordReceiptAiResult({
-      receipt_id: rec3.receipt_id,
-      result: { kind: 'parsed', category: 'combustivel', amount: 120, summary: 'Posto PROVA-LOG · R$ 120.00' },
-      environment: ENV,
-    });
-    check('L14b leitura DEPOIS cola na despesa do fechamento (não duplica)',
-      parsed3.linked_existing === true && parsed3.ai_expense_id === fech3.fuel_expense_id
-      && (await despesasProva()) === antes3 + 1);
-    const rec3row = (await client.query(`SELECT ai_status, ai_expense_id FROM commerce.matriz_trip_receipts WHERE id=$1`, [rec3.receipt_id])).rows[0] as { ai_status: string; ai_expense_id: string };
-    check('L14c comprovante virou LASTRO da despesa existente (parsed + amarrado)',
-      rec3row.ai_status === 'parsed' && rec3row.ai_expense_id === fech3.fuel_expense_id);
-    // (banca 07-03, revisão do resumo) despesas_total da rota NÃO dobra no caso
-    // linked: fuel_expense_id E ai_expense_id apontam pra MESMA despesa → soma 1×.
-    log = await getMatrizLogistica(ENV);
-    check('L14d despesas_total da rota linked NÃO dobra (120, não 240)',
-      Number(log.rotas_recentes.find((t) => t.id === trip3.trip_id)!.despesas_total) === 120);
+      const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG',
+        km_start: 200, order_ids: [await seedOrder({ unitId: mainUnitId })],
+        environment: ENV }, transactionPool);
+      tripIds.push(trip3.trip_id);
+      const rec3 = await addMatrizTripReceipt({ trip_id: trip3.trip_id,
+        bytes: fakeReceipt('RECIBO-3'), mime: 'image/jpeg', environment: ENV }, transactionPool);
+      const antes3 = await despesasProva();
+      const fech3 = await closeMatrizTrip({ trip_id: trip3.trip_id, km_end: 260,
+        fuel_spent: 120, notes: `${runMarker} fecha antes`, environment: ENV }, transactionPool);
+      check('L14a fechar ANTES da leitura continua sem despesa automática',
+        fech3.fuel_expense_id === null && (await despesasProva()) === antes3);
+      const attempt3 = await beginReceiptAiAttempt({ receipt_id: rec3.receipt_id,
+        environment: ENV, model: 'prova-log-model', extractor_version: 'prova-v1',
+        prompt_version: 'prova-p1' }, transactionPool);
+      await completeReceiptAiAttempt({ attempt_id: attempt3.attempt_id, environment: ENV,
+        result: { status: 'suggested', category: 'combustivel', amount: 120,
+          merchant: `Posto 3 ${runMarker}`, document_date: today, confidence: 0.9,
+          summary: `Posto 3 ${runMarker} · R$ 120,00` } }, transactionPool);
+      check('L14b leitura DEPOIS do fechamento ainda não cria dinheiro',
+        (await despesasProva()) === antes3);
+      const approved3 = await approveMatrizTripReceipt({ receipt_id: rec3.receipt_id,
+        ai_attempt_id: attempt3.attempt_id, amount: 120, suggested_amount: 120,
+        category: 'combustivel', merchant: `Posto 3 ${runMarker}`,
+        document_date: today, competence_month: competenceMonth,
+        payment_status: 'paid', payment_date: today, possible_duplicate_confirmed: true,
+        idempotency_key: `${runMarker}-approve-3`, actor_label: 'prova-logistica',
+        note: `${runMarker} aprovação depois do fechamento`, environment: ENV }, transactionPool);
+      check('L14c aprovação posterior cria exatamente uma despesa e vira lastro',
+        approved3.workflow_status === 'linked' && (await despesasProva()) === antes3 + 1);
+      log = await getMatrizLogistica(ENV, transactionPool);
+      check('L14d despesas_total da rota soma a aprovação uma vez (120, não 240)',
+        Number(log.rotas_recentes.find((t) => t.id === trip3.trip_id)!.despesas_total) === 120);
+    } finally {
+      await client.query('ROLLBACK');
+    }
+    // Mantém trip1 fechada para o guard L19, agora pelo contrato novo: só anotação.
+    await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080,
+      fuel_spent: 187.3, environment: ENV });
 
     // ── L15: teto de comprovantes por rota (banca: anti-abuso de storage) ──
     let capped = false;
@@ -287,41 +378,63 @@ async function main(): Promise<void> {
     catch (e) { capped = (e as Error).message === 'receipt_limit'; }
     check('L15 51º comprovante barrado (receipt_limit)', capped);
 
-    // ── L16: "A ROTA SE PAGOU?" — resumo financeiro da rota (frete embutido no
-    // total + lucro pela régua 0117 + despesas amarradas). A: 1×100 custo 60,
-    // total 109,90 (frete 9,90 · lucro 40). B: 2×100 custo 60, total 213 (frete 13
-    // · lucro 80). C: FALHA (fica fora da conta). D: entregue SEM custo congelado
-    // (soma frete, lucro fica de fora, aviso conta). Fecha com gasolina 35. ──
-    const oA = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
-    const oB = await seedOrder({ unitId: mainUnitId, qty: 2, total: 213, unitCost: 60 });
-    const oC = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
-    const oD = await seedOrder({ unitId: mainUnitId, total: 109.9 }); // sem custo congelado
-    const trip5 = await openMatrizTrip({
-      courier_name: 'Resumo PROVA-LOG', km_start: 500,
-      order_ids: [oA, oB, oC, oD], environment: ENV,
-    });
-    tripIds.push(trip5.trip_id);
-    await setMatrizDeliveryStatus({ order_id: oA, status: 'delivered', environment: ENV });
-    await setMatrizDeliveryStatus({ order_id: oB, status: 'delivered', environment: ENV });
-    await setMatrizDeliveryStatus({ order_id: oD, status: 'delivered', environment: ENV });
-    await failMatrizDelivery({ order_id: oC, reason: 'PROVA-LOG resumo', actor_label: 'prova-log', environment: ENV });
-    const fech5 = await closeMatrizTrip({ trip_id: trip5.trip_id, km_end: 560, fuel_spent: 35, environment: ENV });
-    log = await getMatrizLogistica(ENV);
-    const t5 = log.rotas_recentes.find((t) => t.id === trip5.trip_id);
-    const rz = t5?.resumo;
-    check('L16a resumo: 3 entregues (falha FORA) e frete 9,90+13+9,90 = 32,80',
-      !!rz && rz.entregues === 3 && Math.abs(rz.frete_total - 32.8) < 0.005,
-      `resumo=${JSON.stringify(rz)}`);
-    check('L16b lucro dos pneus SÓ com custo congelado (40+80=120) + 1 item sem custo AVISADO',
-      !!rz && Math.abs(rz.lucro_pneus - 120) < 0.005 && rz.itens_sem_custo === 1);
-    check('L16c despesas da rota = gasolina do fechamento (35) → sobra 32,80+120−35 = 117,80',
-      !!t5 && Math.abs(Number(t5.despesas_total) - 35) < 0.005,
-      `despesas=${t5?.despesas_total}`);
-    // Dono APAGA a despesa no Financeiro (soft delete) → a rota reflete na hora.
-    await client.query(`UPDATE commerce.matriz_expenses SET deleted_at = now() WHERE id = $1`, [fech5.fuel_expense_id]);
-    log = await getMatrizLogistica(ENV);
-    check('L16d despesa apagada (soft delete) SAI do resumo da rota',
-      Number(log.rotas_recentes.find((t) => t.id === trip5.trip_id)!.despesas_total) === 0);
+    // ── L16: "A ROTA SE PAGOU?" só desconta dinheiro de comprovante aprovado.
+    // A seção também é desfeita integralmente para não deixar decisão append-only. ──
+    await client.query('BEGIN');
+    try {
+      const oA = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
+      const oB = await seedOrder({ unitId: mainUnitId, qty: 2, total: 213, unitCost: 60 });
+      const oC = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
+      const oD = await seedOrder({ unitId: mainUnitId, total: 109.9 });
+      const trip5 = await openMatrizTrip({ courier_name: 'Resumo PROVA-LOG', km_start: 500,
+        order_ids: [oA, oB, oC, oD], environment: ENV }, transactionPool);
+      tripIds.push(trip5.trip_id);
+      await setMatrizDeliveryStatus({ order_id: oA, status: 'delivered', environment: ENV }, transactionPool);
+      await setMatrizDeliveryStatus({ order_id: oB, status: 'delivered', environment: ENV }, transactionPool);
+      await setMatrizDeliveryStatus({ order_id: oD, status: 'delivered', environment: ENV }, transactionPool);
+      await failMatrizDelivery({ order_id: oC, reason: 'PROVA-LOG resumo',
+        actor_label: 'prova-log', environment: ENV }, transactionPool);
+      const rec5 = await addMatrizTripReceipt({ trip_id: trip5.trip_id,
+        bytes: fakeReceipt('RECIBO-RESUMO'), mime: 'image/jpeg', environment: ENV }, transactionPool);
+      const attempt5 = await beginReceiptAiAttempt({ receipt_id: rec5.receipt_id,
+        environment: ENV, model: 'prova-log-model', extractor_version: 'prova-v1',
+        prompt_version: 'prova-p1' }, transactionPool);
+      await completeReceiptAiAttempt({ attempt_id: attempt5.attempt_id, environment: ENV,
+        result: { status: 'suggested', amount: 35, category: 'combustivel',
+          merchant: `Posto resumo ${runMarker}`, document_date: today, confidence: 0.91,
+          summary: `Posto resumo ${runMarker} · R$ 35,00` } }, transactionPool);
+      const approved5 = await approveMatrizTripReceipt({ receipt_id: rec5.receipt_id,
+        ai_attempt_id: attempt5.attempt_id, amount: 35, suggested_amount: 35,
+        category: 'combustivel', merchant: `Posto resumo ${runMarker}`,
+        document_date: today, competence_month: competenceMonth,
+        payment_status: 'paid', payment_date: today, possible_duplicate_confirmed: true,
+        idempotency_key: `${runMarker}-approve-5`, actor_label: 'prova-logistica',
+        note: `${runMarker} resumo aprovado`, environment: ENV }, transactionPool);
+      const fech5 = await closeMatrizTrip({ trip_id: trip5.trip_id, km_end: 560,
+        fuel_spent: 35, environment: ENV }, transactionPool);
+      log = await getMatrizLogistica(ENV, transactionPool);
+      const t5 = log.rotas_recentes.find((t) => t.id === trip5.trip_id);
+      const rz = t5?.resumo;
+      check('L16a resumo: 3 entregues (falha FORA) e frete 9,90+13+9,90 = 32,80',
+        !!rz && rz.entregues === 3 && Math.abs(rz.frete_total - 32.8) < 0.005,
+        `resumo=${JSON.stringify(rz)}`);
+      check('L16b lucro dos pneus SÓ com custo congelado (40+80=120) + 1 item sem custo AVISADO',
+        !!rz && Math.abs(rz.lucro_pneus - 120) < 0.005 && rz.itens_sem_custo === 1);
+      check('L16c rota desconta os R$35 aprovados; fechamento não cria fuel_expense_id',
+        fech5.fuel_expense_id === null && !!t5
+        && Math.abs(Number(t5.despesas_total) - 35) < 0.005
+        && t5.fuel_spent_without_approved_expense === false,
+        `despesas=${t5?.despesas_total}`);
+      await client.query(`UPDATE commerce.matriz_expenses SET deleted_at=now() WHERE id=$1`,
+        [approved5.expense_id]);
+      log = await getMatrizLogistica(ENV, transactionPool);
+      const t5Removed = log.rotas_recentes.find((t) => t.id === trip5.trip_id)!;
+      check('L16d despesa removida sai do resumo e ativa aviso âmbar da gasolina sem lastro',
+        Number(t5Removed.despesas_total) === 0
+        && t5Removed.fuel_spent_without_approved_expense === true);
+    } finally {
+      await client.query('ROLLBACK');
+    }
 
     // ── L17-L20: VÍNCULO PEDIDO↔ROTA (07-03c) — pendurar em rota aberta + rota não
     // abre vazia. Decisão do dono: opção 2 (botão "pôr na rota" + trava de vazia). ──
@@ -432,8 +545,7 @@ async function main(): Promise<void> {
       && log.finalizadas.some((d) => d.order_id === oReport),
       `qty=${await qtyOf()} (antes=${qtyAntesReport})`);
 
-    // ── L28: NÚMERO DA ROTA (0129) — formato ROTA-XXXX, único, e a despesa do
-    // fechamento CARREGA o número (auditar despesa↔rota no Financeiro). ──
+    // ── L28: número da rota + contrato novo do fechamento sem dinheiro. ──
     const numeradas = [...log.rotas_abertas, ...log.rotas_recentes];
     check('L28a toda rota tem trip_number ROTA-XXXX e sem repetição',
       numeradas.length > 0 && numeradas.every((t) => /^ROTA-\d{4,}$/.test(t.trip_number))
@@ -441,18 +553,17 @@ async function main(): Promise<void> {
       numeradas.map((t) => t.trip_number).join(' '));
 
     const fechPend = await closeMatrizTrip({ trip_id: trip6.trip_id, km_end: 60, fuel_spent: 22, environment: ENV });
-    const t6num = (await client.query<{ trip_number: string }>(
-      `SELECT trip_number FROM commerce.matriz_delivery_trips WHERE id=$1`, [trip6.trip_id])).rows[0]!.trip_number;
-    const expDesc = fechPend.fuel_expense_id
-      ? (await client.query<{ description: string }>(
-          `SELECT description FROM commerce.matriz_expenses WHERE id=$1`, [fechPend.fuel_expense_id])).rows[0]!.description
-      : '';
-    check('L28b despesa do fechamento carrega o número da rota (despesa↔rota auditável)',
-      !!fechPend.fuel_expense_id && expDesc.includes(t6num), expDesc);
+    log = await getMatrizLogistica(ENV);
+    const closed6 = log.rotas_recentes.find((t) => t.id === trip6.trip_id);
+    check('L28b fechamento com R$22 só anota, não cria despesa e acende aviso âmbar',
+      fechPend.fuel_expense_id === null && !!closed6
+      && Number(closed6.fuel_spent) === 22
+      && closed6.fuel_spent_without_approved_expense === true);
 
-    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + rota + anti-dupla + IA idempotente + blob + rota-se-pagou + vínculo pedido↔rota + agendamento D+1 + reportadas/decisão do dono + número da rota)' : `❌ ${fails} CASO(S) FALHARAM`}`);
+    console.log(`\n${fails === 0 ? '✅ LOGÍSTICA DA MATRIZ PROVADA (fila main-only + termômetro + galpão volta + IA só sugere + aprovação humana idempotente + fechamento sem dinheiro + blob + rota-se-pagou + vínculo pedido↔rota + agendamento D+1 + reportadas/decisão do dono + número da rota)' : `❌ ${fails} CASO(S) FALHARAM`}`);
   } finally {
-    // 1º captura as despesas da prova (fechamento + IA) via link das trips/receipts;
+    // As decisões novas rodam em transações revertidas. A limpeza abaixo preserva
+    // compatibilidade com resíduos do contrato antigo e com os demais cenários.
     // 2º apaga blobs → receipts → trips (a FK protege a despesa referenciada — provado);
     // 3º só ENTÃO apaga as despesas capturadas.
     const expIds = tripIds.length
@@ -476,7 +587,8 @@ async function main(): Promise<void> {
       await client.query(
         `DELETE FROM commerce.matriz_expenses
           WHERE environment=$1 AND id = ANY($2::uuid[])
-            AND created_by IN ('logistica-fechamento','ia-comprovante')`, [ENV, expIds]);
+            AND (created_by IN ('logistica-fechamento','ia-comprovante')
+                 OR created_by LIKE 'comprovante:%')`, [ENV, expIds]);
     }
     for (const id of orderIds) {
       await client.query(`DELETE FROM audit.events WHERE environment=$1 AND entity_id=$2`, [ENV, id]);

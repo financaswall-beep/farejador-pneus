@@ -21,8 +21,8 @@ import {
   rateLimitRetryAfterSeconds,
 } from '../../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from '../../parceiro/photo-upload.js';
-import { readReceiptWithAI } from '../painel/receipt-ai.js';
-import { recordReceiptAiResult } from '../painel/queries.js';
+import { extractReceiptSuggestion } from '../painel/receipt-ai-flow.js';
+import { ReceiptExactDuplicateError } from '../painel/queries.js';
 import {
   authenticateEntregador,
   validateEntregadorSession,
@@ -226,6 +226,9 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
       if (err instanceof Error && err.message === 'trip_not_found') {
         return reply.status(404).send({ error: 'trip_not_found' });
       }
+      if (err instanceof ReceiptExactDuplicateError) {
+        return reply.status(409).send({ error: 'receipt_exact_duplicate' });
+      }
       logger.error({ err }, 'entregador fechar rota failed');
       return reply.status(500).send({ error: 'internal_error' });
     }
@@ -256,22 +259,14 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
       return reply.status(500).send({ error: 'internal_error' });
     }
     // IA inline (mesma régua do painel): erro de transporte NÃO derruba o upload.
-    let ai: { ai_status: string; ai_summary?: string | null } = { ai_status: receipt.ai_status };
-    if (env.MATRIZ_RECEIPT_AI) {
-      try {
-        const reading = await readReceiptWithAI(photo.bytes, photo.mime);
-        const recorded = await recordReceiptAiResult({
-          receipt_id: receipt.receipt_id,
-          result: reading.kind === 'parsed'
-            ? { kind: 'parsed', category: reading.category, amount: reading.amount, summary: reading.summary }
-            : { kind: 'unreadable', summary: reading.summary },
-        });
-        ai = { ai_status: recorded.ai_status, ai_summary: reading.summary };
-      } catch (err) {
-        logger.warn({ err, receiptId: receipt.receipt_id }, 'entregador leitura de comprovante falhou (fica pending)');
-      }
+    let ai: object = { ai_status: receipt.ai_status,
+      workflow_status: receipt.workflow_status };
+    if (env.MATRIZ_RECEIPT_AI && !receipt.duplicate) {
+      ai = await extractReceiptSuggestion({ receipt_id: receipt.receipt_id,
+        bytes: photo.bytes, mime: photo.mime });
     }
-    return reply.status(201).send({ ok: true, receipt_id: receipt.receipt_id, ...ai });
+    return reply.status(receipt.duplicate ? 200 : 201).send({ ok: true,
+      receipt_id: receipt.receipt_id, duplicate: receipt.duplicate, ...ai });
   });
 
   // ── Imagem do comprovante (miniatura) — COM posse ──

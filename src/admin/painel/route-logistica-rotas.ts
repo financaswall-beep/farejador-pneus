@@ -2,15 +2,18 @@
 // fechar rota + comprovantes (upload blindado + leitura por IA). Schemas vêm de
 // ./route-logistica.js (içados lá). Corpo VERBATIM das linhas 948-1115 do pré-obra.
 import type { FastifyInstance } from 'fastify';
-import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError, reencodePhoto } from '../../parceiro/photo-upload.js';
-import { addMatrizTripReceipt, attachOrderToMatrizTrip, closeMatrizTrip, getMatrizTripReceiptImage, openMatrizTrip, recordReceiptAiResult } from './queries.js';
-import { readReceiptWithAI } from './receipt-ai.js';
+import { addMatrizTripReceipt, attachOrderToMatrizTrip, closeMatrizTrip,
+  getMatrizTripReceiptImage, openMatrizTrip, ReceiptExactDuplicateError,
+  approveMatrizTripReceipt, rejectMatrizTripReceipt } from './queries.js';
+import { extractReceiptSuggestion } from './receipt-ai-flow.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
-import { abrirRotaSchema, comprovanteIdParamsSchema, comprovanteParamsSchema, fecharRotaSchema, lerComprovanteSchema, pendurarRotaSchema } from './route-logistica.js';
+import { abrirRotaSchema, aprovarComprovanteSchema, comprovanteIdParamsSchema,
+  comprovanteParamsSchema, fecharRotaSchema, lerComprovanteSchema,
+  pendurarRotaSchema, rejeitarComprovanteSchema } from './route-logistica.js';
 
 export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Promise<void> {
   fastify.post('/admin/api/logistica/rotas', { preHandler: requireAdminAuth }, async (request, reply) => {
@@ -57,8 +60,8 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
     }
   });
 
-  // FECHA a rota (km final + gasolina + observação). Gasolina sem comprovante-despesa
-  // → lança 'combustivel' no 0120 na mesma transação (anti-dupla-contagem).
+  // FECHA a rota (km final + gasolina + observação). O valor informado continua
+  // operacional; só uma aprovação humana de comprovante pode criar dinheiro.
   fastify.post('/admin/api/logistica/rotas/fechar', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!env.MATRIZ_LOGISTICS) return reply.status(404).send({ error: 'logistics_disabled' });
     const parsed = fecharRotaSchema.safeParse(request.body);
@@ -108,6 +111,8 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
         trip_id: params.data.tripId,
         bytes: photo.bytes,
         mime: photo.mime,
+        actor_label: operatorLabel(request),
+        upload_source: 'admin',
       });
     } catch (err) {
       if (err instanceof Error && err.message === 'trip_not_found') {
@@ -116,6 +121,10 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
       if (err instanceof Error && err.message === 'receipt_limit') {
         return reply.status(400).send({ error: 'receipt_limit' });
       }
+      if (err instanceof ReceiptExactDuplicateError) {
+        return reply.status(409).send({ error: 'receipt_exact_duplicate',
+          duplicate_trip_number: err.duplicateTripNumber });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel logistica comprovante failed');
       return reply.status(mapped.status).send({ error: mapped.error });
@@ -123,25 +132,17 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
 
     // IA inline (o painel espera com spinner). Erro de transporte NÃO derruba o
     // upload: o comprovante fica 'pending' com "ler de novo" na tela.
-    let ai: { ai_status: string; ai_summary?: string | null; ai_expense_id?: string | null; linked_existing?: boolean } = { ai_status: receipt.ai_status };
-    if (env.MATRIZ_RECEIPT_AI) {
-      try {
-        const reading = await readReceiptWithAI(photo.bytes, photo.mime);
-        const recorded = await recordReceiptAiResult({
-          receipt_id: receipt.receipt_id,
-          result: reading.kind === 'parsed'
-            ? { kind: 'parsed', category: reading.category, amount: reading.amount, summary: reading.summary }
-            : { kind: 'unreadable', summary: reading.summary },
-        });
-        ai = { ai_status: recorded.ai_status, ai_summary: reading.summary, ai_expense_id: recorded.ai_expense_id, linked_existing: recorded.linked_existing };
-      } catch (err) {
-        logger.warn({ err, receiptId: receipt.receipt_id }, 'leitura de comprovante falhou (fica pending)');
-      }
+    let ai: object = { ai_status: receipt.ai_status,
+      workflow_status: receipt.workflow_status };
+    if (env.MATRIZ_RECEIPT_AI && !receipt.duplicate) {
+      ai = await extractReceiptSuggestion({ receipt_id: receipt.receipt_id,
+        bytes: photo.bytes, mime: photo.mime });
     }
-    return reply.status(201).send({ ok: true, receipt_id: receipt.receipt_id, ...ai });
+    return reply.status(receipt.duplicate ? 200 : 201).send({ ok: true,
+      receipt_id: receipt.receipt_id, duplicate: receipt.duplicate, ...ai });
   });
 
-  // Re-tenta a leitura de um comprovante pending/unreadable (idempotente: já lançado não duplica).
+  // Re-tenta somente a extração. Cada tentativa é preservada e continua sem lançar dinheiro.
   fastify.post('/admin/api/logistica/comprovantes/ler', { preHandler: requireAdminAuth }, async (request, reply) => {
     if (!env.MATRIZ_LOGISTICS || !env.MATRIZ_RECEIPT_AI) return reply.status(404).send({ error: 'receipt_ai_disabled' });
     const parsed = lerComprovanteSchema.safeParse(request.body);
@@ -151,17 +152,62 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
     const img = await getMatrizTripReceiptImage(parsed.data.receipt_id);
     if (!img) return reply.status(404).send({ error: 'receipt_not_found' });
     try {
-      const reading = await readReceiptWithAI(img.bytes, img.mime);
-      const recorded = await recordReceiptAiResult({
-        receipt_id: parsed.data.receipt_id,
-        result: reading.kind === 'parsed'
-          ? { kind: 'parsed', category: reading.category, amount: reading.amount, summary: reading.summary }
-          : { kind: 'unreadable', summary: reading.summary },
-      });
-      return reply.status(200).send({ ok: true, ...recorded, ai_summary: reading.summary });
+      const result = await extractReceiptSuggestion({ receipt_id: parsed.data.receipt_id,
+        bytes: img.bytes, mime: img.mime });
+      if (result.suggestion_status === 'failed') {
+        return reply.status(502).send({ error: 'ai_unavailable', ...result });
+      }
+      return reply.status(200).send({ ok: true, ...result });
     } catch (err) {
       logger.warn({ err, receiptId: parsed.data.receipt_id }, 're-leitura de comprovante falhou');
       return reply.status(502).send({ error: 'ai_unavailable' });
+    }
+  });
+
+  fastify.post('/admin/api/logistica/comprovantes/aprovar', {
+    preHandler: requireAdminAuth,
+  }, async (request, reply) => {
+    if (!env.MATRIZ_RECEIPT_APPROVAL) {
+      return reply.status(404).send({ error: 'receipt_approval_disabled' });
+    }
+    if (!env.MATRIZ_EXPENSES) {
+      return reply.status(409).send({ error: 'receipt_approval_expenses_disabled' });
+    }
+    const parsed = aprovarComprovanteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const context = getAdminContext(request);
+      const result = await approveMatrizTripReceipt({ ...parsed.data,
+        actor_label: operatorLabel(request), actor_admin_id: context.personId });
+      return reply.status(200).send({ approved: true, ...result });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel comprovante aprovar failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/logistica/comprovantes/rejeitar', {
+    preHandler: requireAdminAuth,
+  }, async (request, reply) => {
+    if (!env.MATRIZ_RECEIPT_APPROVAL) {
+      return reply.status(404).send({ error: 'receipt_approval_disabled' });
+    }
+    const parsed = rejeitarComprovanteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const context = getAdminContext(request);
+      const result = await rejectMatrizTripReceipt({ ...parsed.data,
+        actor_label: operatorLabel(request), actor_admin_id: context.personId });
+      return reply.status(200).send({ rejected: true, ...result });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel comprovante rejeitar failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
 

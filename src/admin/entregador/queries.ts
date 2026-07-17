@@ -19,7 +19,8 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hashPassword, verifyPassword, fakeVerify, hashSessionToken } from '../../parceiro/password.js';
-import { MAIN_DELIVERY_GUARD, closeMatrizTrip, addMatrizTripReceipt } from '../painel/queries.js';
+import { MAIN_DELIVERY_GUARD, closeMatrizTrip, addMatrizTripReceipt,
+  type MatrizReceiptUploadResult } from '../painel/queries.js';
 
 void hashPassword; // reservado (troca de senha do próprio entregador — fatia futura)
 
@@ -350,10 +351,12 @@ export async function addEntregadorReceipt(
   input: { bytes: Buffer; mime: string },
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
-): Promise<{ receipt_id: string; ai_status: string }> {
+): Promise<MatrizReceiptUploadResult> {
   const tripId = await resolveOpenTripId(auth, environment, dbPool);
   if (!tripId) throw new Error('trip_not_found');
-  return addMatrizTripReceipt({ trip_id: tripId, bytes: input.bytes, mime: input.mime, environment }, dbPool);
+  return addMatrizTripReceipt({ trip_id: tripId, bytes: input.bytes, mime: input.mime,
+    environment, actor_label: `entregador:${auth.collaboratorId}`,
+    upload_source: 'courier' }, dbPool);
 }
 
 /** Imagem do comprovante COM posse: a query junta a trip e exige que ela seja DELE.

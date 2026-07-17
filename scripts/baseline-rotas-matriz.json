@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-17T00:31:07.310Z",
-  "total": 130,
+  "geradoEm": "2026-07-17T06:01:57.856Z",
+  "total": 133,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
@@ -60,6 +60,7 @@
     "GET /admin/painel/app.galpao.js PUBLICA",
     "GET /admin/painel/app.js PUBLICA",
     "GET /admin/painel/app.logistica.acoes.js PUBLICA",
+    "GET /admin/painel/app.logistica.comprovantes.js PUBLICA",
     "GET /admin/painel/app.logistica.js PUBLICA",
     "GET /admin/painel/app.logistica.resultado.js PUBLICA",
     "GET /admin/painel/app.montagem.js PUBLICA",
@@ -94,7 +95,9 @@
     "POST /admin/api/colaboradores/revogar AUTH(1)",
     "POST /admin/api/colaboradores/senha AUTH(1)",
     "POST /admin/api/integrity/resolve AUTH(1)",
+    "POST /admin/api/logistica/comprovantes/aprovar AUTH(1)",
     "POST /admin/api/logistica/comprovantes/ler AUTH(1)",
+    "POST /admin/api/logistica/comprovantes/rejeitar AUTH(1)",
     "POST /admin/api/logistica/entregas/falhou AUTH(1)",
     "POST /admin/api/logistica/entregas/recolocar AUTH(1)",
     "POST /admin/api/logistica/entregas/remarcar AUTH(1)",

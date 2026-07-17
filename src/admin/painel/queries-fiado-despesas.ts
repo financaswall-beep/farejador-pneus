@@ -64,6 +64,8 @@ export interface MatrizExpenseRow {
   description: string | null;
   amount: string;
   occurred_at: string;
+  document_date?: string | null;
+  competence_month?: string | null;
   payment_status: 'paid' | 'pending';
   due_date: string | null;
   paid_at: string | null;
@@ -96,7 +98,7 @@ export async function getMatrizExpenses(
   const params: unknown[] = [environment];
   if (filtro?.month) {
     params.push(filtro.month);
-    where.push(`date_trunc('month',occurred_at AT TIME ZONE 'America/Sao_Paulo')=to_date($${params.length},'YYYY-MM')`);
+    where.push(`ops.matriz_expense_competence_month(competence_month,occurred_at)=to_date($${params.length},'YYYY-MM')`);
   }
   if (filtro?.category) {
     params.push(filtro.category);
@@ -110,7 +112,8 @@ export async function getMatrizExpenses(
     ? `(SELECT i.id FROM finance.matriz_payroll_items i WHERE i.source_expense_id=matriz_expenses.id)`
     : `NULL::uuid`;
   const entries = await dbPool.query<MatrizExpenseRow>(
-    `SELECT id,category,description,amount,occurred_at,payment_status,due_date,paid_at,
+    `SELECT id,category,description,amount,occurred_at,document_date,competence_month,
+            payment_status,due_date,paid_at,
             ${payrollProjection} AS payroll_item_id,
             (payment_status='pending' AND due_date IS NOT NULL AND due_date<current_date) AS overdue
        FROM commerce.matriz_expenses WHERE ${where.join(' AND ')}
