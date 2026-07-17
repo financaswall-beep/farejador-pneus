@@ -12,6 +12,7 @@ import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 import { startPartnerPushFanout } from '../parceiro/push.js';
 import { registerSecurityHeaders } from './security-headers.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
+import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-custos.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -62,6 +63,21 @@ async function start(): Promise<void> {
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
   fastify.log.info({ port }, 'server listening');
+
+  // Marcador da Etapa 6: o guard da 0137 só deixa reconciliar custo quando a
+  // conexão é a DONA de commerce.partner_order_items. Se a blindagem futura
+  // trocar a role do app, este aviso grita no boot — sem travar o servidor.
+  void costReconciliationOwnershipOk()
+    .then((ok) => {
+      if (!ok) {
+        fastify.log.error(
+          'RECONCILIACAO DE CUSTO INOPERANTE: a conexao atual nao e a dona de commerce.partner_order_items (guard da 0137). O POST /admin/api/rede/custos/reconcile vai responder 503 ate a conexao voltar a ser o owner.',
+        );
+      }
+    })
+    .catch((err) => {
+      fastify.log.warn({ err }, 'checagem de ownership da reconciliacao falhou; boot segue normal');
+    });
 }
 
 async function shutdown(signal: string): Promise<void> {
