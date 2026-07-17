@@ -149,9 +149,18 @@ function entregasApp() {
           body: file,
         });
         if (res.status === 401) { this.forcarLogout(); return; }
-        if (!res.ok) throw new Error('upload');
-        this.comprovantesOk += 1;
-        this.msg = { ok: true, text: 'Comprovante enviado.' };
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (payload.error === 'receipt_exact_duplicate') {
+            this.msg = { ok: false, text: 'Este arquivo já foi usado em outro comprovante.' };
+            return;
+          }
+          throw new Error('upload');
+        }
+        if (!payload.duplicate) this.comprovantesOk += 1;
+        this.msg = { ok: true, text: payload.duplicate
+          ? 'Este comprovante já estava anexado à sua rota.'
+          : 'Comprovante enviado para o escritório revisar.' };
       } catch (err) {
         this.msg = { ok: false, text: 'Não consegui enviar a foto.' };
       } finally {
@@ -168,7 +177,7 @@ function entregasApp() {
           km_end: this.fecharForm.km_end === '' ? null : Number(this.fecharForm.km_end),
           fuel_spent: this.fecharForm.fuel_spent === '' ? null : Number(this.fecharForm.fuel_spent),
         });
-        this.msg = { ok: true, text: 'Rota fechada. Bom descanso!' };
+        this.msg = { ok: true, text: 'Rota fechada. A gasolina ficou anotada e o escritório confere o comprovante.' };
         this.fecharForm = { km_end: '', fuel_spent: '' };
         await this.carregar();
       } catch (err) {

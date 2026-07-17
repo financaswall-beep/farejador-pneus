@@ -69,9 +69,10 @@ export async function getMatrizFinancialTruth(
   dbPool: Pool = defaultPool,
 ): Promise<MatrizFinancialTruth> {
   const result = await dbPool.query<TruthRow>(
-    `WITH bounds AS (
+     `WITH bounds AS (
        SELECT (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')
-               AT TIME ZONE 'America/Sao_Paulo') AS month_start
+               AT TIME ZONE 'America/Sao_Paulo') AS month_start,
+              date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')::date AS month_start_date
      ), retail AS (
        SELECT o.id,o.created_at,o.total_amount,o.status,o.fulfillment_mode,o.payment_method,
               o.closed_at,o.delivered_at,o.delivery_status,o.closed_by,o.source,
@@ -119,7 +120,8 @@ export async function getMatrizFinancialTruth(
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries,bounds
                   WHERE environment=$1 AND status<>'reversed' AND realized_at>=month_start),0) commission_revenue,
        COALESCE((SELECT SUM(amount) FROM commerce.matriz_expenses,bounds
-                  WHERE environment=$1 AND deleted_at IS NULL AND occurred_at>=month_start),0) expenses_competence,
+                  WHERE environment=$1 AND deleted_at IS NULL
+                    AND ops.matriz_expense_competence_month(competence_month,occurred_at)>=month_start_date),0) expenses_competence,
        COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start),0) purchases_header,
        COALESCE((SELECT SUM(item_total) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start),0) purchases_items,
        COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status<>'cancelled'

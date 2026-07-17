@@ -30,6 +30,8 @@ export * from './queries-financeiro-verdade.js'; // Etapa 4: competência × cai
 export * from './queries-logistica.js'; // logística (0121) leitura: entregas, rotas, status, falha
 export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendurar/remarcar/recolocar/fechar rota
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)
+export * from './queries-logistica-comprovantes-review.js'; // Etapa 7: tentativas + decisão humana
+export * from './queries-logistica-comprovantes-decision.js'; // Etapa 7: aprovação/rejeição atômica
 export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): cadastro (list/criar/função)
 export * from './queries-colaboradores-acesso.js'; // ciclo de acesso (0132): papel do painel, revogar/reativar, senha
 export * from './queries-colaboradores-gestao.js'; // visão integrada: equipe/remuneração/comissão/desempenho

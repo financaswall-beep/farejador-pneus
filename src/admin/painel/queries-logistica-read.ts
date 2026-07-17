@@ -2,12 +2,10 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-
 export const MAIN_DELIVERY_GUARD = `
   o.fulfillment_mode = 'delivery'
   AND EXISTS (SELECT 1 FROM core.units u
                WHERE u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main')`;
-
 export interface MatrizDeliveryRow {
   order_id: string;
   order_number: string | null;
@@ -44,6 +42,7 @@ export interface MatrizTripRow {
   km_end: string | null;
   fuel_spent: string | null;
   fuel_expense_id: string | null;
+  fuel_spent_without_approved_expense: boolean;
   notes: string | null;
   started_at: string;
   ended_at: string | null;
@@ -95,14 +94,17 @@ export interface MatrizTripRow {
   receipts: Array<{
     id: string;
     ai_status: 'pending' | 'parsed' | 'unreadable' | 'skipped';
+    workflow_status: 'uploaded' | 'processing' | 'review_required' | 'linked' | 'rejected' | 'legacy_linked';
     ai_summary: string | null;
     ai_expense_id: string | null;
     expense_category: string | null;
     expense_amount: number | null;
+    expense_removed: boolean;
+    latest_attempt: Record<string, unknown> | null;
+    decision: Record<string, unknown> | null;
     created_at: string;
   }>;
 }
-
 export interface MatrizLogistica {
   abertas: MatrizDeliveryRow[];
   /** O LIMBO do portal (0125): o entregador REPORTOU não-entregue (failed) e o pedido
@@ -114,7 +116,6 @@ export interface MatrizLogistica {
   rotas_abertas: MatrizTripRow[];
   rotas_recentes: MatrizTripRow[];
 }
-
 /** A tela Logística num GET: entregas da main (abertas + últimas finalizadas) + rotas. */
 export async function getMatrizLogistica(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
@@ -139,6 +140,15 @@ export async function getMatrizLogistica(
   const tripSelect = `
     SELECT t.id, t.trip_number, t.courier_name, t.status, t.km_start::text, t.km_end::text,
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
+           (COALESCE(t.fuel_spent,0)>0 AND NOT EXISTS (
+             SELECT 1 FROM commerce.matriz_expenses ef
+              WHERE ef.environment=t.environment AND ef.deleted_at IS NULL
+                AND ef.category='combustivel'
+                AND (ef.id=t.fuel_expense_id OR ef.id IN (
+                  SELECT rf.ai_expense_id FROM commerce.matriz_trip_receipts rf
+                   WHERE rf.environment=t.environment AND rf.trip_id=t.id
+                     AND rf.workflow_status IN ('linked','legacy_linked')
+                     AND rf.ai_expense_id IS NOT NULL)))) AS fuel_spent_without_approved_expense,
            (SELECT COUNT(*)::int FROM commerce.orders o
              WHERE o.trip_id = t.id AND o.environment = t.environment) AS deliveries_count,
            (SELECT COALESCE(SUM(o.total_amount),0)::text FROM commerce.orders o
@@ -203,7 +213,9 @@ export async function getMatrizLogistica(
              WHERE e.environment = t.environment AND e.deleted_at IS NULL
                AND (e.id = t.fuel_expense_id
                     OR e.id IN (SELECT r2.ai_expense_id FROM commerce.matriz_trip_receipts r2
-                                 WHERE r2.trip_id = t.id AND r2.ai_expense_id IS NOT NULL))) AS despesas_total,
+                                 WHERE r2.environment=t.environment AND r2.trip_id=t.id
+                                   AND r2.workflow_status IN ('linked','legacy_linked')
+                                   AND r2.ai_expense_id IS NOT NULL))) AS despesas_total,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
                        'id', x.id, 'category', x.category, 'description', x.description,
                        'amount', x.amount, 'occurred_at', x.occurred_at,
@@ -216,22 +228,49 @@ export async function getMatrizLogistica(
                            r3.id AS receipt_id, r3.ai_summary AS receipt_summary
                       FROM commerce.matriz_expenses e2
                       LEFT JOIN commerce.matriz_trip_receipts r3
-                        ON r3.trip_id = t.id AND r3.ai_expense_id = e2.id
+                        ON r3.environment=t.environment AND r3.trip_id=t.id
+                       AND r3.workflow_status IN ('linked','legacy_linked')
+                       AND r3.ai_expense_id = e2.id
                      WHERE e2.environment = t.environment AND e2.deleted_at IS NULL
                        AND (e2.id = t.fuel_expense_id
                             OR e2.id IN (SELECT r4.ai_expense_id FROM commerce.matriz_trip_receipts r4
-                                         WHERE r4.trip_id = t.id AND r4.ai_expense_id IS NOT NULL))
+                                         WHERE r4.environment=t.environment AND r4.trip_id=t.id
+                                           AND r4.workflow_status IN ('linked','legacy_linked')
+                                           AND r4.ai_expense_id IS NOT NULL))
                      ORDER BY e2.id, r3.created_at DESC) x), '[]'::jsonb) AS despesas,
            COALESCE((SELECT jsonb_agg(jsonb_build_object(
-                       'id', r.id, 'ai_status', r.ai_status, 'ai_summary', r.ai_summary,
+                       'id', r.id, 'ai_status', r.ai_status,
+                       'workflow_status', r.workflow_status, 'ai_summary', r.ai_summary,
                        'ai_expense_id', r.ai_expense_id,
                        'expense_category', e3.category, 'expense_amount', e3.amount,
+                       'expense_removed', (r.ai_expense_id IS NOT NULL AND e3.id IS NULL),
+                       'latest_attempt', (SELECT jsonb_build_object(
+                         'id',a.id,'attempt_no',a.attempt_no,'status',a.status,
+                         'amount',a.suggested_amount,'category',a.suggested_category,
+                         'merchant',a.suggested_merchant,'document_date',a.suggested_document_date,
+                         'confidence',a.confidence,'summary',a.summary,'error_code',a.error_code,
+                         'model',a.model,'extractor_version',a.extractor_version,
+                         'prompt_version',a.prompt_version,'started_at',a.started_at,
+                         'finished_at',a.finished_at)
+                           FROM commerce.matriz_trip_receipt_ai_attempts a
+                          WHERE a.environment=r.environment AND a.receipt_id=r.id
+                          ORDER BY a.attempt_no DESC LIMIT 1),
+                       'decision', (SELECT jsonb_build_object(
+                         'id',d.id,'action',d.action,'actor_label',d.actor_label,
+                         'approved_amount',d.approved_amount,'approved_category',d.approved_category,
+                         'approved_merchant',d.approved_merchant,'document_date',d.document_date,
+                         'competence_month',d.competence_month,'payment_status',d.payment_status,
+                         'payment_date',d.payment_date,'due_date',d.due_date,'reason',d.reason,
+                         'differences',d.differences,'expense_id',d.expense_id,'created_at',d.created_at)
+                           FROM commerce.matriz_trip_receipt_decisions d
+                          WHERE d.environment=r.environment AND d.receipt_id=r.id),
                        'created_at', r.created_at)
                        ORDER BY r.created_at DESC)
                        FROM commerce.matriz_trip_receipts r
                        LEFT JOIN commerce.matriz_expenses e3
-                         ON e3.id = r.ai_expense_id AND e3.deleted_at IS NULL
-                      WHERE r.trip_id = t.id), '[]'::jsonb) AS receipts
+                         ON e3.environment=r.environment AND e3.id=r.ai_expense_id
+                        AND e3.deleted_at IS NULL
+                      WHERE r.environment=t.environment AND r.trip_id=t.id), '[]'::jsonb) AS receipts
       FROM commerce.matriz_delivery_trips t
      WHERE t.environment = $1 AND t.deleted_at IS NULL`;
 

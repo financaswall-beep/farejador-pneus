@@ -48,4 +48,38 @@ describe('getMatrizLogistica — resultado real por rota', () => {
     expect(telaAtiva).not.toContain('x-model="fecharForm.fuel_spent"');
     expect(actions).toContain('fuel_spent: null');
   });
+
+  it('trata gasolina reportada sem comprovante aprovado como alerta, nunca como dinheiro', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const db = { query } as unknown as Pool;
+
+    await getMatrizLogistica('test', db);
+
+    const tripQueries = query.mock.calls
+      .map(([sql]) => String(sql))
+      .filter((sql) => sql.includes('commerce.matriz_delivery_trips t'));
+    const resultModule = readFileSync(resolve('painel/public/app.logistica.resultado.js'), 'utf8');
+
+    expect(tripQueries).toHaveLength(2);
+    for (const sql of tripQueries) {
+      expect(sql).toContain('fuel_spent_without_approved_expense');
+      expect(sql).toContain('workflow_status');
+      expect(sql).toContain('legacy_linked');
+      expect(sql).toContain('e2.id = t.fuel_expense_id');
+    }
+    expect(resultModule).toContain('Resultado parcial');
+    expect(resultModule).toContain('sem comprovante aprovado');
+    expect(resultModule).toContain('fuel_spent_without_approved_expense');
+  });
+
+  it('fechar rota persiste o dado operacional e nao cria matriz_expenses', () => {
+    const closeSource = readFileSync(
+      resolve('src/admin/painel/queries-logistica-rotas.ts'),
+      'utf8',
+    );
+
+    expect(closeSource).toContain('fuel_spent = COALESCE');
+    expect(closeSource).not.toContain('INSERT INTO commerce.matriz_expenses');
+    expect(closeSource).not.toContain("'logistica-fechamento'");
+  });
 });

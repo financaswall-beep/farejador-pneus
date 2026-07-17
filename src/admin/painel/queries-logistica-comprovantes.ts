@@ -1,8 +1,8 @@
 // Obra 300 (2026-07-05): fatia do banco da MATRIZ — comprovantes da rota + leitura por IA (0121/0122).
 // VERBATIM das linhas 2879-3042 do queries.ts pré-obra (commit 2628748).
 // Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
-import type { Pool, PoolClient } from 'pg';
-import { randomBytes } from 'node:crypto';
+import type { Pool } from 'pg';
+import { createHash } from 'node:crypto';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
@@ -10,7 +10,68 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
-import type { MatrizExpenseCategory } from './queries-fiado-despesas.js';
+
+export interface MatrizReceiptUploadResult {
+  receipt_id: string;
+  ai_status: string;
+  workflow_status: string;
+  duplicate: boolean;
+}
+
+export class ReceiptExactDuplicateError extends Error {
+  constructor(readonly duplicateTripNumber: string) {
+    super('receipt_exact_duplicate');
+    this.name = 'ReceiptExactDuplicateError';
+  }
+}
+
+type DuplicateReceipt = MatrizReceiptUploadResult & {
+  trip_id: string;
+  trip_number: string;
+};
+
+async function findReceiptByHash(
+  dbPool: Pool,
+  environment: 'prod' | 'test',
+  tripId: string,
+  sha256Hex: string,
+): Promise<DuplicateReceipt | null> {
+  const found = await dbPool.query<DuplicateReceipt>(
+    `SELECT r.id AS receipt_id,r.trip_id,t.trip_number,r.ai_status,r.workflow_status,
+            true AS duplicate
+       FROM commerce.matriz_trip_receipt_blobs b
+       JOIN commerce.matriz_trip_receipts r
+         ON r.environment=b.environment AND r.id=b.receipt_id
+       JOIN commerce.matriz_delivery_trips t
+         ON t.environment=r.environment AND t.id=r.trip_id
+      WHERE b.environment=$1 AND b.content_sha256=decode($2,'hex')
+      ORDER BY (r.trip_id=$3) DESC,b.dedup_enforced DESC
+      LIMIT 1`,
+    [environment, sha256Hex, tripId],
+  );
+  return found.rows[0] ?? null;
+}
+
+async function classifyDuplicate(
+  dbPool: Pool, found: DuplicateReceipt, tripId: string,
+  environment: 'prod' | 'test', sha256Hex: string,
+  actorLabel?: string | null, uploadSource?: 'admin' | 'courier',
+): Promise<MatrizReceiptUploadResult> {
+  if (found.trip_id !== tripId) {
+    await dbPool.query(`INSERT INTO audit.events
+      (environment,domain,entity_table,entity_id,event_type,actor_label,
+       idempotency_key,payload_after)
+      VALUES ($1,'receipt','commerce.matriz_trip_receipts',$2,
+        'duplicate_upload_blocked',$3,$4,$5::jsonb)`,
+    [environment, found.receipt_id, actorLabel?.trim().slice(0, 200) || null,
+      `receipt-duplicate:${sha256Hex}:${tripId}`,
+      JSON.stringify({ upload_source: uploadSource ?? 'admin', attempted_trip_id: tripId,
+        existing_trip_id: found.trip_id, existing_trip_number: found.trip_number })]);
+    throw new ReceiptExactDuplicateError(found.trip_number);
+  }
+  return { receipt_id: found.receipt_id, ai_status: found.ai_status,
+    workflow_status: found.workflow_status, duplicate: true };
+}
 
 export async function addMatrizTripReceipt(
   input: {
@@ -18,11 +79,21 @@ export async function addMatrizTripReceipt(
     bytes: Buffer;
     mime: string;
     environment?: 'prod' | 'test';
+    actor_label?: string | null;
+    upload_source?: 'admin' | 'courier';
   },
   dbPool: Pool = defaultPool,
-): Promise<{ receipt_id: string; ai_status: string }> {
+): Promise<MatrizReceiptUploadResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const aiStatus = env.MATRIZ_RECEIPT_AI ? 'pending' : 'skipped';
+  const workflowStatus = env.MATRIZ_RECEIPT_AI ? 'uploaded' : 'review_required';
+  const sha256Hex = createHash('sha256').update(input.bytes).digest('hex');
+  const validTrip = await dbPool.query(`SELECT 1 FROM commerce.matriz_delivery_trips
+    WHERE environment=$1 AND id=$2 AND deleted_at IS NULL`, [environment, input.trip_id]);
+  if (!validTrip.rows[0]) throw new Error('trip_not_found');
+  const existing = await findReceiptByHash(dbPool, environment, input.trip_id, sha256Hex);
+  if (existing) return classifyDuplicate(dbPool, existing, input.trip_id, environment,
+    sha256Hex, input.actor_label, input.upload_source);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -39,9 +110,10 @@ export async function addMatrizTripReceipt(
     );
     if (Number(count.rows[0]!.n) >= 50) throw new Error('receipt_limit');
     const receipt = await client.query<{ id: string }>(
-      `INSERT INTO commerce.matriz_trip_receipts (environment, trip_id, mime, size_bytes, ai_status)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [environment, input.trip_id, input.mime, input.bytes.length, aiStatus],
+      `INSERT INTO commerce.matriz_trip_receipts
+         (environment,trip_id,mime,size_bytes,ai_status,workflow_status)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [environment, input.trip_id, input.mime, input.bytes.length, aiStatus, workflowStatus],
     );
     const receiptId = receipt.rows[0]!.id;
     await client.query(
@@ -50,9 +122,15 @@ export async function addMatrizTripReceipt(
       [receiptId, environment, input.bytes],
     );
     await client.query('COMMIT');
-    return { receipt_id: receiptId, ai_status: aiStatus };
+    return { receipt_id: receiptId, ai_status: aiStatus,
+      workflow_status: workflowStatus, duplicate: false };
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => undefined);
+    if ((err as { code?: string })?.code === '23505') {
+      const raced = await findReceiptByHash(dbPool, environment, input.trip_id, sha256Hex);
+      if (raced) return classifyDuplicate(dbPool, raced, input.trip_id, environment,
+        sha256Hex, input.actor_label, input.upload_source);
+    }
     throw err;
   } finally {
     client.release();
@@ -75,99 +153,6 @@ export async function getMatrizTripReceiptImage(
   return r.rows[0] ?? null;
 }
 
-/** Grava o veredito da IA sobre um comprovante. parsed → LANÇA a despesa (0120)
- *  na mesma transação, amarrada ao comprovante (idempotente: comprovante que já
- *  virou despesa não lança de novo). unreadable → só marca (lançar na mão).
- *  ANTI-DUPLA nas DUAS ordens (banca 07-03): se a rota JÁ lançou a despesa no
- *  FECHAMENTO (fuel_expense_id), o comprovante COLA nela como lastro — não cria
- *  segunda despesa da mesma gasolina. O FOR UPDATE na trip serializa com
- *  closeMatrizTrip (fecha a race leitura×fechamento nas duas direções). */
-export async function recordReceiptAiResult(
-  input: {
-    receipt_id: string;
-    result:
-      | { kind: 'parsed'; category: MatrizExpenseCategory; amount: number; summary: string }
-      | { kind: 'unreadable'; summary: string };
-    environment?: 'prod' | 'test';
-  },
-  dbPool: Pool = defaultPool,
-): Promise<{ receipt_id: string; ai_status: string; ai_expense_id: string | null; linked_existing?: boolean }> {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    const receipt = await client.query<{ id: string; trip_id: string; ai_expense_id: string | null }>(
-      `SELECT r.id, r.trip_id, r.ai_expense_id
-         FROM commerce.matriz_trip_receipts r
-        WHERE r.id = $2 AND r.environment = $1
-        FOR UPDATE`,
-      [environment, input.receipt_id],
-    );
-    if (!receipt.rows[0]) throw new Error('receipt_not_found');
-    if (receipt.rows[0].ai_expense_id) {
-      // Já lançado (retry/dupla chamada) — não duplica despesa.
-      await client.query('COMMIT');
-      return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: receipt.rows[0].ai_expense_id };
-    }
-
-    if (input.result.kind === 'unreadable') {
-      await client.query(
-        `UPDATE commerce.matriz_trip_receipts
-            SET ai_status = 'unreadable', ai_summary = $3
-          WHERE id = $2 AND environment = $1`,
-        [environment, input.receipt_id, input.result.summary],
-      );
-      await client.query('COMMIT');
-      return { receipt_id: input.receipt_id, ai_status: 'unreadable', ai_expense_id: null };
-    }
-
-    // FOR UPDATE: serializa com closeMatrizTrip (que também trava a trip) —
-    // e é aqui que a ordem "fechou lançando manual → leu o comprovante DEPOIS"
-    // deixa de duplicar (achado P1 da banca 07-03).
-    const trip = await client.query<{ trip_number: string; courier_name: string; started_at: string; fuel_expense_id: string | null }>(
-      `SELECT trip_number, courier_name, started_at, fuel_expense_id
-         FROM commerce.matriz_delivery_trips WHERE id = $1
-         FOR UPDATE`,
-      [receipt.rows[0].trip_id],
-    );
-    const existingFuelExpense = trip.rows[0]?.fuel_expense_id ?? null;
-    if (existingFuelExpense) {
-      await client.query(
-        `UPDATE commerce.matriz_trip_receipts
-            SET ai_status = 'parsed', ai_summary = $3, ai_expense_id = $4
-          WHERE id = $2 AND environment = $1`,
-        [environment, input.receipt_id, `${input.result.summary} · lastro da despesa do fechamento`, existingFuelExpense],
-      );
-      await client.query('COMMIT');
-      return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: existingFuelExpense, linked_existing: true };
-    }
-
-    const rotaLabel = trip.rows[0]
-      ? `${trip.rows[0].trip_number} · ${new Date(trip.rows[0].started_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} — ${trip.rows[0].courier_name}`
-      : 'Rota';
-    const exp = await client.query<{ id: string }>(
-      `INSERT INTO commerce.matriz_expenses
-         (environment, category, description, amount, payment_status, paid_at, created_by)
-       VALUES ($1, $2, $3, $4, 'paid', now(), 'ia-comprovante')
-       RETURNING id`,
-      [environment, input.result.category, `${rotaLabel} · ${input.result.summary}`, input.result.amount],
-    );
-    await client.query(
-      `UPDATE commerce.matriz_trip_receipts
-          SET ai_status = 'parsed', ai_summary = $3, ai_expense_id = $4
-        WHERE id = $2 AND environment = $1`,
-      [environment, input.receipt_id, input.result.summary, exp.rows[0]!.id],
-    );
-    await client.query('COMMIT');
-    return { receipt_id: input.receipt_id, ai_status: 'parsed', ai_expense_id: exp.rows[0]!.id };
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
 // ─── Colaboradores da MATRIZ (0124 — fatia 1: CADASTRO; decisão do dono 07-04) ───
 // A identidade reusa a porta única (network.partner_people: username único na
 // rede + senha scrypt). O vínculo/papel do staff da matriz vive em
@@ -175,4 +160,3 @@ export async function recordReceiptAiResult(
 // 0124). Nesta fatia a pessoa criada NÃO loga em lugar nenhum: sem vínculo de
 // loja, authenticatePersonGlobal devolve null (people.ts). As telas por função
 // (rota do entregador / frente de caixa do vendedor) entram nas próximas fatias.
-

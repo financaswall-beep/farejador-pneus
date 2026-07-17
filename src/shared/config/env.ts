@@ -162,17 +162,24 @@ const envSchema = z.object({
   // LOGÍSTICA DA MATRIZ (0121): aba Logística no painel da matriz — entregas da 'main'
   // nos moldes do parceiro (em separação → saiu → entregue/não entregue) + DIÁRIO DE ROTA
   // do entregador (decisão do dono 07-03: por SAÍDA, não por entrega — km inicial/final,
-  // gasolina, comprovantes). Fechar rota com gasolina informada lança despesa 'combustivel'
-  // no 0120 (anti-dupla-contagem: só quando nenhum comprovante da rota já virou despesa).
+  // gasolina, comprovantes). Gasolina digitada no fechamento é somente anotação
+  // operacional; nunca cria dinheiro sem aprovação humana de comprovante.
   // "Não entregue" CANCELA o pedido no caminho atômico (galpão volta via trilha fdd9148).
   // Default OFF = dormente: endpoint devolve enabled:false e a UI se esconde.
   MATRIZ_LOGISTICS: booleanStringSchema,
   // IA LÊ O COMPROVANTE (0121, requer MATRIZ_LOGISTICS): o comprovante anexado à rota
-  // passa pela visão da OpenAI, que extrai categoria/valor/data e LANÇA a despesa (0120)
-  // sozinha, amarrada ao comprovante (receipts.ai_expense_id, created_by 'ia-comprovante').
-  // Sem confiança → NÃO lança (ai_status 'unreadable', lançar na mão). Default OFF =
-  // comprovante só fica guardado (ai_status 'skipped'); despesa segue manual.
+  // passa pela visão da OpenAI, que apenas SUGERE categoria/valor/data. A tentativa
+  // fica auditável; ela nunca escreve no Financeiro. Default OFF = comprovante fica
+  // guardado e já aguarda revisão humana, sem sugestão automática.
   MATRIZ_RECEIPT_AI: booleanStringSchema,
+  // APROVAÇÃO HUMANA DE COMPROVANTE (Etapa 7): expõe a fila e as rotas admin que
+  // podem aprovar/rejeitar. Só a aprovação atômica cria matriz_expenses; entregador
+  // e parceiro não recebem essa porta. Default OFF para rollout separado.
+  MATRIZ_RECEIPT_APPROVAL: booleanStringSchema,
+  // Política explícita e centralizada; o servidor valida de novo mesmo se a tela
+  // for contornada. O default conserva o teto debatido para comprovante de rota.
+  MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT: z.string().transform(Number)
+    .pipe(z.number().positive().max(1_000_000)).default('10000'),
   // PORTAL DO ENTREGADOR (0125, requer MATRIZ_LOGISTICS): /entregas no celular do
   // colaborador job='entregador' (0124) — fila do dia, abrir/fechar a rota DELE,
   // entregue com pagamento, NÃO-ENTREGUE só REPORTA (o dono confirma no painel; o

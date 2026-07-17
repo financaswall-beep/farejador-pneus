@@ -91,6 +91,48 @@ export interface CreateMatrizExpenseInput {
   idempotency_key: string;
 }
 
+export interface MatrizExpenseTransactionInput {
+  environment: 'prod' | 'test';
+  category: string;
+  description?: string | null;
+  amount: number;
+  payment_status: 'paid' | 'pending';
+  due_date?: string | null;
+  paid_at?: string | null;
+  occurred_at?: string | null;
+  document_date?: string | null;
+  competence_month?: string | null;
+  created_by?: string | null;
+}
+
+/** Núcleo sem BEGIN/COMMIT: permite que a aprovação do comprovante crie a
+ * despesa na mesma transação da decisão. O chamador é dono do rollback. */
+export async function insertMatrizExpenseInTransaction(
+  client: PoolClient,
+  input: MatrizExpenseTransactionInput,
+): Promise<MatrizExpenseRow> {
+  const created = await client.query<MatrizExpenseRow>(
+    `INSERT INTO commerce.matriz_expenses
+      (environment,category,description,amount,payment_status,due_date,paid_at,
+       occurred_at,document_date,competence_month,created_by)
+     SELECT $1::env_t,$2,$3,$4,$5,$6::date,
+            CASE WHEN $5='paid' THEN COALESCE($7::timestamptz,now()) ELSE NULL END,
+            COALESCE($8::timestamptz,now()),$9::date,$10::date,$11
+      WHERE EXISTS (SELECT 1 FROM commerce.matriz_expense_categories c
+        WHERE c.environment=$1::env_t AND c.slug=$2 AND c.archived_at IS NULL)
+     RETURNING id,category,description,amount,occurred_at,payment_status,due_date,paid_at,
+       NULL::uuid AS payroll_item_id,
+       (payment_status='pending' AND due_date IS NOT NULL AND due_date<current_date) AS overdue`,
+    [input.environment, input.category, input.description?.trim() || null, input.amount,
+     input.payment_status, input.payment_status === 'pending' ? input.due_date ?? null : null,
+     input.payment_status === 'paid' ? input.paid_at ?? null : null,
+     input.occurred_at ?? null, input.document_date ?? null,
+     input.competence_month ?? null, input.created_by ?? null],
+  );
+  if (!created.rows[0]) throw new Error('category_invalid');
+  return created.rows[0];
+}
+
 export async function createMatrizExpense(
   input: CreateMatrizExpenseInput,
   dbPool: Pool = defaultPool,
@@ -111,20 +153,12 @@ export async function createMatrizExpense(
       await client.query('COMMIT');
       return started.result;
     }
-    const created = await client.query<MatrizExpenseRow>(
-      `INSERT INTO commerce.matriz_expenses
-        (environment,category,description,amount,payment_status,due_date,paid_at,created_by)
-       SELECT $1::env_t,$2,$3,$4,$5,$6::date,CASE WHEN $5='paid' THEN now() ELSE NULL END,$7
-        WHERE EXISTS (SELECT 1 FROM commerce.matriz_expense_categories c
-          WHERE c.environment=$1::env_t AND c.slug=$2 AND c.archived_at IS NULL)
-       RETURNING id,category,description,amount,occurred_at,payment_status,due_date,paid_at,
-         NULL::uuid AS payroll_item_id,
-         (payment_status='pending' AND due_date IS NOT NULL AND due_date<current_date) AS overdue`,
-      [environment, input.category, input.description?.trim() || null, input.amount,
-       paymentStatus, paymentStatus === 'pending' ? (input.due_date ?? null) : null,
-       input.created_by ?? null]);
-    if (!created.rows[0]) throw new Error('category_invalid');
-    const result = integrityResult(created.rows[0]);
+    const created = await insertMatrizExpenseInTransaction(client, {
+      environment, category: input.category, description: input.description,
+      amount: input.amount, payment_status: paymentStatus,
+      due_date: input.due_date, created_by: input.created_by,
+    });
+    const result = integrityResult(created);
     await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
       entityTable: 'commerce.matriz_expenses', entityId: result.id,
       eventType: 'created', actorLabel: input.created_by,

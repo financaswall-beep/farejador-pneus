@@ -76,6 +76,7 @@ export async function getMatrizFinanceiroVisao(
   dbPool: Pool = defaultPool,
 ): Promise<FinanceiroVisao> {
   const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
+  const expenseMesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')::date`;
   const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes, verdade] =
     await Promise.all([
       getWholesaleResumo(environment, dbPool, 'mes'),
@@ -118,7 +119,7 @@ export async function getMatrizFinanceiroVisao(
             `SELECT category, SUM(amount) AS total
                FROM commerce.matriz_expenses
               WHERE environment = $1 AND deleted_at IS NULL
-                AND (occurred_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}
+                AND ops.matriz_expense_competence_month(competence_month,occurred_at) ${expenseMesWhere}
               GROUP BY category ORDER BY SUM(amount) DESC`,
             [environment],
           ).then((r) => r.rows)
