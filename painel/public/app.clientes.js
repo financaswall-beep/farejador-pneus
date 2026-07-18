@@ -175,8 +175,8 @@ window.PAINEL_MODULES.clientes = function () {
     clienteLeadLane(c) {
       if (['novo', 'atendimento', 'orcamento', 'perdido', 'convertido'].includes(c?.lead_lane)) return c.lead_lane;
       if (Number(c?.lead_order_amount || 0) > 0) return 'convertido';
-      const outcome = this.clienteTexto(c.lead_outcome);
-      const stage = this.clienteTexto(c.lead_stage);
+      const outcome = this.clienteTexto(c?.lead_outcome);
+      const stage = this.clienteTexto(c?.lead_stage);
       if (/(perd|lost|cancel|sem interesse)/.test(outcome)) return 'perdido';
       if (/(orc|cot|quote|propost|offer|frete|bairro|pedido)/.test(stage)) return 'orcamento';
       if (stage) return 'atendimento';
