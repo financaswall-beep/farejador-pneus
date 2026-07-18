@@ -91,7 +91,7 @@ export async function getBotVisao(
       const r48 = await dbPool.query<{ respondidas_bot_48h: number }>(
         `SELECT count(DISTINCT t.conversation_id)::int AS respondidas_bot_48h
          FROM agent.turns t
-         WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status = 'delivered'
+         WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status IN ('delivered', 'sent_api_ack')
            AND t.created_at > now() - interval '48 hours'`,
         [environment],
       );

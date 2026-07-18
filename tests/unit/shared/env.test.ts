@@ -97,6 +97,13 @@ describe('environment security validation', () => {
       .toThrow(/CHATWOOT_WEBHOOK_MAX_AGE_SECONDS/);
   });
 
+  it('fails closed when BOT_OUTBOX is enabled without Chatwoot sender config', () => {
+    expect(() => parseEnv({
+      ...baseEnv, NODE_ENV: 'production', BOT_OUTBOX: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24), CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/CHATWOOT_API_BASE_URL.*bot sender[\s\S]*CHATWOOT_API_TOKEN.*bot sender/);
+  });
+
   it('parses an explicit trusted proxy policy', () => {
     expect(parseEnv({ ...baseEnv, TRUST_PROXY: 'loopback, linklocal, uniquelocal' }).TRUST_PROXY)
       .toBe('loopback, linklocal, uniquelocal');

@@ -12,6 +12,12 @@ interface ProductionEnvConfig {
   ADMIN_BEARER_FALLBACK_ENABLED: boolean;
   ADMIN_AUTH_TOKEN: string;
   CHATWOOT_HMAC_SECRET: string;
+  AGENT_V2_WORKER_ENABLED?: boolean;
+  BOT_OUTBOX?: boolean;
+  OPENAI_API_KEY?: string;
+  CHATWOOT_API_BASE_URL?: string;
+  CHATWOOT_API_TOKEN?: string;
+  CHATWOOT_ACCOUNT_ID?: number;
 }
 
 function addIssue(ctx: RefinementCtx, path: string, message: string): void {
@@ -64,5 +70,21 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
   }
   if (Buffer.byteLength(value.CHATWOOT_HMAC_SECRET, 'utf8') < MIN_SECRET_BYTES) {
     addIssue(ctx, 'CHATWOOT_HMAC_SECRET', `must contain at least ${MIN_SECRET_BYTES} bytes in production`);
+  }
+  if (value.AGENT_V2_WORKER_ENABLED) {
+    if (!value.OPENAI_API_KEY) {
+      addIssue(ctx, 'OPENAI_API_KEY', 'is required in production when AGENT_V2_WORKER_ENABLED=true');
+    }
+  }
+  if (value.AGENT_V2_WORKER_ENABLED || value.BOT_OUTBOX) {
+    if (!value.CHATWOOT_API_BASE_URL) {
+      addIssue(ctx, 'CHATWOOT_API_BASE_URL', 'is required in production when the bot sender is enabled');
+    }
+    if (!value.CHATWOOT_API_TOKEN) {
+      addIssue(ctx, 'CHATWOOT_API_TOKEN', 'is required in production when the bot sender is enabled');
+    }
+    if (!value.CHATWOOT_ACCOUNT_ID) {
+      addIssue(ctx, 'CHATWOOT_ACCOUNT_ID', 'is required in production when the bot sender is enabled');
+    }
   }
 }

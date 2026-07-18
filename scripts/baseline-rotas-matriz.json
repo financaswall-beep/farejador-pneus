@@ -1,8 +1,9 @@
 {
-  "geradoEm": "2026-07-17T06:01:57.856Z",
-  "total": 133,
+  "geradoEm": "2026-07-18T02:55:42.067Z",
+  "total": 136,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
+    "GET /admin/api/bot/resiliencia AUTH(1)",
     "GET /admin/api/bot/visao AUTH(1)",
     "GET /admin/api/clientes AUTH(1)",
     "GET /admin/api/clientes/stream AUTH(1)",
@@ -82,6 +83,8 @@
     "GET /assets/brands/whatsapp.svg PUBLICA",
     "GET /seja-parceiro PUBLICA",
     "GET /seja-parceiro-2w.png PUBLICA",
+    "POST /admin/api/bot/resiliencia/reprocessar AUTH(1)",
+    "POST /admin/api/bot/resiliencia/resolver AUTH(1)",
     "POST /admin/api/colaboradores AUTH(1)",
     "POST /admin/api/colaboradores/acesso AUTH(1)",
     "POST /admin/api/colaboradores/ajustes AUTH(1)",

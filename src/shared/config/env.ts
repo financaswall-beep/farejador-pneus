@@ -54,6 +54,12 @@ const envSchema = z.object({
   // Agent V2 Worker (substitui ATENDENTE_SHADOW_*): poll de ops.atendente_jobs,
   // executa runAgentV2 e marca job processed/failed.
   AGENT_V2_WORKER_ENABLED: booleanStringSchema,
+  // ETAPA 8 — Outbox resiliente do Bot/Chatwoot. Default OFF: o caminho antigo
+  // continua vivo até o dono ligar no Coolify. Com ON, a resposta do bot nasce
+  // em agent.turns como generated, passa pela ops.outbound_messages e só vira
+  // sent_api_ack quando a API do Chatwoot devolve aceite. A confirmação por
+  // webhook/provider id é reconciliada separadamente.
+  BOT_OUTBOX: booleanStringSchema,
   // Chat unificado do Portal Parceiro (Fatia 1): espelha mensagens do Chatwoot em
   // commerce.partner_messages durante a normalizacao. Defensivo e isolado por SAVEPOINT
   // — nunca quebra a normalizacao core. Desligado por padrao.

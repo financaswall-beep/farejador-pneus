@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-17T06:00:46.890Z",
+  "geradoEm": "2026-07-18T02:52:45.994Z",
   "commitBase": "dd64a35",
-  "total": 654,
+  "total": 659,
   "propriedades": {
     "abrirHistoricoAtacado": "function",
     "abrirHistoricoCliente": "function",
@@ -77,6 +77,7 @@
     "botConversaFiltro": "value:string",
     "botConversasFila": "getter",
     "botConversasFiltradas": "getter",
+    "botDeadLetters": "getter",
     "botEscalados": "getter",
     "botEsperaMediaSeg": "getter",
     "botFunil": "getter",
@@ -93,6 +94,10 @@
     "botPeriodo": "value:string",
     "botQuandoLabel": "function",
     "botRadar": "getter",
+    "botReprocessar": "function",
+    "botResilience": "value:null",
+    "botResilienceMsg": "value:null",
+    "botResolverSemReenvio": "function",
     "botRespondidas48h": "getter",
     "botSemRegiao": "getter",
     "botTab": "value:string",

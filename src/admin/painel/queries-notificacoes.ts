@@ -13,6 +13,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica.js';
+import { getBotResilienceCounts } from './queries-bot-resilience.js';
 
 export interface MatrizNotificacoesPayload {
   /** Entregas da MAIN com delivery_status='failed' e pedido NÃO cancelado —
@@ -21,9 +22,10 @@ export interface MatrizNotificacoesPayload {
   fiado_vencido: { count: number; total: string };
   a_pagar_vencido: { count: number; total: string };
   galpao_repor: Array<{ measure: string; quantity_on_hand: number; min_quantity: number }>;
+  bot_resilience: { enabled: boolean; dead_letters: number; api_ack_unconfirmed: number };
 }
 
-/** Uma viagem só ao banco (4 subqueries baratas) — roda no load e no refresh de 15s. */
+/** Consultas leves de contagem — roda no load e no refresh de 15s. */
 export async function getMatrizNotificacoes(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
@@ -77,10 +79,13 @@ export async function getMatrizNotificacoes(
     [environment],
   );
   const row = r.rows[0]!;
+  const bot = await getBotResilienceCounts(environment, dbPool);
   return {
     entregas_falhadas: row.entregas_falhadas ?? [],
     fiado_vencido: { count: row.fiado_count, total: row.fiado_total },
     a_pagar_vencido: { count: row.pagar_count, total: row.pagar_total },
     galpao_repor: row.galpao_repor ?? [],
+    bot_resilience: { enabled: bot.enabled, dead_letters: bot.deadLetters,
+      api_ack_unconfirmed: bot.apiAckUnconfirmed },
   };
 }

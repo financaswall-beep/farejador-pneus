@@ -25,6 +25,7 @@ import {
 } from '../shared/repositories/ops-atendente.repository.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
+import { reconcileAgentOutboundDelivery } from '../atendente-v2/outbound-reconcile.js';
 
 export interface RawEvent {
   id: number;
@@ -203,6 +204,21 @@ export async function dispatch(
 
       const message = mapMessage(payload, environment, lastEventAt);
       const upsertedMessage = await upsertMessage(client, message);
+
+      // Prova forte da entrega do bot: casa o id devolvido pela API com o
+      // core.messages criado pelo webhook. Defensivo para nunca quebrar raw/core.
+      if (env.BOT_OUTBOX && message.senderType !== 'contact') {
+        await client.query('SAVEPOINT bot_outbound_reconcile');
+        try {
+          await reconcileAgentOutboundDelivery(client, environment as Environment,
+            upsertedMessage.messageId, message.chatwootMessageId);
+          await client.query('RELEASE SAVEPOINT bot_outbound_reconcile');
+        } catch (error) {
+          await client.query('ROLLBACK TO SAVEPOINT bot_outbound_reconcile');
+          logger.warn({ err: error, chatwoot_message_id: message.chatwootMessageId },
+            'normalization: bot outbound reconciliation deferred');
+        }
+      }
 
       // Fan-out pro chat do Portal Parceiro (Fatia 1). Defensivo: nunca lança,
       // isola falha por SAVEPOINT próprio. Atrás da flag PARTNER_CHAT_FANOUT_ENABLED.

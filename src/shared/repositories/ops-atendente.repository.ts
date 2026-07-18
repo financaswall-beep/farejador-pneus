@@ -6,6 +6,13 @@
 import type { PoolClient } from 'pg';
 import type { Environment } from '../types/chatwoot.js';
 import type { AtendenteJobStatus } from '../types/ops-phase3.js';
+import {
+  classifyAtendenteError,
+  MAX_ATENDENTE_RETRY_ATTEMPTS,
+  retryBackoffSeconds,
+  STALE_ATENDENTE_PROCESSING_MINUTES,
+} from './ops-atendente-retry.js';
+import { openJobDeadLetter, recordAtendenteJobEvent } from './ops-atendente-events.js';
 
 export interface AtendenteJobRow {
   id: string;
@@ -49,17 +56,7 @@ export async function enqueueAtendenteJob(
   );
   const jobId = result.rows[0]!.enqueue_atendente_job;
 
-  // Coalescing window: a cada mensagem nova, RESETA o timer de todos os
-  // jobs pending da mesma conversa pra now() + debounceSeconds. Isso faz
-  // com que o worker so processe quando o cliente parar de digitar por
-  // debounceSeconds. Quando finalmente processar, o picker descarta os
-  // jobs antigos via hasNewerPendingJob e so o ultimo roda — vendo todas
-  // as mensagens da rajada de uma vez via loadHistory.
-  //
-  // Comportamento:
-  //   - 1 msg solta -> espera debounceSeconds e responde
-  //   - 3 msgs em rajada -> cada uma reseta o timer -> 1 resposta vendo as 3
-  //   - cliente pausa e volta -> reset garante que pega tudo
+  // Reseta o debounce dos jobs pendentes; o picker descarta os antigos.
   if (debounceSeconds > 0) {
     await client.query(
       `UPDATE ops.atendente_jobs
@@ -101,43 +98,26 @@ export async function hasNewerPendingJob(
   return result.rows[0]?.exists === true;
 }
 
-/**
- * Marca job como obsoleto. Reusa status='processed' porque o schema atual nao tem
- * 'superseded' no CHECK constraint, mas registra o motivo em error_message para
- * auditoria. Motivos:
- *  - 'superseded:newer_message_arrived' (default): chegou mensagem mais nova antes
- *    do debounce expirar.
- *  - 'superseded:already_replied_after_trigger': a conversa JÁ teve resposta nossa
- *    depois do gatilho (job requentado pela rede de 60s) — ver isStaleTrigger.
- */
+/** Com a flag nova, usa status superseded; no legado preserva processed. */
 export async function markAtendenteJobSuperseded(
   client: PoolClient,
   jobId: string,
   reason = 'superseded:newer_message_arrived',
+  explicitStatus = false,
 ): Promise<void> {
   await client.query(
     `UPDATE ops.atendente_jobs
-     SET status        = 'processed',
+     SET status        = $3,
          processed_at  = now(),
          locked_at     = NULL,
          locked_by     = NULL,
          error_message = $2
      WHERE id = $1`,
-    [jobId, reason],
+    [jobId, reason, explicitStatus ? 'superseded' : 'processed'],
   );
 }
 
-/**
- * Carrega os dois horários que decidem se um job está "requentado": o horário do GATILHO
- * deste job (a mensagem que o criou) e o horário da mensagem MAIS NOVA que o bot JÁ
- * respondeu na conversa — ou seja, o gatilho do último turn ENTREGUE (agent.turns
- * status='delivered'; delivered_message_id é coluna morta, não confiar nela). A
- * comparação fica em isStaleTrigger (testável).
- *
- * Revisado 06-27: antes o 2º horário era o da última resposta (outgoing) na conversa, o
- * que engolia uma pergunta nova quando a saudação saía atrasada (depois dela). Agora é a
- * mensagem que a resposta DE FATO cobriu, não o relógio. Query burra de propósito, baixo risco.
- */
+/** Compara o gatilho atual ao último gatilho efetivamente respondido pelo bot. */
 export async function loadStaleTriggerCheck(
   client: PoolClient,
   environment: Environment,
@@ -155,7 +135,7 @@ export async function loadStaleTriggerCheck(
           JOIN core.messages m ON m.id = t.trigger_message_id AND m.environment = t.environment
          WHERE t.environment = $1
            AND t.conversation_id = $2
-           AND t.status = 'delivered') AS last_answered_trigger_at`,
+           AND t.status IN ('delivered', 'sent_api_ack')) AS last_answered_trigger_at`,
     [environment, conversationId, triggerMessageId],
   );
   const row = result.rows[0];
@@ -181,6 +161,49 @@ export async function pickAtendenteJob(
     [environment],
   );
   return result.rows[0] ?? null;
+}
+
+export async function reclaimStaleAtendenteJobs(
+  client: PoolClient,
+  environment: Environment,
+  resilienceEnabled = false,
+): Promise<number> {
+  const terminalStatus = resilienceEnabled ? 'dead_letter' : 'failed';
+  const result = await client.query<{ id: string; attempts: number; status: string }>(
+    `UPDATE ops.atendente_jobs
+     SET status = CASE WHEN attempts < $2 THEN 'pending' ELSE $4 END,
+         not_before = CASE
+           WHEN attempts < $2 THEN now() + interval '1 minute'
+           ELSE not_before
+         END,
+         locked_at = NULL,
+         locked_by = NULL,
+         error_message = CASE
+           WHEN attempts < $2 THEN 'reclaimed:stale_processing'
+           ELSE 'dead_letter_candidate:stale_processing_max_attempts'
+         END,
+         processed_at = CASE WHEN attempts < $2 THEN NULL ELSE now() END
+         ${resilienceEnabled ? ", dead_lettered_at = CASE WHEN attempts < $2 THEN NULL ELSE now() END, last_error_code = 'stale_processing', last_error_kind = 'timeout'" : ''}
+     WHERE environment = $1
+       AND status = 'processing'
+       AND locked_at < now() - ($3 || ' minutes')::interval
+     RETURNING id, attempts, status`,
+    [environment, MAX_ATENDENTE_RETRY_ATTEMPTS,
+      String(STALE_ATENDENTE_PROCESSING_MINUTES), terminalStatus],
+  );
+  if (resilienceEnabled) {
+    for (const row of result.rows) {
+      const terminal = row.status === 'dead_letter';
+      const event = { environment, jobId: row.id, attempt: row.attempts,
+        fromStatus: 'processing', toStatus: row.status,
+        reason: terminal ? 'stale_processing_retry_limit' : 'stale_processing_reclaimed',
+        errorCode: 'stale_processing', errorKind: 'timeout',
+        errorSummary: terminal ? 'worker_stopped_after_retry_limit' : 'worker_lock_expired' };
+      await recordAtendenteJobEvent(client, event);
+      if (terminal) await openJobDeadLetter(client, event);
+    }
+  }
+  return result.rowCount ?? 0;
 }
 
 export async function markAtendenteJobProcessing(
@@ -218,16 +241,56 @@ export async function markAtendenteJobProcessed(
 export async function markAtendenteJobFailed(
   client: PoolClient,
   jobId: string,
-  errorMessage: string,
+  error: unknown,
+  resilienceEnabled = false,
 ): Promise<void> {
+  const current = await client.query<{ attempts: number; environment: Environment }>(
+    `SELECT attempts, environment FROM ops.atendente_jobs WHERE id = $1 FOR UPDATE`,
+    [jobId],
+  );
+  const attempts = current.rows[0]?.attempts ?? MAX_ATENDENTE_RETRY_ATTEMPTS;
+  const environment = current.rows[0]?.environment;
+  const failure = classifyAtendenteError(error);
+  if (attempts < MAX_ATENDENTE_RETRY_ATTEMPTS && failure.retryable) {
+    await client.query(
+      `UPDATE ops.atendente_jobs
+       SET status        = 'pending',
+           processed_at  = NULL,
+           locked_at     = NULL,
+           locked_by     = NULL,
+           not_before    = now() + ($3 || ' seconds')::interval,
+           error_message = $2${resilienceEnabled ? ', last_error_code = $4, last_error_kind = $5' : ''}
+       WHERE id = $1`,
+      resilienceEnabled
+        ? [jobId, failure.summary, String(retryBackoffSeconds(attempts + 1)), failure.code, failure.kind]
+        : [jobId, failure.summary, String(retryBackoffSeconds(attempts + 1))],
+    );
+    if (resilienceEnabled && environment) await recordAtendenteJobEvent(client, {
+      environment, jobId, attempt: attempts, fromStatus: 'processing', toStatus: 'pending',
+      reason: 'automatic_retry', errorCode: failure.code, errorKind: failure.kind,
+      errorSummary: failure.summary,
+    });
+    return;
+  }
+
+  const terminalStatus = resilienceEnabled ? 'dead_letter' : 'failed';
   await client.query(
     `UPDATE ops.atendente_jobs
-     SET status        = 'failed',
+     SET status        = $3,
          processed_at  = now(),
          locked_at     = NULL,
          locked_by     = NULL,
-         error_message = $2
+         error_message = $2${resilienceEnabled ? ', last_error_code = $4, last_error_kind = $5, dead_lettered_at = now()' : ''}
      WHERE id = $1`,
-    [jobId, errorMessage.slice(0, 1000)],
+    resilienceEnabled
+      ? [jobId, failure.summary, terminalStatus, failure.code, failure.kind]
+      : [jobId, failure.summary, terminalStatus],
   );
+  if (resilienceEnabled && environment) {
+    const event = { environment, jobId, attempt: attempts, fromStatus: 'processing',
+      toStatus: terminalStatus, reason: failure.retryable ? 'retry_limit_reached' : 'permanent_failure',
+      errorCode: failure.code, errorKind: failure.kind, errorSummary: failure.summary };
+    await recordAtendenteJobEvent(client, event);
+    await openJobDeadLetter(client, event);
+  }
 }

@@ -7,6 +7,7 @@ import { startWorker } from '../normalization/worker.js';
 import { startPartnerChatReconciler } from '../normalization/partner-chat.reconcile.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { startAgentV2Worker } from '../atendente-v2/worker.js';
+import { startBotOutboxWorker } from '../atendente-v2/outbound-worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
 import { startPartnerPushFanout } from '../parceiro/push.js';
@@ -23,6 +24,7 @@ registerSecurityHeaders(fastify, env.NODE_ENV === 'production');
 
 let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;
+let stopBotOutbox: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
@@ -47,6 +49,7 @@ async function start(): Promise<void> {
 
   stopWorker = startWorker();
   stopAgentV2 = startAgentV2Worker();
+  stopBotOutbox = startBotOutboxWorker();
   stopPartnerChatReconciler = startPartnerChatReconciler();
   // Hub de tempo real do chat (LISTEN partner_chat -> SSE). Fatia 3.
   startPartnerChatNotifyHub();
@@ -84,6 +87,7 @@ async function shutdown(signal: string): Promise<void> {
   fastify.log.info({ signal }, 'shutting down gracefully');
   stopWorker?.();
   stopAgentV2?.();
+  stopBotOutbox?.();
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();

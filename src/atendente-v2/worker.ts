@@ -24,8 +24,10 @@ import {
   markAtendenteJobProcessing,
   markAtendenteJobSuperseded,
   pickAtendenteJob,
+  reclaimStaleAtendenteJobs,
 } from '../shared/repositories/ops-atendente.repository.js';
 import { isStaleTrigger } from './stale-trigger.js';
+import { recordAtendenteJobEvent } from '../shared/repositories/ops-atendente-events.js';
 import {
   createDefaultAtendenteJobReconcileInput,
   reconcileMissingAtendenteJobsWithPool,
@@ -42,6 +44,15 @@ export async function pollAndAttend(): Promise<void> {
   try {
     client = await pool.connect();
     await client.query('BEGIN');
+
+    const reclaimed = await reclaimStaleAtendenteJobs(
+      client,
+      env.FAREJADOR_ENV,
+      env.BOT_OUTBOX,
+    );
+    if (reclaimed > 0) {
+      logger.warn({ worker_id: WORKER_ID, reclaimed }, 'agent_v2: reclaimed stale processing jobs');
+    }
 
     const job = await pickAtendenteJob(client, env.FAREJADOR_ENV);
     if (!job) {
@@ -65,7 +76,11 @@ export async function pollAndAttend(): Promise<void> {
       job.id,
     );
     if (superseded) {
-      await markAtendenteJobSuperseded(client, job.id);
+      await markAtendenteJobSuperseded(client, job.id, 'superseded:newer_message_arrived', env.BOT_OUTBOX);
+      if (env.BOT_OUTBOX) await recordAtendenteJobEvent(client, {
+        environment: job.environment, jobId: job.id, attempt: job.attempts,
+        fromStatus: job.status, toStatus: 'superseded', reason: 'newer_message_arrived',
+      });
       await client.query('COMMIT');
       logger.info(
         { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
@@ -85,7 +100,11 @@ export async function pollAndAttend(): Promise<void> {
       job.trigger_message_id,
     );
     if (isStaleTrigger(staleCheck.thisTriggerAt, staleCheck.lastAnsweredTriggerAt)) {
-      await markAtendenteJobSuperseded(client, job.id, 'superseded:already_replied_after_trigger');
+      await markAtendenteJobSuperseded(client, job.id, 'superseded:already_replied_after_trigger', env.BOT_OUTBOX);
+      if (env.BOT_OUTBOX) await recordAtendenteJobEvent(client, {
+        environment: job.environment, jobId: job.id, attempt: job.attempts,
+        fromStatus: job.status, toStatus: 'superseded', reason: 'already_replied_after_trigger',
+      });
       await client.query('COMMIT');
       logger.info(
         { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
@@ -95,6 +114,10 @@ export async function pollAndAttend(): Promise<void> {
     }
 
     await markAtendenteJobProcessing(client, job.id, WORKER_ID);
+    if (env.BOT_OUTBOX) await recordAtendenteJobEvent(client, {
+      environment: job.environment, jobId: job.id, actor: WORKER_ID,
+      attempt: job.attempts + 1, fromStatus: 'pending', toStatus: 'processing', reason: 'picked',
+    });
     await client.query('COMMIT');
 
     try {
@@ -106,16 +129,19 @@ export async function pollAndAttend(): Promise<void> {
       });
       await client.query('BEGIN');
       await markAtendenteJobProcessed(client, job.id);
+      if (env.BOT_OUTBOX) await recordAtendenteJobEvent(client, {
+        environment: job.environment, jobId: job.id, actor: WORKER_ID,
+        attempt: job.attempts + 1, fromStatus: 'processing', toStatus: 'processed', reason: 'completed',
+      });
       await client.query('COMMIT');
       logger.info(
         { worker_id: WORKER_ID, job_id: job.id, conversation_id: job.conversation_id },
         'agent_v2: job processed',
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       try {
         await client.query('BEGIN');
-        await markAtendenteJobFailed(client, job.id, message);
+        await markAtendenteJobFailed(client, job.id, err, env.BOT_OUTBOX);
         await client.query('COMMIT');
       } catch (markErr) {
         logger.error(

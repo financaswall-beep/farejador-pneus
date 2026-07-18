@@ -18,7 +18,13 @@ import type { Environment } from './chatwoot.js';
 // ops.atendente_jobs
 // ------------------------------------------------------------------
 
-export type AtendenteJobStatus = 'pending' | 'processing' | 'processed' | 'failed';
+export type AtendenteJobStatus =
+  | 'pending'
+  | 'processing'
+  | 'processed'
+  | 'failed'
+  | 'dead_letter'
+  | 'superseded';
 
 export interface AtendenteJob {
   id: string;

@@ -22,6 +22,7 @@ import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { sendAttachment, sendMessage } from './sender.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { enqueueAccessoryText, enqueuePhotoAttachment } from './outbox-accessory.js';
 
 const PHOTO_REQUEST_TTL_MINUTES = 10;
 const MAX_ACTIVE_PER_CONVERSATION = 2;
@@ -182,12 +183,13 @@ export async function dispatchPhotoToCustomer(
   wasLate: boolean,
 ): Promise<void> {
   const res = await pool.query<{
+    environment: Environment;
     conversation_id: string;
     tire_size: string;
     brand: string | null;
     status: string;
   }>(
-    `SELECT conversation_id, tire_size, brand, status
+    `SELECT environment, conversation_id, tire_size, brand, status
        FROM commerce.photo_requests
       WHERE id = $1`,
     [photoRequestId],
@@ -212,15 +214,21 @@ export async function dispatchPhotoToCustomer(
     ? `Chegou! 📸 A foto do ${nomePneu} que você pediu — dá uma olhada no estado.`
     : `Ó ele aqui 📸 ${nomePneu} — foto real do que temos na loja. Dá uma olhada no estado!`;
 
-  await sendAttachment(
-    Number(row.conversation_id),
-    {
-      buffer: photo.bytes,
-      filename: `pneu-${photoRequestId.slice(0, 8)}.jpg`,
-      contentType: photo.mime,
-    },
-    caption,
-  );
+  if (env.BOT_OUTBOX) {
+    await enqueuePhotoAttachment(pool, {
+      environment: row.environment,
+      chatwootConversationId: Number(row.conversation_id),
+      photoRequestId,
+      caption,
+    });
+    return;
+  }
+
+  await sendAttachment(Number(row.conversation_id), {
+    buffer: photo.bytes,
+    filename: `pneu-${photoRequestId.slice(0, 8)}.jpg`,
+    contentType: photo.mime,
+  }, caption);
 
   await pool.query(
     `UPDATE commerce.photo_requests
@@ -245,15 +253,21 @@ const FALLBACK_TEXT =
  * Restart do Coolify é seguro: no boot, o WHERE pega os vencidos da janela morta.
  */
 async function expirePendingPhotoRequests(): Promise<void> {
-  const expired = await pool.query<{ id: string; conversation_id: string }>(
+  const expired = await pool.query<{ id: string; environment: Environment; conversation_id: string }>(
     `UPDATE commerce.photo_requests
         SET status = 'expired'
       WHERE status = 'pending' AND expires_at < now()
-      RETURNING id, conversation_id`,
+      RETURNING id, environment, conversation_id`,
   );
   for (const row of expired.rows) {
     try {
-      await sendMessage(Number(row.conversation_id), FALLBACK_TEXT);
+      if (env.BOT_OUTBOX) {
+        await enqueueAccessoryText(pool, { environment: row.environment,
+          chatwootConversationId: Number(row.conversation_id), kind: 'photo_text',
+          body: FALLBACK_TEXT, idempotencyKey: `photo-fallback:${row.id}` });
+      } else {
+        await sendMessage(Number(row.conversation_id), FALLBACK_TEXT);
+      }
     } catch (err) {
       // Fallback que falhou não volta o estado: melhor card expirado sem
       // mensagem do que reprocessar e arriscar mandar 2x. Fica no log.
