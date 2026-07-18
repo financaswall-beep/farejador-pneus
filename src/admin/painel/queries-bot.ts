@@ -51,7 +51,7 @@ export async function getBotCampainha(
        SELECT t.conversation_id, max(tm.sent_at) AS trigger_at
        FROM agent.turns t
        JOIN core.messages tm ON tm.id = t.trigger_message_id
-       WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status = 'delivered'
+       WHERE t.environment = $1 AND t.agent_version = 'v2' AND t.status IN ('delivered', 'sent_api_ack')
        GROUP BY t.conversation_id
      )
      SELECT u.conversation_id,

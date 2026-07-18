@@ -459,32 +459,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'editar_pedido',
-      description: 'Edita um pedido com status=open (recém criado). Use quando cliente quiser mudar endereço, forma de pagamento, OU remover/adicionar item. SEMPRE confirme com o cliente antes de chamar. Cliente DEVE explicitamente pedir a mudança. Não edita pedido pago/entregue.',
+      description: 'Edita um pedido com status=open (recém criado) somente para mudar endereço ou forma de pagamento. Mudança de item, quantidade, produto, preço ou total deve escalar humano.',
       parameters: {
         type: 'object',
         properties: {
           order_number: { type: 'string', description: 'Número do pedido (ex: "PED-0010"). Obrigatório.' },
           novo_endereco: { type: 'string', description: 'Novo endereço completo (rua, número, bairro). Opcional.' },
           nova_forma_pagamento: { type: 'string', enum: ['pix', 'cartao', 'dinheiro'], description: 'Nova forma de pagamento. Opcional.' },
-          remover_itens: {
-            type: 'array',
-            items: { type: 'string', description: 'product_id (UUID) do item a remover' },
-            description: 'product_ids dos itens a remover do pedido. Opcional.',
-          },
-          adicionar_itens: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                product_id: { type: 'string' },
-                quantidade: { type: 'integer', minimum: 1 },
-                preco_unitario: { type: 'number' },
-              },
-              required: ['product_id', 'quantidade', 'preco_unitario'],
-              additionalProperties: false,
-            },
-            description: 'Novos itens a adicionar. Opcional.',
-          },
           motivo: { type: 'string', description: 'Motivo livre da edição (ex: "cliente trocou bairro de entrega")' },
         },
         required: ['order_number'],
@@ -1861,6 +1842,13 @@ async function editarPedido(
   const adicionarItens = (args.adicionar_itens as ItemAdicionar[] | undefined) ?? [];
   const motivo = (args.motivo as string | undefined) ?? 'cliente_solicitou';
 
+  if (removerItens.length > 0 || adicionarItens.length > 0) {
+    return JSON.stringify({
+      erro: 'Mudanca de itens, quantidade, produto, preco ou total precisa de atendente humano.',
+      sugestao: 'Escalar humano. O bot so pode alterar endereco e forma de pagamento em pedido aberto.',
+    });
+  }
+
   if (!novoEndereco && !novaFormaPagamento && removerItens.length === 0 && adicionarItens.length === 0) {
     return JSON.stringify({ erro: 'Nenhuma mudanca informada. Passe ao menos um campo.' });
   }
@@ -1926,78 +1914,22 @@ async function editarPedido(
       );
     }
 
-    if (removerItens.length > 0) {
-      await client.query(
-        `DELETE FROM commerce.order_items WHERE order_id = $1 AND product_id = ANY($2::uuid[])`,
-        [order.id, removerItens],
-      );
-    }
-
-    for (const item of adicionarItens) {
-      await client.query(
-        `INSERT INTO commerce.order_items (environment, order_id, product_id, quantity, unit_price)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [environment, order.id, item.product_id, item.quantidade, item.preco_unitario.toFixed(2)],
-      );
-    }
-
-    // Recalcula total: soma itens (NAO inclui frete pra evitar perder o valor original)
-    // O frete ja esta embutido em total_amount; vamos manter a diferenca
-    const totalsResult = await client.query<{ subtotal: string; total_amount: string }>(
-      `SELECT
-         COALESCE(SUM(oi.quantity * oi.unit_price), 0)::text AS subtotal,
-         o.total_amount
-       FROM commerce.orders o
-       LEFT JOIN commerce.order_items oi ON oi.order_id = o.id
-       WHERE o.id = $1
-       GROUP BY o.total_amount`,
-      [order.id],
-    );
-
-    const newSubtotal = parseFloat(totalsResult.rows[0]?.subtotal ?? '0');
-    const oldTotal = parseFloat(totalsResult.rows[0]?.total_amount ?? '0');
-    // Estima o frete antigo subtraindo (heuristica)
-    const subtotalAntigoResult = await client.query<{ s: string }>(
-      `SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)::text AS s
-       FROM commerce.order_items oi WHERE oi.order_id = $1`,
-      [order.id],
-    );
-    // Recupera o frete original via diferenca historica nao da (ja recalculamos os itens)
-    // Solucao: pegamos o frete via JOIN delivery_zones se houver geo_resolution_id, senao 0
-    const freteResult = await client.query<{ frete: string }>(
-      `SELECT COALESCE(dz.delivery_fee, 0)::text AS frete
-       FROM commerce.orders o
-       LEFT JOIN commerce.delivery_zones dz ON dz.geo_resolution_id = o.geo_resolution_id
-       WHERE o.id = $1`,
-      [order.id],
-    );
-    const freteAtual = parseFloat(freteResult.rows[0]?.frete ?? '0');
-    const newTotal = newSubtotal + (order.fulfillment_mode === 'delivery' ? freteAtual : 0);
-
-    await client.query(
-      `UPDATE commerce.orders SET total_amount = $1, updated_at = now() WHERE id = $2`,
-      [newTotal.toFixed(2), order.id],
-    );
-
     await client.query('COMMIT');
 
     logger.info(
       {
         environment, conversation_id: conversationId, order_number: orderNumber,
-        novoEndereco: !!novoEndereco, novaFormaPagamento, removidos: removerItens.length, adicionados: adicionarItens.length,
-        motivo, novo_total: newTotal,
+        novoEndereco: !!novoEndereco, novaFormaPagamento, motivo,
       },
-      'agent_v2: pedido editado via bot',
+      'agent_v2: pedido editado via bot (campos nao-financeiros)',
     );
 
     return JSON.stringify({
       ok: true,
       order_number: orderNumber,
-      novo_subtotal: newSubtotal.toFixed(2),
-      valor_frete: freteAtual.toFixed(2),
-      novo_total: newTotal.toFixed(2),
       mensagem: `Pedido ${orderNumber} atualizado.`,
     });
+
   } catch (err) {
     await client.query('ROLLBACK');
     const message = err instanceof Error ? err.message : String(err);

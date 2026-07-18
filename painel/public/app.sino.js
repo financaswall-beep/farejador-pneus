@@ -25,6 +25,17 @@ window.PAINEL_MODULES.sino = function () {
       const itens = [];
       const s = this.sino;
       if (s) {
+        const br = s.bot_resilience;
+        if (br && br.enabled && (br.dead_letters > 0 || br.api_ack_unconfirmed > 0)) {
+          itens.push({
+            id: 'bot-resilience:' + br.dead_letters + ':' + br.api_ack_unconfirmed,
+            icon: 'bot', iconBg: 'bg-rose-50', iconColor: 'text-rose-600',
+            title: 'Bot precisa de revisão humana',
+            desc: br.dead_letters + ' falha(s) final(is) e ' + br.api_ack_unconfirmed +
+              ' envio(s) aceito(s) sem confirmação do webhook.',
+            page: 'bot', time: 'abrir Bot →',
+          });
+        }
         for (const e of s.entregas_falhadas || []) {
           itens.push({
             id: 'falha:' + e.order_id,

@@ -49,6 +49,8 @@ export interface ChatwootApiClientConfig {
   apiToken: string;
   fetchFn?: typeof fetch;
   sleepFn?: (ms: number) => Promise<void>;
+  /** POST externo: outboxes devem usar 1 para nunca repetir resultado ambíguo em memória. */
+  maxPostAttempts?: number;
 }
 
 export interface ListConversationsInput {
@@ -112,6 +114,7 @@ export class ChatwootApiClient {
   private readonly apiToken: string;
   private readonly fetchFn: typeof fetch;
   private readonly sleepFn: (ms: number) => Promise<void>;
+  private readonly maxPostAttempts: number;
 
   constructor(config: ChatwootApiClientConfig = requireChatwootConfig()) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -119,6 +122,7 @@ export class ChatwootApiClient {
     this.apiToken = config.apiToken;
     this.fetchFn = config.fetchFn ?? fetch;
     this.sleepFn = config.sleepFn ?? defaultSleep;
+    this.maxPostAttempts = Math.max(1, Math.min(MAX_ATTEMPTS, config.maxPostAttempts ?? MAX_ATTEMPTS));
   }
 
   async listConversations(input: ListConversationsInput): Promise<ChatwootPage> {
@@ -160,10 +164,9 @@ export class ChatwootApiClient {
    * Envia uma mensagem PÚBLICA (outgoing, private=false) ao cliente, via Chatwoot.
    * Diferente de createNote (nota interna), esta o cliente recebe no WhatsApp.
    *
-   * `echoId` viaja no payload e o Chatwoot o ecoa no webhook message_created
-   * (mapeado por message.mapper como echoId). O fan-out casa esse eco com a
-   * mensagem otimista que o portal já inseriu (client_token = echo_id) e adota
-   * o chatwoot_message_id — é assim que a mensagem não duplica na tela.
+   * `echoId` viaja no payload como correlação auxiliar. A instalação de produção
+   * pode devolvê-lo como null no webhook; prova forte deve casar pelo id numérico
+   * retornado pela API (`chatwootMessageId`).
    *
    * Retorna o id da mensagem criada no Chatwoot (ou null se a resposta não trouxe).
    */
@@ -192,7 +195,7 @@ export class ChatwootApiClient {
     const startedAt = Date.now();
     let lastError: unknown = null;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= this.maxPostAttempts; attempt++) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -219,7 +222,7 @@ export class ChatwootApiClient {
 
         if (!response.ok) {
           const bodyText = await response.text();
-          if (shouldRetry(response.status) && attempt < MAX_ATTEMPTS) {
+          if (shouldRetry(response.status) && attempt < this.maxPostAttempts) {
             await this.sleepFn(500 * 2 ** (attempt - 1));
             continue;
           }
@@ -244,7 +247,7 @@ export class ChatwootApiClient {
         }
 
         lastError = err;
-        if (attempt < MAX_ATTEMPTS) {
+        if (attempt < this.maxPostAttempts) {
           await this.sleepFn(500 * 2 ** (attempt - 1));
           continue;
         }

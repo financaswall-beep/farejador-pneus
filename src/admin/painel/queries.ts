@@ -38,5 +38,6 @@ export * from './queries-colaboradores-gestao.js'; // visão integrada: equipe/r
 export * from './queries-colaboradores-folha.js'; // ajustes, fechamento e pagamento conciliado com Financeiro
 export * from './queries-notificacoes.js'; // sino do painel: entregas falhadas + vencidos + galpão pra repor
 export * from './queries-bot.js'; // tela do Bot: campainha (cliente esperando agora)
+export * from './queries-bot-resilience.js'; // Etapa 8: outbox/DLQ sem payload sensivel
 export * from './queries-clientes.js'; // CRM da matriz: clientes/leads/compradores/recompra/parceiros
 export * from './queries-bot-visao.js'; // tela do Bot fatia 2: visão (cards/funil/mapa/boca/radar)

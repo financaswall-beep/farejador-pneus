@@ -1,62 +1,43 @@
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
+import { ChatwootApiClient, ChatwootApiError } from '../admin/chatwoot-api.client.js';
 
 const MAX_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 10_000;
 
+export interface SendMessageResult {
+  chatwootMessageId: number | null;
+}
+
 export async function sendMessage(
   chatwootConversationId: number,
   content: string,
-): Promise<void> {
+  echoId?: string,
+): Promise<SendMessageResult> {
+  const result = await new ChatwootApiClient().sendMessage(chatwootConversationId, content, echoId);
+  logger.info(
+    { chatwootConversationId, chatwoot_message_id: result.chatwootMessageId ?? null },
+    'agent_v2: message sent',
+  );
+  return result;
+}
+
+/** Uma única chamada externa. Retry e ambiguidade pertencem ao worker persistente. */
+export async function sendMessageOnce(
+  chatwootConversationId: number,
+  content: string,
+  echoId?: string,
+): Promise<SendMessageResult> {
   if (!env.CHATWOOT_API_BASE_URL || !env.CHATWOOT_API_TOKEN || !env.CHATWOOT_ACCOUNT_ID) {
-    logger.warn({ chatwootConversationId }, 'agent_v2: Chatwoot API not configured, skipping send');
-    return;
+    throw new ChatwootApiError('Chatwoot API configuration is missing');
   }
-
-  const url = `${env.CHATWOOT_API_BASE_URL.replace(/\/$/, '')}/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${chatwootConversationId}/messages`;
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'api_access_token': env.CHATWOOT_API_TOKEN,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content,
-          message_type: 'outgoing',
-          content_type: 'text',
-          private: false,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        const retryable = response.status === 429 || response.status >= 500;
-        if (retryable && attempt < MAX_ATTEMPTS) {
-          await sleep(500 * 2 ** (attempt - 1));
-          continue;
-        }
-        throw new Error(`Chatwoot send failed ${response.status}: ${body.slice(0, 200)}`);
-      }
-
-      logger.info({ chatwootConversationId, attempt }, 'agent_v2: message sent');
-      return;
-    } catch (err) {
-      clearTimeout(timer);
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(500 * 2 ** (attempt - 1));
-        continue;
-      }
-      throw err;
-    }
-  }
+  const client = new ChatwootApiClient({
+    baseUrl: env.CHATWOOT_API_BASE_URL,
+    apiToken: env.CHATWOOT_API_TOKEN,
+    accountId: env.CHATWOOT_ACCOUNT_ID,
+    maxPostAttempts: 1,
+  });
+  return client.sendMessage(chatwootConversationId, content, echoId);
 }
 
 /**
@@ -76,15 +57,32 @@ export async function sendAttachment(
   chatwootConversationId: number,
   file: { buffer: Buffer; filename: string; contentType: string },
   caption: string,
-): Promise<void> {
+): Promise<SendMessageResult> {
+  return sendAttachmentWithAttempts(chatwootConversationId, file, caption, MAX_ATTEMPTS);
+}
+
+/** Uma única chamada de anexo para a outbox; timeout fica ambíguo e exige humano. */
+export async function sendAttachmentOnce(
+  chatwootConversationId: number,
+  file: { buffer: Buffer; filename: string; contentType: string },
+  caption: string,
+): Promise<SendMessageResult> {
+  return sendAttachmentWithAttempts(chatwootConversationId, file, caption, 1);
+}
+
+async function sendAttachmentWithAttempts(
+  chatwootConversationId: number,
+  file: { buffer: Buffer; filename: string; contentType: string },
+  caption: string,
+  maxAttempts: number,
+): Promise<SendMessageResult> {
   if (!env.CHATWOOT_API_BASE_URL || !env.CHATWOOT_API_TOKEN || !env.CHATWOOT_ACCOUNT_ID) {
-    logger.warn({ chatwootConversationId }, 'agent_v2: Chatwoot API not configured, skipping attachment');
-    return;
+    throw new ChatwootApiError('Chatwoot API configuration is missing');
   }
 
   const url = `${env.CHATWOOT_API_BASE_URL.replace(/\/$/, '')}/accounts/${env.CHATWOOT_ACCOUNT_ID}/conversations/${chatwootConversationId}/messages`;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -110,26 +108,39 @@ export async function sendAttachment(
       clearTimeout(timer);
 
       if (!response.ok) {
-        const body = await response.text().catch(() => '');
+        await response.text().catch(() => '');
         const retryable = response.status === 429 || response.status >= 500;
-        if (retryable && attempt < MAX_ATTEMPTS) {
+        if (retryable && attempt < maxAttempts) {
           await sleep(500 * 2 ** (attempt - 1));
           continue;
         }
-        throw new Error(`Chatwoot attachment send failed ${response.status}: ${body.slice(0, 200)}`);
+        throw new ChatwootApiError(`Chatwoot attachment send failed with status ${response.status}`, response.status);
       }
 
+      const responseBody = await response.text().catch(() => '');
+      let chatwootMessageId: number | null = null;
+      try {
+        const parsed = JSON.parse(responseBody) as { id?: unknown };
+        if (typeof parsed.id === 'number') chatwootMessageId = parsed.id;
+      } catch { /* resposta vazia continua sendo aceite da API */ }
       logger.info({ chatwootConversationId, attempt, bytes: file.buffer.length }, 'agent_v2: attachment sent');
-      return;
+      return { chatwootMessageId };
     } catch (err) {
       clearTimeout(timer);
-      if (attempt < MAX_ATTEMPTS) {
+      if (err instanceof ChatwootApiError
+          && err.status !== null && err.status !== 429 && err.status < 500) throw err;
+      if (attempt < maxAttempts) {
         await sleep(500 * 2 ** (attempt - 1));
         continue;
       }
-      throw err;
+      if (err instanceof ChatwootApiError) throw err;
+      throw new ChatwootApiError(
+        err instanceof Error ? err.message : 'Chatwoot attachment send failed',
+        null,
+      );
     }
   }
+  throw new ChatwootApiError('Chatwoot attachment send failed');
 }
 
 function sleep(ms: number): Promise<void> {

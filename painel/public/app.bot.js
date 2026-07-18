@@ -5,15 +5,19 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.bot = function () {
   return {
+    botResilience: null,
+    botResilienceMsg: null,
     // Leve de propósito: roda no boot e no refresh de 15s em QUALQUER página —
     // cliente esperando é alarme, não estatística. Badge acende na aba do menu.
     async loadBotCampainha() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
-      try {
-        this.botCampainha = await this.apiGet('/admin/api/bot/campainha');
-      } catch (err) {
-        this.botCampainha = null; // sem resposta = sem alarme inventado
+      try { this.botCampainha = await this.apiGet('/admin/api/bot/campainha'); }
+      catch (err) { this.botCampainha = null; }
+      // A lista técnica completa só é consultada enquanto o dono está na tela do Bot.
+      if (this.currentPage === 'bot') {
+        try { this.botResilience = await this.apiGet('/admin/api/bot/resiliencia'); }
+        catch (err) { this.botResilience = null; }
       }
       const item = this.liveMenu.find((i) => i.id === 'bot');
       if (item) {
@@ -27,9 +31,12 @@ window.PAINEL_MODULES.bot = function () {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       this.botLoading = true;
       try {
-        this.botVisao = await this.apiGet(
-          '/admin/api/bot/visao?period=' + encodeURIComponent(this.botPeriodo),
-        );
+        const [visao, resilience] = await Promise.allSettled([
+          this.apiGet('/admin/api/bot/visao?period=' + encodeURIComponent(this.botPeriodo)),
+          this.apiGet('/admin/api/bot/resiliencia'),
+        ]);
+        this.botVisao = visao.status === 'fulfilled' ? visao.value : null;
+        this.botResilience = resilience.status === 'fulfilled' ? resilience.value : null;
         if (!this.botMapaSel && this.botMapaRows.length) {
           const destaque = [...this.botMapaRows]
             .sort((a, b) => Number(b.chamou || 0) - Number(a.chamou || 0))[0];
@@ -61,9 +68,39 @@ window.PAINEL_MODULES.bot = function () {
       void this.loadBotCampainha();
     },
 
+    async botReprocessar(letter) {
+      if (!confirm('Reenviar/reexecutar pode repetir uma mensagem cujo resultado ficou desconhecido. Você confirma o risco?')) return;
+      const reason = prompt('Informe o motivo do reprocessamento (mínimo 5 caracteres):', 'revisto pelo dono');
+      if (!reason || reason.trim().length < 5) return;
+      try {
+        await this.apiPost('/admin/api/bot/resiliencia/reprocessar', {
+          id: letter.id, reason: reason.trim(), risk_confirmed: true,
+        });
+        this.botResilienceMsg = { ok: true, text: 'Item devolvido à fila com trilha do responsável.' };
+        await this.loadBotCampainha(); await this.loadSino();
+      } catch (err) {
+        this.botResilienceMsg = { ok: false, text: 'Não consegui reprocessar (' + err.message + ').' };
+      }
+    },
+
+    async botResolverSemReenvio(letter) {
+      const reason = prompt('Como este item foi resolvido fora do sistema?', 'tratado manualmente no Chatwoot');
+      if (!reason || reason.trim().length < 5) return;
+      try {
+        await this.apiPost('/admin/api/bot/resiliencia/resolver', { id: letter.id, reason: reason.trim() });
+        this.botResilienceMsg = { ok: true, text: 'Item encerrado sem reenvio.' };
+        await this.loadBotCampainha(); await this.loadSino();
+      } catch (err) {
+        this.botResilienceMsg = { ok: false, text: 'Não consegui encerrar (' + err.message + ').' };
+      }
+    },
+
     // ─── getters derivados (nada de estado duplicado) ───
     get botMudas() {
       return (this.botCampainha && this.botCampainha.mudas) || [];
+    },
+    get botDeadLetters() {
+      return (this.botResilience && this.botResilience.dead_letters) || [];
     },
     get botEscalados() {
       return (this.botCampainha && this.botCampainha.escalados) || [];

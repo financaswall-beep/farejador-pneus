@@ -28,9 +28,9 @@
 <script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260715-colab2"></script>
 <script src="/admin/painel/app.colaboradores.gestao.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.sino.js?v=20260714-fiscal1"></script>
+<script src="/admin/painel/app.sino.js?v=20260717-etapa8"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.bot.js?v=20260712-botui1"></script>
+<script src="/admin/painel/app.bot.js?v=20260717-etapa8"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260715-kanban1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
@@ -4008,6 +4008,24 @@
             </div>
             <div><p class="text-sm text-gray-500">Pediram pra falar com gente <span class="text-xs">(48h)</span></p><p class="text-2xl font-semibold" x-text="botEscalados.length"></p></div>
           </div>
+        </div>
+
+        <div x-show="botResilience && botResilience.enabled" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+            <div><h3 class="font-semibold">Fila técnica e revisão humana</h3>
+              <p class="text-xs text-gray-500 mt-1"><span x-text="(botResilience?.pending || 0) + ' aguardando envio'"></span> · <span x-text="(botResilience?.api_ack_unconfirmed || 0) + ' aceitos sem eco em 10 min'"></span></p></div>
+          </div>
+          <div x-show="botResilienceMsg" class="mx-5 mt-4 px-3 py-2 rounded-lg text-sm" :class="botResilienceMsg?.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-700'" x-text="botResilienceMsg?.text"></div>
+          <template x-for="d in botDeadLetters" :key="d.id">
+            <div class="px-5 py-4 border-b border-gray-100 last:border-0 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div class="min-w-0"><p class="text-sm font-medium" x-text="d.reason"></p>
+                <p class="text-xs text-gray-500 mt-1" x-text="(d.error_code || 'falha') + ' · ' + (d.error_summary || 'sem detalhe sensível')"></p>
+                <p class="text-[11px] text-gray-400 mt-1" x-text="d.chatwoot_conversation_id ? ('Conversa Chatwoot #' + d.chatwoot_conversation_id) : 'Item técnico sem conversa exposta'"></p></div>
+              <div class="flex gap-2"><button @click="botResolverSemReenvio(d)" class="px-3 py-2 text-xs border border-gray-300 rounded-lg">Resolvido fora</button>
+                <button @click="botReprocessar(d)" class="px-3 py-2 text-xs bg-rose-600 text-white rounded-lg">Reprocessar com risco</button></div>
+            </div>
+          </template>
+          <div x-show="botDeadLetters.length === 0" class="px-5 py-6 text-sm text-gray-500">Nenhuma falha final aguardando revisão.</div>
         </div>
 
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">

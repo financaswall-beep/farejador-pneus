@@ -6,7 +6,7 @@ import { loadHistory, lookupChatwootConversationId } from './history.js';
 import { getLatestCustomerLocation } from './customer-location.js';
 import { haversineKm, type GeoPoint } from '../shared/geo/haversine.js';
 import { activeToolDefinitions, executeTool } from './tools.js';
-import { sendMessage } from './sender.js';
+import { sendFinalAgentText } from './final-send.js';
 import { SYSTEM_PROMPT, GEO_PROMPT_BLOCK, PHOTO_PROMPT_BLOCK } from './prompt.js';
 import { customerWantsPhoto, PHOTO_NUDGE } from './photo-nudge.js';
 import { buildLocationReplyNudge } from './location-nudge.js';
@@ -16,6 +16,7 @@ import { tryCaptureSurveyReply } from './satisfaction.js';
 import type { AgentV2JobInput, ChatMessage, ToolCall } from './types.js';
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
+import { loadLastAcceptedAgentText } from './turn-guards.js';
 
 const MAX_TOOL_ROUNDS = 5;
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -307,39 +308,32 @@ export async function runAgentV2(job: AgentV2JobInput): Promise<void> {
     // Guarda anti-eco: se o bot está prestes a mandar o MESMO texto que mandou no
     // turno anterior desta conversa, descarta silenciosamente — o cliente mandou duas
     // mensagens seguidas e os dois turnos convergiram para a mesma resposta.
-    const lastTurn = await client.query<{ say_text: string }>(
-      `SELECT say_text FROM agent.turns
-       WHERE environment = $1 AND conversation_id = $2
-       ORDER BY created_at DESC LIMIT 1`,
-      [environment, conversationId],
+    const lastAcceptedText = await loadLastAcceptedAgentText(
+      client,
+      environment as Environment,
+      conversationId,
     );
-    if (lastTurn.rows[0]?.say_text === finalBody) {
+    if (lastAcceptedText === finalBody) {
       logger.info(logCtx, 'agent_v2: resposta identica ao turno anterior, descartando (anti-eco)');
       return;
     }
 
-    await sendMessage(chatwootConvId, finalBody);
-
-    // 5. Log turn (com actions pra reconstruir histórico de tool calls)
-    await client.query(
-      `INSERT INTO agent.turns (
-         environment, conversation_id, trigger_message_id,
-         agent_version, context_hash, say_text, actions,
-         llm_input_tokens, llm_output_tokens, llm_duration_ms, status
-       ) VALUES ($1, $2, $3, 'v2', '', $4, $5::jsonb, $6, $7, $8, 'delivered')
-       ON CONFLICT DO NOTHING`,
-      [
-        environment,
-        conversationId,
-        job.triggerMessageId,
-        finalBody.slice(0, 4000),
-        JSON.stringify(turnActions),
-        inputTokens,
-        outputTokens,
-        Date.now() - start,
-      ],
-    );
-    await notifyClientesKanban(client, environment, conversationId, 'agent_turn');
+    const sendResult = await sendFinalAgentText(client, {
+      jobId,
+      conversationId,
+      triggerMessageId: job.triggerMessageId,
+      environment: environment as Environment,
+      chatwootConversationId: chatwootConvId,
+      body: finalBody,
+      actions: turnActions,
+      inputTokens,
+      outputTokens,
+      durationMs: Date.now() - start,
+    });
+    if (sendResult === 'superseded') {
+      logger.info(logCtx, 'agent_v2: outbox draft superseded by newer customer message');
+      return;
+    }
 
     const cacheHitRate = inputTokens > 0 ? Math.round((cachedTokens / inputTokens) * 100) : 0;
     logger.info(

@@ -21,6 +21,7 @@ import { logger } from '../shared/logger.js';
 import { sendMessage } from './sender.js';
 import { parseRating, surveyQuestion, thankYouText } from './satisfaction-rating.js';
 import type { Environment } from '../shared/types/chatwoot.js';
+import { enqueueAccessoryText } from './outbox-accessory.js';
 
 const WORKER_INTERVAL_MS = 60_000;
 // Janela de "recém-finalizado" que o dispatcher varre — evita inundar pedidos
@@ -65,7 +66,13 @@ export async function tryCaptureSurveyReply(
   if (upd.rowCount !== 1) return false; // corrida: já respondida → deixa o bot seguir
 
   try {
-    await sendMessage(chatwootConversationId, thankYouText(rating));
+    if (env.BOT_OUTBOX) {
+      await enqueueAccessoryText(client, { environment, chatwootConversationId,
+        kind: 'survey_text', body: thankYouText(rating),
+        idempotencyKey: `survey-thanks:${pend.rows[0]!.id}` });
+    } else {
+      await sendMessage(chatwootConversationId, thankYouText(rating));
+    }
   } catch (err) {
     logger.error({ err, surveyId: pend.rows[0]!.id }, 'satisfaction: agradecimento nao enviado');
   }
@@ -120,7 +127,13 @@ async function dispatchNewSurveys(): Promise<void> {
     if (ins.rowCount !== 1) continue; // outra réplica já pegou
 
     try {
-      await sendMessage(Number(r.conv), surveyQuestion(r.loja));
+      if (env.BOT_OUTBOX) {
+        await enqueueAccessoryText(pool, { environment: r.environment as Environment,
+          chatwootConversationId: Number(r.conv), kind: 'survey_text',
+          body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
+      } else {
+        await sendMessage(Number(r.conv), surveyQuestion(r.loja));
+      }
     } catch (err) {
       // Pergunta que falhou fica logada; a pesquisa permanece pending (será
       // expirada na janela). Não reabre pra não mandar 2x.
@@ -172,7 +185,13 @@ export async function dispatchMatrizDeliverySurveys(): Promise<void> {
     if (ins.rowCount !== 1) continue; // outra réplica já pegou
 
     try {
-      await sendMessage(Number(r.conv), surveyQuestion(r.loja));
+      if (env.BOT_OUTBOX) {
+        await enqueueAccessoryText(pool, { environment: r.environment as Environment,
+          chatwootConversationId: Number(r.conv), kind: 'survey_text',
+          body: surveyQuestion(r.loja), idempotencyKey: `survey-ask:${ins.rows[0]!.id}` });
+      } else {
+        await sendMessage(Number(r.conv), surveyQuestion(r.loja));
+      }
     } catch (err) {
       logger.error({ err, orderId: r.order_id }, 'satisfaction matriz: pergunta nao enviada');
     }
