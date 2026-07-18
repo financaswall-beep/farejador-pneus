@@ -32,7 +32,8 @@
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260717-etapa8"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
-<script src="/admin/painel/app.clientes.js?v=20260718-frontfix1"></script>
+<script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
+<script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -43,8 +44,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.montagem.js?v=20260717-comprovantes1"></script>
-<script src="/admin/painel/app.js?v=20260716-etapa5"></script>
+<script src="/admin/painel/app.montagem.js?v=20260718-etapa9"></script>
+<script src="/admin/painel/app.js?v=20260718-etapa9"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -4462,7 +4463,7 @@
       </header>
 
       <nav class="flex gap-7 border-b border-gray-200 mb-5 overflow-x-auto">
-        <template x-for="tab in [{id:'todos',label:'Todos'},{id:'leads',label:'Leads'},{id:'compradores',label:'Compradores'},{id:'recompra',label:'Recompra'},{id:'parceiros',label:'Parceiros'}]" :key="'clientes-v2-'+tab.id">
+        <template x-for="tab in [{id:'todos',label:'Todos'},{id:'leads',label:'Leads'},{id:'compradores',label:'Compradores'},{id:'recompra',label:'Recompra'},{id:'parceiros',label:'Parceiros'},...(customerIdentityEnabled?[{id:'identidade',label:'Identidade e privacidade'}]:[])]" :key="'clientes-v2-'+tab.id">
           <button @click="setClientesTab(tab.id)" class="pb-3 px-0.5 text-sm whitespace-nowrap border-b-2 -mb-px" :class="clientesTab===tab.id?'border-emerald-700 text-emerald-800 font-semibold':'border-transparent text-gray-500 hover:text-gray-800'" x-text="tab.label"></button>
         </template>
       </nav>
@@ -4471,6 +4472,31 @@
       <div x-show="clientesError" class="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-4 text-sm">Não foi possível carregar os clientes. <button @click="loadClientes()" class="font-semibold underline">Tentar novamente</button></div>
 
       <div x-show="!clientesLoading && !clientesError">
+        <!-- Etapa 9: só existe com flag ON + sessão owner. PII permanece integral para o dono. -->
+        <section x-show="clientesTab==='identidade' && customerIdentityEnabled" class="space-y-4">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3">
+            <div><p class="text-sm font-semibold text-emerald-900">Visão canônica do owner</p><p class="text-xs text-emerald-800 mt-1">Nomes, telefones e documentos aparecem completos. Telefone igual só cria uma revisão; nunca une pessoas sozinho.</p></div>
+            <div class="flex gap-2"><button @click="syncCustomerIdentities()" class="h-9 px-3 bg-white border border-emerald-300 rounded-md text-xs">Sincronizar fontes</button><button @click="exportCustomerIdentities()" class="h-9 px-3 bg-emerald-700 text-white rounded-md text-xs">Exportar tudo</button></div>
+          </div>
+          <p x-show="customerIdentityNotice" class="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded-md p-3" x-text="customerIdentityNotice"></p>
+          <p x-show="customerIdentityError" class="text-xs bg-rose-50 border border-rose-200 text-rose-800 rounded-md p-3" x-text="customerIdentityError"></p>
+          <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_340px] gap-4">
+            <div class="bg-white border rounded-lg overflow-hidden">
+              <div class="p-3 border-b flex gap-2"><input x-model="clientesBusca" placeholder="Buscar nome, telefone ou documento" class="h-9 flex-1 border rounded-md px-3 text-xs"><button @click="loadCustomerIdentities(true)" class="h-9 px-3 bg-emerald-700 text-white rounded-md text-xs">Buscar</button></div>
+              <div class="overflow-x-auto"><table class="w-full text-xs"><thead class="bg-gray-50 text-left text-gray-500"><tr><th class="px-3 py-2.5">Identidade</th><th class="px-3 py-2.5">Fontes</th><th class="px-3 py-2.5">Escopo</th><th class="px-3 py-2.5 text-right">Compras</th><th class="px-3 py-2.5 text-right">Total</th><th class="px-3 py-2.5">Conflitos</th></tr></thead><tbody class="divide-y"><template x-for="row in customerIdentityRows" :key="'identity-'+row.id"><tr @click="customerIdentitySelectedId=row.id;customerIdentitySplitLinks=[]" class="cursor-pointer hover:bg-emerald-50/40" :class="customerIdentitySelectedId===row.id?'bg-emerald-50/60':''"><td class="px-3 py-3"><p class="font-semibold" x-text="row.name"></p><p class="text-[10px] text-gray-500" x-text="row.phone||row.email||row.document_number||'Sem contato'"></p><p class="text-[9px] text-gray-400 mt-1" x-text="customerEntityLabel(row.entity_type)"></p></td><td class="px-3 py-3"><div class="flex flex-wrap gap-1"><template x-for="source in row.sources" :key="source.link_id"><span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded" x-text="customerSourceLabel(source.source_type)"></span></template></div></td><td class="px-3 py-3" x-text="row.scope==='partner_unit'?'Loja parceira':(row.scope==='mixed'?'Misto':'Matriz')"></td><td class="px-3 py-3 text-right" x-text="row.metrics.purchases"></td><td class="px-3 py-3 text-right font-medium" x-text="formatCurrency(row.metrics.total_spent)"></td><td class="px-3 py-3"><span x-show="!row.conflicts.length" class="text-emerald-700">Sem conflito</span><span x-show="row.conflicts.length" class="text-amber-700" x-text="row.conflicts.join(', ')"></span></td></tr></template></tbody></table></div>
+              <div class="p-3 border-t flex justify-between"><span class="text-[10px] text-gray-400" x-text="customerIdentityRows.length+' identidade(s) carregada(s)'"></span><button x-show="customerIdentityCursor" @click="loadCustomerIdentities(false)" class="text-xs text-emerald-800">Carregar mais</button></div>
+            </div>
+            <aside class="bg-white border rounded-lg p-4 h-fit" x-show="customerIdentitySelected()">
+              <p class="text-sm font-semibold" x-text="customerIdentitySelected()?.name"></p><p class="text-xs mt-1" x-text="customerIdentitySelected()?.phone||'Sem telefone'"></p><p class="text-xs text-gray-500" x-text="customerIdentitySelected()?.email||''"></p><p class="text-xs text-gray-500" x-text="customerIdentitySelected()?.document_number||''"></p>
+              <div class="border-t mt-4 pt-3"><p class="text-[10px] uppercase text-gray-400 mb-2">Fontes e proveniência</p><template x-for="source in customerIdentitySelected()?.sources||[]" :key="'detail-'+source.link_id"><label class="flex items-start gap-2 py-2 border-b text-xs"><input type="checkbox" :value="source.link_id" x-model="customerIdentitySplitLinks" class="mt-0.5"><span><b x-text="customerSourceLabel(source.source_type)"></b><small class="block text-gray-500" x-text="[source.name,source.phone,source.email,source.document_number].filter(Boolean).join(' · ')"></small></span></label></template><button @click="splitSelectedCustomerIdentity()" :disabled="!customerIdentitySplitLinks.length" class="w-full h-9 mt-3 border border-amber-400 text-amber-800 rounded-md text-xs disabled:opacity-40">Separar fontes marcadas</button></div>
+              <div x-show="customerPrivacyEnabled" class="border-t mt-4 pt-3"><p class="text-[10px] uppercase text-gray-400 mb-2">Privacidade</p><div class="grid grid-cols-2 gap-2"><button @click="previewSelectedCustomerPrivacy('portability')" class="h-9 border rounded-md text-xs">Portabilidade</button><button @click="previewSelectedCustomerPrivacy('anonymization')" class="h-9 border rounded-md text-xs">Dry-run de privacidade</button></div><p class="text-[10px] text-gray-500 mt-2">A remoção de nomes está bloqueada. O dry-run apenas inventaria cópias.</p></div>
+            </aside>
+          </div>
+          <div class="bg-white border rounded-lg p-4"><div class="flex justify-between"><div><p class="text-sm font-semibold">Revisões de possível duplicidade</p><p class="text-xs text-gray-500 mt-1">A decisão é sempre humana; a evidência gravada não contém telefone.</p></div><span class="text-xs px-2 py-1 bg-amber-50 text-amber-800 rounded h-fit" x-text="customerIdentityCandidates.length+' pendente(s)'"></span></div><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-2 mt-3"><template x-for="candidate in customerIdentityCandidates" :key="candidate.id"><button @click="inspectCustomerCandidate(candidate)" class="border rounded-md p-3 text-left text-xs hover:border-emerald-400"><b x-text="candidate.signal==='exact_normalized_phone'?'Telefone normalizado igual':'Vínculo explícito'"></b><small class="block text-gray-500 mt-1" x-text="'Score '+candidate.score+' · '+clienteData(candidate.created_at)"></small></button></template><p x-show="!customerIdentityCandidates.length" class="text-xs text-gray-400">Nenhuma revisão pendente.</p></div></div>
+          <div x-show="customerIdentityCandidate" class="bg-white border rounded-lg p-4"><p class="text-sm font-semibold mb-3">Comparar fontes antes de decidir</p><div class="grid md:grid-cols-2 gap-3"><template x-for="side in customerIdentityCandidateSides" :key="side.id"><div class="border rounded-md p-3"><p class="font-semibold" x-text="side.name"></p><p class="text-xs" x-text="side.phone||'Sem telefone'"></p><p class="text-xs text-gray-500" x-text="side.email||side.document_number||''"></p><div class="flex flex-wrap gap-1 mt-2"><template x-for="source in side.sources" :key="source.link_id"><span class="text-[9px] bg-blue-50 text-blue-700 px-1.5 rounded" x-text="customerSourceLabel(source.source_type)"></span></template></div></div></template></div><div class="flex gap-2 mt-3"><button @click="decideCustomerCandidate('reject')" class="h-9 px-3 border rounded-md text-xs">Não são a mesma pessoa</button><button @click="decideCustomerCandidate('approve')" class="h-9 px-3 bg-emerald-700 text-white rounded-md text-xs">Unir identidades</button></div></div>
+          <div x-show="customerPrivacyPreview" class="bg-white border rounded-lg p-4"><div class="flex justify-between"><div><p class="text-sm font-semibold">Resultado do inventário</p><p class="text-xs text-gray-500">Nada foi apagado ou anonimizado.</p></div><button @click="approveSelectedCustomerPrivacy()" class="h-9 px-3 bg-emerald-700 text-white rounded-md text-xs">Aprovar resultado</button></div><div class="grid md:grid-cols-2 xl:grid-cols-3 gap-2 mt-3"><template x-for="item in customerPrivacyPreview?.inventory||[]" :key="item.surface"><div class="border rounded-md p-2 text-xs"><div class="flex justify-between"><b x-text="item.surface"></b><span x-text="item.count"></span></div><p class="mt-1" :class="item.disposition==='pending'?'text-amber-700':(item.disposition==='retained'?'text-blue-700':'text-emerald-700')" x-text="item.disposition"></p><small class="text-gray-500" x-text="item.reason"></small></div></template></div></div>
+        </section>
+
         <!-- 1. TODOS -->
         <section x-show="clientesTab==='todos'">
           <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">

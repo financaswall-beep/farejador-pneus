@@ -54,6 +54,10 @@ Ordem de execução:
 45. `0045_partner_finance_accounts.sql` - cria `finance.partner_payables` e `finance.partner_receivables` para contas a pagar/receber da unidade parceira, com RLS por unidade, triggers de ambiente e GRANTs para o pool restrito do portal.
 46. `0046_partner_summary_sao_paulo_month.sql` - ajusta `network.partner_unit_summary` para calcular o mes atual usando `America/Sao_Paulo`, preservando `security_invoker` para o RLS do portal.
 
+### Etapa 9 — identidade e privacidade
+
+`0142_customer_identity_privacy.sql` cria a sobreposição canônica sem copiar PII, links e candidatos reversíveis, solicitações de privacidade e eventos append-only. É aditiva, não executa anonimização, não agenda retenção e mantém zero acesso para `farejador_partner_app`.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

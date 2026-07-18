@@ -26,6 +26,9 @@ services:
       CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:?CHATWOOT_ACCOUNT_ID is required}
       ADMIN_AUTH_TOKEN: ${ADMIN_AUTH_TOKEN:?ADMIN_AUTH_TOKEN is required}
       ADMIN_BEARER_FALLBACK_ENABLED: ${ADMIN_BEARER_FALLBACK_ENABLED:-false}
+      # Etapa 9: rollout em gates separados; ambos permanecem false no deploy inicial.
+      MATRIZ_CUSTOMER_IDENTITY: ${MATRIZ_CUSTOMER_IDENTITY:-false}
+      MATRIZ_CUSTOMER_PRIVACY: ${MATRIZ_CUSTOMER_PRIVACY:-false}
     restart: always
     healthcheck:
       test:

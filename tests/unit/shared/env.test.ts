@@ -114,4 +114,10 @@ describe('environment security validation', () => {
     expect(parseEnv({ ...baseEnv, ADMIN_BEARER_FALLBACK_ENABLED: 'false' }).ADMIN_BEARER_FALLBACK_ENABLED)
       .toBe(false);
   });
+
+  it('keeps customer identity and privacy dormant by default', () => {
+    const parsed = parseEnv(baseEnv);
+    expect(parsed.MATRIZ_CUSTOMER_IDENTITY).toBe(false);
+    expect(parsed.MATRIZ_CUSTOMER_PRIVACY).toBe(false);
+  });
 });
