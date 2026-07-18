@@ -3746,8 +3746,8 @@
       </div>
 
       <!-- DRAWER contextual: perfil, remuneração, regra de comissão ou memória da folha -->
-      <div x-show="colabDrawer" @click="colabCloseDrawer()" class="fixed inset-0 bg-black/10 z-40"></div>
-      <aside x-show="colabDrawer && colabSelected" class="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-gray-200 shadow-2xl z-50 p-6 overflow-y-auto">
+      <div x-show="colabDrawer" x-cloak @click="colabCloseDrawer()" class="fixed inset-0 bg-black/10 z-40"></div>
+      <aside x-show="colabDrawer && colabSelected" x-cloak class="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-gray-200 shadow-2xl z-50 p-6 overflow-y-auto">
         <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold" x-text="colabDrawer === 'perfil' ? 'Perfil do colaborador' : colabDrawer === 'remuneracao' ? 'Remuneração' : colabDrawer === 'comissao' ? 'Regra de comissão' : 'Memória de cálculo'"></h3><button @click="colabCloseDrawer()" class="text-xl text-gray-400">×</button></div>
         <template x-if="colabSelected"><div>
           <div class="flex items-center gap-3 mb-6"><span class="w-12 h-12 rounded-full bg-emerald-700 text-white flex items-center justify-center font-semibold" x-text="colabIniciais(colabSelected.display_name)"></span><div><p class="font-semibold" x-text="colabSelected.display_name"></p><p class="text-xs text-gray-500" x-text="colabSelected.job_title+' · '+colabEmploymentLabel(colabSelected.employment_type)"></p></div><span class="ml-auto text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Ativo</span></div>
@@ -3790,10 +3790,10 @@
       </aside>
 
       <!-- DRAWER: novo colaborador (painel lateral direito, como no desenho) -->
-      <div x-show="colabShowForm" @click="colabShowForm = false" class="fixed inset-0 bg-black/10 z-40"></div>
+      <div x-show="colabShowForm" x-cloak @click="colabShowForm = false" class="fixed inset-0 bg-black/10 z-40"></div>
       <!-- SEM x-transition de propósito: a transição do Alpine depende de requestAnimationFrame
            e trava o drawer fechado em aba de fundo (provado no preview 07-12); x-show puro abre sempre -->
-      <div x-show="colabShowForm"
+      <div x-show="colabShowForm" x-cloak
            class="fixed inset-y-0 right-0 w-full max-w-sm bg-white border-l border-gray-200 shadow-2xl z-50 p-6 overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
           <h3 class="text-lg font-semibold">Novo colaborador</h3>
