@@ -48,6 +48,7 @@ describe('seguranca de inicializacao do painel', () => {
 
     expect(html).toContain('app.atacado.js?v=20260718-frontfix1');
     expect(html).toContain('app.compras.acoes.js?v=20260718-frontfix1');
-    expect(html).toContain('app.clientes.js?v=20260718-frontfix1');
+    expect(html).toContain('app.clientes.js?v=20260718-etapa9');
+    expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });
 });

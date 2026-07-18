@@ -30,6 +30,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.bot, // app.bot.js (2026-07-06): tela do Bot — campainha/visão/deep-link Chatwoot
     window.PAINEL_MODULES.botMapa, // app.bot.mapa.js (2026-07-06): desenho do mapa IBGE pintado por camada
     window.PAINEL_MODULES.clientes, // CRM da matriz: clientes/leads/compradores/recompra/parceiros
+    window.PAINEL_MODULES.clientesIdentity, // Etapa 9: identidade/revisão/privacidade owner-only
     window.PAINEL_MODULES.financeiro, // app.financeiro.js (linhas 1630-1743 pré-obra): aba Financeiro — visão geral + cobranças + Recebi/Paguei
     window.PAINEL_MODULES.financeiroIndicadores, // app.financeiro.indicadores.js (fatia 07-14): fluxo de caixa + análise + inadimplência
     window.PAINEL_MODULES.financeiroDespesas, // app.financeiro.despesas.js (fatia 07-14): despesas (0120/0130) — form, modalidades, extrato

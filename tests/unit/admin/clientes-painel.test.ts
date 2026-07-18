@@ -50,6 +50,7 @@ describe('painel de clientes', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     const app = readFileSync('painel/public/app.js', 'utf8');
     const staticRoute = readFileSync('src/admin/painel/route-static.ts', 'utf8');
+    const identityUi = readFileSync('painel/public/app.clientes.identity.js', 'utf8');
 
     for (const label of ['Todos', 'Leads', 'Compradores', 'Recompra', 'Parceiros']) {
       expect(html).toContain(`label:'${label}'`);
@@ -59,6 +60,10 @@ describe('painel de clientes', () => {
     }
     expect(app).toContain("{ id: 'clientes',   label: 'Clientes',   icon: 'users' }");
     expect(staticRoute).toContain("'app.clientes.js'");
+    expect(staticRoute).toContain("'app.clientes.identity.js'");
+    expect(html).toContain('Nomes, telefones');
+    expect(identityUi).toContain("confirmation:'UNIR IDENTIDADES'");
+    expect(identityUi).toContain("request_type:requestType");
     expect(html).toContain("id:'convertido',label:'Convertidos'");
     expect(html).toContain("id:'perdido',label:'Perdidos'");
     expect(html).toContain("panel:'bg-rose-100 border-rose-300'");

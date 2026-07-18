@@ -12,6 +12,9 @@ window.PAINEL_MODULES.clientes = function () {
         const payload = await this.apiGet('/admin/api/clientes');
         this.clientes = Array.isArray(payload.rows) ? payload.rows : [];
         this.clientesParceiros = Array.isArray(payload.partners) ? payload.partners : [];
+        this.customerIdentityEnabled = payload.customer_identity?.enabled === true && this.adminUser?.role === 'owner';
+        this.customerPrivacyEnabled = this.customerIdentityEnabled && payload.customer_identity?.privacy_enabled === true;
+        if (this.customerIdentityEnabled && (!silent || !this.customerIdentityRows.length)) await this.loadCustomerIdentities(true);
         if (!this.clienteSelecionadoId && this.clientes[0]) this.clienteSelecionadoId = this.clientes[0].id;
         if (!this.clienteParceiroSelecionadoId && this.clientesParceiros[0]) this.clienteParceiroSelecionadoId = this.clientesParceiros[0].partner_id;
       } catch (err) {
@@ -252,6 +255,7 @@ window.PAINEL_MODULES.clientes = function () {
       else this.currentPage = 'rede';
     },
     exportarClientes() {
+      if (this.customerIdentityEnabled) { this.exportCustomerIdentities(); return; }
       const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const body = this.clientesFiltrados().map((c) => [c.name, this.clienteTipoLabel(c.kind), c.phone, c.email, c.origin, c.is_vip ? 'VIP' : '', c.purchases, c.total_spent, c.last_purchase_at].map(esc).join(';'));
       const csv = ['Cliente;Tipo;Telefone;Email;Origem;Classe;Compras;Total comprado;Última compra', ...body].join('\r\n');

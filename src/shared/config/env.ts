@@ -60,6 +60,8 @@ const envSchema = z.object({
   // sent_api_ack quando a API do Chatwoot devolve aceite. A confirmação por
   // webhook/provider id é reconciliada separadamente.
   BOT_OUTBOX: booleanStringSchema,
+  MATRIZ_CUSTOMER_IDENTITY: booleanStringSchema,
+  MATRIZ_CUSTOMER_PRIVACY: booleanStringSchema,
   // Chat unificado do Portal Parceiro (Fatia 1): espelha mensagens do Chatwoot em
   // commerce.partner_messages durante a normalizacao. Defensivo e isolado por SAVEPOINT
   // — nunca quebra a normalizacao core. Desligado por padrao.
