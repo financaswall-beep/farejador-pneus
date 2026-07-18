@@ -144,13 +144,13 @@ window.PAINEL_MODULES.atacado = function () {
       this.vendasTab = 'historico';
     },
     atacadoLastPurchase(b) {
-      if (!b.last_purchase_at) return '—';
+      if (!b?.last_purchase_at) return '—';
       const d = new Date(b.last_purchase_at);
       return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
     },
     atacadoStatus(b) {
-      if (!Number(b.orders_count)) return { label: 'nunca comprou', cls: 'bg-amber-50 text-amber-700', dot: 'bg-amber-400' };
-      if (b.days_since_last != null && Number(b.days_since_last) > this.atacadoStaleDays)
+      if (!Number(b?.orders_count)) return { label: 'nunca comprou', cls: 'bg-amber-50 text-amber-700', dot: 'bg-amber-400' };
+      if (b?.days_since_last != null && Number(b.days_since_last) > this.atacadoStaleDays)
         return { label: `sumiu (${b.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600', dot: 'bg-rose-400' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
     },
@@ -158,6 +158,7 @@ window.PAINEL_MODULES.atacado = function () {
     // deep-link wa.me com o texto pronto (padrão da casa, fora da API Meta).
     // Sem telefone no cadastro → null e o botão some (a UI esconde).
     reciboWhatsLink(v) {
+      if (!v) return null;
       const digits = String(v.buyer_phone || '').replace(/\D/g, '');
       if (!digits || v.status !== 'confirmed') return null;
       const tel = digits.startsWith('55') ? digits : '55' + digits;

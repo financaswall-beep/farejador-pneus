@@ -4,12 +4,12 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.comprasAcoes = function () {
   return {
     compraData(c) {
-      if (!c.purchased_at) return '—';
+      if (!c?.purchased_at) return '—';
       const date = new Date(c.purchased_at);
       return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
     },
     vendaData(v) {
-      if (!v.sold_at) return '—';
+      if (!v?.sold_at) return '—';
       const date = new Date(v.sold_at);
       return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
     },
