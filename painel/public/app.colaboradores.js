@@ -6,6 +6,9 @@ window.PAINEL_MODULES.colaboradores = function () {
   return {
     async loadColaboradores() {
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      this.colabLoading = true;
+      this.colabLoadError = null;
+      this.colabLoaded = false;
       try {
         const payload = await this.apiGet(`/admin/api/colaboradores/gestao?competencia=${encodeURIComponent(this.colabMes + '-01')}`);
         this.colaboradores = payload.collaborators || [];
@@ -16,7 +19,10 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       } catch (err) {
+        this.colabLoadError = 'Não foi possível carregar a equipe e a folha. Tente novamente.';
         console.error('colaboradores load failed', err);
+      } finally {
+        this.colabLoading = false;
       }
     },
     colabJobLabel(value) {
@@ -151,34 +157,11 @@ window.PAINEL_MODULES.colaboradores = function () {
         this.colabSaving = false;
       }
     },
-    async trocarSenhaColaborador(c) {
-      const senha = prompt(`Nova senha pra ${c.display_name} (mínimo 12):`);
-      if (senha === null) return;
-      if (senha.length < 12) { this.colabMsg = { ok: false, text: 'Senha muito curta (mínimo 12).' }; return; }
-      this.colabSaving = true;
-      try {
-        await this.apiPost('/admin/api/colaboradores/senha', { id: c.id, password: senha });
-        this.colabMsg = { ok: true, text: `Senha de ${c.display_name} trocada.` };
-      } catch (err) {
-        this.colabMsg = { ok: false, text: `Não consegui trocar a senha (${err.message}).` };
-      } finally {
-        this.colabSaving = false;
-      }
+    trocarSenhaColaborador(c) {
+      this.abrirColabDialog('password', c);
     },
-    async revogarColaborador(c) {
-      if (!confirm(`Revogar o acesso de ${c.display_name}? Ele sai da ativa mas fica na trilha (dá pra reativar).`)) return;
-      this.colabSaving = true;
-      try {
-        await this.apiPost('/admin/api/colaboradores/revogar', { id: c.id });
-        this.colabMsg = { ok: true, text: `${c.display_name} revogado.` };
-        await this.loadColaboradores();
-      } catch (err) {
-        this.colabMsg = err.message === 'last_owner_required'
-          ? { ok: false, text: 'Não é possível revogar o último proprietário da Matriz.' }
-          : { ok: false, text: `Não consegui revogar (${err.message}).` };
-      } finally {
-        this.colabSaving = false;
-      }
+    revogarColaborador(c) {
+      this.abrirColabDialog('revoke', c);
     },
     async reativarColaborador(c) {
       this.colabSaving = true;

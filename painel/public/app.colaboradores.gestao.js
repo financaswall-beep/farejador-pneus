@@ -143,28 +143,111 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       } catch (err) { this.colabMsg = { ok: false, text: `Não consegui revisar (${err.message}).` }; }
       finally { this.colabSaving = false; }
     },
-    async colabFecharFolha() {
-      if (!confirm(`Fechar a folha de ${this.colabMes}? Os valores serão congelados e entrarão no Financeiro como contas a pagar.`)) return;
-      this.colabSaving = true; this.colabMsg = null;
-      try {
-        await this.apiPost('/admin/api/colaboradores/folha/fechar', { competence: this.colabMes + '-01' });
-        this.colabMsg = { ok: true, text: 'Folha fechada e conciliada com o Financeiro.' }; await this.loadColaboradores();
-      } catch (err) { this.colabMsg = { ok: false, text: `Não consegui fechar (${err.message}).` }; }
-      finally { this.colabSaving = false; }
+    abrirColabDialog(kind, collaborator = null) {
+      if (!['password', 'revoke', 'close-payroll', 'pay-payroll'].includes(kind)) return;
+      this.colabDialog = {
+        open: true, kind, collaborator, password: '', showPassword: false, error: null,
+      };
+      if (kind === 'password') {
+        this.$nextTick(() => this.$refs.colabDialogPassword?.focus());
+      }
     },
-    async colabPagar(c) {
-      if (!c.payroll_item_id || !confirm(`Confirmar pagamento de ${this.formatCurrency(c.total_due)} para ${c.display_name}?`)) return;
+    fecharColabDialog() {
+      if (this.colabSaving) return;
+      this.colabDialog = {
+        open: false, kind: null, collaborator: null, password: '', showPassword: false, error: null,
+      };
+    },
+    colabDialogTitle() {
+      return ({
+        password: 'Trocar senha', revoke: 'Revogar colaborador',
+        'close-payroll': 'Fechar competência', 'pay-payroll': 'Confirmar pagamento',
+      })[this.colabDialog.kind] || 'Confirmar ação';
+    },
+    colabDialogDescription() {
+      const c = this.colabDialog.collaborator || {};
+      if (this.colabDialog.kind === 'password') {
+        return `Defina uma nova senha para ${c.display_name || 'o colaborador'}. Ela precisa ter pelo menos 12 caracteres.`;
+      }
+      if (this.colabDialog.kind === 'revoke') {
+        return `${c.display_name || 'O colaborador'} sairá da equipe ativa e perderá o acesso, mas continuará na trilha e poderá ser reativado.`;
+      }
+      if (this.colabDialog.kind === 'close-payroll') {
+        return `Os valores de ${this.colabMes} serão congelados e entrarão no Financeiro como contas a pagar.`;
+      }
+      if (this.colabDialog.kind === 'pay-payroll') {
+        return `Confirme o pagamento de ${this.formatCurrency(c.total_due || 0)} para ${c.display_name || 'o colaborador'}.`;
+      }
+      return '';
+    },
+    colabDialogConfirmLabel() {
+      return ({
+        password: 'Trocar senha', revoke: 'Revogar acesso',
+        'close-payroll': 'Fechar competência', 'pay-payroll': 'Confirmar pagamento',
+      })[this.colabDialog.kind] || 'Confirmar';
+    },
+    colabFecharFolha() {
+      this.abrirColabDialog('close-payroll');
+    },
+    colabPagar(c) {
+      if (!c.payroll_item_id) return;
+      this.abrirColabDialog('pay-payroll', c);
+    },
+    async confirmarColabDialog() {
+      const dialog = this.colabDialog;
+      const c = dialog.collaborator;
+      if (!dialog.open || this.colabSaving) return;
+      if (dialog.kind === 'password' && (!c || dialog.password.length < 12)) {
+        this.colabDialog.error = 'A senha precisa ter pelo menos 12 caracteres.';
+        return;
+      }
+      if (['password', 'revoke', 'pay-payroll'].includes(dialog.kind) && !c) {
+        this.colabDialog.error = 'Não foi possível identificar o colaborador. Feche e tente novamente.';
+        return;
+      }
+
       this.colabSaving = true;
+      this.colabMsg = null;
+      this.colabDialog.error = null;
+      let succeeded = false;
       try {
-        const operation = window.PAINEL_INTEGRITY.operation('matriz-payroll-payment', c.payroll_item_id);
-        await this.apiPost('/admin/api/colaboradores/folha/pagar', {
-          item_id: c.payroll_item_id, idempotency_key: operation.key,
-        });
-        window.PAINEL_INTEGRITY.complete('matriz-payroll-payment', c.payroll_item_id);
-        this.colabMsg = { ok: true, text: 'Pagamento confirmado no Colaboradores e no Financeiro.' };
-        await Promise.all([this.loadColaboradores(), this.loadFinanceiro()]); this.colabCloseDrawer();
-      } catch (err) { this.colabMsg = { ok: false, text: `Não consegui pagar (${err.message}).` }; }
-      finally { this.colabSaving = false; }
+        if (dialog.kind === 'password') {
+          await this.apiPost('/admin/api/colaboradores/senha', { id: c.id, password: dialog.password });
+          this.colabMsg = { ok: true, text: `Senha de ${c.display_name} trocada.` };
+        } else if (dialog.kind === 'revoke') {
+          await this.apiPost('/admin/api/colaboradores/revogar', { id: c.id });
+          this.colabMsg = { ok: true, text: `${c.display_name} revogado.` };
+          await this.loadColaboradores();
+        } else if (dialog.kind === 'close-payroll') {
+          await this.apiPost('/admin/api/colaboradores/folha/fechar', { competence: this.colabMes + '-01' });
+          this.colabMsg = { ok: true, text: 'Folha fechada e conciliada com o Financeiro.' };
+          await this.loadColaboradores();
+        } else if (dialog.kind === 'pay-payroll') {
+          const operation = window.PAINEL_INTEGRITY.operation('matriz-payroll-payment', c.payroll_item_id);
+          await this.apiPost('/admin/api/colaboradores/folha/pagar', {
+            item_id: c.payroll_item_id, idempotency_key: operation.key,
+          });
+          window.PAINEL_INTEGRITY.complete('matriz-payroll-payment', c.payroll_item_id);
+          this.colabMsg = { ok: true, text: 'Pagamento confirmado no Colaboradores e no Financeiro.' };
+          await Promise.all([this.loadColaboradores(), this.loadFinanceiro()]);
+          this.colabCloseDrawer();
+        } else {
+          throw new Error('acao_desconhecida');
+        }
+        succeeded = true;
+      } catch (err) {
+        const action = dialog.kind === 'password' ? 'trocar a senha'
+          : dialog.kind === 'revoke' ? 'revogar'
+            : dialog.kind === 'close-payroll' ? 'fechar a folha' : 'confirmar o pagamento';
+        const message = err.message === 'last_owner_required'
+          ? 'Não é possível revogar o último proprietário da Matriz.'
+          : `Não consegui ${action} (${err.message}).`;
+        this.colabDialog.error = message;
+        this.colabMsg = { ok: false, text: message };
+      } finally {
+        this.colabSaving = false;
+        if (succeeded) this.fecharColabDialog();
+      }
     },
   };
 };
