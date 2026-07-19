@@ -23,9 +23,26 @@ export async function setMatrizDeliveryStatus(
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string; delivery_status: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const observed = await client.query<{ trip_id: string | null }>(
+      `SELECT trip_id FROM commerce.orders WHERE id=$2 AND environment=$1`,
+      [environment, input.order_id],
+    );
+    const tripId = observed.rows[0]?.trip_id ?? null;
+    if (tripId) {
+      const trip = await client.query(
+        `SELECT id FROM commerce.matriz_delivery_trips
+          WHERE id=$2 AND environment=$1 AND status='open' AND deleted_at IS NULL
+          FOR UPDATE`,
+        [environment, tripId],
+      );
+      if (!trip.rows[0]) throw new Error('delivery_not_found');
+    }
   // Entregue também fecha o PEDIDO (status delivered — verdade comercial do 0013);
   // a régua de faturamento (0117) não muda: já contava o pedido não-cancelado.
-  const r = await dbPool.query<{ order_id: string; delivery_status: string }>(
+    const r = await client.query<{ order_id: string; delivery_status: string }>(
     `UPDATE commerce.orders o
         SET delivery_status = $3,
             delivery_courier = COALESCE(NULLIF($4, ''), o.delivery_courier),
@@ -38,12 +55,21 @@ export async function setMatrizDeliveryStatus(
             updated_at    = now()
       WHERE o.id = $2 AND o.environment = $1
         AND o.status <> 'cancelled' AND o.delivery_status <> 'delivered'
+        AND (($6::uuid IS NULL AND o.trip_id IS NULL) OR o.trip_id=$6)
         AND ${MAIN_DELIVERY_GUARD}
       RETURNING o.id AS order_id, o.delivery_status`,
-    [environment, input.order_id, input.status, input.courier ?? null, input.payment_method ?? null],
-  );
-  if (!r.rows[0]) throw new Error('delivery_not_found');
-  return r.rows[0];
+      [environment, input.order_id, input.status, input.courier ?? null,
+       input.payment_method ?? null, tripId],
+    );
+    if (!r.rows[0]) throw new Error('delivery_not_found');
+    await client.query('COMMIT');
+    return r.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** NÃO ENTREGUE: marca failed E CANCELA o pedido no MESMO caminho atômico do
@@ -57,6 +83,18 @@ export async function failMatrizDelivery(
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
+    const observed = await client.query<{ trip_id: string | null }>(
+      `SELECT trip_id FROM commerce.orders WHERE id=$2 AND environment=$1`,
+      [environment, input.order_id],
+    );
+    const tripId = observed.rows[0]?.trip_id ?? null;
+    if (tripId) {
+      await client.query(
+        `SELECT id FROM commerce.matriz_delivery_trips
+          WHERE id=$2 AND environment=$1 AND deleted_at IS NULL FOR UPDATE`,
+        [environment, tripId],
+      );
+    }
     const marked = await client.query(
       `UPDATE commerce.orders o
           SET delivery_status = 'failed', updated_at = now()

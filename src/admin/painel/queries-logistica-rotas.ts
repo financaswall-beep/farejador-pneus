@@ -11,6 +11,15 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica.js';
+import { recordIntegrityEvent } from './stage5-integrity.js';
+export { confirmMatrizTripFuelDivergence } from './queries-logistica-financeiro.js';
+
+export class TripHasUnresolvedDeliveriesError extends Error {
+  constructor(readonly deliveries: Array<{ order_id: string; delivery_status: string }>) {
+    super('trip_has_unresolved_deliveries');
+    this.name = 'TripHasUnresolvedDeliveriesError';
+  }
+}
 
 export async function openMatrizTrip(
   input: {
@@ -78,7 +87,17 @@ export async function attachOrderToMatrizTrip(
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string; trip_id: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const r = await dbPool.query<{ order_id: string }>(
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const lockedTrip = await client.query(
+      `SELECT id FROM commerce.matriz_delivery_trips
+        WHERE id=$2 AND environment=$1 AND status='open' AND deleted_at IS NULL
+        FOR UPDATE`,
+      [environment, input.trip_id],
+    );
+    if (!lockedTrip.rows[0]) throw new Error('trip_not_open');
+    const r = await client.query<{ order_id: string }>(
     `UPDATE commerce.orders o
         SET trip_id = $3, delivery_status = 'dispatched',
             dispatched_at = COALESCE(o.dispatched_at, now()),
@@ -94,16 +113,25 @@ export async function attachOrderToMatrizTrip(
       RETURNING o.id AS order_id`,
     [environment, input.order_id, input.trip_id],
   );
-  if (r.rows[0]) return { order_id: r.rows[0].order_id, trip_id: input.trip_id };
+    if (r.rows[0]) {
+      await client.query('COMMIT');
+      return { order_id: r.rows[0].order_id, trip_id: input.trip_id };
+    }
   // 0 linhas: diagnostica pra dar mensagem útil (pós-fato, não afeta a atomicidade
   // do UPDATE acima). Rota fechada/inexistente → trip_not_open; senão o pedido já
   // saiu do páreo (cancelado, entregue, já em outra rota, ou de parceiro).
-  const trip = await dbPool.query<{ status: string }>(
+    const trip = await client.query<{ status: string }>(
     `SELECT status FROM commerce.matriz_delivery_trips WHERE id = $1 AND environment = $2`,
     [input.trip_id, environment],
   );
-  if (!trip.rows[0] || trip.rows[0].status !== 'open') throw new Error('trip_not_open');
-  throw new Error('delivery_not_found');
+    if (!trip.rows[0] || trip.rows[0].status !== 'open') throw new Error('trip_not_open');
+    throw new Error('delivery_not_found');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** REMARCA a data prevista de entrega (agendamento — 07-03e). Só entrega da MAIN
@@ -161,6 +189,7 @@ export async function closeMatrizTrip(
     fuel_spent?: number | null;
     notes?: string | null;
     environment?: 'prod' | 'test';
+    actor_label?: string | null;
   },
   dbPool: Pool = defaultPool,
 ): Promise<{ trip_id: string; fuel_expense_id: string | null }> {
@@ -168,14 +197,58 @@ export async function closeMatrizTrip(
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const trip = await client.query<{ id: string; fuel_expense_id: string | null }>(
-      `SELECT id,fuel_expense_id
+    const trip = await client.query<{
+      id: string; status: 'open' | 'closed'; fuel_expense_id: string | null;
+    }>(
+      `SELECT id,status,fuel_expense_id
          FROM commerce.matriz_delivery_trips
-        WHERE id = $2 AND environment = $1 AND status = 'open' AND deleted_at IS NULL
+        WHERE id = $2 AND environment = $1 AND deleted_at IS NULL
         FOR UPDATE`,
       [environment, input.trip_id],
     );
     if (!trip.rows[0]) throw new Error('trip_not_found');
+    if (trip.rows[0].status === 'closed') {
+      await client.query('COMMIT');
+      return { trip_id: input.trip_id, fuel_expense_id: trip.rows[0].fuel_expense_id };
+    }
+
+    const orders = await client.query<{
+      id: string; status: string; delivery_status: string;
+      delivery_failure_reason: string | null;
+    }>(
+      `SELECT id,status,delivery_status,delivery_failure_reason
+         FROM commerce.orders
+        WHERE environment=$1 AND trip_id=$2
+        ORDER BY id
+        FOR UPDATE`,
+      [environment, input.trip_id],
+    );
+    const unresolved = orders.rows
+      .filter((order) => order.status !== 'cancelled'
+        && (order.delivery_status === 'pending' || order.delivery_status === 'dispatched'))
+      .map((order) => ({ order_id: order.id, delivery_status: order.delivery_status }));
+    if (unresolved.length) throw new TripHasUnresolvedDeliveriesError(unresolved);
+
+    const reported = orders.rows.filter((order) => order.status !== 'cancelled'
+      && order.delivery_status === 'failed');
+    for (const order of reported) {
+      await client.query(
+        `UPDATE commerce.orders SET trip_id=NULL,updated_at=now()
+          WHERE id=$1 AND environment=$2 AND trip_id=$3
+            AND status<>'cancelled' AND delivery_status='failed'`,
+        [order.id, environment, input.trip_id],
+      );
+      await recordIntegrityEvent(client, {
+        environment, domain: 'matriz_logistics', entityTable: 'commerce.orders',
+        entityId: order.id, eventType: 'delivery_report_detached_on_trip_close',
+        actorLabel: input.actor_label,
+        idempotencyKey: `trip-close-detach:${input.trip_id}:${order.id}`,
+        before: { trip_id: input.trip_id, delivery_status: order.delivery_status,
+          delivery_failure_reason: order.delivery_failure_reason },
+        after: { trip_id: null, delivery_status: order.delivery_status,
+          owner_decision_required: true },
+      });
+    }
     const fuel = input.fuel_spent != null && Number(input.fuel_spent) > 0 ? Number(input.fuel_spent) : null;
 
     await client.query(

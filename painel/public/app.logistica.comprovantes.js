@@ -53,7 +53,8 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
         .map((receipt) => ({ trip, receipt })));
     },
     receiptReviewEnabled() {
-      return !!(this.logistica?.receipt_approval && this.logistica?.receipt_approval_finance);
+      return this.adminUser?.role === 'owner'
+        && !!(this.logistica?.receipt_approval && this.logistica?.receipt_approval_finance);
     },
     receiptAmountAttention(receipt) {
       const draft = this.receiptReviewDraft(receipt);
@@ -75,7 +76,8 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
     },
     receiptRejectDisabled(receipt) {
       const draft = this.receiptReviewDraft(receipt);
-      return !this.logistica?.receipt_approval || !!this.receiptReviewBusy[receipt.id]
+      return this.adminUser?.role !== 'owner' || !this.logistica?.receipt_approval
+        || !!this.receiptReviewBusy[receipt.id]
         || !draft.reject_confirmed || String(draft.reject_reason || '').trim().length < 2;
     },
     receiptUploadErrorMessage(payload) {

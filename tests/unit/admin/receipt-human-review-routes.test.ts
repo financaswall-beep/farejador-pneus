@@ -8,10 +8,15 @@ describe('Etapa 7 — portaria da decisao humana', () => {
   it('expoe aprovacao e rejeicao apenas na portaria administrativa autenticada', () => {
     const admin = source('src/admin/painel/route-logistica-rotas.ts');
     const courier = source('src/admin/entregador/route.ts');
+    const approval = admin.slice(admin.indexOf("'/admin/api/logistica/comprovantes/aprovar'"),
+      admin.indexOf("'/admin/api/logistica/comprovantes/rejeitar'"));
+    const rejection = admin.slice(admin.indexOf("'/admin/api/logistica/comprovantes/rejeitar'"),
+      admin.indexOf('// Bytes do comprovante'));
 
     expect(admin).toContain("'/admin/api/logistica/comprovantes/aprovar'");
     expect(admin).toContain("'/admin/api/logistica/comprovantes/rejeitar'");
-    expect(admin).toContain('preHandler: requireAdminAuth');
+    expect(approval).toContain('preHandler: requireAdminOwner');
+    expect(rejection).toContain('preHandler: requireAdminOwner');
     expect(admin).toContain('getAdminContext(request)');
     expect(admin).toContain('operatorLabel(request)');
     expect(courier).not.toContain('/comprovantes/aprovar');

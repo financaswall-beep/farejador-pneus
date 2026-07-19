@@ -34,6 +34,8 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
 
     expect(module).not.toContain('x-transition');
     expect(module).not.toContain('window.confirm');
+    expect(module).toContain("this.adminUser?.role === 'owner'");
+    expect(html).toContain("adminUser?.role === 'owner'");
     expect(html).toMatch(/:disabled="!![^\"]+"/);
   });
 

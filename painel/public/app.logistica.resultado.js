@@ -47,6 +47,8 @@ window.PAINEL_MODULES.logisticaResultado = function () {
         || (['linked', 'legacy_linked'].includes(receipt.workflow_status) && receipt.expense_removed));
       const fuelPending = !!t.fuel_spent_without_approved_expense;
       const semCusto = Number(r.itens_sem_custo || 0);
+      const financialStatus = t.financial_status
+        || (semCusto || comprovantesPendentes.length || fuelPending ? 'pending' : 'reconciled');
       return {
         faturamento,
         faturamentoPneus: Number(r.faturamento_pneus || 0),
@@ -60,8 +62,11 @@ window.PAINEL_MODULES.logisticaResultado = function () {
         semCusto,
         comprovantesPendentes,
         fuelPending,
+        financialStatus,
+        approvedFuelAmount: Number(t.approved_fuel_amount || 0),
+        fuelDifference: Math.round((Number(t.approved_fuel_amount || 0) - Number(t.fuel_spent || 0)) * 100) / 100,
         fuelWarning: fuelPending ? 'Gasolina anotada sem comprovante aprovado.' : null,
-        completo: semCusto === 0 && comprovantesPendentes.length === 0 && !fuelPending,
+        completo: financialStatus === 'reconciled',
         pedidos: Array.isArray(t.pedidos_resultado) ? t.pedidos_resultado : [],
         despesasDetalhadas: Array.isArray(t.despesas) ? t.despesas : [],
       };
@@ -69,11 +74,13 @@ window.PAINEL_MODULES.logisticaResultado = function () {
     rotaResultadoLabel(t) {
       const r = this.rotaResultado(t);
       if (!r) return 'Sem resultado';
-      if (!r.completo) return 'Resultado parcial';
+      if (r.financialStatus === 'divergent') return 'Divergência financeira';
+      if (!r.completo) return 'Conciliação pendente';
       return r.resultado >= 0 ? 'Rota lucrativa' : 'Rota no prejuízo';
     },
     rotaResultadoBadgeClass(t) {
       const r = this.rotaResultado(t);
+      if (r?.financialStatus === 'divergent') return 'bg-rose-50 text-rose-700 border-rose-100';
       if (!r?.completo) return 'bg-amber-50 text-amber-700 border-amber-100';
       return r.resultado >= 0
         ? 'bg-emerald-50 text-emerald-800 border-emerald-100'

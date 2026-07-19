@@ -2,18 +2,20 @@
 // fechar rota + comprovantes (upload blindado + leitura por IA). Schemas vêm de
 // ./route-logistica.js (içados lá). Corpo VERBATIM das linhas 948-1115 do pré-obra.
 import type { FastifyInstance } from 'fastify';
-import { getAdminContext, requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError, reencodePhoto } from '../../parceiro/photo-upload.js';
 import { addMatrizTripReceipt, attachOrderToMatrizTrip, closeMatrizTrip,
   getMatrizTripReceiptImage, openMatrizTrip, ReceiptExactDuplicateError,
-  approveMatrizTripReceipt, rejectMatrizTripReceipt } from './queries.js';
+  approveMatrizTripReceipt, rejectMatrizTripReceipt,
+  confirmMatrizTripFuelDivergence, TripHasUnresolvedDeliveriesError } from './queries.js';
 import { extractReceiptSuggestion } from './receipt-ai-flow.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { abrirRotaSchema, aprovarComprovanteSchema, comprovanteIdParamsSchema,
   comprovanteParamsSchema, fecharRotaSchema, lerComprovanteSchema,
-  pendurarRotaSchema, rejeitarComprovanteSchema } from './route-logistica.js';
+  pendurarRotaSchema, rejeitarComprovanteSchema,
+  confirmarDivergenciaRotaSchema } from './route-logistica.js';
 
 export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Promise<void> {
   fastify.post('/admin/api/logistica/rotas', { preHandler: requireAdminAuth }, async (request, reply) => {
@@ -69,14 +71,42 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const result = await closeMatrizTrip(parsed.data);
+      const result = await closeMatrizTrip({ ...parsed.data,
+        actor_label: operatorLabel(request) });
       return reply.status(200).send({ closed: true, ...result });
     } catch (err) {
+      if (err instanceof TripHasUnresolvedDeliveriesError) {
+        return reply.status(409).send({ error: err.message,
+          blocking_deliveries: err.deliveries });
+      }
       if (err instanceof Error && err.message === 'trip_not_found') {
         return reply.status(404).send({ error: 'trip_not_found' });
       }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel logistica fechar rota failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/logistica/rotas/confirmar-divergencia', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    if (!env.MATRIZ_LOGISTICS) return reply.status(404).send({ error: 'logistics_disabled' });
+    const parsed = confirmarDivergenciaRotaSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      return reply.status(200).send({ confirmed: true,
+        ...await confirmMatrizTripFuelDivergence({ ...parsed.data,
+          actor_label: operatorLabel(request) }) });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'trip_not_found') {
+        return reply.status(404).send({ error: err.message });
+      }
+      if (err instanceof Error && err.message === 'trip_financial_divergence_not_found') {
+        return reply.status(409).send({ error: err.message });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel confirmar divergencia de rota failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
@@ -165,7 +195,7 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
   });
 
   fastify.post('/admin/api/logistica/comprovantes/aprovar', {
-    preHandler: requireAdminAuth,
+    preHandler: requireAdminOwner,
   }, async (request, reply) => {
     if (!env.MATRIZ_RECEIPT_APPROVAL) {
       return reply.status(404).send({ error: 'receipt_approval_disabled' });
@@ -190,7 +220,7 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
   });
 
   fastify.post('/admin/api/logistica/comprovantes/rejeitar', {
-    preHandler: requireAdminAuth,
+    preHandler: requireAdminOwner,
   }, async (request, reply) => {
     if (!env.MATRIZ_RECEIPT_APPROVAL) {
       return reply.status(404).send({ error: 'receipt_approval_disabled' });

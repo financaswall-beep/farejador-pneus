@@ -1,6 +1,4 @@
 // Obra 300 (2026-07-05): fatia do painel da MATRIZ — logística (0121) leitura: cards, rota, datas D+1, deep-links.
-// VERBATIM das linhas 1233-1405 do app.js pré-obra (commit dd64a35).
-// Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.logistica = function () {
   return {
@@ -236,18 +234,31 @@ window.PAINEL_MODULES.logistica = function () {
         this.logisticaSaving = false;
       }
     },
-    async logisticaFalhou(d) {
-      const who = d.customer_name || 'este pedido';
-      const reason = window.prompt(`Marcar a entrega de ${who} como NÃO entregue?\n\nEscreva o motivo (o pedido é cancelado e o pneu VOLTA pro galpão):`);
-      if (reason === null) return;
+    logisticaFalhou(d) {
+      this.logisticaDialog = { open: true, kind: 'delivery-failure', delivery: d, reason: '' };
+      this.$nextTick(() => this.$refs.logisticaDialogReason?.focus());
+    },
+    fecharLogisticaDialog() {
+      this.logisticaDialog = { open: false, kind: null, delivery: null, reason: '' };
+    },
+    async confirmarLogisticaDialog() {
+      const dialog = this.logisticaDialog;
+      if (!dialog?.open || !dialog.delivery) return;
+      const reason = String(dialog.reason || '').trim();
+      if (!reason) {
+        this.logisticaMsg = { ok: false, text: 'Informe o motivo antes de confirmar.' };
+        return;
+      }
+      this.fecharLogisticaDialog();
       this.logisticaSaving = true;
       try {
         await this.apiPost('/admin/api/logistica/entregas/falhou', {
-          order_id: d.order_id,
-          reason: reason.trim() || null,
+          order_id: dialog.delivery.order_id,
+          reason,
         });
         this.logisticaMsg = { ok: true, text: 'Marcado como não entregue — pedido cancelado e galpão recomposto.' };
         await this.loadLogistica();
+        void this.loadSino();
       } catch (err) {
         this.logisticaMsg = { ok: false, text: `Não consegui marcar (${err.message}).` };
       } finally {
@@ -286,5 +297,4 @@ window.PAINEL_MODULES.logistica = function () {
       if (dt === this.hojeISO()) return 'bg-blue-50 text-blue-700';
       return 'bg-amber-50 text-amber-700';
     },
-  };
-};
+  }; };

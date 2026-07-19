@@ -2338,7 +2338,7 @@
           </button>
         </div>
 
-        <section x-show="!(logisticaTab === 'rotas' && logisticaRotaSelecionada()) && logistica?.receipt_approval && receiptReviewQueue().length" class="bg-white border border-amber-200 rounded-xl overflow-hidden shadow-sm">
+        <section x-show="adminUser?.role === 'owner' && !(logisticaTab === 'rotas' && logisticaRotaSelecionada()) && logistica?.receipt_approval && receiptReviewQueue().length" class="bg-white border border-amber-200 rounded-xl overflow-hidden shadow-sm">
           <div class="p-5 border-b border-amber-100 bg-amber-50/60 flex items-start justify-between gap-4">
             <div><h2 class="text-base font-semibold text-amber-950">Comprovantes aguardando sua aprovação</h2><p class="text-xs text-amber-800 mt-1">A IA só sugere. Revise os campos e confirme; antes disso, nenhum valor entra no Financeiro.</p></div>
             <span class="rounded-full bg-white border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-800" x-text="receiptReviewQueue().length"></span>
@@ -2682,6 +2682,15 @@
                   <p x-show="rotaResultado(logisticaRotaSelecionada()).semCusto" class="mt-1" x-text="rotaResultado(logisticaRotaSelecionada()).semCusto + ' item(ns) sem custo congelado.'"></p>
                   <p x-show="rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes.length" class="mt-1" x-text="rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes.length + ' comprovante(s) aguardando leitura ou revisão.'"></p>
                   <p x-show="rotaResultado(logisticaRotaSelecionada()).fuelPending" class="mt-1 font-semibold">Gasolina anotada sem comprovante aprovado: este resultado está incompleto.</p>
+                  <div x-show="rotaResultado(logisticaRotaSelecionada()).financialStatus === 'divergent'" class="mt-2 rounded-md border border-rose-200 bg-white/70 p-2 text-rose-800">
+                    <p class="font-semibold">Valor anotado e comprovante aprovado divergem.</p>
+                    <p class="mt-1" x-text="'Anotado: ' + formatCurrency(Number(logisticaRotaSelecionada().fuel_spent || 0)) + ' · oficial: ' + formatCurrency(rotaResultado(logisticaRotaSelecionada()).approvedFuelAmount)"></p>
+                    <button x-show="adminUser?.role === 'owner'"
+                            @click="confirmarDivergenciaRota(logisticaRotaSelecionada())"
+                            :disabled="logisticaSaving"
+                            class="mt-2 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Confirmar valor oficial</button>
+                    <p x-show="adminUser?.role !== 'owner'" class="mt-1">Somente o proprietário pode confirmar.</p>
+                  </div>
                 </div>
               </aside>
             </div>
@@ -3782,6 +3791,18 @@
           <div x-show="colabDrawer === 'folha'" class="space-y-4">
             <div class="border border-gray-200 rounded-xl p-4 space-y-3 text-sm"><div class="flex justify-between"><span>Salário base</span><span x-text="formatCurrency(colabSelected.base_salary)"></span></div><div class="flex justify-between"><span>Comissão apurada</span><span x-text="formatCurrency(colabSelected.commission_amount)"></span></div><div class="flex justify-between text-emerald-700"><span>Adições</span><span x-text="'+ '+formatCurrency(colabSelected.additions)"></span></div><div class="flex justify-between text-rose-600"><span>Descontos</span><span x-text="'− '+formatCurrency(colabSelected.deductions)"></span></div><div class="border-t pt-3 flex justify-between font-semibold text-base"><span>Total a pagar</span><span class="text-emerald-700" x-text="formatCurrency(colabSelected.total_due)"></span></div></div>
             <div class="border border-gray-200 rounded-xl p-4"><p class="text-xs text-gray-500">Regra da comissão</p><p class="font-semibold mt-1" x-text="colabCommissionLabel(colabSelected)"></p><div class="grid grid-cols-3 gap-2 text-center mt-4"><div><p class="font-semibold" x-text="colabSelected.sales_count"></p><p class="text-[10px] text-gray-500">vendas</p></div><div><p class="font-semibold" x-text="colabSelected.deliveries_count"></p><p class="text-[10px] text-gray-500">entregas</p></div><div><p class="font-semibold" x-text="colabSelected.trips_count"></p><p class="text-[10px] text-gray-500">rotas</p></div></div></div>
+            <div x-show="colabSelectedAdjustments.length" class="border border-gray-200 rounded-xl overflow-hidden">
+              <div class="px-4 py-3 bg-gray-50 border-b border-gray-100"><p class="font-medium text-sm">Ajustes desta competência</p><p class="text-xs text-gray-500 mt-0.5">A origem causal é preservada; folhas antigas nunca são reescritas.</p></div>
+              <template x-for="adjustment in colabSelectedAdjustments" :key="adjustment.id">
+                <div class="p-4 border-b border-gray-100 last:border-b-0 text-sm">
+                  <div class="flex items-start justify-between gap-3"><div><p class="font-medium" x-text="adjustment.description"></p><p class="text-xs text-gray-500 mt-0.5" x-text="colabAdjustmentOrigin(adjustment)"></p></div><span class="font-semibold" :class="adjustment.kind === 'deduction' ? 'text-rose-600' : 'text-emerald-700'" x-text="adjustment.amount == null ? 'revisar' : formatCurrency(adjustment.amount)"></span></div>
+                  <div x-show="adjustment.causal_status === 'needs_review'" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p class="text-xs text-amber-900 mb-2">O valor original não pôde ser determinado com segurança. A folha fica bloqueada até a revisão owner.</p>
+                    <div class="flex gap-2"><input x-model="adjustment.review_amount" inputmode="decimal" placeholder="Valor correto" class="min-w-0 flex-1 border border-amber-200 rounded-lg px-3 py-2 text-sm"><button @click="colabRevisarAjusteCausal(adjustment)" :disabled="colabSaving" class="rounded-lg bg-amber-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">Confirmar valor</button></div>
+                  </div>
+                </div>
+              </template>
+            </div>
             <div x-show="colabSummary.payroll_period_status === 'preview'" class="border border-gray-200 rounded-xl p-4 space-y-3"><p class="font-medium text-sm">Adicionar bônus ou desconto</p><select x-model="colabAjusteForm.kind" class="w-full border rounded-lg px-3 py-2 text-sm bg-white"><option value="addition">Adição / bônus</option><option value="deduction">Desconto / adiantamento</option></select><input x-model="colabAjusteForm.description" placeholder="Motivo" class="w-full border rounded-lg px-3 py-2 text-sm"><input x-model="colabAjusteForm.amount" inputmode="decimal" placeholder="Valor" class="w-full border rounded-lg px-3 py-2 text-sm"><button @click="colabAdicionarAjuste()" class="w-full border border-emerald-700 text-emerald-700 rounded-lg py-2 text-sm font-medium">Incluir ajuste</button></div>
             <button x-show="colabSelected.payroll_status === 'pending'" @click="colabPagar(colabSelected)" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Marcar como pago</button>
             <p x-show="colabSelected.payroll_status === 'paid'" class="text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3 text-center">Pagamento conciliado com o Financeiro.</p>
@@ -4655,6 +4676,42 @@
 <!-- ═══════════════════════════════════════════════
      MODAL: Candidaturas a parceiro (Etapa 3)
      ═══════════════════════════════════════════════ -->
+<div x-show="logisticaDialog.open" x-cloak
+     @keydown.escape.window="fecharLogisticaDialog()"
+     @click.self="fecharLogisticaDialog()"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+     role="dialog" aria-modal="true" aria-labelledby="logistica-dialog-title"
+     style="display:none;">
+  <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-100">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div>
+        <h3 id="logistica-dialog-title" class="font-semibold">Confirmar não-entregue</h3>
+        <p class="text-xs text-gray-500 mt-1">O pedido será cancelado e o estoque voltará ao galpão.</p>
+      </div>
+      <button @click="fecharLogisticaDialog()" class="p-2 hover:bg-gray-100 rounded-lg" aria-label="Fechar diálogo">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="rounded-lg bg-amber-50 border border-amber-100 p-3 text-sm text-amber-900"
+           x-text="logisticaDialog?.delivery?.customer_name || 'Pedido selecionado'"></div>
+      <div>
+        <label for="logistica-dialog-reason" class="text-xs font-medium text-gray-700 block mb-1">Motivo *</label>
+        <textarea id="logistica-dialog-reason" x-ref="logisticaDialogReason"
+                  x-model="logisticaDialog.reason" maxlength="500" rows="4"
+                  class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700"
+                  placeholder="Ex.: cliente ausente, endereço incorreto"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button @click="fecharLogisticaDialog()" class="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm">Voltar</button>
+        <button @click="confirmarLogisticaDialog()"
+                :disabled="logisticaSaving || !String(logisticaDialog?.reason || '').trim()"
+                class="flex-1 px-4 py-2.5 bg-rose-600 text-white rounded-lg text-sm font-semibold disabled:opacity-40">Confirmar cancelamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div x-show="applicationsModalOpen" x-cloak
      @keydown.escape.window="applicationsModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
