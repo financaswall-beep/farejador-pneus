@@ -11,6 +11,26 @@
   no CI. O aplicador genérico recusa SQL fora de `db/migrations` ou manifesto
   divergente.
 
+### Replay completo em PostgreSQL vazio
+
+Os SQL históricos continuam imutáveis. Para reconstruir um PostgreSQL 17 vazio,
+use o replay oficial, que valida o manifesto e aplica em memória somente as três
+compatibilidades históricas documentadas (`0020`, `0083` e `0101`):
+
+```powershell
+$env:DATABASE_URL='postgresql://postgres:senha@127.0.0.1:5432/farejador'
+$env:DATABASE_SSL='false'
+npm run replay:migrations -- --bootstrap-local --commit
+```
+
+- sem `--commit`, todo o replay é validado e revertido;
+- o executor usa uma única transação externa e neutraliza somente os wrappers
+  históricos `BEGIN;`/`COMMIT;`, impedindo confirmação parcial no `DRY-RUN`;
+- `--bootstrap-local` cria apenas os pré-requisitos do PostgreSQL descartável e
+  é recusado quando o host não é loopback;
+- o alvo é recusado se os schemas do Farejador ou o domínio `env_t` já existem;
+- o comando nunca altera os arquivos SQL nem `manifest.sha256`.
+
 Ordem de execução:
 
 1. `0001_init_schemas.sql` — extensions (pgcrypto, pg_trgm, btree_gin), schemas (raw/core/analytics/ops), domínio `env_t`
