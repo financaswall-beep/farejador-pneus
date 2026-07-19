@@ -26,8 +26,8 @@
 <script src="/admin/painel/app.logistica.resultado.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
-<script src="/admin/painel/app.colaboradores.js?v=20260715-colab2"></script>
-<script src="/admin/painel/app.colaboradores.gestao.js?v=20260716-etapa5"></script>
+<script src="/admin/painel/app.colaboradores.js?v=20260719-colab-dialog1"></script>
+<script src="/admin/painel/app.colaboradores.gestao.js?v=20260719-colab-dialog1"></script>
 <script src="/admin/painel/app.sino.js?v=20260717-etapa8"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260717-etapa8"></script>
@@ -45,7 +45,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.montagem.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.js?v=20260718-etapa9"></script>
+<script src="/admin/painel/app.js?v=20260719-colab-dialog1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -3553,6 +3553,23 @@
              :class="colabMsg && colabMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
              x-text="colabMsg ? colabMsg.text : ''"></div>
 
+        <div x-show="colabLoading" role="status"
+             class="flex min-h-40 items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-600">
+          <span class="h-5 w-5 animate-spin rounded-full border-2 border-emerald-700 border-t-transparent" aria-hidden="true"></span>
+          <span>Carregando equipe e folha…</span>
+        </div>
+
+        <div x-show="!colabLoading && colabLoadError" role="alert"
+             class="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+          <p class="font-medium" x-text="colabLoadError"></p>
+          <button @click="loadColaboradores()" type="button"
+                  class="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+            Tentar novamente
+          </button>
+        </div>
+
+        <div x-show="!colabLoading && !colabLoadError && colabLoaded" class="space-y-4">
+
         <div x-show="colabTab === 'equipe'" class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-4 flex items-center gap-3 text-sm text-gray-600">
           <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <i data-lucide="bike" class="w-5 h-5 text-emerald-800"></i>
@@ -3752,6 +3769,7 @@
           <p class="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-4 py-3">Resultados operacionais; valores de pagamento ficam exclusivamente na Folha. Vendas passam a ser atribuídas automaticamente ao colaborador logado que as registra.</p>
         </div>
         </div>
+        </div>
       </div>
 
       <!-- DRAWER contextual: perfil, remuneração, regra de comissão ou memória da folha -->
@@ -3809,6 +3827,55 @@
           </div>
         </div></template>
       </aside>
+
+      <!-- MODAL: confirmações de acesso e folha sem diálogos nativos do navegador -->
+      <div x-show="colabDialog.open" x-cloak style="display: none;"
+           @keydown.escape.window="fecharColabDialog()" @click.self="fecharColabDialog()"
+           class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/45 p-4"
+           role="dialog" aria-modal="true" aria-labelledby="colab-dialog-title">
+        <form @submit.prevent="confirmarColabDialog()"
+              class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 id="colab-dialog-title" class="text-lg font-semibold text-gray-900" x-text="colabDialogTitle()"></h3>
+              <p class="mt-2 text-sm leading-6 text-gray-600" x-text="colabDialogDescription()"></p>
+            </div>
+            <button @click="fecharColabDialog()" :disabled="colabSaving" type="button" aria-label="Fechar diálogo"
+                    class="rounded-lg px-2 py-1 text-xl leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">×</button>
+          </div>
+
+          <div x-show="colabDialog.kind === 'password'" class="mt-5">
+            <label for="colab-dialog-password" class="text-xs font-medium text-gray-700">Nova senha</label>
+            <div class="relative mt-1.5">
+              <input id="colab-dialog-password" x-ref="colabDialogPassword"
+                     :type="colabDialog.showPassword ? 'text' : 'password'"
+                     x-model="colabDialog.password" minlength="12" autocomplete="new-password"
+                     class="w-full rounded-lg border border-gray-200 px-3 py-2.5 pr-20 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                     placeholder="Mínimo de 12 caracteres">
+              <button @click="colabDialog.showPassword = !colabDialog.showPassword" type="button"
+                      class="absolute inset-y-0 right-0 px-3 text-xs font-medium text-emerald-700"
+                      x-text="colabDialog.showPassword ? 'Ocultar' : 'Mostrar'"></button>
+            </div>
+          </div>
+
+          <p x-show="colabDialog.error" role="alert"
+             class="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+             x-text="colabDialog.error"></p>
+
+          <div class="mt-6 flex justify-end gap-3">
+            <button @click="fecharColabDialog()" :disabled="colabSaving" type="button"
+                    class="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+              Voltar
+            </button>
+            <button :disabled="colabSaving" type="submit"
+                    :class="colabDialog.kind === 'revoke' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-700 hover:bg-emerald-800'"
+                    class="min-w-36 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50">
+              <span x-show="!colabSaving" x-text="colabDialogConfirmLabel()"></span>
+              <span x-show="colabSaving">Processando…</span>
+            </button>
+          </div>
+        </form>
+      </div>
 
       <!-- DRAWER: novo colaborador (painel lateral direito, como no desenho) -->
       <div x-show="colabShowForm" x-cloak @click="colabShowForm = false" class="fixed inset-0 bg-black/10 z-40"></div>
