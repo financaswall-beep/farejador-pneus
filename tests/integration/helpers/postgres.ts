@@ -1,4 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
@@ -6,6 +7,10 @@ import { Pool } from 'pg';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(HERE, '..', '..', '..', 'db', 'migrations');
+const require = createRequire(import.meta.url);
+const { patchKnownMigrationIssues } = require('../../../scripts/migration-compat.cjs') as {
+  patchKnownMigrationIssues: (file: string, sql: string) => { sql: string };
+};
 
 export interface IntegrationDb {
   container: StartedPostgreSqlContainer;
@@ -76,7 +81,7 @@ async function applyMigrations(pool: Pool, throughMigration?: string): Promise<v
 
     for (const file of files) {
       const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
-      const sql = patchKnownIssues(file, raw);
+      const sql = patchKnownMigrationIssues(file, raw).sql;
       try {
         await client.query(sql);
       } catch (error) {
@@ -93,7 +98,7 @@ async function applyMigrations(pool: Pool, throughMigration?: string): Promise<v
 export async function applyMigrationFile(pool: Pool, file: string): Promise<void> {
   if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(file)) throw new Error('invalid_migration_file');
   const raw = await readFile(join(MIGRATIONS_DIR, file), 'utf-8');
-  await pool.query(patchKnownIssues(file, raw));
+  await pool.query(patchKnownMigrationIssues(file, raw).sql);
 }
 
 /**
@@ -102,43 +107,4 @@ export async function applyMigrationFile(pool: Pool, file: string): Promise<void
  */
 export function buildRestrictedConnectionString(connectionString: string): string {
   return connectionString.replace(/\/\/test:test@/, '//farejador_partner_app:test@');
-}
-
-/**
- * Patches in-memory de migrations existentes que nao compilam em Postgres 17
- * fresh. Nao toca em arquivo fonte — apenas adapta no carregamento dos testes.
- *
- * Item conhecido: 0020 declara `position TEXT` dentro de `RETURNS TABLE` na
- * function `commerce.find_compatible_tires`. `position` e palavra-chave em
- * contexto de declaracao de TABLE em Postgres 16+ — exige aspas duplas.
- * A 0025 ja recria essa function com `fitment_position`, entao em prod tudo
- * funciona. Mas pra subir banco fresh em CI/dev a 0020 precisa parsear.
- *
- * Correcao adequada seria editar a 0020 ou criar migration nova. Como esta
- * fora do escopo Portal Parceiro (auditoria 2026-05-21), patcheamos so aqui.
- */
-function patchKnownIssues(file: string, sql: string): string {
-  if (file === '0020_vehicle_fitment_validation.sql') {
-    return sql
-      .replace(/^(\s*)position(\s+)TEXT,$/m, '$1"position"$2TEXT,')
-      .replace(/^(\s*)f\.position,$/gm, '$1f."position",')
-      .replace(/f\.position\s*=\s*p_position/g, 'f."position" = p_position')
-      .replace(/f\.position\s*=\s*'both'/g, 'f."position" = \'both\'')
-      .replace(/(GROUP BY[^;]*?)f\.position,/g, '$1f."position",');
-  }
-  if (file === '0083_network_unit_coverage_and_token_role.sql') {
-    return sql.replace(
-      /INSERT INTO network\.unit_coverage \(environment, unit_id, municipio\)\s+VALUES \('prod', '36203e18-c3fb-4201-bca1-b15c605faa37', 'itaborai'\)\s+ON CONFLICT \(environment, unit_id, municipio\) DO NOTHING;/,
-      `INSERT INTO network.unit_coverage (environment, unit_id, municipio)
-       SELECT 'prod', '36203e18-c3fb-4201-bca1-b15c605faa37'::uuid, 'itaborai'
-        WHERE EXISTS (SELECT 1 FROM core.units WHERE id='36203e18-c3fb-4201-bca1-b15c605faa37'::uuid)
-       ON CONFLICT (environment, unit_id, municipio) DO NOTHING;`,
-    );
-  }
-  if (file === '0101_drop_organizadora_dead_tables.sql') {
-    // Em prod o drop foi precedido por checagens operacionais. No banco fresh,
-    // views históricas ainda dependem da tabela e não fazem parte deste teste.
-    return sql.replace('DROP TABLE IF EXISTS ops.agent_incidents;', '-- preservada no banco efemero');
-  }
-  return sql;
 }
