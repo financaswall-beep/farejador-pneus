@@ -50,6 +50,15 @@ async function main(): Promise<void> {
 
   try {
     // ── setup ──
+    // Etapa 5: a venda valida a medida contra o CATÁLOGO (measure_not_in_catalog) —
+    // a medida descartável precisa de tire_specs, ancorada num produto (molde da
+    // prova-financeiro-visao).
+    const prod = await client.query<{ id: string }>(`SELECT id FROM commerce.products WHERE environment=$1 LIMIT 1`, [ENV]);
+    if (!prod.rows[0]) throw new Error('sem produto no env test pra ancorar o tire_specs');
+    await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND tire_size=$2`, [ENV, MEASURE]);
+    await client.query(
+      `INSERT INTO commerce.tire_specs (environment, product_id, tire_size, width_mm, aspect_ratio, rim_diameter)
+       VALUES ($1,$2,$3,97,97,97)`, [ENV, prod.rows[0].id, MEASURE]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     await client.query(
       `INSERT INTO commerce.wholesale_stock (environment, measure, quantity_on_hand, unit_cost) VALUES ($1,$2,30,10)`, [ENV, MEASURE]);
@@ -139,6 +148,7 @@ async function main(): Promise<void> {
     await client.query(`DELETE FROM commerce.wholesale_orders WHERE environment=$1 AND created_by=$2`, [ENV, CREATED_BY]);
     if (buyerId) await client.query(`DELETE FROM commerce.wholesale_customers WHERE id=$1`, [buyerId]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND tire_size=$2`, [ENV, MEASURE]);
     client.release();
     await pool.end();
   }

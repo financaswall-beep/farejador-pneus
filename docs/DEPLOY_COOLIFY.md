@@ -183,33 +183,33 @@ Faça esta etapa somente depois de:
 
 Antes de começar a receber webhooks, o schema do Farejador deve existir no banco.
 
-As migrations estão em `db/migrations/` como arquivos `.sql` e devem ser executados na ordem:
+As migrations estão em `db/migrations/` como arquivos `.sql`, conferidos byte a byte
+pelo manifesto (`manifest.sha256`). Para um banco **novo e vazio**, o replay aplica
+todas na ordem certa — não aplique arquivo a arquivo na mão.
 
-1. `0001_init_schemas.sql`
-2. `0002_raw_layer.sql`
-3. `0003_core_layer.sql`
-4. `0004_analytics_layer.sql`
-5. `0005_ops_layer.sql`
-6. `0006_concurrency_guards.sql`
+### Como aplicar (banco novo)
 
-### Como aplicar
-
-1. Acesse o banco Postgres (via terminal do container `postgres` do Chatwoot, ou via SQL Editor do Supabase).
-2. Execute cada arquivo SQL na ordem numérica. Exemplo via `psql`:
+1. Confira a integridade dos arquivos:
    ```bash
-   psql $DATABASE_URL -f db/migrations/0001_init_schemas.sql
-   psql $DATABASE_URL -f db/migrations/0002_raw_layer.sql
-   psql $DATABASE_URL -f db/migrations/0003_core_layer.sql
-   psql $DATABASE_URL -f db/migrations/0004_analytics_layer.sql
-   psql $DATABASE_URL -f db/migrations/0005_ops_layer.sql
-   psql $DATABASE_URL -f db/migrations/0006_concurrency_guards.sql
+   npm run check:migrations
+   ```
+2. Ensaie o replay (roda tudo e desfaz no final — nada é gravado):
+   ```bash
+   DATABASE_URL=postgresql://... npm run replay:migrations
+   ```
+3. Se o ensaio terminou com `OK`, aplique de verdade:
+   ```bash
+   DATABASE_URL=postgresql://... npm run replay:migrations -- --commit
    ```
 
-3. Verifique se os schemas foram criados:
-   ```sql
-   \dn
-   ```
-   Deve listar: `raw`, `core`, `analytics`, `ops`.
+Notas:
+- O replay **recusa banco que não esteja vazio** (proteção contra rodar no lugar errado).
+  Para atualizar um banco que já existe, aplique apenas as migrations novas, na ordem,
+  pelo processo normal do projeto (apply_migration).
+- Em Postgres puro sem `pg_cron`/roles do projeto (fora do Supabase), use
+  `--bootstrap-local` — aceito somente em loopback (127.0.0.1).
+- Verifique os schemas ao final (`\dn` no psql): deve listar `raw`, `core`,
+  `analytics`, `ops`, `commerce`, `agent`, `network`, `finance`, `audit`.
 
 > **Importante:** O banco deve ter os schemas criados antes do primeiro webhook. Se estiver usando o mesmo Postgres do Chatwoot com database separado, execute as migrations no database do Farejador.
 

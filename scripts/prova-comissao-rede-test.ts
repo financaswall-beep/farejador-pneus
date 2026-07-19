@@ -83,7 +83,14 @@ async function main(): Promise<void> {
     await client.query(
       `UPDATE network.partners SET commercial_model='commission', commission_percent=10, monthly_fee=NULL WHERE id=$1 AND environment=$2`,
       [partnerId, ENV]);
-    check('setup: fake-rede-a com ficha comissão 10%', true);
+    // Estádio limpo: rodada anterior pode ter deixado vendas fake ABERTAS (a faxina
+    // não pode mais apagar lançamento — 0139 é imutável; ela CANCELA). Cancelar aqui
+    // qualquer sobra etiquetada garante o ledger zerado pro fantoche antes dos checks.
+    await client.query(
+      `UPDATE commerce.partner_orders SET status='cancelled', updated_at=now()
+        WHERE environment=$1 AND unit_id=$2 AND status<>'cancelled'
+          AND customer_name LIKE 'PROVA-COMISSAO-%'`, [ENV, unitId]);
+    check('setup: fake-rede-a com ficha comissão 10% (sobras de prova canceladas)', true);
 
     // pedidos: o1 2W pickup realizada · o2 PORTA realizada · o3 2W entrega pendente ·
     //          o4 2W cancelada · o5 2W retirada aguardando
@@ -146,12 +153,24 @@ async function main(): Promise<void> {
       mine !== undefined && mine.open_count === 4 && Number(mine.open_total) === 110, JSON.stringify(mine));
 
     // 6. Recebi: quita os 4 → nada mais em aberto; quitar de novo barra
-    const settled = await settleCommissionEntries({ partner_id: partnerId, settled_by: 'prova-comissao', environment: ENV }, pool);
+    // (stage5: idempotency_key obrigatória; o 6b usa chave DIFERENTE de propósito —
+    //  repetir a MESMA chave seria replay e devolveria o resultado antigo, não o erro)
+    const settled = await settleCommissionEntries(
+      { partner_id: partnerId, settled_by: 'prova-comissao', environment: ENV,
+        idempotency_key: TAG + '-settle-1', reason: 'prova: recebimento em maos' }, pool);
     check('6 Recebi: 4 quitados somando 110,00', settled.settled_count === 4 && Number(settled.settled_total) === 110);
     let barrou = false;
-    try { await settleCommissionEntries({ partner_id: partnerId, settled_by: 'prova', environment: ENV }, pool); }
-    catch (err) { barrou = (err as Error).message === 'nothing_open'; }
+    try {
+      await settleCommissionEntries(
+        { partner_id: partnerId, settled_by: 'prova', environment: ENV,
+          idempotency_key: TAG + '-settle-2', reason: 'prova: repeticao' }, pool);
+    } catch (err) { barrou = (err as Error).message === 'nothing_open'; }
     check('6b quitar sem nada em aberto → barra (nothing_open)', barrou);
+    const replayed = await settleCommissionEntries(
+      { partner_id: partnerId, settled_by: 'prova-comissao', environment: ENV,
+        idempotency_key: TAG + '-settle-1', reason: 'prova: recebimento em maos' }, pool);
+    check('6c repetir a MESMA chave → replay devolve o resultado gravado (não quita de novo)',
+      replayed.replayed === true && replayed.settled_count === 4 && Number(replayed.settled_total) === 110);
 
     // 7. venda cancela DEPOIS de paga → estorna com a trilha do pagamento preservada
     await client.query(`UPDATE commerce.partner_orders SET status='cancelled' WHERE environment=$1 AND id=$2`, [ENV, orderIds.o1]);
@@ -163,15 +182,15 @@ async function main(): Promise<void> {
     // 8. editor de termos: valida, grava e deixa trilha na auditoria
     let invalidou = false;
     try {
-      await updatePartnerCommercialTerms({ partner_id: partnerId, commercial_model: 'commission', commission_percent: 150, monthly_fee: null, actor_label: 'prova', environment: ENV }, pool);
+      await updatePartnerCommercialTerms({ partner_id: partnerId, commercial_model: 'commission', commission_percent: 150, monthly_fee: null, actor_label: 'prova', idempotency_key: TAG + '-terms-1', environment: ENV }, pool);
     } catch (err) { invalidou = (err as Error).message === 'invalid_percent'; }
     check('8 editor: % acima de 100 barra', invalidou);
     let naoachou = false;
     try {
-      await updatePartnerCommercialTerms({ partner_id: '00000000-0000-0000-0000-000000000000', commercial_model: 'commission', commission_percent: 10, monthly_fee: null, actor_label: 'prova', environment: ENV }, pool);
+      await updatePartnerCommercialTerms({ partner_id: '00000000-0000-0000-0000-000000000000', commercial_model: 'commission', commission_percent: 10, monthly_fee: null, actor_label: 'prova', idempotency_key: TAG + '-terms-2', environment: ENV }, pool);
     } catch (err) { naoachou = (err as Error).message === 'partner_not_found'; }
     check('8b editor: parceiro inexistente barra', naoachou);
-    await updatePartnerCommercialTerms({ partner_id: partnerId, commercial_model: 'hybrid', commission_percent: 12.5, monthly_fee: 250, actor_label: 'prova-comissao', environment: ENV }, pool);
+    await updatePartnerCommercialTerms({ partner_id: partnerId, commercial_model: 'hybrid', commission_percent: 12.5, monthly_fee: 250, actor_label: 'prova-comissao', idempotency_key: TAG + '-terms-3', environment: ENV }, pool);
     const after = await client.query(
       `SELECT commercial_model, commission_percent, monthly_fee FROM network.partners WHERE id=$1 AND environment=$2`, [partnerId, ENV]);
     const audit = await client.query(
@@ -181,20 +200,30 @@ async function main(): Promise<void> {
       after.rows[0]?.commercial_model === 'hybrid' && Number(after.rows[0]?.commission_percent) === 12.5
         && Number(after.rows[0]?.monthly_fee) === 250 && audit.rows[0].n >= 1);
   } finally {
-    try {
-      const ids = Object.values(orderIds);
-      if (ids.length) {
-        await client.query(`DELETE FROM network.commission_entries WHERE environment=$1 AND partner_order_id = ANY($2)`, [ENV, ids]);
-        await client.query(`DELETE FROM commerce.partner_orders WHERE environment=$1 AND id = ANY($2)`, [ENV, ids]);
-      }
-      if (partnerId && savedTerms) {
+    // Faxina pós-0139: lançamento de comissão é IMUTÁVEL (DELETE barrado) e a FK
+    // causal impede apagar a venda que tem lançamento. O caminho legítimo é CANCELAR
+    // as vendas fake — o trigger estorna sozinho; fica resíduo inerte etiquetado TAG.
+    // Blocos independentes: a ficha restaura SEMPRE, mesmo se o cancelamento falhar.
+    if (partnerId && savedTerms) {
+      try {
         await client.query(
           `UPDATE network.partners SET commercial_model=$3, commission_percent=$4, monthly_fee=$5 WHERE id=$1 AND environment=$2`,
           [partnerId, ENV, savedTerms.commercial_model, savedTerms.commission_percent, savedTerms.monthly_fee]);
+        console.log('  (ficha do fantoche restaurada)');
+      } catch (e) {
+        console.log('  ⚠️ restauração da ficha falhou:', (e as Error).message);
       }
-      console.log('  (faxina ok — pedidos, lançamentos e ficha restaurados)');
+    }
+    try {
+      const ids = Object.values(orderIds);
+      if (ids.length) {
+        await client.query(
+          `UPDATE commerce.partner_orders SET status='cancelled', updated_at=now()
+            WHERE environment=$1 AND id = ANY($2) AND status<>'cancelled'`, [ENV, ids]);
+      }
+      console.log('  (faxina ok — vendas fake canceladas; lançamentos estornados pelo trigger, trilha preservada)');
     } catch (e) {
-      console.log('  ⚠️ faxina falhou (limpar na mão por TAG=' + TAG + '):', (e as Error).message);
+      console.log('  ⚠️ faxina falhou (cancelar na mão por TAG=' + TAG + '):', (e as Error).message);
     }
     client.release();
     await pool.end();

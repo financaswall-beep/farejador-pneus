@@ -51,7 +51,9 @@ async function main(): Promise<void> {
   const client = await pool.connect();
   let fails = 0;
   let buyerId = '';
-  let comissaoId = '';
+  let comissaoOrderId = '';
+  let comissaoPartnerId = '';
+  let comissaoSavedTerms: { commercial_model: string; commission_percent: string | null; monthly_fee: string | null } | null = null;
   let mainUnitId = '';
   let productId = '';
   let contactId = '';
@@ -171,19 +173,33 @@ async function main(): Promise<void> {
       v.indicadores.fiado_aberto_pct !== null && v.indicadores.fiado_aberto_pct > 0,
       String(v.indicadores.fiado_aberto_pct));
 
-    // ── V5: lançamento de COMISSÃO em aberto (seed direto; a visão SÓ LÊ o livro) ──
+    // ── V5: lançamento de COMISSÃO em aberto. Pós-0139 o livro é CAUSAL: a FK
+    //    recusa lançamento sem venda de verdade — então a prova cria uma venda 2W
+    //    realizada no fantoche fake-rede-a (ficha 10%) e o TRIGGER cria o lançamento
+    //    de R$100 sozinho (10% de 1000). A visão continua SÓ LENDO o livro. ──
     const pu = await client.query<{ partner_id: string; unit_id: string }>(
       `SELECT pu.partner_id, pu.unit_id FROM network.partner_units pu
+        JOIN core.units u ON u.id = pu.unit_id AND u.environment = pu.environment
         JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
-       WHERE pu.environment = $1 AND pu.deleted_at IS NULL AND p.deleted_at IS NULL LIMIT 1`, [ENV]);
-    if (!pu.rows[0]) throw new Error('sem parceiro no env test pro seed de comissão');
+       WHERE pu.environment = $1 AND u.slug = 'fake-rede-a'
+         AND pu.deleted_at IS NULL AND p.deleted_at IS NULL LIMIT 1`, [ENV]);
+    if (!pu.rows[0]) throw new Error('fake-rede-a sem partner_unit no env test');
+    comissaoPartnerId = pu.rows[0].partner_id;
+    const termsBefore = await client.query<{ commercial_model: string; commission_percent: string | null; monthly_fee: string | null }>(
+      `SELECT commercial_model, commission_percent, monthly_fee FROM network.partners WHERE id=$1 AND environment=$2`,
+      [comissaoPartnerId, ENV]);
+    comissaoSavedTerms = termsBefore.rows[0] ?? null;
+    await client.query(
+      `UPDATE network.partners SET commercial_model='commission', commission_percent=10, monthly_fee=NULL
+        WHERE id=$1 AND environment=$2`, [comissaoPartnerId, ENV]);
     const ce = await client.query<{ id: string }>(
-      `INSERT INTO network.commission_entries
-         (environment, partner_id, partner_unit_id, unit_id, partner_order_id,
-          order_total, commission_percent, commission_amount, status, realized_at)
-       VALUES ($1, $2, NULL, $3, gen_random_uuid(), 1000, 10, 100, 'open', now())
-       RETURNING id`, [ENV, pu.rows[0].partner_id, pu.rows[0].unit_id]);
-    comissaoId = ce.rows[0]!.id;
+      `INSERT INTO commerce.partner_orders
+         (environment, unit_id, total_amount, status, fulfillment_mode, source_tag,
+          customer_name, idempotency_key, delivery_status, awaiting_pickup)
+       VALUES ($1, $2, 1000, 'confirmed', 'pickup', '2w',
+               'PROVA-COMISSAO-VISAO', $3, 'pending', false)
+       RETURNING id`, [ENV, pu.rows[0].unit_id, RUN_ID + '-2w']);
+    comissaoOrderId = ce.rows[0]!.id;
     v = await getMatrizFinanceiroVisao(ENV, pool);
     const recCom = v.a_receber.itens.find((x) => x.tipo === 'comissao' && x.id === pu.rows[0]!.partner_id);
     check('V5 comissão em aberto soma no A RECEBER (+100 = fiado 100 + comissão 100)',
@@ -267,7 +283,22 @@ async function main(): Promise<void> {
     await client.query(`DELETE FROM audit.events WHERE environment=$1 AND actor_label=$2`, [ENV, CREATED_BY]);
     await client.query(`DELETE FROM audit.operation_idempotency
       WHERE environment=$1 AND idempotency_key LIKE $2`, [ENV, `${RUN_ID}%`]);
-    if (comissaoId) await client.query(`DELETE FROM network.commission_entries WHERE id=$1`, [comissaoId]);
+    // Comissão pós-0139: lançamento imutável e FK causal segura a venda — o caminho
+    // legítimo é CANCELAR a venda fake (o trigger estorna; resíduo inerte etiquetado).
+    // Ficha do fantoche restaurada antes de qualquer outra limpeza.
+    if (comissaoSavedTerms && comissaoPartnerId) {
+      await client.query(
+        `UPDATE network.partners SET commercial_model=$3, commission_percent=$4, monthly_fee=$5
+          WHERE id=$1 AND environment=$2`,
+        [comissaoPartnerId, ENV, comissaoSavedTerms.commercial_model,
+         comissaoSavedTerms.commission_percent, comissaoSavedTerms.monthly_fee]).catch(() => undefined);
+    }
+    if (comissaoOrderId) {
+      await client.query(
+        `UPDATE commerce.partner_orders SET status='cancelled', updated_at=now()
+          WHERE environment=$1 AND id=$2 AND status<>'cancelled'`,
+        [ENV, comissaoOrderId]).catch(() => undefined);
+    }
     await client.query(
       `DELETE FROM commerce.wholesale_order_items WHERE environment=$1 AND order_id IN
          (SELECT id FROM commerce.wholesale_orders WHERE environment=$1 AND created_by=$2)`, [ENV, CREATED_BY]);

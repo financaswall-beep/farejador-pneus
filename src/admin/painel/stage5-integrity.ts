@@ -42,7 +42,9 @@ export interface IntegrityOperation {
 }
 
 function integrityOperationKey(operation: Pick<IntegrityOperation, 'idempotencyKey'>): string {
-  const key = operation.idempotencyKey.trim();
+  // Chamada programática sem a chave (prova/script velho) deve receber o erro de
+  // contrato, não um TypeError de undefined — o zod das rotas já barra antes por HTTP.
+  const key = (operation.idempotencyKey ?? '').trim();
   if (key.length < 8 || key.length > 200) throw new Error('idempotency_key_required');
   return key;
 }

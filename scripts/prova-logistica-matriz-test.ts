@@ -288,6 +288,8 @@ async function main(): Promise<void> {
       check('L10b retry da aprovação devolve a mesma decisão e a mesma despesa',
         replay1.decision_id === approved1.decision_id && replay1.expense_id === approved1.expense_id
         && (await despesasProva()) === antes + 1);
+      // Etapa 10: rota só fecha com as entregas resolvidas — entregar a da trip1.
+      await setMatrizDeliveryStatus({ order_id: oRota, status: 'delivered', environment: ENV }, transactionPool);
       const fech1 = await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080,
         fuel_spent: 187.3, environment: ENV }, transactionPool);
       const t1 = (await client.query(`SELECT status,km_end,fuel_spent,fuel_expense_id
@@ -298,13 +300,16 @@ async function main(): Promise<void> {
         && Number(t1.fuel_spent) === 187.3 && t1.fuel_expense_id === null
         && (await despesasProva()) === antes + 1);
 
-      let barrou2 = false;
-      try { await closeMatrizTrip({ trip_id: trip1.trip_id, environment: ENV }, transactionPool); }
-      catch (e) { barrou2 = (e as Error).message === 'trip_not_found'; }
-      check('L11 fechar rota 2x barrado (trip_not_found)', barrou2);
+      // Etapa 10: fechar rota JÁ FECHADA virou replay idempotente (devolve o mesmo
+      // resultado, sem efeito novo) — antes barrava com trip_not_found.
+      const fech1b = await closeMatrizTrip({ trip_id: trip1.trip_id, environment: ENV }, transactionPool);
+      check('L11 fechar rota 2x é idempotente (mesmo resultado, nenhuma despesa nova)',
+        fech1b.trip_id === trip1.trip_id && fech1b.fuel_expense_id === fech1.fuel_expense_id
+        && (await despesasProva()) === antes + 1);
 
+      const oTrip2 = await seedOrder({ unitId: mainUnitId });
       const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100,
-        order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV }, transactionPool);
+        order_ids: [oTrip2], environment: ENV }, transactionPool);
       tripIds.push(trip2.trip_id);
       const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id,
         bytes: fakeReceipt('RECIBO-2'), mime: 'image/jpeg', environment: ENV }, transactionPool);
@@ -316,6 +321,7 @@ async function main(): Promise<void> {
           summary: `cupom amassado ${runMarker}` } }, transactionPool);
       check('L12a unreadable fica para revisão e NÃO lança despesa',
         unread.workflow_status === 'review_required' && (await despesasProva()) === antes + 1);
+      await setMatrizDeliveryStatus({ order_id: oTrip2, status: 'delivered', environment: ENV }, transactionPool);
       const fech2 = await closeMatrizTrip({ trip_id: trip2.trip_id, km_end: 180,
         fuel_spent: 95.5, notes: runMarker, environment: ENV }, transactionPool);
       check('L12b fechamento sem aprovação só anota R$95,50 e NÃO lança despesa',
@@ -328,13 +334,15 @@ async function main(): Promise<void> {
         && rec.receipts[0]!.workflow_status === 'linked' && !!rec.receipts[0]!.decision
         && rec.deliveries_count === 1);
 
+      const oTrip3 = await seedOrder({ unitId: mainUnitId });
       const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG',
-        km_start: 200, order_ids: [await seedOrder({ unitId: mainUnitId })],
+        km_start: 200, order_ids: [oTrip3],
         environment: ENV }, transactionPool);
       tripIds.push(trip3.trip_id);
       const rec3 = await addMatrizTripReceipt({ trip_id: trip3.trip_id,
         bytes: fakeReceipt('RECIBO-3'), mime: 'image/jpeg', environment: ENV }, transactionPool);
       const antes3 = await despesasProva();
+      await setMatrizDeliveryStatus({ order_id: oTrip3, status: 'delivered', environment: ENV }, transactionPool);
       const fech3 = await closeMatrizTrip({ trip_id: trip3.trip_id, km_end: 260,
         fuel_spent: 120, notes: `${runMarker} fecha antes`, environment: ENV }, transactionPool);
       check('L14a fechar ANTES da leitura continua sem despesa automática',
@@ -364,6 +372,9 @@ async function main(): Promise<void> {
       await client.query('ROLLBACK');
     }
     // Mantém trip1 fechada para o guard L19, agora pelo contrato novo: só anotação.
+    // (o delivered de dentro da transação foi revertido no ROLLBACK — entregar de novo
+    //  no estado real, senão a trava da Etapa 10 barra este fechamento também)
+    await setMatrizDeliveryStatus({ order_id: oRota, status: 'delivered', environment: ENV });
     await closeMatrizTrip({ trip_id: trip1.trip_id, km_end: 45080,
       fuel_spent: 187.3, environment: ENV });
 
@@ -552,6 +563,14 @@ async function main(): Promise<void> {
       && new Set(numeradas.map((t) => t.trip_number)).size === numeradas.length,
       numeradas.map((t) => t.trip_number).join(' '));
 
+    // Etapa 10: rota só fecha com TODAS as entregas resolvidas. Primeiro prova que
+    // a trava barra com pendência; depois entrega as duas e fecha de verdade.
+    let barrouPendurada = false;
+    try { await closeMatrizTrip({ trip_id: trip6.trip_id, km_end: 60, fuel_spent: 22, environment: ENV }); }
+    catch (e) { barrouPendurada = (e as Error).message === 'trip_has_unresolved_deliveries'; }
+    check('L28a2 fechar rota com entrega pendurada BARRA (trip_has_unresolved_deliveries)', barrouPendurada);
+    await setMatrizDeliveryStatus({ order_id: oBase, status: 'delivered', environment: ENV });
+    await setMatrizDeliveryStatus({ order_id: oPend, status: 'delivered', environment: ENV });
     const fechPend = await closeMatrizTrip({ trip_id: trip6.trip_id, km_end: 60, fuel_spent: 22, environment: ENV });
     log = await getMatrizLogistica(ENV);
     const closed6 = log.rotas_recentes.find((t) => t.id === trip6.trip_id);
