@@ -1,5 +1,6 @@
 import pino from 'pino';
 import type { LoggerOptions } from 'pino';
+import { currentRequestId } from './request-context.js';
 
 const logLevel = ['trace', 'debug', 'info', 'warn', 'error'].includes(process.env.LOG_LEVEL ?? '')
   ? process.env.LOG_LEVEL
@@ -7,6 +8,15 @@ const logLevel = ['trace', 'debug', 'info', 'warn', 'error'].includes(process.en
 
 export const loggerOptions: LoggerOptions = {
   level: logLevel,
+  mixin() {
+    const requestId = currentRequestId();
+    return {
+      service: 'farejador',
+      environment: process.env.FAREJADOR_ENV ?? 'unknown',
+      ...(process.env.APP_COMMIT_SHA ? { commit: process.env.APP_COMMIT_SHA } : {}),
+      ...(requestId ? { request_id: requestId } : {}),
+    };
+  },
   redact: {
     paths: [
       'req.headers.authorization',

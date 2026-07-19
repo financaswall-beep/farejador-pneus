@@ -9,14 +9,17 @@
     "node": ">=20.10.0"
   },
   "scripts": {
+    "predev": "npm run build:css",
     "dev": "tsx watch --env-file=.env src/app/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build:css": "tailwindcss -c tailwind.painel.config.cjs -i styles/tailwind.css -o painel/public/tailwind.css --minify && tailwindcss -c tailwind.parceiro.config.cjs -i styles/tailwind.css -o parceiro/public/tailwind.css --minify",
+    "build": "npm run build:css && tsc -p tsconfig.json",
     "start": "node dist/app/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:all": "npm run test && npm run test:integration",
+    "check:migrations": "node scripts/check-migrations.cjs",
     "checar-tamanho": "node scripts/checar-tamanho.cjs",
     "prova-painel": "node scripts/prova-paridade-painel.cjs && node scripts/prova-paridade-matriz.cjs && node scripts/prova-endpoints-painel.cjs && node scripts/checar-tamanho.cjs && tsx scripts/prova-rotas-matriz.ts",
     "enrich": "tsx --env-file=.env src/enrichment/cli.ts"
@@ -35,6 +38,7 @@
     "@types/pg": "^8.11.0",
     "@types/web-push": "^3.6.4",
     "pino-pretty": "^11.2.0",
+    "tailwindcss": "3.4.17",
     "testcontainers": "^11.14.0",
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",

@@ -14,7 +14,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       PARTNER_DATABASE_URL: ${PARTNER_DATABASE_URL:?PARTNER_DATABASE_URL is required}
-      # SOURCE_COMMIT e uma variavel predefinida do Coolify. Expor no healthz
+      # SOURCE_COMMIT e uma variavel predefinida do Coolify. Expor na readiness
       # permite provar exatamente qual backend esta rodando sem abrir o servidor.
       APP_COMMIT_SHA: ${SOURCE_COMMIT:?SOURCE_COMMIT is required}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
@@ -33,7 +33,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - 'wget -qO- http://127.0.0.1:3000/healthz || exit 1'
+        - 'wget -qO- http://127.0.0.1:3000/readyz || exit 1'
       interval: 30s
       timeout: 5s
       retries: 3

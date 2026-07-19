@@ -16,8 +16,10 @@ import { registerEntregadorRoute } from '../admin/entregador/route.js';
 // não tem como logar (o front não usa mais bearer).
 import { registerAdminLoginRoute } from '../admin/login.route.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
+import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 
-const fastify = Fastify({ logger: loggerOptions });
+const fastify = Fastify({ logger: loggerOptions, genReqId: createRequestId });
+registerRequestContext(fastify);
 
 fastify.addContentTypeParser(
   'application/json',

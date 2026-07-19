@@ -12,8 +12,10 @@ import { loggerOptions, logger } from '../shared/logger.js';
 import { partnerPool } from '../parceiro/db.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
+import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 
-const fastify = Fastify({ logger: loggerOptions });
+const fastify = Fastify({ logger: loggerOptions, genReqId: createRequestId });
+registerRequestContext(fastify);
 
 fastify.addContentTypeParser(
   'application/json',

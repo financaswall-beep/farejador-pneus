@@ -23,7 +23,7 @@ Pino já adiciona `level`, `time`, `pid`, `hostname`. Além desses, sempre inclu
 quando disponíveis:
 
 - `environment` — `prod` | `test` (vem de `FAREJADOR_ENV`)
-- `request_id` — gerado por `fastify` em cada request
+- `request_id` — UUID gerado pelo servidor ou `X-Request-ID` externo validado
 - `chatwoot_delivery_id` — quando o log é sobre um webhook específico
 - `conversation_id` — UUID interno, quando aplicável
 - `message_id` — UUID interno, quando aplicável
@@ -61,6 +61,15 @@ pino({
   },
 });
 ```
+
+## Correlação HTTP
+
+- Toda resposta HTTP devolve `X-Request-ID`.
+- Um `X-Request-ID` recebido só é preservado com 1–128 caracteres seguros
+  (`A-Z`, `a-z`, dígitos, `.`, `_`, `:`, `/` e `-`); caso contrário nasce um UUID.
+- O contexto assíncrono injeta `request_id` também nos logs de serviços que usam
+  o logger global durante a requisição.
+- Nunca use telefone, token, e-mail ou outro dado pessoal como correlation ID.
 
 ## Exemplo correto
 

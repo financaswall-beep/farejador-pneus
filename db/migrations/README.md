@@ -1,5 +1,16 @@
 # Migrations — Farejador
 
+## Integridade do histórico
+
+- Os SQL históricos são imutáveis. Não renomeie nem edite uma migration aplicada.
+- `manifest.sha256` protege byte a byte todos os arquivos `.sql`.
+- Rode `npm run check:migrations` antes de abrir PR ou aplicar qualquer migration.
+- O gap `0071` é histórico e intencional; `0109b` e `0109c` permanecem entre
+  `0109` e `0110` para não reescrever o passado.
+- Uma migration nova deve receber o próximo número, entrar no manifesto e passar
+  no CI. O aplicador genérico recusa SQL fora de `db/migrations` ou manifesto
+  divergente.
+
 Ordem de execução:
 
 1. `0001_init_schemas.sql` — extensions (pgcrypto, pg_trgm, btree_gin), schemas (raw/core/analytics/ops), domínio `env_t`

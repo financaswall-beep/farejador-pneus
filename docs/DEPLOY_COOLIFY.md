@@ -157,7 +157,7 @@ Faça esta etapa somente depois de:
 
 - aplicar as migrations da seção 6;
 - subir o serviço Farejador no Coolify;
-- confirmar que `/healthz` responde 200.
+- confirmar que `/livez` e `/readyz` respondem 200.
 
 ### Passo a passo
 
@@ -217,16 +217,24 @@ As migrations estão em `db/migrations/` como arquivos `.sql` e devem ser execut
 
 ## 7. Testar a integração
 
-### Health check
+### Liveness e readiness
 
 ```bash
-curl http://<farejador-host>:3000/healthz
+curl http://<farejador-host>:3000/livez
+curl http://<farejador-host>:3000/readyz
 ```
 
-Esperado:
+Esperado em `/readyz`:
 ```json
-{"status":"ok","environment":"prod"}
+{"status":"ok","checks":{"database":"ok","partner_database":"ok"},"commit":"<sha>"}
 ```
+
+`/livez` prova que o processo responde sem depender do banco. `/readyz` só
+devolve 200 quando os pools principal e restrito do parceiro respondem; o
+healthcheck do container usa essa rota. `/healthz` continua como alias de
+`/readyz` para compatibilidade. Falha e recuperação geram logs estruturados
+`operational_alert=readiness_failed|readiness_recovered`, sem repetir o alerta a
+cada sondagem. Todas as respostas carregam `X-Request-ID` para correlação.
 
 ### Webhook (HMAC válido)
 
@@ -256,7 +264,7 @@ Esperado (se existir o raw_event 1):
 - [ ] Webhook configurado no Chatwoot apontando para `/webhooks/chatwoot` do Farejador.
 - [ ] `CHATWOOT_API_TOKEN` válido para reconcile.
 - [ ] `ADMIN_AUTH_TOKEN` gerado e anotado em local seguro.
-- [ ] Health check responde 200.
+- [ ] `/livez` e `/readyz` respondem 200.
 - [ ] Teste de mensagem real chega em `raw.raw_events`.
 
 ---
@@ -266,7 +274,7 @@ Esperado (se existir o raw_event 1):
 | Sintoma | Causa provável | Solução |
 |---------|---------------|---------|
 | 401 no webhook | HMAC secret diferente ou timestamp expirado | Verifique se o secret é igual nos dois lados. Verifique se o relógio do servidor está sincronizado. |
-| 503 no healthz | Banco inacessível | Verifique `DATABASE_URL` e se o banco está na mesma network ou acessível externamente. |
+| 503 no readyz/healthz | Banco principal ou pool restrito indisponível | Veja `checks` e verifique `DATABASE_URL` e `PARTNER_DATABASE_URL`. |
 | Webhook não chega | URL errada ou firewall | Verifique a URL no Chatwoot. Teste com `curl` de fora. |
 | Duplicatas em core.* | Replay sem idempotência | O normalizador deve tratar duplicatas. Verifique se o worker está rodando. |
 

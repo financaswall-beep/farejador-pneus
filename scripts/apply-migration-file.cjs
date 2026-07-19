@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
+const { auditMigrationManifest } = require('./check-migrations.cjs');
 
 const migrationPath = process.argv[2];
 const commit = process.argv.includes('--commit');
@@ -19,6 +20,14 @@ if (!process.env.DATABASE_URL) {
 
 async function main() {
   const resolved = path.resolve(migrationPath);
+  const root = path.resolve(__dirname, '..');
+  const migrationsDir = path.join(root, 'db', 'migrations');
+  const relative = path.relative(migrationsDir, resolved);
+  if (relative.startsWith('..') || path.isAbsolute(relative) || path.dirname(relative) !== '.') {
+    throw new Error('apenas arquivos versionados diretamente em db/migrations podem ser aplicados');
+  }
+  const audit = auditMigrationManifest(root);
+  if (!audit.ok) throw new Error(`manifesto de migrations invalido: ${audit.errors.join('; ')}`);
   const sql = fs.readFileSync(resolved, 'utf8');
   const client = new Client({
     connectionString: process.env.DATABASE_URL,

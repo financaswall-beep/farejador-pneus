@@ -7,6 +7,8 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+painel/public/tailwind.css
+parceiro/public/tailwind.css
 
 # Env files (NEVER commit real secrets)
 .env

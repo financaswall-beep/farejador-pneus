@@ -27,6 +27,9 @@ jobs:
       - name: Fiscal de tamanho (teto 300)
         run: node scripts/checar-tamanho.cjs
 
+      - name: Checksums das migrations
+        run: node scripts/check-migrations.cjs
+
       - name: Install dependencies
         run: npm ci
 

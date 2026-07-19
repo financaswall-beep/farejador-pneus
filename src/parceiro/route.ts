@@ -526,6 +526,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   fastify.get('/parceiro/:slug/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   fastify.get('/parceiro/:slug/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
+  fastify.get('/parceiro/:slug/tailwind.css', async (_request, reply) => sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
   // Módulos do painel (obra ≤300: app.format.js, app.charts.resumo.js, ...). Genérico e
   // seguro no espírito da rota de assets: basename mata path traversal e SÓ nomes

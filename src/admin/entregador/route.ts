@@ -118,6 +118,8 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     sendStatic(reply, 'entregas.html', 'text/html; charset=utf-8'));
   fastify.get('/entregas.js', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'entregas.js', 'text/javascript; charset=utf-8'));
+  fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
   // ── Login: usuário+senha → sessão es_. Resposta ÚNICA 401. ──
   fastify.post('/api/entregas/login', { preHandler: flagGate }, async (request, reply) => {
