@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-19T02:23:16.253Z",
-  "total": 155,
+  "geradoEm": "2026-07-19T05:22:00.969Z",
+  "total": 156,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -85,6 +85,7 @@
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",
     "GET /admin/painel/style.css PUBLICA",
+    "GET /admin/painel/tailwind.css PUBLICA",
     "GET /assets/brands/facebook.svg PUBLICA",
     "GET /assets/brands/google-ads.svg PUBLICA",
     "GET /assets/brands/instagram.svg PUBLICA",

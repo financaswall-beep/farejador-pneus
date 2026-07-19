@@ -14,13 +14,16 @@ import { startPartnerPushFanout } from '../parceiro/push.js';
 import { registerSecurityHeaders } from './security-headers.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
 import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-custos.js';
+import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
   trustProxy: env.TRUST_PROXY,
+  genReqId: createRequestId,
 });
 
 registerSecurityHeaders(fastify, env.NODE_ENV === 'production');
+registerRequestContext(fastify);
 
 let stopWorker: (() => void) | null = null;
 let stopAgentV2: (() => void) | null = null;

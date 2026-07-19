@@ -14,7 +14,10 @@ interface MockPool {
   query: ReturnType<typeof vi.fn>;
 }
 
-async function loadHealthRoute(poolMock: MockPool): Promise<(fastify: FastifyInstance) => Promise<void>> {
+async function loadHealthRoute(
+  poolMock: MockPool,
+  partnerPoolMock: MockPool = poolMock,
+): Promise<(fastify: FastifyInstance) => Promise<void>> {
   vi.resetModules();
   Object.assign(process.env, baseEnv);
 
@@ -33,6 +36,8 @@ async function loadHealthRoute(poolMock: MockPool): Promise<(fastify: FastifyIns
       end: vi.fn(),
     })),
   }));
+
+  vi.doMock('../../../src/parceiro/db.js', () => ({ partnerPool: partnerPoolMock }));
 
   const module = await import('../../../src/admin/health.route.js');
   return module.registerHealthRoute;
@@ -74,59 +79,103 @@ describe('registerHealthRoute', () => {
   afterEach(() => {
     vi.doUnmock('pg');
     vi.doUnmock('pino');
+    vi.doUnmock('../../../src/parceiro/db.js');
     vi.resetModules();
     vi.useRealTimers();
   });
 
-  it('returns 200 ok when DB responds', async () => {
-    const poolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
-    const registerHealthRoute = await loadHealthRoute(poolMock);
+  it('livez retorna 200 sem consultar nenhum banco', async () => {
+    const poolMock: MockPool = { query: vi.fn() };
+    const partnerPoolMock: MockPool = { query: vi.fn() };
+    const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
     const fastify = createFastify();
     await registerHealthRoute(fastify);
 
     const reply = createReply();
-    await fastify._routes['/healthz'].handler({}, reply);
+    await fastify._routes['/livez'].handler({ id: 'live-1' }, reply);
 
     expect(reply.statusCode).toBe(200);
     expect(reply.payload).toEqual({ status: 'ok', commit: 'a'.repeat(40) });
+    expect(poolMock.query).not.toHaveBeenCalled();
+    expect(partnerPoolMock.query).not.toHaveBeenCalled();
   });
 
-  it('returns 503 when DB rejects', async () => {
-    const poolMock: MockPool = { query: vi.fn().mockRejectedValue(new Error('connection refused')) };
-    const registerHealthRoute = await loadHealthRoute(poolMock);
+  it('readyz retorna 200 somente quando os dois bancos respondem', async () => {
+    const poolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
+    const partnerPoolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
+    const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
     const fastify = createFastify();
     await registerHealthRoute(fastify);
 
     const reply = createReply();
-    await fastify._routes['/healthz'].handler({}, reply);
+    await fastify._routes['/readyz'].handler({ id: 'ready-1' }, reply);
+
+    expect(reply.statusCode).toBe(200);
+    expect(reply.payload).toEqual({
+      status: 'ok',
+      checks: { database: 'ok', partner_database: 'ok' },
+      commit: 'a'.repeat(40),
+    });
+    expect(poolMock.query).toHaveBeenCalledWith('SELECT 1');
+    expect(partnerPoolMock.query).toHaveBeenCalledWith('SELECT 1');
+  });
+
+  it('readyz retorna 503 e identifica o banco indisponivel', async () => {
+    const poolMock: MockPool = { query: vi.fn().mockRejectedValue(new Error('connection refused')) };
+    const partnerPoolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
+    const fastify = createFastify();
+    await registerHealthRoute(fastify);
+
+    const reply = createReply();
+    await fastify._routes['/readyz'].handler({ id: 'ready-2' }, reply);
 
     expect(reply.statusCode).toBe(503);
     expect(reply.payload).toEqual({
       status: 'error',
-      reason: 'database_unavailable',
+      reason: 'dependency_unavailable',
+      checks: { database: 'error', partner_database: 'ok' },
       commit: 'a'.repeat(40),
     });
   });
 
-  it('returns 503 when DB timeout exceeds 2s', async () => {
+  it('healthz preserva compatibilidade como alias da prontidao', async () => {
+    const poolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const registerHealthRoute = await loadHealthRoute(poolMock);
+    const fastify = createFastify();
+    await registerHealthRoute(fastify);
+
+    const reply = createReply();
+    await fastify._routes['/healthz'].handler({ id: 'legacy-1' }, reply);
+
+    expect(reply.statusCode).toBe(200);
+    expect(reply.payload).toMatchObject({
+      status: 'ok',
+      checks: { database: 'ok', partner_database: 'ok' },
+    });
+  });
+
+  it('readyz retorna 503 quando um check excede 2s', async () => {
     const poolMock: MockPool = {
       query: vi.fn().mockImplementation(() => new Promise(() => {})),
     };
-    const registerHealthRoute = await loadHealthRoute(poolMock);
+    const partnerPoolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
     const fastify = createFastify();
     await registerHealthRoute(fastify);
 
     vi.useFakeTimers();
     const reply = createReply();
-    const promise = fastify._routes['/healthz'].handler({}, reply);
+    const promise = fastify._routes['/readyz'].handler({ id: 'ready-timeout' }, reply);
 
-    vi.advanceTimersByTime(2100);
+    await vi.advanceTimersByTimeAsync(2100);
     await promise;
 
     expect(reply.statusCode).toBe(503);
     expect(reply.payload).toEqual({
       status: 'error',
-      reason: 'database_unavailable',
+      reason: 'dependency_unavailable',
+      checks: { database: 'error', partner_database: 'ok' },
       commit: 'a'.repeat(40),
     });
   });

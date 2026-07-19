@@ -3,6 +3,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# O builder precisa das devDependencies (TypeScript + Tailwind CLI). A imagem
+# final redefine NODE_ENV=production e recebe somente os artefatos compilados.
+ENV NODE_ENV=development
+
 COPY package*.json ./
 RUN npm ci --include=dev
 
