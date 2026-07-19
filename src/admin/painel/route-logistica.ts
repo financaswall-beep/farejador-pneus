@@ -36,6 +36,9 @@ export const fecharRotaSchema = z.object({
   fuel_spent: z.coerce.number().min(0).max(99999).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
 });
+export const confirmarDivergenciaRotaSchema = z.object({
+  trip_id: z.string().uuid(),
+});
 export const pendurarRotaSchema = z.object({
   order_id: z.string().uuid(),
   trip_id: z.string().uuid(),

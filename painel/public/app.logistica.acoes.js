@@ -55,8 +55,6 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
       }
     },
     async fecharRota(t) {
-      const abertasNaRota = (this.logistica?.abertas || []).filter((d) => d.trip_id === t.id).length;
-      if (abertasNaRota > 0 && !window.confirm(`Ainda tem ${abertasNaRota} entrega(s) em aberto nessa rota. Fechar mesmo assim?`)) return;
       this.logisticaSaving = true;
       try {
         await this.apiPost('/admin/api/logistica/rotas/fechar', {
@@ -71,7 +69,11 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
         this.fecharForm = { km_end: '', notes: '' };
         await this.loadLogistica();
       } catch (err) {
-        this.logisticaMsg = { ok: false, text: `Não consegui fechar a rota (${err.message}).` };
+        const blockers = Array.isArray(err.payload?.blocking_deliveries)
+          ? err.payload.blocking_deliveries : [];
+        this.logisticaMsg = err.message === 'trip_has_unresolved_deliveries'
+          ? { ok: false, text: `A rota continua aberta: ${blockers.length || 'há'} entrega(s) ainda pendente(s) ou a caminho.` }
+          : { ok: false, text: `Não consegui fechar a rota (${err.message}).` };
       } finally {
         this.logisticaSaving = false;
       }
@@ -147,23 +149,22 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
         this.logisticaSaving = false;
       }
     },
-    async logisticaConfirmarFalha(d) {
-      const who = d.customer_name || 'este pedido';
-      if (!window.confirm(`Confirmar o NÃO-ENTREGUE de ${who}?\n\nO pedido é cancelado e o pneu VOLTA pro galpão.`)) return;
+    logisticaConfirmarFalha(d) {
+      this.logisticaDialog = {
+        open: true, kind: 'delivery-failure', delivery: d,
+        reason: d.delivery_failure_reason || 'não entregue — confirmado pelo dono',
+      };
+      this.$nextTick(() => this.$refs.logisticaDialogReason?.focus());
+    },
+    async confirmarDivergenciaRota(t) {
       this.logisticaSaving = true;
       try {
-        await this.apiPost('/admin/api/logistica/entregas/falhou', {
-          order_id: d.order_id,
-          reason: d.delivery_failure_reason || 'não entregue — confirmado pelo dono',
-        });
-        this.logisticaMsg = { ok: true, text: 'Não-entregue confirmado — pedido cancelado e galpão recomposto.' };
+        await this.apiPost('/admin/api/logistica/rotas/confirmar-divergencia', { trip_id: t.id });
+        this.logisticaMsg = { ok: true, text: 'Divergência confirmada pelo proprietário. Rota reconciliada.' };
         await this.loadLogistica();
-        void this.loadSino();
       } catch (err) {
-        this.logisticaMsg = { ok: false, text: `Não consegui confirmar (${err.message}).` };
-      } finally {
-        this.logisticaSaving = false;
-      }
+        this.logisticaMsg = { ok: false, text: `Não consegui confirmar a divergência (${err.message}).` };
+      } finally { this.logisticaSaving = false; }
     },
 
     // ── COLABORADORES da matriz (0124 — fatia 1: cadastro; a pessoa ainda não loga) ──

@@ -6,6 +6,7 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-ajustes-causais.js';
 
 export interface MatrizCompensationInput {
   collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
@@ -99,12 +100,36 @@ export async function closeMatrizPayroll(input: {
 }, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
+  const operation = {
+    environment, domain: 'matriz_payroll.close',
+    idempotencyKey: `payroll-close:${environment}:${input.competence}`,
+    fingerprint: operationFingerprint({ competence: input.competence }),
+  };
   try {
     await client.query('BEGIN');
     await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`matriz-payroll:${environment}:${input.competence}`]);
+    const started = await beginIntegrityOperation<{
+      closed: true; period_id: string; items: number;
+    }>(client, operation);
+    if (started.replayed) {
+      await client.query('COMMIT');
+      return started.result;
+    }
     const exists = await client.query(`SELECT 1 FROM finance.matriz_payroll_periods WHERE environment=$1 AND competence=$2::date`, [environment, input.competence]);
     if (exists.rows[0]) throw new Error('period_already_closed');
+    const causalReview = await client.query(
+      `SELECT 1 FROM finance.matriz_payroll_adjustments
+        WHERE environment=$1 AND competence=$2::date AND deleted_at IS NULL
+          AND causal_status='needs_review' LIMIT 1`,
+      [environment, input.competence],
+    );
+    if (causalReview.rows[0]) throw new Error('payroll_has_unresolved_adjustments');
     const overview = await getMatrizCollaboratorManagement(input.competence, environment, client as any);
+    if (overview.collaborators.some((row) => row.active && row.items_without_cost > 0
+      && row.commission_active && row.commission_kind === 'percent'
+      && row.commission_basis === 'margin')) {
+      throw new Error('payroll_has_unresolved_costs');
+    }
     const eligible = overview.collaborators.filter((r) => r.active && r.total_due > 0
       && (r.employment_type || r.commission_active || r.additions || r.deductions));
     if (!eligible.length) throw new Error('nothing_to_close');
@@ -123,13 +148,6 @@ export async function closeMatrizPayroll(input: {
         production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin,
           items_without_cost: row.items_without_cost, deliveries: row.deliveries_count, trips: row.trips_count },
       };
-      const item = await client.query<{ id: string }>(
-        `INSERT INTO finance.matriz_payroll_items
-          (environment,payroll_period_id,collaborator_id,job_title,employment_type,base_salary,
-           commission_amount,additions,deductions,total_due,due_date,calculation)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id`,
-        [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
-         row.commission_amount, row.additions, row.deductions, row.total_due, dueDate, JSON.stringify(calculation)]);
       const label = new Intl.DateTimeFormat('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${input.competence}T12:00:00Z`));
       const expense = await client.query<{ id: string }>(
@@ -137,10 +155,26 @@ export async function closeMatrizPayroll(input: {
           (environment,category,description,amount,occurred_at,payment_status,due_date,created_by)
          VALUES ($1,'funcionario',$2,$3,$4::date,'pending',$5,$6) RETURNING id`,
         [environment, `Folha ${label} · ${row.display_name}`, row.total_due, input.competence, dueDate, input.actor_label ?? null]);
-      await client.query(`UPDATE finance.matriz_payroll_items SET source_expense_id=$2 WHERE id=$1`, [item.rows[0]!.id, expense.rows[0]!.id]);
+      await client.query(
+        `INSERT INTO finance.matriz_payroll_items
+          (environment,payroll_period_id,collaborator_id,job_title,employment_type,base_salary,
+           commission_amount,additions,deductions,total_due,due_date,calculation,source_expense_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)`,
+        [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
+         row.commission_amount, row.additions, row.deductions, row.total_due, dueDate,
+         JSON.stringify(calculation), expense.rows[0]!.id]);
     }
+    const result = integrityResult({ closed: true as const, period_id: periodId,
+      items: eligible.length });
+    await recordIntegrityEvent(client, { environment, domain: 'matriz_payroll',
+      entityTable: 'finance.matriz_payroll_periods', entityId: periodId,
+      eventType: 'payroll_closed', actorLabel: input.actor_label,
+      idempotencyKey: operation.idempotencyKey,
+      after: { competence: input.competence, items: eligible.length } });
+    await completeIntegrityOperation(client, operation,
+      'finance.matriz_payroll_periods', periodId, result);
     await client.query('COMMIT');
-    return { closed: true, period_id: periodId, items: eligible.length };
+    return result;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

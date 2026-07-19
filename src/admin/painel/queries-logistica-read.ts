@@ -7,12 +7,9 @@ export const MAIN_DELIVERY_GUARD = `
   AND EXISTS (SELECT 1 FROM core.units u
                WHERE u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main')`;
 export interface MatrizDeliveryRow {
-  order_id: string;
-  order_number: string | null;
-  customer_name: string | null;
-  customer_phone: string | null;
-  delivery_address: string | null;
-  total_amount: string;
+  order_id: string; order_number: string | null;
+  customer_name: string | null; customer_phone: string | null;
+  delivery_address: string | null; total_amount: string;
   payment_method: string | null;
   status: string;
   delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
@@ -21,9 +18,7 @@ export interface MatrizDeliveryRow {
    *  aguardando o dono confirmar ou recolocar). NULL fora desse limbo. */
   delivery_failure_reason: string | null;
   trip_id: string | null;
-  created_at: string;
-  dispatched_at: string | null;
-  delivered_at: string | null;
+  created_at: string; dispatched_at: string | null; delivered_at: string | null;
   /** Data EFETIVA de entrega prevista (YYYY-MM-DD): a remarcada, ou o padrão D+1
    *  (created_at+1, fuso SP) quando nunca foi remarcada. */
   scheduled_date: string;
@@ -33,35 +28,23 @@ export interface MatrizDeliveryRow {
   items: Array<{ quantity: number; label: string }>;
 }
 export interface MatrizTripRow {
-  id: string;
+  id: string; trip_number: string; courier_name: string;
   /** Número amigável (0129): ROTA-0001, ... — o que o dono fala/audita. */
-  trip_number: string;
-  courier_name: string;
   status: 'open' | 'closed';
-  km_start: string | null;
-  km_end: string | null;
-  fuel_spent: string | null;
-  fuel_expense_id: string | null;
-  fuel_spent_without_approved_expense: boolean;
-  notes: string | null;
-  started_at: string;
-  ended_at: string | null;
-  deliveries_count: number;
-  orders_total: string;
-  remaining_count: number;
+  km_start: string | null; km_end: string | null; fuel_spent: string | null;
+  fuel_expense_id: string | null; fuel_spent_without_approved_expense: boolean;
+  financial_status: 'pending' | 'divergent' | 'reconciled';
+  approved_fuel_amount: string; notes: string | null;
+  started_at: string; ended_at: string | null;
+  deliveries_count: number; orders_total: string; remaining_count: number;
   /** "A rota se pagou?" — SÓ das entregas DELIVERED da rota (failed/cancelada fora).
    *  Régua do lucro = a MESMA do varejo 0117 (custo congelado; item sem custo fica
    *  fora do lucro e é CONTADO pra UI avisar — nunca chuta). Frete = total_amount −
    *  itens (o bot embute o frete no total; walk-in sem frete → 0, nunca negativo). */
   resumo: {
-    entregues: number;
-    nao_entregues: number;
-    faturamento_total: number;
-    frete_total: number;
-    faturamento_pneus: number;
-    custo_pneus: number;
-    lucro_pneus: number;
-    itens_sem_custo: number;
+    entregues: number; nao_entregues: number;
+    faturamento_total: number; frete_total: number; faturamento_pneus: number;
+    custo_pneus: number; lucro_pneus: number; itens_sem_custo: number;
   };
   /** Σ despesas vivas amarradas à rota (fechamento ∪ comprovantes lidos — o IN
    *  dedup cobre o linked_existing; deleted_at IS NULL = dono apagou, rota reflete). */
@@ -69,40 +52,28 @@ export interface MatrizTripRow {
   /** Pedidos entregues que formam o resultado. Valores de custo continuam
    *  parciais quando algum item não tinha snapshot — a UI sinaliza, nunca estima. */
   pedidos_resultado: Array<{
-    order_id: string;
-    order_number: string | null;
-    customer_name: string | null;
-    total: number;
-    faturamento_pneus: number;
-    custo_pneus: number;
-    frete: number;
-    margem_antes_rota: number;
-    itens_sem_custo: number;
+    order_id: string; order_number: string | null; customer_name: string | null;
+    total: number; faturamento_pneus: number; custo_pneus: number;
+    frete: number; margem_antes_rota: number; itens_sem_custo: number;
   }>;
   /** Despesas únicas realmente vinculadas à rota. O mesmo expense pode ser
    *  lastreado por mais de um comprovante; DISTINCT evita dupla contagem. */
   despesas: Array<{
-    id: string;
-    category: string;
-    description: string | null;
-    amount: number;
-    occurred_at: string;
+    id: string; category: string; description: string | null;
+    amount: number; occurred_at: string;
     source: 'comprovante' | 'fechamento';
-    receipt_id: string | null;
-    receipt_summary: string | null;
+    receipt_id: string | null; receipt_summary: string | null;
   }>;
   receipts: Array<{
-    id: string;
+    id: string; ai_summary: string | null; ai_expense_id: string | null;
     ai_status: 'pending' | 'parsed' | 'unreadable' | 'skipped';
     workflow_status: 'uploaded' | 'processing' | 'review_required' | 'linked' | 'rejected' | 'legacy_linked';
-    ai_summary: string | null;
-    ai_expense_id: string | null;
-    expense_category: string | null;
-    expense_amount: number | null;
-    expense_removed: boolean;
-    latest_attempt: Record<string, unknown> | null;
-    decision: Record<string, unknown> | null;
+    expense_category: string | null; expense_amount: number | null; expense_removed: boolean;
+    latest_attempt: Record<string, unknown> | null; decision: Record<string, unknown> | null;
     created_at: string;
+  }>;
+  detached_reports: Array<{
+    order_id: string; delivery_failure_reason: string | null; detached_at: string;
   }>;
 }
 export interface MatrizLogistica {
@@ -140,6 +111,15 @@ export async function getMatrizLogistica(
   const tripSelect = `
     SELECT t.id, t.trip_number, t.courier_name, t.status, t.km_start::text, t.km_end::text,
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
+           commerce.matriz_trip_financial_status(t.id,t.environment) AS financial_status,
+           (SELECT COALESCE(sum(x.amount),0)::text FROM (
+             SELECT DISTINCT ef2.id,ef2.amount
+               FROM commerce.matriz_trip_receipts rf2
+               JOIN commerce.matriz_expenses ef2
+                 ON ef2.id=rf2.ai_expense_id AND ef2.environment=rf2.environment
+                AND ef2.deleted_at IS NULL AND ef2.category='combustivel'
+              WHERE rf2.environment=t.environment AND rf2.trip_id=t.id
+                AND rf2.workflow_status IN ('linked','legacy_linked')) x) AS approved_fuel_amount,
            (COALESCE(t.fuel_spent,0)>0 AND NOT EXISTS (
              SELECT 1 FROM commerce.matriz_expenses ef
               WHERE ef.environment=t.environment AND ef.deleted_at IS NULL
@@ -149,8 +129,13 @@ export async function getMatrizLogistica(
                    WHERE rf.environment=t.environment AND rf.trip_id=t.id
                      AND rf.workflow_status IN ('linked','legacy_linked')
                      AND rf.ai_expense_id IS NOT NULL)))) AS fuel_spent_without_approved_expense,
-           (SELECT COUNT(*)::int FROM commerce.orders o
-             WHERE o.trip_id = t.id AND o.environment = t.environment) AS deliveries_count,
+           ((SELECT COUNT(*)::int FROM commerce.orders o
+               WHERE o.trip_id = t.id AND o.environment = t.environment)
+             + (SELECT COUNT(*)::int FROM audit.events ae
+                 WHERE ae.environment=t.environment::text
+                   AND ae.domain='matriz_logistics'
+                   AND ae.event_type='delivery_report_detached_on_trip_close'
+                   AND ae.payload_before->>'trip_id'=t.id::text)) AS deliveries_count,
            (SELECT COALESCE(SUM(o.total_amount),0)::text FROM commerce.orders o
              WHERE o.trip_id=t.id AND o.environment=t.environment AND o.status<>'cancelled') AS orders_total,
            (SELECT COUNT(*)::int FROM commerce.orders o
@@ -158,9 +143,14 @@ export async function getMatrizLogistica(
                AND o.delivery_status IN ('pending','dispatched')) AS remaining_count,
            (SELECT jsonb_build_object(
                      'entregues', COUNT(*),
-                     'nao_entregues', (SELECT COUNT(*)::int FROM commerce.orders o3
+                     'nao_entregues', ((SELECT COUNT(*)::int FROM commerce.orders o3
                                         WHERE o3.trip_id = t.id AND o3.environment = t.environment
-                                          AND (o3.delivery_status = 'failed' OR o3.status = 'cancelled')),
+                                          AND (o3.delivery_status = 'failed' OR o3.status = 'cancelled'))
+                       + (SELECT COUNT(*)::int FROM audit.events ae2
+                           WHERE ae2.environment=t.environment::text
+                             AND ae2.domain='matriz_logistics'
+                             AND ae2.event_type='delivery_report_detached_on_trip_close'
+                             AND ae2.payload_before->>'trip_id'=t.id::text)),
                      'faturamento_total', COALESCE(ROUND(SUM(x.total_amount), 2), 0),
                      'frete_total', COALESCE(ROUND(SUM(GREATEST(x.total_amount - x.itens_valor, 0)), 2), 0),
                      'faturamento_pneus', COALESCE(ROUND(SUM(x.itens_valor), 2), 0),
@@ -270,7 +260,17 @@ export async function getMatrizLogistica(
                        LEFT JOIN commerce.matriz_expenses e3
                          ON e3.environment=r.environment AND e3.id=r.ai_expense_id
                         AND e3.deleted_at IS NULL
-                      WHERE r.environment=t.environment AND r.trip_id=t.id), '[]'::jsonb) AS receipts
+                      WHERE r.environment=t.environment AND r.trip_id=t.id), '[]'::jsonb) AS receipts,
+           COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                       'order_id',ae3.entity_id,
+                       'delivery_failure_reason',ae3.payload_before->>'delivery_failure_reason',
+                       'detached_at',ae3.created_at)
+                       ORDER BY ae3.created_at)
+                       FROM audit.events ae3
+                      WHERE ae3.environment=t.environment::text
+                        AND ae3.domain='matriz_logistics'
+                        AND ae3.event_type='delivery_report_detached_on_trip_close'
+                        AND ae3.payload_before->>'trip_id'=t.id::text), '[]'::jsonb) AS detached_reports
       FROM commerce.matriz_delivery_trips t
      WHERE t.environment = $1 AND t.deleted_at IS NULL`;
 

@@ -6,6 +6,7 @@ import { logger } from '../../shared/logger.js';
 import {
   addMatrizPayrollAdjustment, closeMatrizPayroll, getMatrizCollaboratorManagement,
   payMatrizPayrollItem, removeMatrizPayrollAdjustment,
+  reviewMatrizPayrollCausalAdjustment,
   saveMatrizCollaboratorCommission, saveMatrizCollaboratorCompensation,
 } from './queries.js';
 import { operatorLabel } from './route-helpers.js';
@@ -40,12 +41,17 @@ const adjustmentSchema = z.object({
   kind: z.enum(['addition', 'deduction']), description: z.string().trim().min(2).max(120),
   amount: money.positive(),
 });
+const causalAdjustmentReviewSchema = z.object({
+  id: z.string().uuid(), amount: money.positive(),
+});
 
 function managementError(reply: any, err: unknown, label: string) {
   const message = err instanceof Error ? err.message : 'internal_server_error';
   const clientErrors = new Set([
     'collaborator_not_found', 'period_closed_or_collaborator_not_found',
     'adjustment_not_found_or_period_closed', 'nothing_to_close',
+    'payroll_has_unresolved_adjustments', 'payroll_has_unresolved_costs',
+    'invalid_adjustment_amount',
   ]);
   if (clientErrors.has(message)) return reply.status(400).send({ error: message });
   if (message === 'collaborator_management_unavailable') {
@@ -58,6 +64,8 @@ function managementError(reply: any, err: unknown, label: string) {
   if (message === 'payroll_item_not_found' || message === 'payroll_expense_not_found') {
     return reply.status(404).send({ error: message });
   }
+  if (message === 'causal_adjustment_not_found') return reply.status(404).send({ error: message });
+  if (message === 'causal_adjustment_already_reviewed') return reply.status(409).send({ error: message });
   logger.error({ err }, label);
   return reply.status(500).send({ error: 'internal_server_error' });
 }
@@ -98,6 +106,18 @@ export async function registerPainelColaboradoresGestao(fastify: FastifyInstance
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
     try { return reply.status(200).send(await removeMatrizPayrollAdjustment(parsed.data)); }
     catch (err) { return managementError(reply, err, 'payroll adjustment remove failed'); }
+  });
+
+  fastify.post('/admin/api/colaboradores/ajustes/causal/revisar', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = causalAdjustmentReviewSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      return reply.status(200).send(await reviewMatrizPayrollCausalAdjustment({
+        ...parsed.data, actor_label: operatorLabel(request),
+      }));
+    } catch (err) { return managementError(reply, err, 'causal payroll adjustment review failed'); }
   });
 
   fastify.post('/admin/api/colaboradores/folha/fechar', { preHandler: requireAdminOwner }, async (request, reply) => {

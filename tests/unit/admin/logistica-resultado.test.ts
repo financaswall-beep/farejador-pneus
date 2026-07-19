@@ -84,7 +84,8 @@ describe('getMatrizLogistica — resultado real por rota', () => {
       expect(sql).toContain('legacy_linked');
       expect(sql).toContain('e2.id = t.fuel_expense_id');
     }
-    expect(resultModule).toContain('Resultado parcial');
+    expect(resultModule).toContain('Conciliação pendente');
+    expect(resultModule).toContain("financialStatus === 'reconciled'");
     expect(resultModule).toContain('sem comprovante aprovado');
     expect(resultModule).toContain('fuel_spent_without_approved_expense');
   });

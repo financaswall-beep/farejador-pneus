@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-18T18:00:01.201Z",
-  "total": 153,
+  "geradoEm": "2026-07-19T02:23:16.253Z",
+  "total": 155,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -100,6 +100,7 @@
     "POST /admin/api/colaboradores AUTH(1)",
     "POST /admin/api/colaboradores/acesso AUTH(1)",
     "POST /admin/api/colaboradores/ajustes AUTH(1)",
+    "POST /admin/api/colaboradores/ajustes/causal/revisar AUTH(1)",
     "POST /admin/api/colaboradores/ajustes/remover AUTH(1)",
     "POST /admin/api/colaboradores/comissao AUTH(1)",
     "POST /admin/api/colaboradores/folha/fechar AUTH(1)",
@@ -119,6 +120,7 @@
     "POST /admin/api/logistica/entregas/status AUTH(1)",
     "POST /admin/api/logistica/rotas AUTH(1)",
     "POST /admin/api/logistica/rotas/:tripId/comprovante AUTH(1)",
+    "POST /admin/api/logistica/rotas/confirmar-divergencia AUTH(1)",
     "POST /admin/api/logistica/rotas/fechar AUTH(1)",
     "POST /admin/api/logistica/rotas/pendurar AUTH(1)",
     "POST /admin/api/matriz/despesas AUTH(1)",

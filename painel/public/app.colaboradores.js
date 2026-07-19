@@ -9,6 +9,9 @@ window.PAINEL_MODULES.colaboradores = function () {
       try {
         const payload = await this.apiGet(`/admin/api/colaboradores/gestao?competencia=${encodeURIComponent(this.colabMes + '-01')}`);
         this.colaboradores = payload.collaborators || [];
+        this.colabAdjustments = (payload.adjustments || []).map((adjustment) => ({
+          ...adjustment, review_amount: adjustment.amount ?? '',
+        }));
         this.colabSummary = payload.summary || {};
         this.colabLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());

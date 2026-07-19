@@ -160,10 +160,42 @@
         </label>
         <div x-show="comprovantesOk > 0" class="text-xs text-emerald-600 mb-3" x-text="comprovantesOk + ' comprovante(s) enviado(s)'"></div>
 
-        <button @click="fecharRota()" :disabled="!!salvando"
+        <button @click="pedirFechamentoRota()" :disabled="!!salvando"
                 class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
           Fechar rota
         </button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="dialogo.open" x-cloak
+       @keydown.escape.window="fecharDialogo()" @click.self="fecharDialogo()"
+       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
+       role="dialog" aria-modal="true" aria-labelledby="entregas-dialog-title"
+       style="display:none;">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="entregas-dialog-title" class="font-bold text-lg"
+              x-text="dialogo.kind === 'close-trip' ? 'Fechar a rota do dia?' : 'O que aconteceu?'"></h2>
+          <p class="text-sm text-slate-500 mt-1"
+             x-text="dialogo.kind === 'close-trip' ? 'Entregas pendentes impedem o fechamento. Não-entregues reportadas voltam para a decisão do escritório.' : (dialogo.delivery?.customer_name || 'Entrega selecionada')"></p>
+        </div>
+        <button @click="fecharDialogo()" class="p-2 rounded-lg bg-slate-100" aria-label="Fechar diálogo">×</button>
+      </div>
+      <div x-show="dialogo.kind === 'failure'" class="mt-4">
+        <label for="entregas-dialog-reason" class="block text-sm text-slate-600 mb-1">Motivo *</label>
+        <textarea id="entregas-dialog-reason" x-ref="entregasDialogReason"
+                  x-model="dialogo.reason" maxlength="500" rows="4"
+                  placeholder="Ex.: cliente não estava, endereço errado"
+                  class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-400"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-5">
+        <button @click="fecharDialogo()" class="border border-slate-300 rounded-xl py-3 text-sm font-semibold">Voltar</button>
+        <button @click="confirmarDialogo()"
+                :disabled="!!salvando || (dialogo.kind === 'failure' && !String(dialogo.reason || '').trim())"
+                class="bg-slate-900 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-40"
+                x-text="dialogo.kind === 'close-trip' ? 'Fechar rota' : 'Enviar relato'"></button>
       </div>
     </div>
   </div>

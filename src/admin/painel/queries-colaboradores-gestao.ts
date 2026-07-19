@@ -36,7 +36,7 @@ export async function getMatrizCollaboratorManagement(
   // closeMatrizPayroll chama esta leitura dentro de um PoolClient transacional.
   // pg nao aceita consultas concorrentes no mesmo client (e removera o suporte
   // acidental no pg 9), portanto estas quatro leituras sao deliberadamente sequenciais.
-  const [people, performance, adjustments, payroll] = await runSequential([
+  const [people, performance, adjustments, payroll, adjustmentDetails] = await runSequential([
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
               mc.panel_role, mc.revoked_at IS NULL AS active,
@@ -107,6 +107,7 @@ export async function getMatrizCollaboratorManagement(
            FROM commerce.matriz_delivery_trips t
           WHERE t.environment=$1 AND t.courier_collaborator_id IS NOT NULL
             AND t.deleted_at IS NULL AND t.status='closed' AND t.ended_at IS NOT NULL
+            AND commerce.matriz_trip_financial_status(t.id,t.environment)='reconciled'
             AND (t.ended_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
             AND (t.ended_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), delivery_events AS (
@@ -169,6 +170,13 @@ export async function getMatrizCollaboratorManagement(
          FROM finance.matriz_payroll_periods p
          JOIN finance.matriz_payroll_items i ON i.payroll_period_id=p.id
         WHERE p.environment=$1 AND p.competence=$2::date`, [environment, competence]),
+    () => db.query<any>(
+      `SELECT a.id,a.collaborator_id,a.kind,a.description,a.amount,a.created_at,
+              a.source_type,a.source_id,a.source_event_at,a.original_payroll_item_id,
+              a.frozen_calculation,a.causal_status,a.reviewed_by,a.reviewed_at
+         FROM finance.matriz_payroll_adjustments a
+        WHERE a.environment=$1 AND a.competence=$2::date AND a.deleted_at IS NULL
+        ORDER BY a.created_at,a.id`, [environment, competence]),
   ]);
 
   const perf = new Map(performance.rows.map((r: any) => [r.id, r]));
@@ -216,5 +224,8 @@ export async function getMatrizCollaboratorManagement(
     revenue: active.reduce((s, r) => s + r.revenue, 0), margin: active.reduce((s, r) => s + r.margin, 0),
     trips_count: active.reduce((s, r) => s + r.trips_count, 0),
   };
-  return { competence, collaborators: rows, summary };
+  return { competence, collaborators: rows, summary,
+    adjustments: adjustmentDetails.rows.map((row: any) => ({
+      ...row, amount: row.amount === null ? null : n(row.amount),
+    })) };
 }

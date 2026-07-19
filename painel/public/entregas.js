@@ -23,6 +23,7 @@ function entregasApp() {
     uploadando: false,
     comprovantesOk: 0,
     msg: null,
+    dialogo: { open: false, kind: null, delivery: null, reason: '' },
 
     init() {
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
@@ -124,13 +125,34 @@ function entregasApp() {
       } finally { this.salvando = false; }
     },
 
-    async naoEntreguei(d) {
-      const motivo = prompt('O que aconteceu? (ex.: cliente não estava, endereço errado)');
-      if (motivo === null) return;
-      if (!motivo.trim()) { this.msg = { ok: false, text: 'Preciso do motivo.' }; return; }
+    naoEntreguei(d) {
+      this.dialogo = { open: true, kind: 'failure', delivery: d, reason: '' };
+      this.$nextTick(() => this.$refs.entregasDialogReason?.focus());
+    },
+
+    pedirFechamentoRota() {
+      this.dialogo = { open: true, kind: 'close-trip', delivery: null, reason: '' };
+    },
+
+    fecharDialogo() {
+      this.dialogo = { open: false, kind: null, delivery: null, reason: '' };
+    },
+
+    async confirmarDialogo() {
+      const dialog = this.dialogo;
+      if (!dialog.open) return;
+      if (dialog.kind === 'close-trip') {
+        this.fecharDialogo();
+        await this.fecharRota();
+        return;
+      }
+      const motivo = String(dialog.reason || '').trim();
+      if (!motivo) { this.msg = { ok: false, text: 'Preciso do motivo.' }; return; }
+      const delivery = dialog.delivery;
+      this.fecharDialogo();
       this.salvando = true; this.msg = null;
       try {
-        await this.api('POST', '/api/entregas/nao-entregue', { order_id: d.order_id, reason: motivo.trim() });
+        await this.api('POST', '/api/entregas/nao-entregue', { order_id: delivery.order_id, reason: motivo });
         this.msg = { ok: true, text: 'Anotado — o escritório vai ver.' };
         await this.carregar();
       } catch (err) {
@@ -170,7 +192,6 @@ function entregasApp() {
     },
 
     async fecharRota() {
-      if (!confirm('Fechar a rota do dia?')) return;
       this.salvando = true; this.msg = null;
       try {
         await this.api('POST', '/api/entregas/rota/fechar', {

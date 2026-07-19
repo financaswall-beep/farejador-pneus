@@ -165,6 +165,7 @@ function painelApp() {
     logisticaLoaded: false,
     logisticaSaving: false,
     logisticaMsg: null,
+    logisticaDialog: { open: false, kind: null, delivery: null, reason: '' },
     logisticaTab: 'visao',
     logisticaRotaSelecionadaId: null, // detalhe financeiro aberto dentro da subaba Rotas
     logisticaPeriodo: 'hoje',
@@ -206,6 +207,7 @@ function painelApp() {
     ],
     // ── COLABORADORES da matriz (0124 — fatia 1): staff próprio, vendedor/entregador ──
     colaboradores: [],
+    colabAdjustments: [],
     colabLoaded: false,
     colabSaving: false,
     colabMsg: null,
@@ -284,11 +286,9 @@ function painelApp() {
     redeKpis: [],
 
     parceirosRede: [],
-
     // Raio de entrega (proximidade-primeiro Fase 2): estado do editor na matriz.
     savingRaio: false,
     raioSalvoMsg: '',
-
     // 2026-06-01: alertas fake removidos — os alertas reais saem de redeAlertasOperacionais (computa de parceirosRede).
     alertasRede: [],
 

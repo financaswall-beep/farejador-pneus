@@ -18,6 +18,10 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
     get colabFolhaRows() {
       return this.colaboradores.filter((c) => c.payroll_item_id || (c.active && (c.employment_type || c.commission_active || c.additions || c.deductions)));
     },
+    get colabSelectedAdjustments() {
+      if (!this.colabSelectedId) return [];
+      return this.colabAdjustments.filter((adjustment) => adjustment.collaborator_id === this.colabSelectedId);
+    },
     get colabVendasRanking() {
       return this.colabAtivos.filter((c) => c.sales_count > 0 || c.work_area === 'sales').sort((a, b) => b.margin - a.margin);
     },
@@ -118,6 +122,25 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
         this.colabMsg = { ok: true, text: `Ajuste incluído para ${c.display_name}.` };
         await this.loadColaboradores(); this.colabOpen(this.colaboradores.find((x) => x.id === c.id), 'folha');
       } catch (err) { this.colabMsg = { ok: false, text: `Não consegui incluir (${err.message}).` }; }
+      finally { this.colabSaving = false; }
+    },
+    colabAdjustmentOrigin(adjustment) {
+      if (adjustment.source_type === 'delivery_cancellation') return 'Entrega cancelada após a folha';
+      if (adjustment.source_type === 'wholesale_sale_cancellation') return 'Venda de atacado cancelada após a folha';
+      if (adjustment.source_type === 'retail_sale_cancellation') return 'Venda cancelada após a folha';
+      return 'Ajuste manual';
+    },
+    async colabRevisarAjusteCausal(adjustment) {
+      const amount = this.colabNumber(adjustment.review_amount);
+      if (amount <= 0) { this.colabMsg = { ok: false, text: 'Informe um valor positivo.' }; return; }
+      this.colabSaving = true; this.colabMsg = null;
+      try {
+        await this.apiPost('/admin/api/colaboradores/ajustes/causal/revisar', {
+          id: adjustment.id, amount,
+        });
+        this.colabMsg = { ok: true, text: 'Ajuste causal revisado e pronto para a folha.' };
+        await this.loadColaboradores();
+      } catch (err) { this.colabMsg = { ok: false, text: `Não consegui revisar (${err.message}).` }; }
       finally { this.colabSaving = false; }
     },
     async colabFecharFolha() {
