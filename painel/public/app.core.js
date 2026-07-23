@@ -106,8 +106,8 @@ window.PAINEL_MODULES.core = function () {
           lucide.createIcons();
           this.renderCurrentPageCharts();
         });
-        // Compras é tela própria: carrega fornecedor/compra/ranking ao entrar.
-        if (page === 'compras') void this.loadAtacado();
+        // Compras carrega relatórios independentes; falha de preço não apaga histórico.
+        if (page === 'compras') void this.loadCompras();
         // Estoque é tela própria: o galpão saiu de Vendas → Atacado, mas o dado é o mesmo.
         // O filme (0128) carrega junto — é a mesma visita à aba.
         if (page === 'estoque') { void this.loadAtacado(); void this.loadGalpaoFilme(); void this.loadStockReconciliation(); }

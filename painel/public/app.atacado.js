@@ -48,45 +48,40 @@ window.PAINEL_MODULES.atacado = function () {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       this.atacadoLoading = true;
+      const jobs = [
+        ['buyers', this.apiGet('/admin/api/wholesale/buyers')],
+        ['ranking', this.apiGet('/admin/api/wholesale/ranking')],
+        ['measures', this.apiGet('/admin/api/wholesale/measures')],
+        ['stock', this.apiGet('/admin/api/wholesale/stock')],
+        ['resumo', this.apiGet('/admin/api/wholesale/resumo?period=' + this.atacadoPeriodo)],
+        ['suppliers', this.apiGet('/admin/api/wholesale/suppliers')],
+        ['supplierRanking', this.apiGet('/admin/api/wholesale/suppliers/ranking')],
+        ['purchases', this.apiGet('/admin/api/wholesale/purchases')],
+        ['breakdown', this.apiGet('/admin/api/wholesale/suppliers/breakdown')],
+        ['finance', this.apiGet('/admin/api/wholesale/finance')],
+        ['sales', this.apiGet('/admin/api/wholesale/sales')],
+      ];
       try {
-        const [buyers, ranking, measures, stock, resumo, suppliers, supRanking, purchases, breakdown, finance, vendas] = await Promise.all([
-          this.apiGet('/admin/api/wholesale/buyers'),
-          this.apiGet('/admin/api/wholesale/ranking'),
-          this.apiGet('/admin/api/wholesale/measures'),
-          this.apiGet('/admin/api/wholesale/stock'),
-          this.apiGet('/admin/api/wholesale/resumo?period=' + this.atacadoPeriodo),
-          this.apiGet('/admin/api/wholesale/suppliers'),
-          this.apiGet('/admin/api/wholesale/suppliers/ranking'),
-          this.apiGet('/admin/api/wholesale/purchases'),
-          this.apiGet('/admin/api/wholesale/suppliers/breakdown'),
-          this.apiGet('/admin/api/wholesale/finance'),
-          this.apiGet('/admin/api/wholesale/sales'),
-        ]);
-        this.atacadoBuyers = buyers.rows || [];
-        this.atacadoRanking = ranking.rows || [];
-        this.atacadoMeasures = measures.rows || [];
-        this.atacadoStock = stock.rows || [];
-        this.atacadoResumo = resumo || null;
-        this.fornecedores = suppliers.rows || [];
-        this.fornecedorRanking = supRanking.rows || [];
-        this.compras = purchases.rows || [];
-        this.fornecedorBreakdown = breakdown.rows || [];
-        // flag off → enabled:false → null (a UI do financeiro some inteira)
-        this.atacadoFinance = finance && finance.enabled ? finance : null;
-        this.atacadoVendas = vendas.rows || [];
-      } catch (err) {
-        this.atacadoBuyers = [];
-        this.atacadoRanking = [];
-        this.atacadoMeasures = [];
-        this.atacadoStock = [];
-        this.atacadoResumo = null;
-        this.fornecedores = [];
-        this.fornecedorRanking = [];
-        this.compras = [];
-        this.fornecedorBreakdown = [];
-        this.atacadoFinance = null;
-        this.atacadoVendas = [];
-        console.warn('atacado load falhou:', err.message);
+        const settled = await Promise.allSettled(jobs.map(([, request]) => request));
+        settled.forEach((result, index) => {
+          const key = jobs[index][0];
+          if (result.status === 'rejected') {
+            console.warn(`atacado ${key} falhou:`, result.reason?.message || result.reason);
+            return;
+          }
+          const value = result.value;
+          if (key === 'buyers') this.atacadoBuyers = value.rows || [];
+          if (key === 'ranking') this.atacadoRanking = value.rows || [];
+          if (key === 'measures') this.atacadoMeasures = value.rows || [];
+          if (key === 'stock') this.atacadoStock = value.rows || [];
+          if (key === 'resumo') this.atacadoResumo = value || null;
+          if (key === 'suppliers') this.fornecedores = value.rows || [];
+          if (key === 'supplierRanking') this.fornecedorRanking = value.rows || [];
+          if (key === 'purchases') this.compras = value.rows || [];
+          if (key === 'breakdown') this.fornecedorBreakdown = value.rows || [];
+          if (key === 'finance') this.atacadoFinance = value && value.enabled ? value : null;
+          if (key === 'sales') this.atacadoVendas = value.rows || [];
+        });
       } finally {
         this.atacadoLoading = false;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());

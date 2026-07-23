@@ -19,9 +19,10 @@
 <script src="/admin/painel/app.varejo.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260718-frontfix1"></script>
-<script src="/admin/painel/app.compras.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.compras.acoes.js?v=20260718-frontfix1"></script>
+<script src="/admin/painel/app.atacado.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.compras.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.compras.relatorios.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.resultado.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
@@ -40,12 +41,12 @@
 <script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.core.js?v=20260716-stock-source1"></script>
+<script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.montagem.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.js?v=20260719-colab-dialog1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.js?v=20260723-compras2"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -1859,18 +1860,18 @@
             <h1 class="text-2xl font-semibold tracking-tight">Compras</h1>
             <p class="text-sm text-gray-500 mt-1">O que entrou no galpão, quanto custou e de quem você está comprando</p>
           </div>
-          <button @click="comprasTab = 'nova'; $nextTick(() => window.lucide && window.lucide.createIcons())"
-                  class="inline-flex self-start items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
+          <button @click="comprasOpenTab('nova')"
+                  class="inline-flex self-start items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
             <i data-lucide="plus" class="w-4 h-4"></i> Nova compra
           </button>
         </div>
 
         <div class="border-b border-gray-200 flex items-center gap-1 overflow-x-auto">
-          <button @click="comprasTab = 'visao'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap" :class="comprasTab === 'visao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
-          <button @click="comprasTab = 'nova'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap" :class="comprasTab === 'nova' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Nova compra</button>
-          <button @click="comprasTab = 'historico'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap" :class="comprasTab === 'historico' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Histórico</button>
-          <button @click="comprasTab = 'fornecedores'; loadAtacado()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap" :class="comprasTab === 'fornecedores' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Fornecedores</button>
-          <button @click="comprasTab = 'precos'; loadAtacado()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap" :class="comprasTab === 'precos' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Preços por medida</button>
+          <button @click="comprasOpenTab('visao')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
+          <button @click="comprasOpenTab('nova')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'nova' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Nova compra</button>
+          <button @click="comprasOpenTab('historico')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'historico' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Histórico</button>
+          <button @click="comprasOpenTab('fornecedores')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'fornecedores' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Fornecedores</button>
+          <button @click="comprasOpenTab('precos')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'precos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Preços por medida</button>
         </div>
       </div>
 
@@ -1878,48 +1879,52 @@
 
       <!-- VISÃO GERAL: tudo derivado das coleções que loadAtacado já carrega. -->
       <div x-show="comprasTab === 'visao'" x-cloak class="space-y-5">
+        <div x-show="comprasErrors.overview" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700">
+          <span>Não foi possível atualizar a visão de Compras. Os dados anteriores foram mantidos.</span>
+          <button @click="loadComprasOverview()" class="font-semibold hover:underline">Tentar novamente</button>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-            <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="shopping-cart" class="w-6 h-6 text-brand-700"></i></div>
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="shopping-cart" class="w-6 h-6 text-emerald-800"></i></div>
             <div><p class="text-sm text-gray-500">Compras registradas</p><p class="text-2xl font-semibold mt-0.5 num" x-text="comprasResumo().registradas"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-            <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dot-dashed" class="w-6 h-6 text-brand-700"></i></div>
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dot-dashed" class="w-6 h-6 text-emerald-800"></i></div>
             <div><p class="text-sm text-gray-500">Pneus recebidos</p><p class="text-2xl font-semibold mt-0.5 num" x-text="comprasResumo().pneus"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-            <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-brand-700"></i></div>
-            <div><p class="text-sm text-gray-500">Total comprado</p><p class="text-2xl font-semibold mt-0.5 text-brand-700 num" x-text="formatCurrency(comprasResumo().total)"></p></div>
+            <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-emerald-800"></i></div>
+            <div><p class="text-sm text-gray-500">Total comprado</p><p class="text-2xl font-semibold mt-0.5 text-emerald-800 num" x-text="formatCurrency(comprasResumo().total)"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
             <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-6 h-6 text-amber-600"></i></div>
-            <div><p class="text-sm text-gray-500">A prazo</p><p class="text-2xl font-semibold mt-0.5 text-amber-600 num" x-text="formatCurrency(comprasResumo().prazo)"></p><p class="text-xs text-amber-600 mt-1"><span x-text="comprasResumo().prazoCount"></span> compra(s) em aberto</p></div>
+            <div><p class="text-sm text-gray-500">Em trânsito</p><p class="text-2xl font-semibold mt-0.5 text-amber-600 num" x-text="comprasResumo().transito"></p><p class="text-xs text-gray-500 mt-1"><span x-text="comprasResumo().prazoCount"></span> título(s) a pagar</p></div>
           </div>
         </div>
 
         <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
           <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Últimas compras</h3><p class="text-xs text-gray-500 mt-1">Toda compra confirmada atualiza o galpão e o custo médio na mesma operação.</p></div>
+            <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Últimas compras</h3><p class="text-xs text-gray-500 mt-1">Pagamento e recebimento são acompanhados separadamente, sem dupla contagem.</p></div>
             <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Pneus</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium text-center">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
-              <template x-for="c in compras.slice(0, 4)" :key="'visao-' + c.id"><tr :class="c.status === 'cancelled' ? 'opacity-55' : 'hover:bg-gray-50'"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="compraData(c)"></td><td class="px-4 py-3 font-medium" x-text="c.supplier_name"></td><td class="px-4 py-3 text-center num" x-text="c.items_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(c.total_amount))"></td><td class="px-4 py-3"><span x-show="c.payment_status === 'paid'" class="text-emerald-700">À vista</span><span x-show="c.payment_status === 'pending'" class="text-amber-700" x-text="'A prazo' + (c.due_date ? ' · ' + financeDate(c.due_date) : '')"></span></td><td class="px-4 py-3 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="c.status === 'cancelled' ? 'bg-rose-50 text-rose-700' : c.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="c.status === 'cancelled' ? 'Cancelada' : c.status === 'pending' ? 'Aguardando pneus' : 'Confirmada'"></span></td><td class="px-5 py-3 text-right"><button @click="comprasTab = 'historico'" class="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500" title="Abrir histórico"><i data-lucide="ellipsis" class="w-4 h-4"></i></button></td></tr></template>
-              <tr x-show="compras.length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Nenhuma compra registrada ainda.</td></tr>
+              <template x-for="c in comprasOverview.rows" :key="'visao-' + c.id"><tr :class="c.status === 'cancelled' ? 'opacity-55' : 'hover:bg-gray-50'"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="compraData(c)"></td><td class="px-4 py-3 font-medium" x-text="c.supplier_name"></td><td class="px-4 py-3 text-center num" x-text="c.items_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(c.total_amount))"></td><td class="px-4 py-3"><span :class="c.payment_status === 'paid' ? 'text-emerald-700' : 'text-amber-700'" x-text="compraPaymentLabel(c)"></span></td><td class="px-4 py-3 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="c.status === 'cancelled' ? 'bg-rose-50 text-rose-700' : c.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="c.status === 'cancelled' ? 'Cancelada' : c.status === 'pending' ? 'Aguardando pneus' : 'Recebida'"></span></td><td class="px-5 py-3 text-right"><button @click="compraOpenDetails(c)" class="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500" title="Ver detalhes"><i data-lucide="ellipsis" class="w-4 h-4"></i></button></td></tr></template>
+              <tr x-show="!comprasLoading.overview && comprasOverview.rows.length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Nenhuma compra registrada ainda.</td></tr>
             </tbody></table></div>
-            <div class="p-4 border-t border-gray-100"><button @click="comprasTab = 'historico'" class="w-full border border-gray-200 hover:bg-gray-50 text-brand-700 text-sm font-medium px-3 py-2.5 rounded-lg">Ver histórico completo</button></div>
+            <div class="p-4 border-t border-gray-100"><button @click="comprasOpenTab('historico')" class="w-full border border-gray-200 hover:bg-gray-50 text-emerald-800 text-sm font-medium px-3 py-2.5 rounded-lg">Ver histórico completo</button></div>
           </div>
 
           <div class="2xl:col-span-4 space-y-5">
             <div class="bg-white border border-gray-200 rounded-xl p-5">
               <h3 class="text-base font-semibold mb-3">Atenção rápida</h3>
               <div class="divide-y divide-gray-100">
-                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="package-search" class="w-4 h-4 text-brand-700"></i></div><div class="min-w-0 flex-1"><p class="text-sm font-semibold"><span x-text="stockResumo().repor + stockResumo().zeradas"></span> medidas pedem reposição</p><p class="text-xs text-gray-500 mt-0.5">Veja o que precisa comprar agora</p></div><button @click="currentPage = 'estoque'; stockTab = 'reposicao'" class="px-3 py-1.5 rounded-lg border border-brand-600 text-brand-700 text-xs font-medium hover:bg-brand-50">Ver estoque</button></div>
-                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i></div><div class="min-w-0 flex-1"><p class="text-sm font-semibold"><span x-text="comprasResumo().prazoCount"></span> compras a prazo</p><p class="text-xs text-gray-500 mt-0.5" x-text="formatCurrency(comprasResumo().prazo) + ' em aberto'"></p></div><button @click="currentPage = 'financeiro'; finTab = 'pagar'" class="px-3 py-1.5 rounded-lg border border-brand-600 text-brand-700 text-xs font-medium hover:bg-brand-50">Contas a pagar</button></div>
+                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="package-search" class="w-4 h-4 text-emerald-800"></i></div><div class="min-w-0 flex-1"><p class="text-sm font-semibold"><span x-text="stockResumo().repor + stockResumo().zeradas"></span> medidas pedem reposição</p><p class="text-xs text-gray-500 mt-0.5">Veja o que precisa comprar agora</p></div><button @click="currentPage = 'estoque'; stockTab = 'reposicao'" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-medium hover:bg-emerald-50">Ver estoque</button></div>
+                <div class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="calendar-clock" class="w-4 h-4 text-amber-600"></i></div><div class="min-w-0 flex-1"><p class="text-sm font-semibold"><span x-text="comprasResumo().prazoCount"></span> compras a prazo</p><p class="text-xs text-gray-500 mt-0.5" x-text="formatCurrency(comprasResumo().prazo) + ' em aberto'"></p></div><button @click="currentPage = 'financeiro'; finTab = 'pagar'" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-medium hover:bg-emerald-50">Contas a pagar</button></div>
                 <div x-show="fornecedorDependencia()" class="py-3 flex items-center gap-3"><div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" :class="fornecedorDependencia() && fornecedorDependencia().pct >= 60 ? 'bg-amber-50' : 'bg-gray-50'"><i data-lucide="triangle-alert" class="w-4 h-4" :class="fornecedorDependencia() && fornecedorDependencia().pct >= 60 ? 'text-amber-600' : 'text-gray-500'"></i></div><div class="min-w-0 flex-1"><p class="text-sm font-semibold">Dependência de fornecedor</p><p class="text-xs text-gray-500 mt-0.5"><span x-text="fornecedorDependencia() ? fornecedorDependencia().pct : 0"></span>% das compras vêm de <span x-text="fornecedorDependencia() ? fornecedorDependencia().name : '—'"></span></p></div><span class="px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="fornecedorDependencia() && fornecedorDependencia().pct >= 60 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="fornecedorDependencia() && fornecedorDependencia().pct >= 60 ? 'Atenção' : 'Saudável'"></span></div>
               </div>
             </div>
 
             <div class="bg-white border border-gray-200 rounded-xl p-5">
               <h3 class="text-base font-semibold mb-3">Maior fornecedor</h3>
-              <template x-if="fornecedorRanking.length"><div class="flex items-center gap-3"><div class="w-11 h-11 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="contact" class="w-5 h-5 text-brand-700"></i></div><div class="min-w-0 flex-1"><p class="font-semibold truncate" x-text="fornecedorRanking[0].name"></p><p class="text-xs text-gray-500 mt-0.5"><span x-text="fornecedorRanking[0].purchases_count"></span> compras · <span x-text="formatCurrency(Number(fornecedorRanking[0].total_spent || 0))"></span></p><p class="text-xs text-gray-400 mt-0.5">Última compra em <span x-text="fornecedorLastPurchase(fornecedorRanking[0])"></span></p></div><button @click="comprasTab = 'fornecedores'" class="text-xs font-medium text-brand-700 whitespace-nowrap">Ver fornecedores</button></div></template>
+              <template x-if="fornecedorRanking.length"><div class="flex items-center gap-3"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="contact" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0 flex-1"><p class="font-semibold truncate" x-text="fornecedorRanking[0].name"></p><p class="text-xs text-gray-500 mt-0.5"><span x-text="fornecedorRanking[0].purchases_count"></span> compras · <span x-text="formatCurrency(Number(fornecedorRanking[0].total_spent || 0))"></span></p><p class="text-xs text-gray-400 mt-0.5">Última compra em <span x-text="fornecedorLastPurchase(fornecedorRanking[0])"></span></p></div><button @click="comprasOpenTab('fornecedores')" class="text-xs font-medium text-emerald-800 whitespace-nowrap">Ver fornecedores</button></div></template>
               <div x-show="fornecedorRanking.length === 0" class="py-4 text-center text-sm text-gray-500">O maior fornecedor aparecerá após as primeiras compras.</div>
             </div>
           </div>
@@ -1929,64 +1934,224 @@
           <div class="bg-white border border-gray-200 rounded-xl p-5">
             <div class="mb-3"><h3 class="text-base font-semibold">Melhores preços recentes</h3><p class="text-xs text-gray-500 mt-1">Menor custo médio registrado por medida</p></div>
             <div class="divide-y divide-gray-100">
-              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.measure"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-brand-600 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
+              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.measure"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-emerald-700 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
               <div x-show="fornecedorBreakdown.length === 0" class="py-8 text-center text-sm text-gray-500">Os melhores preços aparecem depois das primeiras compras.</div>
             </div>
-            <button @click="comprasTab = 'precos'" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-brand-700 text-sm font-medium px-3 py-2.5 rounded-lg">Ver comparação completa</button>
+            <button @click="comprasOpenTab('precos')" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-emerald-800 text-sm font-medium px-3 py-2.5 rounded-lg">Ver comparação completa</button>
           </div>
 
           <div class="bg-white border border-gray-200 rounded-xl p-5">
             <div class="mb-5"><h3 class="text-base font-semibold">Como a compra circula</h3><p class="text-xs text-gray-500 mt-1">Uma operação, três áreas atualizadas</p></div>
             <div class="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-start gap-3">
-              <div class="text-center"><div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center mx-auto"><i data-lucide="shopping-cart" class="w-6 h-6 text-brand-700"></i></div><p class="text-sm font-medium mt-3">1. Compra registrada</p></div><i data-lucide="arrow-right" class="w-5 h-5 text-gray-300 mt-4"></i>
-              <div class="text-center"><div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center mx-auto"><i data-lucide="warehouse" class="w-6 h-6 text-brand-700"></i></div><p class="text-sm font-medium mt-3">2. Galpão atualizado</p></div><i data-lucide="arrow-right" class="w-5 h-5 text-gray-300 mt-4"></i>
-              <div class="text-center"><div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center mx-auto"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-brand-700"></i></div><p class="text-sm font-medium mt-3">3. Financeiro atualizado</p></div>
+              <div class="text-center"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="shopping-cart" class="w-6 h-6 text-emerald-800"></i></div><p class="text-sm font-medium mt-3">1. Compra e financeiro</p></div><i data-lucide="arrow-right" class="w-5 h-5 text-gray-300 mt-4"></i>
+              <div class="text-center"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="truck" class="w-6 h-6 text-emerald-800"></i></div><p class="text-sm font-medium mt-3">2. Em trânsito ou recebida</p></div><i data-lucide="arrow-right" class="w-5 h-5 text-gray-300 mt-4"></i>
+              <div class="text-center"><div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="warehouse" class="w-6 h-6 text-emerald-800"></i></div><p class="text-sm font-medium mt-3">3. Estoque só ao receber</p></div>
             </div>
-            <p class="text-xs text-gray-500 text-center mt-5">À vista registra o pagamento. A prazo cria o título em Contas a pagar.</p>
+            <p class="text-xs text-gray-500 text-center mt-5">A compra nasce no Financeiro; o galpão só muda quando os pneus são recebidos.</p>
           </div>
         </div>
       </div>
 
-      <!-- NOVA COMPRA: mesmos campos e mesma função compraSubmit. -->
-      <div x-show="comprasTab === 'nova'" x-cloak class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div class="p-6 border-b border-gray-100"><h3 class="text-lg font-semibold">Registrar nova compra</h3><p class="text-sm text-gray-500 mt-1">A entrada alimenta o galpão e recalcula o custo médio de cada medida.</p></div>
-        <div class="p-6 space-y-5">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Fornecedor</span><select x-model="compraForm.supplierKey" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-100 focus:border-brand-400 outline-none"><option value="">Escolha o fornecedor…</option><option value="new">+ Novo fornecedor</option><template x-for="s in fornecedores" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></label>
-            <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Observação</span><input x-model="compraForm.notes" type="text" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"></label>
+      <!-- NOVA COMPRA: pagamento e recebimento são eixos independentes. -->
+      <div x-show="comprasTab === 'nova'" x-cloak class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
+        <div class="2xl:col-span-9 bg-white border border-gray-200 rounded-xl overflow-visible">
+          <div class="p-6 border-b border-gray-100">
+            <h3 class="text-lg font-semibold">Registrar nova compra</h3>
+            <p class="text-sm text-gray-500 mt-1">A compra entra no Financeiro agora; o galpão só muda quando os pneus forem recebidos.</p>
           </div>
-          <div x-show="compraForm.supplierKey === 'new'" class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-brand-50/50 border border-brand-100 rounded-xl"><label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Nome do novo fornecedor</span><input x-model="compraForm.newName" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label><label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Documento</span><input x-model="compraForm.newDocument" type="text" placeholder="CPF/CNPJ opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label><label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Telefone</span><input x-model="compraForm.newPhone" type="text" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label></div>
+          <div class="p-6 space-y-6">
+            <section>
+              <div class="flex items-center gap-3 mb-3"><span class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm font-semibold flex items-center justify-center">1</span><h4 class="font-semibold">Fornecedor</h4></div>
+              <div class="flex flex-col md:flex-row gap-3">
+                <select x-model="compraForm.supplierKey" class="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 outline-none">
+                  <option value="">Escolha o fornecedor…</option>
+                  <option value="new">+ Cadastrar junto com a compra</option>
+                  <template x-for="s in fornecedores" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+                </select>
+                <button type="button" @click="fornecedorOpenCreate()" class="px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50 inline-flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Novo fornecedor</button>
+              </div>
+              <div x-show="compraForm.supplierKey === 'new'" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl">
+                <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Nome</span><input x-model="compraForm.newName" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label>
+                <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Documento</span><input x-model="compraForm.newDocument" type="text" placeholder="CPF/CNPJ opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label>
+                <label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Telefone</span><input x-model="compraForm.newPhone" type="text" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"></label>
+              </div>
+            </section>
 
-          <div><div class="grid grid-cols-12 gap-3 px-1 mb-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide"><div class="col-span-4">Medida</div><div class="col-span-3">Marca</div><div class="col-span-2">Quantidade</div><div class="col-span-2">Custo unitário</div><div class="col-span-1"></div></div>
-            <template x-for="(it, i) in compraForm.items" :key="i"><div class="grid grid-cols-12 gap-3 mb-3 items-center"><input x-model="it.measure" type="text" placeholder="Ex.: 185/65 R15" class="col-span-4 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><input x-model="it.brand" type="text" placeholder="Opcional" class="col-span-3 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><input x-model="it.quantity" type="number" min="1" placeholder="0" class="col-span-2 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><input x-model="it.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="col-span-2 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><button @click="compraRemoveItem(i)" x-show="compraForm.items.length > 1" class="col-span-1 text-gray-400 hover:text-rose-500 flex justify-center"><i data-lucide="x" class="w-4 h-4"></i></button></div></template>
-            <button @click="compraAddItem()" class="text-sm text-brand-700 hover:text-brand-800 font-medium inline-flex items-center gap-1"><i data-lucide="plus" class="w-4 h-4"></i> Adicionar pneu</button>
+            <section class="pt-5 border-t border-gray-100">
+              <div class="flex items-center gap-3 mb-3"><span class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm font-semibold flex items-center justify-center">2</span><h4 class="font-semibold">Pneus da compra</h4></div>
+              <div class="hidden lg:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-t-lg text-[11px] font-medium text-gray-500 uppercase tracking-wide"><div class="col-span-3">Medida</div><div class="col-span-3">Marca</div><div class="col-span-2">Quantidade</div><div class="col-span-2">Custo unitário</div><div class="col-span-1 text-right">Subtotal</div><div class="col-span-1"></div></div>
+              <div class="border border-gray-200 lg:border-t-0 rounded-lg lg:rounded-t-none divide-y divide-gray-100">
+                <template x-for="(it, i) in compraForm.items" :key="i">
+                  <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 items-center">
+                    <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-500">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'compra'+i)" @focus="measureFind(it.measure, 'compra'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="Ex.: 90/90-18" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"><div x-show="measureBox.key === 'compra'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template></div></div>
+                    <label class="lg:col-span-3"><span class="lg:hidden text-xs text-gray-500">Marca</span><input x-model="it.brand" type="text" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                    <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Quantidade</span><input x-model="it.quantity" type="number" min="1" step="1" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                    <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Custo unitário</span><input x-model="it.unit_cost" type="number" min="0" step="0.01" placeholder="0,00" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                    <div class="lg:col-span-1 text-right text-sm font-semibold num" x-text="formatCurrency((Number(it.quantity)||0)*(Number(it.unit_cost)||0))"></div>
+                    <button type="button" @click="compraRemoveItem(i)" x-show="compraForm.items.length > 1" class="lg:col-span-1 text-gray-400 hover:text-rose-500 flex justify-end lg:justify-center" aria-label="Remover item"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  </div>
+                </template>
+              </div>
+              <button type="button" @click="compraAddItem()" class="mt-3 px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50 inline-flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Adicionar pneu</button>
+            </section>
+
+            <section class="pt-5 border-t border-gray-100">
+              <div class="flex items-center gap-3 mb-4"><span class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm font-semibold flex items-center justify-center">3</span><h4 class="font-semibold">Pagamento e recebimento</h4></div>
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div>
+                  <p class="text-xs font-medium text-gray-600 mb-2">Condição de pagamento</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" @click="compraForm.payment_status='paid'; compraForm.due_date=''" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.payment_status === 'paid' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">À vista</button>
+                    <button type="button" x-show="atacadoFinance" @click="compraForm.payment_status='pending'" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.payment_status === 'pending' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">A prazo</button>
+                  </div>
+                  <label x-show="atacadoFinance && compraForm.payment_status === 'pending'" class="block mt-3"><span class="block text-xs font-medium text-gray-600 mb-1.5">Vencimento</span><input x-model="compraForm.due_date" type="date" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-600 mb-2">Recebimento dos pneus</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button type="button" @click="compraForm.receipt_status='received'" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.receipt_status === 'received' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">Já chegaram</button>
+                    <button type="button" @click="compraForm.receipt_status='pending'" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.receipt_status === 'pending' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">Ainda não chegaram</button>
+                  </div>
+                </div>
+              </div>
+              <label class="block mt-5"><span class="block text-xs font-medium text-gray-600 mb-1.5">Observações</span><textarea x-model="compraForm.notes" rows="3" maxlength="1000" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></textarea></label>
+            </section>
           </div>
+        </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Recebimento dos pneus</span><select x-model="compraForm.receipt_status" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><option value="received">Já chegaram — entrar no galpão</option><option value="pending">Ainda não chegaram — deixar pendente</option></select></label><div x-show="atacadoFinance"><label class="block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Pagamento</span><select x-model="compraForm.payment_status" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"><option value="paid">Pago na hora (à vista)</option><option value="pending">A prazo — fica no a pagar</option></select></label><label x-show="compraForm.payment_status === 'pending'" class="block mt-3"><span class="block text-xs font-medium text-gray-600 mb-1.5">Vencimento</span><input x-model="compraForm.due_date" type="date" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-100"></label></div></div>
+        <aside class="2xl:col-span-3 bg-white border border-gray-200 rounded-xl p-5 2xl:sticky 2xl:top-5">
+          <h3 class="text-base font-semibold">Resumo da compra</h3>
+          <div class="mt-5 space-y-4">
+            <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dot-dashed" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-2xl font-semibold num" x-text="compraFormSummary().tires"></p><p class="text-xs text-gray-500">pneus</p></div></div>
+            <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="ruler" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-2xl font-semibold num" x-text="compraFormSummary().measures"></p><p class="text-xs text-gray-500">medidas</p></div></div>
+            <div class="pt-4 border-t border-gray-100"><p class="text-sm text-gray-500">Total</p><p class="text-3xl font-semibold mt-1 num" x-text="formatCurrency(compraFormSummary().total)"></p></div>
+          </div>
+          <div class="mt-5 p-4 rounded-xl border border-emerald-100 bg-emerald-50/60">
+            <p class="text-sm font-semibold text-emerald-900 mb-3">Ao confirmar</p>
+            <div class="space-y-2"><template x-for="row in compraConsequences()" :key="row.label"><div class="flex items-start gap-2 text-xs" :class="row.active ? 'text-emerald-900' : 'text-gray-600'"><i :data-lucide="row.active ? 'check-circle-2' : 'clock-3'" class="w-4 h-4 mt-0.5 flex-shrink-0"></i><span x-text="row.label"></span></div></template></div>
+          </div>
+          <button @click="compraSubmit()" :disabled="compraSaving" class="mt-5 w-full px-5 py-3 bg-emerald-700 text-white rounded-lg text-sm font-semibold hover:bg-emerald-800 disabled:opacity-50"><span x-show="!compraSaving">Registrar compra</span><span x-show="compraSaving">Salvando…</span></button>
+          <button @click="comprasOpenTab('visao')" class="mt-2 w-full px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900">Voltar</button>
+        </aside>
+      </div>
 
-          <div class="pt-5 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><p class="text-xs text-gray-500">Total da compra</p><p class="text-2xl font-semibold num" x-text="formatCurrency(compraFormTotal())"></p></div><div class="flex gap-2"><button @click="comprasTab = 'visao'" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Voltar</button><button @click="compraSubmit()" :disabled="compraSaving" class="px-5 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"><span x-show="!compraSaving">Registrar compra</span><span x-show="compraSaving">Salvando…</span></button></div></div>
+      <!-- HISTÓRICO: filtros e paginação são aplicados no servidor. -->
+      <div x-show="comprasTab === 'historico'" x-cloak class="space-y-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex flex-col xl:flex-row xl:items-end gap-3">
+            <label class="flex-1"><span class="block text-xs font-medium text-gray-600 mb-1.5">Buscar fornecedor ou medida</span><div class="relative"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasHistoryFilters.search" @keyup.enter="loadComprasHistory(true)" type="search" placeholder="Ex.: Carioca ou 90/90-18" class="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div></label>
+            <label class="xl:w-44"><span class="block text-xs font-medium text-gray-600 mb-1.5">Período</span><select x-model="comprasHistoryFilters.period" @change="loadComprasHistory(true)" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="year">Este ano</option><option value="all">Todo o histórico</option></select></label>
+            <label class="xl:w-44"><span class="block text-xs font-medium text-gray-600 mb-1.5">Recebimento</span><select x-model="comprasHistoryFilters.status" @change="loadComprasHistory(true)" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="all">Todos</option><option value="pending">Aguardando pneus</option><option value="confirmed">Recebidas</option><option value="cancelled">Canceladas</option></select></label>
+            <label class="xl:w-44"><span class="block text-xs font-medium text-gray-600 mb-1.5">Pagamento</span><select x-model="comprasHistoryFilters.payment" @change="loadComprasHistory(true)" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="all">Todos</option><option value="paid">Pagos</option><option value="pending">A pagar</option></select></label>
+            <button @click="loadComprasHistory(true)" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Buscar</button>
+            <button @click="comprasExportCsv()" :disabled="comprasLoading.history" class="px-4 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 inline-flex items-center justify-center gap-2 disabled:opacity-50"><i data-lucide="download" class="w-4 h-4"></i>Exportar CSV</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="shopping-cart" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Compras no recorte</p><p class="text-2xl font-semibold num" x-text="Number(comprasHistory.summary?.rows_count || 0)"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dot-dashed" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Pneus recebidos</p><p class="text-2xl font-semibold num" x-text="Number(comprasHistory.summary?.received_tires || 0)"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dollar-sign" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Total comprometido</p><p class="text-2xl font-semibold text-emerald-800 num" x-text="formatCurrency(Number(comprasHistory.summary?.total_committed || 0))"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Pendências</p><p class="text-2xl font-semibold text-amber-600 num" x-text="Number(comprasHistory.summary?.pending_receipts || 0) + Number(comprasHistory.summary?.open_payments || 0)"></p><p class="text-[11px] text-gray-500 mt-0.5"><span x-text="Number(comprasHistory.summary?.pending_receipts || 0)"></span> recebimento · <span x-text="Number(comprasHistory.summary?.open_payments || 0)"></span> pagamento</p></div></div>
+        </div>
+
+        <div x-show="comprasErrors.history" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível carregar o histórico. Os dados anteriores foram mantidos.</span><button @click="loadComprasHistory()" class="font-semibold hover:underline">Tentar novamente</button></div>
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[1080px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Pneus</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium">Recebimento</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="c in comprasHistory.rows" :key="'historico-' + c.id"><tr :class="c.status === 'cancelled' ? 'opacity-60' : 'hover:bg-gray-50'"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="compraData(c)"></td><td class="px-4 py-3"><p class="font-medium" x-text="c.supplier_name"></p><span x-show="c.supplier_archived_at" class="text-[11px] text-gray-400">fornecedor arquivado</span></td><td class="px-4 py-3 text-center num" x-text="c.items_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(c.total_amount))"></td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="c.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="compraPaymentLabel(c)"></span></td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="c.stock_applied ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="compraReceiptLabel(c)"></span></td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold" :class="c.status === 'cancelled' ? 'bg-rose-50 text-rose-700' : c.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="c.status === 'cancelled' ? 'Cancelada' : c.status === 'pending' ? 'Em trânsito' : 'Ativa'"></span></td><td class="px-5 py-3 text-right whitespace-nowrap"><button @click="compraOpenDetails(c)" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100" title="Ver detalhes"><i data-lucide="eye" class="w-4 h-4"></i></button><button x-show="c.status === 'pending'" @click="compraOpenAction(c, 'confirm')" class="ml-1 text-xs px-3 py-1.5 rounded-lg text-emerald-800 hover:bg-emerald-50 font-medium">Confirmar chegada</button><button x-show="c.status !== 'cancelled'" @click="compraOpenAction(c, 'cancel')" class="ml-1 text-xs px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 font-medium">Cancelar</button></td></tr></template>
+              <tr x-show="comprasLoading.history"><td colspan="8" class="px-5 py-12 text-center text-gray-500"><span class="inline-flex items-center gap-2"><span class="w-4 h-4 border-2 border-emerald-200 border-t-emerald-700 rounded-full animate-spin"></span>Carregando histórico…</span></td></tr>
+              <tr x-show="!comprasLoading.history && comprasHistory.rows.length === 0"><td colspan="8" class="px-5 py-12 text-center text-gray-500">Nenhuma compra encontrada nesse recorte.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="px-5 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p class="text-xs text-gray-500">Mostrando <span x-text="comprasHistory.rows.length"></span> de <span x-text="Number(comprasHistory.pagination?.total || 0)"></span> compras</p>
+            <div class="flex items-center gap-1"><button @click="comprasHistoryPage(Number(comprasHistory.pagination?.page || 1)-1)" :disabled="Number(comprasHistory.pagination?.page || 1) <= 1" class="w-9 h-9 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40"><i data-lucide="chevron-left" class="w-4 h-4 mx-auto"></i></button><template x-for="page in comprasHistoryPageNumbers()" :key="page"><button @click="comprasHistoryPage(page)" class="w-9 h-9 rounded-lg border text-sm font-medium" :class="page === Number(comprasHistory.pagination?.page || 1) ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-gray-200 text-gray-600'" x-text="page"></button></template><button @click="comprasHistoryPage(Number(comprasHistory.pagination?.page || 1)+1)" :disabled="Number(comprasHistory.pagination?.page || 1) >= Number(comprasHistory.pagination?.pages || 1)" class="w-9 h-9 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-40"><i data-lucide="chevron-right" class="w-4 h-4 mx-auto"></i></button></div>
+          </div>
         </div>
       </div>
 
-      <!-- HISTÓRICO: mantém cancelamento e reversão transacional existentes. -->
-      <div x-show="comprasTab === 'historico'" x-cloak class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Histórico de compras</h3><p class="text-xs text-gray-500 mt-1">Ao cancelar, os pneus saem do galpão, o custo médio recalcula e o título a prazo é retirado.</p></div>
-        <div class="overflow-x-auto"><table class="w-full text-sm min-w-[850px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Pneus</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium">Pagamento</th><th class="px-4 py-3 font-medium text-center">Status</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
-          <template x-for="c in compras" :key="'historico-' + c.id"><tr :class="c.status === 'cancelled' ? 'opacity-55' : 'hover:bg-gray-50'"><td class="px-5 py-3 text-gray-500" x-text="compraData(c)"></td><td class="px-4 py-3 font-medium" x-text="c.supplier_name"></td><td class="px-4 py-3 text-center num" x-text="c.items_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(c.total_amount))"></td><td class="px-4 py-3"><span x-show="c.payment_status === 'pending'" class="inline-flex px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs" x-text="'A prazo' + (c.due_date ? ' · vence ' + financeDate(c.due_date) : '')"></span><span x-show="c.payment_status === 'paid'" class="text-emerald-700">À vista</span></td><td class="px-4 py-3 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="c.status === 'cancelled' ? 'bg-rose-50 text-rose-700' : c.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'" x-text="c.status === 'cancelled' ? 'Cancelada' : c.status === 'pending' ? 'Aguardando pneus' : 'Confirmada'"></span></td><td class="px-5 py-3 text-right whitespace-nowrap"><button x-show="c.status === 'pending'" @click="compraCancel(c, 'confirm')" class="text-xs px-3 py-1.5 rounded-lg text-brand-700 hover:bg-brand-50 font-medium">Confirmar chegada</button><button x-show="c.status !== 'cancelled'" @click="compraCancel(c)" class="text-xs px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 font-medium">Cancelar</button></td></tr></template>
-          <tr x-show="compras.length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Nenhuma compra registrada ainda.</td></tr>
-        </tbody></table></div>
-      </div>
-
-      <!-- FORNECEDORES: ranking, dependência e arquivamento existentes. -->
+      <!-- FORNECEDORES: compromisso comercial inclui mercadoria em trânsito; preço usa só recebidas. -->
       <div x-show="comprasTab === 'fornecedores'" x-cloak class="space-y-5">
-        <template x-if="fornecedorDependencia()"><div class="bg-white border rounded-xl p-5 flex items-center gap-4" :class="fornecedorDependencia().pct >= 60 ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200'"><div class="w-10 h-10 rounded-full flex items-center justify-center" :class="fornecedorDependencia().pct >= 60 ? 'bg-amber-100' : 'bg-brand-50'"><i data-lucide="pie-chart" class="w-5 h-5" :class="fornecedorDependencia().pct >= 60 ? 'text-amber-700' : 'text-brand-700'"></i></div><div><p class="text-sm font-semibold">Concentração de compras</p><p class="text-sm text-gray-600 mt-1"><span class="font-semibold" x-text="fornecedorDependencia().pct + '%'"></span> das compras vêm de <span class="font-medium" x-text="fornecedorDependencia().name"></span>.<span x-show="fornecedorDependencia().pct >= 60" class="text-amber-700"> Dependência alta de um fornecedor só.</span></p></div></div></template>
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden"><div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Ranking de fornecedores</h3><p class="text-xs text-gray-500 mt-1">De quem você compra mais, quanto já gastou e quem ficou parado.</p></div><div class="overflow-x-auto"><table class="w-full text-sm min-w-[800px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Compras</th><th class="px-4 py-3 font-medium text-right">Total gasto</th><th class="px-4 py-3 font-medium">Última compra</th><th class="px-4 py-3 font-medium text-center">Situação</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="s in fornecedorRanking" :key="s.supplier_id"><tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="s.name"></td><td class="px-4 py-3 text-center num" x-text="s.purchases_count"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(s.total_spent || 0))"></td><td class="px-4 py-3 text-gray-500" x-text="fornecedorLastPurchase(s)"></td><td class="px-4 py-3 text-center"><span class="inline-flex text-xs px-2.5 py-1 rounded-full" :class="fornecedorStatus(s).cls" x-text="fornecedorStatus(s).label"></span></td><td class="px-5 py-3 text-right"><button @click="fornecedorArchive(s)" class="text-xs px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 font-medium">Arquivar</button></td></tr></template><tr x-show="fornecedorRanking.length === 0"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-500">Nenhum fornecedor ainda. Registre uma compra.</td></tr></tbody></table></div></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="users" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Fornecedores ativos</p><p class="text-2xl font-semibold num" x-text="comprasSupplierCards().active"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trophy" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Maior fornecedor</p><p class="text-lg font-semibold truncate" x-text="comprasSupplierCards().top?.name || '—'"></p><p class="text-[11px] text-gray-500" x-show="comprasSupplierCards().top" x-text="formatCurrency(Number(comprasSupplierCards().top?.total_spent || 0)) + ' comprometidos'"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="tag" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Ticket médio</p><p class="text-2xl font-semibold num" x-text="formatCurrency(comprasSupplierCards().ticket)"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="clock-3" class="w-5 h-5 text-amber-600"></i></div><div><p class="text-xs text-gray-500">Sem comprar há 60 dias</p><p class="text-2xl font-semibold text-amber-600 num" x-text="comprasSupplierCards().stale"></p></div></div>
+        </div>
+
+        <div x-show="comprasErrors.suppliers" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível atualizar os fornecedores. Os dados anteriores foram mantidos.</span><button @click="loadComprasSuppliers()" class="font-semibold hover:underline">Tentar novamente</button></div>
+        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
+          <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"><div><h3 class="text-base font-semibold">Fornecedores</h3><p class="text-xs text-gray-500 mt-1">De quem você compra, quanto já comprometeu e quem ficou parado.</p></div><div class="flex flex-col sm:flex-row gap-2"><div class="relative"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasSupplierSearch" type="search" placeholder="Buscar fornecedor" class="w-full sm:w-64 pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div><button @click="fornecedorOpenCreate()" class="px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50 inline-flex items-center justify-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>Novo fornecedor</button></div></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[850px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium">Contato</th><th class="px-4 py-3 font-medium text-center">Compras</th><th class="px-4 py-3 font-medium text-right">Total comprometido</th><th class="px-4 py-3 font-medium">Última compra</th><th class="px-4 py-3 font-medium">Situação</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="s in comprasSupplierRows()" :key="s.supplier_id"><tr @click="comprasSupplierSelect(s)" class="cursor-pointer hover:bg-gray-50" :class="comprasSupplierSelectedId === s.supplier_id ? 'bg-emerald-50/60 ring-1 ring-inset ring-emerald-100' : ''"><td class="px-5 py-3 font-medium" x-text="s.name"></td><td class="px-4 py-3 text-gray-500" x-text="s.phone || '—'"></td><td class="px-4 py-3 text-center num"><span x-text="s.purchases_count"></span><span x-show="Number(s.pending_receipts)>0" class="ml-1 text-[10px] text-amber-600" x-text="'+'+s.pending_receipts+' em trânsito'"></span></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(s.total_spent || 0))"></td><td class="px-4 py-3 text-gray-500" x-text="fornecedorLastPurchase(s)"></td><td class="px-4 py-3"><span class="inline-flex text-xs px-2.5 py-1 rounded-full" :class="fornecedorStatus(s).cls" x-text="fornecedorStatus(s).label"></span></td><td class="px-5 py-3 text-right"><button @click.stop="comprasSupplierSelect(s)" class="p-2 rounded-lg hover:bg-white text-gray-500" aria-label="Selecionar fornecedor"><i data-lucide="chevron-right" class="w-4 h-4"></i></button></td></tr></template>
+                <tr x-show="comprasLoading.suppliers"><td colspan="7" class="px-5 py-12 text-center text-gray-500">Carregando fornecedores…</td></tr>
+                <tr x-show="!comprasLoading.suppliers && comprasSupplierRows().length === 0"><td colspan="7" class="px-5 py-12 text-center text-gray-500">Nenhum fornecedor encontrado.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <aside class="2xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5">
+            <template x-if="comprasSupplierSelected()"><div>
+              <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Fornecedor selecionado</p>
+              <div class="mt-4 flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-800 flex items-center justify-center font-semibold" x-text="comprasSupplierInitials(comprasSupplierSelected())"></div><div class="min-w-0"><h3 class="text-lg font-semibold truncate" x-text="comprasSupplierSelected().name"></h3><span class="inline-flex mt-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px]">Ativo</span></div></div>
+              <dl class="mt-5 space-y-3 text-sm"><div class="flex justify-between gap-4"><dt class="text-gray-500">Telefone</dt><dd class="font-medium text-right" x-text="comprasSupplierSelected().phone || '—'"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Documento</dt><dd class="font-medium text-right" x-text="comprasSupplierSelected().document || '—'"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Em trânsito</dt><dd class="font-medium text-right text-amber-700" x-text="comprasSupplierSelected().pending_receipts"></dd></div><div class="flex justify-between gap-4"><dt class="text-gray-500">Títulos abertos</dt><dd class="font-medium text-right text-amber-700" x-text="comprasSupplierSelected().open_payments"></dd></div></dl>
+              <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-3 gap-3"><div><p class="text-lg font-semibold num" x-text="comprasSupplierSelected().purchases_count"></p><p class="text-[11px] text-gray-500">compras</p></div><div><p class="text-lg font-semibold num" x-text="formatCurrency(Number(comprasSupplierSelected().total_spent || 0))"></p><p class="text-[11px] text-gray-500">comprometido</p></div><div><p class="text-sm font-semibold" x-text="fornecedorLastPurchase(comprasSupplierSelected())"></p><p class="text-[11px] text-gray-500">última compra</p></div></div>
+              <div class="mt-5 pt-5 border-t border-gray-100"><p class="text-sm font-semibold mb-2">Medidas mais recebidas</p><div class="space-y-1.5"><template x-for="m in (comprasSupplierSelected().measures || []).slice(0, 4)" :key="m.measure"><div class="flex items-center justify-between text-sm"><span x-text="m.measure"></span><span class="text-gray-500 num" x-text="m.qty_total + ' un'"></span></div></template><p x-show="!(comprasSupplierSelected().measures || []).length" class="text-xs text-gray-500">Nenhuma mercadoria recebida ainda.</p></div></div>
+              <button @click="comprasSupplierHistory(comprasSupplierSelected())" class="mt-5 w-full px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Ver histórico</button>
+              <button @click="fornecedorOpenArchive(comprasSupplierSelected())" class="mt-2 w-full px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-lg">Arquivar fornecedor</button>
+            </div></template>
+            <div x-show="!comprasSupplierSelected()" class="py-12 text-center text-sm text-gray-500">Selecione um fornecedor para ver os detalhes.</div>
+          </aside>
+        </div>
       </div>
 
-      <!-- PREÇOS: comparação histórica já retornada pelo breakdown de fornecedor × medida. -->
-      <div x-show="comprasTab === 'precos'" x-cloak class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Preços por medida</h3><p class="text-xs text-gray-500 mt-1">Compare o custo médio registrado em cada fornecedor. A estrela marca o menor valor da medida.</p></div>
-        <div class="overflow-x-auto"><table class="w-full text-sm min-w-[780px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade comprada</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="g in breakdownByMeasure()" :key="g.measure"><template x-for="(row, ri) in g.suppliers" :key="g.measure + ':' + row.supplier_id"><tr class="hover:bg-gray-50" :class="row.cheapest ? 'bg-emerald-50/30' : ''"><td class="px-5 py-3 font-medium align-top" x-text="ri === 0 ? g.measure : ''"></td><td class="px-4 py-3"><i x-show="row.cheapest" data-lucide="star" class="inline w-4 h-4 mr-1 text-brand-600 fill-current"></i><span x-text="row.supplier_name"></span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total + ' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-brand-700' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template><tr x-show="fornecedorBreakdown.length === 0"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-500">Os preços aparecem depois das primeiras compras.</td></tr></tbody></table></div>
+      <!-- PREÇOS: média histórica ponderada de compras recebidas; nunca cotação atual. -->
+      <div x-show="comprasTab === 'precos'" x-cloak class="space-y-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div><h3 class="text-base font-semibold">Comparação histórica de preços</h3><p class="text-xs text-gray-500 mt-1">Baseada somente em compras recebidas. Não é cotação em tempo real.</p></div>
+          <div class="mt-4 flex flex-col lg:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasPriceFilters.search" @keyup.enter="loadComprasPrices()" type="search" placeholder="Buscar medida" class="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div>
+            <select x-model="comprasPriceFilters.supplierId" @change="loadComprasPrices()" class="lg:w-60 px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="">Todos os fornecedores</option><template x-for="s in comprasSuppliers" :key="'preco-f-'+s.supplier_id"><option :value="s.supplier_id" x-text="s.name"></option></template></select>
+            <select x-model="comprasPriceFilters.period" @change="loadComprasPrices()" class="lg:w-48 px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="year">Este ano</option><option value="all">Todo o histórico</option></select>
+            <button @click="loadComprasPrices()" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Comparar</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="ruler" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Medidas comparadas</p><p class="text-2xl font-semibold num" x-text="comprasPriceCards().measures"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trophy" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Menor média histórica</p><p class="text-lg font-semibold truncate" x-text="comprasPriceCards().top?.name || '—'"></p><p class="text-[11px] text-gray-500" x-show="comprasPriceCards().top"><span x-text="comprasPriceCards().top?.count"></span> medida(s)</p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="percent" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Diferença média</p><p class="text-2xl font-semibold num" x-text="comprasPriceCards().spread.toFixed(1) + '%'"></p><p class="text-[11px] text-gray-500">entre menor e maior média</p></div></div>
+        </div>
+
+        <div x-show="comprasErrors.prices" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível atualizar os preços. Os dados anteriores foram mantidos.</span><button @click="loadComprasPrices()" class="font-semibold hover:underline">Tentar novamente</button></div>
+        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
+          <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Custo médio por medida</h3></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Diferença</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="g in comprasPriceGroups()" :key="g.measure"><template x-for="(row, ri) in g.suppliers" :key="g.measure+':'+row.supplier_id"><tr @click="comprasPriceSelectedMeasure=g.measure" class="cursor-pointer hover:bg-gray-50" :class="comprasPriceSelectedMeasure === g.measure ? 'bg-emerald-50/50' : ''"><td class="px-5 py-3 font-semibold align-top" x-text="ri === 0 ? g.measure : ''"></td><td class="px-4 py-3"><span x-show="row.cheapest" class="inline-flex mr-2 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">Menor média ★</span><span x-text="row.supplier_name"></span><span x-show="row.supplier_archived" class="ml-1 text-[10px] text-gray-400">arquivado</span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total+' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-emerald-800' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-4 py-3 text-right num" x-text="row.cheapest ? '—' : '+'+row.diff_pct.toFixed(1)+'%'"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template>
+                <tr x-show="comprasLoading.prices"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Carregando comparação…</td></tr>
+                <tr x-show="!comprasLoading.prices && comprasPriceGroups().length === 0"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Nenhum preço recebido nesse recorte.</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+
+          <aside class="2xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5">
+            <template x-if="comprasPriceSelected()"><div>
+              <h3 class="text-xl font-semibold" x-text="comprasPriceSelected().measure"></h3>
+              <p class="text-xs text-gray-500 mt-1">Comparação da medida selecionada</p>
+              <div class="mt-5"><p class="text-xs text-gray-500">Melhor média histórica</p><p class="text-2xl font-semibold text-emerald-800 num" x-text="formatCurrency(Number(comprasPriceSelected().suppliers[0]?.avg_cost || 0))"></p><p class="text-sm text-gray-600 mt-1" x-text="comprasPriceSelected().suppliers[0]?.supplier_name"></p></div>
+              <div class="mt-5 space-y-3"><template x-for="row in comprasPriceSelected().suppliers" :key="'bar-'+row.supplier_id"><div><div class="flex items-center justify-between gap-3 text-xs mb-1"><span class="truncate" x-text="row.supplier_name"></span><span class="font-medium num" x-text="formatCurrency(Number(row.avg_cost))"></span></div><div class="h-2 rounded-full bg-gray-100 overflow-hidden"><div class="h-full rounded-full" :class="row.cheapest ? 'bg-emerald-700' : 'bg-gray-300'" :style="'width:'+Math.max(18,(Number(row.avg_cost)/Math.max(...comprasPriceSelected().suppliers.map(s=>Number(s.avg_cost))))*100)+'%'"></div></div></div></template></div>
+              <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-2 gap-4"><div><p class="text-lg font-semibold num" x-text="comprasPriceSelected().qty+' un'"></p><p class="text-[11px] text-gray-500">recebidas no recorte</p></div><div><p class="text-lg font-semibold num" x-text="comprasPriceSelected().suppliers.reduce((n,r)=>n+Number(r.purchases_count||0),0)"></p><p class="text-[11px] text-gray-500">compras observadas</p></div></div>
+              <div class="mt-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-xs flex gap-2"><i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i><span>Preço histórico orienta a negociação, mas não substitui uma cotação atual.</span></div>
+              <button @click="comprasUsePrice(comprasPriceSelected().suppliers[0])" class="mt-5 w-full px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Usar medida em nova compra</button>
+            </div></template>
+            <div x-show="!comprasPriceSelected()" class="py-12 text-center text-sm text-gray-500">Selecione uma medida para comparar.</div>
+          </aside>
+        </div>
       </div>
     </div>
 
@@ -5084,6 +5249,64 @@
           <span x-text="orderSubmitting ? 'Registrando...' : 'Confirmar venda'">Confirmar venda</span>
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal acessível de Compras: substitui confirm/prompt/alert no navegador embutido. -->
+<div x-show="compraDialog.open" x-cloak style="display: none;"
+     class="fixed inset-0 z-[70] flex items-center justify-center p-4"
+     @keydown.escape.window="compraCloseDialog()">
+  <div class="absolute inset-0 bg-gray-950/45" @click="compraCloseDialog()"></div>
+  <div class="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-200"
+       role="dialog" aria-modal="true" aria-labelledby="compra-dialog-title">
+    <div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+      <div>
+        <h3 id="compra-dialog-title" class="text-lg font-semibold" x-text="compraDialogTitle()"></h3>
+        <p x-show="compraDialogDescription()" class="text-sm text-gray-500 mt-1 leading-6" x-text="compraDialogDescription()"></p>
+      </div>
+      <button @click="compraCloseDialog()" class="w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500 flex items-center justify-center" aria-label="Fechar"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <div class="p-6">
+      <div x-show="compraDialog.kind === 'details' && compraDetalhe" class="space-y-5">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div><p class="text-xs text-gray-500">Data</p><p class="font-semibold mt-1" x-text="compraData(compraDetalhe)"></p></div>
+          <div><p class="text-xs text-gray-500">Fornecedor</p><p class="font-semibold mt-1" x-text="compraDetalhe?.supplier_name"></p></div>
+          <div><p class="text-xs text-gray-500">Pagamento</p><p class="font-semibold mt-1" x-text="compraPaymentLabel(compraDetalhe || {})"></p></div>
+          <div><p class="text-xs text-gray-500">Recebimento</p><p class="font-semibold mt-1" x-text="compraReceiptLabel(compraDetalhe || {})"></p></div>
+        </div>
+        <div><p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Itens</p><div class="border border-gray-200 rounded-xl overflow-hidden"><template x-for="item in (compraDetalhe?.items || [])" :key="item.id"><div class="px-4 py-3 border-b last:border-b-0 border-gray-100 flex items-center justify-between gap-4 text-sm"><div><span class="font-medium" x-text="item.quantity+'× '+item.measure"></span><span x-show="item.brand" class="text-gray-500" x-text="' · '+item.brand"></span></div><div class="text-right"><p class="font-semibold num" x-text="formatCurrency(Number(item.line_total))"></p><p class="text-[11px] text-gray-500 num" x-text="formatCurrency(Number(item.unit_cost))+' cada'"></p></div></div></template></div></div>
+        <div class="flex items-center justify-between pt-4 border-t border-gray-100"><span class="text-sm text-gray-500">Total da compra</span><span class="text-2xl font-semibold num" x-text="formatCurrency(Number(compraDetalhe?.total_amount || 0))"></span></div>
+        <div x-show="compraDetalhe?.notes" class="p-4 rounded-xl bg-gray-50"><p class="text-xs font-medium text-gray-500">Observação</p><p class="text-sm mt-1 whitespace-pre-wrap" x-text="compraDetalhe?.notes"></p></div>
+        <div x-show="compraDetalhe?.status === 'cancelled'" class="p-4 rounded-xl bg-rose-50 text-rose-800"><p class="text-xs font-semibold">Cancelamento</p><p class="text-sm mt-1" x-text="compraDetalhe?.cancel_reason || 'Motivo não informado'"></p><p class="text-[11px] mt-2 text-rose-600"><span x-text="compraDetalhe?.cancelled_by || 'operador'"></span> · <span x-text="compraDetalhe?.cancelled_at ? new Date(compraDetalhe.cancelled_at).toLocaleString('pt-BR') : ''"></span></p></div>
+        <div class="flex flex-wrap gap-2 pt-2"><button x-show="compraDetalhe?.status === 'pending'" @click="compraOpenAction(compraDetalhe, 'confirm')" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Confirmar chegada</button><button x-show="compraDetalhe?.status !== 'cancelled'" @click="compraOpenAction(compraDetalhe, 'cancel')" class="px-4 py-2.5 rounded-lg border border-rose-200 text-rose-600 text-sm font-medium hover:bg-rose-50">Cancelar compra</button></div>
+      </div>
+
+      <div x-show="compraDialog.kind === 'cancel'">
+        <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Motivo do cancelamento</span><textarea x-ref="compraDialogReason" x-model="compraDialog.reason" maxlength="300" rows="4" placeholder="Explique o motivo para preservar a trilha de auditoria" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-300"></textarea></label>
+        <div x-show="compraDialog.purchase?.payment_status === 'paid'" class="mt-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-xs flex gap-2"><i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0"></i><span>Esta compra consta como paga. O acerto ou reembolso com o fornecedor precisa ser tratado externamente.</span></div>
+      </div>
+
+      <div x-show="compraDialog.kind === 'supplier-create'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label class="md:col-span-2"><span class="block text-xs font-medium text-gray-600 mb-1.5">Nome</span><input x-ref="fornecedorDialogName" x-model="fornecedorForm.name" maxlength="200" type="text" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+        <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Telefone</span><input x-model="fornecedorForm.phone" maxlength="40" type="text" placeholder="Opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+        <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Documento</span><input x-model="fornecedorForm.document" maxlength="30" type="text" placeholder="CPF/CNPJ opcional" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+        <label class="md:col-span-2"><span class="block text-xs font-medium text-gray-600 mb-1.5">Observações</span><textarea x-model="fornecedorForm.notes" maxlength="1000" rows="3" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></textarea></label>
+        <p class="md:col-span-2 text-xs text-gray-500">Nome, documento e telefone são normalizados para impedir fornecedores duplicados.</p>
+      </div>
+
+      <div x-show="compraDialog.kind === 'review-create'" class="space-y-3">
+        <div x-show="compraDialog.warnings?.discarded" class="p-4 rounded-xl bg-amber-50 text-amber-800 flex gap-3"><i data-lucide="list-x" class="w-5 h-5 flex-shrink-0"></i><div><p class="text-sm font-semibold">Linhas incompletas</p><p class="text-xs mt-1"><span x-text="compraDialog.warnings?.discarded"></span> linha(s) serão ignoradas e não entrarão no total registrado.</p></div></div>
+        <div x-show="compraDialog.warnings?.zeroCost" class="p-4 rounded-xl bg-rose-50 text-rose-800 flex gap-3"><i data-lucide="triangle-alert" class="w-5 h-5 flex-shrink-0"></i><div><p class="text-sm font-semibold">Custo R$ 0</p><p class="text-xs mt-1">Se os pneus já chegaram, o custo médio do galpão será recalculado usando esse valor.</p></div></div>
+      </div>
+
+      <p x-show="compraDialog.error" role="alert" class="mt-4 px-4 py-3 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-700" x-text="compraDialog.error"></p>
+    </div>
+
+    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2">
+      <button @click="compraCloseDialog()" class="px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:bg-gray-50" x-text="compraDialog.kind === 'details' ? 'Fechar' : 'Voltar'"></button>
+      <button x-show="compraDialog.kind !== 'details'" @click="confirmarCompraDialog()" :disabled="compraActionSaving" class="px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50" :class="['cancel','supplier-archive'].includes(compraDialog.kind) ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-700 hover:bg-emerald-800'"><span x-show="!compraActionSaving" x-text="compraDialogConfirmLabel()"></span><span x-show="compraActionSaving">Processando…</span></button>
     </div>
   </div>
 </div>

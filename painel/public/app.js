@@ -89,6 +89,7 @@ function painelApp() {
     vendaVarejoSelecionada: null,
     vendaMenuOpen: false,
     comprasTab: 'visao', // sub-abas: visao | nova | historico | fornecedores | precos
+    comprasLoading: { overview: false, history: false, suppliers: false, prices: false }, comprasErrors: { overview: null, history: null, suppliers: null, prices: null }, comprasOverview: { rows: [], summary: null, pagination: null }, comprasHistory: { rows: [], summary: null, pagination: null }, comprasHistoryFilters: { period: '30d', status: 'all', payment: 'all', search: '', page: 1, pageSize: 10 }, comprasSuppliers: [], comprasSupplierSearch: '', comprasSupplierSelectedId: null, comprasPriceRows: [], comprasPriceFilters: { period: '90d', supplierId: '', search: '' }, comprasPriceSelectedMeasure: null, compraDetalhe: null, compraPendingSubmission: null, compraActionSaving: false, compraDialog: { open: false, kind: null, purchase: null, supplier: null, reason: '', error: '' }, fornecedorForm: { name: '', phone: '', document: '', notes: '' },
     // ── ATACADO (Fase 1): venda de atacado da Matriz + ranking de recompra ──
     atacadoBuyers: [],
     atacadoRanking: [],
