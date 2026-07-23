@@ -86,6 +86,7 @@
     "GET /admin/painel/app.vendas.historico.js PUBLICA",
     "GET /admin/painel/assets/bot-hero.webp PUBLICA",
     "GET /admin/painel/assets/logistica-hero.webp PUBLICA",
+    "GET /admin/painel/assets/vendas-hero.webp PUBLICA",
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",
     "GET /admin/painel/style.css PUBLICA",
