@@ -25,6 +25,7 @@ describe('Rede — apresentação e contratos auditados', () => {
   const nav = readFileSync(resolve('painel/public/app.nav.js'), 'utf8');
   const kpis = readFileSync(resolve('painel/public/app.unidade.kpis.js'), 'utf8');
   const redeKpis = readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8');
+  const redeMock = readFileSync(resolve('painel/public/app.rede.mock.js'), 'utf8');
   const redeApply = readFileSync(resolve('painel/public/app.rede.apply.js'), 'utf8');
   const chartsRede = readFileSync(resolve('painel/public/app.charts.rede.js'), 'utf8');
   const chartsSaude = readFileSync(resolve('painel/public/app.charts.saude.js'), 'utf8');
@@ -88,6 +89,21 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('@click="openApplications()"');
     expect(html).toContain('x-show="!mockTopbar" aria-label="Buscar no painel"');
     expect(html).toContain("? 'ml-auto h-10 px-3.5");
+  });
+
+  it('isola a nova Operação e saúde em ?mock=1 e preserva banner e produção', () => {
+    expect(redeMock).toContain("new URLSearchParams(window.location.search).get('mock') === '1'");
+    expect(html).toContain("redeSection === 'operacao' && redeMockPreview()");
+    expect(html).toContain("redeSection === 'operacao' && !redeMockPreview()");
+    expect(html).toContain('Cobranças em andamento');
+    expect(html).toContain('Pulso de saúde');
+    expect(html).toContain('Alertas operacionais');
+    expect(html).toContain('Unidades em foco');
+    expect(html).toContain('redeMockCommissionRows()');
+    expect(html).toContain('redeSaudeResumo().media');
+    expect(html).toContain('redeVendasHojeRanking()');
+    expect(nav).toContain("section === 'operacao' && !this.redeMockPreview()");
+    expect(html).toContain('/admin/painel/assets/rede-hero-visao-v3.webp?v=20260723-rede-visao2');
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {

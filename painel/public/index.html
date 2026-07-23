@@ -20,6 +20,7 @@
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
 <script src="/admin/painel/app.nav.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
+<script src="/admin/painel/app.rede.mock.js?v=20260723-rede-operacao-mock1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
@@ -538,9 +539,311 @@
         </div>
       </div>
 
+      <!-- Prévia de homologação (?mock=1): Operação e saúde aprovada em 23/07.
+           Banner, navegação superior e contratos permanecem os mesmos da produção. -->
+      <div x-show="redeSection === 'operacao' && redeMockPreview()" x-cloak class="space-y-3.5">
+        <!-- Linha 1: cobranças em andamento + total a receber -->
+        <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
+          <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <header class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex min-w-0 items-start gap-2.5">
+                <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                  <i data-lucide="receipt-text" class="h-4.5 w-4.5"></i>
+                </span>
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-gray-950">Cobranças em andamento</h2>
+                  <p class="mt-0.5 text-[11px] text-gray-500">
+                    <span x-text="redeMockCommissionRows().length"></span> unidade(s) com valores em aberto
+                  </p>
+                </div>
+              </div>
+              <label class="flex flex-shrink-0 items-center gap-2 text-[11px] text-gray-500">
+                Alertar acima de
+                <span class="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-800">
+                  R$
+                  <input type="number" min="0" step="50" :value="comissaoAlerta || ''"
+                         @change="setComissaoAlerta($event.target.value)"
+                         class="ml-1 w-14 border-0 bg-transparent p-0 text-xs font-medium outline-none"
+                         placeholder="0">
+                  <i data-lucide="pencil" class="ml-1 h-3 w-3 text-gray-400"></i>
+                </span>
+              </label>
+            </header>
+
+            <div class="overflow-x-auto px-4">
+              <table class="w-full min-w-[610px] text-xs">
+                <thead>
+                  <tr class="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    <th class="py-2 pr-3">Parceiro</th>
+                    <th class="px-3 py-2 text-right">Em aberto</th>
+                    <th class="px-3 py-2">Última venda</th>
+                    <th class="py-2 pl-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="p in redeMockCommissionRows()" :key="'mock-comissao-' + p.partner_id">
+                    <tr class="text-gray-700">
+                      <td class="max-w-[230px] truncate py-2 pr-3 font-medium" x-text="p.partner_name"></td>
+                      <td class="px-3 py-2 text-right font-semibold tabular-nums" x-text="formatCurrency(Number(p.open_total || 0))"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="p.ultimaVenda"></td>
+                      <td class="py-2 pl-3">
+                        <div class="flex items-center justify-end gap-1.5">
+                          <a x-show="comissaoWhatsLink(p)"
+                             :href="comissaoWhatsLink(p)"
+                             target="_blank"
+                             rel="noopener"
+                             class="inline-flex min-w-[58px] items-center justify-center rounded-md border border-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50">
+                            Cobrar
+                          </a>
+                          <button @click="settleComissao(p)"
+                                  :disabled="!livroComissaoOn() || comissaoSettling === p.partner_id"
+                                  class="inline-flex min-w-[58px] items-center justify-center rounded-md bg-emerald-700 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40">
+                            <span x-text="comissaoSettling === p.partner_id ? 'Salvando' : 'Recebi'"></span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="redeMockCommissionRows().length === 0">
+                    <td colspan="4" class="py-8 text-center text-sm text-gray-500">Nenhuma comissão em aberto.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <footer class="flex items-center justify-between border-t border-gray-100 px-4 py-2.5">
+              <button @click="comissaoExtratoAberto = !comissaoExtratoAberto"
+                      class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900">
+                Ver extrato
+                <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+              </button>
+              <span class="text-[10px] text-gray-400">Fonte: livro de comissões</span>
+            </footer>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header class="flex items-center gap-2">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <i data-lucide="layers-3" class="h-4 w-4"></i>
+              </span>
+              <div>
+                <h2 class="text-base font-semibold tracking-tight text-gray-950">A receber da rede</h2>
+                <p class="text-[10px] text-gray-500">Visão conciliada dos valores em aberto</p>
+              </div>
+            </header>
+
+            <div class="mt-4 grid grid-cols-1 items-center gap-4 sm:grid-cols-[190px_minmax(0,1fr)]">
+              <div class="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full p-3"
+                   :style="`background: conic-gradient(#047857 0 ${redeAReceberTotal() > 0 ? Math.round((redeTotalMensalidade() / redeAReceberTotal()) * 100) : 0}%, #6ee7b7 0 100%)`">
+                <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
+                  <strong class="text-xl font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeAReceberTotal())"></strong>
+                  <span class="mt-0.5 text-[10px] text-gray-500">total em aberto</span>
+                </div>
+              </div>
+              <div class="divide-y divide-gray-100">
+                <div class="flex items-center gap-3 py-3">
+                  <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                    <i data-lucide="database" class="h-4.5 w-4.5"></i>
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-[11px] text-gray-500">Mensalidades</p>
+                    <p class="text-lg font-bold text-emerald-800 tabular-nums" x-text="formatCurrency(redeTotalMensalidade())"></p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 py-3">
+                  <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                    <i data-lucide="percent" class="h-4.5 w-4.5"></i>
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-[11px] text-gray-500" x-text="livroComissaoOn() ? 'Comissões em aberto' : 'Comissões 2W'"></p>
+                    <p class="text-lg font-bold text-emerald-800 tabular-nums" x-text="formatCurrency(redeComissaoAReceber())"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-900">
+              <i data-lucide="shield-check" class="mt-0.5 h-4 w-4 flex-shrink-0"></i>
+              <div>
+                <p class="text-[11px] font-semibold"
+                   x-text="unidadesComCustoPendente().length > 0 ? 'Sem custo confirmado, o resultado não é estimado' : 'Custos confirmados nas unidades'"></p>
+                <p class="mt-0.5 text-[10px] text-emerald-800/70"
+                   x-text="unidadesComCustoPendente().length > 0 ? 'A precisão depende do envio do custo real pelas unidades.' : 'Os resultados podem ser conciliados com os custos registrados.'"></p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Linha 2: pulso consolidado + alertas únicos -->
+        <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header>
+              <h2 class="text-base font-semibold tracking-tight text-gray-950">Pulso de saúde</h2>
+              <p class="mt-0.5 text-[10px] text-gray-500">Panorama consolidado da rede · score auditável de 0 a 100</p>
+            </header>
+            <div class="mt-4 grid grid-cols-1 items-center gap-5 sm:grid-cols-[170px_minmax(0,1fr)]">
+              <div class="border-b border-gray-100 pb-4 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-5">
+                <div class="flex items-end gap-1">
+                  <span class="text-5xl font-bold tracking-tight text-emerald-800" x-text="redeSaudeResumo().media"></span>
+                  <span class="pb-1 text-xl font-semibold text-gray-700">/100</span>
+                </div>
+                <p class="mt-1 text-[10px] text-gray-500">índice geral da rede</p>
+                <span class="mt-3 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
+                  <i data-lucide="trending-up" class="h-3 w-3"></i>
+                  calculado agora
+                </span>
+              </div>
+              <div class="space-y-3">
+                <template x-for="faixa in [
+                  { label: 'Saudável', count: redeSaudeResumo().saudavel, icon: 'heart-pulse', bar: 'bg-emerald-700', iconTone: 'bg-emerald-100 text-emerald-800' },
+                  { label: 'Atenção', count: redeSaudeResumo().atencao, icon: 'triangle-alert', bar: 'bg-lime-500', iconTone: 'bg-lime-100 text-emerald-900' },
+                  { label: 'Crítico', count: redeSaudeResumo().critico, icon: 'shield-alert', bar: 'bg-emerald-950', iconTone: 'bg-emerald-950 text-white' }
+                ]" :key="'mock-saude-' + faixa.label">
+                  <div class="grid grid-cols-[34px_72px_minmax(0,1fr)_22px] items-center gap-2">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-full" :class="faixa.iconTone">
+                      <i :data-lucide="faixa.icon" class="h-3.5 w-3.5"></i>
+                    </span>
+                    <span class="text-xs font-medium text-gray-700" x-text="faixa.label"></span>
+                    <div class="h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div class="h-full rounded-full" :class="faixa.bar"
+                           :style="`width: ${parceirosRede.length > 0 ? Math.round((faixa.count / parceirosRede.length) * 100) : 0}%`"></div>
+                    </div>
+                    <span class="text-right text-sm font-bold text-gray-800 tabular-nums" x-text="faixa.count"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header>
+              <h2 class="text-base font-semibold tracking-tight text-gray-950">Alertas operacionais</h2>
+              <p class="mt-0.5 text-[10px] text-gray-500">Situações únicas que exigem atenção</p>
+            </header>
+            <div class="mt-3 divide-y divide-gray-100">
+              <template x-for="alerta in redeMockAlertas()" :key="'mock-alerta-' + alerta.label">
+                <div class="grid grid-cols-[32px_minmax(0,1fr)_28px_auto] items-center gap-2 py-2">
+                  <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
+                    <i :data-lucide="alerta.icon" class="h-3.5 w-3.5"></i>
+                  </span>
+                  <span class="text-xs font-medium text-gray-700" x-text="alerta.label"></span>
+                  <span class="flex h-5 min-w-5 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-1 text-[10px] font-bold text-emerald-800"
+                        x-text="alerta.count"></span>
+                  <button @click="redeFilter = alerta.filter; setRedeSection('parceiros')"
+                          class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900">
+                    Ver detalhes
+                    <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+
+        <!-- Linha 3: foco, dependência 2W e venda de hoje -->
+        <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-3">
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header>
+              <h2 class="text-base font-semibold tracking-tight text-gray-950">Unidades em foco</h2>
+              <p class="mt-0.5 text-[10px] text-gray-500">Menores scores e principal causa</p>
+            </header>
+            <div class="mt-3 divide-y divide-gray-100">
+              <template x-for="parceiro in redeUnidadesEmFoco()" :key="'mock-foco-' + parceiro.id">
+                <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 py-2.5">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold"
+                        :class="redeSaudeSituacao(parceiro).badge"
+                        x-text="saudeScore(parceiro)"></span>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate text-xs font-semibold text-gray-800" x-text="parceiro.nome"></span>
+                      <span class="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold"
+                            :class="redeSaudeSituacao(parceiro).badge"
+                            x-text="redeSaudeSituacao(parceiro).label"></span>
+                    </div>
+                    <p class="mt-0.5 truncate text-[10px] text-gray-500" x-text="redeCausaPrincipal(parceiro)"></p>
+                  </div>
+                  <button @click="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
+                          class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900">
+                    Ver ação
+                    <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                  </button>
+                </div>
+              </template>
+            </div>
+            <button @click="setRedeSection('parceiros')"
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+              Ver todas as unidades
+              <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+            </button>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header>
+              <h2 class="text-base font-semibold tracking-tight text-gray-950">Dependência 2W</h2>
+              <p class="mt-0.5 text-[10px] text-gray-500">Percentual das vendas originadas pela matriz</p>
+            </header>
+            <div class="mt-3 divide-y divide-gray-100">
+              <template x-for="(parceiro, index) in rankingDependencia2w()" :key="'mock-dependencia-' + parceiro.id">
+                <div class="grid grid-cols-[18px_minmax(90px,1fr)_40px_minmax(54px,0.72fr)_48px] items-center gap-2 py-2 text-[10px]">
+                  <span class="font-semibold text-gray-400" x-text="index + 1"></span>
+                  <span class="truncate font-medium text-gray-700" x-text="parceiro.nome"></span>
+                  <span class="text-right font-semibold tabular-nums" x-text="(parceiro.percentual2w || 0) + '%'"></span>
+                  <div class="h-1.5 overflow-hidden rounded-full bg-emerald-50">
+                    <div class="h-full rounded-full bg-emerald-700" :style="`width: ${Math.min(100, parceiro.percentual2w || 0)}%`"></div>
+                  </div>
+                  <span class="rounded-md border border-emerald-100 bg-emerald-50 px-1.5 py-1 text-center font-semibold text-emerald-800"
+                        x-text="redeDependenciaSituacao(parceiro)"></span>
+                </div>
+              </template>
+              <div x-show="rankingDependencia2w().length === 0" class="py-8 text-center text-xs text-gray-500">Sem vendas 2W no período.</div>
+            </div>
+            <button @click="redeFilter = 'dependencia_2w'; setRedeSection('parceiros')"
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+              Ver ranking completo
+              <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+            </button>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <header>
+              <h2 class="text-base font-semibold tracking-tight text-gray-950">Venda hoje</h2>
+              <p class="mt-0.5 text-[10px] text-gray-500">Vendas realizadas até o momento</p>
+            </header>
+            <div class="mt-3 grid grid-cols-[minmax(0,1fr)_116px] items-center gap-3">
+              <div class="divide-y divide-gray-100">
+                <template x-for="(parceiro, index) in redeVendasHojeRanking()" :key="'mock-venda-hoje-' + parceiro.id">
+                  <div class="grid grid-cols-[16px_minmax(70px,1fr)_auto_28px] items-center gap-1.5 py-1.5 text-[9px]">
+                    <span class="font-semibold text-gray-400" x-text="index + 1"></span>
+                    <span class="truncate font-medium text-gray-700" x-text="parceiro.nome"></span>
+                    <span class="text-right tabular-nums" x-text="formatCurrency(parceiroVendaHojeValor(parceiro))"></span>
+                    <span class="text-right text-gray-500 tabular-nums" x-text="parceiroPedidoHojeValor(parceiro)"></span>
+                  </div>
+                </template>
+              </div>
+              <div class="text-center">
+                <div class="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full p-2.5"
+                     :style="`background: conic-gradient(#047857 0 ${redeVendaHojeCobertura()}%, #d1fae5 0 100%)`">
+                  <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-white shadow-inner">
+                    <strong class="text-sm font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeVendaHojeTotal())"></strong>
+                    <span class="text-[9px] text-gray-500">total hoje</span>
+                  </div>
+                </div>
+                <p class="mt-1.5 text-[10px] text-gray-600">
+                  <strong x-text="redePedidosHojeTotal()"></strong> pedidos
+                </p>
+              </div>
+            </div>
+            <button @click="setRedeSection('parceiros')"
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+              Ver todas as vendas
+              <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+            </button>
+          </section>
+        </div>
+      </div>
+
       <!-- Comissões a receber (0118, flag NETWORK_COMMISSION_LEDGER): cada venda 2W
            realizada vira LANÇAMENTO (% congelado); cancelou, estorna sozinho. -->
-      <div x-show="redeSection === 'operacao' && comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview() && comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="font-semibold">Comissões a receber</h3>
           <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(Number(comissoes?.total_aberto || 0))"></span>
@@ -818,7 +1121,7 @@
       </div>
 
       <!-- Cobrança matriz↔parceiro: o que a rede deve à matriz no período -->
-      <div x-show="redeSection === 'operacao'" class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
           <div>
             <h3 class="font-semibold text-sm">A receber da rede</h3>
@@ -840,8 +1143,8 @@
         <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
-      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 gap-4 mb-4">
-        <div x-show="redeSection === 'operacao'" class="bg-white border border-gray-200 rounded-xl p-5">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 gap-4 mb-4">
+        <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="font-semibold text-sm">Score de saúde das unidades</h3>
@@ -855,7 +1158,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5 flex flex-col">
           <div class="text-xs text-gray-500 mb-3">Estoque parado</div>
           <div class="mb-3">
@@ -895,7 +1198,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-sm">Ranking de saúde</h3>
@@ -954,7 +1257,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>

@@ -51,7 +51,7 @@ window.PAINEL_MODULES.nav = function () {
           this.renderRedeChart();
           this.renderRedeOrigemChart();
         }
-        if (section === 'operacao') {
+        if (section === 'operacao' && !this.redeMockPreview()) {
           this.renderRedeComprasChart();
           this.renderPneusRedeChart();
           this.renderRedeSaudeChart();
