@@ -78,8 +78,9 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('text-base 2xl:text-xl');
   });
 
-  it('ativa a central de comando somente na prévia mockada sem trocar as ações existentes', () => {
-    expect(html).toContain("new URLSearchParams(window.location.search).get('mock') === '1'");
+  it('ativa a central de comando por padrão sem trocar as ações existentes', () => {
+    expect(html).toContain('x-data="{ mockTopbar: true }"');
+    expect(html).not.toContain("new URLSearchParams(window.location.search).get('mock') === '1'");
     expect(html).toContain('Central de rede');
     expect(html).toContain('Buscar ou executar um comando...');
     expect(html).toContain('@click="openWalkinModal()"');

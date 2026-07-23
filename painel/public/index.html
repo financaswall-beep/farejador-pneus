@@ -160,7 +160,7 @@
     <!-- ═══════════════════════════════════════════════
          TOP BAR — sticky, com notificações
          ═══════════════════════════════════════════════ -->
-    <div x-data="{ mockTopbar: new URLSearchParams(window.location.search).get('mock') === '1' }"
+    <div x-data="{ mockTopbar: true }"
          :class="mockTopbar ? 'bg-gray-50 px-3 pt-3 pb-2' : 'bg-white/80 backdrop-blur-md border-b border-gray-200'"
          class="sticky top-0 z-30">
       <div :class="mockTopbar
@@ -168,7 +168,7 @@
                      : 'h-14 justify-end px-8 gap-2'"
            class="relative flex items-center">
 
-      <!-- Central de comando: exclusiva da prévia mockada -->
+      <!-- Central de comando: padrão da matriz -->
       <div x-show="mockTopbar" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-900 text-emerald-300">
           <i data-lucide="network" class="h-5 w-5"></i>
