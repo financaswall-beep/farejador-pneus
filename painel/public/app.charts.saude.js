@@ -11,6 +11,13 @@ window.PAINEL_MODULES.chartsSaude = function () {
 
       const total2w = this.redeTotal2w();
       const totalPorta = this.redeTotalPorta();
+      const chartContext = ctx.getContext('2d');
+      const primaryGradient = chartContext.createLinearGradient(0, 0, 260, 280);
+      primaryGradient.addColorStop(0, '#34d399');
+      primaryGradient.addColorStop(1, '#047857');
+      const secondaryGradient = chartContext.createLinearGradient(260, 0, 0, 280);
+      secondaryGradient.addColorStop(0, '#99f6e4');
+      secondaryGradient.addColorStop(1, '#2dd4bf');
 
       window._redeOrigemChart = new Chart(ctx, {
         type: 'doughnut',
@@ -18,19 +25,17 @@ window.PAINEL_MODULES.chartsSaude = function () {
           labels: ['2W', 'Porta'],
           datasets: [{
             data: [total2w, totalPorta],
-            backgroundColor: ['#047857', '#6ee7b7'],
-            borderWidth: 0,
-            hoverOffset: 4,
+            backgroundColor: [primaryGradient, secondaryGradient],
+            borderColor: '#ffffff',
+            borderWidth: 3,
+            hoverOffset: 3,
           }],
         },
         options: {
           maintainAspectRatio: false,
-          cutout: '68%',
+          cutout: '66%',
           plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { boxWidth: 10, usePointStyle: true, color: '#6b7280', font: { size: 11 } },
-            },
+            legend: { display: false },
             tooltip: {
               backgroundColor: '#111827',
               padding: 10,

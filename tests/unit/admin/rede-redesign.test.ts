@@ -27,6 +27,7 @@ describe('Rede — apresentação e contratos auditados', () => {
   const redeKpis = readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8');
   const redeApply = readFileSync(resolve('painel/public/app.rede.apply.js'), 'utf8');
   const chartsRede = readFileSync(resolve('painel/public/app.charts.rede.js'), 'utf8');
+  const chartsSaude = readFileSync(resolve('painel/public/app.charts.saude.js'), 'utf8');
 
   it('serve a imagem padrão da Rede e expõe as três visões sem duplicar o período', () => {
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
@@ -72,7 +73,8 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('aria-label="Buscar no painel"');
     expect(html).toContain('aria-label="Abrir notificações"');
     expect(html).toContain('@click="logoutAdmin()"');
-    expect(html).toContain('xl:grid-cols-3 2xl:grid-cols-6');
+    expect(html).toContain('sm:grid-cols-2 xl:grid-cols-6');
+    expect(html).toContain('text-base 2xl:text-xl');
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
@@ -125,6 +127,12 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('formatCurrency(redeOrigemTotal())');
     expect(html).toContain('redeOrigemPercent(redeTotal2w())');
     expect(html).toContain('redeOrigemPercent(redeTotalPorta())');
+    expect(html).toContain('Visão consolidada por canal');
+    expect(html).toContain('2 canais');
+    expect(html).toContain("redeTotal2w() >= redeTotalPorta() ? '2W' : 'Porta'");
+    expect(html).toContain('Fonte:</span><strong class="text-slate-700">vendas realizadas');
+    expect(chartsSaude).toContain('createLinearGradient');
+    expect(chartsSaude).toContain('legend: { display: false }');
   });
 
   it('calcula ranking, participação e origem usando os totais conciliados', () => {
