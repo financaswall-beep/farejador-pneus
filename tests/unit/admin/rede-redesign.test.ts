@@ -96,6 +96,7 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain("redeSection === 'operacao' && !redeOperacaoLegadaAtiva()");
     expect(html).toContain("redeSection === 'operacao' && redeOperacaoLegadaAtiva()");
     expect(html).not.toContain('app.rede.mock.js');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260723-rede-operacao-prod1');
     expect(html).toContain('Cobranças em andamento');
     expect(html).toContain('Pulso de saúde');
     expect(html).toContain('Alertas operacionais');
