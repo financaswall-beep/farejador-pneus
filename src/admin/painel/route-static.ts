@@ -61,6 +61,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/rede-hero-v2.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/rede-hero-v2.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/rede-hero-visao-v3.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/rede-hero-visao-v3.webp', 'image/webp'));
   for (const brand of ['facebook.svg', 'google-ads.svg', 'instagram.svg', 'whatsapp.svg']) {
     fastify.get(`/assets/brands/${brand}`, async (_request, reply) =>
       sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), `assets/brands/${brand}`, 'image/svg+xml'));

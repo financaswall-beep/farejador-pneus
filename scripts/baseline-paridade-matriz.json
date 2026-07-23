@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-23T17:44:55.037Z",
+  "geradoEm": "2026-07-23T18:36:38.507Z",
   "commitBase": "dd64a35",
-  "total": 775,
+  "total": 780,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -559,6 +559,9 @@
     "redeConversao2w": "function",
     "redeEstoqueQuantidade": "function",
     "redeEstoqueValor": "function",
+    "redeExecutiveGoalDaily": "function",
+    "redeExecutiveSalesSeries": "function",
+    "redeExecutiveSeriesLabels": "function",
     "redeFilter": "value:string",
     "redeFilters": "value:array",
     "redeGoalDaily": "function",
@@ -572,6 +575,8 @@
     "redePeriod": "value:string",
     "redePeriodLabel": "function",
     "redePeriods": "value:array",
+    "redeResultadoBarWidth": "function",
+    "redeResultadosUnidades": "function",
     "redeSalesGoal": "value:number",
     "redeSalesSeries": "function",
     "redeSection": "value:string",

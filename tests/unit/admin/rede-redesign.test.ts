@@ -9,7 +9,14 @@ function redeKpisModule() {
     readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8'),
     sandbox,
   );
-  return sandbox.window.PAINEL_MODULES.redeKpis();
+  vm.runInNewContext(
+    readFileSync(resolve('painel/public/app.charts.rede.js'), 'utf8'),
+    sandbox,
+  );
+  return {
+    ...sandbox.window.PAINEL_MODULES.redeKpis(),
+    ...sandbox.window.PAINEL_MODULES.chartsRede(),
+  };
 }
 
 describe('Rede — apresentação e contratos auditados', () => {
@@ -23,18 +30,19 @@ describe('Rede — apresentação e contratos auditados', () => {
 
   it('serve a imagem padrão da Rede e expõe as três visões sem duplicar o período', () => {
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
-    const banner = statSync(resolve('painel/public/assets/rede-hero-v2.webp'));
+    const banner = statSync(resolve('painel/public/assets/rede-hero-visao-v3.webp'));
 
-    expect(html).toContain('/admin/painel/assets/rede-hero-v2.webp?v=20260723-rede-fix1');
+    expect(html).toContain('/admin/painel/assets/rede-hero-visao-v3.webp?v=20260723-rede-visao2');
     expect(html).not.toContain('/admin/painel/assets/rede-hero.png');
-    expect(html).toContain('Rede conectada, desempenho que move');
+    expect(html).toContain('Rede de parceiros');
+    expect(html).toContain('Operação consolidada das unidades credenciadas');
     expect(html).toContain("setRedeSection('visao')");
     expect(html).toContain("setRedeSection('operacao')");
     expect(html).toContain("setRedeSection('parceiros')");
     expect(state).toContain("redeSection: 'visao'");
     expect(nav).toContain('setRedeSection(section)');
-    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/rede-hero-v2.webp'");
-    expect(staticRoutes).toContain("'assets/rede-hero-v2.webp', 'image/webp'");
+    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/rede-hero-visao-v3.webp'");
+    expect(staticRoutes).toContain("'assets/rede-hero-visao-v3.webp', 'image/webp'");
     expect(banner.size).toBeGreaterThan(0);
     expect(banner.size).toBeLessThan(150_000);
   });
@@ -74,20 +82,28 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(kpis).toContain('unidadeLancamentosFiltrados(');
   });
 
-  it('completa a visão executiva sem repetir o resumo central', () => {
+  it('reproduz a visão executiva proposta sem criar uma segunda fonte de dados', () => {
     expect(redeApply).toContain("{ label: 'Origem 2W'");
     expect(redeKpis).toContain('redeTopUnidades()');
     expect(redeKpis).toContain('redeParticipacaoVendas(parceiro)');
-    expect(html).toContain('Top 3 unidades por vendas realizadas');
+    expect(chartsRede).toContain('redeExecutiveSalesSeries()');
+    expect(chartsRede).toContain('redeResultadosUnidades()');
+    expect(chartsRede).toContain('this.redeExecutiveSalesSeries()');
+    expect(chartsRede).not.toContain("label: 'Pedidos reais'");
+    expect(html).toContain('Resumo central');
+    expect(html).toContain('Top 3 unidades por vendas');
     expect(html).toContain('x-text="index + 1"');
     expect(html).toContain('x-text="redeParticipacaoVendas(parceiro)"');
-    expect(html).not.toContain('Resumo central');
+    expect(html).toContain('x-text="redeTotalVendas()"');
+    expect(html).toContain('x-text="redeTotalPedidos()"');
+    expect(html).toContain('x-text="formatCurrency(redeTicketMedio())"');
   });
 
   it('sinaliza custo pendente sem fabricar resultado e concilia a origem das vendas', () => {
     expect(chartsRede).toContain('.filter((parceiro) => !parceiro.custoPendente');
     expect(redeKpis).toContain('unidadesComCustoPendente()');
-    expect(html).toContain('custos pendentes ficam sinalizados sem cálculo artificial');
+    expect(html).toContain('redeResultadosUnidades()');
+    expect(html).toContain('redeResultadoBarWidth(parceiro)');
     expect(html).toContain('Custo pendente</span>');
     expect(redeKpis).toContain('redeOrigemTotal()');
     expect(redeKpis).toContain('redeOrigemPercent(valor)');
@@ -113,5 +129,26 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(module.redeOrigemPercent.call({ redeOrigemTotal: () => 400 }, 250)).toBe(63);
     expect(Array.from(module.unidadesComCustoPendente.call({ parceirosRede }), (row: { id: string }) => row.id))
       .toEqual(['b', 'd']);
+  });
+
+  it('mantém a série completa do período e ordena resultados sem inventar custo', () => {
+    const module = redeKpisModule();
+    const parceirosRede = [
+      { id: 'a', vendasValor: 300, serieVendas: [10, 20, 30], custoPendente: false, lucroEstimado: 90 },
+      { id: 'b', vendasValor: 250, serieVendas: [5, 15], custoPendente: true, lucroEstimado: null },
+      { id: 'c', vendasValor: 100, serieVendas: [2, 3, 4], custoPendente: false, lucroEstimado: -30 },
+    ];
+    const context = {
+      parceirosRede,
+      redeExecutiveSalesSeries: module.redeExecutiveSalesSeries,
+      redeResultadosUnidades: module.redeResultadosUnidades,
+    };
+
+    expect(Array.from(module.redeExecutiveSalesSeries.call(context))).toEqual([12, 28, 49]);
+    expect(Array.from(module.redeResultadosUnidades.call(context), (row: { id: string }) => row.id))
+      .toEqual(['a', 'b', 'c']);
+    expect(module.redeResultadoBarWidth.call(context, parceirosRede[0])).toBe(100);
+    expect(module.redeResultadoBarWidth.call(context, parceirosRede[1])).toBe(0);
+    expect(module.redeResultadoBarWidth.call(context, parceirosRede[2])).toBe(33);
   });
 });
