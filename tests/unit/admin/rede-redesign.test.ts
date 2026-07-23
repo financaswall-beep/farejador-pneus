@@ -1,12 +1,25 @@
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
+
+function redeKpisModule() {
+  const sandbox = { window: { PAINEL_MODULES: {} } };
+  vm.runInNewContext(
+    readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8'),
+    sandbox,
+  );
+  return sandbox.window.PAINEL_MODULES.redeKpis();
+}
 
 describe('Rede — apresentação e contratos auditados', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const state = readFileSync(resolve('painel/public/app.js'), 'utf8');
   const nav = readFileSync(resolve('painel/public/app.nav.js'), 'utf8');
   const kpis = readFileSync(resolve('painel/public/app.unidade.kpis.js'), 'utf8');
+  const redeKpis = readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8');
+  const redeApply = readFileSync(resolve('painel/public/app.rede.apply.js'), 'utf8');
+  const chartsRede = readFileSync(resolve('painel/public/app.charts.rede.js'), 'utf8');
 
   it('serve a imagem padrão da Rede e expõe as três visões sem duplicar o período', () => {
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
@@ -59,5 +72,46 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(state).toContain("unidadeLancamentoFiltro: 'todos'");
     expect(kpis).toContain('unidadeEstoqueFiltrado(');
     expect(kpis).toContain('unidadeLancamentosFiltrados(');
+  });
+
+  it('completa a visão executiva sem repetir o resumo central', () => {
+    expect(redeApply).toContain("{ label: 'Origem 2W'");
+    expect(redeKpis).toContain('redeTopUnidades()');
+    expect(redeKpis).toContain('redeParticipacaoVendas(parceiro)');
+    expect(html).toContain('Top 3 unidades por vendas realizadas');
+    expect(html).toContain('x-text="index + 1"');
+    expect(html).toContain('x-text="redeParticipacaoVendas(parceiro)"');
+    expect(html).not.toContain('Resumo central');
+  });
+
+  it('sinaliza custo pendente sem fabricar resultado e concilia a origem das vendas', () => {
+    expect(chartsRede).toContain('.filter((parceiro) => !parceiro.custoPendente');
+    expect(redeKpis).toContain('unidadesComCustoPendente()');
+    expect(html).toContain('custos pendentes ficam sinalizados sem cálculo artificial');
+    expect(html).toContain('Custo pendente</span>');
+    expect(redeKpis).toContain('redeOrigemTotal()');
+    expect(redeKpis).toContain('redeOrigemPercent(valor)');
+    expect(html).toContain('formatCurrency(redeOrigemTotal())');
+    expect(html).toContain('redeOrigemPercent(redeTotal2w())');
+    expect(html).toContain('redeOrigemPercent(redeTotalPorta())');
+  });
+
+  it('calcula ranking, participação e origem usando os totais conciliados', () => {
+    const module = redeKpisModule();
+    const parceirosRede = [
+      { id: 'a', vendasValor: 300, custoPendente: false },
+      { id: 'b', vendasValor: 100, custoPendente: true, custoPendenteReceita: 100 },
+      { id: 'c', vendasValor: 200, custoPendente: false },
+      { id: 'd', vendasValor: 50, custoPendente: true, custoPendenteReceita: 50 },
+    ];
+
+    expect(Array.from(module.redeTopUnidades.call({ parceirosRede }), (row: { id: string }) => row.id))
+      .toEqual(['a', 'c', 'b']);
+    expect(module.redeParticipacaoVendas.call({
+      redeTotalVendasValor: () => 600,
+    }, parceirosRede[0])).toBe('50,0%');
+    expect(module.redeOrigemPercent.call({ redeOrigemTotal: () => 400 }, 250)).toBe(63);
+    expect(Array.from(module.unidadesComCustoPendente.call({ parceirosRede }), (row: { id: string }) => row.id))
+      .toEqual(['b', 'd']);
   });
 });
