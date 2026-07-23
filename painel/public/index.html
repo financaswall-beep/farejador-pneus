@@ -7,7 +7,13 @@
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
 <link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-visao2" />
-<style>[x-cloak]{display:none!important}</style>
+<style>
+  [x-cloak]{display:none!important}
+  .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
+  .farejador-sidebar-nav::-webkit-scrollbar{width:5px}
+  .farejador-sidebar-nav::-webkit-scrollbar-track{background:transparent}
+  .farejador-sidebar-nav::-webkit-scrollbar-thumb{background:rgba(110,231,183,.35);border-radius:999px}
+</style>
 <!-- Dependências críticas locais: o painel não pode voltar para uma tela antiga por falha de CDN. -->
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
@@ -64,20 +70,10 @@
   <!-- ═══════════════════════════════════════════════
        SIDEBAR
        ═══════════════════════════════════════════════ -->
-  <aside
-    :class="currentPage === 'rede'
-      ? 'w-56 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 border-emerald-800 text-white'
-      : 'w-64 bg-white border-gray-200'"
-    class="border-r flex flex-col flex-shrink-0 transition-[width,background-color] duration-200">
+  <aside class="w-56 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 border-r border-emerald-800 text-white flex flex-col flex-shrink-0">
 
     <!-- Logo -->
-    <div x-show="currentPage !== 'rede'" class="h-16 flex items-center gap-2.5 px-6 border-b border-gray-100">
-      <div class="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
-        <i data-lucide="radar" class="w-4.5 h-4.5 text-white"></i>
-      </div>
-      <span class="font-semibold text-[15px]">Farejador</span>
-    </div>
-    <div x-show="currentPage === 'rede'" class="h-28 flex items-center gap-3 px-6 border-b border-emerald-800/70">
+    <div class="h-28 flex items-center gap-3 px-6 border-b border-emerald-800/70">
       <div class="w-12 h-12 rounded-2xl bg-white/10 border border-emerald-300/20 flex items-center justify-center shadow-inner">
         <i data-lucide="radar" class="w-7 h-7 text-emerald-300"></i>
       </div>
@@ -88,49 +84,44 @@
     </div>
 
     <!-- Nav -->
-    <nav :class="currentPage === 'rede' ? 'py-3 px-3' : 'py-4 px-3'" class="flex-1 overflow-y-auto">
+    <nav class="farejador-sidebar-nav flex-1 overflow-y-auto py-3 px-3">
       <template x-for="item in liveMenu">
         <a href="#"
            @click.prevent="currentPage = item.id"
-           :class="currentPage === 'rede'
-             ? (currentPage === item.id
-               ? 'bg-emerald-500/30 text-white font-semibold ring-1 ring-inset ring-emerald-300/10'
-               : 'text-emerald-50/90 hover:bg-white/10 hover:text-white')
-             : (currentPage === item.id
-               ? 'bg-gray-100 text-gray-900 font-medium'
-               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')"
+           :class="currentPage === item.id
+             ? 'bg-emerald-500/30 text-white font-semibold ring-1 ring-inset ring-emerald-300/10'
+             : 'text-emerald-50/90 hover:bg-white/10 hover:text-white'"
            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors mb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
           <i :data-lucide="item.icon" class="w-5 h-5 flex-shrink-0"></i>
           <span x-text="item.label" class="flex-1"></span>
           <span x-show="item.badge"
                 x-text="item.badge"
-                :class="currentPage === 'rede' ? 'bg-white/15 text-white' : 'bg-gray-900 text-white'"
-                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"></span>
+                class="bg-white/15 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium"></span>
         </a>
       </template>
 
-      <div x-show="currentPage !== 'rede'" class="text-[11px] font-medium text-gray-400 uppercase tracking-wider px-3 mt-6 mb-2">
+      <div class="text-[11px] font-medium text-emerald-200/55 uppercase tracking-wider px-3 mt-6 mb-2">
         Fase 2 · próximos
       </div>
-      <div x-show="currentPage !== 'rede'">
+      <div>
         <template x-for="item in futureMenu">
           <a href="#"
              @click.prevent="currentPage = item.id"
              :class="currentPage === item.id
-               ? 'bg-gray-100 text-gray-900 font-medium'
-               : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'"
+               ? 'bg-emerald-500/20 text-white font-medium'
+               : 'text-emerald-100/45 hover:bg-white/5 hover:text-emerald-100/70'"
              class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5">
             <i :data-lucide="item.icon" class="w-4 h-4 flex-shrink-0"></i>
             <span x-text="item.label" class="flex-1"></span>
-            <i data-lucide="lock" class="w-3 h-3 text-gray-300"></i>
+            <i data-lucide="lock" class="w-3 h-3 text-emerald-200/35"></i>
           </a>
         </template>
       </div>
     </nav>
 
     <!-- Equipe -->
-    <div x-show="currentPage !== 'rede'" class="border-t border-gray-100 px-4 py-4">
-      <div class="text-xs font-medium text-gray-500 mb-3">Em operação</div>
+    <div class="border-t border-emerald-800/70 px-4 py-4">
+      <div class="text-xs font-medium text-emerald-200/65 mb-3">Em operação</div>
 
       <div class="flex items-center gap-2 mb-3">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -138,34 +129,26 @@
       </div>
 
       <div class="flex -space-x-1.5 mb-2">
-        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-white">W</div>
-        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-white">A</div>
-        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 ring-2 ring-white flex items-center justify-center text-[10px] font-semibold text-white">M</div>
-        <div class="w-7 h-7 rounded-full bg-gray-100 ring-2 ring-white flex items-center justify-center text-[10px] font-medium text-gray-500">+2</div>
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 ring-2 ring-emerald-950 flex items-center justify-center text-[10px] font-semibold text-white">W</div>
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 ring-2 ring-emerald-950 flex items-center justify-center text-[10px] font-semibold text-white">A</div>
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 ring-2 ring-emerald-950 flex items-center justify-center text-[10px] font-semibold text-white">M</div>
+        <div class="w-7 h-7 rounded-full bg-white/10 ring-2 ring-emerald-950 flex items-center justify-center text-[10px] font-medium text-emerald-100/70">+2</div>
       </div>
 
-      <div class="text-[11px] text-gray-500 mb-3">Gerente: Wallace</div>
+      <div class="text-[11px] text-emerald-200/60 mb-3">Gerente: Wallace</div>
 
-      <button class="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium py-2 rounded-lg transition-colors">
+      <button class="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 border border-emerald-300/10 text-white text-xs font-medium py-2 rounded-lg transition-colors">
         <i data-lucide="users" class="w-3.5 h-3.5"></i>
         Ver equipe
       </button>
     </div>
 
     <!-- Config -->
-    <div x-show="currentPage !== 'rede'" class="border-t border-gray-100 px-3 py-2">
-      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+    <div class="border-t border-emerald-800/70 px-3 py-2">
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-emerald-100/70 hover:bg-white/10 hover:text-white transition-colors">
         <i data-lucide="settings" class="w-4 h-4"></i>
         <span>Configurações</span>
       </a>
-    </div>
-    <div x-show="currentPage === 'rede'" class="border-t border-emerald-800/70 p-4">
-      <button type="button" class="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs text-emerald-100/85 hover:bg-white/10 hover:text-white transition-colors">
-        <span class="w-7 h-7 rounded-full border border-emerald-400/70 flex items-center justify-center">
-          <i data-lucide="chevron-left" class="w-4 h-4"></i>
-        </span>
-        Recolher menu
-      </button>
     </div>
   </aside>
 
@@ -177,7 +160,7 @@
     <!-- ═══════════════════════════════════════════════
          TOP BAR — sticky, com notificações
          ═══════════════════════════════════════════════ -->
-    <div x-show="currentPage !== 'rede'" class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 h-14 flex items-center justify-end px-8 gap-2">
+    <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 h-14 flex items-center justify-end px-8 gap-2">
 
       <!-- Nova venda (sem conversa: balcão / telefone / indicação) -->
       <button @click="openWalkinModal()"
@@ -570,7 +553,7 @@
         </template>
       </div>
 
-      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 mb-4">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3 mb-4">
         <template x-for="kpi in redeKpis">
           <div class="bg-white border border-gray-200 rounded-xl p-3.5 min-h-[112px] flex items-start gap-3">
             <div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="kpi.tone">
@@ -631,19 +614,19 @@
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <h3 class="text-lg font-semibold tracking-tight text-gray-950">Resumo central</h3>
           <div class="grid grid-cols-3 divide-x divide-gray-200 border-b border-gray-200 py-5">
-            <div class="pr-4">
+            <div class="pr-2 2xl:pr-4">
               <p class="text-xs text-slate-500">Vendas</p>
-              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="redeTotalVendas()"></p>
+              <p class="mt-1 text-lg 2xl:text-2xl font-bold tracking-tight text-gray-950 whitespace-nowrap" x-text="redeTotalVendas()"></p>
               <p class="mt-1 text-[10px] text-slate-400">vendas realizadas</p>
             </div>
-            <div class="px-4">
+            <div class="px-2 2xl:px-4">
               <p class="text-xs text-slate-500">Pedidos</p>
-              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="redeTotalPedidos()"></p>
+              <p class="mt-1 text-lg 2xl:text-2xl font-bold tracking-tight text-gray-950 whitespace-nowrap" x-text="redeTotalPedidos()"></p>
               <p class="mt-1 text-[10px] text-slate-400">pedidos realizados</p>
             </div>
-            <div class="pl-4">
+            <div class="pl-2 2xl:pl-4">
               <p class="text-xs text-slate-500">Ticket</p>
-              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeTicketMedio())"></p>
+              <p class="mt-1 text-lg 2xl:text-2xl font-bold tracking-tight text-gray-950 whitespace-nowrap" x-text="formatCurrency(redeTicketMedio())"></p>
               <p class="mt-1 text-[10px] text-slate-400">ticket médio</p>
             </div>
           </div>
