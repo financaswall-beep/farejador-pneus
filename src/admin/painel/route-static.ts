@@ -15,8 +15,10 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.js', 'text/javascript; charset=utf-8'));
   fastify.get('/admin/login.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.css', 'text/css; charset=utf-8'));
-  fastify.get('/admin/painel', async (_request, reply) => sendStatic(reply, 'index.html', 'text/html; charset=utf-8'));
-  fastify.get('/admin/painel/', async (_request, reply) => sendStatic(reply, 'index.html', 'text/html; charset=utf-8'));
+  fastify.get('/admin/painel', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'no-store'), 'index.html', 'text/html; charset=utf-8'));
+  fastify.get('/admin/painel/', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'no-store'), 'index.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/painel/app.js', async (_request, reply) => sendStatic(reply, 'app.js', 'text/javascript; charset=utf-8'));
   // Obra 300 (2026-07-05): módulos-fábrica do painel — lista FIXA (sem wildcard; nada de path traversal).
   const painelModulos = [
@@ -34,6 +36,18 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     fastify.get(`/admin/painel/${modulo}`, async (_request, reply) => sendStatic(reply, modulo, 'text/javascript; charset=utf-8'));
   }
   fastify.get('/admin/painel/rede-fallback.js', async (_request, reply) => sendStatic(reply, 'rede-fallback.js', 'text/javascript; charset=utf-8'));
+  for (const vendor of [
+    'alpine-3.14.9.min.js',
+    'chart-4.4.7.umd.min.js',
+    'lucide-1.17.0.min.js',
+  ]) {
+    fastify.get(`/admin/painel/vendor/${vendor}`, async (_request, reply) =>
+      sendStatic(
+        reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
+        `vendor/${vendor}`,
+        'text/javascript; charset=utf-8',
+      ));
+  }
   fastify.get('/admin/painel/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/tailwind.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
@@ -45,8 +59,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/compras-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/vendas-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
-  fastify.get('/admin/painel/assets/rede-hero.png', async (_request, reply) =>
-    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/rede-hero.png', 'image/png'));
+  fastify.get('/admin/painel/assets/rede-hero-v2.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/rede-hero-v2.webp', 'image/webp'));
   for (const brand of ['facebook.svg', 'google-ads.svg', 'instagram.svg', 'whatsapp.svg']) {
     fastify.get(`/assets/brands/${brand}`, async (_request, reply) =>
       sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), `assets/brands/${brand}`, 'image/svg+xml'));
