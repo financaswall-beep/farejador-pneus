@@ -49,12 +49,11 @@ window.PAINEL_MODULES.nav = function () {
         lucide.createIcons();
         if (section === 'visao') {
           this.renderRedeChart();
-          this.renderRedeLucroChart();
-          this.renderRedeComprasChart();
-          this.renderPneusRedeChart();
           this.renderRedeOrigemChart();
         }
         if (section === 'operacao') {
+          this.renderRedeComprasChart();
+          this.renderPneusRedeChart();
           this.renderRedeSaudeChart();
           this.renderEstoqueParadoChart();
           this.renderMargemChart();

@@ -6,14 +6,14 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-visao1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-visao2" />
 <style>[x-cloak]{display:none!important}</style>
 <!-- Dependências críticas locais: o painel não pode voltar para uma tela antiga por falha de CDN. -->
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao1"></script>
+<script src="/admin/painel/app.nav.js?v=20260723-rede-visao2"></script>
+<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
@@ -41,10 +41,10 @@
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao1"></script>
+<script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.charts.rede.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260723-compras2"></script>
@@ -64,52 +64,72 @@
   <!-- ═══════════════════════════════════════════════
        SIDEBAR
        ═══════════════════════════════════════════════ -->
-  <aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+  <aside
+    :class="currentPage === 'rede'
+      ? 'w-56 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 border-emerald-800 text-white'
+      : 'w-64 bg-white border-gray-200'"
+    class="border-r flex flex-col flex-shrink-0 transition-[width,background-color] duration-200">
 
     <!-- Logo -->
-    <div class="h-16 flex items-center gap-2.5 px-6 border-b border-gray-100">
+    <div x-show="currentPage !== 'rede'" class="h-16 flex items-center gap-2.5 px-6 border-b border-gray-100">
       <div class="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
         <i data-lucide="radar" class="w-4.5 h-4.5 text-white"></i>
       </div>
       <span class="font-semibold text-[15px]">Farejador</span>
     </div>
+    <div x-show="currentPage === 'rede'" class="h-28 flex items-center gap-3 px-6 border-b border-emerald-800/70">
+      <div class="w-12 h-12 rounded-2xl bg-white/10 border border-emerald-300/20 flex items-center justify-center shadow-inner">
+        <i data-lucide="radar" class="w-7 h-7 text-emerald-300"></i>
+      </div>
+      <div class="min-w-0">
+        <div class="text-xl font-bold tracking-tight">Farejador</div>
+        <div class="text-[9px] font-semibold uppercase tracking-[0.18em] text-emerald-200/75">Distribuição de pneus</div>
+      </div>
+    </div>
 
     <!-- Nav -->
-    <nav class="flex-1 overflow-y-auto py-4 px-3">
+    <nav :class="currentPage === 'rede' ? 'py-3 px-3' : 'py-4 px-3'" class="flex-1 overflow-y-auto">
       <template x-for="item in liveMenu">
         <a href="#"
            @click.prevent="currentPage = item.id"
-           :class="currentPage === item.id
-             ? 'bg-gray-100 text-gray-900 font-medium'
-             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors mb-1">
-          <i :data-lucide="item.icon" class="w-4 h-4 flex-shrink-0"></i>
+           :class="currentPage === 'rede'
+             ? (currentPage === item.id
+               ? 'bg-emerald-500/30 text-white font-semibold ring-1 ring-inset ring-emerald-300/10'
+               : 'text-emerald-50/90 hover:bg-white/10 hover:text-white')
+             : (currentPage === item.id
+               ? 'bg-gray-100 text-gray-900 font-medium'
+               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors mb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
+          <i :data-lucide="item.icon" class="w-5 h-5 flex-shrink-0"></i>
           <span x-text="item.label" class="flex-1"></span>
           <span x-show="item.badge"
                 x-text="item.badge"
-                class="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full font-medium"></span>
+                :class="currentPage === 'rede' ? 'bg-white/15 text-white' : 'bg-gray-900 text-white'"
+                class="text-[10px] px-1.5 py-0.5 rounded-full font-medium"></span>
         </a>
       </template>
 
-      <div class="text-[11px] font-medium text-gray-400 uppercase tracking-wider px-3 mt-6 mb-2">
+      <div x-show="currentPage !== 'rede'" class="text-[11px] font-medium text-gray-400 uppercase tracking-wider px-3 mt-6 mb-2">
         Fase 2 · próximos
       </div>
-      <template x-for="item in futureMenu">
-        <a href="#"
-           @click.prevent="currentPage = item.id"
-           :class="currentPage === item.id
-             ? 'bg-gray-100 text-gray-900 font-medium'
-             : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'"
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5">
-          <i :data-lucide="item.icon" class="w-4 h-4 flex-shrink-0"></i>
-          <span x-text="item.label" class="flex-1"></span>
-          <i data-lucide="lock" class="w-3 h-3 text-gray-300"></i>
-        </a>
-      </template>
+      <div x-show="currentPage !== 'rede'">
+        <template x-for="item in futureMenu">
+          <a href="#"
+             @click.prevent="currentPage = item.id"
+             :class="currentPage === item.id
+               ? 'bg-gray-100 text-gray-900 font-medium'
+               : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'"
+             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors mb-0.5">
+            <i :data-lucide="item.icon" class="w-4 h-4 flex-shrink-0"></i>
+            <span x-text="item.label" class="flex-1"></span>
+            <i data-lucide="lock" class="w-3 h-3 text-gray-300"></i>
+          </a>
+        </template>
+      </div>
     </nav>
 
     <!-- Equipe -->
-    <div class="border-t border-gray-100 px-4 py-4">
+    <div x-show="currentPage !== 'rede'" class="border-t border-gray-100 px-4 py-4">
       <div class="text-xs font-medium text-gray-500 mb-3">Em operação</div>
 
       <div class="flex items-center gap-2 mb-3">
@@ -133,11 +153,19 @@
     </div>
 
     <!-- Config -->
-    <div class="border-t border-gray-100 px-3 py-2">
+    <div x-show="currentPage !== 'rede'" class="border-t border-gray-100 px-3 py-2">
       <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors">
         <i data-lucide="settings" class="w-4 h-4"></i>
         <span>Configurações</span>
       </a>
+    </div>
+    <div x-show="currentPage === 'rede'" class="border-t border-emerald-800/70 p-4">
+      <button type="button" class="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs text-emerald-100/85 hover:bg-white/10 hover:text-white transition-colors">
+        <span class="w-7 h-7 rounded-full border border-emerald-400/70 flex items-center justify-center">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </span>
+        Recolher menu
+      </button>
     </div>
   </aside>
 
@@ -149,7 +177,7 @@
     <!-- ═══════════════════════════════════════════════
          TOP BAR — sticky, com notificações
          ═══════════════════════════════════════════════ -->
-    <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 h-14 flex items-center justify-end px-8 gap-2">
+    <div x-show="currentPage !== 'rede'" class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 h-14 flex items-center justify-end px-8 gap-2">
 
       <!-- Nova venda (sem conversa: balcão / telefone / indicação) -->
       <button @click="openWalkinModal()"
@@ -418,67 +446,60 @@
     </div>
 
     <!-- ═══ TELA: REDE / PARCEIROS ═══ -->
-    <div x-show="currentPage === 'rede'" class="p-8 bg-gray-50/40 min-h-screen">
-      <section aria-labelledby="rede-heading"
-               class="relative -mx-8 -mt-8 mb-5 min-h-[260px] overflow-hidden border-b border-emerald-900/30 bg-emerald-950 bg-cover bg-center shadow-sm"
-               style="background-image: linear-gradient(90deg, rgba(2,44,34,.99) 0%, rgba(2,44,34,.95) 35%, rgba(2,44,34,.72) 51%, rgba(2,44,34,.12) 78%), url('/admin/painel/assets/rede-hero-v2.webp?v=20260723-rede-fix1');">
-        <div class="absolute right-8 top-5 z-10 flex flex-wrap items-center justify-end gap-2">
-          <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-900/80 px-3 py-1.5 text-xs font-medium text-emerald-50 shadow-sm backdrop-blur-sm">
-            <i data-lucide="circle-check" class="h-3.5 w-3.5 text-emerald-300"></i>
-            dados reais
-          </span>
-          <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-900/80 px-3 py-1.5 text-xs font-medium text-emerald-50 shadow-sm backdrop-blur-sm">
-            <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-300"></i>
-            <span x-text="redePeriodLabel()"></span>
-          </span>
+    <div x-show="currentPage === 'rede'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+      <section aria-labelledby="rede-heading" class="grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch mb-0">
+        <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
+          <h1 id="rede-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Rede de parceiros</h1>
+          <p class="mt-3 text-sm text-slate-500">Operação consolidada das unidades credenciadas</p>
         </div>
-        <div class="relative flex min-h-[260px] items-center px-10 pt-8">
-          <div class="max-w-xl">
-            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Rede de parceiros</p>
-            <h1 id="rede-heading" class="max-w-lg text-3xl font-bold tracking-tight text-white lg:text-4xl">Rede conectada, desempenho que move</h1>
-            <div class="mt-3 h-1 w-12 rounded-full bg-emerald-400"></div>
-            <p class="mt-4 max-w-lg text-sm leading-6 text-emerald-50/85">Acompanhe seus parceiros em tempo real, identifique oportunidades e fortaleça sua rede de borracharias.</p>
+        <div class="relative min-h-[148px] overflow-hidden rounded-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+          <img
+            src="/admin/painel/assets/rede-hero-visao-v3.webp?v=20260723-rede-visao2"
+            alt="Rede de borracharias conectadas"
+            class="absolute inset-0 h-full w-full object-cover">
+          <div class="absolute inset-0 bg-gradient-to-r from-emerald-950/20 via-transparent to-emerald-950/5"></div>
+          <div class="absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/20 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="chart-no-axes-combined" class="h-3.5 w-3.5 text-emerald-200"></i>
+              dados reais
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/20 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
+              <span x-text="redePeriodLabel()"></span>
+            </span>
           </div>
         </div>
       </section>
 
-      <div class="bg-white border border-gray-200 rounded-xl mb-6">
-        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 px-4 pt-3">
-          <nav aria-label="Seções da Rede" class="flex items-center gap-1 overflow-x-auto">
+      <div class="bg-white border border-gray-200 border-t-0 rounded-b-xl mb-5">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 px-5">
+          <nav aria-label="Seções da Rede" class="flex items-center gap-3 overflow-x-auto">
             <button @click="setRedeSection('visao')"
-                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
                     :class="redeSection === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
               Visão executiva
             </button>
             <button @click="setRedeSection('operacao')"
-                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
                     :class="redeSection === 'operacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
               Operação e saúde
             </button>
             <button @click="setRedeSection('parceiros')"
-                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
                     :class="redeSection === 'parceiros' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
               Parceiros
             </button>
           </nav>
-          <div class="flex items-center gap-1 pb-3 xl:pb-0">
+          <div class="flex items-center overflow-hidden rounded-lg border border-gray-200 mb-3 xl:mb-0">
             <template x-for="period in redePeriods" :key="period.id">
               <button @click="setRedePeriod(period.id)"
-                      class="px-3 py-2 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap"
+                      class="min-w-[78px] border-r border-gray-200 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap last:border-r-0"
                       :class="redePeriod === period.id
-                        ? 'bg-emerald-700 text-white border-emerald-700'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'"
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-white text-gray-600 hover:bg-emerald-50'"
                       x-text="period.label"></button>
             </template>
           </div>
-        </div>
-        <div class="border-t border-gray-100 px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
-          <div class="flex flex-wrap gap-x-4 gap-y-1">
-            <span x-text="'Período: ' + redePeriodLabel()"></span>
-            <span>Vendas: somente realizadas</span>
-            <span>Estoque: posição atual do portal do parceiro</span>
-          </div>
-          <span>sem dados simulados</span>
         </div>
       </div>
 
@@ -549,115 +570,165 @@
         </template>
       </div>
 
-      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 mb-4">
         <template x-for="kpi in redeKpis">
-          <div class="bg-white border border-gray-200 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-              <div class="text-xs text-gray-500" x-text="kpi.label"></div>
-              <div class="w-9 h-9 rounded-full flex items-center justify-center" :class="kpi.tone">
-                <i :data-lucide="kpi.icon" class="w-4 h-4"></i>
-              </div>
+          <div class="bg-white border border-gray-200 rounded-xl p-3.5 min-h-[112px] flex items-start gap-3">
+            <div class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" :class="kpi.tone">
+              <i :data-lucide="kpi.icon" class="w-5 h-5"></i>
             </div>
-            <div class="text-xl font-bold" x-text="kpi.value"></div>
-            <div class="text-xs text-gray-500 mt-1" x-text="kpi.detail"></div>
+            <div class="min-w-0 pt-0.5">
+              <div class="text-xs text-slate-600 truncate" x-text="kpi.label"></div>
+              <div class="mt-1 text-xl font-bold tracking-tight text-gray-950 whitespace-nowrap" x-text="kpi.value"></div>
+              <div class="text-[11px] text-slate-500 mt-1 truncate" x-text="kpi.detail"></div>
+            </div>
           </div>
         </template>
       </div>
 
-      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-6">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)] gap-4 mb-4">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-2">
             <div>
-              <h3 class="font-semibold">Vendas consolidadas da rede</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Apanhado geral de todas as unidades credenciadas</p>
-            </div>
-            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 mb-4">
-            <label class="text-xs text-gray-500">
-              Meta do período
-              <input type="number"
-                     min="0"
-                     step="100"
-                     x-model.number="redeSalesGoal"
-                     @change="updateRedeSalesGoal()"
-                     class="mt-1 w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-900">
-            </label>
-            <div class="pt-5">
-              <div class="flex items-center justify-between text-xs text-gray-600 mb-1">
-                <span x-text="redeGoalProgress() + '% alcançado'"></span>
-                <span x-text="'faltam ' + formatCurrency(redeGoalRemaining())"></span>
-              </div>
-              <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div class="h-full bg-emerald-600" :style="`width: ${redeGoalProgress()}%`"></div>
+              <h3 class="text-lg font-semibold tracking-tight text-gray-950">Vendas consolidadas da rede</h3>
+              <div class="mt-2 flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-1 w-6 rounded-full bg-emerald-700"></span>
+                  Vendas realizadas (R$)
+                </span>
+                <span class="inline-flex items-center gap-2">
+                  <span class="h-0 w-6 border-t-2 border-dashed border-emerald-500"></span>
+                  Meta (R$)
+                </span>
               </div>
             </div>
+            <div class="w-full md:w-56">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-600">Progresso da meta</span>
+                <span class="text-2xl font-bold text-emerald-700" x-text="redeGoalProgress() + '%'"></span>
+              </div>
+              <div class="mt-1.5 h-2 rounded-full bg-emerald-50 overflow-hidden">
+                <div class="h-full rounded-full bg-emerald-600" :style="`width: ${redeGoalProgress()}%`"></div>
+              </div>
+              <label class="mt-2 flex items-center justify-end gap-1 text-[11px] text-slate-500">
+                Meta do período:
+                <span>R$</span>
+                <input type="number"
+                       aria-label="Meta de vendas da rede"
+                       min="0"
+                       step="100"
+                       x-model.number="redeSalesGoal"
+                       @change="updateRedeSalesGoal()"
+                       class="w-24 border-0 bg-transparent p-0 text-right text-[11px] font-medium text-slate-600 outline-none">
+              </label>
+            </div>
           </div>
-          <div class="h-72">
+          <div class="h-[245px]">
             <canvas id="chartRedeVendas"></canvas>
           </div>
+          <p class="mt-1 text-[10px] text-slate-400">Fonte: vendas realizadas</p>
         </div>
 
         <div class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="font-semibold">Destaques do período</h3>
-            <span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">real</span>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500 mb-3">Top 3 unidades por vendas realizadas</p>
-            <div class="space-y-1">
-              <template x-for="(parceiro, index) in redeTopUnidades()" :key="'top-vendas-' + parceiro.id">
-                <div class="grid grid-cols-[24px_minmax(0,1fr)_auto_auto] items-center gap-2 text-sm py-2.5 border-b border-gray-100 last:border-b-0">
-                  <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center"
-                        x-text="index + 1"></span>
-                  <span class="font-medium truncate" x-text="parceiro.nome"></span>
-                  <span class="text-gray-700 tabular-nums" x-text="parceiro.vendas"></span>
-                  <span class="min-w-12 text-right text-xs font-semibold text-emerald-700 tabular-nums"
-                        x-text="redeParticipacaoVendas(parceiro)"></span>
-                </div>
-              </template>
-              <div x-show="redeTopUnidades().length === 0" class="py-6 text-center text-sm text-gray-500">Nenhuma venda realizada no período.</div>
+          <h3 class="text-lg font-semibold tracking-tight text-gray-950">Resumo central</h3>
+          <div class="grid grid-cols-3 divide-x divide-gray-200 border-b border-gray-200 py-5">
+            <div class="pr-4">
+              <p class="text-xs text-slate-500">Vendas</p>
+              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="redeTotalVendas()"></p>
+              <p class="mt-1 text-[10px] text-slate-400">vendas realizadas</p>
+            </div>
+            <div class="px-4">
+              <p class="text-xs text-slate-500">Pedidos</p>
+              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="redeTotalPedidos()"></p>
+              <p class="mt-1 text-[10px] text-slate-400">pedidos realizados</p>
+            </div>
+            <div class="pl-4">
+              <p class="text-xs text-slate-500">Ticket</p>
+              <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeTicketMedio())"></p>
+              <p class="mt-1 text-[10px] text-slate-400">ticket médio</p>
             </div>
           </div>
+          <p class="mt-4 text-xs font-medium text-gray-800">Top 3 unidades por vendas</p>
+          <div class="mt-2 space-y-0.5">
+            <template x-for="(parceiro, index) in redeTopUnidades()" :key="'top-vendas-' + parceiro.id">
+              <div class="grid grid-cols-[24px_minmax(0,1fr)_auto_auto] items-center gap-2 py-2 text-xs">
+                <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center"
+                      x-text="index + 1"></span>
+                <span class="font-medium text-slate-600 truncate" x-text="parceiro.nome"></span>
+                <span class="text-gray-900 tabular-nums" x-text="parceiro.vendas"></span>
+                <span class="min-w-12 text-right font-semibold text-emerald-700 tabular-nums"
+                      x-text="redeParticipacaoVendas(parceiro)"></span>
+              </div>
+            </template>
+            <div x-show="redeTopUnidades().length === 0" class="py-6 text-center text-sm text-gray-500">Nenhuma venda realizada no período.</div>
+          </div>
+          <p class="mt-2 text-[10px] text-slate-400">Fonte: vendas realizadas</p>
         </div>
       </div>
 
-      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)] gap-4 mb-4">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-semibold text-sm">Resultado por unidade</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Lucro estimado; custos pendentes ficam sinalizados sem cálculo artificial</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
+          <h3 class="text-lg font-semibold tracking-tight text-gray-950">Resultado por unidade</h3>
+          <div class="mt-2 grid grid-cols-[140px_minmax(0,1fr)_96px] gap-3 text-[10px] text-slate-500">
+            <span>Unidade</span>
+            <span></span>
+            <span class="text-right">Lucro (R$)</span>
           </div>
-          <div class="h-48">
-            <canvas id="chartRedeLucro"></canvas>
-          </div>
-          <div x-show="unidadesComCustoPendente().length > 0" class="mt-3 pt-3 border-t border-amber-100 space-y-2">
-            <template x-for="parceiro in unidadesComCustoPendente()" :key="'custo-pendente-' + parceiro.id">
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs">
-                <div class="min-w-0">
-                  <div class="font-medium text-gray-700 truncate" x-text="parceiro.nome"></div>
-                  <div class="text-amber-700" x-text="(parceiro.custoPendenteItens || 0) + ' item(ns) sem custo histórico'"></div>
+          <div class="mt-2 space-y-2">
+            <template x-for="parceiro in redeResultadosUnidades()" :key="'resultado-' + parceiro.id">
+              <div class="grid grid-cols-[140px_minmax(0,1fr)_96px] items-center gap-3 text-xs">
+                <span class="truncate text-slate-600" x-text="parceiro.nome"></span>
+                <div class="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div x-show="!parceiro.custoPendente && parceiro.lucroEstimado !== null"
+                       class="h-full rounded-full"
+                       :class="Number(parceiro.lucroEstimado || 0) < 0 ? 'bg-rose-500' : 'bg-emerald-700'"
+                       :style="`width: ${redeResultadoBarWidth(parceiro)}%`"></div>
                 </div>
-                <span class="font-semibold text-amber-700 whitespace-nowrap">Custo pendente</span>
+                <span x-show="!parceiro.custoPendente && parceiro.lucroEstimado !== null"
+                      class="text-right font-medium tabular-nums text-gray-800"
+                      x-text="formatCurrency(Number(parceiro.lucroEstimado || 0))"></span>
+                <span x-show="parceiro.custoPendente || parceiro.lucroEstimado === null"
+                      class="text-right text-[11px] font-semibold text-amber-600 whitespace-nowrap">Custo pendente</span>
               </div>
             </template>
+            <div x-show="redeResultadosUnidades().length === 0" class="py-6 text-center text-sm text-gray-500">Nenhum resultado disponível no período.</div>
           </div>
+          <p class="mt-3 text-[10px] text-slate-400">Fonte: vendas realizadas e custos conciliados</p>
         </div>
 
         <div class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-semibold text-sm">Compras de pneus por unidade</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Quem mais investe em reposição de estoque</p>
+          <h3 class="text-lg font-semibold tracking-tight text-gray-950">Origem das vendas</h3>
+          <div class="mt-2 grid grid-cols-[180px_minmax(0,1fr)] gap-5 items-center">
+            <div class="relative h-44">
+              <canvas id="chartRedeOrigem"></canvas>
+              <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span class="text-sm font-bold text-gray-900 tabular-nums" x-text="formatCurrency(redeOrigemTotal())"></span>
+                <span class="mt-0.5 text-[10px] text-gray-400">total de vendas</span>
+              </div>
             </div>
-            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
+            <div class="space-y-5 text-sm">
+              <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                <div class="flex items-center gap-3 text-gray-700">
+                  <span class="w-3 h-3 rounded-full bg-emerald-700"></span>
+                  <span>2W</span>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotal2w()) + '%'"></div>
+                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotal2w())"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                <div class="flex items-center gap-3 text-gray-700">
+                  <span class="w-3 h-3 rounded-full bg-emerald-300"></span>
+                  <span>Porta</span>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotalPorta()) + '%'"></div>
+                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotalPorta())"></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="h-48">
-            <canvas id="chartRedeCompras"></canvas>
-          </div>
+          <p class="mt-1 text-[10px] text-slate-400">Fonte: vendas realizadas</p>
         </div>
       </div>
 
@@ -684,48 +755,7 @@
         <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 mb-4">
-        <div x-show="redeSection === 'visao'" class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-semibold text-sm">Origem das vendas</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Quanto veio da 2W contra venda de porta</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
-          </div>
-          <div class="grid grid-cols-[180px_1fr] gap-4 items-center">
-            <div class="relative h-44">
-              <canvas id="chartRedeOrigem"></canvas>
-              <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span class="text-sm font-bold text-gray-900 tabular-nums" x-text="formatCurrency(redeOrigemTotal())"></span>
-                <span class="mt-0.5 text-[10px] text-gray-400">total de vendas</span>
-              </div>
-            </div>
-            <div class="space-y-4 text-sm">
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-100 pb-3">
-                <div class="flex items-center gap-2 text-gray-600">
-                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-700"></span>
-                  <span>2W</span>
-                </div>
-                <div class="text-right">
-                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotal2w()) + '%'"></div>
-                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotal2w())"></div>
-                </div>
-              </div>
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-                <div class="flex items-center gap-2 text-gray-600">
-                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-300"></span>
-                  <span>Porta</span>
-                </div>
-                <div class="text-right">
-                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotalPorta()) + '%'"></div>
-                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotalPorta())"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 gap-4 mb-4">
         <div x-show="redeSection === 'operacao'" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
@@ -839,6 +869,33 @@
         </div>
       </div>
 
+      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-sm">Compras de pneus por unidade</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Quem mais investe em reposição de estoque</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
+          </div>
+          <div class="h-48">
+            <canvas id="chartRedeCompras"></canvas>
+          </div>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-semibold">Pneus mais vendidos da rede</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Consolidado dos pneus que mais aparecem no topo das unidades.</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
+          </div>
+          <div class="h-48">
+            <canvas id="chartPneusRede"></canvas>
+          </div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 gap-6">
         <div x-show="redeSection === 'parceiros'" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -917,19 +974,6 @@
                 </template>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        <div x-show="redeSection === 'visao'" class="bg-white border border-gray-200 rounded-xl p-5">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="font-semibold">Pneus mais vendidos da rede</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Consolidado dos pneus que mais aparecem no topo das unidades.</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
-          </div>
-          <div class="h-40 max-w-2xl">
-            <canvas id="chartPneusRede"></canvas>
           </div>
         </div>
 

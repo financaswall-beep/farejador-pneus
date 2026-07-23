@@ -4,6 +4,59 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.chartsRede = function () {
   return {
+    redeExecutiveSalesSeries() {
+      const maxLen = Math.max(0, ...this.parceirosRede.map((p) => (Array.isArray(p.serieVendas) ? p.serieVendas.length : 0)));
+      const len = maxLen || 1;
+      const series = new Array(len).fill(0);
+      for (const parceiro of this.parceirosRede) {
+        const values = Array.isArray(parceiro.serieVendas) ? parceiro.serieVendas : [];
+        const offset = len - values.length;
+        for (let i = 0; i < values.length; i += 1) {
+          series[offset + i] += Number(values[i] || 0);
+        }
+      }
+      return series;
+    },
+
+    redeExecutiveSeriesLabels() {
+      const len = Math.max(this.redeExecutiveSalesSeries().length, 1);
+      if (len === 1) return ['Hoje'];
+      const formatter = new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        timeZone: 'America/Sao_Paulo',
+      });
+      const today = new Date();
+      return Array.from({ length: len }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - (len - index - 1));
+        return formatter.format(date).replace('.', '');
+      });
+    },
+
+    redeExecutiveGoalDaily() {
+      const len = Math.max(this.redeExecutiveSalesSeries().length, 1);
+      return Number(this.redeSalesGoal || 0) / len;
+    },
+
+    redeResultadosUnidades() {
+      return [...this.parceirosRede]
+        .filter((parceiro) => parceiro.custoPendente || parceiro.lucroEstimado !== null)
+        .sort((a, b) => Number(b.vendasValor || 0) - Number(a.vendasValor || 0));
+    },
+
+    redeResultadoBarWidth(parceiro) {
+      if (!parceiro || parceiro.custoPendente || parceiro.lucroEstimado === null) return 0;
+      const max = Math.max(
+        1,
+        ...this.redeResultadosUnidades()
+          .filter((row) => !row.custoPendente && row.lucroEstimado !== null)
+          .map((row) => Math.abs(Number(row.lucroEstimado || 0))),
+      );
+      const width = Math.round((Math.abs(Number(parceiro.lucroEstimado || 0)) / max) * 100);
+      return Math.max(4, Math.min(100, width));
+    },
+
     renderRedeChart() {
       const ctx = document.getElementById('chartRedeVendas');
       if (!ctx) return;
@@ -12,74 +65,56 @@ window.PAINEL_MODULES.chartsRede = function () {
       window._redeChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: this.redeSeriesLabels(),
+          labels: this.redeExecutiveSeriesLabels(),
           datasets: [
             {
-              label: 'Vendas reais da rede',
-              data: this.redeSalesSeries(),
-              yAxisID: 'y',
+              label: 'Vendas realizadas (R$)',
+              data: this.redeExecutiveSalesSeries(),
               borderColor: '#047857',
-              backgroundColor: 'rgba(4,120,87,0.08)',
-              tension: 0.35,
+              backgroundColor: 'rgba(16,185,129,0.12)',
+              borderWidth: 2.5,
+              tension: 0.28,
               fill: true,
-              pointRadius: 4,
-              pointBackgroundColor: '#ffffff',
+              pointRadius: 2.5,
+              pointBackgroundColor: '#047857',
               pointBorderColor: '#047857',
-              pointBorderWidth: 2,
+              pointBorderWidth: 1,
             },
             {
-              label: 'Meta diária',
-              data: this.redeSalesSeries().map(() => this.redeGoalDaily()),
-              yAxisID: 'y',
-              borderColor: '#6ee7b7',
+              label: 'Meta (R$)',
+              data: this.redeExecutiveSalesSeries().map(() => this.redeExecutiveGoalDaily()),
+              borderColor: '#059669',
               borderDash: [6, 5],
-              borderWidth: 2,
+              borderWidth: 1.5,
               pointRadius: 0,
               fill: false,
-            },
-            {
-              label: 'Pedidos reais',
-              data: this.redeOrderSeries(),
-              yAxisID: 'y1',
-              borderColor: '#34d399',
-              backgroundColor: 'rgba(52,211,153,0.08)',
-              tension: 0.35,
-              fill: false,
-              pointRadius: 3,
-              pointBackgroundColor: '#ffffff',
-              pointBorderColor: '#34d399',
-              pointBorderWidth: 2,
             },
           ],
         },
         options: {
           ...this.chartOptions('R$ '),
+          interaction: { intersect: false, mode: 'index' },
           scales: {
             y: {
               beginAtZero: true,
               position: 'left',
-              grid: { color: '#f3f4f6' },
+              grid: { color: '#e5e7eb' },
               ticks: {
-                color: '#9ca3af',
-                font: { size: 11 },
+                color: '#64748b',
+                font: { size: 10 },
                 callback: (value) => 'R$ ' + Number(value).toLocaleString('pt-BR'),
-              },
-              border: { display: false },
-            },
-            y1: {
-              beginAtZero: true,
-              position: 'right',
-              grid: { drawOnChartArea: false },
-              ticks: {
-                precision: 0,
-                color: '#059669',
-                font: { size: 11 },
               },
               border: { display: false },
             },
             x: {
               grid: { display: false },
-              ticks: { color: '#9ca3af', font: { size: 11 } },
+              ticks: {
+                autoSkip: true,
+                maxTicksLimit: 7,
+                maxRotation: 0,
+                color: '#64748b',
+                font: { size: 10 },
+              },
               border: { display: false },
             },
           },
