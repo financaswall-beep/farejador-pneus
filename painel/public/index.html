@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-operacao-prod1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-parceiros-prod1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -717,19 +717,19 @@
           <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <header>
               <h2 class="text-base font-semibold tracking-tight text-gray-950">Alertas operacionais</h2>
-              <p class="mt-0.5 text-[10px] text-gray-500">Situações únicas que exigem atenção</p>
+              <p class="mt-1 text-sm text-gray-500">Situações únicas que exigem atenção</p>
             </header>
             <div class="mt-3 divide-y divide-gray-100">
               <template x-for="alerta in redeOperacaoAlertas()" :key="'operacao-alerta-' + alerta.label">
-                <div class="grid grid-cols-[32px_minmax(0,1fr)_28px_auto] items-center gap-2 py-2">
+                <div class="grid grid-cols-[32px_minmax(0,1fr)_28px_auto] items-center gap-2 py-2.5">
                   <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
                     <i :data-lucide="alerta.icon" class="h-3.5 w-3.5"></i>
                   </span>
-                  <span class="text-xs font-medium text-gray-700" x-text="alerta.label"></span>
-                  <span class="flex h-5 min-w-5 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-1 text-[10px] font-bold text-emerald-800"
+                  <span class="text-base font-medium text-gray-700" x-text="alerta.label"></span>
+                  <span class="flex h-7 min-w-7 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 text-sm font-bold text-emerald-800"
                         x-text="alerta.count"></span>
                   <button @click="redeFilter = alerta.filter; setRedeSection('parceiros')"
-                          class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900">
+                          class="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900">
                     Ver detalhes
                     <i data-lucide="arrow-right" class="h-3 w-3"></i>
                   </button>
@@ -744,25 +744,25 @@
           <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <header>
               <h2 class="text-base font-semibold tracking-tight text-gray-950">Unidades em foco</h2>
-              <p class="mt-0.5 text-[10px] text-gray-500">Menores scores e principal causa</p>
+              <p class="mt-1 text-sm text-gray-500">Menores scores e principal causa</p>
             </header>
             <div class="mt-3 divide-y divide-gray-100">
               <template x-for="parceiro in redeUnidadesEmFoco()" :key="'mock-foco-' + parceiro.id">
                 <div class="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2 py-2.5">
-                  <span class="flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold"
+                  <span class="flex h-9 w-9 items-center justify-center rounded-full border text-base font-bold"
                         :class="redeSaudeSituacao(parceiro).badge"
                         x-text="saudeScore(parceiro)"></span>
                   <div class="min-w-0">
                     <div class="flex items-center gap-2">
-                      <span class="truncate text-xs font-semibold text-gray-800" x-text="parceiro.nome"></span>
-                      <span class="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold"
+                      <span class="truncate text-base font-semibold text-gray-800" x-text="parceiro.nome"></span>
+                      <span class="rounded-full border px-2 py-0.5 text-sm font-semibold"
                             :class="redeSaudeSituacao(parceiro).badge"
                             x-text="redeSaudeSituacao(parceiro).label"></span>
                     </div>
-                    <p class="mt-0.5 truncate text-[10px] text-gray-500" x-text="redeCausaPrincipal(parceiro)"></p>
+                    <p class="mt-1 truncate text-sm text-gray-500" x-text="redeCausaPrincipal(parceiro)"></p>
                   </div>
                   <button @click="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
-                          class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900">
+                          class="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900">
                     Ver ação
                     <i data-lucide="arrow-right" class="h-3 w-3"></i>
                   </button>
@@ -770,7 +770,7 @@
               </template>
             </div>
             <button @click="setRedeSection('parceiros')"
-                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-sm font-semibold text-emerald-700">
               Ver todas as unidades
               <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
             </button>
@@ -779,11 +779,11 @@
           <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <header>
               <h2 class="text-base font-semibold tracking-tight text-gray-950">Dependência 2W</h2>
-              <p class="mt-0.5 text-[10px] text-gray-500">Percentual das vendas originadas pela matriz</p>
+              <p class="mt-1 text-sm text-gray-500">Percentual das vendas originadas pela matriz</p>
             </header>
             <div class="mt-3 divide-y divide-gray-100">
               <template x-for="(parceiro, index) in rankingDependencia2w()" :key="'mock-dependencia-' + parceiro.id">
-                <div class="grid grid-cols-[18px_minmax(90px,1fr)_40px_minmax(54px,0.72fr)_48px] items-center gap-2 py-2 text-[10px]">
+                <div class="grid grid-cols-[20px_minmax(90px,1fr)_46px_minmax(54px,0.72fr)_56px] items-center gap-2 py-2.5 text-sm">
                   <span class="font-semibold text-gray-400" x-text="index + 1"></span>
                   <span class="truncate font-medium text-gray-700" x-text="parceiro.nome"></span>
                   <span class="text-right font-semibold tabular-nums" x-text="(parceiro.percentual2w || 0) + '%'"></span>
@@ -797,7 +797,7 @@
               <div x-show="rankingDependencia2w().length === 0" class="py-8 text-center text-xs text-gray-500">Sem vendas 2W no período.</div>
             </div>
             <button @click="redeFilter = 'dependencia_2w'; setRedeSection('parceiros')"
-                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-sm font-semibold text-emerald-700">
               Ver ranking completo
               <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
             </button>
@@ -806,12 +806,12 @@
           <section class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <header>
               <h2 class="text-base font-semibold tracking-tight text-gray-950">Venda hoje</h2>
-              <p class="mt-0.5 text-[10px] text-gray-500">Vendas realizadas até o momento</p>
+              <p class="mt-1 text-sm text-gray-500">Vendas realizadas até o momento</p>
             </header>
             <div class="mt-3 grid grid-cols-[minmax(0,1fr)_116px] items-center gap-3">
               <div class="divide-y divide-gray-100">
                 <template x-for="(parceiro, index) in redeVendasHojeRanking()" :key="'mock-venda-hoje-' + parceiro.id">
-                  <div class="grid grid-cols-[16px_minmax(70px,1fr)_auto_28px] items-center gap-1.5 py-1.5 text-[9px]">
+                  <div class="grid grid-cols-[18px_minmax(70px,1fr)_auto_32px] items-center gap-2 py-2 text-sm">
                     <span class="font-semibold text-gray-400" x-text="index + 1"></span>
                     <span class="truncate font-medium text-gray-700" x-text="parceiro.nome"></span>
                     <span class="text-right tabular-nums" x-text="formatCurrency(parceiroVendaHojeValor(parceiro))"></span>
@@ -823,17 +823,17 @@
                 <div class="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full p-2.5"
                      :style="`background: conic-gradient(#047857 0 ${redeVendaHojeCobertura()}%, #d1fae5 0 100%)`">
                   <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-white shadow-inner">
-                    <strong class="text-sm font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeVendaHojeTotal())"></strong>
-                    <span class="text-[9px] text-gray-500">total hoje</span>
+                    <strong class="text-lg font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeVendaHojeTotal())"></strong>
+                    <span class="text-sm text-gray-500">total hoje</span>
                   </div>
                 </div>
-                <p class="mt-1.5 text-[10px] text-gray-600">
+                <p class="mt-1.5 text-sm text-gray-600">
                   <strong x-text="redePedidosHojeTotal()"></strong> pedidos
                 </p>
               </div>
             </div>
             <button @click="setRedeSection('parceiros')"
-                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-[11px] font-semibold text-emerald-700">
+                    class="mt-3 flex w-full items-center justify-center gap-1.5 border-t border-gray-100 pt-3 text-sm font-semibold text-emerald-700">
               Ver todas as vendas
               <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
             </button>
@@ -1285,84 +1285,223 @@
       </div>
 
       <div class="grid grid-cols-1 gap-6">
-        <div x-show="redeSection === 'parceiros'" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold">Parceiros da rede</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Clique em uma unidade para ver relatório individual.</p>
+        <div x-show="redeSection === 'parceiros'" class="space-y-4">
+          <section aria-labelledby="rede-parceiros-heading"
+                   class="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div class="min-w-0 flex-1">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 id="rede-parceiros-heading" class="text-lg font-semibold tracking-tight text-emerald-950">Central de parceiros</h3>
+                    <p class="mt-1 text-sm text-slate-500">Encontre uma unidade e abra o relatório operacional completo.</p>
+                  </div>
+                  <span class="hidden rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 sm:inline-flex"
+                        x-text="filteredParceirosRede().length + ' unidade(s) exibida(s)'"></span>
+                </div>
+                <div class="flex flex-col gap-2 lg:flex-row lg:items-center">
+                  <label class="relative w-full lg:w-[360px] lg:flex-shrink-0">
+                    <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-emerald-700"></i>
+                    <input x-model.debounce.200ms="redeBusca"
+                           type="search"
+                           aria-label="Buscar parceiro, responsável ou cidade"
+                           placeholder="Buscar parceiro, responsável ou cidade"
+                           class="h-10 w-full rounded-lg border border-emerald-100 bg-emerald-50/30 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-emerald-600 focus:bg-white focus:ring-2 focus:ring-emerald-100">
+                  </label>
+                  <div class="flex flex-wrap gap-2" aria-label="Filtros de parceiros">
+                    <template x-for="filtro in redeFilters" :key="'rede-filtro-' + filtro.id">
+                      <button @click="redeFilter = filtro.id"
+                              class="rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                              :class="redeFilter === filtro.id
+                                ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                                : 'border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800'"
+                              x-text="filtro.label"></button>
+                    </template>
+                  </div>
+                </div>
+              </div>
             </div>
-            <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600"
-                  x-text="filteredParceirosRede().length + ' unidade(s)'"></span>
-          </div>
-          <div class="px-5 py-3 border-b border-gray-100 flex flex-col xl:flex-row xl:items-center gap-3">
-            <label class="relative w-full xl:w-80">
-              <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
-              <input x-model.debounce.200ms="redeBusca" type="search"
-                     placeholder="Buscar parceiro, responsável ou cidade"
-                     class="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 text-xs outline-none focus:border-emerald-600">
-            </label>
-            <div class="flex flex-wrap gap-2">
-              <template x-for="filtro in redeFilters">
-                <button @click="redeFilter = filtro.id"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                        :class="redeFilter === filtro.id
-                          ? 'bg-emerald-700 text-white border-emerald-700'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'"
-                        x-text="filtro.label"></button>
-              </template>
-            </div>
-          </div>
+          </section>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200">
-                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                  <th class="px-5 py-3 font-medium">Parceiro</th>
-                  <th class="px-5 py-3 font-medium">Responsável</th>
-                  <th class="px-5 py-3 font-medium">Cidade</th>
-                  <th class="px-5 py-3 font-medium">Status</th>
-                  <th class="px-5 py-3 font-medium text-right">Vendas</th>
-                  <th class="px-5 py-3 font-medium text-right">Ticket</th>
-                  <th class="px-5 py-3 font-medium text-right">2W</th>
-                  <th class="px-5 py-3 font-medium text-right">Score</th>
-                  <th class="px-5 py-3 font-medium">Estoque</th>
-                  <th class="px-5 py-3 font-medium">Atualização</th>
-                  <th class="px-5 py-3 font-medium">Alerta</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="parceiro in filteredParceirosRede()">
-                  <tr @click="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
-                      class="hover:bg-gray-50 cursor-pointer"
-                       :class="parceirosRede.indexOf(parceiro) === selectedParceiroIndex ? 'bg-emerald-50/60' : ''">
-                    <td class="px-5 py-3 font-medium" x-text="parceiro.nome"></td>
-                    <td class="px-5 py-3 text-gray-600" x-text="parceiro.responsavel"></td>
-                    <td class="px-5 py-3 text-gray-600" x-text="parceiro.cidade"></td>
-                    <td class="px-5 py-3">
-                      <span class="text-xs px-2 py-1 rounded-full"
-                            :class="parceiro.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'"
-                            x-text="parceiro.status"></span>
-                    </td>
-                    <td class="px-5 py-3 text-right font-semibold" x-text="parceiro.vendas"></td>
-                    <td class="px-5 py-3 text-right text-gray-600" x-text="parceiro.ticket"></td>
-                    <td class="px-5 py-3 text-right text-gray-600" x-text="(parceiro.percentual2w || 0) + '%'"></td>
-                    <td class="px-5 py-3 text-right">
-                      <span class="text-xs font-semibold px-2 py-1 rounded-full"
-                            :class="saudeScoreClass(parceiro)"
-                            x-text="saudeScore(parceiro)"></span>
-                    </td>
-                    <td class="px-5 py-3 text-gray-600" x-text="parceiro.estoque"></td>
-                    <td class="px-5 py-3 text-gray-600" x-text="parceiro.ultimaAtualizacao || '-'"></td>
-                    <td class="px-5 py-3">
-                      <span class="text-xs px-2 py-1 rounded"
-                            :class="parceiro.alerta === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-                            x-text="parceiro.alerta"></span>
+          <section aria-label="Resumo dos parceiros"
+                   class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <button @click="redeFilter = 'todos'"
+                    class="group flex min-h-[96px] items-center gap-4 rounded-xl border border-emerald-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+              <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+                <i data-lucide="users" class="h-6 w-6"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <strong class="block text-3xl font-bold tracking-tight text-emerald-800"
+                        x-text="parceirosRede.filter((parceiro) => parceiro.status === 'Ativo').length"></strong>
+                <span class="mt-1 block text-sm text-slate-600">parceiros ativos</span>
+              </span>
+              <i data-lucide="chevron-right" class="h-5 w-5 text-emerald-700 transition group-hover:translate-x-0.5"></i>
+            </button>
+
+            <button @click="redeFilter = 'alerta'"
+                    class="group flex min-h-[96px] items-center gap-4 rounded-xl border border-lime-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-lime-400 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-500">
+              <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-lime-100 text-lime-800">
+                <i data-lucide="triangle-alert" class="h-6 w-6"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <strong class="block text-3xl font-bold tracking-tight text-lime-800"
+                        x-text="parceirosRede.filter((parceiro) => parceiro.alerta !== 'ok').length"></strong>
+                <span class="mt-1 block text-sm text-slate-600">parceiros com alerta</span>
+              </span>
+              <i data-lucide="chevron-right" class="h-5 w-5 text-lime-700 transition group-hover:translate-x-0.5"></i>
+            </button>
+
+            <button @click="redeFilter = 'sem_venda'"
+                    class="group flex min-h-[96px] items-center gap-4 rounded-xl border border-emerald-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-500 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-800">
+              <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-200/70 text-emerald-950">
+                <i data-lucide="trending-down" class="h-6 w-6"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <strong class="block text-3xl font-bold tracking-tight text-emerald-950"
+                        x-text="unidadesSemVendaHoje().length"></strong>
+                <span class="mt-1 block text-sm text-slate-600">sem venda hoje</span>
+              </span>
+              <i data-lucide="chevron-right" class="h-5 w-5 text-emerald-900 transition group-hover:translate-x-0.5"></i>
+            </button>
+
+            <button @click="redeFilter = 'sem_atualizacao'"
+                    class="group flex min-h-[96px] items-center gap-4 rounded-xl border border-emerald-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+              <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                <i data-lucide="history" class="h-6 w-6"></i>
+              </span>
+              <span class="min-w-0 flex-1">
+                <strong class="block text-3xl font-bold tracking-tight text-emerald-800"
+                        x-text="unidadesSemAtualizacao().length"></strong>
+                <span class="mt-1 block text-sm text-slate-600">atualização pendente</span>
+              </span>
+              <i data-lucide="chevron-right" class="h-5 w-5 text-emerald-700 transition group-hover:translate-x-0.5"></i>
+            </button>
+          </section>
+
+          <section aria-label="Lista de parceiros"
+                   class="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
+            <header class="flex flex-col gap-3 border-b border-emerald-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-emerald-950">Unidades credenciadas</h3>
+                <p class="mt-1 text-sm text-slate-500">Dados operacionais conciliados no período selecionado.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-600" aria-label="Legenda de saúde">
+                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-600"></span>Saudável</span>
+                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-lime-600"></span>Atenção</span>
+                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-950"></span>Crítico</span>
+              </div>
+            </header>
+
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[1120px] table-fixed text-sm">
+                <thead class="border-b border-emerald-100 bg-emerald-50/50">
+                  <tr class="text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <th class="w-[290px] px-4 py-3">Parceiro</th>
+                    <th class="w-[90px] px-3 py-3">Status</th>
+                    <th class="w-[210px] px-3 py-3">Desempenho</th>
+                    <th class="w-[170px] px-3 py-3">Dependência 2W</th>
+                    <th class="w-[80px] px-3 py-3 text-center">Score</th>
+                    <th class="w-[230px] px-3 py-3">Situação</th>
+                    <th class="w-[120px] px-4 py-3 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-emerald-50">
+                  <template x-for="parceiro in filteredParceirosRede()" :key="'rede-parceiro-' + parceiro.id">
+                    <tr @click="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
+                        class="cursor-pointer transition-colors hover:bg-emerald-50/50 focus-within:bg-emerald-50/70"
+                        :class="parceirosRede.indexOf(parceiro) === selectedParceiroIndex ? 'bg-emerald-50/70' : 'bg-white'">
+                      <td class="px-4 py-3">
+                        <div class="flex min-w-0 items-center gap-3">
+                          <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
+                            <i data-lucide="store" class="h-4 w-4"></i>
+                          </span>
+                          <div class="min-w-0">
+                            <p class="truncate text-base font-semibold text-slate-900" x-text="parceiro.nome"></p>
+                            <p class="mt-1 truncate text-sm text-slate-500">
+                              <span x-text="parceiro.responsavel || 'Responsável não informado'"></span>
+                              <span aria-hidden="true"> · </span>
+                              <span x-text="parceiro.cidade || 'Cidade não informada'"></span>
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-3 py-3">
+                        <span class="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                              x-text="parceiro.status || 'Ativo'"></span>
+                      </td>
+                      <td class="px-3 py-3">
+                        <div class="grid grid-cols-2 gap-3">
+                          <div>
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Vendas</p>
+                            <p class="mt-0.5 truncate text-sm font-semibold text-slate-900" x-text="parceiro.vendas"></p>
+                          </div>
+                          <div>
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Ticket</p>
+                            <p class="mt-0.5 truncate text-sm font-semibold text-slate-900" x-text="parceiro.ticket"></p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-3 py-3">
+                        <div class="flex items-center gap-2.5">
+                          <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-emerald-50">
+                            <div class="h-full rounded-full bg-emerald-700"
+                                 :style="`width: ${Math.min(100, Math.max(0, Number(parceiro.percentual2w || 0)))}%`"></div>
+                          </div>
+                          <span class="w-10 text-right text-sm font-semibold tabular-nums text-emerald-950"
+                                x-text="(parceiro.percentual2w || 0) + '%'"></span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full p-[3px]"
+                              :style="`background: conic-gradient(${saudeScore(parceiro) >= 80 ? '#047857' : (saudeScore(parceiro) >= 60 ? '#65a30d' : '#022c22')} ${saudeScore(parceiro)}%, #d1fae5 0)`">
+                          <span class="flex h-full w-full items-center justify-center rounded-full bg-white text-sm font-bold text-emerald-950"
+                                x-text="saudeScore(parceiro)"></span>
+                        </span>
+                      </td>
+                      <td class="px-3 py-3">
+                        <div class="flex min-w-0 items-center gap-2">
+                          <span class="max-w-[122px] truncate rounded-md border px-2 py-1 text-xs font-semibold"
+                                :class="parceiro.alerta === 'ok'
+                                  ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
+                                  : (saudeScore(parceiro) < 60
+                                    ? 'border-emerald-800 bg-emerald-950 text-emerald-50'
+                                    : 'border-lime-200 bg-lime-100 text-lime-800')"
+                                x-text="parceiro.alerta || 'ok'"></span>
+                          <span class="inline-flex min-w-0 items-center gap-1 text-xs text-slate-500">
+                            <i data-lucide="clock-3" class="h-3 w-3 flex-shrink-0 text-emerald-700"></i>
+                            <span class="truncate" x-text="parceiro.ultimaAtualizacao || 'Sem atualização'"></span>
+                          </span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3 text-right">
+                        <button @click.stop="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
+                                class="inline-flex items-center gap-1 whitespace-nowrap text-sm font-semibold text-emerald-700 transition hover:text-emerald-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
+                          Abrir unidade
+                          <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="filteredParceirosRede().length === 0">
+                    <td colspan="7" class="px-6 py-12 text-center">
+                      <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                        <i data-lucide="search-x" class="h-5 w-5"></i>
+                      </span>
+                      <p class="mt-3 text-sm font-semibold text-emerald-950">Nenhum parceiro encontrado</p>
+                      <p class="mt-1 text-xs text-slate-500">Ajuste a busca ou selecione outro filtro.</p>
                     </td>
                   </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+
+            <footer class="flex items-center justify-between border-t border-emerald-100 bg-emerald-50/30 px-4 py-3 text-sm text-slate-500">
+              <span x-text="filteredParceirosRede().length + ' parceiro(s)'"></span>
+              <span class="inline-flex items-center gap-1.5 font-medium text-emerald-800">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                período: <span x-text="redePeriodLabel()"></span>
+              </span>
+            </footer>
+          </section>
         </div>
 
         <div class="hidden">

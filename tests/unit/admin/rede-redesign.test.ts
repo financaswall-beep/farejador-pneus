@@ -96,7 +96,7 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain("redeSection === 'operacao' && !redeOperacaoLegadaAtiva()");
     expect(html).toContain("redeSection === 'operacao' && redeOperacaoLegadaAtiva()");
     expect(html).not.toContain('app.rede.mock.js');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260723-rede-operacao-prod1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260723-rede-parceiros-prod1');
     expect(html).toContain('Cobranças em andamento');
     expect(html).toContain('Pulso de saúde');
     expect(html).toContain('Alertas operacionais');
@@ -106,6 +106,33 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('redeVendasHojeRanking()');
     expect(nav).toContain("section === 'operacao' && this.redeOperacaoLegadaAtiva()");
     expect(html).toContain('/admin/painel/assets/rede-hero-visao-v3.webp?v=20260723-rede-visao2');
+  });
+
+  it('mantém fontes legíveis nos quatro cards operacionais compactos', () => {
+    expect(html).toContain('<span class="text-base font-medium text-gray-700" x-text="alerta.label"></span>');
+    expect(html).toContain('<span class="truncate text-base font-semibold text-gray-800" x-text="parceiro.nome"></span>');
+    expect(html).toContain('py-2.5 text-sm');
+    expect(html).toContain('py-2 text-sm');
+    expect(html).toContain('<strong class="text-lg font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeVendaHojeTotal())"></strong>');
+  });
+
+  it('reestiliza apenas o conteúdo de Parceiros com a paleta verde e mantém os contratos existentes', () => {
+    expect(html).toContain('id="rede-parceiros-heading"');
+    expect(html).toContain('Central de parceiros');
+    expect(html).toContain('id="rede-parceiros-heading" class="text-lg');
+    expect(html).toContain('aria-label="Resumo dos parceiros"');
+    expect(html).toContain('Unidades credenciadas');
+    expect(html).toContain('<p class="truncate text-base font-semibold text-slate-900" x-text="parceiro.nome"></p>');
+    expect(html).toContain('text-sm font-semibold text-emerald-700 transition');
+    expect(html).toContain("x-text=\"filteredParceirosRede().length + ' unidade(s) exibida(s)'\"");
+    expect(html).toContain("x-text=\"parceirosRede.filter((parceiro) => parceiro.status === 'Ativo').length\"");
+    expect(html).toContain("x-text=\"unidadesSemVendaHoje().length\"");
+    expect(html).toContain("x-text=\"unidadesSemAtualizacao().length\"");
+    expect(html).toContain("filteredParceirosRede()");
+    expect(html).toContain("@click.stop=\"openParceiroDetalhe(parceirosRede.indexOf(parceiro))\"");
+    expect(html).toContain("bg-lime-100 text-lime-800");
+    expect(html).toContain("bg-emerald-950 text-emerald-50");
+    expect(html).not.toContain("redeSection === 'parceiros'\" class=\"bg-white border border-gray-200 rounded-xl overflow-hidden");
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
