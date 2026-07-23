@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-visao2" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-topbar1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -160,37 +160,77 @@
     <!-- ═══════════════════════════════════════════════
          TOP BAR — sticky, com notificações
          ═══════════════════════════════════════════════ -->
-    <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200 h-14 flex items-center justify-end px-8 gap-2">
+    <div x-data="{ mockTopbar: new URLSearchParams(window.location.search).get('mock') === '1' }"
+         :class="mockTopbar ? 'bg-gray-50 px-3 pt-3 pb-2' : 'bg-white/80 backdrop-blur-md border-b border-gray-200'"
+         class="sticky top-0 z-30">
+      <div :class="mockTopbar
+                     ? 'h-16 rounded-2xl bg-emerald-950 border border-emerald-800 px-4 gap-2 shadow-[0_12px_30px_rgba(2,44,34,0.18)]'
+                     : 'h-14 justify-end px-8 gap-2'"
+           class="relative flex items-center">
+
+      <!-- Central de comando: exclusiva da prévia mockada -->
+      <div x-show="mockTopbar" class="flex min-w-[190px] flex-shrink-0 items-center gap-3 pr-2 text-white">
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-900 text-emerald-300">
+          <i data-lucide="network" class="h-5 w-5"></i>
+        </span>
+        <div class="min-w-0">
+          <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-white">Central de rede</p>
+          <p class="mt-0.5 flex items-center gap-1.5 text-[10px] text-emerald-200/80">
+            <span x-text="parceirosRede.length + ' unidades conectadas'"></span>
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.95)]"></span>
+          </p>
+        </div>
+      </div>
+
+      <label x-show="mockTopbar"
+             class="mx-1 flex h-10 min-w-[220px] max-w-md flex-1 items-center gap-2 rounded-xl border border-emerald-700/70 bg-emerald-900/80 px-3 text-emerald-100 shadow-inner">
+        <i data-lucide="search" class="h-4 w-4 flex-shrink-0 text-emerald-300"></i>
+        <input type="search"
+               aria-label="Buscar ou executar um comando"
+               placeholder="Buscar ou executar um comando..."
+               class="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs text-white placeholder:text-emerald-200/60 focus:outline-none focus:ring-0">
+        <span class="rounded-md border border-emerald-600/60 bg-emerald-950/70 px-2 py-1 text-[9px] font-medium text-emerald-200">Ctrl K</span>
+      </label>
 
       <!-- Nova venda (sem conversa: balcão / telefone / indicação) -->
       <button @click="openWalkinModal()"
-              class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm font-medium transition-colors">
+              :class="mockTopbar
+                        ? 'h-10 px-3.5 text-xs font-semibold bg-emerald-300 hover:bg-emerald-200 text-emerald-950 rounded-xl shadow-[0_0_18px_rgba(110,231,183,0.18)]'
+                        : 'px-4 py-2 text-sm font-medium bg-gray-900 hover:bg-gray-800 text-white rounded-lg'"
+              class="flex flex-shrink-0 items-center gap-2 transition-colors">
         <i data-lucide="plus" class="w-4 h-4"></i>
         Nova venda
       </button>
 
       <!-- Novo parceiro (cadastro na matriz — Etapa 1 onboarding) -->
       <button @click="openPartnerModal()"
-              class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+              :class="mockTopbar
+                        ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
+                        : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
+              class="flex flex-shrink-0 items-center gap-2 border font-medium transition-colors">
         <i data-lucide="store" class="w-4 h-4"></i>
         Novo parceiro
       </button>
 
       <!-- Candidaturas (Etapa 3) -->
       <button @click="openApplications()"
-              class="relative flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+              :class="mockTopbar
+                        ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
+                        : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
+              class="relative flex flex-shrink-0 items-center gap-2 border font-medium transition-colors">
         <i data-lucide="inbox" class="w-4 h-4"></i>
         Candidaturas
         <span x-show="applications.length > 0" x-cloak
-              class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+              :class="mockTopbar ? 'static bg-emerald-300 text-emerald-950 ring-0' : 'absolute -top-1.5 -right-1.5 bg-rose-500 text-white'"
+              class="min-w-[18px] h-[18px] text-[10px] font-bold rounded-full flex items-center justify-center px-1"
               x-text="applications.length"></span>
       </button>
 
       <!-- Separador vertical -->
-      <div class="w-px h-6 bg-gray-200 mx-1"></div>
+      <div x-show="!mockTopbar" class="w-px h-6 bg-gray-200 mx-1"></div>
 
       <!-- Busca rápida (placeholder) -->
-      <button aria-label="Buscar no painel" class="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-900 transition-colors">
+      <button x-show="!mockTopbar" aria-label="Buscar no painel" class="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-900 transition-colors">
         <i data-lucide="search" class="w-5 h-5"></i>
       </button>
 
@@ -201,12 +241,15 @@
 
         <!-- Botão -->
         <button @click="open = !open" aria-label="Abrir notificações"
-                :class="open ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'"
-                class="relative p-2 rounded-lg transition-colors">
-          <i data-lucide="bell" class="w-5 h-5"></i>
+                :class="mockTopbar
+                          ? ('flex h-10 w-10 items-center justify-center rounded-xl border ' + (open ? 'border-emerald-400 bg-emerald-900 text-white' : 'border-emerald-700 bg-emerald-950 text-emerald-100 hover:border-emerald-500'))
+                          : ('p-2 rounded-lg ' + (open ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'))"
+                class="relative transition-colors">
+          <i data-lucide="bell" :class="mockTopbar ? 'w-4 h-4' : 'w-5 h-5'"></i>
           <span x-show="notifBadgeCount() > 0"
                 x-text="notifBadgeCount()"
-                class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white flex items-center justify-center px-1"></span>
+                :class="mockTopbar ? 'ring-emerald-950' : 'ring-white'"
+                class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[10px] font-bold rounded-full ring-2 flex items-center justify-center px-1"></span>
         </button>
 
         <!-- Dropdown -->
@@ -266,16 +309,25 @@
       </div>
 
       <!-- Separador vertical -->
-      <div class="w-px h-6 bg-gray-200 mx-1"></div>
+      <div :class="mockTopbar ? 'h-7 bg-emerald-700' : 'h-6 bg-gray-200'" class="w-px mx-1"></div>
 
       <!-- Avatar do operador -->
       <button @click="logoutAdmin()" title="Sair da Matriz"
-              class="flex items-center gap-2 p-1 pr-2.5 hover:bg-gray-100 rounded-lg transition-colors">
+              :class="mockTopbar
+                        ? 'h-10 p-1 pr-2.5 text-white hover:bg-emerald-900 rounded-xl'
+                        : 'p-1 pr-2.5 hover:bg-gray-100 rounded-lg'"
+              class="flex flex-shrink-0 items-center gap-2 transition-colors">
         <div class="w-7 h-7 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-xs font-semibold"
              x-text="operatorLabel.charAt(0).toUpperCase()">O</div>
-        <span class="text-sm font-medium" x-text="operatorLabel">Operador</span>
-        <i data-lucide="log-out" class="w-3.5 h-3.5 text-gray-500"></i>
+        <span class="min-w-0 text-left">
+          <span :class="mockTopbar ? 'max-w-24 text-xs font-semibold' : 'text-sm font-medium'"
+                class="block truncate"
+                x-text="operatorLabel">Operador</span>
+          <span x-show="mockTopbar" class="block text-[9px] font-normal text-emerald-200/70">Administrador</span>
+        </span>
+        <i data-lucide="log-out" :class="mockTopbar ? 'text-emerald-300' : 'text-gray-500'" class="w-3.5 h-3.5"></i>
       </button>
+      </div>
     </div>
 
     <!-- ═══ TELA: RESUMO ═══ -->

@@ -68,13 +68,24 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('Fase 2 · próximos');
     expect(html).toContain('Em operação');
     expect(html).toContain('Configurações');
-    expect(html).toContain('<div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md');
+    expect(html).toContain(":class=\"mockTopbar ? 'bg-gray-50 px-3 pt-3 pb-2' : 'bg-white/80 backdrop-blur-md border-b border-gray-200'\"");
+    expect(html).toContain('class="sticky top-0 z-30"');
     expect(html).not.toContain('<div x-show="currentPage !== \'rede\'" class="sticky top-0');
     expect(html).toContain('aria-label="Buscar no painel"');
     expect(html).toContain('aria-label="Abrir notificações"');
     expect(html).toContain('@click="logoutAdmin()"');
     expect(html).toContain('sm:grid-cols-2 xl:grid-cols-6');
     expect(html).toContain('text-base 2xl:text-xl');
+  });
+
+  it('ativa a central de comando somente na prévia mockada sem trocar as ações existentes', () => {
+    expect(html).toContain("new URLSearchParams(window.location.search).get('mock') === '1'");
+    expect(html).toContain('Central de rede');
+    expect(html).toContain('Buscar ou executar um comando...');
+    expect(html).toContain('@click="openWalkinModal()"');
+    expect(html).toContain('@click="openPartnerModal()"');
+    expect(html).toContain('@click="openApplications()"');
+    expect(html).toContain('x-show="!mockTopbar" aria-label="Buscar no painel"');
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
