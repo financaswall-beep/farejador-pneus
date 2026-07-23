@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-23T13:41:40.810Z",
-  "total": 160,
+  "geradoEm": "2026-07-23T16:44:39.694Z",
+  "total": 163,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -87,6 +87,7 @@
     "GET /admin/painel/assets/bot-hero.webp PUBLICA",
     "GET /admin/painel/assets/compras-hero.webp PUBLICA",
     "GET /admin/painel/assets/logistica-hero.webp PUBLICA",
+    "GET /admin/painel/assets/rede-hero.png PUBLICA",
     "GET /admin/painel/assets/vendas-hero.webp PUBLICA",
     "GET /admin/painel/mapa-rm-dados.js PUBLICA",
     "GET /admin/painel/rede-fallback.js PUBLICA",

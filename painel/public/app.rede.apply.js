@@ -244,10 +244,10 @@ window.PAINEL_MODULES.redeApply = function () {
       });
 
       this.redeKpis = [
-        { label: 'Parceiros ativos', value: String(this.parceirosRede.filter((p) => p.status === 'Ativo').length), detail: `${this.parceirosRede.length} cadastrados`, icon: 'building-2', tone: 'bg-blue-50 text-blue-700' },
+        { label: 'Parceiros ativos', value: String(this.parceirosRede.filter((p) => p.status === 'Ativo').length), detail: `${this.parceirosRede.length} cadastrados`, icon: 'building-2', tone: 'bg-emerald-50 text-emerald-700' },
         { label: 'Vendas da rede', value: this.redeTotalVendas(), detail: this.redePeriodLabel(), icon: 'trending-up', tone: 'bg-emerald-50 text-emerald-700' },
-        { label: 'Ticket médio', value: this.formatCurrency(this.redeTicketMedio()), detail: `${this.redeTotalPedidos()} pedidos`, icon: 'receipt', tone: 'bg-sky-50 text-sky-700' },
-        { label: 'Conversão 2W', value: `${this.redeConversao2w()}%`, detail: `${this.formatCurrency(this.redeTotal2w())} da rede`, icon: 'handshake', tone: 'bg-purple-50 text-purple-700' },
+        { label: 'Ticket médio', value: this.formatCurrency(this.redeTicketMedio()), detail: `${this.redeTotalPedidos()} pedidos`, icon: 'receipt', tone: 'bg-teal-50 text-teal-700' },
+        { label: 'Conversão 2W', value: `${this.redeConversao2w()}%`, detail: `${this.formatCurrency(this.redeTotal2w())} da rede`, icon: 'handshake', tone: 'bg-emerald-50 text-emerald-700' },
         { label: 'Estoque total', value: String(this.redeEstoqueQuantidade()), detail: `${this.formatCurrency(this.redeEstoqueValor())} em custo`, icon: 'package', tone: 'bg-amber-50 text-amber-700' },
         { label: 'Alertas operacionais', value: String(this.redeAlertasOperacionais().length), detail: 'risco, estoque ou atualização', icon: 'alert-triangle', tone: 'bg-rose-50 text-rose-700' },
       ];

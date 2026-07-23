@@ -49,9 +49,9 @@ window.PAINEL_MODULES.unidadeKpis = function () {
 
     lancamentoClass(tipo) {
       if (tipo === 'Venda') return 'bg-emerald-50 text-emerald-700';
-      if (typeof tipo === 'string' && tipo.startsWith('Pedido')) return 'bg-indigo-50 text-indigo-700';
-      if (tipo === 'Compra pneus') return 'bg-blue-50 text-blue-700';
-      if (tipo === 'Pagamento funcionário') return 'bg-purple-50 text-purple-700';
+      if (typeof tipo === 'string' && tipo.startsWith('Pedido')) return 'bg-teal-50 text-teal-700';
+      if (tipo === 'Compra pneus') return 'bg-emerald-50 text-emerald-700';
+      if (tipo === 'Pagamento funcionário') return 'bg-slate-100 text-slate-700';
       if (tipo === 'Despesa extra') return 'bg-amber-50 text-amber-700';
       return 'bg-gray-100 text-gray-700';
     },
@@ -110,6 +110,60 @@ window.PAINEL_MODULES.unidadeKpis = function () {
       if (score >= 80) return 'forte';
       if (score >= 60) return 'atenção';
       return 'risco';
+    },
+
+    unidadeEstoqueFiltrado(parceiro = this.selectedParceiro()) {
+      let rows = parceiro?.estoqueItens || [];
+      if (this.unidadeStockFiltro === 'baixo') rows = rows.filter((item) => item.status === 'baixo');
+      if (this.unidadeStockFiltro === 'zerado') rows = rows.filter((item) => item.status === 'zerado');
+      if (this.unidadeStockFiltro === 'nao_controlado') rows = rows.filter((item) => item.qtd === null);
+      const term = String(this.unidadeStockBusca || '').trim().toLocaleLowerCase('pt-BR');
+      if (!term) return rows;
+      return rows.filter((item) => [item.pneu, item.fornecedor]
+        .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(term)));
+    },
+
+    unidadeEstoqueQuantidade(parceiro = this.selectedParceiro()) {
+      return (parceiro?.estoqueItens || []).reduce((sum, item) =>
+        sum + (item.qtd === null ? 0 : Number(item.qtd || 0)), 0);
+    },
+
+    unidadeEstoqueValor(parceiro = this.selectedParceiro()) {
+      return (parceiro?.estoqueItens || []).reduce((sum, item) =>
+        sum + (item.qtd === null ? 0 : Number(item.qtd || 0) * Number(item.custoValor || 0)), 0);
+    },
+
+    unidadeEstoqueCritico(parceiro = this.selectedParceiro()) {
+      return (parceiro?.estoqueItens || []).filter((item) => ['baixo', 'zerado'].includes(item.status)).length;
+    },
+
+    unidadeLancamentosFiltrados(parceiro = this.selectedParceiro()) {
+      const rows = parceiro?.lancamentos || [];
+      if (this.unidadeLancamentoFiltro === 'vendas') return rows.filter((item) => item.tipo === 'Venda');
+      if (this.unidadeLancamentoFiltro === 'pedidos') return rows.filter((item) => item.pendente);
+      if (this.unidadeLancamentoFiltro === 'compras') return rows.filter((item) => item.tipo === 'Compra pneus');
+      if (this.unidadeLancamentoFiltro === 'despesas') {
+        return rows.filter((item) => ['Pagamento funcionário', 'Despesa extra'].includes(item.tipo));
+      }
+      return rows;
+    },
+
+    unidadeEntradasValor(parceiro = this.selectedParceiro()) {
+      return (parceiro?.lancamentos || []).reduce((sum, item) =>
+        sum + (!item.pendente && Number(item.valor || 0) > 0 ? Number(item.valor || 0) : 0), 0);
+    },
+
+    unidadeSaidasValor(parceiro = this.selectedParceiro()) {
+      return (parceiro?.lancamentos || []).reduce((sum, item) =>
+        sum + (Number(item.valor || 0) < 0 ? Math.abs(Number(item.valor || 0)) : 0), 0);
+    },
+
+    unidadePedidosEmCurso(parceiro = this.selectedParceiro()) {
+      return (parceiro?.lancamentos || []).filter((item) => item.pendente).length;
+    },
+
+    unidadeSaldoOperacional(parceiro = this.selectedParceiro()) {
+      return this.unidadeEntradasValor(parceiro) - this.unidadeSaidasValor(parceiro);
     },
 
     // ─── AÇÕES ──────────────────────────────────────

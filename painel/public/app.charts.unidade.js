@@ -50,17 +50,17 @@ window.PAINEL_MODULES.chartsUnidade = function () {
       window._parceiroChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Hoje'],
+          labels: this.redeSeriesLabels(),
           datasets: [{
             label: parceiro.nome,
-            data: parceiro.serieVendas,
-            borderColor: '#2563eb',
-            backgroundColor: 'rgba(37,99,235,0.07)',
+            data: (parceiro.serieVendas || []).slice(-7),
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5,150,105,0.08)',
             tension: 0.35,
             fill: true,
             pointRadius: 4,
             pointBackgroundColor: '#ffffff',
-            pointBorderColor: '#2563eb',
+            pointBorderColor: '#059669',
             pointBorderWidth: 2,
           }],
         },

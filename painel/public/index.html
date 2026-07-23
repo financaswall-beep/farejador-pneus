@@ -6,13 +6,13 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260719-etapa11" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-redesign1" />
 <script src="https://unpkg.com/lucide@1.17.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.rede.kpis.js?v=20260710-rede1"></script>
-<script src="/admin/painel/app.unidade.kpis.js?v=20260710-rede2"></script>
+<script src="/admin/painel/app.nav.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-redesign1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
 <script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
@@ -42,11 +42,11 @@
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.charts.rede.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.charts.saude.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.charts.unidade.js?v=20260705-obra300"></script>
+<script src="/admin/painel/app.charts.rede.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.charts.saude.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-redesign1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.js?v=20260723-rede-redesign1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -417,33 +417,57 @@
     </div>
 
     <!-- ═══ TELA: REDE / PARCEIROS ═══ -->
-    <div x-show="currentPage === 'rede'" class="p-8">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">Rede de parceiros</h1>
-          <p class="text-sm text-gray-500 mt-1">Visão central das borracharias credenciadas, vendas e estoque local</p>
-        </div>
-        <div class="flex gap-2">
-          <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">dados reais</span>
-          <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">mês atual</span>
-        </div>
-      </div>
+    <div x-show="currentPage === 'rede'" class="p-8 bg-gray-50/40 min-h-screen">
+      <h1 class="sr-only">Rede de parceiros</h1>
+      <section aria-label="Rede conectada" class="mb-5 overflow-hidden rounded-xl border border-emerald-900/20 bg-emerald-950 shadow-sm">
+        <img src="/admin/painel/assets/rede-hero.png?v=20260723-rede-redesign1"
+             alt="Rede conectada, desempenho que move. Acompanhe seus parceiros em tempo real, identifique oportunidades e fortaleça sua rede de borracharias."
+             class="block w-full min-h-[95px] object-cover">
+      </section>
 
-      <!-- Períodos reais disponíveis na Rede -->
-      <div class="flex items-center justify-between mb-5">
-        <div class="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-          <span class="px-2.5 py-1 rounded-lg bg-gray-100" x-text="'período selecionado: ' + redePeriodLabel()"></span>
-          <span class="px-2.5 py-1 rounded-lg bg-gray-100">meta salva nesta máquina</span>
-          <span class="px-2.5 py-1 rounded-lg bg-gray-100">estoque: posição atual</span>
+      <div class="bg-white border border-gray-200 rounded-xl mb-6">
+        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 px-4 pt-3">
+          <nav aria-label="Seções da Rede" class="flex items-center gap-1 overflow-x-auto">
+            <button @click="setRedeSection('visao')"
+                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    :class="redeSection === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
+              Visão executiva
+            </button>
+            <button @click="setRedeSection('operacao')"
+                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    :class="redeSection === 'operacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
+              Operação e saúde
+            </button>
+            <button @click="setRedeSection('parceiros')"
+                    class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors"
+                    :class="redeSection === 'parceiros' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">
+              Parceiros
+            </button>
+          </nav>
+          <div class="flex items-center gap-1 pb-3 xl:pb-0">
+            <template x-for="period in redePeriods" :key="period.id">
+              <button @click="setRedePeriod(period.id)"
+                      class="px-3 py-2 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap"
+                      :class="redePeriod === period.id
+                        ? 'bg-emerald-700 text-white border-emerald-700'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'"
+                      x-text="period.label"></button>
+            </template>
+          </div>
         </div>
-        <div class="text-xs text-gray-400">
-          sem dados simulados nesta tela
+        <div class="border-t border-gray-100 px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+          <div class="flex flex-wrap gap-x-4 gap-y-1">
+            <span x-text="'Período: ' + redePeriodLabel()"></span>
+            <span>Vendas: somente realizadas</span>
+            <span>Estoque: posição atual do portal do parceiro</span>
+          </div>
+          <span>sem dados simulados</span>
         </div>
       </div>
 
       <!-- Comissões a receber (0118, flag NETWORK_COMMISSION_LEDGER): cada venda 2W
            realizada vira LANÇAMENTO (% congelado); cancelou, estorna sozinho. -->
-      <div x-show="comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div x-show="redeSection === 'operacao' && comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="font-semibold">Comissões a receber</h3>
           <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(Number(comissoes?.total_aberto || 0))"></span>
@@ -508,12 +532,12 @@
         </template>
       </div>
 
-      <div class="grid grid-cols-2 xl:grid-cols-6 gap-4 mb-6">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 mb-6">
         <template x-for="kpi in redeKpis">
           <div class="bg-white border border-gray-200 rounded-xl p-4">
             <div class="flex items-center justify-between mb-3">
               <div class="text-xs text-gray-500" x-text="kpi.label"></div>
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center" :class="kpi.tone">
+              <div class="w-9 h-9 rounded-full flex items-center justify-center" :class="kpi.tone">
                 <i :data-lucide="kpi.icon" class="w-4 h-4"></i>
               </div>
             </div>
@@ -523,23 +547,14 @@
         </template>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-6">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="font-semibold">Vendas consolidadas da rede</h3>
               <p class="text-xs text-gray-500 mt-0.5">Apanhado geral de todas as unidades credenciadas</p>
             </div>
-            <div class="flex flex-wrap items-center justify-end gap-2 text-xs">
-              <template x-for="period in redePeriods">
-                <button @click="setRedePeriod(period.id)"
-                        class="px-2 py-1 rounded border transition-colors"
-                        :class="redePeriod === period.id
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'"
-                        x-text="period.label"></button>
-              </template>
-            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 mb-4">
             <label class="text-xs text-gray-500">
@@ -568,22 +583,14 @@
 
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="font-semibold">Resumo central</h3>
+            <h3 class="font-semibold">Destaques do período</h3>
             <span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">real</span>
           </div>
-          <div class="space-y-4">
-            <div>
-              <div class="text-xs text-gray-500">Vendas totais</div>
-              <div class="text-2xl font-bold" x-text="redeTotalVendas()">R$ 0</div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500">Pedidos registrados</div>
-              <div class="text-2xl font-bold" x-text="redeTotalPedidos()">0</div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 mb-2">Top unidades</div>
+          <div>
+            <p class="text-xs text-gray-500 mb-3">Unidades com maior volume realizado</p>
+            <div class="space-y-1">
               <template x-for="parceiro in parceirosRede.filter(p => p.status === 'Ativo').sort((a, b) => b.vendasValor - a.vendasValor).slice(0, 3)">
-                <div class="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-b-0">
+                <div class="flex items-center justify-between text-sm py-2.5 border-b border-gray-100 last:border-b-0">
                   <span class="font-medium truncate" x-text="parceiro.nome"></span>
                   <span class="text-gray-600" x-text="parceiro.vendas"></span>
                 </div>
@@ -593,23 +600,14 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+      <div x-show="redeSection === 'visao'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="font-semibold text-sm">Lucro estimado por unidade</h3>
               <p class="text-xs text-gray-500 mt-0.5">Comparativo, incluindo unidades no negativo</p>
             </div>
-            <div class="flex flex-wrap justify-end gap-1 text-xs">
-              <template x-for="period in redePeriods">
-                <button @click="setRedePeriod(period.id)"
-                        class="px-2 py-1 rounded border transition-colors"
-                        :class="redePeriod === period.id
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'"
-                        x-text="period.label"></button>
-              </template>
-            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="h-48">
             <canvas id="chartRedeLucro"></canvas>
@@ -622,16 +620,7 @@
               <h3 class="font-semibold text-sm">Compras de pneus por unidade</h3>
               <p class="text-xs text-gray-500 mt-0.5">Quem mais investe em reposição de estoque</p>
             </div>
-            <div class="flex flex-wrap justify-end gap-1 text-xs">
-              <template x-for="period in redePeriods">
-                <button @click="setRedePeriod(period.id)"
-                        class="px-2 py-1 rounded border transition-colors"
-                        :class="redePeriod === period.id
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'"
-                        x-text="period.label"></button>
-              </template>
-            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="h-48">
             <canvas id="chartRedeCompras"></canvas>
@@ -640,7 +629,7 @@
       </div>
 
       <!-- Cobrança matriz↔parceiro: o que a rede deve à matriz no período -->
-      <div class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <div x-show="redeSection === 'operacao'" class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
           <div>
             <h3 class="font-semibold text-sm">A receber da rede</h3>
@@ -649,31 +638,27 @@
           <span class="text-sm font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
                 x-text="formatCurrency(redeAReceberTotal())"></span>
         </div>
-        <div class="grid grid-cols-3 gap-4 text-sm">
+        <div class="grid grid-cols-2 gap-4 text-sm">
           <div>
             <div class="text-xs text-gray-500 mb-1">Mensalidades</div>
             <div class="font-semibold" x-text="formatCurrency(redeTotalMensalidade())"></div>
           </div>
           <div>
-            <div class="text-xs text-gray-500 mb-1" x-text="livroComissaoOn() ? 'Comissão (em aberto)' : 'Comissão (2W)'"></div>
+            <div class="text-xs text-gray-500 mb-1" x-text="livroComissaoOn() ? 'Comissões em aberto' : 'Comissões 2W'"></div>
             <div class="font-semibold" x-text="formatCurrency(redeComissaoAReceber())"></div>
-          </div>
-          <div>
-            <div class="text-xs text-gray-500 mb-1">Total devido</div>
-            <div class="font-bold text-emerald-700" x-text="formatCurrency(redeAReceberTotal())"></div>
           </div>
         </div>
         <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="grid grid-cols-1 gap-4 mb-4">
+        <div x-show="redeSection === 'visao'" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="font-semibold text-sm">Origem das vendas</h3>
               <p class="text-xs text-gray-500 mt-0.5">Quanto veio da 2W contra venda de porta</p>
             </div>
-            <span class="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700"
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700"
                   x-text="redeConversao2w() + '% 2W'"></span>
           </div>
           <div class="grid grid-cols-[180px_1fr] gap-4 items-center">
@@ -697,11 +682,11 @@
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div x-show="redeSection === 'operacao'" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="font-semibold text-sm">Score de saúde das unidades</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Peso por lucro, venda, estoque, margem, custos e 2W</p>
+              <p class="text-xs text-gray-500 mt-0.5">Resultado, venda, estoque, custos, 2W e nota do cliente quando há amostra</p>
             </div>
             <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">0-100</span>
           </div>
@@ -711,7 +696,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5 flex flex-col">
           <div class="text-xs text-gray-500 mb-3">Estoque parado</div>
           <div class="mb-3">
@@ -751,7 +736,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao'" class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-sm">Ranking de saúde</h3>
@@ -775,7 +760,7 @@
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-sm">Dependência da 2W</h3>
-            <span class="text-xs px-2 py-1 rounded bg-purple-50 text-purple-700">mês atual</span>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="space-y-2">
             <template x-for="parceiro in rankingDependencia2w()">
@@ -785,7 +770,7 @@
                   <span class="font-semibold" x-text="(parceiro.percentual2w || 0) + '%'"></span>
                 </div>
                 <div class="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                  <div class="h-full bg-purple-600" :style="`width: ${Math.min(100, parceiro.percentual2w || 0)}%`"></div>
+                  <div class="h-full bg-emerald-600" :style="`width: ${Math.min(100, parceiro.percentual2w || 0)}%`"></div>
                 </div>
               </div>
             </template>
@@ -811,7 +796,7 @@
       </div>
 
       <div class="grid grid-cols-1 gap-6">
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div x-show="redeSection === 'parceiros'" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h3 class="font-semibold">Parceiros da rede</h3>
@@ -820,15 +805,23 @@
             <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600"
                   x-text="filteredParceirosRede().length + ' unidade(s)'"></span>
           </div>
-          <div class="px-5 py-3 border-b border-gray-100 flex flex-wrap gap-2">
-            <template x-for="filtro in redeFilters">
-              <button @click="redeFilter = filtro.id"
-                      class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                      :class="redeFilter === filtro.id
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'"
-                      x-text="filtro.label"></button>
-            </template>
+          <div class="px-5 py-3 border-b border-gray-100 flex flex-col xl:flex-row xl:items-center gap-3">
+            <label class="relative w-full xl:w-80">
+              <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+              <input x-model.debounce.200ms="redeBusca" type="search"
+                     placeholder="Buscar parceiro, responsável ou cidade"
+                     class="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 text-xs outline-none focus:border-emerald-600">
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="filtro in redeFilters">
+                <button @click="redeFilter = filtro.id"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                        :class="redeFilter === filtro.id
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'"
+                        x-text="filtro.label"></button>
+              </template>
+            </div>
           </div>
 
           <div class="overflow-x-auto">
@@ -852,7 +845,7 @@
                 <template x-for="parceiro in filteredParceirosRede()">
                   <tr @click="openParceiroDetalhe(parceirosRede.indexOf(parceiro))"
                       class="hover:bg-gray-50 cursor-pointer"
-                      :class="parceirosRede.indexOf(parceiro) === selectedParceiroIndex ? 'bg-blue-50/50' : ''">
+                       :class="parceirosRede.indexOf(parceiro) === selectedParceiroIndex ? 'bg-emerald-50/60' : ''">
                     <td class="px-5 py-3 font-medium" x-text="parceiro.nome"></td>
                     <td class="px-5 py-3 text-gray-600" x-text="parceiro.responsavel"></td>
                     <td class="px-5 py-3 text-gray-600" x-text="parceiro.cidade"></td>
@@ -883,22 +876,13 @@
           </div>
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div x-show="redeSection === 'visao'" class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-4">
             <div>
               <h3 class="font-semibold">Pneus mais vendidos da rede</h3>
               <p class="text-xs text-gray-500 mt-0.5">Consolidado dos pneus que mais aparecem no topo das unidades.</p>
             </div>
-            <div class="flex flex-wrap justify-end gap-1 text-xs">
-              <template x-for="period in redePeriods">
-                <button @click="setRedePeriod(period.id)"
-                        class="px-2 py-1 rounded border transition-colors"
-                        :class="redePeriod === period.id
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'"
-                        x-text="period.label"></button>
-              </template>
-            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="h-40 max-w-2xl">
             <canvas id="chartPneusRede"></canvas>
@@ -1057,7 +1041,7 @@
     </div>
 
     <!-- ═══ TELA: DETALHE DA UNIDADE ═══ -->
-    <div x-show="currentPage === 'unidade'" class="p-8">
+    <div x-show="currentPage === 'unidade'" class="p-8 bg-gray-50/40 min-h-screen">
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-4">
           <button @click="voltarParaRede()"
@@ -1081,8 +1065,9 @@
         </div>
       </div>
 
+      <div x-show="unidadeTab === 'visao'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
       <!-- Entrega na Rede: raio de entrega (proximidade-primeiro Fase 2) -->
-      <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
         <div class="flex items-center justify-between gap-2 mb-1">
           <div class="text-sm font-semibold text-gray-700">Raio de entrega (Rede)</div>
           <span class="text-[11px] px-2 py-0.5 rounded-full"
@@ -1096,7 +1081,7 @@
                    x-model.number="selectedParceiro().deliveryRadiusKm" placeholder="km" />
             <span class="text-sm text-gray-500">km</span>
             <button @click="salvarRaioEntrega()" :disabled="savingRaio"
-                    class="text-sm px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
+                    class="text-sm px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50">
               <span x-text="savingRaio ? 'Salvando...' : 'Salvar raio'"></span>
             </button>
             <span x-show="raioSalvoMsg" class="text-xs text-emerald-600" x-text="raioSalvoMsg"></span>
@@ -1112,7 +1097,7 @@
 
       <!-- Modelo comercial (Rede): editor dos termos do parceiro — 0118 (pendência de 06-01).
            x-effect re-preenche o form quando troca o parceiro selecionado. -->
-      <div class="bg-white border border-gray-200 rounded-xl p-4 mb-6" x-effect="selectedParceiroIndex; abrirTermsForm()">
+      <div class="bg-white border border-gray-200 rounded-xl p-5" x-effect="selectedParceiroIndex; abrirTermsForm()">
         <div class="text-sm font-semibold text-gray-700 mb-1">Modelo comercial (Rede)</div>
         <p class="text-xs text-gray-500 mb-3">Vale pra comissões NOVAS daqui pra frente — lançamento já gerado fica com o % da época (congelado).</p>
         <div class="flex items-end gap-3 flex-wrap">
@@ -1132,7 +1117,7 @@
                    class="mt-1 block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="R$" />
           </label>
           <button @click="salvarTerms()" :disabled="termsSaving"
-                  class="text-sm px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50">
+                  class="text-sm px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-50">
             <span x-text="termsSaving ? 'Salvando...' : 'Salvar termos'"></span>
           </button>
           <span x-show="termsMsg" class="text-xs"
@@ -1140,58 +1125,69 @@
                 x-text="termsMsg"></span>
         </div>
       </div>
+      </div>
 
-      <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Faturamento</div>
-          <div class="text-lg font-bold" x-text="selectedParceiro()?.vendas"></div>
+      <div x-show="unidadeTab === 'visao'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div><div class="text-xs text-gray-500 mb-1">Faturamento</div><div class="text-lg font-bold truncate" x-text="selectedParceiro()?.vendas"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="circle-dollar-sign" class="w-4 h-4"></i></span>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Pedidos</div>
-          <div class="text-lg font-bold" x-text="selectedParceiro()?.pedidos"></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div><div class="text-xs text-gray-500 mb-1">Pedidos</div><div class="text-lg font-bold" x-text="selectedParceiro()?.pedidos"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="shopping-bag" class="w-4 h-4"></i></span>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
           <div class="text-xs text-gray-500 mb-1">Vendas 2W</div>
-          <div class="text-lg font-bold" x-text="formatCurrency(selectedParceiro()?.vendas2w)"></div>
-          <div class="text-xs text-gray-500 mt-1" x-text="(selectedParceiro()?.pedidos2w || 0) + ' pedido(s)'"></div>
+          <div class="flex items-end justify-between gap-3"><div><div class="text-lg font-bold truncate" x-text="formatCurrency(selectedParceiro()?.vendas2w)"></div><div class="text-xs text-gray-500 mt-1" x-text="(selectedParceiro()?.pedidos2w || 0) + ' pedido(s)'"></div></div><span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="radio-tower" class="w-4 h-4"></i></span></div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
           <div class="text-xs text-gray-500 mb-1">Vendas porta</div>
-          <div class="text-lg font-bold" x-text="formatCurrency(selectedParceiro()?.vendasPorta)"></div>
-          <div class="text-xs text-gray-500 mt-1" x-text="(selectedParceiro()?.pedidosPorta || 0) + ' pedido(s)'"></div>
+          <div class="flex items-end justify-between gap-3"><div><div class="text-lg font-bold truncate" x-text="formatCurrency(selectedParceiro()?.vendasPorta)"></div><div class="text-xs text-gray-500 mt-1" x-text="(selectedParceiro()?.pedidosPorta || 0) + ' pedido(s)'"></div></div><span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="store" class="w-4 h-4"></i></span></div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Compra pneus</div>
-          <div class="text-lg font-bold" x-text="formatCurrency(selectedParceiro()?.comprasPneus)"></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div><div class="text-xs text-gray-500 mb-1">Compra de pneus</div><div class="text-lg font-bold truncate" x-text="formatCurrency(selectedParceiro()?.comprasPneus)"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="package-plus" class="w-4 h-4"></i></span>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Folha / funcionários</div>
-          <div class="text-lg font-bold" x-text="formatCurrency(selectedParceiro()?.folha)"></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div><div class="text-xs text-gray-500 mb-1">Folha / funcionários</div><div class="text-lg font-bold truncate" x-text="formatCurrency(selectedParceiro()?.folha)"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="users" class="w-4 h-4"></i></span>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Extras</div>
-          <div class="text-lg font-bold" x-text="formatCurrency(selectedParceiro()?.despesasExtras)"></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div><div class="text-xs text-gray-500 mb-1">Despesas extras</div><div class="text-lg font-bold truncate" x-text="formatCurrency(selectedParceiro()?.despesasExtras)"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center"><i data-lucide="receipt" class="w-4 h-4"></i></span>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-4">
-          <div class="text-xs text-gray-500 mb-1">Resultado</div>
-          <div class="text-lg font-bold" :class="parceiroLucroClass()" x-text="selectedParceiro()?.custoPendente ? 'Custo pendente' : formatCurrency(selectedParceiro()?.lucroEstimado)"></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 min-w-0">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0"><div class="text-xs text-gray-500 mb-1">Resultado</div><div class="text-lg font-bold truncate" :class="parceiroLucroClass()" x-text="selectedParceiro()?.custoPendente ? 'Custo pendente' : formatCurrency(selectedParceiro()?.lucroEstimado)"></div></div>
+            <span class="w-9 h-9 shrink-0 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="trending-up" class="w-4 h-4"></i></span>
+          </div>
         </div>
       </div>
 
       <div class="bg-white border border-gray-200 rounded-xl p-1 mb-6 inline-flex gap-1">
         <button @click="setUnidadeTab('visao')"
                 class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                :class="unidadeTab === 'visao' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'">
+                :class="unidadeTab === 'visao' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-emerald-50'">
           Visão geral
         </button>
         <button @click="setUnidadeTab('estoque')"
                 class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                :class="unidadeTab === 'estoque' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'">
+                :class="unidadeTab === 'estoque' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-emerald-50'">
           Estoque
         </button>
         <button @click="setUnidadeTab('lancamentos')"
                 class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                :class="unidadeTab === 'lancamentos' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'">
+                :class="unidadeTab === 'lancamentos' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-emerald-50'">
           Lançamentos
         </button>
       </div>
@@ -1202,14 +1198,10 @@
             <h3 class="font-semibold">Cadastro do parceiro</h3>
             <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">somente leitura</span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <div class="text-xs text-gray-500 mb-1">CNPJ/CPF</div>
               <div class="font-medium" x-text="selectedParceiro()?.documento || '-'"></div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 mb-1">Responsável</div>
-              <div class="font-medium" x-text="selectedParceiro()?.responsavel || '-'"></div>
             </div>
             <div>
               <div class="text-xs text-gray-500 mb-1">WhatsApp</div>
@@ -1218,20 +1210,6 @@
             <div class="md:col-span-2">
               <div class="text-xs text-gray-500 mb-1">Endereço</div>
               <div class="font-medium" x-text="selectedParceiro()?.endereco || '-'"></div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 mb-1">Modelo comercial</div>
-              <div class="font-medium" x-text="selectedParceiro()?.modeloComercial || '-'"></div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 mb-1">Comissão</div>
-              <div class="font-medium" x-text="selectedParceiro()?.comissao || '-'"></div>
-            </div>
-            <div>
-              <div class="text-xs text-gray-500 mb-1">Status</div>
-              <span class="text-xs px-2 py-1 rounded-full"
-                    :class="selectedParceiro()?.status === 'Ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'"
-                    x-text="selectedParceiro()?.status"></span>
             </div>
             <div>
               <div class="text-xs text-gray-500 mb-1">Última atualização</div>
@@ -1290,8 +1268,8 @@
               <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.vendasPorta)"></span>
             </div>
             <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600">Compra de pneus</span>
-              <span class="font-semibold" x-text="formatCurrency(selectedParceiro()?.comprasPneus)"></span>
+              <span class="text-gray-600">CMV (custo vendido)</span>
+              <span class="font-semibold" x-text="selectedParceiro()?.custoPendente ? 'pendente' : formatCurrency(selectedParceiro()?.cogsValor)"></span>
             </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-gray-600">Folha / funcionários</span>
@@ -1329,7 +1307,7 @@
             <div class="text-xs text-gray-500 mb-2">Responsável operacional</div>
             <div class="flex flex-wrap gap-2">
               <template x-for="nome in (selectedParceiro()?.equipe || [])">
-                <span class="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700" x-text="nome"></span>
+                <span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700" x-text="nome"></span>
               </template>
               <span x-show="(selectedParceiro()?.equipe || []).length === 0"
                     class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">não informado</span>
@@ -1338,160 +1316,136 @@
         </div>
       </div>
 
-      <div x-show="unidadeTab === 'estoque'" class="grid grid-cols-1 gap-6">
-        <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold">Estoque local da unidade</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Pneus cadastrados pelo parceiro, incluindo estoque desconhecido.</p>
-            </div>
-            <span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">vem do portal do parceiro</span>
-          </div>
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b border-gray-200">
-              <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
-                <th class="px-5 py-3 font-medium">Pneu</th>
-                <th class="px-5 py-3 font-medium text-right">Qtd</th>
-                <th class="px-5 py-3 font-medium text-right">Mín.</th>
-                <th class="px-5 py-3 font-medium">Últ. compra</th>
-                <th class="px-5 py-3 font-medium">Fornecedor</th>
-                <th class="px-5 py-3 font-medium text-right">Custo</th>
-                <th class="px-5 py-3 font-medium text-right">Venda</th>
-                <th class="px-5 py-3 font-medium text-right">Margem</th>
-                <th class="px-5 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-              <template x-for="item in (selectedParceiro()?.estoqueItens || [])">
-                <tr class="hover:bg-gray-50">
-                  <td class="px-5 py-3 font-medium" x-text="item.pneu"></td>
-                  <td class="px-5 py-3 text-right" x-text="item.qtd === null ? 'não controlado' : item.qtd"></td>
-                  <td class="px-5 py-3 text-right text-gray-600" x-text="item.minimo === null ? '-' : item.minimo"></td>
-                  <td class="px-5 py-3 text-gray-600" x-text="item.ultimaCompra || '-'"></td>
-                  <td class="px-5 py-3 text-gray-600" x-text="item.fornecedor || '-'"></td>
-                  <td class="px-5 py-3 text-right text-gray-600" x-text="item.custo"></td>
-                  <td class="px-5 py-3 text-right font-semibold" x-text="item.venda"></td>
-                  <td class="px-5 py-3 text-right text-gray-600" x-text="item.margem || '-'"></td>
-                  <td class="px-5 py-3">
-                    <span class="text-xs px-2 py-1 rounded" :class="estoqueStatusClass(item.status)" x-text="item.status"></span>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="(selectedParceiro()?.estoqueItens || []).length === 0">
-                <td colspan="5" class="px-5 py-8 text-center text-sm text-gray-500">Estoque ainda não cadastrado.</td>
-              </tr>
-            </tbody>
-          </table>
+      <div x-show="unidadeTab === 'estoque'" class="space-y-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Medidas cadastradas</div><div class="mt-1 text-2xl font-bold" x-text="(selectedParceiro()?.estoqueItens || []).length"></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Unidades controladas</div><div class="mt-1 text-2xl font-bold" x-text="unidadeEstoqueQuantidade()"></div><div class="mt-1 text-[11px] text-gray-400">não controlado não vira zero</div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Itens críticos</div><div class="mt-1 text-2xl font-bold" :class="unidadeEstoqueCritico() > 0 ? 'text-amber-700' : 'text-emerald-700'" x-text="unidadeEstoqueCritico()"></div><div class="mt-1 text-[11px] text-gray-400">baixo ou zerado</div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Valor a custo</div><div class="mt-1 text-2xl font-bold text-emerald-800" x-text="formatCurrency(unidadeEstoqueValor())"></div><div class="mt-1 text-[11px] text-gray-400">snapshot atual informado</div></div>
         </div>
 
-        <div class="hidden">
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold">Lançamentos da unidade</h3>
-              <button class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-lg text-xs">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                Novo
-              </button>
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div class="px-5 py-4 border-b border-gray-100 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div>
+              <h3 class="font-semibold">Estoque local da unidade</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Snapshot atual enviado pelo parceiro; ausência de controle permanece explícita.</p>
             </div>
-            <div class="space-y-2">
-              <template x-for="lancamento in (selectedParceiro()?.lancamentos || [])">
-                <div class="rounded-lg border border-gray-200 p-3">
-                  <div class="flex items-center justify-between gap-3 mb-1">
-                    <span class="text-xs px-2 py-1 rounded-full" :class="lancamentoClass(lancamento.tipo)" x-text="lancamento.tipo"></span>
-                    <span class="text-xs text-gray-500" x-text="lancamento.data"></span>
-                  </div>
-                  <div class="text-sm font-medium" x-text="lancamento.descricao"></div>
-                  <div class="text-sm font-semibold mt-1" :class="lancamentoValorClass(lancamento)" x-text="formatCurrency(lancamento.valor)"></div>
-                </div>
-              </template>
-              <div x-show="(selectedParceiro()?.lancamentos || []).length === 0"
-                   class="text-sm text-gray-500 text-center py-6">
-                Nenhum lançamento registrado ainda.
-              </div>
-            </div>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 whitespace-nowrap">somente leitura · portal do parceiro</span>
           </div>
-
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 class="font-semibold mb-3">Pneus mais vendidos</h3>
-            <div class="space-y-2">
-              <template x-for="(pneu, index) in (selectedParceiro()?.topPneus || [])">
-                <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm">
-                  <span class="font-medium" x-text="typeof pneu === 'string' ? pneu : pneu.pneu"></span>
-                  <span class="text-xs text-gray-500" x-text="typeof pneu === 'string' ? ('#' + (index + 1)) : ((pneu.quantidade || 0) + ' vendidos')"></span>
-                </div>
+          <div class="px-5 py-3 border-b border-gray-100 flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
+            <label class="relative w-full xl:max-w-sm">
+              <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
+              <input x-model.debounce.200ms="unidadeStockBusca" placeholder="Buscar medida ou fornecedor" class="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500">
+            </label>
+            <div class="flex items-center gap-1 overflow-x-auto">
+              <template x-for="filtro in [{id:'todos',label:'Todos'},{id:'baixo',label:'Baixo'},{id:'zerado',label:'Zerado'},{id:'nao_controlado',label:'Não controlado'}]" :key="filtro.id">
+                <button @click="unidadeStockFiltro=filtro.id" class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap" :class="unidadeStockFiltro===filtro.id ? 'bg-emerald-700 text-white' : 'bg-gray-50 text-gray-600 hover:bg-emerald-50'" x-text="filtro.label"></button>
               </template>
             </div>
           </div>
-
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 class="font-semibold mb-3">Custos recentes</h3>
-            <div class="space-y-2">
-              <template x-for="custo in (selectedParceiro()?.custosRecentes || [])">
-                <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm">
-                  <span class="text-gray-600" x-text="custo.label"></span>
-                  <span class="font-semibold" x-text="custo.value"></span>
-                </div>
-              </template>
-            </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b border-gray-200">
+                <tr class="text-left text-xs text-gray-500 uppercase tracking-wider">
+                  <th class="px-5 py-3 font-medium">Pneu</th>
+                  <th class="px-5 py-3 font-medium text-right">Qtd</th>
+                  <th class="px-5 py-3 font-medium text-right">Mín.</th>
+                  <th class="px-5 py-3 font-medium">Últ. compra</th>
+                  <th class="px-5 py-3 font-medium">Fornecedor</th>
+                  <th class="px-5 py-3 font-medium text-right">Custo</th>
+                  <th class="px-5 py-3 font-medium text-right">Venda</th>
+                  <th class="px-5 py-3 font-medium text-right">Margem</th>
+                  <th class="px-5 py-3 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="item in unidadeEstoqueFiltrado()" :key="item.pneu + '-' + (item.fornecedor || '')">
+                  <tr class="hover:bg-emerald-50/30">
+                    <td class="px-5 py-3 font-medium whitespace-nowrap" x-text="item.pneu"></td>
+                    <td class="px-5 py-3 text-right" x-text="item.qtd === null ? 'não controlado' : item.qtd"></td>
+                    <td class="px-5 py-3 text-right text-gray-600" x-text="item.minimo === null ? '-' : item.minimo"></td>
+                    <td class="px-5 py-3 text-gray-600 whitespace-nowrap" x-text="item.ultimaCompra || '-'"></td>
+                    <td class="px-5 py-3 text-gray-600" x-text="item.fornecedor || '-'"></td>
+                    <td class="px-5 py-3 text-right text-gray-600" x-text="item.custo"></td>
+                    <td class="px-5 py-3 text-right font-semibold" x-text="item.venda"></td>
+                    <td class="px-5 py-3 text-right text-gray-600" x-text="item.margem || '-'"></td>
+                    <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded" :class="estoqueStatusClass(item.status)" x-text="item.status"></span></td>
+                  </tr>
+                </template>
+                <tr x-show="unidadeEstoqueFiltrado().length === 0">
+                  <td colspan="9" class="px-5 py-10 text-center text-sm text-gray-500">Nenhum item corresponde aos filtros atuais.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
-      <div x-show="unidadeTab === 'lancamentos'" class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold">Lançamentos da unidade</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Vendas, compras, despesas, funcionários e ajustes de estoque.</p>
-            </div>
-            <button class="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              Novo lançamento
-            </button>
-          </div>
-
-          <div class="divide-y divide-gray-100">
-            <template x-for="lancamento in (selectedParceiro()?.lancamentos || [])">
-              <div class="px-5 py-4 flex items-center justify-between gap-4 hover:bg-gray-50">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="text-xs px-2 py-1 rounded-full" :class="lancamentoClass(lancamento.tipo)" x-text="lancamento.tipo"></span>
-                    <span class="text-xs text-gray-500" x-text="lancamento.data"></span>
-                  </div>
-                  <div class="text-sm font-medium truncate" x-text="lancamento.descricao"></div>
-                </div>
-                <div class="text-sm font-semibold whitespace-nowrap" :class="lancamentoValorClass(lancamento.valor)" x-text="formatCurrency(lancamento.valor)"></div>
-              </div>
-            </template>
-            <div x-show="(selectedParceiro()?.lancamentos || []).length === 0"
-                 class="px-5 py-10 text-center text-sm text-gray-500">
-              Nenhum lançamento registrado ainda.
-            </div>
-          </div>
+      <div x-show="unidadeTab === 'lancamentos'" class="space-y-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Entradas realizadas</div><div class="mt-1 text-2xl font-bold text-emerald-700" x-text="formatCurrency(unidadeEntradasValor())"></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Saídas registradas</div><div class="mt-1 text-2xl font-bold text-rose-700" x-text="formatCurrency(unidadeSaidasValor())"></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Pedidos em curso</div><div class="mt-1 text-2xl font-bold text-amber-700" x-text="unidadePedidosEmCurso()"></div><div class="mt-1 text-[11px] text-gray-400">ainda não realizados</div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-4"><div class="text-xs text-gray-500">Saldo operacional</div><div class="mt-1 text-2xl font-bold" :class="unidadeSaldoOperacional() >= 0 ? 'text-emerald-800' : 'text-rose-700'" x-text="formatCurrency(unidadeSaldoOperacional())"></div></div>
         </div>
 
-        <div class="space-y-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 class="font-semibold mb-3">Custos recentes</h3>
-            <div class="space-y-2">
-              <template x-for="custo in (selectedParceiro()?.custosRecentes || [])">
-                <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm">
-                  <span class="text-gray-600" x-text="custo.label"></span>
-                  <span class="font-semibold" x-text="custo.value"></span>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="font-semibold">Lançamentos da unidade</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Eventos consolidados do portal, sem edição financeira pela matriz.</p>
+              </div>
+              <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 whitespace-nowrap">somente leitura · portal do parceiro</span>
+            </div>
+            <div class="px-5 py-3 border-b border-gray-100 flex gap-1 overflow-x-auto">
+              <template x-for="filtro in [{id:'todos',label:'Todos'},{id:'vendas',label:'Vendas'},{id:'pedidos',label:'Em curso'},{id:'compras',label:'Compras'},{id:'despesas',label:'Despesas'}]" :key="filtro.id">
+                <button @click="unidadeLancamentoFiltro=filtro.id" class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap" :class="unidadeLancamentoFiltro===filtro.id ? 'bg-emerald-700 text-white' : 'bg-gray-50 text-gray-600 hover:bg-emerald-50'" x-text="filtro.label"></button>
+              </template>
+            </div>
+            <div class="divide-y divide-gray-100">
+              <template x-for="lancamento in unidadeLancamentosFiltrados()" :key="lancamento.tipo + '-' + lancamento.data + '-' + lancamento.descricao">
+                <div class="px-5 py-4 flex items-center justify-between gap-4 hover:bg-emerald-50/30">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="text-xs px-2 py-1 rounded-full" :class="lancamentoClass(lancamento.tipo)" x-text="lancamento.tipo"></span>
+                      <span class="text-xs text-gray-500" x-text="lancamento.data"></span>
+                      <span x-show="lancamento.pendente" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">em curso</span>
+                    </div>
+                    <div class="text-sm font-medium truncate" x-text="lancamento.descricao"></div>
+                  </div>
+                  <div class="text-sm font-semibold whitespace-nowrap" :class="lancamentoValorClass(lancamento)" x-text="lancamento.pendente ? 'aguardando realização' : formatCurrency(lancamento.valor)"></div>
                 </div>
               </template>
+              <div x-show="unidadeLancamentosFiltrados().length === 0" class="px-5 py-10 text-center text-sm text-gray-500">Nenhum lançamento corresponde ao filtro atual.</div>
             </div>
           </div>
 
-          <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 class="font-semibold mb-3">Pneus mais vendidos</h3>
-            <div class="space-y-2">
-              <template x-for="(pneu, index) in (selectedParceiro()?.topPneus || [])">
-                <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm">
-                  <span class="font-medium" x-text="typeof pneu === 'string' ? pneu : pneu.pneu"></span>
-                  <span class="text-xs text-gray-500" x-text="typeof pneu === 'string' ? ('#' + (index + 1)) : ((pneu.quantidade || 0) + ' vendidos')"></span>
-                </div>
-              </template>
+          <div class="space-y-4">
+            <div class="bg-white border border-gray-200 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-3"><span class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="shield-check" class="w-4 h-4"></i></span><h3 class="font-semibold">Regra de realização</h3></div>
+              <div class="space-y-3 text-xs text-gray-600">
+                <p><strong class="text-gray-800">Entrega:</strong> entra no realizado somente após entregue.</p>
+                <p><strong class="text-gray-800">Retirada:</strong> entra no realizado somente após retirado.</p>
+                <p><strong class="text-gray-800">Cancelado:</strong> não entra nos indicadores nem no saldo.</p>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 class="font-semibold mb-3">Custos recentes</h3>
+              <div class="space-y-2">
+                <template x-for="custo in (selectedParceiro()?.custosRecentes || [])">
+                  <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm"><span class="text-gray-600" x-text="custo.label"></span><span class="font-semibold" x-text="custo.value"></span></div>
+                </template>
+                <div x-show="(selectedParceiro()?.custosRecentes || []).length === 0" class="text-xs text-gray-400 py-3">Nenhum custo recente informado.</div>
+              </div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 class="font-semibold mb-3">Pneus mais vendidos</h3>
+              <div class="space-y-2">
+                <template x-for="(pneu, index) in (selectedParceiro()?.topPneus || [])">
+                  <div class="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm"><span class="font-medium" x-text="typeof pneu === 'string' ? pneu : pneu.pneu"></span><span class="text-xs text-gray-500" x-text="typeof pneu === 'string' ? ('#' + (index + 1)) : ((pneu.quantidade || 0) + ' vendidos')"></span></div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -4939,30 +4893,39 @@
      @keydown.escape.window="applicationsModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
      style="display:none;">
-  <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+  <div class="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-emerald-100">
+    <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
       <div>
-        <h3 class="font-semibold">Candidaturas a parceiro</h3>
-        <p class="text-xs text-gray-500">Quem se candidatou pelo formulário público. Aprovar cria o parceiro com login.</p>
+        <div class="flex items-center gap-2">
+          <span class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="inbox" class="w-4 h-4"></i></span>
+          <div><h3 class="font-semibold">Candidaturas a parceiro</h3><p class="text-xs text-gray-500">Triagem, cobertura e credenciamento em um único fluxo.</p></div>
+        </div>
       </div>
       <button @click="applicationsModalOpen = false" class="p-2 hover:bg-gray-100 rounded-lg">
         <i data-lucide="x" class="w-4 h-4"></i>
       </button>
     </div>
 
-    <div class="p-6 space-y-3">
+    <div class="px-6 py-3 border-b border-gray-100 flex flex-wrap gap-2 text-[11px] text-gray-500">
+      <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"><strong x-text="applications.length"></strong> pendente(s)</span>
+      <span class="px-2.5 py-1 rounded-full bg-gray-100">aprovação cria parceiro e credencial auditada</span>
+      <span class="px-2.5 py-1 rounded-full bg-gray-100">login exibido uma única vez</span>
+    </div>
+
+    <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div x-show="applicationsLoading" class="text-sm text-gray-500 text-center py-6">Carregando...</div>
-      <div x-show="!applicationsLoading && applications.length === 0" class="text-sm text-gray-500 text-center py-8">
-        Nenhuma candidatura pendente.
+      <div x-show="!applicationsLoading && applications.length === 0" class="lg:col-span-2 rounded-xl border border-dashed border-gray-200 text-sm text-gray-500 text-center py-12">
+        Nenhuma candidatura pendente. A fila está em dia.
       </div>
 
       <template x-for="app in applications" :key="app.id">
-        <div class="rounded-xl border border-gray-200 p-4">
+        <div class="rounded-xl border border-gray-200 p-5 hover:border-emerald-200 transition-colors"
+             :class="approvingApp && approvingApp.id === app.id ? 'lg:col-span-2 border-emerald-300 bg-emerald-50/20' : ''">
           <div class="flex items-center justify-between gap-3">
-            <div class="font-semibold" x-text="app.trade_name"></div>
-            <span class="text-xs text-gray-400" x-text="formatDateTime(app.created_at)"></span>
+            <div><div class="font-semibold" x-text="app.trade_name"></div><span class="text-[10px] text-gray-400">aguardando análise</span></div>
+            <span class="text-xs text-gray-400 whitespace-nowrap" x-text="formatDateTime(app.created_at)"></span>
           </div>
-          <div class="text-sm text-gray-600 mt-1 space-y-0.5">
+          <div class="text-sm text-gray-600 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
             <div x-show="app.responsible_name">👤 <span x-text="app.responsible_name"></span></div>
             <div x-show="app.whatsapp_phone">📱 <span x-text="app.whatsapp_phone"></span></div>
             <div x-show="app.email">✉️ <span x-text="app.email"></span></div>
@@ -4976,24 +4939,29 @@
             <button @click="rejectApplication(app)" class="px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg text-sm">Recusar</button>
           </div>
 
-          <div x-show="approvingApp && approvingApp.id === app.id" class="mt-3 border-t border-gray-100 pt-3">
+          <div x-show="approvingApp && approvingApp.id === app.id" class="mt-4 border-t border-emerald-100 pt-4">
             <template x-if="!approveResult">
-              <div class="space-y-2">
-                <div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="md:col-span-2">
                   <label class="text-xs font-medium text-gray-700 block mb-1">Cidades que ele vai atender (cobertura) *</label>
                   <input x-model="approveForm.municipios" type="text" placeholder="Niterói, São Gonçalo"
-                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
                 </div>
                 <div>
                   <label class="text-xs font-medium text-gray-700 block mb-1">Comissão (%)</label>
                   <input x-model="approveForm.commission_percent" type="number" min="0" max="100" step="0.5"
-                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
                 </div>
-                <div x-show="approveError" class="text-sm text-rose-600" x-text="approveError"></div>
-                <div class="flex gap-2">
+                <div class="md:col-span-3">
+                  <label class="text-xs font-medium text-gray-700 block mb-1">Endereço de acesso (opcional)</label>
+                  <input x-model="approveForm.slug" type="text" placeholder="borracharia-do-ze"
+                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
+                </div>
+                <div x-show="approveError" class="md:col-span-3 text-sm text-rose-600" x-text="approveError"></div>
+                <div class="md:col-span-3 flex gap-2 justify-end">
                   <button @click="approvingApp = null" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm">Cancelar</button>
                   <button @click="confirmApprove()" :disabled="approveSubmitting"
-                          class="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm disabled:opacity-50"
+                          class="flex-1 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm disabled:opacity-50"
                           x-text="approveSubmitting ? 'Aprovando...' : 'Confirmar e criar parceiro'"></button>
                 </div>
               </div>
@@ -5016,7 +4984,7 @@
                           x-text="approveSubmitting ? 'Gerando...' : 'Gerar novo login auditado'"></button>
                 </div>
                 <div x-show="approveError" class="text-sm text-rose-600" x-text="approveError"></div>
-                <button @click="approvingApp = null; approveResult = null" class="w-full px-3 py-2 bg-gray-900 text-white rounded-lg text-sm">Pronto</button>
+                <button @click="approvingApp = null; approveResult = null" class="w-full px-3 py-2 bg-emerald-700 text-white rounded-lg text-sm">Pronto</button>
               </div>
             </template>
           </div>
@@ -5034,11 +5002,13 @@
      @keydown.escape.window="partnerModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
      style="display:none;">
-  <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+  <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-emerald-100">
+    <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
       <div>
-        <h3 class="font-semibold">Novo parceiro</h3>
-        <p class="text-xs text-gray-500">Cria o parceiro, o acesso (login) e a cobertura de cidades.</p>
+        <div class="flex items-center gap-2">
+          <span class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center"><i data-lucide="store" class="w-4 h-4"></i></span>
+          <div><h3 class="font-semibold">Novo parceiro</h3><p class="text-xs text-gray-500">Cadastro, cobertura e credencial inicial.</p></div>
+        </div>
       </div>
       <button @click="partnerModalOpen = false" class="p-2 hover:bg-gray-100 rounded-lg">
         <i data-lucide="x" class="w-4 h-4"></i>
@@ -5047,31 +5017,43 @@
 
     <!-- Resultado: login gerado (token mostrado UMA vez) -->
     <template x-if="partnerResult">
-      <div class="p-6 space-y-4">
-        <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-          <div class="text-sm font-semibold text-emerald-800 mb-1">Parceiro criado ✅</div>
-          <div class="text-xs text-emerald-700">Endereço de acesso (slug): <span class="font-mono" x-text="partnerResult.slug"></span></div>
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-5">
+          <div class="w-10 h-10 rounded-full bg-white text-emerald-700 flex items-center justify-center mb-3"><i data-lucide="badge-check" class="w-5 h-5"></i></div>
+          <div class="text-sm font-semibold text-emerald-800 mb-1">Parceiro criado</div>
+          <div class="text-xs text-emerald-700">Endereço de acesso: <span class="font-mono" x-text="partnerResult.slug"></span></div>
         </div>
-        <div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+        <div class="rounded-xl bg-amber-50 border border-amber-200 p-5">
           <div class="text-xs font-semibold text-amber-800 mb-1">⚠️ Login (copie agora — não será mostrado de novo)</div>
           <div class="font-mono text-xs break-all bg-white border border-amber-200 rounded p-2" x-text="partnerResult.token"></div>
           <button @click="navigator.clipboard && navigator.clipboard.writeText(partnerResult.token)"
                   class="mt-2 text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg">Copiar login</button>
         </div>
-        <div class="text-xs text-gray-500">O parceiro entra em <span class="font-mono" x-text="'/parceiro/' + partnerResult.slug + '/'"></span> com esse login.</div>
-        <button @click="partnerModalOpen = false" class="w-full px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">Fechar</button>
+        <div class="lg:col-span-2 text-xs text-gray-500">O parceiro entra em <span class="font-mono" x-text="'/parceiro/' + partnerResult.slug + '/'"></span> com esse login.</div>
+        <button @click="partnerModalOpen = false" class="lg:col-span-2 w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm">Concluir</button>
       </div>
     </template>
 
     <!-- Formulário -->
     <template x-if="!partnerResult">
-      <div class="p-6 space-y-4">
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-6">
+        <aside class="rounded-xl bg-emerald-950 text-white p-5 h-fit">
+          <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-4"><i data-lucide="network" class="w-5 h-5"></i></div>
+          <h4 class="text-sm font-semibold">Entrada segura na Rede</h4>
+          <p class="text-xs text-emerald-100 mt-2 leading-relaxed">O cadastro cria o parceiro no ambiente atual e habilita somente a cobertura informada.</p>
+          <div class="mt-5 space-y-3 text-[11px] text-emerald-100">
+            <p>✓ credencial exibida uma única vez</p>
+            <p>✓ cidades definem a cobertura inicial</p>
+            <p>✓ nenhuma venda ou estoque é criado aqui</p>
+          </div>
+        </aside>
+        <div class="space-y-4">
         <div>
           <label class="text-xs font-medium text-gray-700 mb-1 block">Nome do parceiro *</label>
           <input x-model="partnerForm.trade_name" type="text" placeholder="Ex: Borracharia do Zé"
-                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500">
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="text-xs font-medium text-gray-700 mb-1 block">Responsável</label>
             <input x-model="partnerForm.responsible_name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
@@ -5081,7 +5063,7 @@
             <input x-model="partnerForm.whatsapp_phone" type="text" placeholder="+55..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="text-xs font-medium text-gray-700 mb-1 block">E-mail</label>
             <input x-model="partnerForm.email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
@@ -5107,8 +5089,9 @@
         <div class="flex gap-2 pt-2">
           <button @click="partnerModalOpen = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm">Cancelar</button>
           <button @click="submitNewPartner()" :disabled="partnerSubmitting"
-                  class="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm disabled:opacity-50"
+                  class="flex-1 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm disabled:opacity-50"
                   x-text="partnerSubmitting ? 'Criando...' : 'Criar parceiro'"></button>
+        </div>
         </div>
       </div>
     </template>

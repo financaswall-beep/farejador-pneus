@@ -69,7 +69,7 @@ function painelApp() {
     liveRefreshing: false,
     liveRefreshId: null,
     selectedParceiroIndex: 0,
-    unidadeTab: 'visao',
+    unidadeTab: 'visao', unidadeStockBusca: '', unidadeStockFiltro: 'todos', unidadeLancamentoFiltro: 'todos',
     vendasTab: 'visao', // sub-abas: visao | varejo | atacado | historico | recompra
     vendasPeriodo: '30d', // recorte comercial compartilhado: today | 7d | 30d
     vendasHistoricoCanal: 'todos',
@@ -197,7 +197,7 @@ function painelApp() {
       { id: '30d', label: '30 dias' },
       { id: 'month', label: 'Mês atual' },
     ],
-    redeFilter: 'todos',
+    redeFilter: 'todos', redeSection: 'visao', redeBusca: '',
     redeFilters: [
       { id: 'todos', label: 'Todos' },
       { id: 'alerta', label: 'Com alerta' },
