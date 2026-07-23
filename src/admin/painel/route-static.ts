@@ -41,6 +41,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/logistica-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/bot-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/bot-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/vendas-hero.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
   for (const brand of ['facebook.svg', 'google-ads.svg', 'instagram.svg', 'whatsapp.svg']) {
     fastify.get(`/assets/brands/${brand}`, async (_request, reply) =>
       sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), `assets/brands/${brand}`, 'image/svg+xml'));
