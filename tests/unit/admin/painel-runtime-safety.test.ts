@@ -43,11 +43,29 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('aria-label="Buscar cliente ou conversa"');
   });
 
+  it('usa dialogo interno nas mutacoes de compra e preserva os modulos novos', () => {
+    const source = readFileSync('painel/public/app.compras.acoes.js', 'utf8');
+    const purchaseActions = source.slice(
+      source.indexOf('compraOpenDetails'),
+      source.indexOf('async atacadoCancelSale'),
+    );
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    const staticRoute = readFileSync('src/admin/painel/route-static.ts', 'utf8');
+
+    expect(purchaseActions).not.toContain('window.confirm');
+    expect(purchaseActions).not.toContain('window.prompt');
+    expect(purchaseActions).not.toContain('window.alert');
+    expect(html).toContain('aria-labelledby="compra-dialog-title"');
+    expect(staticRoute).toContain("'app.compras.relatorios.js'");
+  });
+
   it('invalida o cache dos modulos corrigidos', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
 
-    expect(html).toContain('app.atacado.js?v=20260718-frontfix1');
-    expect(html).toContain('app.compras.acoes.js?v=20260718-frontfix1');
+    expect(html).toContain('app.atacado.js?v=20260723-compras2');
+    expect(html).toContain('app.compras.relatorios.js?v=20260723-compras2');
+    expect(html).toContain('app.compras.acoes.js?v=20260723-compras2');
+    expect(html).toContain('app.core.js?v=20260723-compras2');
     expect(html).toContain('app.clientes.js?v=20260718-etapa9');
     expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });

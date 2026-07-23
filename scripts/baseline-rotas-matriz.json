@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-19T05:22:00.969Z",
-  "total": 156,
+  "geradoEm": "2026-07-23T13:41:40.810Z",
+  "total": 160,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -31,6 +31,7 @@
     "GET /admin/api/wholesale/finance AUTH(1)",
     "GET /admin/api/wholesale/measures AUTH(1)",
     "GET /admin/api/wholesale/purchases AUTH(1)",
+    "GET /admin/api/wholesale/purchases/report AUTH(1)",
     "GET /admin/api/wholesale/ranking AUTH(1)",
     "GET /admin/api/wholesale/resumo AUTH(1)",
     "GET /admin/api/wholesale/sales AUTH(1)",
@@ -39,6 +40,8 @@
     "GET /admin/api/wholesale/stock/reconciliation AUTH(1)",
     "GET /admin/api/wholesale/suppliers AUTH(1)",
     "GET /admin/api/wholesale/suppliers/breakdown AUTH(1)",
+    "GET /admin/api/wholesale/suppliers/insights AUTH(1)",
+    "GET /admin/api/wholesale/suppliers/prices AUTH(1)",
     "GET /admin/api/wholesale/suppliers/ranking AUTH(1)",
     "GET /admin/login PUBLICA",
     "GET /admin/login.css PUBLICA",
@@ -59,6 +62,7 @@
     "GET /admin/painel/app.comissoes.js PUBLICA",
     "GET /admin/painel/app.compras.acoes.js PUBLICA",
     "GET /admin/painel/app.compras.js PUBLICA",
+    "GET /admin/painel/app.compras.relatorios.js PUBLICA",
     "GET /admin/painel/app.core.js PUBLICA",
     "GET /admin/painel/app.financeiro.despesas.js PUBLICA",
     "GET /admin/painel/app.financeiro.indicadores.js PUBLICA",

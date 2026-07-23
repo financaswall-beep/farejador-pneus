@@ -57,17 +57,21 @@ window.PAINEL_MODULES.compras = function () {
       const d = new Date(row.last_purchased_at);
       return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
     },
-    async compraSubmit() {
+    compraBuildSubmission() {
       const f = this.compraForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       if (f.supplierKey === 'new') {
-        if (!f.newName.trim()) { this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' }; return; }
+        if (!f.newName.trim()) {
+          this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' };
+          return null;
+        }
         body.new_supplier = { name: f.newName.trim(), phone: f.newPhone.trim() || null,
           document: f.newDocument.trim() || null };
       } else if (f.supplierKey) {
         body.supplier_id = f.supplierKey;
       } else {
-        this.compraMsg = { ok: false, text: 'Escolha o fornecedor.' }; return;
+        this.compraMsg = { ok: false, text: 'Escolha o fornecedor.' };
+        return null;
       }
       const items = f.items
         .filter((it) => it.measure && it.measure.trim() && Number(it.quantity) > 0)
@@ -77,7 +81,10 @@ window.PAINEL_MODULES.compras = function () {
           quantity: Number(it.quantity),
           unit_cost: Number(it.unit_cost) || 0,
         }));
-      if (items.length === 0) { this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
+      if (items.length === 0) {
+        this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' };
+        return null;
+      }
       // Auditoria 07-06: linha PREENCHIDA mas inválida (sem medida / sem quantidade) era
       // descartada em silêncio — a tela mostrava um total e registrava outro. Linha 100%
       // vazia (sobrou do "+ Adicionar pneu") segue ignorada sem pergunta.
@@ -88,11 +95,6 @@ window.PAINEL_MODULES.compras = function () {
           || (it.unit_cost !== '' && it.unit_cost != null && Number(it.unit_cost) > 0)
           || Number(it.quantity) !== 1;
       });
-      if (descartadas.length > 0
-          && !window.confirm(`${descartadas.length} linha(s) sem medida (ou sem quantidade) vão ficar DE FORA da compra.\n\nRegistrar mesmo assim?`)) return;
-      // Auditoria 07-06: custo em branco virava R$ 0 calado e DERRUBAVA o custo médio.
-      if (items.some((it) => it.unit_cost === 0)
-          && !window.confirm('Tem pneu com custo R$ 0 — entra de graça e DERRUBA o custo médio do galpão.\n\nÉ isso mesmo?')) return;
       body.items = items;
       // FINANCEIRO (0115): compra fiada só com o financeiro ligado (flag).
       if (this.atacadoFinance && f.payment_status === 'pending') {
@@ -102,6 +104,28 @@ window.PAINEL_MODULES.compras = function () {
       body.receipt_status = f.receipt_status;
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;
       body.idempotency_key = f.idempotency_key;
+      return {
+        body,
+        warnings: {
+          discarded: descartadas.length,
+          zeroCost: items.some((it) => it.unit_cost === 0),
+        },
+      };
+    },
+    async compraSubmit() {
+      const submission = this.compraBuildSubmission();
+      if (!submission) return;
+      if (submission.warnings.discarded || submission.warnings.zeroCost) {
+        this.compraPendingSubmission = submission.body;
+        this.compraDialog = {
+          open: true, kind: 'review-create', purchase: null, supplier: null,
+          reason: '', error: '', warnings: submission.warnings,
+        };
+        return;
+      }
+      await this.compraPersist(submission.body);
+    },
+    async compraPersist(body) {
 
       this.compraSaving = true;
       this.compraMsg = null;
@@ -112,7 +136,9 @@ window.PAINEL_MODULES.compras = function () {
         this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}` };
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
         this.compraForm = { supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '', payment_status: 'paid', due_date: '', receipt_status: 'received', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
-        await this.loadAtacado();
+        this.compraPendingSubmission = null;
+        this.comprasTab = 'visao';
+        await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);
       } catch (err) {
         this.compraMsg = { ok: false, text: this.compraErrText(err.message) };
       } finally {

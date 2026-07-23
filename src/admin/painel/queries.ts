@@ -27,6 +27,7 @@ export * from './queries-comissoes.js'; // comissões como lançamento (0118): v
 export * from './queries-comissoes-acoes.js'; // Etapa 6: liquidação/termos atômicos e idempotentes
 export * from './queries-financeiro-visao.js'; // visão consolidada do Financeiro da matriz (só leitura)
 export * from './queries-financeiro-verdade.js'; // Etapa 4: competência × caixa × posição + conciliação
+export * from './queries-compras-relatorios.js'; // Compras: relatórios conciliados, paginação e preço histórico
 export * from './queries-logistica.js'; // logística (0121) leitura: entregas, rotas, status, falha
 export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendurar/remarcar/recolocar/fechar rota
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)

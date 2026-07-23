@@ -6,9 +6,24 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
+import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { archiveWholesaleSupplierSchema, cancelWholesalePurchaseSchema, confirmWholesalePurchaseSchema, registerPurchaseSchema, registerSupplierSchema } from './route-schemas.js';
+
+const purchaseReportQuerySchema = z.object({
+  period: z.enum(['30d', '90d', 'year', 'all']).default('30d'),
+  status: z.enum(['all', 'pending', 'confirmed', 'cancelled']).default('all'),
+  payment: z.enum(['all', 'paid', 'pending']).default('all'),
+  search: z.string().trim().max(80).optional(),
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  page_size: z.coerce.number().int().min(4).max(100).default(10),
+});
+
+const priceReportQuerySchema = z.object({
+  period: z.enum(['30d', '90d', 'year', 'all']).default('90d'),
+  supplier_id: z.string().uuid().optional(),
+  search: z.string().trim().max(80).optional(),
+});
 
 export async function registerPainelFornecedores(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -41,9 +56,42 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
     return reply.status(200).send(dashboardPayload(await getWholesaleSupplierMeasureBreakdown()));
   });
 
+  fastify.get('/admin/api/wholesale/suppliers/insights', { preHandler: requireAdminAuth }, async (_request, reply) => {
+    return reply.status(200).send(dashboardPayload(await getWholesaleSupplierInsights()));
+  });
+
+  fastify.get('/admin/api/wholesale/suppliers/prices', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = priceReportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_query' });
+    }
+    const rows = await getWholesalePriceReport({
+      period: parsed.data.period,
+      supplierId: parsed.data.supplier_id,
+      search: parsed.data.search,
+    });
+    return reply.status(200).send(dashboardPayload(rows));
+  });
+
   // Histórico de compras (cabeçalhos, mais recente primeiro).
   fastify.get('/admin/api/wholesale/purchases', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(dashboardPayload(await listWholesalePurchases()));
+  });
+
+  fastify.get('/admin/api/wholesale/purchases/report', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = purchaseReportQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_query' });
+    }
+    const report = await getWholesalePurchaseReport({
+      period: parsed.data.period,
+      status: parsed.data.status,
+      payment: parsed.data.payment,
+      search: parsed.data.search,
+      page: parsed.data.page,
+      pageSize: parsed.data.page_size,
+    });
+    return reply.status(200).send({ environment: env.FAREJADOR_ENV, ...report });
   });
 
   // Registra compra: recebida alimenta o galpão na transação; pendente não toca estoque.
