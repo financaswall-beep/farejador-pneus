@@ -6,14 +6,14 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-fix1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-visao1" />
 <style>[x-cloak]{display:none!important}</style>
 <!-- Dependências críticas locais: o painel não pode voltar para uma tela antiga por falha de CDN. -->
 <script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
 <script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
 <script src="/admin/painel/app.nav.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
@@ -41,7 +41,7 @@
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
+<script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-fix1"></script>
@@ -604,14 +604,19 @@
             <span class="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">real</span>
           </div>
           <div>
-            <p class="text-xs text-gray-500 mb-3">Unidades com maior volume realizado</p>
+            <p class="text-xs text-gray-500 mb-3">Top 3 unidades por vendas realizadas</p>
             <div class="space-y-1">
-              <template x-for="parceiro in parceirosRede.filter(p => p.status === 'Ativo').sort((a, b) => b.vendasValor - a.vendasValor).slice(0, 3)">
-                <div class="flex items-center justify-between text-sm py-2.5 border-b border-gray-100 last:border-b-0">
+              <template x-for="(parceiro, index) in redeTopUnidades()" :key="'top-vendas-' + parceiro.id">
+                <div class="grid grid-cols-[24px_minmax(0,1fr)_auto_auto] items-center gap-2 text-sm py-2.5 border-b border-gray-100 last:border-b-0">
+                  <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center"
+                        x-text="index + 1"></span>
                   <span class="font-medium truncate" x-text="parceiro.nome"></span>
-                  <span class="text-gray-600" x-text="parceiro.vendas"></span>
+                  <span class="text-gray-700 tabular-nums" x-text="parceiro.vendas"></span>
+                  <span class="min-w-12 text-right text-xs font-semibold text-emerald-700 tabular-nums"
+                        x-text="redeParticipacaoVendas(parceiro)"></span>
                 </div>
               </template>
+              <div x-show="redeTopUnidades().length === 0" class="py-6 text-center text-sm text-gray-500">Nenhuma venda realizada no período.</div>
             </div>
           </div>
         </div>
@@ -621,13 +626,24 @@
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <h3 class="font-semibold text-sm">Lucro estimado por unidade</h3>
-              <p class="text-xs text-gray-500 mt-0.5">Comparativo, incluindo unidades no negativo</p>
+              <h3 class="font-semibold text-sm">Resultado por unidade</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Lucro estimado; custos pendentes ficam sinalizados sem cálculo artificial</p>
             </div>
             <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="h-48">
             <canvas id="chartRedeLucro"></canvas>
+          </div>
+          <div x-show="unidadesComCustoPendente().length > 0" class="mt-3 pt-3 border-t border-amber-100 space-y-2">
+            <template x-for="parceiro in unidadesComCustoPendente()" :key="'custo-pendente-' + parceiro.id">
+              <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg bg-amber-50 px-3 py-2 text-xs">
+                <div class="min-w-0">
+                  <div class="font-medium text-gray-700 truncate" x-text="parceiro.nome"></div>
+                  <div class="text-amber-700" x-text="(parceiro.custoPendenteItens || 0) + ' item(ns) sem custo histórico'"></div>
+                </div>
+                <span class="font-semibold text-amber-700 whitespace-nowrap">Custo pendente</span>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -675,25 +691,36 @@
               <h3 class="font-semibold text-sm">Origem das vendas</h3>
               <p class="text-xs text-gray-500 mt-0.5">Quanto veio da 2W contra venda de porta</p>
             </div>
-            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700"
-                  x-text="redeConversao2w() + '% 2W'"></span>
+            <span class="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700" x-text="redePeriodLabel()"></span>
           </div>
           <div class="grid grid-cols-[180px_1fr] gap-4 items-center">
-            <div class="h-44">
+            <div class="relative h-44">
               <canvas id="chartRedeOrigem"></canvas>
+              <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span class="text-sm font-bold text-gray-900 tabular-nums" x-text="formatCurrency(redeOrigemTotal())"></span>
+                <span class="mt-0.5 text-[10px] text-gray-400">total de vendas</span>
+              </div>
             </div>
-            <div class="space-y-3 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">2W</span>
-                <span class="font-semibold" x-text="formatCurrency(redeTotal2w())"></span>
+            <div class="space-y-4 text-sm">
+              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-100 pb-3">
+                <div class="flex items-center gap-2 text-gray-600">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-700"></span>
+                  <span>2W</span>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotal2w()) + '%'"></div>
+                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotal2w())"></div>
+                </div>
               </div>
-              <div class="flex items-center justify-between">
-                <span class="text-gray-600">Porta</span>
-                <span class="font-semibold" x-text="formatCurrency(redeTotalPorta())"></span>
-              </div>
-              <div class="flex items-center justify-between border-t border-gray-100 pt-3">
-                <span class="text-gray-600">Ticket médio</span>
-                <span class="font-semibold" x-text="formatCurrency(redeTicketMedio())"></span>
+              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                <div class="flex items-center gap-2 text-gray-600">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-300"></span>
+                  <span>Porta</span>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold text-gray-900 tabular-nums" x-text="redeOrigemPercent(redeTotalPorta()) + '%'"></div>
+                  <div class="text-xs text-gray-500 tabular-nums" x-text="formatCurrency(redeTotalPorta())"></div>
+                </div>
               </div>
             </div>
           </div>

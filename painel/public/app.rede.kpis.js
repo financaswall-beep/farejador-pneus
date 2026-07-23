@@ -82,12 +82,35 @@ window.PAINEL_MODULES.redeKpis = function () {
       return pedidos > 0 ? this.redeTotalVendasValor() / pedidos : 0;
     },
 
+    redeTopUnidades() {
+      return [...this.parceirosRede]
+        .filter((parceiro) => Number(parceiro.vendasValor || 0) > 0)
+        .sort((a, b) => Number(b.vendasValor || 0) - Number(a.vendasValor || 0))
+        .slice(0, 3);
+    },
+
+    redeParticipacaoVendas(parceiro) {
+      const total = this.redeTotalVendasValor();
+      if (total <= 0) return '0%';
+      const percentual = (Number(parceiro?.vendasValor || 0) / total) * 100;
+      return percentual.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    },
+
     redeTotal2w() {
       return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.vendas2w || 0), 0);
     },
 
     redeTotalPorta() {
       return this.parceirosRede.reduce((sum, parceiro) => sum + Number(parceiro.vendasPorta || 0), 0);
+    },
+
+    redeOrigemTotal() {
+      return this.redeTotal2w() + this.redeTotalPorta();
+    },
+
+    redeOrigemPercent(valor) {
+      const total = this.redeOrigemTotal();
+      return total > 0 ? Math.round((Number(valor || 0) / total) * 100) : 0;
     },
 
     redeTotalComissao() {
@@ -145,6 +168,12 @@ window.PAINEL_MODULES.redeKpis = function () {
         .filter((parceiro) => !parceiro.custoPendente && parceiro.lucroEstimado !== null)
         .sort((a, b) => Number(b.lucroEstimado) - Number(a.lucroEstimado))
         .slice(0, 4);
+    },
+
+    unidadesComCustoPendente() {
+      return [...this.parceirosRede]
+        .filter((parceiro) => parceiro.custoPendente)
+        .sort((a, b) => Number(b.custoPendenteReceita || 0) - Number(a.custoPendenteReceita || 0));
     },
 
     rankingSaude() {
