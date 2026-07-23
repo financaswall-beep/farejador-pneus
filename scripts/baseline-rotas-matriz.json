@@ -1,5 +1,5 @@
 {
-  "geradoEm": "2026-07-23T22:29:38.753Z",
+  "geradoEm": "2026-07-23T22:42:40.053Z",
   "total": 168,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
@@ -79,7 +79,7 @@
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",
     "GET /admin/painel/app.rede.apply.js PUBLICA",
     "GET /admin/painel/app.rede.kpis.js PUBLICA",
-    "GET /admin/painel/app.rede.mock.js PUBLICA",
+    "GET /admin/painel/app.rede.operacao.js PUBLICA",
     "GET /admin/painel/app.sino.js PUBLICA",
     "GET /admin/painel/app.unidade.kpis.js PUBLICA",
     "GET /admin/painel/app.varejo.js PUBLICA",

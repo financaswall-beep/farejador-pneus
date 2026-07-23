@@ -1,11 +1,11 @@
-// Prévia visual aprovada em 23/07: isolada em ?mock=1 até a homologação.
+// Operação e saúde aprovada em 23/07 e promovida para a tela padrão da Rede.
 // Nenhuma fonte paralela é criada: todos os blocos derivam de parceirosRede
-// e do mesmo livro de comissões usado pela tela de produção.
+// e do mesmo livro de comissões usado pela tela anterior.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
-window.PAINEL_MODULES.redeMock = function () {
+window.PAINEL_MODULES.redeOperacao = function () {
   return {
-    redeMockPreview() {
-      return new URLSearchParams(window.location.search).get('mock') === '1';
+    redeOperacaoLegadaAtiva() {
+      return new URLSearchParams(window.location.search).get('redeLegacy') === '1';
     },
 
     redeUltimaVendaLabel(parceiro) {
@@ -20,7 +20,7 @@ window.PAINEL_MODULES.redeMock = function () {
       return 'Sem venda';
     },
 
-    redeMockCommissionRows() {
+    redeOperacaoCommissionRows() {
       if (this.livroComissaoOn()) {
         return [...(this.comissoes?.partners || [])]
           .filter((row) => Number(row.open_total || 0) > 0)
@@ -98,7 +98,7 @@ window.PAINEL_MODULES.redeMock = function () {
         .slice(0, 3);
     },
 
-    redeMockAlertas() {
+    redeOperacaoAlertas() {
       return [
         {
           label: 'Custo pendente',

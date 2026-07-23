@@ -20,7 +20,7 @@
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
 <script src="/admin/painel/app.nav.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-visao2"></script>
-<script src="/admin/painel/app.rede.mock.js?v=20260723-rede-operacao-mock1"></script>
+<script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
@@ -539,9 +539,9 @@
         </div>
       </div>
 
-      <!-- Prévia de homologação (?mock=1): Operação e saúde aprovada em 23/07.
-           Banner, navegação superior e contratos permanecem os mesmos da produção. -->
-      <div x-show="redeSection === 'operacao' && redeMockPreview()" x-cloak class="space-y-3.5">
+      <!-- Operação e saúde aprovada em 23/07 e promovida para produção.
+           A tela anterior permanece disponível somente via ?redeLegacy=1. -->
+      <div x-show="redeSection === 'operacao' && !redeOperacaoLegadaAtiva()" x-cloak class="space-y-3.5">
         <!-- Linha 1: cobranças em andamento + total a receber -->
         <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
           <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -553,7 +553,7 @@
                 <div>
                   <h2 class="text-base font-semibold tracking-tight text-gray-950">Cobranças em andamento</h2>
                   <p class="mt-0.5 text-[11px] text-gray-500">
-                    <span x-text="redeMockCommissionRows().length"></span> unidade(s) com valores em aberto
+                    <span x-text="redeOperacaoCommissionRows().length"></span> unidade(s) com valores em aberto
                   </p>
                 </div>
               </div>
@@ -581,7 +581,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <template x-for="p in redeMockCommissionRows()" :key="'mock-comissao-' + p.partner_id">
+                  <template x-for="p in redeOperacaoCommissionRows()" :key="'operacao-comissao-' + p.partner_id">
                     <tr class="text-gray-700">
                       <td class="max-w-[230px] truncate py-2 pr-3 font-medium" x-text="p.partner_name"></td>
                       <td class="px-3 py-2 text-right font-semibold tabular-nums" x-text="formatCurrency(Number(p.open_total || 0))"></td>
@@ -604,7 +604,7 @@
                       </td>
                     </tr>
                   </template>
-                  <tr x-show="redeMockCommissionRows().length === 0">
+                  <tr x-show="redeOperacaoCommissionRows().length === 0">
                     <td colspan="4" class="py-8 text-center text-sm text-gray-500">Nenhuma comissão em aberto.</td>
                   </tr>
                 </tbody>
@@ -720,7 +720,7 @@
               <p class="mt-0.5 text-[10px] text-gray-500">Situações únicas que exigem atenção</p>
             </header>
             <div class="mt-3 divide-y divide-gray-100">
-              <template x-for="alerta in redeMockAlertas()" :key="'mock-alerta-' + alerta.label">
+              <template x-for="alerta in redeOperacaoAlertas()" :key="'operacao-alerta-' + alerta.label">
                 <div class="grid grid-cols-[32px_minmax(0,1fr)_28px_auto] items-center gap-2 py-2">
                   <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
                     <i :data-lucide="alerta.icon" class="h-3.5 w-3.5"></i>
@@ -843,7 +843,7 @@
 
       <!-- Comissões a receber (0118, flag NETWORK_COMMISSION_LEDGER): cada venda 2W
            realizada vira LANÇAMENTO (% congelado); cancelou, estorna sozinho. -->
-      <div x-show="redeSection === 'operacao' && !redeMockPreview() && comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva() && comissoes && comissoes.enabled" class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
         <div class="flex items-center justify-between mb-1">
           <h3 class="font-semibold">Comissões a receber</h3>
           <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(Number(comissoes?.total_aberto || 0))"></span>
@@ -1121,7 +1121,7 @@
       </div>
 
       <!-- Cobrança matriz↔parceiro: o que a rede deve à matriz no período -->
-      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
         <div class="flex items-center justify-between mb-3">
           <div>
             <h3 class="font-semibold text-sm">A receber da rede</h3>
@@ -1143,8 +1143,8 @@
         <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
-      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 gap-4 mb-4">
-        <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="bg-white border border-gray-200 rounded-xl p-5">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="grid grid-cols-1 gap-4 mb-4">
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>
               <h3 class="font-semibold text-sm">Score de saúde das unidades</h3>
@@ -1158,7 +1158,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5 flex flex-col">
           <div class="text-xs text-gray-500 mb-3">Estoque parado</div>
           <div class="mb-3">
@@ -1198,7 +1198,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-sm">Ranking de saúde</h3>
@@ -1257,7 +1257,7 @@
         </div>
       </div>
 
-      <div x-show="redeSection === 'operacao' && !redeMockPreview()" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
+      <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div class="flex items-center justify-between mb-3">
             <div>

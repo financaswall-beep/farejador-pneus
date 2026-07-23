@@ -25,7 +25,7 @@ describe('Rede — apresentação e contratos auditados', () => {
   const nav = readFileSync(resolve('painel/public/app.nav.js'), 'utf8');
   const kpis = readFileSync(resolve('painel/public/app.unidade.kpis.js'), 'utf8');
   const redeKpis = readFileSync(resolve('painel/public/app.rede.kpis.js'), 'utf8');
-  const redeMock = readFileSync(resolve('painel/public/app.rede.mock.js'), 'utf8');
+  const redeOperacao = readFileSync(resolve('painel/public/app.rede.operacao.js'), 'utf8');
   const redeApply = readFileSync(resolve('painel/public/app.rede.apply.js'), 'utf8');
   const chartsRede = readFileSync(resolve('painel/public/app.charts.rede.js'), 'utf8');
   const chartsSaude = readFileSync(resolve('painel/public/app.charts.saude.js'), 'utf8');
@@ -91,18 +91,19 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain("? 'ml-auto h-10 px-3.5");
   });
 
-  it('isola a nova Operação e saúde em ?mock=1 e preserva banner e produção', () => {
-    expect(redeMock).toContain("new URLSearchParams(window.location.search).get('mock') === '1'");
-    expect(html).toContain("redeSection === 'operacao' && redeMockPreview()");
-    expect(html).toContain("redeSection === 'operacao' && !redeMockPreview()");
+  it('torna a nova Operação e saúde padrão e preserva um rollback visual explícito', () => {
+    expect(redeOperacao).toContain("new URLSearchParams(window.location.search).get('redeLegacy') === '1'");
+    expect(html).toContain("redeSection === 'operacao' && !redeOperacaoLegadaAtiva()");
+    expect(html).toContain("redeSection === 'operacao' && redeOperacaoLegadaAtiva()");
+    expect(html).not.toContain('app.rede.mock.js');
     expect(html).toContain('Cobranças em andamento');
     expect(html).toContain('Pulso de saúde');
     expect(html).toContain('Alertas operacionais');
     expect(html).toContain('Unidades em foco');
-    expect(html).toContain('redeMockCommissionRows()');
+    expect(html).toContain('redeOperacaoCommissionRows()');
     expect(html).toContain('redeSaudeResumo().media');
     expect(html).toContain('redeVendasHojeRanking()');
-    expect(nav).toContain("section === 'operacao' && !this.redeMockPreview()");
+    expect(nav).toContain("section === 'operacao' && this.redeOperacaoLegadaAtiva()");
     expect(html).toContain('/admin/painel/assets/rede-hero-visao-v3.webp?v=20260723-rede-visao2');
   });
 

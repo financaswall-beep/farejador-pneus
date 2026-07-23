@@ -1,5 +1,5 @@
 {
-  "geradoEm": "2026-07-23T22:24:55.720Z",
+  "geradoEm": "2026-07-23T22:42:37.241Z",
   "commitBase": "dd64a35",
   "total": 794,
   "propriedades": {
@@ -571,9 +571,9 @@
     "redeGoalProgress": "function",
     "redeGoalRemaining": "function",
     "redeKpis": "value:array",
-    "redeMockAlertas": "function",
-    "redeMockCommissionRows": "function",
-    "redeMockPreview": "function",
+    "redeOperacaoAlertas": "function",
+    "redeOperacaoCommissionRows": "function",
+    "redeOperacaoLegadaAtiva": "function",
     "redeOrderSeries": "function",
     "redeOrigemPercent": "function",
     "redeOrigemTotal": "function",
