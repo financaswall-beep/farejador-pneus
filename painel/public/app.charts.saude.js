@@ -18,7 +18,7 @@ window.PAINEL_MODULES.chartsSaude = function () {
           labels: ['2W', 'Porta'],
           datasets: [{
             data: [total2w, totalPorta],
-            backgroundColor: ['#7c3aed', '#10b981'],
+            backgroundColor: ['#047857', '#6ee7b7'],
             borderWidth: 0,
             hoverOffset: 4,
           }],
@@ -109,7 +109,7 @@ window.PAINEL_MODULES.chartsSaude = function () {
           labels: parceiros.map((p) => p.nome.replace('Borracharia ', '').replace('Pneus ', '')),
           datasets: [{
             data: parceiros.map((p) => Number(p.comprasPneus || 0)),
-            backgroundColor: parceiros.map((p, i) => i === 0 ? '#f97316' : '#fed7aa'),
+            backgroundColor: parceiros.map((p, i) => i === 0 ? '#047857' : '#a7f3d0'),
             borderRadius: 6,
             barThickness: 16,
           }],
@@ -162,7 +162,7 @@ window.PAINEL_MODULES.chartsSaude = function () {
           labels: parceiros.map((p) => p.nome.replace('Borracharia ', '').replace('Pneus ', '')),
           datasets: [{
             data: parceiros.map((p) => (p.estoqueItens || []).length),
-            backgroundColor: parceiros.map((p, i) => i === 0 ? '#f97316' : '#e5e7eb'),
+            backgroundColor: parceiros.map((p, i) => i === 0 ? '#047857' : '#d1fae5'),
             borderRadius: 4,
             barThickness: 8,
           }],

@@ -43,6 +43,26 @@ window.PAINEL_MODULES.nav = function () {
       });
     },
 
+    setRedeSection(section) {
+      this.redeSection = section;
+      this.$nextTick(() => {
+        lucide.createIcons();
+        if (section === 'visao') {
+          this.renderRedeChart();
+          this.renderRedeLucroChart();
+          this.renderRedeComprasChart();
+          this.renderPneusRedeChart();
+          this.renderRedeOrigemChart();
+        }
+        if (section === 'operacao') {
+          this.renderRedeSaudeChart();
+          this.renderEstoqueParadoChart();
+          this.renderMargemChart();
+          this.renderVendaHojeChart();
+        }
+      });
+    },
+
     voltarParaRede() {
       this.currentPage = 'rede';
       this.$nextTick(() => {

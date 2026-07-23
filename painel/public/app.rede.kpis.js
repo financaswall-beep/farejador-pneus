@@ -204,12 +204,17 @@ window.PAINEL_MODULES.redeKpis = function () {
     },
 
     filteredParceirosRede() {
-      if (this.redeFilter === 'alerta') return this.parceirosRede.filter((parceiro) => parceiro.alerta !== 'ok');
-      if (this.redeFilter === 'sem_venda') return this.unidadesSemVendaHoje();
-      if (this.redeFilter === 'sem_atualizacao') return this.unidadesSemAtualizacao();
-      if (this.redeFilter === 'dependencia_2w') return this.parceirosRede.filter((parceiro) => Number(parceiro.percentual2w || 0) >= 50);
-      if (this.redeFilter === 'risco') return this.parceirosRede.filter((parceiro) => this.saudeScore(parceiro) < 60);
-      return this.parceirosRede;
+      let rows = this.parceirosRede;
+      if (this.redeFilter === 'alerta') rows = rows.filter((parceiro) => parceiro.alerta !== 'ok');
+      if (this.redeFilter === 'sem_venda') rows = this.unidadesSemVendaHoje();
+      if (this.redeFilter === 'sem_atualizacao') rows = this.unidadesSemAtualizacao();
+      if (this.redeFilter === 'dependencia_2w') rows = rows.filter((parceiro) => Number(parceiro.percentual2w || 0) >= 50);
+      if (this.redeFilter === 'risco') rows = rows.filter((parceiro) => this.saudeScore(parceiro) < 60);
+      const term = String(this.redeBusca || '').trim().toLocaleLowerCase('pt-BR');
+      if (!term) return rows;
+      return rows.filter((parceiro) => [
+        parceiro.nome, parceiro.responsavel, parceiro.cidade, parceiro.status,
+      ].some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(term)));
     },
 
   };
