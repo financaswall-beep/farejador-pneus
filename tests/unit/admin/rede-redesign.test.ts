@@ -130,7 +130,8 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('Visão consolidada por canal');
     expect(html).toContain('2 canais');
     expect(html).toContain("redeTotal2w() >= redeTotalPorta() ? '2W' : 'Porta'");
-    expect(html).toContain('Fonte:</span><strong class="text-slate-700">vendas realizadas');
+    expect(html).toContain('xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)]');
+    expect(html).toContain('Fonte: <strong class="text-slate-700">vendas realizadas');
     expect(chartsSaude).toContain('createLinearGradient');
     expect(chartsSaude).toContain('legend: { display: false }');
   });
