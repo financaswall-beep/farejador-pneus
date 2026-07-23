@@ -60,6 +60,21 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(staticRoutes).toContain("reply.header('Cache-Control', 'no-store')");
   });
 
+  it('usa o menu verde como padrão e preserva a barra superior na Rede', () => {
+    expect(html).toContain('<aside class="w-56 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950');
+    expect(html).toContain('<div class="h-28 flex items-center gap-3 px-6 border-b border-emerald-800/70">');
+    expect(html).toContain("currentPage === item.id");
+    expect(html).toContain('Fase 2 · próximos');
+    expect(html).toContain('Em operação');
+    expect(html).toContain('Configurações');
+    expect(html).toContain('<div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md');
+    expect(html).not.toContain('<div x-show="currentPage !== \'rede\'" class="sticky top-0');
+    expect(html).toContain('aria-label="Buscar no painel"');
+    expect(html).toContain('aria-label="Abrir notificações"');
+    expect(html).toContain('@click="logoutAdmin()"');
+    expect(html).toContain('xl:grid-cols-3 2xl:grid-cols-6');
+  });
+
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
     expect(html).toContain("x-show=\"unidadeTab === 'visao'\" class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4");
     expect(html).toContain('CMV (custo vendido)');
