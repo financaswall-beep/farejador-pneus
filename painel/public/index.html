@@ -6,13 +6,15 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-redesign1" />
-<script src="https://unpkg.com/lucide@1.17.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-rede-fix1" />
+<style>[x-cloak]{display:none!important}</style>
+<!-- Dependências críticas locais: o painel não pode voltar para uma tela antiga por falha de CDN. -->
+<script src="/admin/painel/vendor/lucide-1.17.0.min.js"></script>
+<script src="/admin/painel/vendor/chart-4.4.7.umd.min.js"></script>
 <!-- Obra 300 (2026-07-05): módulos-fábrica ANTES, compositor app.js POR ÚLTIMO. Ordem de merge documentada no app.js. -->
-<script src="/admin/painel/app.nav.js?v=20260723-rede-redesign1"></script>
-<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-redesign1"></script>
-<script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.nav.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.rede.kpis.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
 <script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
@@ -42,13 +44,12 @@
 <script src="/admin/painel/app.rede.apply.js?v=20260710-rede2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.charts.rede.js?v=20260723-rede-redesign1"></script>
-<script src="/admin/painel/app.charts.saude.js?v=20260723-rede-redesign1"></script>
-<script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-redesign1"></script>
+<script src="/admin/painel/app.charts.rede.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.js?v=20260723-rede-redesign1"></script>
-<script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
-<script defer src="/admin/painel/rede-fallback.js?v=20260701-oversell"></script>
+<script src="/admin/painel/app.js?v=20260723-rede-fix1"></script>
+<script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,7 +59,7 @@
 
 <body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="painelApp()">
 
-<div class="flex h-screen overflow-hidden">
+<div class="flex h-screen overflow-hidden" x-cloak>
 
   <!-- ═══════════════════════════════════════════════
        SIDEBAR
@@ -418,11 +419,27 @@
 
     <!-- ═══ TELA: REDE / PARCEIROS ═══ -->
     <div x-show="currentPage === 'rede'" class="p-8 bg-gray-50/40 min-h-screen">
-      <h1 class="sr-only">Rede de parceiros</h1>
-      <section aria-label="Rede conectada" class="mb-5 overflow-hidden rounded-xl border border-emerald-900/20 bg-emerald-950 shadow-sm">
-        <img src="/admin/painel/assets/rede-hero.png?v=20260723-rede-redesign1"
-             alt="Rede conectada, desempenho que move. Acompanhe seus parceiros em tempo real, identifique oportunidades e fortaleça sua rede de borracharias."
-             class="block w-full min-h-[95px] object-cover">
+      <section aria-labelledby="rede-heading"
+               class="relative -mx-8 -mt-8 mb-5 min-h-[260px] overflow-hidden border-b border-emerald-900/30 bg-emerald-950 bg-cover bg-center shadow-sm"
+               style="background-image: linear-gradient(90deg, rgba(2,44,34,.99) 0%, rgba(2,44,34,.95) 35%, rgba(2,44,34,.72) 51%, rgba(2,44,34,.12) 78%), url('/admin/painel/assets/rede-hero-v2.webp?v=20260723-rede-fix1');">
+        <div class="absolute right-8 top-5 z-10 flex flex-wrap items-center justify-end gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-900/80 px-3 py-1.5 text-xs font-medium text-emerald-50 shadow-sm backdrop-blur-sm">
+            <i data-lucide="circle-check" class="h-3.5 w-3.5 text-emerald-300"></i>
+            dados reais
+          </span>
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-900/80 px-3 py-1.5 text-xs font-medium text-emerald-50 shadow-sm backdrop-blur-sm">
+            <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-300"></i>
+            <span x-text="redePeriodLabel()"></span>
+          </span>
+        </div>
+        <div class="relative flex min-h-[260px] items-center px-10 pt-8">
+          <div class="max-w-xl">
+            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Rede de parceiros</p>
+            <h1 id="rede-heading" class="max-w-lg text-3xl font-bold tracking-tight text-white lg:text-4xl">Rede conectada, desempenho que move</h1>
+            <div class="mt-3 h-1 w-12 rounded-full bg-emerald-400"></div>
+            <p class="mt-4 max-w-lg text-sm leading-6 text-emerald-50/85">Acompanhe seus parceiros em tempo real, identifique oportunidades e fortaleça sua rede de borracharias.</p>
+          </div>
+        </div>
       </section>
 
       <div class="bg-white border border-gray-200 rounded-xl mb-6">

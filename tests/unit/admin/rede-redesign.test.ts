@@ -10,18 +10,33 @@ describe('Rede — apresentação e contratos auditados', () => {
 
   it('serve a imagem padrão da Rede e expõe as três visões sem duplicar o período', () => {
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
-    const banner = statSync(resolve('painel/public/assets/rede-hero.png'));
+    const banner = statSync(resolve('painel/public/assets/rede-hero-v2.webp'));
 
-    expect(html).toContain('/admin/painel/assets/rede-hero.png?v=20260723-rede-redesign1');
+    expect(html).toContain('/admin/painel/assets/rede-hero-v2.webp?v=20260723-rede-fix1');
+    expect(html).not.toContain('/admin/painel/assets/rede-hero.png');
+    expect(html).toContain('Rede conectada, desempenho que move');
     expect(html).toContain("setRedeSection('visao')");
     expect(html).toContain("setRedeSection('operacao')");
     expect(html).toContain("setRedeSection('parceiros')");
     expect(state).toContain("redeSection: 'visao'");
     expect(nav).toContain('setRedeSection(section)');
-    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/rede-hero.png'");
-    expect(staticRoutes).toContain("'assets/rede-hero.png', 'image/png'");
+    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/rede-hero-v2.webp'");
+    expect(staticRoutes).toContain("'assets/rede-hero-v2.webp', 'image/webp'");
     expect(banner.size).toBeGreaterThan(0);
     expect(banner.size).toBeLessThan(150_000);
+  });
+
+  it('não exibe telas cruas no refresh nem troca a interface pelo fallback antigo', () => {
+    const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
+
+    expect(html).toContain('<div class="flex h-screen overflow-hidden" x-cloak>');
+    expect(html).toContain('/admin/painel/vendor/alpine-3.14.9.min.js');
+    expect(html).toContain('/admin/painel/vendor/chart-4.4.7.umd.min.js');
+    expect(html).toContain('/admin/painel/vendor/lucide-1.17.0.min.js');
+    expect(html).not.toContain('<script defer src="/admin/painel/rede-fallback.js');
+    expect(html).not.toContain('https://unpkg.com');
+    expect(html).not.toContain('https://cdn.jsdelivr.net');
+    expect(staticRoutes).toContain("reply.header('Cache-Control', 'no-store')");
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
