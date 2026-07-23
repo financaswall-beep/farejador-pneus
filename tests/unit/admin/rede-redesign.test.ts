@@ -86,6 +86,7 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain('@click="openPartnerModal()"');
     expect(html).toContain('@click="openApplications()"');
     expect(html).toContain('x-show="!mockTopbar" aria-label="Buscar no painel"');
+    expect(html).toContain("? 'ml-auto h-10 px-3.5");
   });
 
   it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
