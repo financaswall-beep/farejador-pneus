@@ -8,9 +8,14 @@ describe('Vendas — cabeçalho panorâmico', () => {
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
     const banner = statSync(resolve('painel/public/assets/vendas-hero.webp'));
 
-    expect(html).toContain("url('/admin/painel/assets/vendas-hero.webp?v=20260723-vendas1')");
+    expect(html).toContain('/admin/painel/assets/vendas-hero.webp?v=20260723-vendas-rede2');
     expect(html).toContain('aria-labelledby="vendas-heading"');
     expect(html).toContain('id="vendas-heading"');
+    expect(html).toContain('xl:grid-cols-[380px_minmax(0,1fr)]');
+    expect(html).toContain('min-h-[148px]');
+    expect(html).toContain('aria-label="Seções de Vendas"');
+    expect(html).toContain('vendas reais');
+    expect(html).toContain('vendasHistoricoPeriodoLabel()');
     expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/vendas-hero.webp'");
     expect(staticRoutes).toContain("'assets/vendas-hero.webp', 'image/webp'");
     expect(banner.size).toBeGreaterThan(0);
