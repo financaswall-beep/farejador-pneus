@@ -57,6 +57,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/bot-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/compras-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/compras-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/estoque-hero.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/estoque-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/vendas-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/rede-hero-v2.webp', async (_request, reply) =>

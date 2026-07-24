@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260723-bot-banner-rede1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260724-estoque-movimentos1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -28,7 +28,7 @@
 <script src="/admin/painel/app.varejo.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.atacado.js?v=20260724-estoque-mock1"></script>
 <script src="/admin/painel/app.compras.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
@@ -47,7 +47,7 @@
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.galpao.js?v=20260716-stock-source1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260724-estoque-movimentos1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
@@ -2492,32 +2492,47 @@
     </div>
 
     <!-- ═══ TELA: COMPRAS — entrada do galpão + fornecedor + financeiro, sem fonte paralela ═══ -->
-    <div x-show="currentPage === 'compras'" class="p-8 bg-gray-50/40 min-h-screen">
+    <div x-show="currentPage === 'compras'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
       <section aria-labelledby="compras-heading"
-               class="relative -mx-8 -mt-8 mb-5 min-h-[260px] overflow-hidden border-b border-emerald-100 bg-slate-50 bg-cover bg-center"
-               style="background-image: linear-gradient(90deg, rgba(248,250,252,.99) 0%, rgba(248,250,252,.94) 32%, rgba(248,250,252,.08) 58%), url('/admin/painel/assets/compras-hero.webp?v=20260723-compras1');">
-        <div class="absolute right-8 top-5 z-10">
-          <button @click="comprasOpenTab('nova')"
-                  class="inline-flex self-start items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
-            <i data-lucide="plus" class="w-4 h-4"></i> Nova compra
-          </button>
+               class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
+        <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
+          <h1 id="compras-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Compras</h1>
+          <p class="mt-3 max-w-md text-sm text-slate-500">O que entrou no galpão, quanto custou e de quem você está comprando</p>
         </div>
-
-        <div class="relative flex min-h-[260px] items-center px-10 pt-8">
-          <div class="max-w-lg">
-            <h1 id="compras-heading" class="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-600 bg-clip-text text-4xl font-bold uppercase tracking-tight text-transparent lg:text-5xl">Compras</h1>
-            <div class="mt-2 h-1 w-10 rounded-full bg-emerald-600"></div>
-            <p class="mt-3 max-w-md text-sm text-slate-600">O que entrou no galpão, quanto custou e de quem você está comprando</p>
+        <div class="relative min-h-[148px] overflow-hidden rounded-xl border border-emerald-950/20 bg-white shadow-sm">
+          <img
+            src="/admin/painel/assets/compras-hero.webp?v=20260723-compras-rede2"
+            alt="Comparação de fornecedores e aprovação de compra de pneus"
+            class="absolute inset-0 h-full w-full object-cover object-center">
+          <div class="absolute inset-0 bg-gradient-to-r from-white/5 via-transparent to-emerald-950/5"></div>
+          <div class="absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="badge-check" class="h-3.5 w-3.5 text-emerald-200"></i>
+              dados reais
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="warehouse" class="h-3.5 w-3.5 text-emerald-200"></i>
+              galpão + financeiro
+            </span>
           </div>
         </div>
       </section>
 
-      <div class="mb-5 border-b border-gray-200 flex items-center gap-1 overflow-x-auto">
-        <button @click="comprasOpenTab('visao')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
-        <button @click="comprasOpenTab('nova')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'nova' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Nova compra</button>
-        <button @click="comprasOpenTab('historico')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'historico' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Histórico</button>
-        <button @click="comprasOpenTab('fornecedores')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'fornecedores' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Fornecedores</button>
-        <button @click="comprasOpenTab('precos')" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:rounded-lg" :class="comprasTab === 'precos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Preços por medida</button>
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
+          <nav aria-label="Seções de Compras" class="flex items-center gap-1 overflow-x-auto">
+            <button @click="comprasOpenTab('visao')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Visão geral</button>
+            <button @click="comprasOpenTab('nova')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'nova' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Nova compra</button>
+            <button @click="comprasOpenTab('historico')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'historico' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Histórico</button>
+            <button @click="comprasOpenTab('fornecedores')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'fornecedores' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Fornecedores</button>
+            <button @click="comprasOpenTab('precos')" class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1" :class="comprasTab === 'precos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-900'">Preços por medida</button>
+          </nav>
+          <button @click="comprasOpenTab('nova')"
+                  class="mb-3 inline-flex self-start items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-emerald-800 xl:mb-0 xl:self-auto">
+            <i data-lucide="plus" class="h-4 w-4"></i>
+            Nova compra
+          </button>
+        </div>
       </div>
 
       <div x-show="compraMsg" x-cloak class="mb-4 text-sm px-4 py-3 rounded-xl border" :class="compraMsg && compraMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'" x-text="compraMsg ? compraMsg.text : ''"></div>
@@ -2801,61 +2816,84 @@
     </div>
 
     <!-- ═══ TELA: ESTOQUE do galpão — mesma fonte de atacado, varejo, compras, sino, Bot e Financeiro ═══ -->
-    <div x-show="currentPage === 'estoque'" class="p-8">
-      <div class="flex flex-col gap-5 mb-5">
-        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight">Estoque do galpão</h1>
-            <p class="text-sm text-gray-500 mt-1">O que tem, o que precisa repor e tudo que entrou ou saiu</p>
+    <div x-show="currentPage === 'estoque'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+      <section aria-labelledby="estoque-heading"
+               class="mb-0 grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch">
+        <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2">
+          <h1 id="estoque-heading" class="text-3xl font-bold tracking-tight text-gray-950 lg:text-[34px] lg:leading-tight">Estoque do galpão</h1>
+          <p class="mt-3 max-w-md text-sm text-slate-500">O que tem, o que precisa repor e tudo que entrou ou saiu</p>
+        </div>
+          <div class="relative min-h-[148px] overflow-hidden rounded-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+            <img
+              src="/admin/painel/assets/estoque-hero.webp?v=20260723-estoque-rede1"
+              alt="Controle visual do estoque de pneus organizado por medida"
+              class="absolute inset-0 h-full w-full object-cover object-center">
+            <div class="absolute inset-0 bg-gradient-to-r from-emerald-950/5 via-transparent to-emerald-950/15"></div>
+            <div class="absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+                <i data-lucide="badge-check" class="h-3.5 w-3.5 text-emerald-200"></i>
+                <span x-text="new URLSearchParams(location.search).get('mock') === '1' ? 'prévia mockada' : 'dados reais'"></span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+                <i data-lucide="warehouse" class="h-3.5 w-3.5 text-emerald-200"></i>
+                galpão oficial
+              </span>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+      </section>
+
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
+          <nav aria-label="Seções de Estoque" class="flex items-center gap-1 overflow-x-auto">
+            <button @click="stockTab = 'visao'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  :class="stockTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
+            <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  :class="stockTab === 'movimentacoes' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Movimentações</button>
+            <button @click="stockTab = 'reposicao'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  :class="stockTab === 'reposicao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
+            <button @click="stockTab = 'custos'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                  :class="stockTab === 'custos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
+            <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
+          </nav>
+          <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
             <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
-                    class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm">
+                    class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm">
               <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
             </button>
             <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
-                    class="inline-flex items-center gap-2 border border-brand-600 text-brand-700 hover:bg-brand-50 text-sm font-medium px-4 py-2.5 rounded-lg">
+                    class="inline-flex items-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 text-xs font-medium px-4 py-2 rounded-lg">
               <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Ajustar estoque
             </button>
           </div>
         </div>
-
-        <div class="border-b border-gray-200 flex items-center gap-1 overflow-x-auto">
-          <button @click="stockTab = 'visao'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
-                  :class="stockTab === 'visao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
-          <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
-                  :class="stockTab === 'movimentacoes' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Movimentações</button>
-          <button @click="stockTab = 'reposicao'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
-                  :class="stockTab === 'reposicao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
-          <button @click="stockTab = 'custos'" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
-                  :class="stockTab === 'custos' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
-          <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap"
-                  :class="stockTab === 'conciliacao' ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'">ConciliaÃ§Ã£o</button>
-        </div>
       </div>
 
       <!-- Os quatro números vêm da mesma lista já carregada; nenhuma nova fonte paralela. -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
-        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-          <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dot-dashed" class="w-6 h-6 text-brand-700"></i></div>
-          <div><p class="text-sm text-gray-500">Pneus no galpão</p><p class="text-2xl font-semibold mt-0.5 num" x-text="stockResumo().pneus"></p></div>
+      <section aria-label="Resumo do estoque"
+               class="mb-5 overflow-hidden rounded-xl border border-emerald-700/60 bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white shadow-sm">
+        <div class="grid grid-cols-1 divide-y divide-emerald-700/50 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+          <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-700/45"><i data-lucide="circle-dot-dashed" class="h-6 w-6 text-emerald-100"></i></div>
+            <div><p class="text-xs text-emerald-100/80">Pneus no galpão</p><p class="mt-1 text-2xl font-semibold num" x-text="stockResumo().pneus"></p></div>
+          </div>
+          <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-emerald-300/30 bg-emerald-700/45"><i data-lucide="circle-dollar-sign" class="h-6 w-6 text-emerald-100"></i></div>
+            <div><p class="text-xs text-emerald-100/80">Capital em estoque</p><p class="mt-1 text-2xl font-semibold num" x-text="formatCurrency(stockResumo().capital)"></p></div>
+          </div>
+          <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-emerald-200/40 bg-emerald-800/60"><i data-lucide="clipboard-list" class="h-6 w-6 text-emerald-100"></i></div>
+            <div><p class="text-xs text-emerald-100/80">Para repor</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().repor"></span> <span class="text-base font-medium text-emerald-100">medidas</span></p></div>
+          </div>
+          <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
+            <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-100/70 bg-emerald-950/50"><i data-lucide="triangle-alert" class="h-6 w-6 text-emerald-50"></i></div>
+            <div><p class="text-xs text-emerald-100/80">Zeradas</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().zeradas"></span> <span class="text-base font-medium text-emerald-100">medidas</span></p></div>
+          </div>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-          <div class="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-6 h-6 text-brand-700"></i></div>
-          <div><p class="text-sm text-gray-500">Capital em estoque</p><p class="text-2xl font-semibold mt-0.5 text-brand-700 num" x-text="formatCurrency(stockResumo().capital)"></p></div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-          <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="clipboard-list" class="w-6 h-6 text-amber-600"></i></div>
-          <div><p class="text-sm text-gray-500">Para repor</p><p class="text-2xl font-semibold mt-0.5 num" :class="stockResumo().repor > 0 ? 'text-amber-600' : ''"><span x-text="stockResumo().repor"></span> <span class="text-base font-medium">medidas</span></p></div>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4 min-h-[104px]">
-          <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="triangle-alert" class="w-6 h-6 text-rose-600"></i></div>
-          <div><p class="text-sm text-gray-500">Zeradas</p><p class="text-2xl font-semibold mt-0.5 num" :class="stockResumo().zeradas > 0 ? 'text-rose-600' : ''"><span x-text="stockResumo().zeradas"></span> <span class="text-base font-medium">medidas</span></p></div>
-        </div>
-      </div>
+      </section>
 
-      <div x-show="stockMsg" x-cloak class="mb-4 text-sm px-4 py-3 rounded-xl border"
-           :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'"
+      <div x-show="stockMsg" x-cloak class="mb-4 rounded-xl border px-4 py-3 text-sm"
+           :class="stockMsg && stockMsg.ok ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-700'"
            x-text="stockMsg ? stockMsg.text : ''"></div>
 
       <!-- VISÃO GERAL -->
@@ -2875,7 +2913,7 @@
               <input id="estoque-medida" x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
                      type="text" autocomplete="off" placeholder="Ex.: 185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
               <div x-show="measureBox.key === 'estoque' && measureBox.hits.length" class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-                <template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-brand-50" x-text="m.measure"></button></template>
+                <template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template>
               </div>
             </label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
@@ -2883,7 +2921,7 @@
             <label x-show="stockOperacao === 'ajuste'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Estoque mínimo</span><input x-model="stockForm.min_quantity" type="number" min="0" placeholder="Sem aviso" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <div :class="stockOperacao === 'ajuste' ? 'xl:col-span-3' : 'xl:col-span-5'" class="flex justify-end gap-2">
               <button @click="stockOperacao = null" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button @click="stockOperacao === 'entrada' ? stockEntry() : stockSubmit()" :disabled="stockSaving" class="px-4 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">
+              <button @click="stockOperacao === 'entrada' ? stockEntry() : stockSubmit()" :disabled="stockSaving" class="px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50">
                 <span x-show="!stockSaving" x-text="stockOperacao === 'entrada' ? 'Confirmar entrada' : 'Salvar ajuste'"></span><span x-show="stockSaving">Salvando…</span>
               </button>
             </div>
@@ -2891,87 +2929,540 @@
         </div>
 
         <!-- BAIXA MANUAL: preserva o motivo e o registro no filme. -->
-        <div x-show="stockBaixaForm.measure" x-cloak class="border border-amber-200 bg-amber-50 rounded-xl p-4">
+        <div x-show="stockBaixaForm.measure" x-cloak class="border border-emerald-200 bg-emerald-50 rounded-xl p-4">
           <div class="flex flex-col xl:flex-row xl:items-end gap-3">
-            <div class="xl:w-56"><p class="text-sm font-semibold text-amber-900">Baixar <span x-text="stockBaixaForm.measure"></span></p><p class="text-xs text-amber-700 mt-1">A saída ficará registrada no histórico.</p></div>
-            <label class="block"><span class="block text-xs font-medium text-amber-800 mb-1.5">Quantidade</span><input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="0" class="w-28 border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
-            <label class="block"><span class="block text-xs font-medium text-amber-800 mb-1.5">Motivo</span><select x-model="stockBaixaForm.tipo" class="border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="quebra">Quebra</option><option value="perda">Perda/sumiço</option><option value="uso interno">Uso interno</option><option value="outro">Outro</option></select></label>
-            <label class="block flex-1"><span class="block text-xs font-medium text-amber-800 mb-1.5">Detalhe</span><input x-model="stockBaixaForm.texto" type="text" placeholder="Opcional" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
-            <div class="flex gap-2"><button @click="stockBaixaSubmit()" :disabled="stockBaixaSaving" class="bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"><span x-show="!stockBaixaSaving">Confirmar baixa</span><span x-show="stockBaixaSaving">Salvando…</span></button><button @click="stockBaixaFechar()" class="text-sm text-gray-600 px-3 py-2">Cancelar</button></div>
+            <div class="xl:w-56"><p class="text-sm font-semibold text-emerald-950">Baixar <span x-text="stockBaixaForm.measure"></span></p><p class="text-xs text-emerald-700 mt-1">A saída ficará registrada no histórico.</p></div>
+            <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Quantidade</span><input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="0" class="w-28 border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
+            <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Motivo</span><select x-model="stockBaixaForm.tipo" class="border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="quebra">Quebra</option><option value="perda">Perda/sumiço</option><option value="uso interno">Uso interno</option><option value="outro">Outro</option></select></label>
+            <label class="block flex-1"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Detalhe</span><input x-model="stockBaixaForm.texto" type="text" placeholder="Opcional" class="w-full border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
+            <div class="flex gap-2"><button @click="stockBaixaSubmit()" :disabled="stockBaixaSaving" class="bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"><span x-show="!stockBaixaSaving">Confirmar baixa</span><span x-show="stockBaixaSaving">Salvando…</span></button><button @click="stockBaixaFechar()" class="text-sm text-gray-600 px-3 py-2">Cancelar</button></div>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
-          <div class="2xl:col-span-9 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="p-5 border-b border-gray-100">
-              <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                <div><h3 class="text-base font-semibold">Estoque por medida</h3><p class="text-xs text-gray-500 mt-1"><span x-text="atacadoStock.length"></span> medida(s) cadastrada(s)</p></div>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <div class="relative"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i><input x-model="stockBusca" type="text" placeholder="Buscar medida" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm"></div>
-                  <div class="inline-flex border border-gray-200 rounded-lg p-0.5 bg-gray-50 overflow-x-auto">
-                    <button @click="stockFiltro = 'todos'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'todos' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Todos</button>
-                    <button @click="stockFiltro = 'em_dia'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'em_dia' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Em dia</button>
-                    <button @click="stockFiltro = 'repor'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'repor' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Repor</button>
-                    <button @click="stockFiltro = 'zerados'" class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap" :class="stockFiltro === 'zerados' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Zerados</button>
+        <div
+          x-data="{
+            selectedMeasure: '',
+            visibleRows() {
+              return stockRowsView().filter((row) =>
+                stockFiltro === 'todos' ||
+                (stockFiltro === 'zerados' && Number(row.quantity_on_hand) === 0) ||
+                (stockFiltro === 'repor' && Number(row.quantity_on_hand) > 0 && stockPrecisaRepor(row)) ||
+                (stockFiltro === 'em_dia' && Number(row.quantity_on_hand) > 0 && !stockPrecisaRepor(row))
+              );
+            },
+            get selectedRow() {
+              const rows = this.visibleRows();
+              return rows.find((row) => row.measure === this.selectedMeasure) || rows[0] || null;
+            },
+            selectRow(row) {
+              this.selectedMeasure = row.measure;
+              loadGalpaoFilme(row.measure);
+            }
+          }"
+          class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
+          <section aria-labelledby="estoque-lista-heading" class="overflow-hidden rounded-xl border border-gray-200 bg-white 2xl:col-span-8">
+            <div class="border-b border-gray-100 p-5">
+              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <h3 id="estoque-lista-heading" class="text-lg font-semibold">Estoque por medida</h3>
+                  <p class="mt-1 text-xs text-gray-500"><span x-text="atacadoStock.length"></span> medida(s) cadastrada(s)</p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label class="relative block">
+                    <span class="sr-only">Buscar medida</span>
+                    <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"></i>
+                    <input x-model="stockBusca" type="search" placeholder="Buscar medida" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm sm:w-56">
+                  </label>
+                  <div aria-label="Filtrar estoque" class="inline-flex overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                    <button @click="stockFiltro = 'todos'" class="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium" :class="stockFiltro === 'todos' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Todos</button>
+                    <button @click="stockFiltro = 'em_dia'" class="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium" :class="stockFiltro === 'em_dia' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Em dia</button>
+                    <button @click="stockFiltro = 'repor'" class="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium" :class="stockFiltro === 'repor' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Repor</button>
+                    <button @click="stockFiltro = 'zerados'" class="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium" :class="stockFiltro === 'zerados' ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'">Zerados</button>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm min-w-[930px]">
-                <thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-center">Mínimo</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Capital</th><th class="px-4 py-3 font-medium text-center">Status</th><th class="px-5 py-3 font-medium text-right">Ações</th></tr></thead>
+
+            <div class="max-h-[610px] overflow-auto">
+              <table class="w-full min-w-[760px] text-sm">
+                <thead class="sticky top-0 z-10 border-b border-gray-200 bg-gray-50/95 backdrop-blur">
+                  <tr class="text-left text-xs text-gray-500">
+                    <th class="px-5 py-3 font-medium">Medida</th>
+                    <th class="px-4 py-3 text-center font-medium">Saldo</th>
+                    <th class="px-4 py-3 text-center font-medium">Mínimo</th>
+                    <th class="px-4 py-3 text-right font-medium">Custo médio</th>
+                    <th class="px-4 py-3 text-right font-medium">Capital</th>
+                    <th class="px-5 py-3 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <template x-for="row in stockRowsView()" :key="row.measure">
-                    <tr x-show="stockFiltro === 'todos' || (stockFiltro === 'zerados' && Number(row.quantity_on_hand) === 0) || (stockFiltro === 'repor' && Number(row.quantity_on_hand) > 0 && stockPrecisaRepor(row)) || (stockFiltro === 'em_dia' && Number(row.quantity_on_hand) > 0 && !stockPrecisaRepor(row))" class="hover:bg-gray-50/80">
-                      <td class="px-5 py-3 font-medium" x-text="row.measure"></td>
-                      <td class="px-4 py-3 text-center font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : (stockPrecisaRepor(row) ? 'text-amber-600' : 'text-gray-900')" x-text="row.quantity_on_hand"></td>
-                      <td class="px-4 py-3 text-center text-gray-500 num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></td>
-                      <td class="px-4 py-3 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
-                      <td class="px-4 py-3 text-right font-medium num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td>
-                      <td class="px-4 py-3 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50 text-rose-700' : (stockPrecisaRepor(row) ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')" x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span></td>
-                      <td class="px-5 py-3 text-right whitespace-nowrap">
-                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="text-xs font-medium text-brand-700 hover:text-brand-800 mr-3">entrada</button>
-                        <button @click="stockEdit(row); stockOperacao = 'ajuste'" class="text-xs font-medium text-gray-600 hover:text-gray-900 mr-3">ajustar</button>
-                        <button @click="stockBaixaOpen(row)" class="text-xs font-medium text-amber-700 hover:text-amber-800 mr-3">baixar</button>
-                        <button @click="stockTab = 'movimentacoes'; filmeDaMedida(row.measure)" class="text-xs font-medium text-gray-500 hover:text-gray-800 mr-3">histórico</button>
-                        <button @click="stockRemove(row.measure)" class="text-xs font-medium text-rose-600 hover:text-rose-700">remover</button>
+                  <template x-for="row in visibleRows()" :key="row.measure">
+                    <tr role="button" tabindex="0"
+                        @click="selectRow(row)"
+                        @keydown.enter.prevent="selectRow(row)"
+                        @keydown.space.prevent="selectRow(row)"
+                        :aria-selected="selectedRow && selectedRow.measure === row.measure"
+                        :class="selectedRow && selectedRow.measure === row.measure ? 'bg-emerald-50/90 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/80'"
+                        class="cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
+                      <td class="px-5 py-3.5">
+                        <div class="flex items-center gap-3">
+                          <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="circle-dot-dashed" class="h-4 w-4"></i></div>
+                          <span class="font-semibold" x-text="row.measure"></span>
+                        </div>
+                      </td>
+                      <td class="px-4 py-3.5 text-center font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-emerald-950' : 'text-emerald-800'" x-text="row.quantity_on_hand"></td>
+                      <td class="px-4 py-3.5 text-center text-gray-500 num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></td>
+                      <td class="px-4 py-3.5 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
+                      <td class="px-4 py-3.5 text-right font-medium num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td>
+                      <td class="px-5 py-3.5 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                          <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                                :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(row) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
+                                x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span>
+                          <i x-show="selectedRow && selectedRow.measure === row.measure" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
+                        </div>
                       </td>
                     </tr>
                   </template>
-                  <tr x-show="atacadoStock.length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Estoque vazio. Use “Registrar entrada” para cadastrar a primeira medida.</td></tr>
-                  <tr x-show="atacadoStock.length > 0 && stockRowsView().length === 0"><td colspan="7" class="px-5 py-12 text-center text-sm text-gray-500">Nenhuma medida corresponde à busca.</td></tr>
+                  <tr x-show="atacadoStock.length === 0"><td colspan="6" class="px-5 py-14 text-center text-sm text-gray-500">Estoque vazio. Use “Registrar entrada” para cadastrar a primeira medida.</td></tr>
+                  <tr x-show="atacadoStock.length > 0 && visibleRows().length === 0"><td colspan="6" class="px-5 py-14 text-center text-sm text-gray-500">Nenhuma medida corresponde à busca ou ao filtro.</td></tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
 
-          <aside class="2xl:col-span-3 bg-white border border-gray-200 rounded-xl p-5">
-            <div class="flex items-center justify-between gap-3 mb-4"><div><h3 class="text-base font-semibold">Atenção rápida</h3><p class="text-xs text-gray-500 mt-1">Prioridades do galpão</p></div><div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center"><i data-lucide="bell-ring" class="w-4 h-4 text-amber-600"></i></div></div>
-            <div class="divide-y divide-gray-100">
-              <template x-for="row in stockRowsView().filter((r) => Number(r.quantity_on_hand) === 0 || stockPrecisaRepor(r)).slice(0, 3)" :key="'alerta-' + row.measure">
-                <div class="py-3.5 flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50' : 'bg-amber-50'"><i data-lucide="circle-alert" class="w-4 h-4" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : 'text-amber-600'"></i></div>
-                  <div class="min-w-0 flex-1"><p class="text-sm font-semibold" x-text="row.measure"></p><p class="text-xs text-gray-500 mt-0.5"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
-                  <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="px-3 py-1.5 rounded-lg border border-brand-600 text-brand-700 text-xs font-medium hover:bg-brand-50">Repor</button>
+          <aside aria-labelledby="painel-medida-heading" class="rounded-xl border border-gray-200 bg-white 2xl:sticky 2xl:top-24 2xl:col-span-4">
+            <template x-if="selectedRow">
+              <div>
+                <div class="border-b border-gray-100 p-5">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-xs font-medium uppercase tracking-[0.14em] text-emerald-700">Painel da medida</p>
+                      <div class="mt-3 flex items-center gap-3">
+                        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="circle-dot-dashed" class="h-7 w-7"></i></div>
+                        <div>
+                          <h3 id="painel-medida-heading" class="text-2xl font-semibold tracking-tight" x-text="selectedRow.measure"></h3>
+                          <p class="mt-1 text-xs text-gray-500"><span class="font-semibold text-emerald-800 num" x-text="selectedRow.quantity_on_hand"></span> em estoque <span class="mx-1">·</span> mínimo <span class="num" x-text="selectedRow.min_quantity == null ? '—' : selectedRow.min_quantity"></span></p>
+                        </div>
+                      </div>
+                    </div>
+                    <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          :class="Number(selectedRow.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(selectedRow) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
+                          x-text="Number(selectedRow.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(selectedRow) ? 'Repor' : 'Em dia')"></span>
+                  </div>
+                  <div class="mt-4 h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div class="h-full rounded-full bg-emerald-700 transition-all"
+                         :style="'width:' + Math.min(100, selectedRow.min_quantity == null || Number(selectedRow.min_quantity) === 0 ? 100 : (Number(selectedRow.quantity_on_hand) / Number(selectedRow.min_quantity)) * 100) + '%'"></div>
+                  </div>
                 </div>
-              </template>
-              <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-8 text-center"><i data-lucide="circle-check-big" class="w-8 h-8 text-emerald-600 mx-auto mb-2"></i><p class="text-sm font-medium text-emerald-700">Tudo em dia</p><p class="text-xs text-gray-500 mt-1">Nenhuma medida pede reposição.</p></div>
+
+                <div class="grid grid-cols-2 border-b border-gray-100">
+                  <div class="border-b border-r border-gray-100 p-4">
+                    <p class="text-xs text-gray-500">Custo médio</p>
+                    <p class="mt-1 font-semibold num" x-text="formatCurrency(Number(selectedRow.unit_cost || 0))"></p>
+                  </div>
+                  <div class="border-b border-gray-100 p-4">
+                    <p class="text-xs text-gray-500">Capital</p>
+                    <p class="mt-1 font-semibold num" x-text="formatCurrency(Number(selectedRow.quantity_on_hand || 0) * Number(selectedRow.unit_cost || 0))"></p>
+                  </div>
+                  <div class="border-r border-gray-100 p-4">
+                    <p class="text-xs text-gray-500">Último movimento</p>
+                    <p class="mt-1 text-sm font-semibold" x-text="galpaoFilme.measure === selectedRow.measure && galpaoFilme.rows.length ? movQuando(galpaoFilme.rows[0]) : 'Selecione para carregar'"></p>
+                  </div>
+                  <div class="p-4">
+                    <p class="text-xs text-gray-500">Observação</p>
+                    <p class="mt-1 truncate text-sm font-semibold" x-text="selectedRow.notes || 'Sem observação'"></p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 border-b border-gray-100 p-4 sm:grid-cols-2 2xl:grid-cols-1">
+                  <button @click="stockForm = { measure: selectedRow.measure, quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-medium text-white hover:bg-emerald-800">
+                    <i data-lucide="plus" class="h-4 w-4"></i> Registrar entrada
+                  </button>
+                  <button @click="stockEdit(selectedRow); stockOperacao = 'ajuste'; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
+                    <i data-lucide="sliders-horizontal" class="h-4 w-4"></i> Ajustar saldo e custo
+                  </button>
+                  <button @click="stockBaixaOpen(selectedRow)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/70 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
+                    <i data-lucide="arrow-down-to-line" class="h-4 w-4"></i> Baixa manual
+                  </button>
+                  <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <i data-lucide="history" class="h-4 w-4"></i> Ver histórico
+                  </button>
+                  <button @click="stockRemove(selectedRow.measure)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 sm:col-span-2 2xl:col-span-1">
+                    <i data-lucide="trash-2" class="h-4 w-4"></i> Remover medida
+                  </button>
+                  <p class="text-center text-[11px] text-gray-400 sm:col-span-2 2xl:col-span-1">Entrada recalcula o custo médio ponderado; ajuste também define o mínimo.</p>
+                </div>
+
+                <div class="border-b border-gray-100 p-4">
+                  <div class="mb-3 flex items-center justify-between gap-3">
+                    <div><h4 class="text-sm font-semibold">Movimentos recentes</h4><p class="mt-0.5 text-[11px] text-gray-400">Da medida selecionada</p></div>
+                    <span x-show="galpaoFilme.loading && galpaoFilme.measure === selectedRow.measure" class="text-[11px] text-gray-400">Carregando…</span>
+                  </div>
+                  <div class="divide-y divide-gray-100">
+                    <template x-for="m in (galpaoFilme.measure === selectedRow.measure ? galpaoFilme.rows.slice(0, 3) : [])" :key="'painel-' + m.created_at + m.measure + m.qty_after">
+                      <div class="flex items-center gap-3 py-2.5">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
+                          <i :data-lucide="m.qty_delta > 0 ? 'arrow-down-to-line' : (m.qty_delta < 0 ? 'arrow-up-from-line' : 'pencil')" class="h-4 w-4"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <p class="truncate text-xs font-medium" x-text="movRotulo(m)"></p>
+                          <p class="mt-0.5 text-[10px] text-gray-400" x-text="movQuando(m)"></p>
+                        </div>
+                        <span class="text-xs font-semibold num" :class="m.qty_delta > 0 ? 'text-emerald-700' : 'text-slate-700'" x-text="m.qty_delta > 0 ? '+' + m.qty_delta + ' un' : (m.qty_delta < 0 ? m.qty_delta + ' un' : 'ajuste')"></span>
+                      </div>
+                    </template>
+                    <div x-show="galpaoFilme.measure !== selectedRow.measure" class="py-5 text-center text-xs text-gray-400">Selecione a linha para carregar o histórico.</div>
+                    <div x-show="galpaoFilme.measure === selectedRow.measure && !galpaoFilme.loading && galpaoFilme.rows.length === 0" class="py-5 text-center text-xs text-gray-400">Nenhum movimento gravado para esta medida.</div>
+                  </div>
+                </div>
+
+                <div class="p-4">
+                  <div class="mb-2 flex items-center justify-between gap-3"><h4 class="text-sm font-semibold">Prioridades</h4><button @click="stockTab = 'reposicao'" class="text-[11px] font-medium text-emerald-800 hover:underline">Ver todas na aba Reposição</button></div>
+                  <div class="divide-y divide-gray-100">
+                    <template x-for="row in stockRowsView().filter((item) => Number(item.quantity_on_hand) === 0 || stockPrecisaRepor(item)).filter((item) => item.measure !== selectedRow.measure).slice(0, 2)" :key="'prioridade-painel-' + row.measure">
+                      <div class="flex items-center gap-3 py-2.5">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
+                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
+                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
+                      </div>
+                    </template>
+                    <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-4 text-center text-xs text-emerald-700">Todas as medidas estão dentro do mínimo.</div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div x-show="!selectedRow" class="px-6 py-16 text-center">
+              <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="package-search" class="h-6 w-6"></i></div>
+              <p class="mt-3 text-sm font-semibold">Nenhuma medida selecionada</p>
+              <p class="mt-1 text-xs text-gray-500">Cadastre uma entrada ou ajuste os filtros.</p>
             </div>
-            <button @click="stockTab = 'reposicao'" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-brand-700 text-sm font-medium px-3 py-2.5 rounded-lg">Ver todas as prioridades</button>
           </aside>
         </div>
       </div>
 
-      <!-- MOVIMENTAÇÕES: o mesmo filme e o mesmo filtro por medida. -->
-      <div x-show="stockTab === 'movimentacoes'" x-cloak id="galpao-filme" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div><div class="flex items-center gap-2"><h3 class="text-base font-semibold">Movimentações do galpão</h3><span x-show="galpaoFilme.measure" class="text-[11px] px-2 py-1 rounded-full bg-brand-50 text-brand-700 font-medium"><span x-text="galpaoFilme.measure"></span><button @click="loadGalpaoFilme(null)" class="ml-1 hover:text-brand-900">× ver todas</button></span></div><p class="text-xs text-gray-500 mt-1">Entradas, vendas, cancelamentos, baixas e ajustes. Últimos 50 registros.</p></div>
-          <span class="text-xs text-gray-400" x-show="galpaoFilme.loading">Carregando…</span>
-        </div>
-        <div class="overflow-x-auto"><table class="w-full text-sm min-w-[900px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Data e hora</th><th class="px-4 py-3 font-medium">Origem</th><th class="px-4 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Movimento</th><th class="px-4 py-3 font-medium text-center">Saldo</th><th class="px-5 py-3 font-medium text-right">Custo médio</th></tr></thead><tbody class="divide-y divide-gray-100">
-          <template x-for="m in galpaoFilme.rows" :key="m.created_at + m.measure + m.op + m.qty_after"><tr class="hover:bg-gray-50"><td class="px-5 py-3 text-gray-500 whitespace-nowrap" x-text="movQuando(m)"></td><td class="px-4 py-3 text-gray-600" x-text="movRotulo(m)"></td><td class="px-4 py-3 font-medium" x-text="m.measure"></td><td class="px-4 py-3 text-center font-semibold num" :class="m.qty_delta > 0 ? 'text-emerald-600' : (m.qty_delta < 0 ? 'text-rose-600' : 'text-gray-400')" x-text="m.qty_delta > 0 ? '+' + m.qty_delta : (m.qty_delta < 0 ? String(m.qty_delta) : '—')"></td><td class="px-4 py-3 text-center text-gray-600 num" x-text="m.qty_before + ' → ' + m.qty_after"></td><td class="px-5 py-3 text-right text-gray-500 num" x-text="movCustoTexto(m) || '—'"></td></tr></template>
-          <tr x-show="!galpaoFilme.loading && galpaoFilme.rows.length === 0"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-500">Nenhum movimento gravado ainda.</td></tr>
-        </tbody></table></div>
+      <!-- MOVIMENTAÇÕES: cálculos locais sobre o mesmo filme append-only do galpão. -->
+      <div x-show="stockTab === 'movimentacoes'"
+           x-cloak
+           id="galpao-filme"
+           x-data="{
+             movFiltro: 'todos',
+             movBusca: '',
+             movPeriodo: '7',
+             movPage: 1,
+             movPageSize: 25,
+             movRows() {
+               const query = this.movBusca.trim().toLowerCase();
+               const days = Number(this.movPeriodo);
+               const cutoff = Number.isFinite(days) ? Date.now() - (days * 86400000) : null;
+               return galpaoFilme.rows.filter((row) => {
+                 const time = new Date(row.created_at).getTime();
+                 const inPeriod = cutoff === null || (!Number.isNaN(time) && time >= cutoff);
+                 const delta = Number(row.qty_delta || 0);
+                 const inType =
+                   this.movFiltro === 'todos' ||
+                   (this.movFiltro === 'entradas' && delta > 0) ||
+                   (this.movFiltro === 'saidas' && delta < 0) ||
+                   (this.movFiltro === 'ajustes' && (delta === 0 || row.source === 'definir'));
+                 const haystack = [row.measure, row.source, row.reason, row.ref, movRotulo(row)].filter(Boolean).join(' ').toLowerCase();
+                 return inPeriod && inType && (!query || haystack.includes(query));
+               });
+             },
+             movTotalPages() {
+               return Math.max(1, Math.ceil(this.movRows().length / this.movPageSize));
+             },
+             movCurrentPage() {
+               return Math.min(Math.max(1, Number(this.movPage) || 1), this.movTotalPages());
+             },
+             movPagedRows() {
+               const start = (this.movCurrentPage() - 1) * this.movPageSize;
+               return this.movRows().slice(start, start + this.movPageSize);
+             },
+             movSetPage(page) {
+               this.movPage = Math.min(Math.max(1, Number(page) || 1), this.movTotalPages());
+             },
+             movPageNumbers() {
+               return Array.from({ length: this.movTotalPages() }, (_, index) => index + 1);
+             },
+             movPageStart() {
+               return this.movRows().length ? ((this.movCurrentPage() - 1) * this.movPageSize) + 1 : 0;
+             },
+             movPageEnd() {
+               return Math.min(this.movCurrentPage() * this.movPageSize, this.movRows().length);
+             },
+             movGroups() {
+               const groups = [];
+               const byDay = new Map();
+               for (const row of this.movPagedRows()) {
+                 const date = new Date(row.created_at);
+                 const key = Number.isNaN(date.getTime()) ? 'sem-data' : date.toISOString().slice(0, 10);
+                 if (!byDay.has(key)) {
+                   const today = new Date();
+                   const yesterday = new Date(Date.now() - 86400000);
+                   const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+                   const prefix = !Number.isNaN(date.getTime()) && same(date, today) ? 'Hoje' : (!Number.isNaN(date.getTime()) && same(date, yesterday) ? 'Ontem' : '');
+                   const label = Number.isNaN(date.getTime()) ? 'Sem data' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+                   const group = { key, label: prefix ? prefix + ', ' + label : label, rows: [] };
+                   byDay.set(key, group);
+                   groups.push(group);
+                 }
+                 byDay.get(key).rows.push(row);
+               }
+               return groups;
+             },
+             movResumo() {
+               let entradas = 0, saidas = 0;
+               for (const row of this.movRows()) {
+                 const delta = Number(row.qty_delta || 0);
+                 if (delta > 0) entradas += delta;
+                 if (delta < 0) saidas += Math.abs(delta);
+               }
+               return { entradas, saidas, saldo: entradas - saidas };
+             },
+             movContexto(row) {
+               if ((row.source === 'compra' || row.source === 'baixa_manual') && row.ref) return 'Ref. ' + String(row.ref).slice(0, 18);
+               if (row.reason) return row.reason;
+               if (row.ref) return 'Ref. ' + String(row.ref).slice(0, 18);
+               return row.source === 'sem_rotulo' ? 'Origem não identificada' : 'Registro automático';
+             },
+             movHora(row) {
+               const date = new Date(row.created_at);
+               return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+             },
+             movKind(row) {
+               const delta = Number(row.qty_delta || 0);
+               return delta > 0 ? 'entrada' : (delta < 0 ? 'saida' : 'ajuste');
+             },
+             movRanking() {
+               const totals = new Map();
+               for (const row of this.movRows()) totals.set(row.measure, (totals.get(row.measure) || 0) + Math.abs(Number(row.qty_delta || 0)));
+               return [...totals.entries()].map(([measure, total]) => ({ measure, total })).sort((a, b) => b.total - a.total || a.measure.localeCompare(b.measure)).slice(0, 3);
+             },
+             movRankingMax() {
+               return Math.max(1, ...this.movRanking().map((row) => row.total));
+             },
+             movTrend() {
+               const days = Array.from({ length: 7 }, (_, index) => {
+                 const date = new Date();
+                 date.setHours(0, 0, 0, 0);
+                 date.setDate(date.getDate() - (6 - index));
+                 return { key: date.toISOString().slice(0, 10), label: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', ''), total: 0 };
+               });
+               const index = new Map(days.map((day) => [day.key, day]));
+               for (const row of this.movRows()) {
+                 const date = new Date(row.created_at);
+                 if (!Number.isNaN(date.getTime())) {
+                   const day = index.get(date.toISOString().slice(0, 10));
+                   if (day) day.total += Math.abs(Number(row.qty_delta || 0));
+                 }
+               }
+               return days;
+             },
+             movTrendPoints() {
+               const rows = this.movTrend();
+               const max = Math.max(1, ...rows.map((row) => row.total));
+               return rows.map((row, index) => (12 + index * 46) + ',' + (86 - (row.total / max) * 58)).join(' ');
+             },
+             movTrendY(index) {
+               const rows = this.movTrend();
+               const max = Math.max(1, ...rows.map((row) => row.total));
+               return 86 - ((rows[index]?.total || 0) / max) * 58;
+             },
+             movTrendArea() {
+               return '12,90 ' + this.movTrendPoints() + ' 288,90';
+             }
+           }"
+           class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
+        <section aria-labelledby="movimentos-heading" class="overflow-hidden rounded-xl border border-gray-200 bg-white 2xl:col-span-8">
+          <div class="border-b border-gray-100 p-5">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 id="movimentos-heading" class="text-lg font-semibold">Movimentações do galpão</h3>
+                <span x-show="galpaoFilme.measure" class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                  <span x-text="galpaoFilme.measure"></span>
+                  <button @click="movPage = 1; loadGalpaoFilme(null)" class="ml-1 hover:text-emerald-950">× ver todas</button>
+                </span>
+              </div>
+              <p class="mt-1 text-xs text-gray-500">Tudo que entrou, saiu ou foi ajustado · até 50 registros oficiais</p>
+              <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <label class="relative block">
+                  <span class="sr-only">Buscar medida ou referência</span>
+                  <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"></i>
+                  <input x-model="movBusca" @input="movPage = 1" type="search" placeholder="Buscar medida" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm sm:w-52">
+                </label>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1" aria-label="Filtrar movimentações">
+                  <template x-for="filter in [
+                    { id: 'todos', label: 'Todos' },
+                    { id: 'entradas', label: 'Entradas' },
+                    { id: 'saidas', label: 'Saídas' },
+                    { id: 'ajustes', label: 'Ajustes' }
+                  ]" :key="'mov-filter-' + filter.id">
+                    <button @click="movFiltro = filter.id; movPage = 1"
+                            :class="movFiltro === filter.id ? 'bg-emerald-700 text-white shadow-sm' : 'text-gray-600 hover:bg-white'"
+                            class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+                            x-text="filter.label"></button>
+                  </template>
+                </div>
+                <label class="relative">
+                  <span class="sr-only">Período</span>
+                  <select x-model="movPeriodo" @change="movPage = 1" class="rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-8 text-xs font-medium text-gray-700">
+                    <option value="7">Últimos 7 dias</option>
+                    <option value="30">Últimos 30 dias</option>
+                    <option value="all">Todos carregados</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div x-show="galpaoFilme.loading" class="p-10 text-center text-sm text-gray-500">Carregando movimentações…</div>
+          <div x-show="!galpaoFilme.loading && movRows().length > 0" class="px-5 pb-5">
+            <template x-for="group in movGroups()" :key="group.key">
+              <section class="pt-5">
+                <h4 class="mb-3 text-xs font-semibold text-slate-600" x-text="group.label"></h4>
+                <div class="relative ml-2 border-l border-slate-200">
+                  <template x-for="m in group.rows" :key="m.created_at + m.measure + m.op + m.qty_after">
+                    <article class="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-100 py-3 pl-7 last:border-b-0 md:grid-cols-[minmax(220px,1.2fr)_minmax(150px,.8fr)_70px_74px_82px] md:items-center">
+                      <span class="absolute -left-[6px] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white shadow-sm"
+                            :class="movKind(m) === 'entrada' ? 'bg-emerald-600' : 'bg-slate-500'"></span>
+                      <div class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
+                              :class="movKind(m) === 'entrada' ? 'border-emerald-700 bg-emerald-700 text-white' : (movKind(m) === 'saida' ? 'border-slate-500 bg-white text-slate-700' : 'border-emerald-300 bg-emerald-50 text-emerald-800')">
+                          <i :data-lucide="movKind(m) === 'entrada' ? 'arrow-down' : (movKind(m) === 'saida' ? 'arrow-up' : 'sliders-horizontal')" class="h-4 w-4"></i>
+                        </span>
+                        <div class="min-w-0">
+                          <p class="truncate text-sm font-medium text-slate-900" x-text="movRotulo(m)"></p>
+                          <p class="mt-0.5 text-sm font-semibold text-slate-700" x-text="m.measure"></p>
+                        </div>
+                      </div>
+                      <p class="hidden truncate text-xs text-slate-500 md:block" x-text="movContexto(m)"></p>
+                      <time class="hidden text-xs tabular-nums text-slate-500 md:block" x-text="movHora(m)"></time>
+                      <span class="justify-self-end rounded-lg border px-2.5 py-1 text-xs font-semibold tabular-nums"
+                            :class="movKind(m) === 'entrada' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'"
+                            x-text="Number(m.qty_delta) > 0 ? '+' + m.qty_delta + ' un' : (Number(m.qty_delta) < 0 ? m.qty_delta + ' un' : 'ajuste')"></span>
+                      <div class="hidden items-center justify-end gap-1.5 text-xs font-medium tabular-nums text-slate-700 md:flex">
+                        <span x-text="m.qty_before"></span><i data-lucide="arrow-right" class="h-3.5 w-3.5 text-slate-400"></i><span x-text="m.qty_after"></span>
+                      </div>
+                      <div class="col-span-2 flex items-center justify-between gap-3 pl-12 text-[11px] text-slate-500 md:hidden">
+                        <span x-text="movContexto(m)"></span>
+                        <span><span x-text="movHora(m)"></span> · <span x-text="m.qty_before + ' → ' + m.qty_after"></span></span>
+                      </div>
+                    </article>
+                  </template>
+                </div>
+              </section>
+            </template>
+          </div>
+
+          <nav x-show="!galpaoFilme.loading && movRows().length > movPageSize"
+               aria-label="Paginação das movimentações"
+               class="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-xs text-slate-500">
+              Exibindo <span class="font-semibold text-slate-700" x-text="movPageStart()"></span>–<span class="font-semibold text-slate-700" x-text="movPageEnd()"></span>
+              de <span class="font-semibold text-slate-700" x-text="movRows().length"></span> movimentações
+            </p>
+            <div class="flex items-center gap-1">
+              <button @click="movSetPage(movCurrentPage() - 1)"
+                      :disabled="movCurrentPage() === 1"
+                      class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Página anterior">
+                <i data-lucide="chevron-left" class="h-4 w-4"></i>
+              </button>
+              <template x-for="page in movPageNumbers()" :key="'mov-page-' + page">
+                <button @click="movSetPage(page)"
+                        :aria-current="movCurrentPage() === page ? 'page' : null"
+                        :class="movCurrentPage() === page ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-gray-200 bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'"
+                        class="h-8 min-w-8 rounded-lg border px-2 text-xs font-semibold"
+                        x-text="page"></button>
+              </template>
+              <button @click="movSetPage(movCurrentPage() + 1)"
+                      :disabled="movCurrentPage() === movTotalPages()"
+                      class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Próxima página">
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+              </button>
+            </div>
+          </nav>
+
+          <div x-show="!galpaoFilme.loading && galpaoFilme.rows.length === 0" class="px-5 py-16 text-center">
+            <i data-lucide="history" class="mx-auto h-9 w-9 text-emerald-300"></i>
+            <p class="mt-3 text-sm font-semibold text-slate-700">Nenhum movimento gravado ainda</p>
+            <p class="mt-1 text-xs text-slate-500">Entradas, vendas, baixas e ajustes aparecerão aqui.</p>
+          </div>
+          <div x-show="!galpaoFilme.loading && galpaoFilme.rows.length > 0 && movRows().length === 0" class="px-5 py-16 text-center">
+            <i data-lucide="search-x" class="mx-auto h-9 w-9 text-emerald-300"></i>
+            <p class="mt-3 text-sm font-semibold text-slate-700">Nenhuma movimentação nesse filtro</p>
+            <button @click="movFiltro = 'todos'; movBusca = ''; movPeriodo = 'all'; movPage = 1" class="mt-2 text-xs font-medium text-emerald-800 hover:text-emerald-950">Limpar filtros</button>
+          </div>
+        </section>
+
+        <aside aria-label="Indicadores das movimentações" class="space-y-5 2xl:col-span-4">
+          <section class="rounded-xl border border-gray-200 bg-white p-5">
+            <h3 class="text-base font-semibold text-slate-900">Resumo do período</h3>
+            <p class="mt-1 text-xs text-slate-500">Calculado sobre o recorte carregado</p>
+            <div class="mt-5 grid grid-cols-3 divide-x divide-gray-100">
+              <div class="pr-3"><p class="text-[11px] text-slate-500">Entradas</p><p class="mt-1 text-2xl font-semibold tabular-nums text-slate-900" x-text="movResumo().entradas"></p></div>
+              <div class="px-3"><p class="text-[11px] text-slate-500">Saídas</p><p class="mt-1 text-2xl font-semibold tabular-nums text-slate-900" x-text="movResumo().saidas"></p></div>
+              <div class="pl-3"><p class="text-[11px] text-slate-500">Saldo líquido</p><p class="mt-1 text-2xl font-semibold tabular-nums" :class="movResumo().saldo >= 0 ? 'text-emerald-700' : 'text-slate-700'" x-text="(movResumo().saldo > 0 ? '+' : '') + movResumo().saldo"></p></div>
+            </div>
+            <div class="mt-5 border-t border-gray-100 pt-4">
+              <svg viewBox="0 0 300 104" class="h-28 w-full" role="img" aria-label="Volume diário das movimentações">
+                <line x1="12" y1="30" x2="288" y2="30" stroke="#e2e8f0" stroke-width="1"></line>
+                <line x1="12" y1="60" x2="288" y2="60" stroke="#e2e8f0" stroke-width="1"></line>
+                <line x1="12" y1="90" x2="288" y2="90" stroke="#e2e8f0" stroke-width="1"></line>
+                <polygon :points="movTrendArea()" fill="#dff7ec" opacity=".8"></polygon>
+                <polyline :points="movTrendPoints()" fill="none" stroke="#047857" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <circle cx="12"  :cy="movTrendY(0)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="58"  :cy="movTrendY(1)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="104" :cy="movTrendY(2)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="150" :cy="movTrendY(3)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="196" :cy="movTrendY(4)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="242" :cy="movTrendY(5)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+                <circle cx="288" :cy="movTrendY(6)" r="3.5" fill="#047857" stroke="white" stroke-width="2"></circle>
+              </svg>
+              <div class="grid grid-cols-3 text-[10px] text-slate-400">
+                <span x-text="movTrend()[0].label"></span>
+                <span class="text-center" x-text="movTrend()[3].label"></span>
+                <span class="text-right" x-text="movTrend()[6].label"></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-xl border border-gray-200 bg-white p-5">
+            <h3 class="text-base font-semibold text-slate-900">Medidas mais movimentadas</h3>
+            <p class="mt-1 text-xs text-slate-500">Volume absoluto de entradas e saídas</p>
+            <div class="mt-5 space-y-4">
+              <template x-for="row in movRanking()" :key="'mov-rank-' + row.measure">
+                <div>
+                  <div class="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                    <span class="font-medium text-slate-700" x-text="row.measure"></span>
+                    <span class="tabular-nums text-slate-500" x-text="row.total + ' un'"></span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-emerald-50">
+                    <div class="h-full rounded-full bg-emerald-700" :style="'width:' + Math.max(8, (row.total / movRankingMax()) * 100) + '%'"></div>
+                  </div>
+                </div>
+              </template>
+              <p x-show="movRanking().length === 0" class="py-5 text-center text-xs text-slate-500">Sem medidas neste recorte.</p>
+            </div>
+          </section>
+
+          <section class="flex items-center justify-between gap-4 rounded-xl border border-emerald-100 bg-emerald-50/70 p-5">
+            <div>
+              <h3 class="text-sm font-semibold text-emerald-950">Rastreabilidade preservada</h3>
+              <p class="mt-1 text-xs leading-relaxed text-emerald-800">Origem, referência, saldo anterior e saldo final permanecem ligados a cada movimento.</p>
+            </div>
+            <span class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 shadow-sm">
+              <i data-lucide="shield-check" class="h-7 w-7"></i>
+            </span>
+          </section>
+        </aside>
       </div>
 
       <!-- REPOSIÇÃO: somente leitura da mesma lista; ação abre a entrada existente. -->
@@ -2980,11 +3471,11 @@
         <div class="divide-y divide-gray-100">
           <template x-for="row in stockRowsView().filter((r) => Number(r.quantity_on_hand) === 0 || stockPrecisaRepor(r))" :key="'repor-' + row.measure">
             <div class="p-5 grid grid-cols-1 md:grid-cols-[minmax(150px,1fr)_repeat(3,minmax(100px,auto))_auto] gap-4 md:items-center">
-              <div><p class="font-semibold" x-text="row.measure"></p><span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="Number(row.quantity_on_hand) === 0 ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'" x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : 'Repor'"></span></div>
+              <div><p class="font-semibold" x-text="row.measure"></p><span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : 'border border-emerald-500/50 bg-emerald-50 text-emerald-800'" x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : 'Repor'"></span></div>
               <div><p class="text-xs text-gray-500">Em estoque</p><p class="text-lg font-semibold num" x-text="row.quantity_on_hand"></p></div>
               <div><p class="text-xs text-gray-500">Mínimo</p><p class="text-lg font-semibold num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></p></div>
-              <div><p class="text-xs text-gray-500">Faltam para o mínimo</p><p class="text-lg font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-rose-600' : 'text-amber-600'" x-text="row.min_quantity == null ? '—' : Math.max(0, Number(row.min_quantity) - Number(row.quantity_on_hand))"></p></div>
-              <button @click="stockTab = 'visao'; stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="justify-self-start md:justify-self-end px-4 py-2 rounded-lg border border-brand-600 text-brand-700 text-sm font-medium hover:bg-brand-50">Registrar entrada</button>
+              <div><p class="text-xs text-gray-500">Faltam para o mínimo</p><p class="text-lg font-semibold text-emerald-900 num" x-text="row.min_quantity == null ? '—' : Math.max(0, Number(row.min_quantity) - Number(row.quantity_on_hand))"></p></div>
+              <button @click="stockTab = 'visao'; stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="justify-self-start md:justify-self-end px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Registrar entrada</button>
             </div>
           </template>
           <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="px-5 py-16 text-center"><i data-lucide="circle-check-big" class="w-10 h-10 text-emerald-600 mx-auto mb-3"></i><p class="font-semibold text-emerald-700">Estoque dentro dos mínimos</p><p class="text-sm text-gray-500 mt-1">Não há medidas para repor agora.</p></div>
@@ -2993,32 +3484,32 @@
 
       <!-- CUSTOS: derivado localmente de quantidade × custo médio, igual ao Financeiro. -->
       <div x-show="stockTab === 'custos'" x-cloak class="space-y-5">
-        <div class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4"><div><p class="text-sm text-gray-500">Capital total em estoque</p><p class="text-3xl font-semibold text-brand-700 mt-1 num" x-text="formatCurrency(stockResumo().capital)"></p><p class="text-xs text-gray-400 mt-2">Quantidade atual × custo médio de cada medida — a mesma conta mostrada no Financeiro.</p></div><div class="w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center"><i data-lucide="wallet-cards" class="w-7 h-7 text-brand-700"></i></div></div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4"><div><p class="text-sm text-gray-500">Capital total em estoque</p><p class="text-3xl font-semibold text-emerald-800 mt-1 num" x-text="formatCurrency(stockResumo().capital)"></p><p class="text-xs text-gray-400 mt-2">Quantidade atual × custo médio de cada medida — a mesma conta mostrada no Financeiro.</p></div><div class="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="wallet-cards" class="w-7 h-7 text-emerald-800"></i></div></div>
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden"><div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><h3 class="text-base font-semibold">Capital por medida</h3><p class="text-xs text-gray-500 mt-1">Ordenação do estoque operacional; valores calculados em tempo real.</p></div><div class="relative"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i><input x-model="stockBusca" type="text" placeholder="Buscar medida" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm"></div></div>
-          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[760px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Capital</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="row in stockRowsView()" :key="'custo-' + row.measure"><tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.measure"></td><td class="px-4 py-3 text-center num" x-text="row.quantity_on_hand"></td><td class="px-4 py-3 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td><td class="px-5 py-3 text-right"><button @click="stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'" class="text-xs font-medium text-brand-700 hover:text-brand-900">ajustar custo</button></td></tr></template><tr x-show="atacadoStock.length === 0"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-500">Cadastre o estoque para acompanhar o capital por medida.</td></tr></tbody></table></div>
+          <div class="overflow-x-auto"><table class="w-full text-sm min-w-[760px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Capital</th><th class="px-5 py-3 font-medium text-right">Ação</th></tr></thead><tbody class="divide-y divide-gray-100"><template x-for="row in stockRowsView()" :key="'custo-' + row.measure"><tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.measure"></td><td class="px-4 py-3 text-center num" x-text="row.quantity_on_hand"></td><td class="px-4 py-3 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td><td class="px-4 py-3 text-right font-semibold num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td><td class="px-5 py-3 text-right"><button @click="stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'" class="text-xs font-medium text-emerald-800 hover:text-emerald-950">ajustar custo</button></td></tr></template><tr x-show="atacadoStock.length === 0"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-500">Cadastre o estoque para acompanhar o capital por medida.</td></tr></tbody></table></div>
         </div>
       </div>
     </div>
 
     <!-- ═══ TELA: LOGÍSTICA da matriz — cockpit operacional ═══ -->
-    <div x-show="currentPage === 'estoque' && stockTab === 'conciliacao'" class="px-8 pb-8" x-cloak>
+    <div x-show="currentPage === 'estoque' && stockTab === 'conciliacao'" class="px-4 pb-4 lg:px-5 lg:pb-5" x-cloak>
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div class="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-start md:justify-between gap-3">
           <div>
             <h3 class="text-base font-semibold">Estoque oficial x cadastro antigo</h3>
-            <p class="text-xs text-gray-500 mt-1">RelatÃ³rio somente leitura. O saldo usado para vender e calcular custo Ã© commerce.wholesale_stock.</p>
+            <p class="text-xs text-gray-500 mt-1">Relatório somente leitura. O saldo usado para vender e calcular custo é commerce.wholesale_stock.</p>
           </div>
           <button @click="loadStockReconciliation()" :disabled="stockReconciliation.loading" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Atualizar</button>
         </div>
         <div x-show="stockReconciliation.loading" class="p-6 text-sm text-gray-500">Comparando as duas fontesâ€¦</div>
-        <div x-show="stockReconciliation.error" class="m-5 px-4 py-3 rounded-lg bg-rose-50 text-rose-700 text-sm">NÃ£o foi possÃ­vel carregar a conciliaÃ§Ã£o.</div>
+        <div x-show="stockReconciliation.error" class="m-5 px-4 py-3 rounded-lg bg-slate-100 text-slate-700 text-sm">NÃ£o foi possÃ­vel carregar a conciliaÃ§Ã£o.</div>
         <template x-if="stockReconciliation.summary">
           <div>
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 p-5 bg-gray-50/70 border-b border-gray-100">
               <div><p class="text-xs text-gray-500">Medidas comparadas</p><p class="text-xl font-semibold num" x-text="stockReconciliation.summary.total"></p></div>
               <div><p class="text-xs text-gray-500">Alinhadas</p><p class="text-xl font-semibold text-emerald-700 num" x-text="stockReconciliation.summary.aligned"></p></div>
-              <div><p class="text-xs text-gray-500">Divergentes</p><p class="text-xl font-semibold text-amber-700 num" x-text="stockReconciliation.summary.divergent"></p></div>
-              <div><p class="text-xs text-gray-500">Sem linha oficial</p><p class="text-xl font-semibold text-rose-700 num" x-text="stockReconciliation.summary.catalog_only"></p></div>
+              <div><p class="text-xs text-gray-500">Divergentes</p><p class="text-xl font-semibold text-emerald-900 num" x-text="stockReconciliation.summary.divergent"></p></div>
+              <div><p class="text-xs text-gray-500">Sem linha oficial</p><p class="text-xl font-semibold text-slate-700 num" x-text="stockReconciliation.summary.catalog_only"></p></div>
             </div>
             <p class="px-5 pt-4 text-xs text-gray-500">Marcas sÃ£o apenas referÃªncia do catÃ¡logo. O galpÃ£o controla quantidade e custo por medida, sem inventar divisÃ£o por marca.</p>
             <div class="overflow-x-auto mt-3">
@@ -3026,7 +3517,7 @@
                 <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Marcas no catÃ¡logo</th><th class="px-4 py-3 font-medium text-center">Oficial</th><th class="px-4 py-3 font-medium text-center">Antigo</th><th class="px-4 py-3 font-medium text-right">Custo oficial</th><th class="px-5 py-3 font-medium">SituaÃ§Ã£o</th></tr></thead>
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in stockReconciliation.rows" :key="row.key">
-                    <tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.catalog_measures[0] || row.key"></td><td class="px-4 py-3 text-gray-500" x-text="row.catalog_brands.join(', ') || 'â€”'"></td><td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity == null ? 'â€”' : row.official_quantity"></td><td class="px-4 py-3 text-center text-gray-500 num" x-text="row.legacy_quantity == null ? 'â€”' : row.legacy_quantity"></td><td class="px-4 py-3 text-right num" x-text="row.official_unit_cost == null ? 'â€”' : formatCurrency(row.official_unit_cost)"></td><td class="px-5 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium" :class="row.status === 'aligned' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="reconciliationStatusText(row.status)"></span></td></tr>
+                    <tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.catalog_measures[0] || row.key"></td><td class="px-4 py-3 text-gray-500" x-text="row.catalog_brands.join(', ') || 'â€”'"></td><td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity == null ? 'â€”' : row.official_quantity"></td><td class="px-4 py-3 text-center text-gray-500 num" x-text="row.legacy_quantity == null ? 'â€”' : row.legacy_quantity"></td><td class="px-4 py-3 text-right num" x-text="row.official_unit_cost == null ? 'â€”' : formatCurrency(row.official_unit_cost)"></td><td class="px-5 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium" :class="row.status === 'aligned' ? 'bg-emerald-50 text-emerald-700' : 'border border-emerald-500/40 bg-white text-emerald-900'" x-text="reconciliationStatusText(row.status)"></span></td></tr>
                   </template>
                 </tbody>
               </table>

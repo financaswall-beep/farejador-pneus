@@ -5,6 +5,13 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
     async loadStockReconciliation() {
+      if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
+        this.stockReconciliation.loading = false;
+        this.stockReconciliation.error = null;
+        this.stockReconciliation.summary = { ...window.PAINEL_STOCK_PREVIEW.reconciliation.summary };
+        this.stockReconciliation.rows = window.PAINEL_STOCK_PREVIEW.reconciliation.rows.map((row) => ({ ...row }));
+        return;
+      }
       this.stockReconciliation.loading = true;
       this.stockReconciliation.error = null;
       try {
@@ -227,6 +234,15 @@ window.PAINEL_MODULES.galpao = function () {
     // ── O FILME (0128): a movimentação do galpão — quem mexeu, quanto, quando ──
     async loadGalpaoFilme(measure) {
       if (measure !== undefined) this.galpaoFilme.measure = measure;
+      if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
+        const selected = this.galpaoFilme.measure;
+        this.galpaoFilme.loading = false;
+        this.galpaoFilme.rows = window.PAINEL_STOCK_PREVIEW.movements
+          .filter((row) => !selected || row.measure === selected)
+          .map((row) => ({ ...row }));
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        return;
+      }
       // guarda de corrida: o load geral do watch e o clique "filme" podem estar em voo
       // juntos — só a resposta do pedido MAIS RECENTE pode pintar a tela.
       const req = (this.galpaoFilme.req = (this.galpaoFilme.req || 0) + 1);
