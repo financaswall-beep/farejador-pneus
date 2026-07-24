@@ -35,6 +35,7 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('Custo médio');
     expect(stockHtml).toContain('Capital');
     expect(stockHtml).toContain('Status');
+    expect(stockHtml.match(/\/admin\/painel\/assets\/estoque-hero\.webp\?preview=tire/g)).toHaveLength(2);
     expect(stockHtml).not.toContain('Mapa | Lista');
     expect(stockHtml).not.toContain('Criar compra');
     expect(stockHtml).not.toContain('pagination');
@@ -66,6 +67,46 @@ describe('Estoque — lista com painel da medida', () => {
     expect(galpao).toContain("this.apiPost('/admin/api/wholesale/stock/remove'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/movimentos'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/reconciliation'");
+  });
+
+  it('implementa a fila de reposição sobre o estoque oficial e abre o fluxo auditado de Compras', () => {
+    expect(stockHtml).toContain('id="fila-reposicao"');
+    expect(stockHtml).toContain('Fila inteligente de reposição');
+    expect(stockHtml).toContain('Plano de compra');
+    expect(stockHtml).toContain('Por que repor agora?');
+    expect(stockHtml).toContain('Adicionar à compra');
+    expect(stockHtml).toContain('Criar nova compra');
+    expect(stockHtml).toContain('repoRowsView()');
+    expect(stockHtml).toContain('repoPlanoResumo()');
+    expect(stockHtml).toContain('repoAbrirCompra(repoPlano())');
+    expect(stockHtml).toContain('/admin/painel/assets/estoque-hero.webp?preview=tire');
+    expect(stockHtml).toContain('loading="lazy"');
+    expect(stockHtml).toContain("stockTab = 'reposicao'; loadGalpaoFilme()");
+    expect(stockHtml).toContain("const fontesDeVenda = new Set(['venda_atacado', 'varejo'])");
+    expect(stockHtml).toContain('repoSugestao(row)');
+    expect(stockHtml).toContain("this.currentPage = 'compras'");
+    expect(stockHtml).toContain("this.comprasOpenTab('nova')");
+    expect(stockHtml).toContain("receipt_status: 'pending'");
+    expect(galpao).not.toContain("this.apiPost('/admin/api/wholesale/replenishment'");
+  });
+
+  it('transforma Custos em leitura financeira local sem criar uma nova fonte', () => {
+    expect(stockHtml).toContain('id="capital-medida-heading"');
+    expect(stockHtml).toContain('Capital por medida');
+    expect(stockHtml).toContain('Leitura dos custos');
+    expect(stockHtml).toContain('Custo médio ponderado');
+    expect(stockHtml).toContain('Concentração no Top 3');
+    expect(stockHtml).toContain('id="custos-medida-heading"');
+    expect(stockHtml).toContain('Custos por medida');
+    expect(stockHtml).toContain('Como este valor é calculado');
+    expect(stockHtml).toContain('Mesma conta usada no Financeiro');
+    expect(stockHtml).toContain('commerce.wholesale_stock');
+    expect(stockHtml).toContain('custoCapital(row)');
+    expect(stockHtml).toContain('custoMediaPonderada()');
+    expect(stockHtml).toContain('custoTop3Percentual()');
+    expect(stockHtml).toContain("custoOrdem: 'capital'");
+    expect(stockHtml).toContain("stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'");
+    expect(galpao).not.toContain("this.apiGet('/admin/api/wholesale/stock/costs'");
   });
 
   it('aplica a paleta verde sem tokens laranja ou rosa dentro da tela', () => {
