@@ -30,6 +30,7 @@ window.PAINEL_MODULES.nav = function () {
       this.unidadeTab = 'visao';
       this.currentPage = 'unidade';
       this.$nextTick(() => {
+        document.querySelector('main')?.scrollTo(0, 0);
         lucide.createIcons();
         this.renderParceiroChart();
       });
@@ -65,6 +66,7 @@ window.PAINEL_MODULES.nav = function () {
     voltarParaRede() {
       this.currentPage = 'rede';
       this.$nextTick(() => {
+        document.querySelector('main')?.scrollTo(0, 0);
         lucide.createIcons();
         this.renderRedeChart();
         this.renderRedeLucroChart();

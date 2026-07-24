@@ -96,7 +96,7 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain("redeSection === 'operacao' && !redeOperacaoLegadaAtiva()");
     expect(html).toContain("redeSection === 'operacao' && redeOperacaoLegadaAtiva()");
     expect(html).not.toContain('app.rede.mock.js');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260723-rede-parceiros-prod1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260723-unidade-redesign1');
     expect(html).toContain('Cobranças em andamento');
     expect(html).toContain('Pulso de saúde');
     expect(html).toContain('Alertas operacionais');
@@ -135,11 +135,29 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).not.toContain("redeSection === 'parceiros'\" class=\"bg-white border border-gray-200 rounded-xl overflow-hidden");
   });
 
-  it('mantém a visão da unidade em quatro cards por linha e separa compra de CMV', () => {
-    expect(html).toContain("x-show=\"unidadeTab === 'visao'\" class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4");
-    expect(html).toContain('CMV (custo vendido)');
+  it('organiza a visão da unidade em seis cards 3x2 sem perder os dados correlatos', () => {
+    expect(html).toContain('aria-label="Indicadores da unidade"');
+    expect(html).toContain('class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"');
+    expect(html).toContain('CMV vendido');
     expect(html).toContain('formatCurrency(selectedParceiro()?.cogsValor)');
     expect(html).toContain('formatCurrency(selectedParceiro()?.comprasPneus)');
+    expect(html).toContain('formatCurrency(selectedParceiro()?.vendasPorta)');
+    expect(html).toContain('formatCurrency(selectedParceiro()?.despesasExtras)');
+  });
+
+  it('preserva raio e modelo comercial e aplica os quatro blocos da referência', () => {
+    expect(html).toContain('@click="salvarRaioEntrega()"');
+    expect(html).toContain('@click="salvarTerms()"');
+    expect(html).toContain('x-effect="selectedParceiroIndex; abrirTermsForm()"');
+    expect(html).toContain('aria-label="Visão geral da unidade"');
+    expect(html).toContain('Cadastro do parceiro');
+    expect(html).toContain('Saúde da unidade');
+    expect(html).toContain('Vendas da unidade');
+    expect(html).toContain('Resultado operacional');
+    expect(html).toContain('id="chartParceiroVendas"');
+    expect(html).toContain('Voltar para Rede');
+    expect(nav).toContain("this.currentPage = 'unidade';");
+    expect(nav).toContain("document.querySelector('main')?.scrollTo(0, 0);");
   });
 
   it('preserva estoque desconhecido e deixa lançamentos da matriz somente leitura', () => {
