@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { validateProductionEnv } from './env-production-validation.js';
-
+import { marketingEnvShape } from './env-marketing.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
 
 const envSchema = z.object({
@@ -62,6 +62,7 @@ const envSchema = z.object({
   BOT_OUTBOX: booleanStringSchema,
   MATRIZ_CUSTOMER_IDENTITY: booleanStringSchema,
   MATRIZ_CUSTOMER_PRIVACY: booleanStringSchema,
+  ...marketingEnvShape,
   // Chat unificado do Portal Parceiro (Fatia 1): espelha mensagens do Chatwoot em
   // commerce.partner_messages durante a normalizacao. Defensivo e isolado por SAVEPOINT
   // — nunca quebra a normalizacao core. Desligado por padrao.

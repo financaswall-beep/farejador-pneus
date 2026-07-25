@@ -217,7 +217,9 @@ function painelApp() {
     colabView: 'ativos',
     colabSenhaVisivel: false, colabTab: 'equipe', colabMes: new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date()), colabSummary: {}, colabCargoFiltro: '', colabAcessoFiltro: '', colabSelectedId: null, colabDrawer: null,
     colabRemForm: { employment_type: 'clt', base_salary: '', payment_day: 5, payment_method: 'pix', payment_note: '', starts_on: '' }, colabComForm: { kind: 'percent', basis: 'margin', value: '', starts_on: '', active: true }, colabAjusteForm: { kind: 'addition', description: '', amount: '' }, colabPerfilForm: { job_title: '', work_area: 'other' },
-
+    // MARKETING: primeira tela read-only; Meta sobe dormente e segredo nunca chega ao front.
+    marketingTab: 'visao', marketingPeriod: '30d', marketingVisao: null,
+    marketingLoading: false, marketingError: null,
     // ─── MENUS ──────────────────────────────────────
     liveMenu: [
       { id: 'resumo',     label: 'Resumo',     icon: 'layout-dashboard' },
@@ -229,14 +231,13 @@ function painelApp() {
       { id: 'logistica',  label: 'Logística',  icon: 'truck' },
       { id: 'financeiro', label: 'Financeiro', icon: 'wallet' },
       { id: 'rede',       label: 'Rede',       icon: 'network' },
+      { id: 'marketing',  label: 'Marketing',  icon: 'megaphone' },
       { id: 'colaboradores', label: 'Colaboradores', icon: 'users' },
     ],
-
     futureMenu: [
       { id: 'catalogo',     label: 'Catálogo',      icon: 'tag' },
       { id: 'relatorios',   label: 'Relatórios',    icon: 'bar-chart-3' },
     ],
-
     // ─── FILTROS DE TEMPO ───────────────────────────
     timeFilters: [
       { id: 'hoje',    label: 'Hoje' },
@@ -281,7 +282,6 @@ function painelApp() {
     leadsRecuperar: [],
     resumoSeries: [],
     pedidos: [],
-
     produtos: [],
     redeKpis: [],
 

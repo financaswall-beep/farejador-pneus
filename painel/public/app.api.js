@@ -87,7 +87,7 @@ window.PAINEL_MODULES.api = function () {
       this.operatorLabel = payload.user.display_name;
       this.adminAuthenticated = true;
       if (payload.user.role !== 'owner') {
-        this.liveMenu = this.liveMenu.filter((item) => item.id !== 'colaboradores');
+        this.liveMenu = this.liveMenu.filter((item) => !['colaboradores', 'marketing'].includes(item.id));
       }
       await recoverPendingIntegrityOperations(this);
       return true;

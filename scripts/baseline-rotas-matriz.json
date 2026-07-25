@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-23T22:42:40.053Z",
-  "total": 169,
+  "geradoEm": "2026-07-25T03:35:38.826Z",
+  "total": 172,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -19,6 +19,7 @@
     "GET /admin/api/dashboard/rede AUTH(1)",
     "GET /admin/api/logistica AUTH(1)",
     "GET /admin/api/logistica/comprovantes/:receiptId/imagem AUTH(1)",
+    "GET /admin/api/marketing/overview AUTH(1)",
     "GET /admin/api/matriz/despesas AUTH(1)",
     "GET /admin/api/matriz/financeiro AUTH(1)",
     "GET /admin/api/matriz/notificacoes AUTH(1)",
@@ -74,6 +75,7 @@
     "GET /admin/painel/app.logistica.comprovantes.js PUBLICA",
     "GET /admin/painel/app.logistica.js PUBLICA",
     "GET /admin/painel/app.logistica.resultado.js PUBLICA",
+    "GET /admin/painel/app.marketing.js PUBLICA",
     "GET /admin/painel/app.montagem.js PUBLICA",
     "GET /admin/painel/app.nav.js PUBLICA",
     "GET /admin/painel/app.pedidos.parceiros.js PUBLICA",
@@ -89,6 +91,7 @@
     "GET /admin/painel/assets/compras-hero.webp PUBLICA",
     "GET /admin/painel/assets/estoque-hero.webp PUBLICA",
     "GET /admin/painel/assets/logistica-hero.webp PUBLICA",
+    "GET /admin/painel/assets/marketing-hero.webp PUBLICA",
     "GET /admin/painel/assets/rede-hero-v2.webp PUBLICA",
     "GET /admin/painel/assets/rede-hero-visao-v3.webp PUBLICA",
     "GET /admin/painel/assets/vendas-hero.webp PUBLICA",

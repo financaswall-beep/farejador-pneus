@@ -120,4 +120,32 @@ describe('environment security validation', () => {
     expect(parsed.MATRIZ_CUSTOMER_IDENTITY).toBe(false);
     expect(parsed.MATRIZ_CUSTOMER_PRIVACY).toBe(false);
   });
+
+  it('keeps Marketing integrations dormant by default', () => {
+    const parsed = parseEnv(baseEnv);
+    expect(parsed.MARKETING_META_ENABLED).toBe(false);
+    expect(parsed.MARKETING_ATTRIBUTION).toBe(false);
+    expect(parsed.META_ADS_ACCESS_TOKEN).toBeUndefined();
+  });
+
+  it('fails closed when Meta is enabled in production without server credentials', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_META_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/META_ADS_ACCOUNT_ID.*MARKETING_META_ENABLED[\s\S]*META_ADS_ACCESS_TOKEN.*MARKETING_META_ENABLED/);
+
+    const parsed = parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_META_ENABLED: 'true',
+      META_ADS_ACCOUNT_ID: 'act_123',
+      META_ADS_ACCESS_TOKEN: 'token-seguro-do-coolify',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    });
+    expect(parsed.MARKETING_META_ENABLED).toBe(true);
+  });
 });

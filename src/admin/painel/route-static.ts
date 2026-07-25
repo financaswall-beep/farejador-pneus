@@ -30,6 +30,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js', 'app.clientes.js', 'app.clientes.identity.js',
+    'app.marketing.js',
     'app.montagem.js', // fatia 07-14: compositor + lista de fábricas (app.js ficou só o estado)
   ];
   for (const modulo of painelModulos) {
@@ -68,6 +69,8 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
   });
   fastify.get('/admin/painel/assets/vendas-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/marketing-hero.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/marketing-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/rede-hero-v2.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/rede-hero-v2.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/rede-hero-visao-v3.webp', async (_request, reply) =>

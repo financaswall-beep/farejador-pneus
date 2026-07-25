@@ -44,6 +44,7 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
+<script src="/admin/painel/app.marketing.js?v=20260725-marketing-visao1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -6505,6 +6506,281 @@
             <aside class="bg-white border rounded-lg p-4 h-fit" x-show="clienteParceiroSelecionado()"><div class="flex justify-between"><p class="text-sm font-semibold">Vínculo com parceiro</p><button @click="clienteParceiroSelecionadoId=null" class="text-gray-400">×</button></div><div class="flex items-center gap-3 py-4"><div class="w-11 h-11 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center"><i data-lucide="building-2" class="w-5 h-5"></i></div><div><p class="font-semibold text-sm" x-text="clienteParceiroSelecionado()?.name"></p><p class="text-[10px] text-gray-400">Borracharia parceira</p></div></div><dl class="space-y-2 text-xs border-y py-3"><div class="flex justify-between"><dt class="text-gray-500">Parceiro vinculado</dt><dd x-text="clienteParceiroSelecionado()?.name"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Modelo comercial</dt><dd x-text="({commission:'Comissão',monthly:'Mensalidade',hybrid:'Híbrido'})[clienteParceiroSelecionado()?.commercial_model]||'—'"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Início do vínculo</dt><dd x-text="clienteData(clienteParceiroSelecionado()?.created_at)"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Compras</dt><dd x-text="clienteParceiroSelecionado()?.purchases||0"></dd></div><div class="flex justify-between"><dt class="text-gray-500">Receita gerada</dt><dd class="font-medium" x-text="formatCurrency(clienteParceiroSelecionado()?.total_bought||0)"></dd></div></dl><button @click="abrirParceiroDaRede(clienteParceiroSelecionado())" class="w-full h-9 mt-4 border border-emerald-700 text-emerald-800 rounded-md text-xs">Ver parceiro</button></aside></div>
         </section>
       </div>
+    </div>
+
+    <!-- ═══ TELA: MARKETING — leitura executiva, sem atribuição presumida ═══ -->
+    <div x-show="currentPage === 'marketing'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" x-cloak>
+      <section aria-labelledby="marketing-heading"
+               class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+        <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl bg-emerald-950">
+          <img
+            src="/admin/painel/assets/marketing-hero.webp?v=20260725-marketing-visao1"
+            alt="Pneu e canais digitais conectados à operação comercial"
+            class="absolute inset-0 h-full w-full object-cover object-center">
+          <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/80 to-emerald-950/10"></div>
+        </div>
+        <div class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10">
+          <h1 id="marketing-heading"
+              class="text-3xl font-bold tracking-tight text-white lg:text-[34px] lg:leading-tight">Marketing conectado à operação</h1>
+          <p class="mt-3 max-w-xl text-sm text-emerald-50/90">
+            Do anúncio ao lucro, com estoque, território e atribuição no mesmo fluxo
+          </p>
+        </div>
+        <div class="absolute right-3 top-3 z-30 flex flex-wrap items-center justify-end gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+            <i data-lucide="badge-check" class="h-3.5 w-3.5 text-emerald-200"></i>
+            <span x-text="marketingIsMock() ? 'prévia mockada' : 'dados reais'"></span>
+          </span>
+          <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+            <i data-lucide="plug-zap" class="h-3.5 w-3.5 text-emerald-200"></i>
+            <span x-text="marketingVisao?.connection?.meta === 'connected' ? 'Meta conectada' : 'integração pendente'"></span>
+          </span>
+        </div>
+      </section>
+
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
+          <nav aria-label="Seções de Marketing" class="flex items-center gap-1 overflow-x-auto">
+            <template x-for="tab in marketingTabs()" :key="tab.id">
+              <button @click="marketingSetTab(tab.id)"
+                      class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                      :class="marketingTab === tab.id ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'"
+                      x-text="tab.label"></button>
+            </template>
+          </nav>
+          <div class="mb-3 flex items-center gap-2 xl:mb-0">
+            <select x-model="marketingPeriod" @change="loadMarketing()"
+                    class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
+              <option value="7d">Últimos 7 dias</option>
+              <option value="30d">Últimos 30 dias</option>
+            </select>
+            <span class="hidden text-[11px] text-gray-400 2xl:inline" x-text="marketingPeriodLabel()"></span>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="marketingTab === 'visao'" class="space-y-4">
+        <div x-show="marketingLoading" class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
+          Carregando dados de Marketing…
+        </div>
+        <div x-show="marketingError" class="flex items-center justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <span x-text="marketingError"></span>
+          <button @click="loadMarketing()" class="rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold">Tentar novamente</button>
+        </div>
+
+        <div x-show="!marketingLoading && !marketingError && marketingVisao">
+          <section aria-label="Indicadores de Marketing" class="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+            <template x-for="item in marketingKpis()" :key="item.id">
+              <article class="min-h-[118px] rounded-xl border bg-white p-4 shadow-sm"
+                       :class="item.tone === 'attention' ? 'border-amber-200' : 'border-gray-200'">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                       :class="item.tone === 'attention' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-800'">
+                    <i :data-lucide="item.icon" class="h-4.5 w-4.5"></i>
+                  </div>
+                  <span class="text-right text-[10px] font-medium uppercase tracking-wide text-gray-400" x-text="item.detail"></span>
+                </div>
+                <p class="mt-3 text-xs font-medium text-gray-500" x-text="item.label"></p>
+                <p class="mt-1 text-xl font-semibold tracking-tight text-gray-950" x-text="item.value"></p>
+              </article>
+            </template>
+          </section>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-12">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm 2xl:col-span-7">
+              <header class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
+                      <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>
+                    </span>
+                    <h2 class="text-base font-semibold text-gray-950">Ritmo de investimento e conversas</h2>
+                  </div>
+                  <p class="mt-1 pl-10 text-xs text-gray-500">Leitura diária da entrega nas campanhas conectadas</p>
+                </div>
+                <div class="flex items-center gap-4 text-[11px] text-gray-500">
+                  <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-800"></span>Investimento</span>
+                  <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-emerald-300"></span>Conversas</span>
+                </div>
+              </header>
+              <div class="px-5 pb-4 pt-3">
+                <div x-show="marketingVisao?.series?.length" class="relative">
+                  <svg viewBox="0 0 700 205" role="img" aria-label="Séries de investimento e conversas" class="h-[230px] w-full">
+                    <line x1="20" y1="35" x2="680" y2="35" stroke="#e5e7eb" stroke-width="1"></line>
+                    <line x1="20" y1="107" x2="680" y2="107" stroke="#e5e7eb" stroke-width="1"></line>
+                    <line x1="20" y1="180" x2="680" y2="180" stroke="#e5e7eb" stroke-width="1"></line>
+                    <polyline :points="marketingSeriesPoints('spend')" fill="none" stroke="#047857" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                    <polyline :points="marketingSeriesPoints('conversations')" fill="none" stroke="#6ee7b7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                  </svg>
+                  <div class="flex items-center justify-between text-[10px] text-gray-400">
+                    <span x-text="marketingDateLabel(marketingVisao?.series?.[0]?.date)"></span>
+                    <span x-text="marketingDateLabel(marketingVisao?.series?.[marketingVisao.series.length - 1]?.date)"></span>
+                  </div>
+                </div>
+                <div x-show="!marketingVisao?.series?.length" class="flex min-h-[250px] flex-col items-center justify-center text-center">
+                  <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+                    <i data-lucide="plug" class="h-5 w-5"></i>
+                  </span>
+                  <p class="mt-3 text-sm font-semibold text-gray-800">Conecte a Meta para iniciar a série</p>
+                  <p class="mt-1 max-w-sm text-xs leading-relaxed text-gray-500">A tela permanece sem valores inventados até que a conta de anúncios esteja configurada no ambiente seguro.</p>
+                </div>
+                <div class="mt-4 flex gap-2 rounded-lg border border-emerald-100 bg-emerald-50/70 p-3 text-xs leading-relaxed text-emerald-900">
+                  <i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0"></i>
+                  <p><strong>Leitura honesta:</strong> zero vendas atribuídas não significa zero vendas realizadas. A venda só entra aqui depois de haver vínculo rastreável.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm 2xl:col-span-5">
+              <header class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <div class="flex items-center gap-2">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
+                    <i data-lucide="bell-ring" class="h-4 w-4"></i>
+                  </span>
+                  <div>
+                    <h2 class="text-base font-semibold text-gray-950">Central de alertas</h2>
+                    <p class="text-xs text-gray-500">O que exige ação antes de aumentar a verba</p>
+                  </div>
+                </div>
+                <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600" x-text="marketingVisao?.alerts?.length || 0"></span>
+              </header>
+              <div class="space-y-2 p-4">
+                <template x-for="alert in marketingVisao?.alerts || []" :key="alert.id">
+                  <button @click="marketingNavigate(alert.target)"
+                          class="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
+                          :class="marketingAlertClass(alert.severity)">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70">
+                      <i :data-lucide="marketingAlertIcon(alert.severity)" class="h-4 w-4"></i>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-semibold" x-text="alert.title"></span>
+                      <span class="mt-0.5 block text-[11px] opacity-80" x-text="alert.detail"></span>
+                    </span>
+                    <i data-lucide="chevron-right" class="h-4 w-4 shrink-0"></i>
+                  </button>
+                </template>
+                <div x-show="!marketingVisao?.alerts?.length" class="py-10 text-center text-sm text-gray-500">Nenhum alerta no período.</div>
+              </div>
+            </section>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm 2xl:col-span-7">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-base font-semibold text-gray-950">Do investimento ao lucro</h2>
+                  <p class="mt-1 text-xs text-gray-500">Cada etapa só avança com evidência disponível</p>
+                </div>
+                <span class="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">funil auditável</span>
+              </div>
+              <div class="mt-5 grid grid-cols-1 gap-2 md:grid-cols-5">
+                <template x-for="(stage, index) in marketingFunnel()" :key="stage.label">
+                  <div class="relative rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-emerald-800 shadow-sm"><i :data-lucide="stage.icon" class="h-4 w-4"></i></span>
+                    <p class="mt-3 text-[11px] text-gray-500" x-text="stage.label"></p>
+                    <p class="mt-1 text-base font-semibold text-gray-950" x-text="stage.value"></p>
+                    <i x-show="index < marketingFunnel().length - 1" data-lucide="chevron-right" class="absolute -right-3 top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 text-emerald-500 md:block"></i>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm 2xl:col-span-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h2 class="text-base font-semibold text-gray-950">Comparação de períodos</h2>
+                  <p class="mt-1 text-xs text-gray-500">Atual contra o intervalo anterior equivalente</p>
+                </div>
+                <i data-lucide="calendar-range" class="h-5 w-5 text-emerald-700"></i>
+              </div>
+              <div x-show="marketingVisao?.comparison?.available" class="mt-5 grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-emerald-50 p-4">
+                  <p class="text-[11px] text-emerald-700">Investimento</p>
+                  <p class="mt-1 text-xl font-semibold text-emerald-950"
+                     x-text="`${Number(marketingVisao?.comparison?.spend_delta_percent || 0).toFixed(1).replace('.', ',')}%`"></p>
+                  <p class="mt-1 text-[10px] text-emerald-700">versus período anterior</p>
+                </div>
+                <div class="rounded-xl bg-emerald-50 p-4">
+                  <p class="text-[11px] text-emerald-700">Conversas</p>
+                  <p class="mt-1 text-xl font-semibold text-emerald-950"
+                     x-text="`${Number(marketingVisao?.comparison?.conversations_delta_percent || 0).toFixed(1).replace('.', ',')}%`"></p>
+                  <p class="mt-1 text-[10px] text-emerald-700">versus período anterior</p>
+                </div>
+              </div>
+              <div x-show="!marketingVisao?.comparison?.available" class="mt-5 flex min-h-[104px] items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 p-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-gray-500"><i data-lucide="history" class="h-4 w-4"></i></span>
+                <div>
+                  <p class="text-sm font-semibold text-gray-800">Histórico anterior insuficiente</p>
+                  <p class="mt-1 text-xs leading-relaxed text-gray-500">A comparação aparecerá quando os dois períodos tiverem dados completos.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-gray-950">Canais</h2>
+                <button @click="marketingNavigate('canais')" class="text-xs font-semibold text-emerald-700 hover:underline">Ver canais</button>
+              </div>
+              <div class="mt-4 space-y-2">
+                <template x-for="channel in marketingVisao?.channels || []" :key="channel.id">
+                  <div class="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2.5">
+                    <span class="flex items-center gap-2 text-sm font-medium text-gray-800"><span class="h-2 w-2 rounded-full bg-emerald-600"></span><span x-text="channel.label"></span></span>
+                    <span class="rounded-full px-2 py-1 text-[10px] font-semibold" :class="marketingChannelClass(channel.status)" x-text="marketingChannelStatus(channel.status)"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-gray-950">Qualidade da medição</h2>
+                <span class="text-[11px] font-medium text-gray-500" x-text="marketingQualityReady()"></span>
+              </div>
+              <div class="mt-4 space-y-2">
+                <template x-for="row in marketingVisao?.quality || []" :key="row.id">
+                  <div class="flex items-center justify-between border-b border-gray-100 py-2 last:border-b-0">
+                    <span class="text-xs text-gray-700" x-text="row.label"></span>
+                    <span class="rounded-full px-2 py-1 text-[10px] font-semibold" :class="marketingQualityClass(row.status)"
+                          x-text="row.status === 'ok' ? 'pronto' : row.status === 'blocked' ? 'bloqueado' : 'pendente'"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-emerald-900/20 bg-emerald-950 p-5 text-white shadow-sm">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-800">
+                <i data-lucide="route" class="h-4 w-4 text-emerald-100"></i>
+              </div>
+              <h2 class="mt-4 text-base font-semibold">Próximos passos seguros</h2>
+              <ul class="mt-3 space-y-2 text-xs leading-relaxed text-emerald-50/85">
+                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Conectar a Meta por variável segura</span></li>
+                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Validar CTWA antes de atribuir vendas</span></li>
+                <li class="flex gap-2"><i data-lucide="check" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i><span>Habilitar CAPI somente após a prova ponta a ponta</span></li>
+              </ul>
+              <button @click="marketingNavigate('integracoes')" class="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-950 hover:bg-emerald-200">
+                Abrir integrações <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+              </button>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <section x-show="marketingTab !== 'visao'"
+               class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <div class="max-w-lg">
+          <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+            <i data-lucide="panels-top-left" class="h-6 w-6"></i>
+          </span>
+          <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">estrutura preservada</p>
+          <h2 class="mt-2 text-2xl font-semibold text-gray-950" x-text="marketingTabLabel()"></h2>
+          <p class="mt-3 text-sm leading-relaxed text-gray-500">
+            Esta seção já está ligada à navegação aprovada. O conteúdo será implementado tela por tela, reutilizando os mesmos contratos e sem duplicar indicadores da visão geral.
+          </p>
+          <button @click="marketingSetTab('visao')" class="mt-6 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Voltar à visão geral</button>
+        </div>
+      </section>
     </div>
 
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->

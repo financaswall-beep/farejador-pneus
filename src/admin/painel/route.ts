@@ -25,6 +25,7 @@ import { registerPainelColaboradoresGestao } from './route-colaboradores-gestao.
 import { registerPainelNotificacoes } from './route-notificacoes.js';
 import { registerPainelBot } from './route-bot.js';
 import { registerPainelClientes } from './route-clientes.js';
+import { registerPainelMarketing } from './route-marketing.js';
 
 export async function registerPainelRoute(fastify: FastifyInstance): Promise<void> {
   await registerPainelStatic(fastify); // estáticos do painel (index/app.js/módulos/css) (linhas 377-394 pré-obra)
@@ -45,4 +46,5 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   await registerPainelNotificacoes(fastify); // sino do painel (2026-07-06): notificações reais
   await registerPainelBot(fastify); // tela do Bot (2026-07-06): campainha + mapa + radar
   await registerPainelClientes(fastify); // CRM da matriz: leitura unificada sem duplicar Vendas/Rede
+  await registerPainelMarketing(fastify); // Marketing: visão inicial, Meta read-only + qualidade de atribuição
 }

@@ -18,6 +18,9 @@ interface ProductionEnvConfig {
   CHATWOOT_API_BASE_URL?: string;
   CHATWOOT_API_TOKEN?: string;
   CHATWOOT_ACCOUNT_ID?: number;
+  MARKETING_META_ENABLED?: boolean;
+  META_ADS_ACCOUNT_ID?: string;
+  META_ADS_ACCESS_TOKEN?: string;
 }
 
 function addIssue(ctx: RefinementCtx, path: string, message: string): void {
@@ -85,6 +88,14 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
     }
     if (!value.CHATWOOT_ACCOUNT_ID) {
       addIssue(ctx, 'CHATWOOT_ACCOUNT_ID', 'is required in production when the bot sender is enabled');
+    }
+  }
+  if (value.MARKETING_META_ENABLED) {
+    if (!value.META_ADS_ACCOUNT_ID) {
+      addIssue(ctx, 'META_ADS_ACCOUNT_ID', 'is required in production when MARKETING_META_ENABLED=true');
+    }
+    if (!value.META_ADS_ACCESS_TOKEN) {
+      addIssue(ctx, 'META_ADS_ACCESS_TOKEN', 'is required in production when MARKETING_META_ENABLED=true');
     }
   }
 }
