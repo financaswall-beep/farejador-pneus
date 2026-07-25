@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 describe('Marketing — primeira tela da matriz', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const front = readFileSync(resolve('painel/public/app.marketing.js'), 'utf8');
+  const campaignsFront = readFileSync(resolve('painel/public/app.marketing.campaigns.js'), 'utf8');
   const route = readFileSync(resolve('src/admin/painel/route-marketing.ts'), 'utf8');
   const staticRoute = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
 
@@ -19,7 +20,6 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('aria-label="Seções de Marketing"');
     for (const label of [
       'Visão geral',
-      'Canais',
       'Campanhas',
       'Criativos',
       'Jornadas',
@@ -35,9 +35,11 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260725-marketing-visao3');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260725-marketing-visao3');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260725-marketing-campaigns1');
+    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260725-marketing-campaigns1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260725-marketing-campaigns1');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
+    expect(staticRoute).toContain("'app.marketing.campaigns.js'");
     expect(front).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(html).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
@@ -79,5 +81,42 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).not.toContain('h-4.5 w-4.5');
     expect(front).toContain("'border-emerald-300 bg-emerald-100/80 text-emerald-950'");
     expect(front).not.toContain("'border-rose-200 bg-rose-50 text-rose-700'");
+  });
+
+  it('remove a subaba redundante Canais e direciona gestão para Integrações', () => {
+    const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
+    const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
+    const marketingHtml = html.slice(marketingStart, marketingEnd);
+
+    expect(front).not.toContain("{ id: 'canais', label: 'Canais' }");
+    expect(front).not.toContain("target: 'canais'");
+    expect(marketingHtml).not.toContain('data-marketing-channels-screen');
+    expect(marketingHtml).toContain("marketingNavigate('integracoes')");
+    expect(marketingHtml).toContain("marketingTab !== 'visao' && marketingTab !== 'campanhas'");
+  });
+
+  it('implementa Campanhas com seleção real de Consolidado, Meta, Google e TikTok', () => {
+    const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
+    const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
+    const marketingHtml = html.slice(marketingStart, marketingEnd);
+
+    expect(marketingHtml).toContain('data-marketing-campaigns-screen');
+    expect(marketingHtml).toContain("marketingCampaignSetChannel('all')");
+    expect(marketingHtml).toContain("marketingCampaignSetChannel('meta')");
+    expect(marketingHtml).toContain("marketingCampaignSetChannel('google')");
+    expect(marketingHtml).toContain("marketingCampaignSetChannel('tiktok')");
+    expect(marketingHtml).toContain('Decisão por campanha');
+    expect(marketingHtml).toContain('data-marketing-campaign-channel-icon');
+    expect(marketingHtml).toContain('Aguardando atribuição');
+    expect(marketingHtml).toContain('A conciliar');
+    expect(marketingHtml).toContain('Nenhuma verba é alterada automaticamente');
+    expect(campaignsFront).toContain('/admin/api/marketing/campaigns?period=');
+    expect(campaignsFront).toContain('&channel=');
+    expect(campaignsFront).toContain('marketingCampaignSetChannel(channel)');
+    expect(campaignsFront).toContain("marketingCampaignChannel === channel");
+    expect(route).toContain("fastify.get('/admin/api/marketing/campaigns'");
+    expect(route).toContain("z.enum(['all', 'meta', 'google', 'tiktok'])");
+    expect(campaignsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
+    expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
 });

@@ -24,12 +24,23 @@ export interface MetaDailyMetric {
   conversations: number;
 }
 
+export interface MetaCampaignMetric {
+  id: string;
+  name: string;
+  spend: number;
+  conversations: number;
+  cost_per_conversation: number | null;
+  delivery_days: number;
+  last_delivery: string;
+}
+
 export interface MetaPeriodSummary {
   spend: number;
   conversations: number;
   campaigns: number;
   cost_per_conversation: number | null;
   daily: MetaDailyMetric[];
+  campaign_rows: MetaCampaignMetric[];
 }
 
 export interface MetaMarketingSnapshot {
@@ -40,6 +51,7 @@ export interface MetaMarketingSnapshot {
 
 interface MetaInsightRow {
   campaign_id?: unknown;
+  campaign_name?: unknown;
   date_start?: unknown;
   spend?: unknown;
   actions?: unknown;
@@ -101,6 +113,13 @@ function leadCount(actions: unknown): number {
 function summarize(rows: MetaInsightRow[], since: string, until: string): MetaPeriodSummary {
   const campaigns = new Set<string>();
   const byDate = new Map<string, MetaDailyMetric>();
+  const byCampaign = new Map<string, {
+    id: string;
+    name: string;
+    spend: number;
+    conversations: number;
+    deliveryDates: Set<string>;
+  }>();
   let spend = 0;
   let conversations = 0;
 
@@ -111,7 +130,21 @@ function summarize(rows: MetaInsightRow[], since: string, until: string): MetaPe
     const rowConversations = leadCount(row.actions);
     spend += rowSpend;
     conversations += rowConversations;
-    if (row.campaign_id) campaigns.add(String(row.campaign_id));
+    if (row.campaign_id) {
+      const id = String(row.campaign_id);
+      campaigns.add(id);
+      const current = byCampaign.get(id) ?? {
+        id,
+        name: String(row.campaign_name || id),
+        spend: 0,
+        conversations: 0,
+        deliveryDates: new Set<string>(),
+      };
+      current.spend += rowSpend;
+      current.conversations += rowConversations;
+      if (date) current.deliveryDates.add(date);
+      byCampaign.set(id, current);
+    }
     const daily = byDate.get(date) ?? { date, spend: 0, conversations: 0 };
     daily.spend += rowSpend;
     daily.conversations += rowConversations;
@@ -129,6 +162,23 @@ function summarize(rows: MetaInsightRow[], since: string, until: string): MetaPe
     daily: [...byDate.values()]
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((row) => ({ ...row, spend: Math.round(row.spend * 100) / 100 })),
+    campaign_rows: [...byCampaign.values()]
+      .map((row) => {
+        const rounded = Math.round(row.spend * 100) / 100;
+        const dates = [...row.deliveryDates].sort();
+        return {
+          id: row.id,
+          name: row.name,
+          spend: rounded,
+          conversations: Math.round(row.conversations),
+          cost_per_conversation: row.conversations > 0
+            ? Math.round((rounded / row.conversations) * 100) / 100
+            : null,
+          delivery_days: dates.length,
+          last_delivery: dates.at(-1) ?? until,
+        };
+      })
+      .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name)),
   };
 }
 

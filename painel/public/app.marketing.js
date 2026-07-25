@@ -38,7 +38,7 @@ function marketingMockPayload() {
       { id: 'capi', severity: 'attention', title: 'CAPI não configurada',
         detail: 'Retorno às plataformas bloqueado', target: 'integracoes' },
       { id: 'channels', severity: 'info', title: '2 canais desconectados',
-        detail: 'Google e TikTok aguardando conexão', target: 'canais' },
+        detail: 'Google e TikTok aguardando conexão', target: 'integracoes' },
     ],
     channels: [
       { id: 'meta', label: 'Meta', status: 'connected' },
@@ -80,7 +80,6 @@ window.PAINEL_MODULES.marketing = function () {
     marketingTabs() {
       return [
         { id: 'visao', label: 'Visão geral' },
-        { id: 'canais', label: 'Canais' },
         { id: 'campanhas', label: 'Campanhas' },
         { id: 'criativos', label: 'Criativos' },
         { id: 'jornadas', label: 'Jornadas' },
@@ -91,6 +90,7 @@ window.PAINEL_MODULES.marketing = function () {
 
     marketingSetTab(tab) {
       this.marketingTab = tab;
+      if (tab === 'campanhas') void this.loadMarketingCampaigns();
       this.$nextTick(() => lucide.createIcons());
     },
 

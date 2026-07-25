@@ -26,6 +26,7 @@ describe('Marketing Meta read-only', () => {
       data: [
         {
           campaign_id: 'camp-1',
+          campaign_name: '205/55 R16 • Curitiba',
           date_start: '2026-07-19',
           spend: '10',
           actions: [
@@ -35,6 +36,7 @@ describe('Marketing Meta read-only', () => {
         },
         {
           campaign_id: 'camp-2',
+          campaign_name: 'Pneus para moto • Sul',
           date_start: '2026-07-20',
           spend: '20',
           actions: [{ action_type: 'lead', value: '2' }],
@@ -67,6 +69,26 @@ describe('Marketing Meta read-only', () => {
       campaigns: 2,
       cost_per_conversation: 5,
     });
+    expect(snapshot.current.campaign_rows).toEqual([
+      {
+        id: 'camp-2',
+        name: 'Pneus para moto • Sul',
+        spend: 20,
+        conversations: 2,
+        cost_per_conversation: 10,
+        delivery_days: 1,
+        last_delivery: '2026-07-20',
+      },
+      {
+        id: 'camp-1',
+        name: '205/55 R16 • Curitiba',
+        spend: 10,
+        conversations: 4,
+        cost_per_conversation: 2.5,
+        delivery_days: 1,
+        last_delivery: '2026-07-19',
+      },
+    ]);
     expect(snapshot.previous).toMatchObject({
       spend: 5,
       conversations: 1,

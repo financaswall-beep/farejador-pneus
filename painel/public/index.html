@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260725-marketing-visao3" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260725-marketing-campaigns1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -44,7 +44,8 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260725-marketing-visao3"></script>
+<script src="/admin/painel/app.marketing.js?v=20260725-marketing-campaigns1"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260725-marketing-campaigns1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -55,8 +56,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.js?v=20260723-rede-fix1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260725-marketing-campaigns1"></script>
+<script src="/admin/painel/app.js?v=20260725-marketing-campaigns1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -6549,7 +6550,7 @@
             </template>
           </nav>
           <div class="mb-3 flex items-center gap-2 lg:mb-0">
-            <select x-model="marketingPeriod" @change="loadMarketing()"
+            <select x-model="marketingPeriod" @change="marketingPeriodChanged()"
                     class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-100">
               <option value="7d">Últimos 7 dias</option>
               <option value="30d">Últimos 30 dias</option>
@@ -6820,7 +6821,7 @@
                   <h2 class="text-base font-semibold text-gray-950">Canais conectados</h2>
                   <p class="mt-1 text-xs text-gray-500">Situação real de cada plataforma</p>
                 </div>
-                <button @click="marketingNavigate('canais')" class="text-xs font-semibold text-emerald-700 hover:underline">Ver canais</button>
+                <button @click="marketingNavigate('integracoes')" class="text-xs font-semibold text-emerald-700 hover:underline">Gerenciar integrações</button>
               </div>
               <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <template x-for="channel in marketingVisao?.channels || []" :key="channel.id">
@@ -6914,7 +6915,286 @@
         </div>
       </div>
 
-      <section x-show="marketingTab !== 'visao'"
+      <section x-show="marketingTab === 'campanhas'"
+               class="space-y-4"
+               data-marketing-campaigns-screen
+               x-cloak>
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">centro de decisão</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-gray-950">Campanhas</h2>
+            <p class="mt-1 text-sm text-gray-500">Decida onde revisar ou manter a entrega sem presumir venda, lucro ou estoque.</p>
+          </div>
+          <button type="button" disabled
+                  title="A criação será habilitada somente com fluxo de escrita auditado"
+                  class="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white opacity-55">
+            <i data-lucide="lock-keyhole" class="h-4 w-4"></i>
+            Nova campanha
+          </button>
+        </header>
+
+        <section class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+          <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar campanhas por canal">
+              <button type="button" @click="marketingCampaignSetChannel('all')"
+                      :aria-pressed="marketingCampaignChannel === 'all'"
+                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
+                      :class="marketingCampaignChannel === 'all' ? 'border-emerald-700 bg-emerald-800 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200 hover:text-emerald-800'">
+                <i data-lucide="layout-grid" class="h-4 w-4"></i>
+                Consolidado
+              </button>
+              <button type="button" @click="marketingCampaignSetChannel('meta')"
+                      :aria-pressed="marketingCampaignChannel === 'meta'"
+                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
+                      :class="marketingCampaignChannel === 'meta' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200'">
+                <span class="relative h-5 w-6">
+                  <img src="/assets/brands/facebook.svg" alt="" class="absolute left-0 top-0 h-4 w-4">
+                  <img src="/assets/brands/instagram.svg" alt="" class="absolute bottom-0 right-0 h-4 w-4 rounded bg-white ring-1 ring-white">
+                </span>
+                Meta
+              </button>
+              <button type="button" @click="marketingCampaignSetChannel('google')"
+                      :aria-pressed="marketingCampaignChannel === 'google'"
+                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
+                      :class="marketingCampaignChannel === 'google' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200'">
+                <img src="/assets/brands/google-ads.svg" alt="" class="h-4 w-4">
+                Google
+              </button>
+              <button type="button" @click="marketingCampaignSetChannel('tiktok')"
+                      :aria-pressed="marketingCampaignChannel === 'tiktok'"
+                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
+                      :class="marketingCampaignChannel === 'tiktok' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200'">
+                <svg role="img" aria-label="TikTok" viewBox="0 0 24 24" class="h-4 w-4 fill-current">
+                  <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
+                </svg>
+                TikTok
+              </button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-800"
+                    x-text="marketingCampaignSelectedStatus()"></span>
+              <button type="button" @click="loadMarketingCampaigns()"
+                      class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-emerald-200 hover:text-emerald-800"
+                      aria-label="Atualizar campanhas">
+                <i data-lucide="refresh-cw" class="h-4 w-4" :class="marketingCampaignsLoading ? 'animate-spin' : ''"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div x-show="marketingCampaignsLoading && !marketingCampaigns"
+             class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
+          Carregando campanhas do canal selecionado…
+        </div>
+        <div x-show="marketingCampaignsError"
+             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <span x-text="marketingCampaignsError"></span>
+          <button type="button" @click="loadMarketingCampaigns()" class="font-semibold underline">Tentar novamente</button>
+        </div>
+
+        <div x-show="marketingCampaigns && !marketingCampaignsError" class="space-y-4">
+          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+            <template x-for="(item, index) in marketingCampaignSummary()" :key="item.id">
+              <article class="flex min-h-[102px] items-center gap-3 px-5 py-4"
+                       :class="index > 0 ? 'border-t border-emerald-800/80 sm:border-l sm:border-t-0' : ''">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-600/60 bg-emerald-800/70 text-emerald-100">
+                  <i :data-lucide="item.icon" class="h-5 w-5"></i>
+                </span>
+                <div class="min-w-0">
+                  <p class="text-xs text-emerald-100/75" x-text="item.label"></p>
+                  <p class="mt-1 truncate text-xl font-semibold num" x-text="item.value"></p>
+                  <p class="mt-0.5 truncate text-[11px] text-emerald-200/70" x-text="item.detail"></p>
+                </div>
+              </article>
+            </template>
+          </section>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-9">
+              <header class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-950">Decisão por campanha</h3>
+                  <p class="mt-1 text-xs text-gray-500">
+                    Canal: <strong class="text-gray-700" x-text="marketingCampaignChannelName(marketingCampaignChannel)"></strong>
+                  </p>
+                </div>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                    <template x-for="tab in marketingCampaignDecisionTabs()" :key="tab.id">
+                      <button type="button" @click="marketingCampaignDecision = tab.id; marketingCampaignPage = 1"
+                              class="rounded-md px-3 py-1.5 text-[11px] font-semibold"
+                              :class="marketingCampaignDecision === tab.id ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-500'"
+                              x-text="tab.label"></button>
+                    </template>
+                  </div>
+                  <label class="relative block">
+                    <i data-lucide="search" class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400"></i>
+                    <input x-model="marketingCampaignSearch" @input="marketingCampaignPage = 1"
+                           type="search" placeholder="Buscar campanha"
+                           class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-emerald-500 sm:w-52">
+                  </label>
+                </div>
+              </header>
+
+              <div x-show="marketingCampaignFiltered().length" class="overflow-x-auto">
+                <table class="w-full min-w-[1120px] text-xs">
+                  <thead class="bg-gray-50 text-left text-[11px] text-gray-500">
+                    <tr>
+                      <th class="px-5 py-3 font-medium">Campanha</th>
+                      <th class="px-3 py-3 font-medium">Canal</th>
+                      <th class="px-3 py-3 font-medium">Entrega</th>
+                      <th class="px-3 py-3 text-right font-medium">Investimento</th>
+                      <th class="px-3 py-3 text-right font-medium">Conversas</th>
+                      <th class="px-3 py-3 text-right font-medium">Custo/conversa</th>
+                      <th class="px-3 py-3 font-medium">Venda / lucro</th>
+                      <th class="px-3 py-3 font-medium">Estoque</th>
+                      <th class="px-5 py-3 font-medium">Decisão</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <template x-for="row in marketingCampaignPageRows()" :key="row.id">
+                      <tr class="hover:bg-emerald-50/30">
+                        <td class="px-5 py-4">
+                          <p class="max-w-[250px] truncate text-sm font-semibold text-gray-900" x-text="row.name"></p>
+                          <p class="mt-1 text-[11px] text-gray-400" x-text="row.delivery_days + ' dia(s) com entrega • até ' + marketingDateLabel(row.last_delivery)"></p>
+                        </td>
+                        <td class="px-3 py-4">
+                          <span class="inline-flex items-center gap-2 font-semibold text-gray-700"
+                                data-marketing-campaign-channel-icon>
+                            <template x-if="row.channel === 'meta'">
+                              <span class="relative h-5 w-6 shrink-0" aria-hidden="true">
+                                <img src="/assets/brands/facebook.svg" alt="" class="absolute left-0 top-0 h-4 w-4">
+                                <img src="/assets/brands/instagram.svg" alt="" class="absolute bottom-0 right-0 h-4 w-4 rounded bg-white ring-1 ring-white">
+                              </span>
+                            </template>
+                            <template x-if="row.channel === 'google'">
+                              <img src="/assets/brands/google-ads.svg" alt="" class="h-5 w-5 shrink-0" aria-hidden="true">
+                            </template>
+                            <template x-if="row.channel === 'tiktok'">
+                              <svg viewBox="0 0 24 24" class="h-5 w-5 shrink-0 fill-black" aria-hidden="true">
+                                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
+                              </svg>
+                            </template>
+                            <span x-text="marketingCampaignChannelName(row.channel)"></span>
+                          </span>
+                        </td>
+                        <td class="px-3 py-4">
+                          <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">Com entrega</span>
+                        </td>
+                        <td class="px-3 py-4 text-right font-semibold num text-gray-900" x-text="formatCurrency(Number(row.investment))"></td>
+                        <td class="px-3 py-4 text-right num text-gray-700" x-text="row.conversations"></td>
+                        <td class="px-3 py-4 text-right num text-gray-700" x-text="row.cost_per_conversation == null ? '—' : formatCurrency(Number(row.cost_per_conversation))"></td>
+                        <td class="px-3 py-4">
+                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                            <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
+                            Aguardando atribuição
+                          </span>
+                        </td>
+                        <td class="px-3 py-4"><span class="text-[11px] font-medium text-gray-500">A conciliar</span></td>
+                        <td class="px-5 py-4">
+                          <span class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                                :class="marketingCampaignDecisionClass(row.decision)"
+                                x-text="row.decision.label"></span>
+                          <p class="mt-1 max-w-[190px] text-[10px] leading-relaxed text-gray-400" x-text="row.decision.detail"></p>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+
+              <div x-show="!marketingCampaignFiltered().length"
+                   class="flex min-h-[330px] flex-col items-center justify-center px-6 text-center">
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
+                  <i data-lucide="megaphone-off" class="h-5 w-5"></i>
+                </span>
+                <h4 class="mt-4 text-base font-semibold text-gray-900">Nenhuma campanha disponível neste filtro</h4>
+                <p class="mt-2 max-w-md text-sm leading-relaxed text-gray-500">
+                  O sistema não preenche canais desconectados com estimativas. Conecte a plataforma ou escolha outro canal.
+                </p>
+                <button type="button" @click="marketingNavigate('integracoes')" class="mt-4 text-sm font-semibold text-emerald-700 hover:underline">Abrir integrações</button>
+              </div>
+
+              <footer x-show="marketingCampaignFiltered().length"
+                      class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+                <span x-text="marketingCampaignFiltered().length + ' campanha(s)'"></span>
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="marketingCampaignSetPage(marketingCampaignPage - 1)"
+                          :disabled="marketingCampaignPage <= 1"
+                          class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-40">
+                    <i data-lucide="chevron-left" class="h-4 w-4"></i>
+                  </button>
+                  <span class="min-w-14 text-center font-semibold text-gray-700"
+                        x-text="marketingCampaignPage + ' / ' + marketingCampaignPageCount()"></span>
+                  <button type="button" @click="marketingCampaignSetPage(marketingCampaignPage + 1)"
+                          :disabled="marketingCampaignPage >= marketingCampaignPageCount()"
+                          class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 disabled:opacity-40">
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                  </button>
+                </div>
+              </footer>
+            </section>
+
+            <aside class="space-y-4 xl:col-span-3">
+              <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center gap-2">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><i data-lucide="list-checks" class="h-4 w-4"></i></span>
+                  <h3 class="text-base font-semibold text-gray-950">Próximas decisões</h3>
+                </div>
+                <div class="mt-3 divide-y divide-gray-100">
+                  <template x-for="item in marketingCampaignRecommendations()" :key="item.id">
+                    <button type="button" @click="marketingNavigate(item.target)" class="flex w-full items-start gap-3 py-3.5 text-left">
+                      <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
+                        <i :data-lucide="item.icon" class="h-4 w-4"></i>
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <strong class="block text-sm leading-snug text-gray-900" x-text="item.title"></strong>
+                        <span class="mt-1 block text-[11px] leading-relaxed text-gray-500" x-text="item.detail"></span>
+                      </span>
+                      <i data-lucide="chevron-right" class="mt-2 h-4 w-4 shrink-0 text-gray-400"></i>
+                    </button>
+                  </template>
+                </div>
+              </section>
+
+              <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="text-base font-semibold text-gray-950">Alertas que afetam resultado</h3>
+                  <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800"
+                        x-text="marketingCampaigns?.alerts?.length || 0"></span>
+                </div>
+                <div class="mt-3 divide-y divide-gray-100">
+                  <template x-for="alert in marketingCampaigns?.alerts || []" :key="alert.id">
+                    <button type="button" @click="marketingNavigate(alert.target)" class="flex w-full items-start gap-3 py-3.5 text-left">
+                      <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                            :class="marketingCampaignAlertClass(alert.severity)">
+                        <i :data-lucide="marketingAlertIcon(alert.severity)" class="h-4 w-4"></i>
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <strong class="block text-sm leading-snug text-gray-900" x-text="alert.title"></strong>
+                        <span class="mt-1 block text-[11px] leading-relaxed text-gray-500" x-text="alert.detail"></span>
+                      </span>
+                    </button>
+                  </template>
+                  <p x-show="!marketingCampaigns?.alerts?.length" class="py-6 text-center text-xs text-gray-500">Nenhum alerta neste canal.</p>
+                </div>
+              </section>
+
+              <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+                <div class="flex gap-3">
+                  <i data-lucide="shield-check" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"></i>
+                  <div>
+                    <p class="text-sm font-semibold">Recomendação protegida</p>
+                    <p class="mt-1 text-[11px] leading-relaxed text-emerald-800">Nenhuma verba é alterada automaticamente. Vendas e lucro continuam bloqueados sem prova de atribuição.</p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">
