@@ -35,7 +35,8 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260725-marketing-visao2');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260725-marketing-visao3');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260725-marketing-visao3');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(front).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(html).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
@@ -67,7 +68,11 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('data-marketing-channel-filter-mock');
     expect(marketingHtml).toContain('Estes botões ainda NÃO filtram os dados');
     expect(marketingHtml).toContain('channels=meta,google,tiktok');
-    expect(marketingHtml).toContain('Mock visual — os valores ainda usam a amostra da Meta');
+    expect(marketingHtml).toContain('Prévia dos filtros — os valores atuais ainda usam somente a Meta');
+    expect(marketingHtml).not.toContain('<section x-show="marketingIsMock()" x-cloak data-marketing-channel-filter-mock');
+    expect(marketingHtml).toContain('grid grid-cols-1 gap-4 lg:grid-cols-12');
+    expect(marketingHtml).toContain('shadow-sm lg:col-span-8');
+    expect(marketingHtml).toContain('shadow-sm lg:col-span-7');
     expect(marketingHtml).toContain('absolute right-3 top-3 z-20');
     expect(marketingHtml).not.toContain('absolute right-3 top-3 z-30');
     expect(marketingHtml).toContain('xl:grid-cols-6');
