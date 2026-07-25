@@ -10,17 +10,16 @@ describe('Estoque — cabeçalho panorâmico', () => {
     const previewBanner = statSync(resolve('painel/public/assets/estoque-hero-warehouse.webp'));
     const tireThumbnail = statSync(resolve('painel/public/assets/tire-dashboard.webp'));
 
-    expect(html).toContain('/admin/painel/assets/estoque-hero.webp?v=20260723-estoque-rede1');
-    expect(html).toContain('/admin/painel/assets/estoque-hero.webp?preview=warehouse&v=20260724-estoque-banner-preview3');
+    expect(html).toContain('/admin/painel/assets/estoque-hero.webp?preview=warehouse&v=20260724-estoque-banner-prod1');
+    expect(html).not.toContain('/admin/painel/assets/estoque-hero.webp?v=20260723-estoque-rede1');
     expect(html).toContain('aria-labelledby="estoque-heading"');
     expect(html).toContain('id="estoque-heading"');
     expect(html).toContain('aria-label="Seções de Estoque"');
-    expect(html).toContain('xl:grid-cols-[380px_minmax(0,1fr)]');
     expect(html).toContain('min-h-[148px]');
-    expect(html).toContain("'absolute inset-0 rounded-t-xl'");
-    expect(html).toContain("'relative rounded-xl'");
-    expect(html).toContain("'relative z-20 justify-center px-8 py-6 xl:px-10'");
-    expect(html).toContain("'from-emerald-950 via-emerald-950/75 to-emerald-950/5'");
+    expect(html).toContain('class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl');
+    expect(html).toContain('class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10"');
+    expect(html).toContain('class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl');
+    expect(html).toContain('bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5');
     expect(html).toContain('galpão oficial');
     expect(html).toContain("stockTab = 'movimentacoes'; loadGalpaoFilme()");
     expect(html).toContain("stockTab = 'conciliacao'; loadStockReconciliation()");

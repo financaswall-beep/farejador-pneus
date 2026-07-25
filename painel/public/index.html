@@ -2818,34 +2818,18 @@
     <!-- ═══ TELA: ESTOQUE do galpão — mesma fonte de atacado, varejo, compras, sino, Bot e Financeiro ═══ -->
     <div x-show="currentPage === 'estoque'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
       <section aria-labelledby="estoque-heading"
-               class="mb-0"
-               :class="new URLSearchParams(location.search).get('mock') === '1'
-                 ? 'relative min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm'
-                 : 'grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-stretch'">
-        <div class="flex min-h-[148px] flex-col justify-start pt-1 xl:pt-2"
-             :class="new URLSearchParams(location.search).get('mock') === '1'
-               ? 'relative z-20 justify-center px-8 py-6 xl:px-10'
-               : ''">
+               class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+        <div class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10">
           <h1 id="estoque-heading"
-              class="text-3xl font-bold tracking-tight lg:text-[34px] lg:leading-tight"
-              :class="new URLSearchParams(location.search).get('mock') === '1' ? 'text-white' : 'text-gray-950'">Estoque do galpão</h1>
-          <p class="mt-3 max-w-md text-sm"
-             :class="new URLSearchParams(location.search).get('mock') === '1' ? 'text-emerald-50/90' : 'text-slate-500'">O que tem, o que precisa repor e tudo que entrou ou saiu</p>
+              class="text-3xl font-bold tracking-tight text-white lg:text-[34px] lg:leading-tight">Estoque do galpão</h1>
+          <p class="mt-3 max-w-md text-sm text-emerald-50/90">O que tem, o que precisa repor e tudo que entrou ou saiu</p>
         </div>
-          <div class="min-h-[148px] overflow-hidden border border-emerald-950/20 bg-emerald-950 shadow-sm"
-               :class="new URLSearchParams(location.search).get('mock') === '1'
-                 ? 'absolute inset-0 rounded-t-xl'
-                 : 'relative rounded-xl'">
+          <div class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
             <img
-              :src="new URLSearchParams(location.search).get('mock') === '1'
-                ? '/admin/painel/assets/estoque-hero.webp?preview=warehouse&v=20260724-estoque-banner-preview3'
-                : '/admin/painel/assets/estoque-hero.webp?v=20260723-estoque-rede1'"
+              src="/admin/painel/assets/estoque-hero.webp?preview=warehouse&v=20260724-estoque-banner-prod1"
               alt="Controle visual do estoque de pneus organizado por medida"
               class="absolute inset-0 h-full w-full object-cover object-center">
-            <div class="absolute inset-0 bg-gradient-to-r"
-                 :class="new URLSearchParams(location.search).get('mock') === '1'
-                   ? 'from-emerald-950 via-emerald-950/75 to-emerald-950/5'
-                   : 'from-emerald-950/5 via-transparent to-emerald-950/15'"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5"></div>
             <div class="absolute right-3 top-3 z-10 flex flex-wrap items-center justify-end gap-2">
               <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-800/90 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
                 <i data-lucide="badge-check" class="h-3.5 w-3.5 text-emerald-200"></i>
