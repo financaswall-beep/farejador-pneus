@@ -122,15 +122,29 @@ window.PAINEL_MODULES.marketing = function () {
       ];
     },
 
-    marketingSeriesPoints(field) {
+    marketingSeriesPoints(field, area = false) {
       const rows = this.marketingVisao?.series || [];
       if (!rows.length) return '';
       const max = Math.max(1, ...rows.map((row) => Number(row[field]) || 0));
-      return rows.map((row, index) => {
+      const points = rows.map((row, index) => {
         const x = rows.length === 1 ? 350 : 20 + (660 * index / (rows.length - 1));
         const y = 180 - ((Number(row[field]) || 0) / max * 145);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(' ');
+        return { x, y };
+      });
+      if (points.length === 1) {
+        const point = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+        return area ? `${point} L ${points[0].x.toFixed(1)} 180 Z` : point;
+      }
+      let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+      for (let index = 0; index < points.length - 1; index += 1) {
+        const current = points[index];
+        const next = points[index + 1];
+        const controlX = (current.x + next.x) / 2;
+        path += ` C ${controlX.toFixed(1)} ${current.y.toFixed(1)}, ${controlX.toFixed(1)} ${next.y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`;
+      }
+      return area
+        ? `${path} L ${points[points.length - 1].x.toFixed(1)} 180 L ${points[0].x.toFixed(1)} 180 Z`
+        : path;
     },
 
     marketingDateLabel(date) {
@@ -145,9 +159,9 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingAlertClass(severity) {
-      if (severity === 'high') return 'border-rose-200 bg-rose-50 text-rose-700';
-      if (severity === 'attention') return 'border-amber-200 bg-amber-50 text-amber-700';
-      return 'border-emerald-100 bg-emerald-50 text-emerald-800';
+      if (severity === 'high') return 'border-emerald-300 bg-emerald-100/80 text-emerald-950';
+      if (severity === 'attention') return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+      return 'border-emerald-100 bg-emerald-50/50 text-emerald-800';
     },
 
     marketingAlertIcon(severity) {
@@ -164,9 +178,8 @@ window.PAINEL_MODULES.marketing = function () {
 
     marketingChannelClass(status) {
       if (status === 'connected') return 'bg-emerald-100 text-emerald-800';
-      if (status === 'error') return 'bg-rose-100 text-rose-700';
-      if (status === 'planned') return 'bg-gray-100 text-gray-500';
-      return 'bg-amber-100 text-amber-800';
+      if (status === 'planned') return 'border border-emerald-100 bg-emerald-50 text-emerald-700';
+      return 'bg-gray-100 text-gray-600';
     },
 
     marketingQualityClass(status) {
@@ -184,11 +197,16 @@ window.PAINEL_MODULES.marketing = function () {
       const metrics = this.marketingVisao?.metrics || {};
       const money = (value) => value == null ? '—' : this.formatCurrency(Number(value));
       return [
-        { label: 'Investimento', value: money(metrics.investment), icon: 'circle-dollar-sign' },
-        { label: 'Conversas', value: metrics.conversations ?? '—', icon: 'messages-square' },
-        { label: 'Demanda identificada', value: '—', icon: 'search' },
-        { label: 'Vendas atribuídas', value: metrics.attributed_sales ?? '—', icon: 'shopping-cart' },
-        { label: 'Lucro', value: metrics.profit == null ? '—' : money(metrics.profit), icon: 'trending-up' },
+        { label: 'Investimento', value: money(metrics.investment), detail: 'confirmado na plataforma',
+          icon: 'circle-dollar-sign', status: metrics.investment == null ? 'pending' : 'ready' },
+        { label: 'Conversas', value: metrics.conversations ?? '—', detail: 'iniciadas pelo anúncio',
+          icon: 'messages-square', status: metrics.conversations == null ? 'pending' : 'ready' },
+        { label: 'Demanda', value: 'A classificar', detail: 'medida e região procuradas',
+          icon: 'search', status: 'pending' },
+        { label: 'Vendas atribuídas', value: metrics.attributed_sales ?? 'Pendente', detail: 'exige vínculo CTWA validado',
+          icon: 'shopping-cart', status: metrics.attributed_sales == null ? 'pending' : 'ready' },
+        { label: 'Lucro real', value: metrics.profit == null ? 'Bloqueado' : money(metrics.profit), detail: 'receita menos custos reais',
+          icon: 'trending-up', status: metrics.profit == null ? 'blocked' : 'ready' },
       ];
     },
   };
