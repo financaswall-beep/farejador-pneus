@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260725-marketing-campaigns1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-integrations1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -44,8 +44,9 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260725-marketing-campaigns1"></script>
-<script src="/admin/painel/app.marketing.campaigns.js?v=20260725-marketing-campaigns1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260726-marketing-integrations1"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-integrations1"></script>
+<script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-integrations1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -56,8 +57,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260725-marketing-campaigns1"></script>
-<script src="/admin/painel/app.js?v=20260725-marketing-campaigns1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260726-marketing-integrations1"></script>
+<script src="/admin/painel/app.js?v=20260726-marketing-integrations1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -7194,7 +7195,263 @@
         </div>
       </section>
 
-      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas'"
+      <section x-show="marketingTab === 'integracoes'"
+               class="space-y-4"
+               data-marketing-integrations-screen
+               x-cloak>
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">ambiente de conexão</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-gray-950">Integrações</h2>
+            <p class="mt-1 text-sm text-gray-500">Conecte plataformas, valide a coleta e acompanhe cada sincronização.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+              <i data-lucide="shield-check" class="h-4 w-4"></i>
+              Ambiente protegido
+            </span>
+            <button type="button" @click="marketingScrollAudit()"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:border-emerald-200 hover:text-emerald-800">
+              <i data-lucide="history" class="h-4 w-4"></i>
+              Ver auditoria
+            </button>
+          </div>
+        </header>
+
+        <div x-show="marketingIntegrationsLoading && !marketingIntegrations"
+             class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
+          Carregando estado das integrações…
+        </div>
+        <div x-show="marketingIntegrationsError"
+             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+          <span x-text="marketingIntegrationsError"></span>
+          <button type="button" @click="loadMarketingIntegrations()" class="font-semibold underline">Tentar novamente</button>
+        </div>
+
+        <div x-show="marketingIntegrations && !marketingIntegrationsError" class="space-y-4">
+          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+            <template x-for="(item, index) in marketingIntegrationSummary()" :key="item.id">
+              <article class="flex min-h-[96px] items-center gap-3 px-5 py-4"
+                       :class="index > 0 ? 'border-t border-emerald-800/80 sm:border-l sm:border-t-0' : ''">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-800/70 text-emerald-100">
+                  <i :data-lucide="item.icon" class="h-5 w-5"></i>
+                </span>
+                <div class="min-w-0">
+                  <p class="text-xs text-emerald-100/75" x-text="item.label"></p>
+                  <p class="mt-1 truncate text-xl font-semibold num" x-text="item.value"></p>
+                </div>
+              </article>
+            </template>
+          </section>
+
+          <section class="grid grid-cols-1 gap-3 xl:grid-cols-3" aria-label="Plataformas de Marketing">
+            <template x-for="platform in marketingIntegrations?.platforms || []" :key="platform.id">
+              <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-50">
+                      <template x-if="platform.id === 'meta'">
+                        <span class="relative h-8 w-9">
+                          <img src="/assets/brands/facebook.svg" alt="Facebook Ads" class="absolute left-0 top-0 h-6 w-6">
+                          <img src="/assets/brands/instagram.svg" alt="Instagram Ads" class="absolute bottom-0 right-0 h-6 w-6 rounded-md bg-white ring-2 ring-white">
+                        </span>
+                      </template>
+                      <template x-if="platform.id === 'google'">
+                        <img src="/assets/brands/google-ads.svg" alt="Google Ads" class="h-8 w-8">
+                      </template>
+                      <template x-if="platform.id === 'tiktok'">
+                        <svg role="img" aria-label="TikTok Ads" viewBox="0 0 24 24" class="h-8 w-8 fill-black">
+                          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
+                        </svg>
+                      </template>
+                    </span>
+                    <div class="min-w-0">
+                      <h3 class="truncate text-lg font-semibold text-gray-950" x-text="platform.label"></h3>
+                      <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold"
+                            :class="marketingIntegrationStatusClass(platform.status)">
+                        <i :data-lucide="marketingIntegrationStatusIcon(platform.status)" class="h-3 w-3"></i>
+                        <span x-text="marketingIntegrationStatusLabel(platform.status)"></span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-4 min-h-[88px] space-y-2 text-xs">
+                  <template x-if="platform.id === 'meta' && platform.status === 'connected'">
+                    <div class="space-y-2">
+                      <div class="flex justify-between gap-3"><span class="text-gray-500">Conta de anúncios</span><strong class="num text-gray-800" x-text="platform.account_masked || 'Configurada'"></strong></div>
+                      <div class="flex justify-between gap-3"><span class="text-gray-500">Última sincronização</span><strong class="text-gray-800" x-text="platform.last_sync_at ? formatDateTime(platform.last_sync_at) : '—'"></strong></div>
+                      <div class="flex justify-between gap-3"><span class="text-gray-500">Itens importados</span><strong class="text-right text-gray-800" x-text="platform.imported.join(', ')"></strong></div>
+                    </div>
+                  </template>
+                  <template x-if="platform.id === 'meta' && platform.status !== 'connected'">
+                    <p class="leading-relaxed text-gray-500">A coleta permanece vazia até a credencial e a conta serem validadas no ambiente protegido.</p>
+                  </template>
+                  <template x-if="platform.id === 'google'">
+                    <p class="leading-relaxed text-gray-500">Conector ainda não implementado. Nenhuma campanha ou indicador do Google é presumido.</p>
+                  </template>
+                  <template x-if="platform.id === 'tiktok'">
+                    <p class="leading-relaxed text-gray-500">Integração planejada. A coleta será liberada somente depois do conector próprio.</p>
+                  </template>
+                </div>
+
+                <button type="button" @click="marketingIntegrationAction(platform)"
+                        class="mt-4 inline-flex w-full items-center justify-center rounded-lg border px-3 py-2.5 text-xs font-semibold"
+                        :class="platform.status === 'connected' ? 'border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900' : 'border-emerald-700 bg-white text-emerald-800 hover:bg-emerald-50'"
+                        x-text="marketingIntegrationActionLabel(platform)"></button>
+              </article>
+            </template>
+          </section>
+
+          <div x-show="marketingIntegrationsMessage"
+               class="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+            <span x-text="marketingIntegrationsMessage"></span>
+            <button type="button" @click="marketingIntegrationsMessage = ''" aria-label="Fechar aviso"><i data-lucide="x" class="h-4 w-4"></i></button>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-7">
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><i data-lucide="workflow" class="h-4 w-4"></i></span>
+                <div><h3 class="text-base font-semibold text-gray-950">Fluxo de dados</h3><p class="mt-0.5 text-xs text-gray-500">Da plataforma ao resultado, sem atalhos de atribuição.</p></div>
+              </div>
+
+              <div class="relative mt-6 grid grid-cols-5">
+                <div class="absolute left-[10%] right-[10%] top-5 h-0.5 bg-gray-200"></div>
+                <template x-for="(step, index) in marketingIntegrations?.pipeline || []" :key="step.id">
+                  <div class="relative z-10 flex min-w-0 flex-col items-center px-1 text-center">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-full border-2 bg-white"
+                          :class="step.status === 'ok' ? 'border-emerald-700 text-emerald-800' : 'border-gray-300 text-gray-500'">
+                      <i :data-lucide="step.status === 'ok' ? 'check' : step.status === 'blocked' ? 'lock-keyhole' : 'clock-3'" class="h-4 w-4"></i>
+                    </span>
+                    <strong class="mt-2 text-[11px] text-gray-800" x-text="step.label"></strong>
+                    <span class="mt-0.5 text-[9px]" :class="step.status === 'ok' ? 'text-emerald-700' : 'text-gray-400'"
+                          x-text="marketingIntegrationStatusLabel(step.status)"></span>
+                  </div>
+                </template>
+              </div>
+
+              <div class="mt-6 divide-y divide-gray-100 rounded-lg border border-gray-100">
+                <template x-for="row in marketingIntegrations?.collection || []" :key="row.id">
+                  <div class="flex items-center gap-3 px-4 py-2.5 text-xs">
+                    <span class="flex h-5 w-5 items-center justify-center rounded-full"
+                          :class="row.status === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'">
+                      <i :data-lucide="marketingIntegrationStatusIcon(row.status)" class="h-3 w-3"></i>
+                    </span>
+                    <span class="flex-1 font-medium text-gray-700" x-text="row.label"></span>
+                    <span :class="row.status === 'ok' ? 'text-emerald-700' : 'text-gray-500'" x-text="row.detail"></span>
+                  </div>
+                </template>
+              </div>
+              <p class="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-900">
+                <i data-lucide="shield-check" class="h-4 w-4"></i>
+                Nenhuma venda é atribuída sem vínculo rastreável.
+              </p>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-5">
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><i data-lucide="badge-check" class="h-4 w-4"></i></span>
+                <div><h3 class="text-base font-semibold text-gray-950">Qualidade e segurança</h3><p class="mt-0.5 text-xs text-gray-500">Prontidão técnica da coleta atual.</p></div>
+              </div>
+              <div class="mt-5 grid grid-cols-[128px_minmax(0,1fr)] items-center gap-5">
+                <div class="relative h-28 w-28 rounded-full p-2"
+                     :style="`background:conic-gradient(#047857 ${marketingIntegrations?.summary?.quality_percent || 0}%, #d1fae5 0)`">
+                  <div class="flex h-full w-full items-center justify-center rounded-full bg-white">
+                    <span class="text-3xl font-semibold text-gray-950" x-text="`${marketingIntegrations?.summary?.quality_percent || 0}%`"></span>
+                  </div>
+                </div>
+                <div class="divide-y divide-gray-100">
+                  <template x-for="row in marketingIntegrations?.quality || []" :key="row.id">
+                    <div class="flex items-center gap-2 py-2 text-xs">
+                      <i :data-lucide="marketingIntegrationStatusIcon(row.status)" class="h-4 w-4"
+                         :class="row.status === 'ok' ? 'text-emerald-700' : 'text-gray-400'"></i>
+                      <span class="flex-1 text-gray-700" x-text="row.label"></span>
+                      <strong class="text-[10px]" :class="row.status === 'ok' ? 'text-emerald-700' : 'text-gray-500'"
+                              x-text="marketingIntegrationStatusLabel(row.status)"></strong>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div class="mt-5 flex gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+                <i data-lucide="arrow-right-circle" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"></i>
+                <div><p class="text-xs font-semibold">Próximo passo</p><p class="mt-1 text-sm" x-text="marketingIntegrations?.next_step"></p></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-7">
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><i data-lucide="link-2" class="h-4 w-4"></i></span>
+                <div><h3 class="text-base font-semibold text-gray-950">Padrão de rastreamento</h3><p class="mt-0.5 text-xs text-gray-500">Gere UTMs consistentes antes de publicar uma campanha.</p></div>
+              </div>
+              <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label class="text-[11px] font-medium text-gray-600 sm:col-span-2">URL de destino
+                  <input x-model.trim="marketingUtmForm.base_url" type="url" placeholder="https://seusite.com.br/oferta"
+                         class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-emerald-500">
+                </label>
+                <label class="text-[11px] font-medium text-gray-600">Origem
+                  <input x-model.trim="marketingUtmForm.source" type="text" placeholder="meta"
+                         class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-emerald-500">
+                </label>
+                <label class="text-[11px] font-medium text-gray-600">Mídia
+                  <input x-model.trim="marketingUtmForm.medium" type="text" placeholder="paid_social"
+                         class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-emerald-500">
+                </label>
+                <label class="text-[11px] font-medium text-gray-600">Campanha
+                  <input x-model.trim="marketingUtmForm.campaign" type="text" placeholder="pneus_julho"
+                         class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-emerald-500">
+                </label>
+                <label class="text-[11px] font-medium text-gray-600">Conteúdo
+                  <input x-model.trim="marketingUtmForm.content" type="text" placeholder="video_chuva"
+                         class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-xs outline-none focus:border-emerald-500">
+                </label>
+              </div>
+              <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">URL gerada</p>
+                <p class="mt-1 break-all text-[11px] text-gray-700" x-text="marketingUtmUrl() || 'Preencha uma URL de destino válida.'"></p>
+              </div>
+              <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold"
+                      :class="marketingUtmValid() ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-gray-50 text-gray-500'">
+                  <i :data-lucide="marketingUtmValid() ? 'check' : 'clock-3'" class="h-3 w-3"></i>
+                  <span x-text="marketingUtmValid() ? 'UTM válida' : 'Aguardando dados'"></span>
+                </span>
+                <button type="button" @click="marketingCopyUtm()"
+                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-900">
+                  <i data-lucide="copy" class="h-4 w-4"></i>
+                  Copiar padrão
+                </button>
+              </div>
+              <p x-show="marketingUtmMessage" class="mt-2 text-xs text-emerald-800" x-text="marketingUtmMessage"></p>
+            </section>
+
+            <section x-ref="marketingIntegrationAudit" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-5">
+              <div class="flex items-center gap-2">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800"><i data-lucide="history" class="h-4 w-4"></i></span>
+                <div><h3 class="text-base font-semibold text-gray-950">Auditoria de integrações</h3><p class="mt-0.5 text-xs text-gray-500">Somente eventos registrados no domínio Marketing.</p></div>
+              </div>
+              <div class="mt-4 divide-y divide-gray-100">
+                <template x-for="event in marketingIntegrations?.audit_events || []" :key="event.id">
+                  <article class="grid grid-cols-[12px_minmax(0,1fr)_auto] items-start gap-3 py-3">
+                    <span class="mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-emerald-700 bg-white"></span>
+                    <div class="min-w-0"><p class="truncate text-xs font-semibold text-gray-800" x-text="event.event_type"></p><p class="mt-1 text-[10px] text-gray-500" x-text="event.actor_label"></p></div>
+                    <time class="text-[10px] text-gray-400" x-text="formatDateTime(event.created_at)"></time>
+                  </article>
+                </template>
+                <div x-show="!marketingIntegrations?.audit_events?.length" class="py-10 text-center">
+                  <i data-lucide="shield-check" class="mx-auto h-6 w-6 text-emerald-700"></i>
+                  <p class="mt-3 text-sm font-medium text-gray-700">Nenhum evento registrado</p>
+                  <p class="mt-1 text-xs text-gray-500">A tela não cria um histórico fictício.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'integracoes'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">

@@ -34,6 +34,7 @@ describe('Marketing overview da matriz', () => {
 
     expect(overview.connection).toEqual({
       meta: 'disabled',
+      meta_synced_at: null,
       attribution: 'disabled',
       capi: 'not_implemented',
     });
@@ -86,6 +87,7 @@ describe('Marketing overview da matriz', () => {
 
     expect(metaProvider).toHaveBeenCalledOnce();
     expect(overview.connection.meta).toBe('connected');
+    expect(overview.connection.meta_synced_at).toBe('2026-07-25T12:00:00.000Z');
     expect(overview.metrics).toMatchObject({
       investment: 120,
       campaigns: 3,

@@ -103,14 +103,6 @@ window.PAINEL_MODULES.marketingCampaigns = function () {
       void this.loadMarketingCampaigns();
     },
 
-    marketingPeriodChanged() {
-      void this.loadMarketing();
-      if (this.marketingTab === 'campanhas') {
-        this.marketingCampaigns = null;
-        void this.loadMarketingCampaigns();
-      }
-    },
-
     marketingCampaignSummary() {
       const metrics = this.marketingCampaigns?.metrics || {};
       const money = (value) => value == null ? '—' : this.formatCurrency(Number(value));

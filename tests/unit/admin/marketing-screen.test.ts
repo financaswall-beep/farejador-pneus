@@ -6,6 +6,7 @@ describe('Marketing — primeira tela da matriz', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const front = readFileSync(resolve('painel/public/app.marketing.js'), 'utf8');
   const campaignsFront = readFileSync(resolve('painel/public/app.marketing.campaigns.js'), 'utf8');
+  const integrationsFront = readFileSync(resolve('painel/public/app.marketing.integrations.js'), 'utf8');
   const route = readFileSync(resolve('src/admin/painel/route-marketing.ts'), 'utf8');
   const staticRoute = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
 
@@ -35,11 +36,13 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260725-marketing-campaigns1');
-    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260725-marketing-campaigns1');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260725-marketing-campaigns1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-integrations1');
+    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-integrations1');
+    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260726-marketing-integrations1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-integrations1');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
+    expect(staticRoute).toContain("'app.marketing.integrations.js'");
     expect(front).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(html).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
@@ -92,7 +95,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(front).not.toContain("target: 'canais'");
     expect(marketingHtml).not.toContain('data-marketing-channels-screen');
     expect(marketingHtml).toContain("marketingNavigate('integracoes')");
-    expect(marketingHtml).toContain("marketingTab !== 'visao' && marketingTab !== 'campanhas'");
+    expect(marketingHtml).toContain("marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'integracoes'");
   });
 
   it('implementa Campanhas com seleção real de Consolidado, Meta, Google e TikTok', () => {
@@ -117,6 +120,25 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("fastify.get('/admin/api/marketing/campaigns'");
     expect(route).toContain("z.enum(['all', 'meta', 'google', 'tiktok'])");
     expect(campaignsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
+    expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
+  });
+
+  it('implementa Integrações sem expor segredo nem inventar conexão ou auditoria', () => {
+    const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
+    const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
+    const marketingHtml = html.slice(marketingStart, marketingEnd);
+
+    expect(marketingHtml).toContain('data-marketing-integrations-screen');
+    expect(marketingHtml).toContain('Fluxo de dados');
+    expect(marketingHtml).toContain('Qualidade e segurança');
+    expect(marketingHtml).toContain('Padrão de rastreamento');
+    expect(marketingHtml).toContain('Auditoria de integrações');
+    expect(marketingHtml).toContain('Nenhuma venda é atribuída sem vínculo rastreável');
+    expect(integrationsFront).toContain('/admin/api/marketing/integrations?period=');
+    expect(integrationsFront).toContain('marketingUtmUrl()');
+    expect(integrationsFront).toContain('navigator.clipboard.writeText');
+    expect(route).toContain("fastify.get('/admin/api/marketing/integrations'");
+    expect(integrationsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
 });

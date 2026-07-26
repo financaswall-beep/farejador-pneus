@@ -27,6 +27,7 @@ export interface MarketingOverview {
   period: ReturnType<typeof marketingDateWindow> & { id: MarketingPeriod };
   connection: {
     meta: ConnectionStatus;
+    meta_synced_at: string | null;
     attribution: 'enabled' | 'disabled';
     capi: 'not_implemented';
   };
@@ -179,6 +180,7 @@ export async function getMarketingOverview(
     period: { id: period, ...window },
     connection: {
       meta: metaStatus,
+      meta_synced_at: meta?.fetched_at ?? null,
       attribution: config.attributionEnabled ? 'enabled' : 'disabled',
       capi: 'not_implemented',
     },
