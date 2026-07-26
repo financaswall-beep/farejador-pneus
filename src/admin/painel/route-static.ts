@@ -30,7 +30,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js', 'app.clientes.js', 'app.clientes.identity.js',
-    'app.marketing.js', 'app.marketing.campaigns.js', 'app.marketing.integrations.js',
+    'app.marketing.js', 'app.marketing.campaigns.js', 'app.marketing.journeys.js', 'app.marketing.integrations.js',
     'app.montagem.js', // fatia 07-14: compositor + lista de fábricas (app.js ficou só o estado)
   ];
   for (const modulo of painelModulos) {

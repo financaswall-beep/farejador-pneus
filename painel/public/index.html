@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-integrations1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-journeys1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -44,9 +44,10 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260726-marketing-integrations1"></script>
-<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-integrations1"></script>
-<script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-integrations1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260726-marketing-journeys1"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-journeys1"></script>
+<script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-journeys1"></script>
+<script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-journeys1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -7451,7 +7452,179 @@
         </div>
       </section>
 
-      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'integracoes'"
+      <section x-show="marketingTab === 'jornadas'" x-cloak data-marketing-journeys-screen class="space-y-4">
+        <header class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
+              <i data-lucide="route" class="h-5 w-5"></i>
+            </span>
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Meta → Farejador → venda</p>
+              <h2 class="mt-1 text-xl font-semibold text-gray-950">Jornada rastreável</h2>
+              <p class="mt-1 text-xs text-gray-500">Cada etapa declara sua origem e só avança com evidência determinística.</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[10px] font-semibold text-gray-600">
+              <i data-lucide="shield-check" class="h-3.5 w-3.5 text-emerald-700"></i>
+              <span x-text="marketingJourneys?.environment === 'prod' ? 'Produção isolada' : 'Ambiente de teste'"></span>
+            </span>
+            <button type="button" @click="marketingJourneys = null; loadMarketingJourneys()"
+                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
+              <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+              Atualizar
+            </button>
+          </div>
+        </header>
+
+        <div x-show="marketingJourneysLoading && !marketingJourneys"
+             class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
+          Carregando a jornada da Meta até a venda…
+        </div>
+        <div x-show="marketingJourneysError"
+             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+          <span x-text="marketingJourneysError"></span>
+          <button type="button" @click="loadMarketingJourneys()" class="font-semibold underline">Tentar novamente</button>
+        </div>
+
+        <div x-show="marketingJourneys && !marketingJourneysError" class="space-y-4">
+          <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Indicadores da jornada">
+            <template x-for="kpi in marketingJourneyKpis()" :key="kpi.id">
+              <article class="min-h-[126px] rounded-xl border bg-white p-4 shadow-sm"
+                       :class="kpi.blocked ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200'">
+                <div class="flex items-start justify-between gap-2">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-lg"
+                        :class="kpi.blocked ? 'bg-amber-100 text-amber-700' : 'bg-emerald-50 text-emerald-800'">
+                    <i :data-lucide="kpi.icon" class="h-4 w-4"></i>
+                  </span>
+                  <span class="rounded-full border px-2 py-1 text-[8px] font-semibold uppercase tracking-wide"
+                        :class="marketingJourneySourceClass(kpi.source)"
+                        x-text="marketingJourneySourceLabel(kpi.source)"></span>
+                </div>
+                <p class="mt-3 text-[11px] text-gray-500" x-text="kpi.label"></p>
+                <p class="mt-1 text-xl font-semibold num"
+                   :class="kpi.blocked ? 'text-sm text-amber-800' : 'text-gray-950'"
+                   x-text="kpi.value"></p>
+                <p class="mt-1 text-[9px] text-gray-400" x-text="kpi.detail"></p>
+              </article>
+            </template>
+          </section>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-8">
+              <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+                <div><h3 class="text-base font-semibold text-gray-950">Mapa da jornada</h3><p class="mt-1 text-xs text-gray-500">Contagens agregadas; nenhum cliente é exposto nesta visão.</p></div>
+                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-semibold text-emerald-800">DINÂMICO</span>
+              </div>
+              <div class="p-5">
+                <div class="relative grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+                  <div class="absolute left-[8%] right-[8%] top-8 hidden h-0.5 bg-gray-200 xl:block"></div>
+                  <template x-for="stage in marketingJourneys?.stages || []" :key="stage.id">
+                    <article class="relative z-10 min-w-0 text-center">
+                      <span class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border-2 ring-4 ring-white"
+                            :class="marketingJourneyStageClass(stage.status)">
+                        <i :data-lucide="stage.status === 'blocked' ? 'lock-keyhole' : marketingJourneyStageIcon(stage.id)" class="h-5 w-5"></i>
+                      </span>
+                      <h4 class="mt-3 truncate text-[11px] font-semibold text-gray-800" x-text="stage.label"></h4>
+                      <p class="mt-1 text-xl font-semibold num text-gray-950" x-text="stage.value == null ? '—' : stage.value"></p>
+                      <span class="mt-2 inline-flex rounded-full border px-2 py-1 text-[8px] font-semibold uppercase"
+                            :class="marketingJourneySourceClass(stage.status === 'blocked' ? 'blocked' : stage.source)"
+                            x-text="marketingJourneySourceLabel(stage.status === 'blocked' ? 'blocked' : stage.source)"></span>
+                      <p class="mt-2 text-[9px] leading-relaxed text-gray-400" x-text="stage.detail"></p>
+                    </article>
+                  </template>
+                </div>
+
+                <div class="mt-5 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"
+                     :class="marketingJourneyBottleneckClass()">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70">
+                    <i :data-lucide="marketingJourneyBottleneckIcon()" class="h-4 w-4"></i>
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-xs font-semibold" x-text="marketingJourneys?.bottleneck?.title"></p>
+                    <p class="mt-1 text-[10px] leading-relaxed opacity-80" x-text="marketingJourneys?.bottleneck?.detail"></p>
+                  </div>
+                  <button type="button" @click="marketingNavigate(marketingJourneys?.bottleneck?.target)"
+                          class="shrink-0 rounded-lg border border-current bg-white/70 px-3 py-2 text-[10px] font-semibold">
+                    Ver diagnóstico →
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <aside class="space-y-4 xl:col-span-4">
+              <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <div><h3 class="text-base font-semibold text-gray-950">Qualidade da jornada</h3><p class="mt-1 text-xs text-gray-500">Cobertura real das fontes.</p></div>
+                  <span class="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[9px] font-semibold text-violet-800">CALCULADO</span>
+                </div>
+                <div class="mt-5 space-y-4">
+                  <div>
+                    <div class="mb-1.5 flex justify-between text-[10px]"><span class="text-gray-600">Meta Ads</span><strong x-text="marketingJourneys?.quality?.meta_percent == null ? '—' : `${marketingJourneys.quality.meta_percent}%`"></strong></div>
+                    <div class="h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-emerald-500" :style="`width:${marketingJourneyCoverageWidth(marketingJourneys?.quality?.meta_percent)}`"></div></div>
+                  </div>
+                  <div>
+                    <div class="mb-1.5 flex justify-between text-[10px]"><span class="text-gray-600">Vínculo CTWA</span><strong x-text="marketingJourneys?.quality?.tracking_percent == null ? '—' : `${marketingJourneys.quality.tracking_percent}%`"></strong></div>
+                    <div class="h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-amber-400" :style="`width:${marketingJourneyCoverageWidth(marketingJourneys?.quality?.tracking_percent)}`"></div></div>
+                  </div>
+                  <div class="flex items-center justify-between border-t border-gray-100 pt-3 text-[10px]">
+                    <span class="text-gray-600">Eventos comerciais</span>
+                    <strong :class="marketingJourneys?.quality?.commercial_status === 'ready' ? 'text-emerald-700' : 'text-amber-700'"
+                            x-text="marketingJourneys?.quality?.commercial_status === 'ready' ? 'liberados' : 'bloqueados'"></strong>
+                  </div>
+                </div>
+                <p class="mt-4 rounded-lg bg-gray-50 px-3 py-2.5 text-[9px] leading-relaxed text-gray-500">
+                  Ausência de atribuição não é tratada como zero vendas. As etapas comerciais permanecem nulas até o vínculo ser confiável.
+                </p>
+              </section>
+
+              <section class="rounded-xl border border-emerald-900 bg-gradient-to-br from-emerald-950 to-emerald-900 p-5 text-white shadow-sm">
+                <div class="flex items-center gap-2"><i data-lucide="shield-check" class="h-5 w-5 text-emerald-300"></i><h3 class="text-sm font-semibold">Regra de atribuição</h3></div>
+                <ol class="mt-4 space-y-3">
+                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">1</span><div><strong class="text-[10px]">CTWA persistido</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Chave real recebida no webhook.</p></div></li>
+                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">2</span><div><strong class="text-[10px]">Evento posterior ao clique</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Evita usar histórico anterior da conversa.</p></div></li>
+                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">3</span><div><strong class="text-[10px]">Venda não cancelada</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Verdade comercial em commerce.orders.</p></div></li>
+                </ol>
+              </section>
+            </aside>
+          </div>
+
+          <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+              <div><h3 class="text-base font-semibold text-gray-950">Jornada por campanha</h3><p class="mt-1 text-xs text-gray-500">A Meta entrega investimento e conversas; CTWA por campanha exige mapear o anúncio de origem.</p></div>
+              <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-semibold text-emerald-800">SOMENTE LEITURA</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[780px] text-left">
+                <thead class="bg-gray-50 text-[9px] uppercase tracking-wide text-gray-400">
+                  <tr><th class="px-5 py-3">Campanha</th><th class="px-4 py-3">Investimento</th><th class="px-4 py-3">Conversas Meta</th><th class="px-4 py-3">CTWA</th><th class="px-4 py-3">Vendas</th><th class="px-4 py-3">Gargalo</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="row in marketingJourneys?.campaigns || []" :key="row.id">
+                    <tr class="text-xs text-gray-700">
+                      <td class="max-w-[340px] px-5 py-3.5"><strong class="block truncate text-gray-900" x-text="row.name"></strong><span class="mt-1 block text-[9px] text-gray-400">Meta Ads</span></td>
+                      <td class="px-4 py-3.5 font-medium num" x-text="formatCurrency(Number(row.investment || 0))"></td>
+                      <td class="px-4 py-3.5 font-medium num" x-text="row.conversations"></td>
+                      <td class="px-4 py-3.5 num" x-text="row.ctwa == null ? '—' : row.ctwa"></td>
+                      <td class="px-4 py-3.5 num" x-text="row.attributed_sales == null ? '—' : row.attributed_sales"></td>
+                      <td class="px-4 py-3.5"><span class="inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold" :class="marketingJourneyCampaignClass(row)" x-text="marketingJourneyCampaignBottleneck(row)"></span></td>
+                    </tr>
+                  </template>
+                  <tr x-show="!marketingJourneys?.campaigns?.length">
+                    <td colspan="6" class="px-5 py-10 text-center text-xs text-gray-500">Nenhuma campanha com entrega encontrada no período.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-5 py-3 text-[10px] text-gray-500">
+              <span>Nenhuma verba é alterada automaticamente por esta tela.</span>
+              <button type="button" @click="marketingNavigate('campanhas')" class="font-semibold text-emerald-800">Abrir Campanhas →</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section x-show="marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes'"
                class="flex min-h-[440px] items-center justify-center rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div class="max-w-lg">
           <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-800">

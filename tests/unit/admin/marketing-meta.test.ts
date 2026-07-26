@@ -97,8 +97,36 @@ describe('Marketing Meta read-only', () => {
     expect(fetcher).toHaveBeenCalledOnce();
     const requested = fetcher.mock.calls[0]?.[0] as URL;
     expect(requested.hostname).toBe('graph.facebook.com');
+    expect(requested.searchParams.has('access_token')).toBe(false);
     expect(requested.searchParams.get('level')).toBe('campaign');
     expect(requested.searchParams.get('time_increment')).toBe('1');
+    expect(fetcher.mock.calls[0]?.[1]?.headers).toMatchObject({
+      Authorization: `Bearer ${config.accessToken}`,
+    });
+  });
+
+  it('escolhe uma ação canônica sem somar sinônimos da mesma conversa', async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      data: [{
+        campaign_id: 'camp-1',
+        campaign_name: 'WhatsApp',
+        date_start: '2026-07-25',
+        spend: '10',
+        actions: [
+          { action_type: 'lead', value: '7' },
+          { action_type: 'onsite_conversion.lead_grouped', value: '6' },
+          { action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '4' },
+        ],
+      }],
+    }));
+
+    const snapshot = await getMetaMarketingSnapshot(config, '7d', {
+      now: new Date('2026-07-25T12:00:00.000Z'),
+      fetcher: fetcher as typeof fetch,
+      cacheMs: 0,
+    });
+
+    expect(snapshot.current.conversations).toBe(4);
   });
 
   it('recusa paginação que tente retirar o token do domínio oficial', async () => {

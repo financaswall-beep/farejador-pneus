@@ -91,6 +91,7 @@ window.PAINEL_MODULES.marketing = function () {
     marketingSetTab(tab) {
       this.marketingTab = tab;
       if (tab === 'campanhas') void this.loadMarketingCampaigns();
+      if (tab === 'jornadas') void this.loadMarketingJourneys();
       if (tab === 'integracoes') void this.loadMarketingIntegrations();
       this.$nextTick(() => lucide.createIcons());
     },
@@ -100,6 +101,10 @@ window.PAINEL_MODULES.marketing = function () {
       if (this.marketingTab === 'campanhas') {
         this.marketingCampaigns = null;
         void this.loadMarketingCampaigns();
+      }
+      if (this.marketingTab === 'jornadas') {
+        this.marketingJourneys = null;
+        void this.loadMarketingJourneys();
       }
       if (this.marketingTab === 'integracoes') {
         this.marketingIntegrations = null;

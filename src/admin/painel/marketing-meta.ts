@@ -4,11 +4,13 @@
  * Sem escrita/CAPI; falha externa não pode derrubar o painel.
  */
 
-const LEAD_ACTION_TYPES = new Set([
-  'lead',
-  'onsite_conversion.lead_grouped',
+const LEAD_ACTION_PRIORITY = [
   'onsite_conversion.messaging_conversation_started_7d',
-]);
+  'onsite_conversion.lead_grouped',
+  'lead',
+] as const;
+
+const LEAD_ACTION_TYPES = new Set<string>(LEAD_ACTION_PRIORITY);
 
 export type MarketingPeriod = '7d' | '30d';
 
@@ -101,13 +103,18 @@ export function marketingDateWindow(period: MarketingPeriod, now = new Date()) {
 
 function leadCount(actions: unknown): number {
   if (!Array.isArray(actions)) return 0;
-  return actions.reduce((total, action) => {
-    if (!action || typeof action !== 'object') return total;
+  const totals = new Map<string, number>();
+  for (const action of actions) {
+    if (!action || typeof action !== 'object') continue;
     const row = action as Record<string, unknown>;
-    return LEAD_ACTION_TYPES.has(String(row.action_type ?? ''))
-      ? total + numberValue(row.value)
-      : total;
-  }, 0);
+    const actionType = String(row.action_type ?? '');
+    if (!LEAD_ACTION_TYPES.has(actionType)) continue;
+    totals.set(actionType, (totals.get(actionType) ?? 0) + numberValue(row.value));
+  }
+  for (const actionType of LEAD_ACTION_PRIORITY) {
+    if (totals.has(actionType)) return totals.get(actionType) ?? 0;
+  }
+  return 0;
 }
 
 function summarize(rows: MetaInsightRow[], since: string, until: string): MetaPeriodSummary {
@@ -188,6 +195,9 @@ function validateNextPage(next: unknown): URL | null {
   if (parsed.protocol !== 'https:' || parsed.hostname !== 'graph.facebook.com') {
     throw new Error('meta_invalid_pagination_origin');
   }
+  // A Meta pode repetir o token em paging.next. O servidor já autentica por
+  // header; removê-lo da URL reduz exposição acidental em logs e traces.
+  parsed.searchParams.delete('access_token');
   return parsed;
 }
 
@@ -201,7 +211,6 @@ async function fetchInsightRows(
     `https://graph.facebook.com/${encodeURIComponent(config.apiVersion)}/${encodeURIComponent(config.adAccountId)}/insights`,
   );
   first.search = new URLSearchParams({
-    access_token: config.accessToken,
     fields: 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,frequency,reach,cpm,actions,cost_per_action_type',
     time_range: JSON.stringify({ since, until }),
     time_increment: '1',
@@ -215,7 +224,10 @@ async function fetchInsightRows(
   while (next && pages < 20) {
     pages += 1;
     const response = await fetcher(next, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${config.accessToken}`,
+      },
       signal: AbortSignal.timeout(15_000),
     });
     const body = await response.json().catch(() => ({})) as MetaPage;
