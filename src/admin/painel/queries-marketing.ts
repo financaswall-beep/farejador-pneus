@@ -7,11 +7,15 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import {
-  getMetaMarketingSnapshot,
   marketingDateWindow,
   type MarketingPeriod,
   type MetaMarketingSnapshot,
 } from './marketing-meta.js';
+import { getPersistedOrLiveMetaSnapshot } from '../../marketing/meta-sync.js';
+import {
+  getMarketingAttributionReport,
+  type MarketingAttributionReport,
+} from '../../marketing/reporting.js';
 
 type ConnectionStatus = 'connected' | 'disabled' | 'not_configured' | 'error';
 
@@ -29,15 +33,23 @@ export interface MarketingOverview {
     meta: ConnectionStatus;
     meta_synced_at: string | null;
     attribution: 'enabled' | 'disabled';
-    capi: 'not_implemented';
+    capi: 'enabled' | 'disabled';
   };
   metrics: {
     investment: number | null;
     campaigns: number | null;
     conversations: number | null;
+    impressions: number | null;
+    clicks: number | null;
+    ctr: number | null;
     cost_per_conversation: number | null;
-    attributed_sales: null;
-    profit: null;
+    attributed_sales: number | null;
+    attributed_revenue: number | null;
+    gross_margin: number | null;
+    net_after_media: number | null;
+    /** Compatibilidade com a primeira versão da tela: equivale a net_after_media. */
+    profit: number | null;
+    pending_margin_orders: number | null;
   };
   series: Array<{ date: string; spend: number; conversations: number }>;
   comparison: {
@@ -65,7 +77,10 @@ interface MarketingDependencies {
   dbPool?: Pool;
   now?: Date;
   config?: MarketingConfig;
-  metaProvider?: typeof getMetaMarketingSnapshot;
+  metaProvider?: (
+    ...args: Parameters<typeof getPersistedOrLiveMetaSnapshot>
+  ) => Promise<MetaMarketingSnapshot>;
+  attributionProvider?: typeof getMarketingAttributionReport;
 }
 
 function deltaPercent(current: number, previous: number): number | null {
@@ -121,7 +136,7 @@ export async function getMarketingOverview(
   const now = dependencies.now ?? new Date();
   const config = dependencies.config ?? defaultConfig();
   const dbPool = dependencies.dbPool ?? defaultPool;
-  const metaProvider = dependencies.metaProvider ?? getMetaMarketingSnapshot;
+  const metaProvider = dependencies.metaProvider;
   const window = marketingDateWindow(period, now);
   const attribution = await attributionHealth(env.FAREJADOR_ENV, window.since, window.until, dbPool);
 
@@ -129,11 +144,14 @@ export async function getMarketingOverview(
   let metaStatus: ConnectionStatus = config.metaEnabled ? 'not_configured' : 'disabled';
   if (config.metaEnabled && config.accessToken && config.adAccountId) {
     try {
-      meta = await metaProvider({
+      const metaConfig = {
         accessToken: config.accessToken,
         adAccountId: config.adAccountId,
         apiVersion: config.apiVersion,
-      }, period, { now });
+      };
+      meta = metaProvider
+        ? await metaProvider(metaConfig, period, { now })
+        : await getPersistedOrLiveMetaSnapshot(metaConfig, period, { now, dbPool });
       metaStatus = 'connected';
     } catch {
       metaStatus = 'error';
@@ -155,7 +173,7 @@ export async function getMarketingOverview(
   if ((meta?.current.conversations ?? 0) > 0 && attribution.ctwa === 0) {
     alerts.push({
       id: 'ctwa-missing', severity: 'high', title: 'Referência CTWA ausente',
-      detail: `${meta?.current.conversations ?? 0} conversas de anúncio e nenhum ctwa_clid capturado`,
+      detail: `${meta?.current.conversations ?? 0} conversas e nenhum CTWA; impulsionamento comum não substitui campanha de Mensagens`,
       target: 'jornadas',
     });
   }
@@ -166,12 +184,28 @@ export async function getMarketingOverview(
       target: 'jornadas',
     });
   }
-  alerts.push({
-    id: 'capi-pending', severity: 'info', title: 'CAPI ainda não implementada',
-    detail: 'O retorno às plataformas só entra depois da atribuição comprovada',
-    target: 'integracoes',
-  });
+  if (!env.MARKETING_CAPI_ENABLED) {
+    alerts.push({
+      id: 'capi-pending', severity: 'info', title: 'CAPI pronta e desligada',
+      detail: 'Ative somente depois de validar um Purchase em Test Events',
+      target: 'integracoes',
+    });
+  }
 
+  let attributed: MarketingAttributionReport | null = null;
+  if (config.attributionEnabled) {
+    attributed = await (dependencies.attributionProvider ?? getMarketingAttributionReport)(
+      window.since,
+      window.until,
+      dbPool,
+    );
+  }
+  const attributionReady = Boolean(config.attributionEnabled && attributed?.available);
+  const grossMargin = attributionReady ? attributed?.gross_margin ?? null : null;
+  const investment = meta?.current.spend ?? null;
+  const netAfterMedia = grossMargin != null && investment != null
+    ? Math.round((grossMargin - investment) * 100) / 100
+    : null;
   const previous = meta?.previous ?? null;
   const comparisonAvailable = Boolean(previous && (previous.spend > 0 || previous.conversations > 0));
   return {
@@ -182,15 +216,22 @@ export async function getMarketingOverview(
       meta: metaStatus,
       meta_synced_at: meta?.fetched_at ?? null,
       attribution: config.attributionEnabled ? 'enabled' : 'disabled',
-      capi: 'not_implemented',
+      capi: env.MARKETING_CAPI_ENABLED ? 'enabled' : 'disabled',
     },
     metrics: {
-      investment: meta?.current.spend ?? null,
+      investment,
       campaigns: meta?.current.campaigns ?? null,
       conversations: meta?.current.conversations ?? null,
+      impressions: meta?.current.impressions ?? null,
+      clicks: meta?.current.clicks ?? null,
+      ctr: meta?.current.ctr ?? null,
       cost_per_conversation: meta?.current.cost_per_conversation ?? null,
-      attributed_sales: null,
-      profit: null,
+      attributed_sales: attributionReady ? attributed?.attributed_sales ?? 0 : null,
+      attributed_revenue: attributionReady ? attributed?.attributed_revenue ?? 0 : null,
+      gross_margin: grossMargin,
+      net_after_media: netAfterMedia,
+      profit: netAfterMedia,
+      pending_margin_orders: attributionReady ? attributed?.pending_margin_orders ?? 0 : null,
     },
     series: meta?.current.daily ?? [],
     comparison: {
@@ -214,7 +255,11 @@ export async function getMarketingOverview(
       { id: 'investment', label: 'Investimento', status: meta ? 'ok' : 'pending' },
       { id: 'conversations', label: 'Conversas', status: meta ? 'ok' : 'pending' },
       { id: 'attribution', label: 'Atribuição', status: attribution.ctwa > 0 ? 'ok' : 'pending' },
-      { id: 'profit', label: 'Lucro', status: 'blocked' },
+      {
+        id: 'profit',
+        label: 'Lucro',
+        status: grossMargin != null ? 'ok' : attributionReady ? 'pending' : 'blocked',
+      },
     ],
   };
 }

@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-journeys1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-meta2" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -44,10 +44,10 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260726-marketing-journeys1"></script>
-<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-journeys1"></script>
-<script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-journeys1"></script>
-<script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-journeys1"></script>
+<script src="/admin/painel/app.marketing.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
@@ -6572,13 +6572,6 @@
         </div>
 
         <div x-show="!marketingLoading && !marketingError && marketingVisao">
-          <!--
-            PRÉVIA MULTICANAL — composição visual aprovada em 2026-07-25 e visível também em produção.
-            Estes botões ainda NÃO filtram os dados nem alteram /admin/api/marketing/overview.
-            Implementação futura: seleção múltipla Meta/Google/TikTok, query `channels=meta,google,tiktok`,
-            consolidação no backend e deduplicação de conversas/vendas antes de atualizar KPIs, gráfico e lucro.
-            Não transformar esta prévia em atribuição real sem a prova CTWA/CAPI prevista na auditoria.
-          -->
           <section data-marketing-channel-filter-mock
                    class="mb-3 flex flex-col gap-3 rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-3">
@@ -6587,11 +6580,11 @@
               </span>
               <div>
                 <p class="text-xs font-semibold text-gray-900">Canais da visão</p>
-                <p class="mt-0.5 text-[10px] text-gray-500">Prévia dos filtros — os valores atuais ainda usam somente a Meta</p>
+                <p class="mt-0.5 text-[10px] text-gray-500">Meta somente — Google e TikTok não têm conector neste módulo</p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Mock dos futuros filtros de canal">
-              <button type="button" aria-pressed="true" title="Mock visual — filtro ainda não implementado"
+              <button type="button" aria-pressed="true" title="Fonte ativa"
                       class="inline-flex cursor-default items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
                 <span class="relative h-5 w-7">
                   <img src="/assets/brands/facebook.svg" alt="" class="absolute left-0 top-0 h-4 w-4">
@@ -6600,28 +6593,28 @@
                 Meta
                 <i data-lucide="check" class="h-3.5 w-3.5 text-emerald-700"></i>
               </button>
-              <button type="button" aria-pressed="true" title="Mock visual — filtro ainda não implementado"
-                      class="inline-flex cursor-default items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
+              <button type="button" disabled aria-pressed="false" title="Sem conector"
+                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-400">
                 <img src="/assets/brands/google-ads.svg" alt="" class="h-5 w-5">
                 Google
-                <i data-lucide="check" class="h-3.5 w-3.5 text-emerald-700"></i>
+                <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
               </button>
-              <button type="button" aria-pressed="true" title="Mock visual — filtro ainda não implementado"
-                      class="inline-flex cursor-default items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
+              <button type="button" disabled aria-pressed="false" title="Sem conector"
+                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-400">
                 <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 fill-black">
                   <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
                 </svg>
                 TikTok
-                <i data-lucide="check" class="h-3.5 w-3.5 text-emerald-700"></i>
+                <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
               </button>
               <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">
-                <i data-lucide="combine" class="h-3.5 w-3.5"></i>
-                Consolidado
+                <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
+                Dados reais
               </span>
             </div>
           </section>
 
-          <section aria-label="Indicadores de Marketing" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          <section aria-label="Indicadores de Marketing" class="grid grid-cols-2 gap-3 lg:grid-cols-4 2xl:grid-cols-8">
             <template x-for="item in marketingKpis()" :key="item.id">
               <article class="min-h-[118px] rounded-xl border bg-white p-4 shadow-sm"
                        :class="item.tone === 'attention' ? 'border-amber-200' : 'border-gray-200'">
@@ -6925,7 +6918,7 @@
           <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">centro de decisão</p>
             <h2 class="mt-1 text-2xl font-semibold tracking-tight text-gray-950">Campanhas</h2>
-            <p class="mt-1 text-sm text-gray-500">Decida onde revisar ou manter a entrega sem presumir venda, lucro ou estoque.</p>
+            <p class="mt-1 text-sm text-gray-500">Compare entrega da Meta com vendas e margem atribuídas por CTWA.</p>
           </div>
           <button type="button" disabled
                   title="A criação será habilitada somente com fluxo de escrita auditado"
@@ -6955,17 +6948,13 @@
                 </span>
                 Meta
               </button>
-              <button type="button" @click="marketingCampaignSetChannel('google')"
-                      :aria-pressed="marketingCampaignChannel === 'google'"
-                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
-                      :class="marketingCampaignChannel === 'google' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200'">
+              <button type="button" disabled aria-pressed="false" title="Sem conector"
+                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-400">
                 <img src="/assets/brands/google-ads.svg" alt="" class="h-4 w-4">
                 Google
               </button>
-              <button type="button" @click="marketingCampaignSetChannel('tiktok')"
-                      :aria-pressed="marketingCampaignChannel === 'tiktok'"
-                      class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-semibold transition"
-                      :class="marketingCampaignChannel === 'tiktok' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-200'">
+              <button type="button" disabled aria-pressed="false" title="Sem conector"
+                      class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-400">
                 <svg role="img" aria-label="TikTok" viewBox="0 0 24 24" class="h-4 w-4 fill-current">
                   <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"></path>
                 </svg>
@@ -6995,7 +6984,7 @@
         </div>
 
         <div x-show="marketingCampaigns && !marketingCampaignsError" class="space-y-4">
-          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <template x-for="(item, index) in marketingCampaignSummary()" :key="item.id">
               <article class="flex min-h-[102px] items-center gap-3 px-5 py-4"
                        :class="index > 0 ? 'border-t border-emerald-800/80 sm:border-l sm:border-t-0' : ''">
@@ -7039,13 +7028,16 @@
               </header>
 
               <div x-show="marketingCampaignFiltered().length" class="overflow-x-auto">
-                <table class="w-full min-w-[1120px] text-xs">
+                <table class="w-full min-w-[1380px] text-xs">
                   <thead class="bg-gray-50 text-left text-[11px] text-gray-500">
                     <tr>
                       <th class="px-5 py-3 font-medium">Campanha</th>
                       <th class="px-3 py-3 font-medium">Canal</th>
                       <th class="px-3 py-3 font-medium">Entrega</th>
                       <th class="px-3 py-3 text-right font-medium">Investimento</th>
+                      <th class="px-3 py-3 text-right font-medium">Impressões</th>
+                      <th class="px-3 py-3 text-right font-medium">Cliques</th>
+                      <th class="px-3 py-3 text-right font-medium">CTR</th>
                       <th class="px-3 py-3 text-right font-medium">Conversas</th>
                       <th class="px-3 py-3 text-right font-medium">Custo/conversa</th>
                       <th class="px-3 py-3 font-medium">Venda / lucro</th>
@@ -7084,13 +7076,25 @@
                           <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">Com entrega</span>
                         </td>
                         <td class="px-3 py-4 text-right font-semibold num text-gray-900" x-text="formatCurrency(Number(row.investment))"></td>
+                        <td class="px-3 py-4 text-right num text-gray-700" x-text="Number(row.impressions || 0).toLocaleString('pt-BR')"></td>
+                        <td class="px-3 py-4 text-right num text-gray-700" x-text="Number(row.clicks || 0).toLocaleString('pt-BR')"></td>
+                        <td class="px-3 py-4 text-right num text-gray-700" x-text="row.ctr == null ? '—' : `${Number(row.ctr).toLocaleString('pt-BR')}%`"></td>
                         <td class="px-3 py-4 text-right num text-gray-700" x-text="row.conversations"></td>
                         <td class="px-3 py-4 text-right num text-gray-700" x-text="row.cost_per_conversation == null ? '—' : formatCurrency(Number(row.cost_per_conversation))"></td>
                         <td class="px-3 py-4">
-                          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
-                            <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
-                            Aguardando atribuição
-                          </span>
+                          <template x-if="row.attribution_status === 'ready'">
+                            <div>
+                              <strong class="block text-xs text-gray-900" x-text="`${row.attributed_sales || 0} venda(s)`"></strong>
+                              <span class="mt-1 block text-[10px]" :class="Number(row.profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'"
+                                    x-text="row.profit == null ? 'margem pendente' : `${formatCurrency(Number(row.profit))} após mídia`"></span>
+                            </div>
+                          </template>
+                          <template x-if="row.attribution_status !== 'ready'">
+                            <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                              <i data-lucide="lock-keyhole" class="h-3.5 w-3.5"></i>
+                              Aguardando atribuição
+                            </span>
+                          </template>
                         </td>
                         <td class="px-3 py-4"><span class="text-[11px] font-medium text-gray-500">A conciliar</span></td>
                         <td class="px-5 py-4">
@@ -7207,10 +7211,24 @@
             <p class="mt-1 text-sm text-gray-500">Conecte plataformas, valide a coleta e acompanhe cada sincronização.</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-              <i data-lucide="shield-check" class="h-4 w-4"></i>
-              Ambiente protegido
-            </span>
+            <button type="button" @click="marketingRunIntegrationAction('sync')"
+                    :disabled="Boolean(marketingIntegrationActionLoading)"
+                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+              <i data-lucide="refresh-cw" class="h-4 w-4" :class="marketingIntegrationActionLoading === 'sync' ? 'animate-spin' : ''"></i>
+              Sincronizar 60 dias
+            </button>
+            <button type="button" @click="marketingRunIntegrationAction('reconcile')"
+                    :disabled="Boolean(marketingIntegrationActionLoading)"
+                    class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 disabled:opacity-50">
+              <i data-lucide="route" class="h-4 w-4"></i>
+              Reconciliar
+            </button>
+            <button type="button" @click="marketingRunIntegrationAction('capi_test')"
+                    :disabled="Boolean(marketingIntegrationActionLoading)"
+                    class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">
+              <i data-lucide="send" class="h-4 w-4"></i>
+              Testar CAPI
+            </button>
             <button type="button" @click="marketingScrollAudit()"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:border-emerald-200 hover:text-emerald-800">
               <i data-lucide="history" class="h-4 w-4"></i>
@@ -7297,8 +7315,9 @@
                 </div>
 
                 <button type="button" @click="marketingIntegrationAction(platform)"
+                        :disabled="platform.id !== 'meta' || Boolean(marketingIntegrationActionLoading)"
                         class="mt-4 inline-flex w-full items-center justify-center rounded-lg border px-3 py-2.5 text-xs font-semibold"
-                        :class="platform.status === 'connected' ? 'border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900' : 'border-emerald-700 bg-white text-emerald-800 hover:bg-emerald-50'"
+                        :class="platform.status === 'connected' ? 'border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900 disabled:opacity-50' : 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400'"
                         x-text="marketingIntegrationActionLabel(platform)"></button>
               </article>
             </template>
@@ -7343,6 +7362,13 @@
                     <span :class="row.status === 'ok' ? 'text-emerald-700' : 'text-gray-500'" x-text="row.detail"></span>
                   </div>
                 </template>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-5">
+                <div class="rounded-lg bg-gray-50 p-2.5"><span class="block text-gray-400">Sync</span><strong class="mt-1 block text-gray-800" x-text="marketingIntegrations?.sync?.status || 'sem execução'"></strong></div>
+                <div class="rounded-lg bg-gray-50 p-2.5"><span class="block text-gray-400">Linhas</span><strong class="mt-1 block text-gray-800 num" x-text="marketingIntegrations?.sync?.rows_upserted || 0"></strong></div>
+                <div class="rounded-lg bg-gray-50 p-2.5"><span class="block text-gray-400">CAPI pendente</span><strong class="mt-1 block text-gray-800 num" x-text="marketingIntegrations?.capi?.pending || 0"></strong></div>
+                <div class="rounded-lg bg-gray-50 p-2.5"><span class="block text-gray-400">CAPI enviado</span><strong class="mt-1 block text-emerald-700 num" x-text="marketingIntegrations?.capi?.sent || 0"></strong></div>
+                <div class="rounded-lg bg-gray-50 p-2.5"><span class="block text-gray-400">Dead-letter</span><strong class="mt-1 block text-rose-700 num" x-text="marketingIntegrations?.capi?.dead_letter || 0"></strong></div>
               </div>
               <p class="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-900">
                 <i data-lucide="shield-check" class="h-4 w-4"></i>
@@ -7488,7 +7514,7 @@
         </div>
 
         <div x-show="marketingJourneys && !marketingJourneysError" class="space-y-4">
-          <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Indicadores da jornada">
+          <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Indicadores da jornada">
             <template x-for="kpi in marketingJourneyKpis()" :key="kpi.id">
               <article class="min-h-[126px] rounded-xl border bg-white p-4 shadow-sm"
                        :class="kpi.blocked ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200'">
@@ -7582,8 +7608,8 @@
                 <div class="flex items-center gap-2"><i data-lucide="shield-check" class="h-5 w-5 text-emerald-300"></i><h3 class="text-sm font-semibold">Regra de atribuição</h3></div>
                 <ol class="mt-4 space-y-3">
                   <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">1</span><div><strong class="text-[10px]">CTWA persistido</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Chave real recebida no webhook.</p></div></li>
-                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">2</span><div><strong class="text-[10px]">Evento posterior ao clique</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Evita usar histórico anterior da conversa.</p></div></li>
-                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">3</span><div><strong class="text-[10px]">Venda não cancelada</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Verdade comercial em commerce.orders.</p></div></li>
+                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">2</span><div><strong class="text-[10px]">Last-click em até 7 dias</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Usa o CTWA elegível mais recente antes da venda.</p></div></li>
+                  <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-800 text-[9px] font-semibold text-emerald-200">3</span><div><strong class="text-[10px]">Uma venda por clique</strong><p class="mt-0.5 text-[9px] text-emerald-100/70">Só conta entrega ou retirada efetivamente realizada.</p></div></li>
                 </ol>
               </section>
             </aside>

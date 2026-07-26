@@ -4,13 +4,11 @@
  * Sem escrita/CAPI; falha externa não pode derrubar o painel.
  */
 
-const LEAD_ACTION_PRIORITY = [
-  'onsite_conversion.messaging_conversation_started_7d',
-  'onsite_conversion.lead_grouped',
-  'lead',
-] as const;
-
-const LEAD_ACTION_TYPES = new Set<string>(LEAD_ACTION_PRIORITY);
+import { summarizeMetaRows } from './marketing-meta-summary.js';
+export {
+  canonicalConversationAction,
+  summarizeMetaRows,
+} from './marketing-meta-summary.js';
 
 export type MarketingPeriod = '7d' | '30d';
 
@@ -24,6 +22,8 @@ export interface MetaDailyMetric {
   date: string;
   spend: number;
   conversations: number;
+  impressions: number;
+  clicks: number;
 }
 
 export interface MetaCampaignMetric {
@@ -31,6 +31,9 @@ export interface MetaCampaignMetric {
   name: string;
   spend: number;
   conversations: number;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
   cost_per_conversation: number | null;
   delivery_days: number;
   last_delivery: string;
@@ -40,6 +43,9 @@ export interface MetaPeriodSummary {
   spend: number;
   conversations: number;
   campaigns: number;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
   cost_per_conversation: number | null;
   daily: MetaDailyMetric[];
   campaign_rows: MetaCampaignMetric[];
@@ -51,11 +57,21 @@ export interface MetaMarketingSnapshot {
   fetched_at: string;
 }
 
-interface MetaInsightRow {
+export type MetaInsightLevel = 'campaign' | 'ad';
+
+export interface MetaInsightRow {
+  account_currency?: unknown;
   campaign_id?: unknown;
   campaign_name?: unknown;
+  adset_id?: unknown;
+  adset_name?: unknown;
+  ad_id?: unknown;
+  ad_name?: unknown;
   date_start?: unknown;
   spend?: unknown;
+  impressions?: unknown;
+  clicks?: unknown;
+  reach?: unknown;
   actions?: unknown;
 }
 
@@ -71,11 +87,6 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-
-function numberValue(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 function shiftIsoDate(date: string, days: number): string {
   const [year, month, day] = date.split('-').map(Number);
@@ -101,94 +112,6 @@ export function marketingDateWindow(period: MarketingPeriod, now = new Date()) {
   return { days, since, until, previousSince, previousUntil };
 }
 
-function leadCount(actions: unknown): number {
-  if (!Array.isArray(actions)) return 0;
-  const totals = new Map<string, number>();
-  for (const action of actions) {
-    if (!action || typeof action !== 'object') continue;
-    const row = action as Record<string, unknown>;
-    const actionType = String(row.action_type ?? '');
-    if (!LEAD_ACTION_TYPES.has(actionType)) continue;
-    totals.set(actionType, (totals.get(actionType) ?? 0) + numberValue(row.value));
-  }
-  for (const actionType of LEAD_ACTION_PRIORITY) {
-    if (totals.has(actionType)) return totals.get(actionType) ?? 0;
-  }
-  return 0;
-}
-
-function summarize(rows: MetaInsightRow[], since: string, until: string): MetaPeriodSummary {
-  const campaigns = new Set<string>();
-  const byDate = new Map<string, MetaDailyMetric>();
-  const byCampaign = new Map<string, {
-    id: string;
-    name: string;
-    spend: number;
-    conversations: number;
-    deliveryDates: Set<string>;
-  }>();
-  let spend = 0;
-  let conversations = 0;
-
-  for (const row of rows) {
-    const date = String(row.date_start ?? '');
-    if (date < since || date > until) continue;
-    const rowSpend = numberValue(row.spend);
-    const rowConversations = leadCount(row.actions);
-    spend += rowSpend;
-    conversations += rowConversations;
-    if (row.campaign_id) {
-      const id = String(row.campaign_id);
-      campaigns.add(id);
-      const current = byCampaign.get(id) ?? {
-        id,
-        name: String(row.campaign_name || id),
-        spend: 0,
-        conversations: 0,
-        deliveryDates: new Set<string>(),
-      };
-      current.spend += rowSpend;
-      current.conversations += rowConversations;
-      if (date) current.deliveryDates.add(date);
-      byCampaign.set(id, current);
-    }
-    const daily = byDate.get(date) ?? { date, spend: 0, conversations: 0 };
-    daily.spend += rowSpend;
-    daily.conversations += rowConversations;
-    byDate.set(date, daily);
-  }
-
-  const roundedSpend = Math.round(spend * 100) / 100;
-  return {
-    spend: roundedSpend,
-    conversations: Math.round(conversations),
-    campaigns: campaigns.size,
-    cost_per_conversation: conversations > 0
-      ? Math.round((roundedSpend / conversations) * 100) / 100
-      : null,
-    daily: [...byDate.values()]
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((row) => ({ ...row, spend: Math.round(row.spend * 100) / 100 })),
-    campaign_rows: [...byCampaign.values()]
-      .map((row) => {
-        const rounded = Math.round(row.spend * 100) / 100;
-        const dates = [...row.deliveryDates].sort();
-        return {
-          id: row.id,
-          name: row.name,
-          spend: rounded,
-          conversations: Math.round(row.conversations),
-          cost_per_conversation: row.conversations > 0
-            ? Math.round((rounded / row.conversations) * 100) / 100
-            : null,
-          delivery_days: dates.length,
-          last_delivery: dates.at(-1) ?? until,
-        };
-      })
-      .sort((a, b) => b.spend - a.spend || a.name.localeCompare(b.name)),
-  };
-}
-
 function validateNextPage(next: unknown): URL | null {
   if (typeof next !== 'string' || next.length === 0) return null;
   const parsed = new URL(next);
@@ -201,20 +124,31 @@ function validateNextPage(next: unknown): URL | null {
   return parsed;
 }
 
-async function fetchInsightRows(
+export async function fetchMetaInsightRows(
   config: MetaMarketingConfig,
   since: string,
   until: string,
+  level: MetaInsightLevel,
   fetcher: typeof fetch,
 ): Promise<MetaInsightRow[]> {
   const first = new URL(
     `https://graph.facebook.com/${encodeURIComponent(config.apiVersion)}/${encodeURIComponent(config.adAccountId)}/insights`,
   );
   first.search = new URLSearchParams({
-    fields: 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,frequency,reach,cpm,actions,cost_per_action_type',
+    fields: [
+      'account_currency',
+      'campaign_id',
+      'campaign_name',
+      ...(level === 'ad' ? ['adset_id', 'adset_name', 'ad_id', 'ad_name'] : []),
+      'spend',
+      'impressions',
+      'clicks',
+      'reach',
+      'actions',
+    ].join(','),
     time_range: JSON.stringify({ since, until }),
     time_increment: '1',
-    level: 'campaign',
+    level,
     limit: '200',
   }).toString();
 
@@ -252,10 +186,16 @@ export async function getMetaMarketingSnapshot(
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now.getTime()) return cached.value;
 
-  const rows = await fetchInsightRows(config, window.previousSince, window.until, fetcher);
+  const rows = await fetchMetaInsightRows(
+    config,
+    window.previousSince,
+    window.until,
+    'campaign',
+    fetcher,
+  );
   const value: MetaMarketingSnapshot = {
-    current: summarize(rows, window.since, window.until),
-    previous: summarize(rows, window.previousSince, window.previousUntil),
+    current: summarizeMetaRows(rows, window.since, window.until),
+    previous: summarizeMetaRows(rows, window.previousSince, window.previousUntil),
     fetched_at: now.toISOString(),
   };
   cache.set(key, { expiresAt: now.getTime() + cacheMs, value });

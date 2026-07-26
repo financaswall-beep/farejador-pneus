@@ -7,6 +7,10 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { getMarketingOverview, type MarketingOverview } from './queries-marketing.js';
 import type { MarketingPeriod } from './marketing-meta.js';
+import {
+  getMarketingPipelineHealth,
+  type MarketingPipelineHealth,
+} from '../../marketing/reporting.js';
 
 type PlatformStatus = 'connected' | 'disabled' | 'not_configured' | 'error' | 'not_connected' | 'planned';
 type CheckStatus = 'ok' | 'pending' | 'blocked' | 'error';
@@ -41,6 +45,12 @@ export interface MarketingIntegrationsPayload {
   quality: Array<{ id: string; label: string; status: CheckStatus }>;
   next_step: string;
   audit_events: MarketingAuditEvent[];
+  sync: {
+    available: boolean;
+    status: 'running' | 'succeeded' | 'failed' | null;
+    rows_upserted: number;
+  };
+  capi: MarketingPipelineHealth['capi'] & { enabled: boolean };
 }
 
 interface IntegrationConfig {
@@ -51,6 +61,7 @@ export interface MarketingIntegrationDependencies {
   dbPool?: Pool;
   overviewProvider?: typeof getMarketingOverview;
   auditProvider?: (pool: Pool) => Promise<MarketingAuditEvent[]>;
+  healthProvider?: typeof getMarketingPipelineHealth;
   config?: IntegrationConfig;
 }
 
@@ -88,21 +99,26 @@ export async function getMarketingIntegrations(
   const dbPool = dependencies.dbPool ?? defaultPool;
   const overview: MarketingOverview = await overviewProvider(period);
   const auditProvider = dependencies.auditProvider ?? loadAuditEvents;
-  const auditEvents = await auditProvider(dbPool);
+  const [auditEvents, health] = await Promise.all([
+    auditProvider(dbPool),
+    (dependencies.healthProvider ?? getMarketingPipelineHealth)(dbPool),
+  ]);
   const accountId = dependencies.config?.adAccountId ?? env.META_ADS_ACCOUNT_ID;
 
   const metaStatus = overview.connection.meta;
   const metaConnected = metaStatus === 'connected';
   const hasCtwa = overview.attribution.available && overview.attribution.ctwa > 0;
   const attributionReady = overview.connection.attribution === 'enabled' && hasCtwa;
-  const syncedAt = overview.connection.meta_synced_at;
+  const syncedAt = health.last_sync_at ?? overview.connection.meta_synced_at;
+  const capiEnabled = overview.connection.capi === 'enabled';
+  const capiHealthy = capiEnabled && health.available && health.capi.dead_letter === 0;
 
   const quality = [
     check('credential', 'Credencial protegida', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
     check('account', 'Conta de anúncios', accountId ? 'ok' : 'pending'),
     check('sync', 'Sincronização', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
     check('ctwa', 'Atribuição CTWA', hasCtwa ? 'ok' : 'pending'),
-    check('capi', 'Retorno CAPI', 'blocked'),
+    check('capi', 'Retorno CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
   ];
   const ready = quality.filter((row) => row.status === 'ok').length;
   const criticalPending = Number(!metaConnected)
@@ -149,7 +165,7 @@ export async function getMarketingIntegrations(
       check('collection', 'Coleta', metaConnected ? 'ok' : 'pending'),
       check('normalization', 'Normalização', metaConnected ? 'ok' : 'pending'),
       check('attribution', 'Atribuição', attributionReady ? 'ok' : 'pending'),
-      check('profit', 'Vendas e lucro', attributionReady ? 'pending' : 'blocked'),
+      check('profit', 'Vendas e lucro', attributionReady ? 'ok' : 'blocked'),
     ],
     collection: [
       { ...check('campaigns', 'Campanhas e investimento', metaConnected ? 'ok' : 'pending'),
@@ -157,8 +173,15 @@ export async function getMarketingIntegrations(
       { ...check('conversations', 'Conversas por anúncio', metaConnected ? 'ok' : 'pending'),
         detail: metaConnected ? 'recebendo' : 'sem coleta' },
       { ...check('ctwa', 'ctwa_clid', hasCtwa ? 'ok' : 'pending'),
-        detail: hasCtwa ? `${overview.attribution.ctwa} referência(s)` : 'incompleto' },
-      { ...check('capi', 'CAPI', 'blocked'), detail: 'não configurada' },
+        detail: hasCtwa
+          ? `${overview.attribution.ctwa} referência(s)`
+          : 'ausente; exige campanha de Mensagens, não impulsionamento comum' },
+      {
+        ...check('capi', 'CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
+        detail: capiEnabled
+          ? `${health.capi.sent} enviado(s), ${health.capi.dead_letter} em dead-letter`
+          : 'implementada e desligada até passar no Test Events',
+      },
     ],
     quality,
     next_step: !metaConnected
@@ -167,7 +190,20 @@ export async function getMarketingIntegrations(
         ? 'Validar o vínculo entre conversa e venda'
         : overview.connection.attribution !== 'enabled'
           ? 'Habilitar a atribuição depois da prova ponta a ponta'
-          : 'Preparar o retorno CAPI sem alterar a coleta atual',
+          : !capiEnabled
+            ? 'Validar Purchase no Test Events e ativar a CAPI'
+            : health.capi.dead_letter > 0
+              ? 'Revisar eventos CAPI em dead-letter'
+              : 'Pipeline Meta e CAPI operacionais',
     audit_events: auditEvents,
+    sync: {
+      available: health.available,
+      status: health.last_sync_status,
+      rows_upserted: health.rows_upserted,
+    },
+    capi: {
+      enabled: capiEnabled,
+      ...health.capi,
+    },
   };
 }

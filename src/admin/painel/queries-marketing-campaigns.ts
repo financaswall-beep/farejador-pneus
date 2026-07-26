@@ -1,16 +1,18 @@
-/**
- * Marketing — campanhas read-only por canal.
- * Só publica fatos presentes na plataforma; venda, lucro e estoque ficam nulos
- * até existirem correlações determinísticas e auditáveis.
- */
+/** Campanhas Meta e atribuição determinística, sem estimar canais desconectados. */
+import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
+import { pool as defaultPool } from '../../persistence/db.js';
 import {
-  getMetaMarketingSnapshot,
   marketingDateWindow,
   type MarketingPeriod,
   type MetaCampaignMetric,
   type MetaMarketingSnapshot,
 } from './marketing-meta.js';
+import { getPersistedOrLiveMetaSnapshot } from '../../marketing/meta-sync.js';
+import {
+  getMarketingAttributionReport,
+  type MarketingAttributionReport,
+} from '../../marketing/reporting.js';
 
 export type MarketingCampaignChannel = 'all' | 'meta' | 'google' | 'tiktok';
 
@@ -26,8 +28,12 @@ interface CampaignConfig {
 
 export interface MarketingCampaignDependencies {
   now?: Date;
+  dbPool?: Pool;
   config?: CampaignConfig;
-  metaProvider?: typeof getMetaMarketingSnapshot;
+  metaProvider?: (
+    ...args: Parameters<typeof getPersistedOrLiveMetaSnapshot>
+  ) => Promise<MetaMarketingSnapshot>;
+  attributionProvider?: typeof getMarketingAttributionReport;
 }
 
 export interface MarketingCampaignsPayload {
@@ -41,9 +47,16 @@ export interface MarketingCampaignsPayload {
     investment: number | null;
     campaigns: number | null;
     conversations: number | null;
+    impressions: number | null;
+    clicks: number | null;
+    ctr: number | null;
     cost_per_conversation: number | null;
-    attributed_sales: null;
-    profit: null;
+    attributed_sales: number | null;
+    attributed_revenue: number | null;
+    gross_margin: number | null;
+    net_after_media: number | null;
+    /** Compatibilidade com a primeira versão da tela: equivale a net_after_media. */
+    profit: number | null;
   };
   campaigns: Array<{
     id: string;
@@ -53,11 +66,16 @@ export interface MarketingCampaignsPayload {
     status: 'with_delivery';
     investment: number;
     conversations: number;
+    impressions: number;
+    clicks: number;
+    ctr: number | null;
     cost_per_conversation: number | null;
-    attributed_sales: null;
-    profit: null;
+    attributed_sales: number | null;
+    attributed_revenue: number | null;
+    gross_margin: number | null;
+    profit: number | null;
     stock_status: 'not_reconciled';
-    attribution_status: 'pending' | 'disabled';
+    attribution_status: 'ready' | 'pending' | 'disabled';
     delivery_days: number;
     last_delivery: string;
     decision: {
@@ -118,19 +136,23 @@ export async function getMarketingCampaigns(
   dependencies: MarketingCampaignDependencies = {},
 ): Promise<MarketingCampaignsPayload> {
   const now = dependencies.now ?? new Date();
+  const dbPool = dependencies.dbPool ?? defaultPool;
   const config = dependencies.config ?? defaultConfig();
-  const metaProvider = dependencies.metaProvider ?? getMetaMarketingSnapshot;
+  const metaProvider = dependencies.metaProvider;
   const window = marketingDateWindow(period, now);
 
   let meta: MetaMarketingSnapshot | null = null;
   let metaStatus: ChannelStatus = config.metaEnabled ? 'not_configured' : 'disabled';
   if (config.metaEnabled && config.accessToken && config.adAccountId) {
     try {
-      meta = await metaProvider({
+      const metaConfig = {
         accessToken: config.accessToken,
         adAccountId: config.adAccountId,
         apiVersion: config.apiVersion,
-      }, period, { now });
+      };
+      meta = metaProvider
+        ? await metaProvider(metaConfig, period, { now })
+        : await getPersistedOrLiveMetaSnapshot(metaConfig, period, { now, dbPool });
       metaStatus = 'connected';
     } catch {
       metaStatus = 'error';
@@ -140,7 +162,21 @@ export async function getMarketingCampaigns(
   const includesMeta = channel === 'all' || channel === 'meta';
   const sourceRows = includesMeta ? meta?.current.campaign_rows ?? [] : [];
   const averageCost = includesMeta ? meta?.current.cost_per_conversation ?? null : null;
-  const campaigns = sourceRows.map((row) => ({
+  let attribution: MarketingAttributionReport | null = null;
+  if (config.attributionEnabled) {
+    attribution = await (dependencies.attributionProvider ?? getMarketingAttributionReport)(
+      window.since,
+      window.until,
+      dbPool,
+    );
+  }
+  const campaignAttribution = new Map(
+    (attribution?.campaigns ?? []).map((row) => [row.campaign_id, row]),
+  );
+  const campaigns = sourceRows.map((row) => {
+    const attributed = campaignAttribution.get(row.id);
+    const grossMargin = attributed?.gross_margin ?? null;
+    return {
     id: `meta:${row.id}`,
     platform_id: row.id,
     channel: 'meta' as const,
@@ -148,15 +184,25 @@ export async function getMarketingCampaigns(
     status: 'with_delivery' as const,
     investment: row.spend,
     conversations: row.conversations,
+    impressions: row.impressions ?? 0,
+    clicks: row.clicks ?? 0,
+    ctr: row.ctr ?? null,
     cost_per_conversation: row.cost_per_conversation,
-    attributed_sales: null,
-    profit: null,
+    attributed_sales: config.attributionEnabled ? attributed?.attributed_sales ?? 0 : null,
+    attributed_revenue: config.attributionEnabled ? attributed?.attributed_revenue ?? 0 : null,
+    gross_margin: config.attributionEnabled ? grossMargin : null,
+    profit: config.attributionEnabled && grossMargin != null
+      ? Math.round((grossMargin - row.spend) * 100) / 100
+      : null,
     stock_status: 'not_reconciled' as const,
-    attribution_status: config.attributionEnabled ? 'pending' as const : 'disabled' as const,
+    attribution_status: config.attributionEnabled
+      ? attributed ? 'ready' as const : 'pending' as const
+      : 'disabled' as const,
     delivery_days: row.delivery_days,
     last_delivery: row.last_delivery,
     decision: campaignDecision(row, averageCost),
-  }));
+  };
+  });
 
   const alerts: MarketingCampaignsPayload['alerts'] = [];
   if (channel === 'google') {
@@ -216,6 +262,10 @@ export async function getMarketingCampaigns(
   }
 
   const hasMeta = includesMeta && metaStatus === 'connected';
+  const netAfterMedia = config.attributionEnabled && attribution?.available
+    && attribution.gross_margin != null && meta
+    ? Math.round((attribution.gross_margin - meta.current.spend) * 100) / 100
+    : null;
   return {
     environment: env.FAREJADOR_ENV,
     generated_at: now.toISOString(),
@@ -231,9 +281,18 @@ export async function getMarketingCampaigns(
       investment: hasMeta ? meta?.current.spend ?? 0 : null,
       campaigns: hasMeta ? meta?.current.campaigns ?? 0 : null,
       conversations: hasMeta ? meta?.current.conversations ?? 0 : null,
+      impressions: hasMeta ? meta?.current.impressions ?? 0 : null,
+      clicks: hasMeta ? meta?.current.clicks ?? 0 : null,
+      ctr: hasMeta ? meta?.current.ctr ?? null : null,
       cost_per_conversation: hasMeta ? meta?.current.cost_per_conversation ?? null : null,
-      attributed_sales: null,
-      profit: null,
+      attributed_sales: config.attributionEnabled && attribution?.available
+        ? attribution.attributed_sales : null,
+      attributed_revenue: config.attributionEnabled && attribution?.available
+        ? attribution.attributed_revenue : null,
+      gross_margin: config.attributionEnabled && attribution?.available
+        ? attribution.gross_margin : null,
+      net_after_media: netAfterMedia,
+      profit: netAfterMedia,
     },
     campaigns,
     alerts,

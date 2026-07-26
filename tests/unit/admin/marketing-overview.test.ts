@@ -36,14 +36,20 @@ describe('Marketing overview da matriz', () => {
       meta: 'disabled',
       meta_synced_at: null,
       attribution: 'disabled',
-      capi: 'not_implemented',
+      capi: 'disabled',
     });
-    expect(overview.metrics).toEqual({
+    expect(overview.metrics).toMatchObject({
       investment: null,
       campaigns: null,
       conversations: null,
+      impressions: null,
+      clicks: null,
+      ctr: null,
       cost_per_conversation: null,
       attributed_sales: null,
+      attributed_revenue: null,
+      gross_margin: null,
+      net_after_media: null,
       profit: null,
     });
     expect(overview.attribution).toEqual({ available: true, referrals: 3, ctwa: 1 });

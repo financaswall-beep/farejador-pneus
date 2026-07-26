@@ -124,7 +124,10 @@ describe('environment security validation', () => {
   it('keeps Marketing integrations dormant by default', () => {
     const parsed = parseEnv(baseEnv);
     expect(parsed.MARKETING_META_ENABLED).toBe(false);
+    expect(parsed.MARKETING_SYNC_ENABLED).toBe(false);
     expect(parsed.MARKETING_ATTRIBUTION).toBe(false);
+    expect(parsed.MARKETING_CAPI_ENABLED).toBe(false);
+    expect(parsed.CAPI_EXTENDED_MATCHING).toBe(false);
     expect(parsed.META_ADS_ACCESS_TOKEN).toBeUndefined();
   });
 
@@ -147,5 +150,40 @@ describe('environment security validation', () => {
       CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
     });
     expect(parsed.MARKETING_META_ENABLED).toBe(true);
+  });
+
+  it('só habilita CAPI em produção com atribuição e credenciais próprias', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_CAPI_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/MARKETING_ATTRIBUTION.*MARKETING_CAPI_ENABLED[\s\S]*META_CAPI_DATASET_ID[\s\S]*META_CAPI_ACCESS_TOKEN[\s\S]*META_WHATSAPP_BUSINESS_ACCOUNT_ID/);
+
+    const parsed = parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_CAPI_ENABLED: 'true',
+      MARKETING_ATTRIBUTION: 'true',
+      META_CAPI_DATASET_ID: '123456',
+      META_CAPI_ACCESS_TOKEN: 'token-capi-seguro',
+      META_CAPI_PAGE_ID: '456789',
+      META_WHATSAPP_BUSINESS_ACCOUNT_ID: '987654',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    });
+    expect(parsed.MARKETING_CAPI_ENABLED).toBe(true);
+    expect(parsed.META_CAPI_PAGE_ID).toBe('456789');
+  });
+
+  it('não agenda sync da Meta com o conector desligado', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_SYNC_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/MARKETING_META_ENABLED.*MARKETING_SYNC_ENABLED/);
   });
 });

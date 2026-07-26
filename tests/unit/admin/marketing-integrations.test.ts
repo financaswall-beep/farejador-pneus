@@ -23,7 +23,7 @@ function overview(meta: 'connected' | 'disabled', ctwa: number) {
       meta,
       meta_synced_at: meta === 'connected' ? '2026-07-26T11:35:00.000Z' : null,
       attribution: 'disabled',
-      capi: 'not_implemented',
+      capi: 'disabled',
     },
     metrics: {
       investment: meta === 'connected' ? 100 : null,

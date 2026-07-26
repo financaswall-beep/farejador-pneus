@@ -15,6 +15,8 @@ import { registerSecurityHeaders } from './security-headers.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
 import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-custos.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
+import { startMarketingScheduler } from '../marketing/scheduler.js';
+import { startMarketingCapiWorker } from '../marketing/capi.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -32,6 +34,8 @@ let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
 let stopPartnerPush: (() => void) | null = null;
+let stopMarketingScheduler: (() => void) | null = null;
+let stopMarketingCapi: (() => void) | null = null;
 
 fastify.addContentTypeParser(
   'application/json',
@@ -65,6 +69,8 @@ async function start(): Promise<void> {
   // Push (PWA, 0109): escuta global do partner_chat -> notificação nativa no
   // celular do borracheiro (foto/pedido com navegador fechado). No-op com a flag off.
   stopPartnerPush = startPartnerPushFanout();
+  stopMarketingScheduler = startMarketingScheduler();
+  stopMarketingCapi = startMarketingCapiWorker();
 
   const port = env.PORT;
   await fastify.listen({ port, host: '0.0.0.0' });
@@ -95,6 +101,8 @@ async function shutdown(signal: string): Promise<void> {
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();
   stopPartnerPush?.();
+  stopMarketingScheduler?.();
+  stopMarketingCapi?.();
   await fastify.close();
   await pool.end();
   fastify.log.info('shutdown complete');

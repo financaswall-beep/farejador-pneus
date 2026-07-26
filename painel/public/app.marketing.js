@@ -8,10 +8,13 @@ function marketingMockPayload() {
     environment: 'test',
     generated_at: '2026-07-22T12:00:00.000Z',
     period: { id: '30d', days: 30, since: '2026-06-24', until: '2026-07-22' },
-    connection: { meta: 'connected', attribution: 'disabled', capi: 'not_implemented' },
+    connection: { meta: 'connected', attribution: 'enabled', capi: 'disabled' },
     metrics: {
       investment: 232.99, campaigns: 4, conversations: 86,
-      cost_per_conversation: 2.71, attributed_sales: null, profit: null,
+      impressions: 18420, clicks: 612, ctr: 3.32,
+      cost_per_conversation: 2.71, attributed_sales: 7, attributed_revenue: 5840,
+      gross_margin: 1420, net_after_media: 1187.01, profit: 1187.01,
+      pending_margin_orders: 1,
     },
     series: [
       { date: '2026-06-24', spend: 18, conversations: 7 },
@@ -129,14 +132,18 @@ window.PAINEL_MODULES.marketing = function () {
           detail: metrics.investment == null ? 'Meta ainda não conectada' : 'Meta API', icon: 'circle-dollar-sign' },
         { id: 'campaigns', label: 'Campanhas no período', value: metrics.campaigns ?? '—',
           detail: metrics.campaigns == null ? 'Aguardando conexão' : 'com entrega', icon: 'megaphone' },
+        { id: 'impressions', label: 'Impressões', value: metrics.impressions == null ? '—' : Number(metrics.impressions).toLocaleString('pt-BR'),
+          detail: 'Meta API', icon: 'eye' },
+        { id: 'clicks', label: 'Cliques', value: metrics.clicks == null ? '—' : Number(metrics.clicks).toLocaleString('pt-BR'),
+          detail: metrics.ctr == null ? 'CTR indisponível' : `CTR ${Number(metrics.ctr).toLocaleString('pt-BR')}%`, icon: 'mouse-pointer-click' },
         { id: 'conversations', label: 'Conversas', value: metrics.conversations ?? '—',
           detail: metrics.conversations == null ? 'Aguardando conexão' : 'iniciadas pelo anúncio', icon: 'messages-square' },
         { id: 'cost', label: 'Custo por conversa', value: money(metrics.cost_per_conversation),
           detail: 'investimento ÷ conversas', icon: 'badge-dollar-sign' },
         { id: 'sales', label: 'Vendas atribuídas', value: metrics.attributed_sales ?? '—',
-          detail: 'atribuição pendente', icon: 'shopping-cart', tone: 'attention' },
-        { id: 'profit', label: 'Lucro real', value: metrics.profit == null ? 'Não calculado' : money(metrics.profit),
-          detail: 'bloqueado até a venda', icon: 'trending-up' },
+          detail: metrics.attributed_sales == null ? 'atribuição desligada' : 'last-click CTWA, 7 dias', icon: 'shopping-cart', tone: 'attention' },
+        { id: 'profit', label: 'Margem após mídia', value: metrics.net_after_media == null ? 'Não calculada' : money(metrics.net_after_media),
+          detail: metrics.pending_margin_orders ? `${metrics.pending_margin_orders} pedido(s) sem custo` : 'margem bruta − mídia', icon: 'trending-up' },
       ];
     },
 
@@ -223,8 +230,8 @@ window.PAINEL_MODULES.marketing = function () {
           icon: 'search', status: 'pending' },
         { label: 'Vendas atribuídas', value: metrics.attributed_sales ?? 'Pendente', detail: 'exige vínculo CTWA validado',
           icon: 'shopping-cart', status: metrics.attributed_sales == null ? 'pending' : 'ready' },
-        { label: 'Lucro real', value: metrics.profit == null ? 'Bloqueado' : money(metrics.profit), detail: 'receita menos custos reais',
-          icon: 'trending-up', status: metrics.profit == null ? 'blocked' : 'ready' },
+        { label: 'Margem após mídia', value: metrics.net_after_media == null ? 'Bloqueada' : money(metrics.net_after_media), detail: 'margem bruta menos mídia',
+          icon: 'trending-up', status: metrics.net_after_media == null ? 'blocked' : 'ready' },
       ];
     },
   };

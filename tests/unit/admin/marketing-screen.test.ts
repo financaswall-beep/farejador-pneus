@@ -37,11 +37,11 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-journeys1');
-    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-journeys1');
-    expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260726-marketing-journeys1');
-    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260726-marketing-journeys1');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-journeys1');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-meta2');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
     expect(staticRoute).toContain("'app.marketing.journeys.js'");
@@ -51,8 +51,8 @@ describe('Marketing — primeira tela da matriz', () => {
   });
 
   it('não transforma ausência de atribuição em venda zero', () => {
-    expect(front).toContain("attributed_sales: null");
-    expect(front).toContain("profit: null");
+    expect(front).toContain("metrics.attributed_sales ?? '—'");
+    expect(front).toContain("metrics.net_after_media == null ? 'Não calculada'");
     expect(html).toContain('zero vendas atribuídas não significa zero vendas realizadas');
     expect(html).toContain('A venda só entra aqui depois de haver vínculo rastreável');
   });
@@ -74,16 +74,15 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('background:conic-gradient(#047857');
     expect(marketingHtml).toContain('<strong>Próximo passo:</strong> validar atribuição CTWA');
     expect(marketingHtml).toContain('data-marketing-channel-filter-mock');
-    expect(marketingHtml).toContain('Estes botões ainda NÃO filtram os dados');
-    expect(marketingHtml).toContain('channels=meta,google,tiktok');
-    expect(marketingHtml).toContain('Prévia dos filtros — os valores atuais ainda usam somente a Meta');
+    expect(marketingHtml).toContain('Meta somente — Google e TikTok não têm conector neste módulo');
+    expect(marketingHtml).toContain('disabled aria-pressed="false" title="Sem conector"');
     expect(marketingHtml).not.toContain('<section x-show="marketingIsMock()" x-cloak data-marketing-channel-filter-mock');
     expect(marketingHtml).toContain('grid grid-cols-1 gap-4 lg:grid-cols-12');
     expect(marketingHtml).toContain('shadow-sm lg:col-span-8');
     expect(marketingHtml).toContain('shadow-sm lg:col-span-7');
     expect(marketingHtml).toContain('absolute right-3 top-3 z-20');
     expect(marketingHtml).not.toContain('absolute right-3 top-3 z-30');
-    expect(marketingHtml).toContain('xl:grid-cols-6');
+    expect(marketingHtml).toContain('2xl:grid-cols-8');
     expect(marketingHtml).not.toContain('h-4.5 w-4.5');
     expect(front).toContain("'border-emerald-300 bg-emerald-100/80 text-emerald-950'");
     expect(front).not.toContain("'border-rose-200 bg-rose-50 text-rose-700'");
@@ -101,7 +100,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain("marketingTab !== 'visao' && marketingTab !== 'campanhas' && marketingTab !== 'jornadas' && marketingTab !== 'integracoes'");
   });
 
-  it('implementa Jornadas com Meta, CTWA e comércio sem fabricar atribuição', () => {
+  it('implementa Jornadas com ledger CTWA e denominador comercial explícito', () => {
     const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
     const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
     const marketingHtml = html.slice(marketingStart, marketingEnd);
@@ -112,14 +111,16 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('Jornada por campanha');
     expect(marketingHtml).toContain('Ausência de atribuição não é tratada como zero vendas');
     expect(journeysFront).toContain('/admin/api/marketing/journeys?period=');
-    expect(journeysFront).toContain("attributed_sales: null");
+    expect(journeysFront).toContain("id: 'order_coverage'");
+    expect(marketingHtml).toContain('Last-click em até 7 dias');
+    expect(marketingHtml).toContain('Uma venda por clique');
     expect(journeysFront).toContain("marketingJourneySourceLabel(source)");
     expect(route).toContain("fastify.get('/admin/api/marketing/journeys'");
     expect(journeysFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
 
-  it('implementa Campanhas com seleção real de Consolidado, Meta, Google e TikTok', () => {
+  it('implementa Campanhas da Meta e mantém canais sem conector desabilitados', () => {
     const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
     const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
     const marketingHtml = html.slice(marketingStart, marketingEnd);
@@ -127,11 +128,12 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('data-marketing-campaigns-screen');
     expect(marketingHtml).toContain("marketingCampaignSetChannel('all')");
     expect(marketingHtml).toContain("marketingCampaignSetChannel('meta')");
-    expect(marketingHtml).toContain("marketingCampaignSetChannel('google')");
-    expect(marketingHtml).toContain("marketingCampaignSetChannel('tiktok')");
+    expect(marketingHtml).toContain('title="Sem conector"');
     expect(marketingHtml).toContain('Decisão por campanha');
     expect(marketingHtml).toContain('data-marketing-campaign-channel-icon');
     expect(marketingHtml).toContain('Aguardando atribuição');
+    expect(marketingHtml).toContain('Impressões');
+    expect(marketingHtml).toContain('Cliques');
     expect(marketingHtml).toContain('A conciliar');
     expect(marketingHtml).toContain('Nenhuma verba é alterada automaticamente');
     expect(campaignsFront).toContain('/admin/api/marketing/campaigns?period=');
@@ -158,7 +160,11 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(integrationsFront).toContain('/admin/api/marketing/integrations?period=');
     expect(integrationsFront).toContain('marketingUtmUrl()');
     expect(integrationsFront).toContain('navigator.clipboard.writeText');
+    expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/sync'");
+    expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/reconcile'");
+    expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/capi/test'");
     expect(route).toContain("fastify.get('/admin/api/marketing/integrations'");
+    expect(route).toContain("fastify.post('/admin/api/marketing/sync'");
     expect(integrationsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });

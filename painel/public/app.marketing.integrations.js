@@ -29,17 +29,19 @@ function marketingIntegrationMockPayload() {
     collection: [
       { id: 'campaigns', label: 'Campanhas e investimento', status: 'ok', detail: 'recebendo' },
       { id: 'conversations', label: 'Conversas por anúncio', status: 'ok', detail: 'recebendo' },
-      { id: 'ctwa', label: 'ctwa_clid', status: 'pending', detail: 'incompleto' },
-      { id: 'capi', label: 'CAPI', status: 'blocked', detail: 'não configurada' },
+      { id: 'ctwa', label: 'ctwa_clid', status: 'ok', detail: '61 referência(s)' },
+      { id: 'capi', label: 'CAPI', status: 'pending', detail: 'implementada e desligada até passar no Test Events' },
     ],
     quality: [
       { id: 'credential', label: 'Credencial protegida', status: 'ok' },
       { id: 'account', label: 'Conta de anúncios', status: 'ok' },
       { id: 'sync', label: 'Sincronização', status: 'ok' },
-      { id: 'ctwa', label: 'Atribuição CTWA', status: 'pending' },
-      { id: 'capi', label: 'Retorno CAPI', status: 'blocked' },
+      { id: 'ctwa', label: 'Atribuição CTWA', status: 'ok' },
+      { id: 'capi', label: 'Retorno CAPI', status: 'pending' },
     ],
-    next_step: 'Validar o vínculo entre conversa e venda',
+    next_step: 'Validar Purchase no Test Events e ativar a CAPI',
+    sync: { available: true, status: 'succeeded', rows_upserted: 146 },
+    capi: { enabled: false, pending: 0, processing: 0, sent: 0, dead_letter: 0 },
     audit_events: [
       { id: '1', event_type: 'Meta sincronizada', actor_label: 'Sistema', created_at: '2026-07-26T11:35:00.000Z' },
       { id: '2', event_type: 'Credencial validada', actor_label: 'Sistema', created_at: '2026-07-26T11:34:00.000Z' },
@@ -104,9 +106,9 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
       return 'clock-3';
     },
 
-    marketingIntegrationAction(platform) {
+    async marketingIntegrationAction(platform) {
       if (platform.id === 'meta' && platform.status === 'connected') {
-        this.marketingIntegrationsMessage = 'A Meta é gerenciada por variáveis protegidas no ambiente de produção.';
+        await this.marketingRunIntegrationAction('sync');
       } else if (platform.id === 'google') {
         this.marketingIntegrationsMessage = 'Google Ads ainda não possui conector. Nenhuma configuração foi alterada.';
       } else {
@@ -115,9 +117,46 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
     },
 
     marketingIntegrationActionLabel(platform) {
-      if (platform.id === 'meta' && platform.status === 'connected') return 'Gerenciar';
-      if (platform.id === 'google') return 'Conectar Google';
-      return 'Preparar integração';
+      if (platform.id === 'meta' && platform.status === 'connected') return 'Sincronizar Meta';
+      if (platform.id === 'google') return 'Sem conector';
+      return 'Planejado';
+    },
+
+    async marketingRunIntegrationAction(action) {
+      if (this.marketingIntegrationActionLoading) return;
+      this.marketingIntegrationActionLoading = action;
+      this.marketingIntegrationsMessage = '';
+      try {
+        if (this.marketingIsMock()) {
+          this.marketingIntegrationsMessage = action === 'sync'
+            ? 'Amostra: 146 linhas seriam sincronizadas.'
+            : action === 'reconcile'
+              ? 'Amostra: atribuições seriam reconciliadas e enfileiradas.'
+              : 'Amostra: Purchase seria enviado ao Test Events.';
+          return;
+        }
+        if (action === 'sync') {
+          const result = await this.apiPost('/admin/api/marketing/sync', { lookback_days: 60 });
+          this.marketingIntegrationsMessage = `Sincronização concluída: ${result.rows_upserted || 0} linha(s) persistidas.`;
+        } else if (action === 'reconcile') {
+          const result = await this.apiPost('/admin/api/marketing/reconcile', {});
+          this.marketingIntegrationsMessage = `Reconciliação concluída: ${result.attribution?.created || 0} nova(s) atribuição(ões), ${result.capi_enqueued || 0} evento(s) enfileirado(s).`;
+        } else {
+          const result = await this.apiPost('/admin/api/marketing/capi/test', {});
+          this.marketingIntegrationsMessage = result.processed
+            ? 'Um Purchase foi enviado ao Test Events da Meta.'
+            : 'Nenhum Purchase elegível estava pendente para o Test Events.';
+        }
+        await this.loadMarketingIntegrations();
+      } catch (error) {
+        const code = error?.message || '';
+        this.marketingIntegrationsMessage = code === 'capi_test_event_code_not_configured'
+          ? 'Configure META_CAPI_TEST_EVENT_CODE antes de testar a CAPI.'
+          : 'A ação não foi concluída. Confira a configuração e o diagnóstico do pipeline.';
+      } finally {
+        this.marketingIntegrationActionLoading = '';
+        this.$nextTick(() => lucide.createIcons());
+      }
     },
 
     marketingUtmUrl() {

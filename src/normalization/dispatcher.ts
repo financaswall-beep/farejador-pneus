@@ -26,6 +26,7 @@ import {
 import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { reconcileAgentOutboundDelivery } from '../atendente-v2/outbound-reconcile.js';
+import { captureAdReferralAfterMessageUpsert } from '../marketing/referrals.js';
 
 export interface RawEvent {
   id: number;
@@ -204,6 +205,8 @@ export async function dispatch(
 
       const message = mapMessage(payload, environment, lastEventAt);
       const upsertedMessage = await upsertMessage(client, message);
+
+      await captureAdReferralAfterMessageUpsert(client, environment as Environment, message, upsertedMessage);
 
       // Prova forte da entrega do bot: casa o id devolvido pela API com o
       // core.messages criado pelo webhook. Defensivo para nunca quebrar raw/core.
