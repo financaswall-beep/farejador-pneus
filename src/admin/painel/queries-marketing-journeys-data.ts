@@ -7,8 +7,6 @@ export interface OperationalJourney {
   qualified: number;
   quotes: number;
   order_intents: number;
-  attributed_sales: number;
-  attributed_revenue: number;
 }
 
 interface OperationalJourneyRow {
@@ -17,8 +15,6 @@ interface OperationalJourneyRow {
   qualified: unknown;
   quotes: unknown;
   order_intents: unknown;
-  attributed_sales: unknown;
-  attributed_revenue: unknown;
 }
 
 function numberValue(value: unknown): number {
@@ -78,21 +74,7 @@ export async function loadOperationalJourney(
            WHERE cf.environment = $1
              AND cf.fact_key = 'pedido_criado'
              AND cf.superseded_by IS NULL
-             AND COALESCE(cf.observed_at, cf.created_at) >= t.attributed_at)::int AS order_intents,
-         (SELECT count(o.id)
-            FROM commerce.orders o
-            JOIN tracked t ON t.conversation_id = o.source_conversation_id
-           WHERE o.environment = $1
-             AND o.status <> 'cancelled'
-             AND o.created_at >= t.attributed_at
-             AND o.created_at < ($3::date + 1))::int AS attributed_sales,
-         (SELECT COALESCE(sum(o.total_amount), 0)
-            FROM commerce.orders o
-            JOIN tracked t ON t.conversation_id = o.source_conversation_id
-           WHERE o.environment = $1
-             AND o.status <> 'cancelled'
-             AND o.created_at >= t.attributed_at
-             AND o.created_at < ($3::date + 1)) AS attributed_revenue`,
+             AND COALESCE(cf.observed_at, cf.created_at) >= t.attributed_at)::int AS order_intents`,
       [environment, since, until],
     );
     const row = result.rows[0];
@@ -103,8 +85,6 @@ export async function loadOperationalJourney(
       qualified: numberValue(row?.qualified),
       quotes: numberValue(row?.quotes),
       order_intents: numberValue(row?.order_intents),
-      attributed_sales: numberValue(row?.attributed_sales),
-      attributed_revenue: Math.round(numberValue(row?.attributed_revenue) * 100) / 100,
     };
   } catch {
     return {
@@ -114,8 +94,6 @@ export async function loadOperationalJourney(
       qualified: 0,
       quotes: 0,
       order_intents: 0,
-      attributed_sales: 0,
-      attributed_revenue: 0,
     };
   }
 }

@@ -106,6 +106,15 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
       return 'clock-3';
     },
 
+    marketingIntegrationAuditLabel(eventType) {
+      const labels = {
+        marketing_sync_manual: 'Sincronização manual da Meta',
+        marketing_attribution_reconciled: 'Atribuição reconciliada',
+        marketing_capi_test: 'Teste CAPI',
+      };
+      return labels[eventType] || eventType;
+    },
+
     async marketingIntegrationAction(platform) {
       if (platform.id === 'meta' && platform.status === 'connected') {
         await this.marketingRunIntegrationAction('sync');
@@ -145,7 +154,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
           const result = await this.apiPost('/admin/api/marketing/capi/test', {});
           this.marketingIntegrationsMessage = result.processed
             ? 'Um Purchase foi enviado ao Test Events da Meta.'
-            : 'Nenhum Purchase elegível estava pendente para o Test Events.';
+            : 'Nenhuma compra recente elegível foi encontrada para o Test Events.';
         }
         await this.loadMarketingIntegrations();
       } catch (error) {

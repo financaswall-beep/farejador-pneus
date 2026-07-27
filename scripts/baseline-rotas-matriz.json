@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-26T18:19:16.679Z",
-  "total": 181,
+  "geradoEm": "2026-07-27T02:25:09.117Z",
+  "total": 183,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -20,6 +20,7 @@
     "GET /admin/api/logistica AUTH(1)",
     "GET /admin/api/logistica/comprovantes/:receiptId/imagem AUTH(1)",
     "GET /admin/api/marketing/campaigns AUTH(1)",
+    "GET /admin/api/marketing/campaigns/:campaignId AUTH(1)",
     "GET /admin/api/marketing/integrations AUTH(1)",
     "GET /admin/api/marketing/journeys AUTH(1)",
     "GET /admin/api/marketing/overview AUTH(1)",
@@ -78,6 +79,7 @@
     "GET /admin/painel/app.logistica.comprovantes.js PUBLICA",
     "GET /admin/painel/app.logistica.js PUBLICA",
     "GET /admin/painel/app.logistica.resultado.js PUBLICA",
+    "GET /admin/painel/app.marketing.campaign-detail.js PUBLICA",
     "GET /admin/painel/app.marketing.campaigns.js PUBLICA",
     "GET /admin/painel/app.marketing.integrations.js PUBLICA",
     "GET /admin/painel/app.marketing.journeys.js PUBLICA",

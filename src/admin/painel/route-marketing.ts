@@ -1,10 +1,10 @@
 /**
- * Marketing da matriz — endpoint owner-only e read-only.
+ * Marketing da matriz — leitura e ações operacionais owner-only.
  * Falha da plataforma externa aparece no payload; nunca derruba outras abas.
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminOwner } from '../auth.js';
+import { getAdminContext, requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
 import {
   getMarketingCampaignDetail,
@@ -15,8 +15,10 @@ import {
 } from './queries.js';
 import { syncMetaInsights } from '../../marketing/meta-sync.js';
 import { reconcileMarketingAttributions } from '../../marketing/attribution.js';
-import { enqueueCapiPurchases, pollCapiOutbox } from '../../marketing/capi.js';
+import { enqueueCapiPurchases } from '../../marketing/capi.js';
+import { sendLatestCapiTestPurchase } from '../../marketing/capi-test.js';
 import { env } from '../../shared/config/env.js';
+import { recordMarketingAudit } from './marketing-audit.js';
 
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
@@ -105,33 +107,91 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
         triggerType: 'manual',
         lookbackDays: parsed.data.lookback_days,
       });
+      await recordMarketingAudit({
+        eventType: 'marketing_sync_manual',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.meta_sync_runs',
+        entityId: result.run_id,
+        idempotencyKey: String(request.id),
+        payload: {
+          status: 'succeeded',
+          lookback_days: parsed.data.lookback_days,
+          rows_upserted: result.rows_upserted,
+          since: result.since,
+          until: result.until,
+        },
+      });
       return reply.status(200).send(result);
     } catch (err) {
+      await recordMarketingAudit({
+        eventType: 'marketing_sync_manual',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.meta_sync_runs',
+        idempotencyKey: String(request.id),
+        payload: { status: 'failed', lookback_days: parsed.data.lookback_days },
+      });
       logger.error({ err }, 'painel marketing manual sync failed');
       return reply.status(503).send({ error: 'marketing_sync_failed' });
     }
   });
 
-  fastify.post('/admin/api/marketing/reconcile', { preHandler: requireAdminOwner }, async (_request, reply) => {
+  fastify.post('/admin/api/marketing/reconcile', { preHandler: requireAdminOwner }, async (request, reply) => {
     try {
       const attribution = await reconcileMarketingAttributions();
       const capi_enqueued = await enqueueCapiPurchases();
+      await recordMarketingAudit({
+        eventType: 'marketing_attribution_reconciled',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.order_attributions',
+        idempotencyKey: String(request.id),
+        payload: { status: 'succeeded', ...attribution, capi_enqueued },
+      });
       return reply.status(200).send({ attribution, capi_enqueued });
     } catch (err) {
+      await recordMarketingAudit({
+        eventType: 'marketing_attribution_reconciled',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.order_attributions',
+        idempotencyKey: String(request.id),
+        payload: { status: 'failed' },
+      });
       logger.error({ err }, 'painel marketing attribution reconcile failed');
       return reply.status(503).send({ error: 'marketing_reconcile_failed' });
     }
   });
 
-  fastify.post('/admin/api/marketing/capi/test', { preHandler: requireAdminOwner }, async (_request, reply) => {
+  fastify.post('/admin/api/marketing/capi/test', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.META_CAPI_TEST_EVENT_CODE) {
+      await recordMarketingAudit({
+        eventType: 'marketing_capi_test',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.capi_test',
+        idempotencyKey: String(request.id),
+        payload: { status: 'blocked', reason: 'test_event_code_not_configured' },
+      });
       return reply.status(409).send({ error: 'capi_test_event_code_not_configured' });
     }
     try {
-      const enqueued = await enqueueCapiPurchases({ enabled: true });
-      const processed = await pollCapiOutbox();
-      return reply.status(200).send({ enqueued, processed });
+      const result = await sendLatestCapiTestPurchase();
+      await recordMarketingAudit({
+        eventType: 'marketing_capi_test',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.capi_test',
+        idempotencyKey: String(request.id),
+        payload: {
+          status: result.processed ? 'succeeded' : 'no_eligible_purchase',
+          events_received: result.events_received,
+        },
+      });
+      return reply.status(200).send(result);
     } catch (err) {
+      await recordMarketingAudit({
+        eventType: 'marketing_capi_test',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.capi_test',
+        idempotencyKey: String(request.id),
+        payload: { status: 'failed' },
+      });
       logger.error({ err }, 'painel marketing CAPI test failed');
       return reply.status(503).send({ error: 'marketing_capi_test_failed' });
     }

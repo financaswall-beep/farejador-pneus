@@ -58,8 +58,6 @@ describe('Marketing — Jornadas rastreáveis', () => {
       qualified: 2,
       quotes: 1,
       order_intents: 1,
-      attributed_sales: 1,
-      attributed_revenue: '320.00',
     });
     const metaProvider = vi.fn().mockResolvedValue(metaSnapshot());
 
@@ -94,6 +92,8 @@ describe('Marketing — Jornadas rastreáveis', () => {
       bottleneck: 'campaign_mapping_pending',
     });
     expect(query.mock.calls[0]?.[1]?.[0]).toBe(payload.environment);
+    expect(query.mock.calls[0]?.[0]).not.toContain('AS attributed_sales');
+    expect(query.mock.calls[0]?.[0]).not.toContain('o.source_conversation_id');
     expect(JSON.stringify(payload)).not.toContain(secret);
   });
 
@@ -104,8 +104,6 @@ describe('Marketing — Jornadas rastreáveis', () => {
       qualified: 3,
       quotes: 2,
       order_intents: 2,
-      attributed_sales: 1,
-      attributed_revenue: '320.00',
     });
 
     const payload = await getMarketingJourneys('7d', {
@@ -119,6 +117,23 @@ describe('Marketing — Jornadas rastreáveis', () => {
         apiVersion: 'v21.0',
       },
       metaProvider: vi.fn().mockResolvedValue(metaSnapshot()),
+      attributionProvider: vi.fn().mockResolvedValue({
+        available: true,
+        referrals: 4,
+        total_realized_orders: 2,
+        orders_with_conversation: 2,
+        attributed_sales: 1,
+        attributed_revenue: 320,
+        gross_margin: 100,
+        pending_margin_orders: 0,
+        campaigns: [{
+          campaign_id: 'campaign-1',
+          attributed_sales: 1,
+          attributed_revenue: 320,
+          gross_margin: 100,
+          pending_margin_orders: 0,
+        }],
+      }),
     });
 
     expect(payload.quality.attribution_reliable).toBe(true);
@@ -135,8 +150,6 @@ describe('Marketing — Jornadas rastreáveis', () => {
       qualified: 0,
       quotes: 0,
       order_intents: 0,
-      attributed_sales: 0,
-      attributed_revenue: 0,
     });
 
     const payload = await getMarketingJourneys('30d', {

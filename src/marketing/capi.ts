@@ -3,21 +3,15 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
+import {
+  loadProductionCapiSources,
+  type CapiSourceRow,
+} from './capi-source.js';
+import { sendCapiPayload } from './capi-transport.js';
 
 const MAX_ATTEMPTS = 5;
+const META_MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const WORKER_ID = `marketing-capi-${randomUUID().slice(0, 8)}`;
-
-interface CapiSourceRow {
-  attribution_id: string;
-  order_number: string;
-  total_amount: string;
-  realized_at: string;
-  phone_e164: string | null;
-  ctwa_clid: string;
-  city_name: string | null;
-  state_code: string | null;
-  postal_code_prefix: string | null;
-}
 
 export interface CapiOutboxRow {
   id: string;
@@ -93,33 +87,12 @@ export async function enqueueCapiPurchases(options: {
     throw new Error('marketing_capi_waba_not_configured');
   }
   const dbPool = options.dbPool ?? defaultPool;
-  const source = await dbPool.query<CapiSourceRow>(
-    `SELECT a.id AS attribution_id,o.order_number,o.total_amount::text,
-            a.realized_at::text,c.phone_e164,r.ctwa_clid,
-            g.city_name,g.state_code,g.postal_code_prefix
-       FROM marketing.order_attributions a
-       JOIN marketing.ad_referrals r
-         ON r.environment=a.environment AND r.id=a.referral_id
-       JOIN commerce.orders o
-         ON o.environment=a.environment AND o.id=a.order_id
-       JOIN core.contacts c
-         ON c.environment=o.environment AND c.id=o.contact_id
-       LEFT JOIN commerce.geo_resolutions g
-         ON g.environment=o.environment AND g.id=o.geo_resolution_id
-      WHERE a.environment=$1 AND a.status='active' AND a.superseded_by IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM marketing.capi_outbox q
-           WHERE q.environment=a.environment AND q.attribution_id=a.id
-        )
-      ORDER BY a.realized_at,a.id`,
-    [env.FAREJADOR_ENV],
-  );
+  const source = await loadProductionCapiSources(dbPool);
   let enqueued = 0;
-  for (const row of source.rows) {
+  for (const row of source) {
     const payload = buildCapiPayload(row, {
       whatsappBusinessAccountId: env.META_WHATSAPP_BUSINESS_ACCOUNT_ID,
       pageId: env.META_CAPI_PAGE_ID,
-      testEventCode: env.META_CAPI_TEST_EVENT_CODE,
       extendedMatching: env.CAPI_EXTENDED_MATCHING,
     });
     const inserted = await dbPool.query(
@@ -159,44 +132,19 @@ async function pickCapiEvent(client: PoolClient): Promise<CapiOutboxRow | null> 
   return result.rows[0] ?? null;
 }
 
-async function sendCapi(row: CapiOutboxRow, fetcher: typeof fetch): Promise<{
-  eventsReceived: number;
-  fbtraceId: string | null;
-}> {
-  if (!env.META_CAPI_DATASET_ID || !env.META_CAPI_ACCESS_TOKEN) {
-    throw new Error('marketing_capi_not_configured');
-  }
-  const url = new URL(
-    `https://graph.facebook.com/${encodeURIComponent(env.META_GRAPH_API_VERSION)}/${encodeURIComponent(env.META_CAPI_DATASET_ID)}/events`,
-  );
-  const response = await fetcher(url, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.META_CAPI_ACCESS_TOKEN}`,
-    },
-    body: JSON.stringify(row.payload),
-    signal: AbortSignal.timeout(15_000),
-  });
-  const body = await response.json().catch(() => ({})) as {
-    events_received?: unknown;
-    fbtrace_id?: unknown;
-    error?: { code?: unknown; message?: unknown };
-  };
-  if (!response.ok || body.error) {
-    const code = body.error?.code ? String(body.error.code) : String(response.status);
-    throw new Error(`meta_capi_${code}`);
-  }
-  return {
-    eventsReceived: Number(body.events_received ?? 0),
-    fbtraceId: body.fbtrace_id ? String(body.fbtrace_id) : null,
-  };
+function capiPayloadExpired(payload: Record<string, unknown>, now: Date): boolean {
+  const data = Array.isArray(payload.data) ? payload.data : [];
+  const event = data[0];
+  if (!event || typeof event !== 'object') return false;
+  const eventTime = Number((event as Record<string, unknown>).event_time);
+  return Number.isFinite(eventTime)
+    && eventTime * 1000 < now.getTime() - META_MAX_EVENT_AGE_MS;
 }
 
 export async function pollCapiOutbox(options: {
   dbPool?: Pool;
   fetcher?: typeof fetch;
+  now?: Date;
 } = {}): Promise<boolean> {
   const dbPool = options.dbPool ?? defaultPool;
   const client = await dbPool.connect();
@@ -206,7 +154,19 @@ export async function pollCapiOutbox(options: {
     row = await pickCapiEvent(client);
     await client.query('COMMIT');
     if (!row) return false;
-    const ack = await sendCapi(row, options.fetcher ?? fetch);
+    if (capiPayloadExpired(row.payload, options.now ?? new Date())) {
+      await client.query(
+        `UPDATE marketing.capi_outbox
+            SET status='dead_letter',locked_at=NULL,locked_by=NULL,
+                last_error_code='event_time_expired',last_error_kind='terminal',
+                last_error_summary='event_time older than 7 days',
+                dead_lettered_at=now(),updated_at=now()
+          WHERE environment=$1 AND id=$2`,
+        [row.environment, row.id],
+      );
+      return true;
+    }
+    const ack = await sendCapiPayload(row.payload, { fetcher: options.fetcher });
     await client.query(
       `UPDATE marketing.capi_outbox
           SET status='sent',events_received=$2,fbtrace_id=$3,sent_at=now(),

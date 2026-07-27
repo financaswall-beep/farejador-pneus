@@ -6,6 +6,10 @@ let extractAdReferral: typeof import('../../../src/marketing/referrals.js').extr
 let captureAdReferralAfterMessageUpsert:
   typeof import('../../../src/marketing/referrals.js').captureAdReferralAfterMessageUpsert;
 let buildCapiPayload: typeof import('../../../src/marketing/capi.js').buildCapiPayload;
+let enqueueCapiPurchases: typeof import('../../../src/marketing/capi.js').enqueueCapiPurchases;
+let pollCapiOutbox: typeof import('../../../src/marketing/capi.js').pollCapiOutbox;
+let sendLatestCapiTestPurchase:
+  typeof import('../../../src/marketing/capi-test.js').sendLatestCapiTestPurchase;
 let syncMetaInsights: typeof import('../../../src/marketing/meta-sync.js').syncMetaInsights;
 let reconcileMarketingAttributions:
   typeof import('../../../src/marketing/attribution.js').reconcileMarketingAttributions;
@@ -17,11 +21,18 @@ beforeAll(async () => {
     DATABASE_URL: 'postgresql://postgres:password@example.test:6543/postgres',
     CHATWOOT_HMAC_SECRET: 'test-secret',
     ADMIN_AUTH_TOKEN: 'test-admin-token',
+    META_WHATSAPP_BUSINESS_ACCOUNT_ID: '123456789',
+    META_CAPI_DATASET_ID: '987654321',
+    META_CAPI_ACCESS_TOKEN: 'capi-test-token',
+    META_CAPI_TEST_EVENT_CODE: 'TEST42',
   });
   ({ extractAdReferral, captureAdReferralAfterMessageUpsert } = await import(
     '../../../src/marketing/referrals.js'
   ));
-  ({ buildCapiPayload } = await import('../../../src/marketing/capi.js'));
+  ({ buildCapiPayload, enqueueCapiPurchases, pollCapiOutbox } = await import(
+    '../../../src/marketing/capi.js'
+  ));
+  ({ sendLatestCapiTestPurchase } = await import('../../../src/marketing/capi-test.js'));
   ({ syncMetaInsights } = await import('../../../src/marketing/meta-sync.js'));
   ({ reconcileMarketingAttributions } = await import('../../../src/marketing/attribution.js'));
 });
@@ -102,6 +113,115 @@ describe('pipeline determinístico de Marketing', () => {
       zp: [expect.stringMatching(/^[a-f0-9]{64}$/)],
       country: [expect.stringMatching(/^[a-f0-9]{64}$/)],
     });
+  });
+
+  it('enfileira somente compras recentes e nunca leva o código de teste para produção', async () => {
+    const source = {
+      attribution_id: 'attr-1',
+      order_number: 'PED-0042',
+      total_amount: '799.90',
+      realized_at: '2026-07-26T12:00:00.000Z',
+      phone_e164: '+5521999990000',
+      ctwa_clid: 'clid-real',
+      city_name: null,
+      state_code: null,
+      postal_code_prefix: null,
+    };
+    const query = vi.fn(async (sql: string, _params?: unknown[]) => (
+      sql.includes('FROM marketing.order_attributions')
+        ? { rows: [source], rowCount: 1 }
+        : { rows: [], rowCount: 1 }
+    ));
+    const dbPool = { query } as unknown as Pool;
+
+    await expect(enqueueCapiPurchases({ dbPool, enabled: true })).resolves.toBe(1);
+
+    expect(query.mock.calls[0]?.[0]).toContain("interval '6 days 23 hours'");
+    expect(query.mock.calls[0]?.[0]).toContain('NOT EXISTS');
+    const persistedPayload = JSON.parse(String(query.mock.calls[1]?.[1]?.[3])) as {
+      test_event_code?: string;
+    };
+    expect(persistedPayload.test_event_code).toBeUndefined();
+  });
+
+  it('envia Test Events diretamente sem inserir nem consumir a outbox', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{
+        attribution_id: 'attr-2',
+        order_number: 'PED-0043',
+        total_amount: '450.00',
+        realized_at: '2026-07-26T13:00:00.000Z',
+        phone_e164: '+5521988880000',
+        ctwa_clid: 'clid-test',
+        city_name: null,
+        state_code: null,
+        postal_code_prefix: null,
+      }],
+      rowCount: 1,
+    }));
+    const dbPool = { query } as unknown as Pool;
+    const fetcher = vi.fn(async (_input: URL | RequestInfo, _init?: RequestInit) => (
+      new Response(JSON.stringify({ events_received: 1, fbtrace_id: 'trace-test' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ));
+
+    const result = await sendLatestCapiTestPurchase({
+      dbPool,
+      fetcher: fetcher as typeof fetch,
+      config: {
+        whatsappBusinessAccountId: 'waba-test',
+        testEventCode: 'TEST42',
+        datasetId: 'dataset-test',
+        accessToken: 'token-test',
+        apiVersion: 'v21.0',
+      },
+    });
+
+    expect(result).toEqual({
+      processed: true,
+      events_received: 1,
+      fbtrace_id: 'trace-test',
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).toContain("interval '6 days 23 hours'");
+    expect(query.mock.calls[0]?.[0]).not.toContain('capi_outbox');
+    const requestBody = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
+      test_event_code?: string;
+    };
+    expect(requestBody.test_event_code).toBe('TEST42');
+  });
+
+  it('manda evento vencido para dead-letter sem chamar a Meta', async () => {
+    const eventTime = Math.floor(new Date('2026-07-01T12:00:00.000Z').getTime() / 1000);
+    const clientQuery = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'outbox-old',
+          environment: 'test',
+          payload: { data: [{ event_time: eventTime }] },
+          attempts: 1,
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
+    const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+    const fetcher = vi.fn();
+
+    await expect(pollCapiOutbox({
+      dbPool,
+      fetcher: fetcher as typeof fetch,
+      now: new Date('2026-07-26T12:00:00.000Z'),
+    })).resolves.toBe(true);
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(clientQuery.mock.calls[4]?.[0]).toContain("status='dead_letter'");
+    expect(clientQuery.mock.calls[4]?.[0]).toContain("last_error_code='event_time_expired'");
+    expect(client.release).toHaveBeenCalledOnce();
   });
 
   it('persiste campanha e anúncio por dia, substituindo a recoleta', async () => {
