@@ -10,7 +10,7 @@ import {
   addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, deleteWholesaleStockComRotulo,
   getMatrizStockReconciliation, listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
 } from './queries.js';
-import { dashboardPayload, mapWriteError } from './route-helpers.js';
+import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { baixaWholesaleStockSchema, entryWholesaleStockSchema, removeWholesaleStockSchema, setWholesaleStockSchema } from './route-schemas.js';
 
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
@@ -29,7 +29,9 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const row = await addWholesaleStockEntryComRotulo(parsed.data);
+      const row = await addWholesaleStockEntryComRotulo({
+        ...parsed.data, actor_label: operatorLabel(request),
+      });
       return reply.status(200).send(row);
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -77,7 +79,9 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      const row = await applyGalpaoBaixaManual(parsed.data);
+      const row = await applyGalpaoBaixaManual({
+        ...parsed.data, actor_label: operatorLabel(request),
+      });
       return reply.status(200).send(row);
     } catch (err) {
       const mapped = mapWriteError(err);

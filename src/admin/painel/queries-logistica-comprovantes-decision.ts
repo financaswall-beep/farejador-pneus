@@ -195,7 +195,6 @@ export async function approveMatrizTripReceipt(
         idempotencyKey: operation.idempotencyKey,
         after: { ...expense, receipt_id: input.receipt_id } });
     }
-
     const differences = { amount_changed: attempt?.suggested_amount != null
       && moneyCents(Number(attempt.suggested_amount)) !== normalized.amount_cents,
       category_changed: attempt?.suggested_category != null

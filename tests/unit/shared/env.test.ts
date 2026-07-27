@@ -121,6 +121,12 @@ describe('environment security validation', () => {
     expect(parsed.MATRIZ_CUSTOMER_PRIVACY).toBe(false);
   });
 
+  it('keeps the central financial ledger dormant by default', () => {
+    expect(parseEnv(baseEnv).MATRIZ_CENTRAL_LEDGER).toBe(false);
+    expect(parseEnv({ ...baseEnv, MATRIZ_CENTRAL_LEDGER: 'true' }).MATRIZ_CENTRAL_LEDGER)
+      .toBe(true);
+  });
+
   it('keeps Marketing integrations dormant by default', () => {
     const parsed = parseEnv(baseEnv);
     expect(parsed.MARKETING_META_ENABLED).toBe(false);

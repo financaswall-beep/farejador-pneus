@@ -8,13 +8,13 @@ import { logger } from '../../shared/logger.js';
 import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError, reencodePhoto } from '../../parceiro/photo-upload.js';
 import { addMatrizTripReceipt, attachOrderToMatrizTrip, closeMatrizTrip,
   getMatrizTripReceiptImage, openMatrizTrip, ReceiptExactDuplicateError,
-  approveMatrizTripReceipt, rejectMatrizTripReceipt,
+  approveMatrizTripReceipt, rejectMatrizTripReceipt, repairMatrizTripReceiptExpense,
   confirmMatrizTripFuelDivergence, TripHasUnresolvedDeliveriesError } from './queries.js';
 import { extractReceiptSuggestion } from './receipt-ai-flow.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { abrirRotaSchema, aprovarComprovanteSchema, comprovanteIdParamsSchema,
   comprovanteParamsSchema, fecharRotaSchema, lerComprovanteSchema,
-  pendurarRotaSchema, rejeitarComprovanteSchema,
+  pendurarRotaSchema, rejeitarComprovanteSchema, repararDespesaComprovanteSchema,
   confirmarDivergenciaRotaSchema } from './route-logistica.js';
 
 export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Promise<void> {
@@ -237,6 +237,28 @@ export async function registerPainelLogisticaRotas(fastify: FastifyInstance): Pr
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel comprovante rejeitar failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/logistica/comprovantes/reparar-despesa', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    if (!env.MATRIZ_RECEIPT_APPROVAL || !env.MATRIZ_EXPENSES) {
+      return reply.status(404).send({ error: 'receipt_approval_disabled' });
+    }
+    const parsed = repararDespesaComprovanteSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    try {
+      const result = await repairMatrizTripReceiptExpense({
+        ...parsed.data, actor_label: operatorLabel(request),
+      });
+      return reply.status(200).send({ repaired: true, ...result });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel comprovante reparar despesa failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

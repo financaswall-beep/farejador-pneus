@@ -11,6 +11,8 @@ export const resolveIntegrityOperationSchema = z.object({
     'wholesale_sale.create',
     'wholesale_purchase.create',
     'matriz_expense.create',
+    'stock.entry',
+    'stock.manual_decrement',
   ]),
   idempotency_key: idempotencyKeySchema,
 });
@@ -35,15 +37,10 @@ export const financePeriodQuerySchema = z.object({
 });
 
 // Comissões da Rede (0118): quitar por parceiro + editor do modelo comercial.
-export const settleComissaoSchema = z.object({ partner_id: z.string().uuid(),
-  idempotency_key: idempotencyKeySchema, reason: z.string().trim().min(2).max(300) });
-export const partnerIdParamSchema = z.object({ partner_id: z.string().uuid() });
-export const partnerTermsSchema = z.object({
-  idempotency_key: idempotencyKeySchema,
-  commercial_model: z.enum(['commission', 'monthly', 'hybrid']),
-  commission_percent: z.number().min(0).max(100).nullable(),
-  monthly_fee: z.number().min(0).nullable(),
-});
+export {
+  partnerIdParamSchema, partnerTermsSchema, settleComissaoSchema,
+  settleCommissionRefundSchema, settleMonthlyFeeSchema,
+} from './route-schemas-comissoes.js';
 
 // Onboarding de parceiro (Etapa 1). Termos comerciais são definidos pela matriz aqui,
 // não pelo candidato. municipios = cobertura inicial; slug opcional (gerado do nome).
@@ -120,12 +117,17 @@ export const entryWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
+  entry_nature: z.enum(['inventory_found', 'owner_contribution', 'opening_balance', 'other']),
+  reason: z.string().trim().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
 });
 // Baixa MANUAL com motivo (0128 — quebra/perda/uso interno): recusa acima do saldo.
 export const baixaWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
   quantity: z.number().int('quantidade_inteira').positive().max(1000000),
+  nature: z.enum(['breakage', 'loss', 'internal_use', 'other']),
   reason: z.string().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
 });
 
 // ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.

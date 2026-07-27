@@ -31,6 +31,9 @@ describe('gestão de colaboradores da matriz', () => {
         { id: 'c2', display_name: 'Ana', username: 'ana', job: 'colaborador', job_title: 'Secretária', work_area: 'administrative', panel_role: 'admin', active: true,
           employment_type: 'clt', base_salary: '2100', monthly_base_salary: '2100', payment_day: 5, payment_method: 'transferencia', payment_note: null, compensation_starts_on: '2026-07-01',
           commission_kind: null, commission_basis: null, commission_value: '0', commission_starts_on: null, commission_active: false },
+        { id: 'c3', display_name: 'Bia', username: 'bia', job: 'colaborador', job_title: 'Auxiliar', work_area: 'other', panel_role: null, active: false, eligible_in_competence: true,
+          employment_type: 'clt', base_salary: '1000', monthly_base_salary: '1000', payment_day: 5, payment_method: 'pix', payment_note: null, compensation_starts_on: '2026-07-01',
+          commission_kind: null, commission_basis: null, commission_value: '0', commission_starts_on: null, commission_active: false },
       ] };
       if (sql.includes('WITH retail AS')) return { rows: [{ id: 'c1', sales_count: 10, revenue: '12000', margin: '5000', items_without_cost: 0, commission_amount: '100', deliveries_count: 0, trips_count: 0, distance_km: 0, on_time_pct: null }] };
       if (sql.includes('matriz_payroll_adjustments')) return { rows: [{ collaborator_id: 'c1', additions: '300', deductions: '120' }] };
@@ -44,6 +47,7 @@ describe('gestão de colaboradores da matriz', () => {
     expect(joao.payroll_status).toBe('preview');
     expect(result.summary.role_count).toBe(2);
     expect(result.summary.payroll_payable).toBe(0);
+    expect(result.summary.payroll_total).toBe(5580);
   });
 
   it('mantém equipe neutra e concilia folha com Financeiro na interface e migration', () => {

@@ -241,7 +241,9 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
             : dialog.kind === 'close-payroll' ? 'fechar a folha' : 'confirmar o pagamento';
         const message = err.message === 'last_owner_required'
           ? 'Não é possível revogar o último proprietário da Matriz.'
-          : `Não consegui ${action} (${err.message}).`;
+          : err.message === 'payroll_has_unassigned_events'
+            ? 'Existem vendas ou entregas comissionáveis sem responsável. Corrija as atribuições antes de fechar.'
+            : `Não consegui ${action} (${err.message}).`;
         this.colabDialog.error = message;
         this.colabMsg = { ok: false, text: message };
       } finally {

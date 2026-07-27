@@ -8,9 +8,13 @@ import { env } from '../../shared/config/env.js';
 import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
+import {
+  applyMatrizWalkinStockSale, prepareMatrizWalkinStock,
+} from './matriz-walkin-stock.js';
 import { hashPassword } from '../../parceiro/password.js';
 import type { RegisterManualOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
+import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -98,32 +102,38 @@ export async function registerManualOrder(
       );
       if (!seller.rows[0]) throw new Error('seller_collaborator_not_found');
     }
+    if (env.WHOLESALE_MATRIZ_RETAIL_COST || env.MATRIZ_CENTRAL_LEDGER) {
+      const main = await client.query<{ id: string }>(
+        `SELECT id FROM core.units WHERE environment=$1 AND slug='main' LIMIT 1`,
+        [environment],
+      );
+      const matrizId = main.rows[0]?.id ?? null;
+      if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
+        const stockPlan = env.MATRIZ_CENTRAL_LEDGER
+          ? await prepareMatrizWalkinStock(
+            client, environment,
+            input.items.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
+          )
+          : null;
+        await applyMatrizRetailCostSnapshot(
+          client, environment, orderId,
+          input.items.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
+          true,
+        );
+        if (stockPlan) {
+          await applyMatrizWalkinStockSale(client, environment, orderId, stockPlan);
+        }
+      }
+    }
+    await postMatrizRetailSaleFacts(client, environment, orderId);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally { client.release(); }
 
-  // Venda MANUAL que cai na MATRIZ (unit vazia → 'main' dentro da função SQL) também congela
-  // o custo do galpão nos itens (0117). NÃO baixa estoque aqui (comportamento de hoje: só
-  // walk-in e bot baixam) — este é só o retrato do custo pro lucro do varejo sair certo.
-  if (env.WHOLESALE_MATRIZ_RETAIL_COST) {
-    const m = await dbPool.query<{ id: string }>(
-      `SELECT id FROM core.units WHERE environment = $1 AND slug = 'main' LIMIT 1`,
-      [environment],
-    );
-    const matrizId = m.rows[0]?.id ?? null;
-    if (matrizId && (!input.unit_id || input.unit_id === matrizId)) {
-      await applyMatrizRetailCostSnapshot(
-        dbPool as unknown as PoolClient,
-        environment,
-        orderId,
-        input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
-        true,
-      );
-    }
-  }
-
+  // Livro central ligado: venda manual da Matriz congela o custo e baixa o
+  // galpão na mesma transação. Flag desligada preserva o comportamento legado.
   return { order_id: orderId };
 }
 
@@ -146,6 +156,12 @@ export async function cancelManualOrder(
       input.reason,
     ]);
     await applyMatrizGalpaoReturn(client, environment, input.order_id);
+    const cancelled = await client.query<{ updated_at: string }>(
+      `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,
+      [input.order_id, environment],
+    );
+    await postMatrizRetailCancellation(client, environment, input.order_id,
+      cancelled.rows[0]!.updated_at, input.actor_label, input.reason);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

@@ -3,12 +3,12 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getAdminContext, requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { getCommissionLedger, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
+import { getCommissionLedger, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema } from './route-schemas.js';
+import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
 
 export async function registerPainelAtacado(fastify: FastifyInstance): Promise<void> {
   const reconcilePartnerCostSchema = z.object({
@@ -128,6 +128,63 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
       if ((err as Error).message === 'nothing_open') return reply.status(404).send({ error: 'nothing_open' });
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel commission settle failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/rede/comissoes/refund', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    if (!env.NETWORK_COMMISSION_LEDGER) {
+      return reply.status(409).send({ error: 'ledger_disabled' });
+    }
+    const parsed = settleCommissionRefundSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      const result = await settleCommissionRefund({
+        ...parsed.data, actor_label: operatorLabel(request),
+      });
+      return reply.status(200).send({ refunded: true, ...result });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === 'commission_refund_not_found') {
+        return reply.status(404).send({ error: message });
+      }
+      if (message === 'commission_refund_not_pending') {
+        return reply.status(409).send({ error: message });
+      }
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel commission refund failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.get('/admin/api/rede/mensalidades', {
+    preHandler: requireAdminOwner,
+  }, async (_request, reply) => {
+    if (!env.MATRIZ_CENTRAL_LEDGER) {
+      return reply.status(409).send({ error: 'central_ledger_disabled' });
+    }
+    await sweepCommissionEntries();
+    return reply.status(200).send({
+      enabled: true, entries: await listMatrizPartnerMonthlyFees(),
+    });
+  });
+
+  fastify.post('/admin/api/rede/mensalidades/settle', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    if (!env.MATRIZ_CENTRAL_LEDGER) {
+      return reply.status(409).send({ error: 'central_ledger_disabled' });
+    }
+    const parsed = settleMonthlyFeeSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      return reply.status(200).send(await settleMatrizPartnerMonthlyFee({
+        ...parsed.data, actor_label: operatorLabel(request),
+      }));
+    } catch (error) {
+      const mapped = mapWriteError(error);
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

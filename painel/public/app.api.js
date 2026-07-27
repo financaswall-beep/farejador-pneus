@@ -38,6 +38,10 @@ function recoverPendingIntegrityOperations(state) {
         label: 'a compra anterior', message: 'compraMsg' },
       { scope: 'matriz-expense-create', domain: 'matriz_expense.create',
         label: 'a despesa anterior', message: 'despesaMsg' },
+      { scope: 'stock-entry', domain: 'stock.entry',
+        label: 'a entrada de estoque anterior', message: 'stockMsg' },
+      { scope: 'stock-manual-decrement', domain: 'stock.manual_decrement',
+        label: 'a baixa de estoque anterior', message: 'stockMsg' },
     ];
     const recovered = [];
     const unresolved = [];

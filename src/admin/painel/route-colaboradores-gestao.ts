@@ -51,6 +51,7 @@ function managementError(reply: any, err: unknown, label: string) {
     'collaborator_not_found', 'period_closed_or_collaborator_not_found',
     'adjustment_not_found_or_period_closed', 'nothing_to_close',
     'payroll_has_unresolved_adjustments', 'payroll_has_unresolved_costs',
+    'payroll_has_unassigned_events',
     'invalid_adjustment_amount',
   ]);
   if (clientErrors.has(message)) return reply.status(400).send({ error: message });

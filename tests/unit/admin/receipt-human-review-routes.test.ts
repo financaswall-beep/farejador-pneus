@@ -15,12 +15,14 @@ describe('Etapa 7 — portaria da decisao humana', () => {
 
     expect(admin).toContain("'/admin/api/logistica/comprovantes/aprovar'");
     expect(admin).toContain("'/admin/api/logistica/comprovantes/rejeitar'");
+    expect(admin).toContain("'/admin/api/logistica/comprovantes/reparar-despesa'");
     expect(approval).toContain('preHandler: requireAdminOwner');
     expect(rejection).toContain('preHandler: requireAdminOwner');
     expect(admin).toContain('getAdminContext(request)');
     expect(admin).toContain('operatorLabel(request)');
     expect(courier).not.toContain('/comprovantes/aprovar');
     expect(courier).not.toContain('/comprovantes/rejeitar');
+    expect(courier).not.toContain('/comprovantes/reparar-despesa');
   });
 
   it('falha fechada por flags e nunca aceita ator vindo do schema', () => {

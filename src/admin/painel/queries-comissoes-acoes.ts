@@ -5,6 +5,7 @@ import {
   beginIntegrityOperation,completeIntegrityOperation,integrityResult,
   operationFingerprint,recordIntegrityEvent,
 } from './stage5-integrity.js';
+import { syncMatrizCommissionLedgerEntry } from './matriz-ledger-commissions.js';
 
 export interface SettleCommissionInput {
   partner_id: string;
@@ -51,6 +52,7 @@ export async function settleCommissionEntries(
         [environment,row.id,row.partner_order_id,input.settled_by,input.reason,
          input.idempotency_key,JSON.stringify({ commission_amount: row.commission_amount })],
       );
+      await syncMatrizCommissionLedgerEntry(client, environment, row.id);
     }
     const total = rows.rows.reduce((sum,row) => sum+Number(row.commission_amount),0);
     const result = integrityResult({ settled_count: rows.rowCount ?? 0,

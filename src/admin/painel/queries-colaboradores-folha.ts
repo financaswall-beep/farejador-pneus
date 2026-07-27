@@ -6,6 +6,10 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+import {
+  ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState,
+  postMatrizExpensePayment,
+} from './matriz-ledger-expenses.js';
 export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-ajustes-causais.js';
 
 export interface MatrizCompensationInput {
@@ -68,7 +72,9 @@ export async function addMatrizPayrollAdjustment(input: {
        (environment, collaborator_id, competence, kind, description, amount, created_by)
      SELECT mc.environment, mc.id, $3::date, $4, $5, $6, $7
        FROM network.matriz_collaborators mc
-      WHERE mc.environment=$1 AND mc.id=$2 AND mc.revoked_at IS NULL
+      WHERE mc.environment=$1 AND mc.id=$2
+        AND finance.matriz_collaborator_in_competence(
+          mc.created_at,mc.revoked_at,$3::date)
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_payroll_periods p WHERE p.environment=$1 AND p.competence=$3::date)
      RETURNING id`,
     [environment, input.collaborator_id, input.competence, input.kind, input.description.trim(), input.amount, input.actor_label ?? null],
@@ -124,13 +130,22 @@ export async function closeMatrizPayroll(input: {
       [environment, input.competence],
     );
     if (causalReview.rows[0]) throw new Error('payroll_has_unresolved_adjustments');
+    const assignmentGaps = await client.query<{ event_type: string; missing_count: number }>(
+      `SELECT event_type,missing_count
+         FROM finance.matriz_payroll_assignment_gaps($1,$2::date)
+        WHERE missing_count>0`,
+      [environment, input.competence],
+    );
+    if (assignmentGaps.rows.length) throw new Error('payroll_has_unassigned_events');
     const overview = await getMatrizCollaboratorManagement(input.competence, environment, client as any);
-    if (overview.collaborators.some((row) => row.active && row.items_without_cost > 0
+    if (overview.collaborators.some((row) => row.eligible_in_competence
+      && row.items_without_cost > 0
       && row.commission_active && row.commission_kind === 'percent'
       && row.commission_basis === 'margin')) {
       throw new Error('payroll_has_unresolved_costs');
     }
-    const eligible = overview.collaborators.filter((r) => r.active && r.total_due > 0
+    const eligible = overview.collaborators.filter((r) => r.eligible_in_competence
+      && r.total_due > 0
       && (r.employment_type || r.commission_active || r.additions || r.deductions));
     if (!eligible.length) throw new Error('nothing_to_close');
     const period = await client.query<{ id: string }>(
@@ -163,6 +178,10 @@ export async function closeMatrizPayroll(input: {
         [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
          row.commission_amount, row.additions, row.deductions, row.total_due, dueDate,
          JSON.stringify(calculation), expense.rows[0]!.id]);
+      await ensureMatrizExpenseAccrual(
+        client,
+        await getMatrizExpenseLedgerState(client, environment, expense.rows[0]!.id),
+      );
     }
     const result = integrityResult({ closed: true as const, period_id: periodId,
       items: eligible.length });
@@ -217,12 +236,19 @@ export async function payMatrizPayrollItem(input: {
     if (!item.rows[0] || item.rows[0].payment_status !== 'pending') throw new Error('payroll_item_not_found');
     if (!expense.rows[0] || expense.rows[0].deleted_at
       || expense.rows[0].payment_status !== 'pending') throw new Error('payroll_expense_not_found');
+    const expenseLedger = env.MATRIZ_CENTRAL_LEDGER
+      ? await getMatrizExpenseLedgerState(
+        client, environment, item.rows[0].source_expense_id,
+      ) : null;
     const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=now()
         WHERE id=$1 AND environment=$2 AND payment_status='pending' AND deleted_at IS NULL
         RETURNING id,paid_at`,
       [item.rows[0].source_expense_id, environment]);
     if (!paid.rows[0]) throw new Error('payroll_expense_not_found');
+    if (expenseLedger) await postMatrizExpensePayment(
+      client, expenseLedger, paid.rows[0].paid_at, input.actor_label,
+    );
     await client.query(
       `UPDATE finance.matriz_payroll_items
           SET payment_status='paid',paid_at=$2::timestamptz,paid_by=$3 WHERE id=$1`,

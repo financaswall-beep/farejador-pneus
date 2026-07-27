@@ -2,6 +2,12 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { MatrizExpenseRow } from './queries-fiado-despesas.js';
+import { getWholesalePurchaseLedgerState, postWholesalePurchasePayment } from './matriz-ledger-purchases.js';
+import { getWholesaleSaleLedgerState, postWholesaleSalePayment } from './matriz-ledger-wholesale-sales.js';
+import {
+  ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState,
+  postMatrizExpensePayment,
+} from './matriz-ledger-expenses.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult, moneyCents,
   operationFingerprint, recordIntegrityEvent,
@@ -39,12 +45,20 @@ async function settleWholesalePayment(
         WHERE id=$1 AND environment=$2 AND ${activeStatus} FOR UPDATE`, [entityId, environment]);
     const notFound = sale ? 'receivable_not_found' : 'payable_not_found';
     if (!current.rows[0] || current.rows[0].payment_status !== 'pending') throw new Error(notFound);
+    const saleLedger = env.MATRIZ_CENTRAL_LEDGER && sale
+      ? await getWholesaleSaleLedgerState(client, environment, entityId) : null;
+    const purchaseLedger = env.MATRIZ_CENTRAL_LEDGER && !sale
+      ? await getWholesalePurchaseLedgerState(client, environment, entityId) : null;
     const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE ${table} SET payment_status='paid',paid_at=now()
         WHERE id=$1 AND environment=$2 AND payment_status='pending' RETURNING id,paid_at`,
       [entityId, environment]);
     if (!paid.rows[0]) throw new Error(notFound);
     const result = integrityResult(paid.rows[0]!);
+    if (saleLedger) await postWholesaleSalePayment(
+      client, saleLedger, result.paid_at, options.actor_label);
+    if (purchaseLedger) await postWholesalePurchasePayment(
+      client, purchaseLedger, result.paid_at, options.actor_label);
     await recordIntegrityEvent(client, { environment,
       domain: sale ? 'wholesale_sale' : 'wholesale_purchase', entityTable: table,
       entityId, eventType: 'payment_settled', actorLabel: options.actor_label,
@@ -130,7 +144,16 @@ export async function insertMatrizExpenseInTransaction(
      input.competence_month ?? null, input.created_by ?? null],
   );
   if (!created.rows[0]) throw new Error('category_invalid');
-  return created.rows[0];
+  const expense = created.rows[0];
+  await ensureMatrizExpenseAccrual(client, {
+    environment: input.environment, expenseId: expense.id,
+    category: expense.category, description: expense.description,
+    amount: expense.amount, occurredAt: expense.occurred_at,
+    paymentStatus: expense.payment_status, dueDate: expense.due_date,
+    paidAt: expense.paid_at, createdBy: input.created_by ?? null,
+    competenceMonth: input.competence_month, documentDate: input.document_date,
+  });
+  return expense;
 }
 
 export async function createMatrizExpense(
@@ -203,6 +226,8 @@ export async function settleMatrizExpense(
     }
     const current = await lockExpense(client, expenseId, environment);
     if (!current || current.deleted_at || current.payment_status !== 'pending') throw new Error('expense_not_found');
+    const expenseLedger = env.MATRIZ_CENTRAL_LEDGER
+      ? await getMatrizExpenseLedgerState(client, environment, expenseId) : null;
     const payroll = await client.query<{
       id: string; payroll_period_id: string; payment_status: string;
     }>(
@@ -215,6 +240,9 @@ export async function settleMatrizExpense(
       `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=now()
         WHERE id=$1 AND environment=$2 RETURNING id,paid_at`, [expenseId, environment]);
     const result = integrityResult(paid.rows[0]!);
+    if (expenseLedger) await postMatrizExpensePayment(
+      client, expenseLedger, result.paid_at, options.actor_label,
+    );
     if (payroll.rows[0]) {
       await client.query(
         `UPDATE finance.matriz_payroll_items
@@ -245,46 +273,4 @@ export async function settleMatrizExpense(
   }
 }
 
-export async function removeMatrizExpense(
-  expenseId: string,
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-  options: MatrizWriteOptions,
-): Promise<{ id: string }> {
-  const reason = options.reason?.trim() || null;
-  if (!reason || reason.length < 2) throw new Error('reason_required');
-  const client = await dbPool.connect();
-  const operation = { environment, domain: 'matriz_expense.remove',
-    idempotencyKey: options.idempotency_key,
-    fingerprint: operationFingerprint({ id: expenseId, reason }) };
-  try {
-    await client.query('BEGIN');
-    const started = await beginIntegrityOperation<{ id: string }>(client, operation);
-    if (started.replayed) {
-      await client.query('COMMIT');
-      return started.result;
-    }
-    const current = await lockExpense(client, expenseId, environment);
-    if (!current || current.deleted_at) throw new Error('expense_not_found');
-    const removed = await client.query<{ id: string }>(
-      `UPDATE commerce.matriz_expenses
-          SET deleted_at=now(),deleted_by=$3,delete_reason=$4
-        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL RETURNING id`,
-      [expenseId, environment, options.actor_label ?? null, reason.slice(0, 300)]);
-    await recordIntegrityEvent(client, { environment, domain: 'matriz_expense',
-      entityTable: 'commerce.matriz_expenses', entityId: expenseId,
-      eventType: 'removed', actorLabel: options.actor_label,
-      idempotencyKey: operation.idempotencyKey,
-      before: { payment_status: current.payment_status, amount: current.amount },
-      after: { deleted: true, reason } });
-    await completeIntegrityOperation(client, operation,
-      'commerce.matriz_expenses', expenseId, removed.rows[0]);
-    await client.query('COMMIT');
-    return removed.rows[0]!;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
+export { removeMatrizExpense } from './queries-financeiro-despesas-remove.js';

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
+import { postWholesalePurchaseCancellation } from './matriz-ledger-purchases.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
@@ -110,9 +111,19 @@ export async function cancelWholesalePurchase(
       return started.result;
     }
     const current = await client.query<{
-      status: 'pending' | 'confirmed' | 'cancelled'; payment_status: string; stock_applied: boolean;
+      status: 'pending' | 'confirmed' | 'cancelled';
+      payment_status: 'paid' | 'pending';
+      stock_applied: boolean;
+      supplier_id: string;
+      total_amount: string;
+      purchased_at: string;
+      due_date: string | null;
+      paid_at: string | null;
+      created_by: string | null;
     }>(
-      `SELECT status,payment_status,stock_applied FROM commerce.wholesale_purchases
+      `SELECT status,payment_status,stock_applied,supplier_id,total_amount,
+              purchased_at,due_date,paid_at,created_by
+         FROM commerce.wholesale_purchases
         WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.purchase_id, environment]);
     if (!current.rows[0]) throw new Error('purchase_not_found');
     if (current.rows[0].status === 'cancelled') throw new Error('purchase_already_cancelled');
@@ -123,6 +134,17 @@ export async function cancelWholesalePurchase(
           SET status='cancelled',cancelled_at=now(),cancelled_by=$3,cancel_reason=$4
         WHERE id=$1 AND environment=$2 RETURNING cancelled_at`,
       [input.purchase_id, environment, input.cancelled_by, reason.slice(0, 300)]);
+    await postWholesalePurchaseCancellation(client, {
+      environment, purchaseId: input.purchase_id,
+      supplierId: current.rows[0].supplier_id,
+      totalAmount: current.rows[0].total_amount,
+      purchasedAt: current.rows[0].purchased_at,
+      paymentStatus: current.rows[0].payment_status,
+      dueDate: current.rows[0].due_date,
+      paidAt: current.rows[0].paid_at,
+      stockApplied: current.rows[0].stock_applied,
+      createdBy: current.rows[0].created_by,
+    }, updated.rows[0]!.cancelled_at, input.cancelled_by, reason);
     const result = integrityResult({ purchase_id: input.purchase_id,
       cancelled_at: updated.rows[0]!.cancelled_at,
       payment_status: current.rows[0].payment_status });

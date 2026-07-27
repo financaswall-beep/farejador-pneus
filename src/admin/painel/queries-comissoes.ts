@@ -4,6 +4,8 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { syncMatrizCommissionLedgerEntry } from './matriz-ledger-commissions.js';
+import { generateCurrentMatrizPartnerMonthlyFees } from './queries-mensalidades.js';
 
 export interface CommissionSweepResult {
   created: number;
@@ -97,6 +99,43 @@ export async function sweepCommissionEntries(
          `commission-reversed-${row.partner_order_id}`],
       );
     }
+    if (env.MATRIZ_CENTRAL_LEDGER) {
+      const pending = await client.query<{ id: string }>(
+        `SELECT ce.id FROM network.commission_entries ce
+          WHERE ce.environment=$1 AND ce.commission_amount>0 AND (
+            NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
+              WHERE t.environment=ce.environment::env_t
+                AND t.source_type='network.commission_entry.accrual'
+                AND t.source_id=ce.id::text)
+            OR (ce.settled_at IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM finance.matriz_ledger_transactions t
+               WHERE t.environment=ce.environment::env_t
+                 AND t.source_type='network.commission_entry.payment'
+                 AND t.source_id=ce.id::text))
+            OR (ce.reversed_at IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM finance.matriz_ledger_transactions t
+              JOIN finance.matriz_commission_reversals r
+                ON r.environment=t.environment AND r.id::text=t.source_id
+               WHERE r.commission_entry_id=ce.id
+                 AND t.source_type='network.commission_entry.reversal'))
+            OR EXISTS (
+              SELECT 1 FROM finance.matriz_commission_reversals r
+               WHERE r.environment=ce.environment::env_t
+                 AND r.commission_entry_id=ce.id
+                 AND r.refund_status='paid'
+                 AND NOT EXISTS (
+                   SELECT 1 FROM finance.matriz_ledger_transactions t
+                    WHERE t.environment=r.environment
+                      AND t.source_type='network.commission_refund.payment'
+                      AND t.source_id=r.id::text))
+          ) ORDER BY ce.realized_at,ce.id LIMIT 1000`,
+        [environment],
+      );
+      for (const row of pending.rows) {
+        await syncMatrizCommissionLedgerEntry(client, environment, row.id);
+      }
+      await generateCurrentMatrizPartnerMonthlyFees(client, environment);
+    }
     await client.query('COMMIT');
     return { created: ins.rowCount ?? 0, reversed: rev.rowCount ?? 0 };
   } catch (error) {
@@ -110,6 +149,15 @@ export async function sweepCommissionEntries(
 export interface CommissionLedger {
   total_aberto: string;
   abertos_count: number;
+  refund_total_pending: string;
+  refunds_pending: Array<{
+    reversal_id: string;
+    commission_entry_id: string;
+    partner_name: string;
+    amount: string;
+    due_date: string;
+    overdue: boolean;
+  }>;
   partners: Array<{
     partner_id: string;
     partner_name: string;
@@ -127,6 +175,9 @@ export interface CommissionLedger {
     realized_at: string;
     settled_at: string | null;
     reversed_at: string | null;
+    reversal_id: string | null;
+    refund_status: 'not_due' | 'pending' | 'paid' | null;
+    refunded_at: string | null;
   }>;
 }
 
@@ -152,13 +203,27 @@ export async function getCommissionLedger(
       ORDER BY open_total DESC`,
     [environment],
   );
+  const refunds = await dbPool.query<CommissionLedger['refunds_pending'][number]>(
+    `SELECT r.id AS reversal_id,r.commission_entry_id,
+            COALESCE(p.trade_name,p.legal_name,'Parceiro') AS partner_name,
+            r.amount::text,r.refund_due_date::text AS due_date,
+            (r.refund_due_date<current_date) AS overdue
+       FROM finance.matriz_commission_reversals r
+       JOIN network.partners p ON p.id=r.partner_id AND p.environment=r.environment
+      WHERE r.environment=$1 AND r.refund_status='pending'
+      ORDER BY r.refund_due_date,r.reversed_at`,
+    [environment],
+  );
   const entries = await dbPool.query(
     `SELECT ce.id, COALESCE(p.trade_name, p.legal_name, 'Parceiro') AS partner_name,
-            ce.order_total, ce.commission_percent, ce.commission_amount,
-            ce.status, ce.realized_at, ce.settled_at, ce.reversed_at
-       FROM network.commission_entries ce
-       JOIN network.partners p ON p.id = ce.partner_id AND p.environment = ce.environment
-      WHERE ce.environment = $1
+             ce.order_total, ce.commission_percent, ce.commission_amount,
+             ce.status, ce.realized_at, ce.settled_at, ce.reversed_at,
+             r.id AS reversal_id,r.refund_status,r.refunded_at
+        FROM network.commission_entries ce
+        JOIN network.partners p ON p.id = ce.partner_id AND p.environment = ce.environment
+        LEFT JOIN finance.matriz_commission_reversals r
+          ON r.commission_entry_id=ce.id AND r.environment=ce.environment
+       WHERE ce.environment = $1
       ORDER BY ce.realized_at DESC
       LIMIT 25`,
     [environment],
@@ -166,6 +231,9 @@ export async function getCommissionLedger(
   return {
     total_aberto: totals.rows[0]!.total_aberto,
     abertos_count: totals.rows[0]!.abertos_count,
+    refund_total_pending: refunds.rows
+      .reduce((total, row) => total + Number(row.amount), 0).toFixed(2),
+    refunds_pending: refunds.rows,
     partners: partners.rows as CommissionLedger['partners'],
     entries: entries.rows as CommissionLedger['entries'],
   };

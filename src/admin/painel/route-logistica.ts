@@ -74,6 +74,10 @@ export const aprovarComprovanteSchema = receiptDecisionBaseSchema.extend({
 export const rejeitarComprovanteSchema = receiptDecisionBaseSchema.extend({
   reason: z.string().trim().min(2).max(500),
 });
+export const repararDespesaComprovanteSchema = z.object({
+  receipt_id: z.string().uuid(),
+  idempotency_key: z.string().trim().min(8).max(200),
+});
 
 export async function registerPainelLogistica(fastify: FastifyInstance): Promise<void> {
   // ── MATRIZ — LOGÍSTICA (0121, flag MATRIZ_LOGISTICS) ─────────────────────────

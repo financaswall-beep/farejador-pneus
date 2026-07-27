@@ -326,4 +326,76 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
     expect(fn.rows).toHaveLength(1);
     expect(fn.rows[0]!.can_execute).toBe(false);
   });
+
+  it('protege e repara a mesma despesa de comprovante sem duplicar dinheiro', async () => {
+    const q = await import('../../src/admin/painel/queries.js');
+    const trip = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_delivery_trips(environment,courier_name)
+       VALUES ('test','Receipt repair') RETURNING id`,
+    );
+    const receipt = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_trip_receipts
+        (environment,trip_id,mime,size_bytes,ai_status,workflow_status)
+       VALUES ('test',$1,'image/jpeg',17,'skipped','review_required') RETURNING id`,
+      [trip.rows[0]!.id],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.matriz_trip_receipt_blobs(receipt_id,environment,bytes)
+       VALUES ($1,'test',convert_to('receipt-repair-stage10','UTF8'))`,
+      [receipt.rows[0]!.id],
+    );
+    const approved = await q.approveMatrizTripReceipt({
+      receipt_id: receipt.rows[0]!.id, amount: 43.21, category: 'manutencao',
+      merchant: 'Oficina Teste', document_date: '2026-07-20',
+      competence_month: '2026-07-01', payment_status: 'paid',
+      payment_date: '2026-07-20', idempotency_key: 'stage10-repair-approve',
+      actor_label: 'owner-stage10', environment: 'test',
+    }, db.pool);
+
+    await expect(q.removeMatrizExpense(
+      approved.expense_id, 'test', db.pool, {
+        reason: 'tentativa bloqueada', actor_label: 'owner-stage10',
+        idempotency_key: 'stage10-remove-linked-expense',
+      },
+    )).rejects.toThrow('receipt_expense_locked');
+
+    await db.pool.query(
+      'ALTER TABLE commerce.matriz_expenses DISABLE TRIGGER protect_matriz_receipt_expense',
+    );
+    try {
+      await db.pool.query(
+        `UPDATE commerce.matriz_expenses SET deleted_at=now(),deleted_by='legacy-test'
+          WHERE id=$1 AND environment='test'`,
+        [approved.expense_id],
+      );
+    } finally {
+      await db.pool.query(
+        'ALTER TABLE commerce.matriz_expenses ENABLE TRIGGER protect_matriz_receipt_expense',
+      );
+    }
+
+    const input = {
+      receipt_id: receipt.rows[0]!.id,
+      idempotency_key: 'stage10-repair-linked-expense',
+      actor_label: 'owner-stage10',
+      environment: 'test' as const,
+    };
+    const repaired = await q.repairMatrizTripReceiptExpense(input, db.pool);
+    const replay = await q.repairMatrizTripReceiptExpense(input, db.pool);
+    expect(repaired).toEqual({
+      receipt_id: receipt.rows[0]!.id,
+      expense_id: approved.expense_id,
+      restored: true,
+    });
+    expect(replay).toEqual(repaired);
+
+    const state = await db.pool.query<{ deleted_at: string | null; audits: number }>(
+      `SELECT e.deleted_at,
+        (SELECT count(*)::int FROM audit.events a
+          WHERE a.entity_id=$2 AND a.event_type='linked_expense_restored') audits
+       FROM commerce.matriz_expenses e WHERE e.id=$1`,
+      [approved.expense_id, receipt.rows[0]!.id],
+    );
+    expect(state.rows[0]).toEqual({ deleted_at: null, audits: 1 });
+  });
 });

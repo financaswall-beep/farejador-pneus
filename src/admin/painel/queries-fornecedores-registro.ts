@@ -6,6 +6,10 @@ import { addWholesaleStockEntry } from './queries-galpao.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import {
+  ensureWholesalePurchaseAccrual,
+  postWholesalePurchaseReceipt,
+} from './matriz-ledger-purchases.js';
+import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult, moneyCents,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
@@ -137,12 +141,12 @@ export async function registerWholesalePurchase(
     const items = await canonicalPurchaseItems(client, environment, rawItems);
     const supplier = await resolveSupplier(client, environment, input);
     const pendingPayment = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
-    const purchase = await client.query<{ id: string }>(
+    const purchase = await client.query<{ id: string; purchased_at: string; paid_at: string | null }>(
       `INSERT INTO commerce.wholesale_purchases
         (environment,supplier_id,purchased_at,total_amount,status,stock_applied,
          stock_applied_at,stock_applied_by,created_by,notes,payment_status,due_date,paid_at)
        VALUES ($1,$2,COALESCE($3::timestamptz,now()),0,'pending',false,NULL,NULL,$4,$5,$6,$7::date,$8::timestamptz)
-       RETURNING id`,
+       RETURNING id,purchased_at,paid_at`,
       [environment, supplier.id, input.purchased_at ?? null, input.created_by, input.notes ?? null,
        pendingPayment ? 'pending' : 'paid', pendingPayment ? (input.due_date ?? null) : null,
        env.WHOLESALE_FINANCE && !pendingPayment ? new Date().toISOString() : null]);
@@ -166,6 +170,15 @@ export async function registerWholesalePurchase(
             SET status='confirmed',stock_applied=true,stock_applied_at=now(),stock_applied_by=$2
           WHERE id=$1`, [purchaseId, input.created_by]);
     }
+    await ensureWholesalePurchaseAccrual(client, {
+      environment, purchaseId, supplierId: supplier.id,
+      totalAmount: total.rows[0]!.total_amount,
+      purchasedAt: purchase.rows[0]!.purchased_at,
+      paymentStatus: pendingPayment ? 'pending' : 'paid',
+      dueDate: pendingPayment ? input.due_date ?? null : null,
+      paidAt: purchase.rows[0]!.paid_at,
+      stockApplied: received, createdBy: input.created_by,
+    });
     const result = { purchase_id: purchaseId, supplier_id: supplier.id,
       supplier_name: supplier.name, total_amount: total.rows[0]!.total_amount,
       items_count: items.length, status: received ? 'confirmed' as const : 'pending' as const,
@@ -210,8 +223,13 @@ export async function confirmWholesalePurchase(
       await client.query('COMMIT');
       return started.result;
     }
-    const purchase = await client.query<{ status: string; stock_applied: boolean; supplier_name: string }>(
-      `SELECT p.status,p.stock_applied,s.name AS supplier_name
+    const purchase = await client.query<{
+      status: string; stock_applied: boolean; supplier_name: string; supplier_id: string;
+      total_amount: string; purchased_at: string; payment_status: 'paid' | 'pending';
+      due_date: string | null; paid_at: string | null; created_by: string | null;
+    }>(
+      `SELECT p.status,p.stock_applied,p.supplier_id,p.total_amount,p.purchased_at,
+              p.payment_status,p.due_date,p.paid_at,p.created_by,s.name AS supplier_name
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment
         WHERE p.id=$1 AND p.environment=$2 FOR UPDATE OF p`, [input.purchase_id, environment]);
@@ -231,6 +249,17 @@ export async function confirmWholesalePurchase(
           SET status='confirmed',stock_applied=true,stock_applied_at=now(),stock_applied_by=$3
         WHERE id=$1 AND environment=$2 RETURNING stock_applied_at`,
       [input.purchase_id, environment, input.confirmed_by]);
+    await postWholesalePurchaseReceipt(client, {
+      environment, purchaseId: input.purchase_id,
+      supplierId: purchase.rows[0].supplier_id,
+      totalAmount: purchase.rows[0].total_amount,
+      purchasedAt: purchase.rows[0].purchased_at,
+      paymentStatus: purchase.rows[0].payment_status,
+      dueDate: purchase.rows[0].due_date,
+      paidAt: purchase.rows[0].paid_at,
+      stockApplied: false,
+      createdBy: purchase.rows[0].created_by,
+    }, updated.rows[0]!.stock_applied_at, input.confirmed_by);
     const result = integrityResult({ purchase_id: input.purchase_id,
       confirmed_at: updated.rows[0]!.stock_applied_at, stock_applied: true as const });
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_purchase',

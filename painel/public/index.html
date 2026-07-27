@@ -29,7 +29,7 @@
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260724-estoque-mock1"></script>
-<script src="/admin/painel/app.compras.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.compras.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
@@ -49,8 +49,8 @@
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260727-marketing-capi1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.financeiro.indicadores.js?v=20260716-etapa4"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260727-ledger-agenda1"></script>
+<script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.js?v=20260724-estoque-movimentos1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
@@ -896,16 +896,23 @@
                     x-text="comissaoExtratoAberto ? 'esconder extrato' : 'ver extrato (lançamentos um a um)'"></button>
             <div x-show="comissaoExtratoAberto" class="space-y-1">
               <template x-for="e in (comissoes?.entries || [])" :key="e.id">
-                <div class="flex items-center justify-between text-xs px-2 py-1.5 rounded bg-gray-50"
-                     :class="e.status === 'reversed' ? 'opacity-60' : ''">
+                <div class="flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded bg-gray-50"
+                     :class="e.status === 'reversed' && e.refund_status !== 'pending' ? 'opacity-60' : ''">
                   <span class="text-gray-600">
                     <span class="font-medium" x-text="e.partner_name"></span> ·
                     <span x-text="formatCurrency(Number(e.commission_amount || 0))"></span>
                     (<span x-text="Number(e.commission_percent)"></span>% de <span x-text="formatCurrency(Number(e.order_total || 0))"></span>)
                   </span>
-                  <span class="px-2 py-0.5 rounded-full"
-                        :class="e.status === 'open' ? 'bg-amber-50 text-amber-700' : (e.status === 'settled' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500')"
-                        x-text="e.status === 'open' ? 'em aberto' : (e.status === 'settled' ? 'recebida' : (e.settled_at ? 'estornada (JÁ PAGA — acerto por fora)' : 'estornada'))"></span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-full"
+                          :class="e.status === 'open' ? 'bg-amber-50 text-amber-700' : (e.status === 'settled' ? 'bg-emerald-50 text-emerald-700' : e.refund_status === 'pending' ? 'bg-rose-50 text-rose-700' : 'bg-gray-100 text-gray-500')"
+                          x-text="e.status === 'open' ? 'em aberto' : (e.status === 'settled' ? 'recebida' : e.refund_status === 'pending' ? 'estornada · devolver' : e.refund_status === 'paid' ? 'estornada · devolvida' : 'estornada sem recebimento')"></span>
+                    <button x-show="e.refund_status === 'pending' && adminUser?.role === 'owner'"
+                            @click="refundComissao(e)"
+                            :disabled="comissaoRefunding === e.reversal_id"
+                            class="px-2 py-0.5 rounded border border-rose-200 bg-white text-rose-700 font-medium disabled:opacity-50"
+                            x-text="comissaoRefunding === e.reversal_id ? 'Salvando…' : 'Marcar devolvida'"></button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -2863,11 +2870,11 @@
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
           </nav>
           <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
-            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm">
               <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
             </button>
-            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 text-xs font-medium px-4 py-2 rounded-lg">
               <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Ajustar estoque
             </button>
@@ -2924,6 +2931,8 @@
             </label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Custo unitário</span><input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
+            <label x-show="stockOperacao === 'entrada'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Origem</span><select x-model="stockForm.entry_nature" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="inventory_found">Encontrado na contagem</option><option value="owner_contribution">Aporte do proprietário</option><option value="opening_balance">Saldo inicial/teste</option><option value="other">Outra origem</option></select></label>
+            <label x-show="stockOperacao === 'entrada'" class="xl:col-span-3 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Explicação obrigatória</span><input x-model="stockForm.entry_reason" type="text" maxlength="300" placeholder="De onde vieram estes pneus?" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label x-show="stockOperacao === 'ajuste'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Estoque mínimo</span><input x-model="stockForm.min_quantity" type="number" min="0" placeholder="Sem aviso" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <div :class="stockOperacao === 'ajuste' ? 'xl:col-span-3' : 'xl:col-span-5'" class="flex justify-end gap-2">
               <button @click="stockOperacao = null" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
@@ -2939,7 +2948,7 @@
           <div class="flex flex-col xl:flex-row xl:items-end gap-3">
             <div class="xl:w-56"><p class="text-sm font-semibold text-emerald-950">Baixar <span x-text="stockBaixaForm.measure"></span></p><p class="text-xs text-emerald-700 mt-1">A saída ficará registrada no histórico.</p></div>
             <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Quantidade</span><input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="0" class="w-28 border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
-            <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Motivo</span><select x-model="stockBaixaForm.tipo" class="border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="quebra">Quebra</option><option value="perda">Perda/sumiço</option><option value="uso interno">Uso interno</option><option value="outro">Outro</option></select></label>
+            <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Motivo</span><select x-model="stockBaixaForm.tipo" class="border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="breakage">Quebra</option><option value="loss">Perda/sumiço</option><option value="internal_use">Uso interno</option><option value="other">Outro</option></select></label>
             <label class="block flex-1"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Detalhe</span><input x-model="stockBaixaForm.texto" type="text" placeholder="Opcional" class="w-full border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
             <div class="flex gap-2"><button @click="stockBaixaSubmit()" :disabled="stockBaixaSaving" class="bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"><span x-show="!stockBaixaSaving">Confirmar baixa</span><span x-show="stockBaixaSaving">Salvando…</span></button><button @click="stockBaixaFechar()" class="text-sm text-gray-600 px-3 py-2">Cancelar</button></div>
           </div>
@@ -3090,7 +3099,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 border-b border-gray-100 p-4 sm:grid-cols-2 2xl:grid-cols-1">
-                  <button @click="stockForm = { measure: selectedRow.measure, quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                  <button @click="stockForm = { measure: selectedRow.measure, quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                           class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-medium text-white hover:bg-emerald-800">
                     <i data-lucide="plus" class="h-4 w-4"></i> Registrar entrada
                   </button>
@@ -3143,7 +3152,7 @@
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
                         <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
-                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
+                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
                       </div>
                     </template>
                     <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-4 text-center text-xs text-emerald-700">Todas as medidas estão dentro do mínimo.</div>
@@ -4501,7 +4510,7 @@
                 </div>
                 <div x-show="rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes.length" class="border-t border-amber-100 bg-amber-50/60 p-4 space-y-2">
                   <p class="text-xs font-semibold text-amber-800">Comprovantes pendentes</p>
-                  <template x-for="r in rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes" :key="'pendente-' + r.id"><div class="flex items-center justify-between gap-2 text-[11px]"><div class="flex items-center gap-2 min-w-0"><a x-show="receiptUrls[r.id]" :href="receiptUrls[r.id]" target="_blank"><img :src="receiptUrls[r.id]" class="w-7 h-7 object-cover rounded border border-amber-200" alt="comprovante pendente"></a><span class="text-amber-800" x-text="logisticaComprovanteStatusLabel(r)"></span></div><button x-show="logistica?.receipt_ai && (r.ai_status === 'pending' || r.ai_status === 'unreadable' || r.ai_status === 'skipped')" @click="lerComprovante(r)" :disabled="logisticaSaving" class="px-2 py-1 rounded bg-white border border-amber-200 text-amber-800 font-medium disabled:opacity-50">Ler agora</button></div></template>
+                  <template x-for="r in rotaResultado(logisticaRotaSelecionada()).comprovantesPendentes" :key="'pendente-' + r.id"><div class="flex items-center justify-between gap-2 text-[11px]"><div class="flex items-center gap-2 min-w-0"><a x-show="receiptUrls[r.id]" :href="receiptUrls[r.id]" target="_blank"><img :src="receiptUrls[r.id]" class="w-7 h-7 object-cover rounded border border-amber-200" alt="comprovante pendente"></a><span class="text-amber-800" x-text="logisticaComprovanteStatusLabel(r)"></span></div><div class="flex items-center gap-1"><button x-show="r.expense_removed && adminUser?.role === 'owner'" @click="repairReceiptExpense(r)" :disabled="receiptReviewBusy[r.id]" class="px-2 py-1 rounded bg-white border border-amber-200 text-amber-800 font-medium disabled:opacity-50">Restaurar despesa</button><button x-show="logistica?.receipt_ai && (r.ai_status === 'pending' || r.ai_status === 'unreadable' || r.ai_status === 'skipped')" @click="lerComprovante(r)" :disabled="logisticaSaving" class="px-2 py-1 rounded bg-white border border-amber-200 text-amber-800 font-medium disabled:opacity-50">Ler agora</button></div></div></template>
                 </div>
                 <div class="border-t border-gray-200 p-4 flex items-center justify-between"><span class="text-sm font-semibold">Total vinculado</span><span class="text-lg font-semibold tabular-nums" x-text="formatCurrency(rotaResultado(logisticaRotaSelecionada()).despesas)"></span></div>
               </aside>
@@ -4585,6 +4594,17 @@
       <!-- ═══════ SUB-ABA: VISÃO GERAL ═══════ -->
       <template x-if="financeiroVisao">
         <div x-show="finTab === 'visao'" class="w-full space-y-5">
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="rounded-full px-3 py-1 font-semibold"
+              :class="financeiroVisao.leitura?.source === 'central_ledger' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'"
+              x-text="financeiroVisao.leitura?.source === 'central_ledger' ? 'Livro financeiro central' : 'Cálculo anterior'"></span>
+            <span x-show="financeiroVisao.leitura?.fallback_reason"
+              class="rounded-full bg-rose-50 text-rose-700 px-3 py-1 font-semibold"
+              x-text="'Fallback automático: ' + financeiroVisao.leitura?.fallback_reason"></span>
+            <span x-show="financeiroVisao.leitura?.comparison && !financeiroVisao.leitura.comparison.matched"
+              class="rounded-full bg-amber-50 text-amber-700 px-3 py-1 font-semibold"
+              x-text="'Comparação: ' + formatCurrency(Number(financeiroVisao.leitura.comparison.total_abs_difference)) + ' de diferença'"></span>
+          </div>
 
           <!-- 4 cards do topo -->
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -4629,6 +4649,8 @@
               </div>
               <p class="text-xs text-amber-600 mt-3" x-show="financeiroVisao.verdade.competencia.receita_custo_pendente !== '0.00'"
                  x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente)) + ' de receita está com custo pendente e ficou fora do lucro.'"></p>
+              <p class="text-xs text-rose-600 mt-2" x-show="Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas || 0) > 0"
+                 x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque.perdas)) + ' de perdas/baixas do estoque já descontadas do lucro.'"></p>
             </div>
 
             <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
@@ -4765,7 +4787,8 @@
                         <td class="px-5 py-3"><div class="flex justify-end items-center gap-2">
                           <a x-show="finWhatsLink(item)" :href="finWhatsLink(item)" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-700 text-emerald-700 hover:bg-emerald-50 font-medium whitespace-nowrap"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>Cobrar</a>
                           <span x-show="!finWhatsLink(item)" class="text-[11px] text-gray-400 whitespace-nowrap">Sem telefone</span>
-                          <button @click="finReceber(item)" :disabled="finQuitando" class="text-xs px-3 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Recebi</button>
+                          <button x-show="!['retail_sale','central_obligation','monthly_fee'].includes(item.settlement_mode) || adminUser?.role === 'owner'" @click="finReceber(item)" :disabled="finQuitando" class="text-xs px-3 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Recebi</button>
+                          <span x-show="['retail_sale','central_obligation','monthly_fee'].includes(item.settlement_mode) && adminUser?.role !== 'owner'" class="text-[11px] text-gray-400 whitespace-nowrap">Somente dono</span>
                         </div></td>
                       </tr>
                     </template>
@@ -4866,13 +4889,14 @@
                         <template x-for="item in pagarFila()" :key="item.tipo + item.id">
                           <tr class="border-b border-gray-100">
                             <td class="py-2.5 pr-3 font-medium text-gray-800" x-text="item.nome"></td>
-                            <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="item.tipo === 'fornecedor' ? 'Fornecedor de pneus' : item.tipo === 'folha' ? 'Folha salarial' : despesaLabel(item.categoria || 'outros')"></span></td>
+                            <td class="py-2.5 pr-3"><span class="inline-block text-xs bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5 text-gray-600 whitespace-nowrap" x-text="pagarOrigem(item)"></span></td>
                             <td class="py-2.5 pr-3 text-gray-500 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'sem vencimento'"></td>
                             <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
                             <td class="py-2.5 pr-3 whitespace-nowrap"><span class="inline-block text-xs rounded-full px-2.5 py-0.5" :class="pagarStatus(item).cls" x-text="pagarStatus(item).label"></span></td>
                             <td class="py-2.5 text-right whitespace-nowrap">
-                              <button @click="finPagar(item)" :disabled="finQuitando"
+                              <button x-show="!['central_obligation','central_account','commission_refund'].includes(item.settlement_mode) || adminUser?.role === 'owner'" @click="finPagar(item)" :disabled="finQuitando"
                                       class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
+                              <span x-show="['central_obligation','central_account','commission_refund'].includes(item.settlement_mode) && adminUser?.role !== 'owner'" class="text-[11px] text-gray-400">Somente dono</span>
                             </td>
                           </tr>
                         </template>
@@ -4882,7 +4906,7 @@
                   <div x-show="!financeiroVisao.a_pagar.itens.length" class="py-8 text-center">
                     <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2"><i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i></div>
                     <p class="text-sm font-medium text-gray-700">Nenhuma conta pendente.</p>
-                    <p class="text-xs text-gray-400 mt-1">Compras a prazo e despesas a pagar aparecerão nesta fila.</p>
+                    <p class="text-xs text-gray-400 mt-1">Fornecedores, despesas, marketing e devoluções aparecerão nesta fila.</p>
                   </div>
                   <div x-show="financeiroVisao.a_pagar.itens.length && !pagarFila().length" class="text-sm text-gray-400 py-6 text-center">Nenhum título nesse filtro — <button @click="pagarFiltro = ''" class="text-emerald-700 hover:underline font-medium">ver todos</button>.</div>
                 </div>
@@ -5014,7 +5038,7 @@
             <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               <div class="px-6 py-5 border-b border-gray-100"><h3 class="text-base font-semibold">Próximos movimentos</h3><p class="text-xs text-gray-500 mt-1">Agenda unificada de cobranças, fornecedores e despesas em aberto.</p></div>
               <div class="overflow-x-auto"><table class="w-full min-w-[920px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-6 py-3 text-left font-medium">Vencimento</th><th class="px-4 py-3 text-left font-medium">Origem</th><th class="px-4 py-3 text-left font-medium">Descrição</th><th class="px-4 py-3 text-right font-medium">Entrada</th><th class="px-4 py-3 text-right font-medium">Saída</th><th class="px-4 py-3 text-left font-medium">Status</th><th class="px-6 py-3 text-right font-medium">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
-                <template x-for="item in finFluxoPainel().movimentos" :key="item.direcao + ':' + item.tipo + ':' + item.id"><tr class="hover:bg-gray-50/60"><td class="px-6 py-3 text-gray-600 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'Sem data'"></td><td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="item.origem"></td><td class="px-4 py-3 font-medium text-gray-800 max-w-[270px] truncate" x-text="item.descricao"></td><td class="px-4 py-3 text-right font-semibold text-emerald-700 num" x-text="item.direcao === 'entrada' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3 text-right font-semibold text-rose-600 num" x-text="item.direcao === 'saida' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></td><td class="px-6 py-3 text-right"><button type="button" @click="item.direcao === 'entrada' ? finReceber(item) : finPagar(item)" :disabled="finQuitando" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50" x-text="item.direcao === 'entrada' ? 'Receber' : 'Pagar'"></button></td></tr></template>
+                <template x-for="item in finFluxoPainel().movimentos" :key="item.direcao + ':' + item.tipo + ':' + item.id"><tr class="hover:bg-gray-50/60"><td class="px-6 py-3 text-gray-600 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'Sem data'"></td><td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="item.origem"></td><td class="px-4 py-3 font-medium text-gray-800 max-w-[270px] truncate" x-text="item.descricao"></td><td class="px-4 py-3 text-right font-semibold text-emerald-700 num" x-text="item.direcao === 'entrada' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3 text-right font-semibold text-rose-600 num" x-text="item.direcao === 'saida' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></td><td class="px-6 py-3 text-right"><button type="button" @click="item.direcao === 'entrada' ? finReceber(item) : finPagar(item)" :disabled="finQuitando || (['retail_sale','central_obligation','central_account','monthly_fee','commission_refund'].includes(item.settlement_mode) && adminUser?.role !== 'owner')" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50" x-text="item.direcao === 'entrada' ? 'Receber' : 'Pagar'"></button></td></tr></template>
               </tbody></table><div x-show="!finFluxoPainel().movimentos.length" class="py-12 text-center"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="badge-check" class="w-5 h-5 text-emerald-700"></i></div><p class="text-sm font-medium text-gray-700 mt-3">Nenhum movimento previsto.</p><p class="text-xs text-gray-400 mt-1">Contas e cobranças com vencimento aparecerão aqui.</p></div></div>
             </div>
           </div>

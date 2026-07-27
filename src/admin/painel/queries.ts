@@ -30,14 +30,18 @@ export * from './queries-despesas-categorias.js'; // modalidades de despesa cada
 export * from './queries-atacado-cancelar.js'; // últimas vendas do atacado + cancelar venda (0116)
 export * from './queries-comissoes.js'; // comissões como lançamento (0118): varredura, livro, quitar, termos
 export * from './queries-comissoes-acoes.js'; // Etapa 6: liquidação/termos atômicos e idempotentes
+export * from './queries-comissoes-estornos.js'; // 0146: devolução de comissão recebida e estornada
+export * from './queries-mensalidades.js'; // 0151: mensalidade por competência, geração e baixa
 export * from './queries-financeiro-visao.js'; // visão consolidada do Financeiro da matriz (só leitura)
 export * from './queries-financeiro-verdade.js'; // Etapa 4: competência × caixa × posição + conciliação
+export * from './queries-financeiro-read-switch.js'; // Etapa 7: chave de leitura + rollback
 export * from './queries-compras-relatorios.js'; // Compras: relatórios conciliados, paginação e preço histórico
 export * from './queries-logistica.js'; // logística (0121) leitura: entregas, rotas, status, falha
 export * from './queries-logistica-rotas.js'; // logística ações: abrir/pendurar/remarcar/recolocar/fechar rota
 export * from './queries-logistica-comprovantes.js'; // comprovantes da rota + leitura por IA (0121/0122)
 export * from './queries-logistica-comprovantes-review.js'; // Etapa 7: tentativas + decisão humana
 export * from './queries-logistica-comprovantes-decision.js'; // Etapa 7: aprovação/rejeição atômica
+export * from './queries-logistica-comprovantes-repair.js'; // 0145: protege e repara despesa terminal vinculada
 export * from './queries-colaboradores.js'; // colaboradores da matriz (0124): cadastro (list/criar/função)
 export * from './queries-colaboradores-acesso.js'; // ciclo de acesso (0132): papel do painel, revogar/reativar, senha
 export * from './queries-colaboradores-gestao.js'; // visão integrada: equipe/remuneração/comissão/desempenho

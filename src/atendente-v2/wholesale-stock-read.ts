@@ -281,12 +281,14 @@ export async function applyMatrizGalpaoReturn(
 
   for (const mv of movements) {
     if (!mv.measure || !(mv.qty > 0)) continue;
-    await client.query(
+    const updated = await client.query(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand + $3
-        WHERE environment = $1 AND measure = $2`,
+        WHERE environment = $1 AND measure = $2
+        RETURNING quantity_on_hand`,
       [environment, mv.measure, mv.qty],
     );
+    if (updated.rowCount !== 1) throw new Error(`stock_measure_missing:${mv.measure}`);
   }
 
   await client.query(

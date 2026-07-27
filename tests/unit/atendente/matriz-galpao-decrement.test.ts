@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PoolClient } from 'pg';
-import { applyMatrizGalpaoDecrement } from '../../../src/atendente-v2/wholesale-stock-read.js';
+import {
+  applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn,
+} from '../../../src/atendente-v2/wholesale-stock-read.js';
 
 // Mock do client: responde tire_specs / SELECT measure / captura os UPDATE (que agora
 // devolvem old_qty/new_qty do RETURNING) / captura o INSERT da trilha (audit.events).
@@ -115,5 +117,24 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
     );
     await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 2 }], true);
     expect(audits).toHaveLength(0);
+  });
+});
+
+describe('applyMatrizGalpaoReturn — devolução estrita no cancelamento', () => {
+  it('falha fechado se a medida baixada não existir mais', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("event_type = 'matriz_galpao_return'")) return { rows: [] };
+      if (sql.includes("event_type = 'matriz_galpao_decrement'")) {
+        return { rows: [{ payload_after: { movements: [{ measure: '90/90-12', qty: 1 }] } }] };
+      }
+      if (sql.includes('UPDATE commerce.wholesale_stock')) return { rows: [], rowCount: 0 };
+      return { rows: [] };
+    });
+    const client = { query } as unknown as PoolClient;
+
+    await expect(applyMatrizGalpaoReturn(client, 'test', 'order-1'))
+      .rejects.toThrow('stock_measure_missing:90/90-12');
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('matriz_galpao_return')
+      && String(sql).includes('INSERT INTO audit.events'))).toBe(false);
   });
 });

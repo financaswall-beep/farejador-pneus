@@ -115,6 +115,16 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (err.message.includes('payroll_expense_locked')) {
     return { status: 409, error: 'payroll_expense_locked' };
   }
+  if (err.message.includes('receipt_expense_locked')) {
+    return { status: 409, error: 'receipt_expense_locked' };
+  }
+  if (['receipt_expense_not_repairable', 'receipt_expense_repair_failed']
+    .includes(err.message)) {
+    return { status: 409, error: err.message };
+  }
+  if (err.message === 'receipt_expense_not_found') {
+    return { status: 404, error: err.message };
+  }
 
   return { status: 500, error: 'internal_server_error' };
 }

@@ -14,6 +14,7 @@ import {
   type MetaMarketingConfig,
   type MetaMarketingSnapshot,
 } from '../admin/painel/marketing-meta.js';
+import { reconcileMatrizMarketingSpend } from './matriz-ledger-spend.js';
 
 type SyncTrigger = 'startup' | 'scheduled' | 'manual';
 
@@ -111,7 +112,7 @@ export async function syncMetaInsights(options: {
         for (const row of group.rows) {
           const value = insightValues(row, group.level);
           if (!value) continue;
-          await client.query(
+          const upserted = await client.query<{ id: string }>(
             `INSERT INTO marketing.meta_insights_daily (
                environment,sync_run_id,ad_account_id,api_version,account_currency,
                entity_level,entity_id,entity_name,campaign_id,campaign_name,adset_id,
@@ -128,7 +129,8 @@ export async function syncMetaInsights(options: {
                spend=EXCLUDED.spend,impressions=EXCLUDED.impressions,clicks=EXCLUDED.clicks,
                reach=EXCLUDED.reach,conversations=EXCLUDED.conversations,
                conversation_action_type=EXCLUDED.conversation_action_type,
-               actions_raw=EXCLUDED.actions_raw,collected_at=now()`,
+               actions_raw=EXCLUDED.actions_raw,collected_at=now()
+             RETURNING id`,
             [
               env.FAREJADOR_ENV, runId, config.adAccountId, config.apiVersion,
               value.currency, group.level, value.entityId, value.entityName,
@@ -137,6 +139,9 @@ export async function syncMetaInsights(options: {
               value.reach, value.conversations, value.actionType, JSON.stringify(value.actions),
             ],
           );
+          if (upserted.rows[0]) {
+            await reconcileMatrizMarketingSpend(client, upserted.rows[0].id, runId);
+          }
           rowsUpserted += 1;
         }
       }

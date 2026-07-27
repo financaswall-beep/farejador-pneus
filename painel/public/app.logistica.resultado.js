@@ -109,6 +109,7 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       return found?.label || String(category || 'Despesa');
     },
     logisticaComprovanteStatusLabel(receipt) {
+      if (receipt?.expense_removed) return 'Despesa vinculada removida — restauração necessária';
       if (receipt?.workflow_status === 'linked') return 'Aprovado e vinculado';
       if (receipt?.workflow_status === 'legacy_linked') return 'Legado — sem aprovação humana registrada';
       if (receipt?.workflow_status === 'rejected') return 'Rejeitado — nenhum lançamento';

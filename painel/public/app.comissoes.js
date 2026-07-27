@@ -29,6 +29,28 @@ window.PAINEL_MODULES.comissoes = function () {
         this.comissaoSettling = null;
       }
     },
+    async refundComissao(entry) {
+      if (!entry?.reversal_id || entry.refund_status !== 'pending') return;
+      const amount = this.formatCurrency(Number(entry.commission_amount || 0));
+      if (!confirm(`Confirmar DEVOLUÇÃO de ${amount} para ${entry.partner_name}?`)) return;
+      this.comissaoRefunding = entry.reversal_id;
+      try {
+        entry._refundIdempotencyKey = entry._refundIdempotencyKey
+          || `commission-refund-${entry.reversal_id}-${crypto.randomUUID()}`;
+        await this.apiPost('/admin/api/rede/comissoes/refund', {
+          reversal_id: entry.reversal_id,
+          idempotency_key: entry._refundIdempotencyKey,
+          reason: 'Devolução de comissão confirmada no painel',
+        });
+        delete entry._refundIdempotencyKey;
+        await Promise.all([this.loadComissoes(), this.loadFinanceiro()]);
+      } catch (err) {
+        alert('Não deu para registrar a devolução: '
+          + (err instanceof Error ? err.message : err));
+      } finally {
+        this.comissaoRefunding = null;
+      }
+    },
     setComissaoAlerta(value) {
       this.comissaoAlerta = Math.max(0, Number(value) || 0);
       localStorage.setItem('farejador_comissao_alerta', String(this.comissaoAlerta));

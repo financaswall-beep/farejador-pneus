@@ -3,6 +3,9 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { applyWholesaleStockReturn } from './wholesale-stock.js';
 import {
+  getWholesaleSaleLedgerState, postWholesaleSaleCancellation,
+} from './matriz-ledger-wholesale-sales.js';
+import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
@@ -88,6 +91,8 @@ export async function cancelWholesaleSale(
         WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.order_id, environment]);
     if (!current.rows[0]) throw new Error('sale_not_found');
     if (current.rows[0].status !== 'confirmed') throw new Error('sale_already_cancelled');
+    const ledgerState = env.MATRIZ_CENTRAL_LEDGER
+      ? await getWholesaleSaleLedgerState(client, environment, input.order_id) : null;
 
     const history = await client.query<{
       measure: string; returned_quantity: number; unverified_quantity: number;
@@ -122,6 +127,8 @@ export async function cancelWholesaleSale(
           SET status='cancelled',cancelled_at=now(),cancelled_by=$3,cancel_reason=$4
         WHERE id=$1 AND environment=$2 RETURNING cancelled_at`,
       [input.order_id, environment, input.cancelled_by, reason.slice(0, 300)]);
+    if (ledgerState) await postWholesaleSaleCancellation(client, ledgerState, stockReturned,
+      updated.rows[0]!.cancelled_at, input.cancelled_by, reason);
     const result = integrityResult({ order_id: input.order_id,
       cancelled_at: updated.rows[0]!.cancelled_at,
       payment_status: current.rows[0].payment_status,

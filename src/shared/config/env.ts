@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { validateProductionEnv } from './env-production-validation.js';
 import { marketingEnvShape } from './env-marketing.js';
 const booleanStringSchema = z.enum(['true', 'false']).default('false').transform((value) => value === 'true');
-
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FAREJADOR_ENV: z.enum(['prod', 'test']),
@@ -164,10 +163,11 @@ const envSchema = z.object({
   // FINANCEIRO do painel da matriz ganha o lançamento de despesas (aluguel/funcionário/
   // combustível/frete/manutenção/outros) com pago na hora × a pagar (vocabulário do
   // fiado 0115) — a perna de SAÍDA que faltava pro caixa fechar. A visão consolidada da
-  // mesma aba (Onda 1, SÓ leitura) mostra a fatia de despesas apenas com esta flag ON.
-  // Default OFF = dormente: endpoint devolve enabled:false e a UI se esconde. Liga no
+  // mesma aba mostra despesas só com a flag ON. Default OFF = dormente; UI se esconde. Liga no
   // Coolify pós-Deploy. Fase B (0121, livro-razão) lê esta tabela com a mesma régua.
   MATRIZ_EXPENSES: booleanStringSchema,
+  MATRIZ_CENTRAL_LEDGER: booleanStringSchema, // 0149: adaptadores futuros; default OFF.
+  MATRIZ_CENTRAL_LEDGER_READ: booleanStringSchema, // Etapa 7: leitura com fallback.
   // LOGÍSTICA DA MATRIZ (0121): aba Logística no painel da matriz — entregas da 'main'
   // nos moldes do parceiro (em separação → saiu → entregue/não entregue) + DIÁRIO DE ROTA
   // do entregador (decisão do dono 07-03: por SAÍDA, não por entrega — km inicial/final,

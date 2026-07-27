@@ -66,14 +66,14 @@ window.PAINEL_MODULES.financeiroIndicadores = function () {
       const receber = (v.a_receber.itens || []).map((item) => ({
         ...item,
         direcao: 'entrada',
-        origem: item.tipo === 'comissao' ? 'Comissao da rede' : 'Venda atacado',
+        origem: this.cobrancaOrigem(item),
         descricao: item.nome,
         dias: this.cobrancaDias(item.due_date),
       }));
       const pagar = (v.a_pagar.itens || []).map((item) => ({
         ...item,
         direcao: 'saida',
-        origem: item.tipo === 'despesa' ? 'Despesa da Matriz' : 'Fornecedor',
+        origem: this.pagarOrigem(item),
         descricao: item.nome,
         dias: this.cobrancaDias(item.due_date),
       }));

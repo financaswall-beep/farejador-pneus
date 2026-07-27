@@ -5,15 +5,22 @@
 // Definir/Entrada/Remover dentro de transação rotulada, (c) a BAIXA MANUAL com motivo
 // (quebra/perda — RECUSA acima do saldo, diferente da venda que nunca trava) e (d) a
 // leitura do filme pra tela. Dado SÓ da matriz (zero grant parceiro, provado na 0128).
+import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import {
   addWholesaleStockEntry, deleteWholesaleStock, setWholesaleStock, type WholesaleStockRow,
 } from './queries-galpao.js';
+import {
+  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  operationFingerprint, recordIntegrityEvent,
+} from './stage5-integrity.js';
+import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inventory.js';
 
 export interface GalpaoMovContext {
   source: string; // quem mexeu: definir | entrada | compra | venda_atacado | cancelamento_* | varejo | baixa_manual | remocao
+  nature?: string | null;
   reason?: string | null; // motivo livre (ex.: 'quebra: furou na desmontagem')
   ref?: string | null; // id do pedido/compra quando houver
 }
@@ -24,9 +31,10 @@ export interface GalpaoMovContext {
 export async function setGalpaoMovContext(client: PoolClient, ctx: GalpaoMovContext): Promise<void> {
   await client.query(
     `SELECT set_config('app.galpao_source', $1, true),
-            set_config('app.galpao_reason', COALESCE($2, ''), true),
-            set_config('app.galpao_ref',    COALESCE($3, ''), true)`,
-    [ctx.source, ctx.reason ?? null, ctx.ref ?? null],
+            set_config('app.galpao_nature', COALESCE($2, ''), true),
+            set_config('app.galpao_reason', COALESCE($3, ''), true),
+            set_config('app.galpao_ref',    COALESCE($4, ''), true)`,
+    [ctx.source, ctx.nature ?? null, ctx.reason ?? null, ctx.ref ?? null],
   );
 }
 
@@ -56,15 +64,71 @@ export async function setWholesaleStockComRotulo(
   input: Parameters<typeof setWholesaleStock>[0],
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
-  return comRotulo(dbPool, { source: 'definir' }, (client) => setWholesaleStock(input, client));
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const movementRef = randomUUID();
+  return comRotulo(dbPool, { source: 'definir', nature: 'inventory_count',
+    reason: 'ajuste manual de saldo/custo', ref: movementRef }, async (client) => {
+    const result = await setWholesaleStock(input, client);
+    await postMatrizInventoryAdjustmentsByMovementRef(
+      client, environment, movementRef, 'system:stock-count',
+    );
+    return result;
+  });
 }
 
 /** "+ Entrada" da tela com rótulo 'entrada' (compra avulsa sem ficha de fornecedor). */
 export async function addWholesaleStockEntryComRotulo(
-  input: Parameters<typeof addWholesaleStockEntry>[0],
+  input: Parameters<typeof addWholesaleStockEntry>[0] & {
+    entry_nature?: 'inventory_found' | 'owner_contribution' | 'opening_balance' | 'other';
+    reason?: string; actor_label?: string; idempotency_key?: string;
+  },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
-  return comRotulo(dbPool, { source: 'entrada' }, (client) => addWholesaleStockEntry(input, client));
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const nature = input.entry_nature;
+  const reason = input.reason?.trim() ?? '';
+  if (!nature) throw new Error('stock_entry_nature_required');
+  if (reason.length < 2) throw new Error('reason_required');
+  const operation = { environment, domain: 'stock.entry',
+    idempotencyKey: input.idempotency_key ?? '', fingerprint: operationFingerprint({
+      measure: input.measure.trim(), quantity_in: input.quantity_in,
+      unit_cost: input.unit_cost, entry_nature: nature, reason,
+    }) };
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const started = await beginIntegrityOperation<WholesaleStockRow>(client, operation);
+    if (started.replayed) {
+      await client.query('COMMIT');
+      return started.result;
+    }
+    await setGalpaoMovContext(client, {
+      source: 'entrada', nature, reason, ref: operation.idempotencyKey,
+    });
+    const result = integrityResult(await addWholesaleStockEntry(input, client));
+    const entity = await client.query<{ id: string }>(
+      `SELECT id FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`,
+      [environment, result.measure],
+    );
+    const entityId = entity.rows[0]?.id;
+    if (!entityId) throw new Error('stock_measure_missing');
+    await recordIntegrityEvent(client, { environment, domain: 'stock',
+      entityTable: 'commerce.wholesale_stock', entityId, eventType: 'manual_entry',
+      actorLabel: input.actor_label, idempotencyKey: operation.idempotencyKey,
+      after: { measure: result.measure, quantity_in: input.quantity_in,
+        unit_cost: input.unit_cost, nature, reason } });
+    await completeIntegrityOperation(client, operation, 'commerce.wholesale_stock', entityId, result);
+    await postMatrizInventoryAdjustmentsByMovementRef(
+      client, environment, operation.idempotencyKey, input.actor_label,
+    );
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** Remover medida (tela) com rótulo 'remocao'. */
@@ -73,7 +137,14 @@ export async function deleteWholesaleStockComRotulo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<void> {
-  return comRotulo(dbPool, { source: 'remocao' }, (client) => deleteWholesaleStock(measure, environment, client));
+  const movementRef = randomUUID();
+  return comRotulo(dbPool, { source: 'remocao', nature: 'inventory_writeoff',
+    reason: 'medida removida manualmente', ref: movementRef }, async (client) => {
+    await deleteWholesaleStock(measure, environment, client);
+    await postMatrizInventoryAdjustmentsByMovementRef(
+      client, environment, movementRef, 'system:stock-removal',
+    );
+  });
 }
 
 /** BAIXA MANUAL com motivo (quebra/perda/uso interno) — o ajuste honesto que faltava:
@@ -82,7 +153,9 @@ export async function deleteWholesaleStockComRotulo(
  *  régua é a verdade do galpão. NÃO mexe no custo médio (sai quantidade; o prejuízo
  *  fica legível no filme: qty × custo da época). Motivo é OBRIGATÓRIO. */
 export async function applyGalpaoBaixaManual(
-  input: { measure: string; quantity: number; reason: string; environment?: 'prod' | 'test' },
+  input: { measure: string; quantity: number; reason: string;
+    nature?: 'breakage' | 'loss' | 'internal_use' | 'other';
+    actor_label?: string; idempotency_key?: string; environment?: 'prod' | 'test' },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
@@ -91,17 +164,44 @@ export async function applyGalpaoBaixaManual(
   if (!measure) throw new Error('measure_required');
   if (!Number.isInteger(input.quantity) || input.quantity <= 0) throw new Error('quantity_invalid');
   if (reason.length < 2) throw new Error('reason_required');
-
-  return comRotulo(dbPool, { source: 'baixa_manual', reason }, async (client) => {
-    const r = await client.query<WholesaleStockRow>(
+  if (!input.nature) throw new Error('stock_decrement_nature_required');
+  const operation = { environment, domain: 'stock.manual_decrement',
+    idempotencyKey: input.idempotency_key ?? '', fingerprint: operationFingerprint({
+      measure, quantity: input.quantity, nature: input.nature, reason,
+    }) };
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const started = await beginIntegrityOperation<WholesaleStockRow>(client, operation);
+    if (started.replayed) {
+      await client.query('COMMIT');
+      return started.result;
+    }
+    await setGalpaoMovContext(client, { source: 'baixa_manual',
+      nature: input.nature, reason, ref: operation.idempotencyKey });
+    const r = await client.query<WholesaleStockRow & { id: string }>(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand - $3
         WHERE environment = $1 AND measure = $2 AND quantity_on_hand >= $3
-        RETURNING measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
+        RETURNING id, measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                   tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
       [environment, measure, input.quantity],
     );
-    if (r.rows[0]) return r.rows[0];
+    if (r.rows[0]) {
+      const { id, ...row } = r.rows[0];
+      const result = integrityResult(row);
+      await recordIntegrityEvent(client, { environment, domain: 'stock',
+        entityTable: 'commerce.wholesale_stock', entityId: id,
+        eventType: 'manual_decrement', actorLabel: input.actor_label,
+        idempotencyKey: operation.idempotencyKey,
+        after: { measure, quantity: input.quantity, nature: input.nature, reason } });
+      await completeIntegrityOperation(client, operation, 'commerce.wholesale_stock', id, result);
+      await postMatrizInventoryAdjustmentsByMovementRef(
+        client, environment, operation.idempotencyKey, input.actor_label,
+      );
+      await client.query('COMMIT');
+      return result;
+    }
     // 0 linhas: medida não existe OU saldo insuficiente — dizer QUAL (erro honesto)
     const cur = await client.query<{ quantity_on_hand: number }>(
       `SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1 AND measure = $2`,
@@ -109,7 +209,12 @@ export async function applyGalpaoBaixaManual(
     );
     if (!cur.rows[0]) throw new Error('measure_not_found');
     throw new Error('baixa_maior_que_estoque:' + cur.rows[0].quantity_on_hand);
-  });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export interface GalpaoMovementRow {

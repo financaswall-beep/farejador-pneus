@@ -72,6 +72,38 @@ describe('Etapa 6 — livro causal de comissão 2W', () => {
       'SELECT status,settled_at FROM network.commission_entries WHERE id=$1', [created.rows[0]!.id]);
     expect(final.rows[0]?.status).toBe('reversed');
     expect(final.rows[0]?.settled_at).toBeTruthy();
+    const reversal = await db.pool.query<{
+      id: string; amount: string; refund_status: string;
+    }>(
+      `SELECT id,amount::text,refund_status
+         FROM finance.matriz_commission_reversals
+        WHERE commission_entry_id=$1`,
+      [created.rows[0]!.id],
+    );
+    expect(reversal.rows[0]).toMatchObject({
+      amount: '14.00', refund_status: 'pending',
+    });
+    const beforeRefund = await admin.getMatrizFinancialTruth('test', db.pool);
+    expect(beforeRefund.caixa.recebimentos.comissao).toBe('14.00');
+    expect(beforeRefund.caixa.pagamentos.devolucoes_comissao).toBe('0.00');
+    expect(beforeRefund.posicao.a_pagar).toBe('14.00');
+    expect(beforeRefund.conciliacao.qualidade.comissoes_estornadas_apos_quitacao).toBe(1);
+
+    const refundInput = {
+      reversal_id: reversal.rows[0]!.id,
+      actor_label: 'owner teste',
+      idempotency_key: `refund-${randomUUID()}`,
+      reason: 'devolvido no teste',
+      environment: 'test' as const,
+    };
+    const refund = await admin.settleCommissionRefund(refundInput, db.pool);
+    const refundReplay = await admin.settleCommissionRefund(refundInput, db.pool);
+    expect(refundReplay).toEqual(refund);
+    const afterRefund = await admin.getMatrizFinancialTruth('test', db.pool);
+    expect(afterRefund.caixa.recebimentos.comissao).toBe('14.00');
+    expect(afterRefund.caixa.pagamentos.devolucoes_comissao).toBe('14.00');
+    expect(afterRefund.posicao.a_pagar).toBe('0.00');
+    expect(afterRefund.conciliacao.qualidade.comissoes_estornadas_apos_quitacao).toBe(0);
     const events = await db.pool.query<{ event_type: string }>(
       'SELECT event_type FROM network.commission_entry_events WHERE commission_entry_id=$1 ORDER BY created_at',
       [created.rows[0]!.id]);
@@ -81,6 +113,8 @@ describe('Etapa 6 — livro causal de comissão 2W', () => {
   it('papel parceiro não lê o filme de comissão', async () => {
     const restricted = new Pool({ connectionString: buildRestrictedConnectionString(db.connectionString) });
     await expect(restricted.query('SELECT * FROM network.commission_entry_events LIMIT 1'))
+      .rejects.toThrow(/permission denied/i);
+    await expect(restricted.query('SELECT * FROM finance.matriz_commission_reversals LIMIT 1'))
       .rejects.toThrow(/permission denied/i);
     await restricted.end();
   });

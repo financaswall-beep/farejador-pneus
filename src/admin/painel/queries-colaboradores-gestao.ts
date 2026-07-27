@@ -10,6 +10,7 @@ type CommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
 export interface CollaboratorManagementRow {
   id: string; display_name: string; username: string; job: string; job_title: string;
   work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean;
+  eligible_in_competence: boolean;
   employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
   payment_method: string | null; payment_note: string | null; compensation_starts_on: string | null;
   commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
@@ -40,6 +41,8 @@ export async function getMatrizCollaboratorManagement(
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
               mc.panel_role, mc.revoked_at IS NULL AS active,
+              finance.matriz_collaborator_in_competence(
+                mc.created_at,mc.revoked_at,$2::date) AS eligible_in_competence,
               cp.employment_type, COALESCE(cp.base_salary, 0) AS monthly_base_salary,
               COALESCE(cp.base_salary, 0) AS base_salary,
               cp.payment_day, cp.payment_method, cp.payment_note, cp.starts_on AS compensation_starts_on,
@@ -185,7 +188,9 @@ export async function getMatrizCollaboratorManagement(
   const rows: CollaboratorManagementRow[] = people.rows.map((p: any) => {
     const q = perf.get(p.id) as any ?? {}; const a = adj.get(p.id) as any ?? {}; const f = frozen.get(p.id) as any;
     const row: CollaboratorManagementRow = {
-      ...p, base_salary: n(p.base_salary), monthly_base_salary: n(p.monthly_base_salary),
+      ...p, active: Boolean(p.active),
+      eligible_in_competence: Boolean(p.eligible_in_competence ?? p.active),
+      base_salary: n(p.base_salary), monthly_base_salary: n(p.monthly_base_salary),
       payment_day: p.payment_day === null ? null : n(p.payment_day),
       commission_value: n(p.commission_value), commission_active: Boolean(p.commission_active),
       sales_count: n(q.sales_count), revenue: n(q.revenue), margin: n(q.margin), items_without_cost: n(q.items_without_cost),
@@ -202,27 +207,30 @@ export async function getMatrizCollaboratorManagement(
     return row;
   });
   const active = rows.filter((r) => r.active);
-  const payrollRows = payroll.rows.length ? rows.filter((r) => r.payroll_item_id) : active;
+  const competenceEligible = rows.filter((r) => r.eligible_in_competence);
+  const payrollRows = payroll.rows.length ? rows.filter((r) => r.payroll_item_id) : competenceEligible;
   const payable = rows.filter((r) => r.payroll_status === 'pending');
   const paid = rows.filter((r) => r.payroll_status === 'paid');
   const summary = {
     active_count: active.length, role_count: new Set(active.map((r) => r.job_title)).size,
     panel_access_count: active.filter((r) => r.panel_role).length, revoked_count: rows.length - active.length,
-    configured_count: active.filter((r) => r.employment_type).length,
-    base_salary_total: active.reduce((s, r) => s + r.base_salary, 0),
-    unconfigured_count: active.filter((r) => !r.employment_type).length,
-    commission_total: active.reduce((s, r) => s + r.commission_amount, 0),
-    sales_eligible: active.reduce((s, r) => s + r.sales_count, 0),
-    deliveries_eligible: active.reduce((s, r) => s + r.deliveries_count, 0),
-    without_rule: active.filter((r) => !r.commission_active).length,
+    configured_count: competenceEligible.filter((r) => r.employment_type).length,
+    base_salary_total: competenceEligible.reduce((s, r) => s + r.base_salary, 0),
+    unconfigured_count: competenceEligible.filter((r) => !r.employment_type).length,
+    commission_total: competenceEligible.reduce((s, r) => s + r.commission_amount, 0),
+    sales_eligible: competenceEligible.reduce((s, r) => s + r.sales_count, 0),
+    deliveries_eligible: competenceEligible.reduce((s, r) => s + r.deliveries_count, 0),
+    without_rule: competenceEligible.filter((r) => !r.commission_active).length,
     payroll_total: payrollRows.reduce((s, r) => s + r.total_due, 0),
     payroll_payable: payable.reduce((s, r) => s + r.total_due, 0),
     payroll_paid: paid.reduce((s, r) => s + r.total_due, 0), paid_count: paid.length,
-    payroll_count: payroll.rows.length || active.filter((r) => r.employment_type || r.commission_active).length,
+    payroll_count: payroll.rows.length
+      || competenceEligible.filter((r) => r.employment_type || r.commission_active).length,
     payroll_period_id: payroll.rows[0]?.payroll_period_id ?? null,
     payroll_period_status: payroll.rows[0]?.payroll_period_status ?? 'preview',
-    revenue: active.reduce((s, r) => s + r.revenue, 0), margin: active.reduce((s, r) => s + r.margin, 0),
-    trips_count: active.reduce((s, r) => s + r.trips_count, 0),
+    revenue: competenceEligible.reduce((s, r) => s + r.revenue, 0),
+    margin: competenceEligible.reduce((s, r) => s + r.margin, 0),
+    trips_count: competenceEligible.reduce((s, r) => s + r.trips_count, 0),
   };
   return { competence, collaborators: rows, summary,
     adjustments: adjustmentDetails.rows.map((row: any) => ({

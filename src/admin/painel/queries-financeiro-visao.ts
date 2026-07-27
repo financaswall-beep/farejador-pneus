@@ -13,30 +13,18 @@ import { hashPassword } from '../../parceiro/password.js';
 import { getWholesaleResumo, getVarejoResumo } from './queries-galpao.js';
 import { getWholesaleFinance, getMatrizExpenses } from './queries-fiado-despesas.js';
 import { getCommissionLedger } from './queries-comissoes.js';
-import { getMatrizFinancialTruth, type MatrizFinancialTruth } from './queries-financeiro-verdade.js';
-
-export interface FinanceiroReceivableItem {
-  tipo: 'fiado' | 'comissao';
-  id: string;                 // order id (fiado) ou partner_id (comissao)
-  nome: string;
-  valor: string;
-  due_date: string | null;    // comissão acumulada não tem vencimento
-  overdue: boolean;
-  phone: string | null;       // deep-link wa.me "Cobrar"
-  count?: number;             // comissão: nº de lançamentos em aberto
-}
-
-export interface FinanceiroPayableItem {
-  tipo: 'fornecedor' | 'despesa' | 'folha';
-  id: string;
-  nome: string;
-  categoria?: string;         // despesa: categoria (pro rótulo da agenda)
-  valor: string;
-  due_date: string | null;
-  overdue: boolean;
-}
+import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
+import { getMatrizFinancialRead, type MatrizFinancialRead } from './queries-financeiro-read-switch.js';
+import {
+  getMatrizLedgerOpenItems,
+  type FinanceiroPayableItem, type FinanceiroReceivableItem,
+} from './matriz-ledger-open-items.js';
+export type {
+  FinanceiroPayableItem, FinanceiroReceivableItem,
+} from './matriz-ledger-open-items.js';
 
 export interface FinanceiroVisao {
+  leitura: Omit<MatrizFinancialRead, 'truth'>;
   fontes: { fiado: boolean; comissao: boolean; despesas: boolean };
   verdade: MatrizFinancialTruth;
   mes: {
@@ -86,10 +74,16 @@ export async function getMatrizFinanceiroVisao(
       env.NETWORK_COMMISSION_LEDGER ? getCommissionLedger(environment, dbPool) : Promise.resolve(null),
       env.NETWORK_COMMISSION_LEDGER
         ? dbPool.query<{ realizado: string }>(
-            `SELECT COALESCE(SUM(commission_amount), 0) AS realizado
-               FROM network.commission_entries
-              WHERE environment = $1 AND status <> 'reversed'
-                AND (realized_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+            `SELECT
+               COALESCE((SELECT SUM(commission_amount)
+                 FROM network.commission_entries
+                WHERE environment=$1
+                  AND (realized_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}),0)
+               - COALESCE((SELECT SUM(amount)
+                 FROM finance.matriz_commission_reversals
+                WHERE environment=$1
+                  AND (reversed_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}),0)
+               AS realizado`,
             [environment],
           ).then((r) => r.rows[0]!.realizado)
         : Promise.resolve(null),
@@ -159,8 +153,10 @@ export async function getMatrizFinanceiroVisao(
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
         [environment],
       ).then((r) => r.rows[0]!.frete),
-      getMatrizFinancialTruth(environment, dbPool),
+      getMatrizFinancialRead(environment, dbPool),
     ]);
+  const centralAgenda = verdade.source === 'central_ledger'
+    ? await getMatrizLedgerOpenItems(environment, dbPool) : null;
 
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
   // Frete entra CHEIO no lucro (não tem custo de pneu; o custo dele — gasolina da
@@ -206,6 +202,14 @@ export async function getMatrizFinanceiroVisao(
         categoria: d.category, valor: d.amount, due_date: d.due_date, overdue: d.overdue });
     }
   }
+  if (ledger) {
+    for (const refund of ledger.refunds_pending) {
+      pagaveis.push({ tipo: 'estorno_comissao', id: refund.reversal_id,
+        nome: `Devolução de comissão · ${refund.partner_name}`,
+        categoria: 'estorno_comissao', valor: refund.amount,
+        due_date: refund.due_date, overdue: refund.overdue });
+    }
+  }
   pagaveis.sort((a, b) => {
     if (a.overdue !== b.overdue) return Number(b.overdue) - Number(a.overdue);
     if (!a.due_date && !b.due_date) return Number(b.valor) - Number(a.valor);
@@ -234,7 +238,10 @@ export async function getMatrizFinanceiroVisao(
     ? Math.round(despesasMes / margemBrutaFrac) : null;
 
   return {
-    verdade,
+    verdade: verdade.truth,
+    leitura: { source: verdade.source, requested_source: verdade.requested_source,
+      fallback_reason: verdade.fallback_reason, integration_status: verdade.integration_status,
+      comparison: verdade.comparison },
     fontes: {
       fiado: Boolean(env.WHOLESALE_FINANCE),
       comissao: Boolean(env.NETWORK_COMMISSION_LEDGER),
@@ -255,14 +262,18 @@ export async function getMatrizFinanceiroVisao(
       },
       despesas_categoria: despCat,
     },
-    a_receber: {
+    a_receber: centralAgenda?.a_receber ?? {
       total: ((fiado ? Number(fiado.a_receber_total) : 0) + (ledger ? Number(ledger.total_aberto) : 0)).toFixed(2),
       vencidos_count: fiado ? fiado.a_receber_vencidos : 0,
       itens: recebiveis,
     },
-    a_pagar: {
-      total: ((fiado ? Number(fiado.a_pagar_total) : 0) + (despesas ? Number(despesas.a_pagar_total) : 0)).toFixed(2),
-      vencidos_count: (fiado ? fiado.a_pagar_vencidos : 0) + (despesas ? despesas.a_pagar_vencidos : 0),
+    a_pagar: centralAgenda?.a_pagar ?? {
+      total: ((fiado ? Number(fiado.a_pagar_total) : 0)
+        + (despesas ? Number(despesas.a_pagar_total) : 0)
+        + (ledger ? Number(ledger.refund_total_pending) : 0)).toFixed(2),
+      vencidos_count: (fiado ? fiado.a_pagar_vencidos : 0)
+        + (despesas ? despesas.a_pagar_vencidos : 0)
+        + (ledger ? ledger.refunds_pending.filter((refund) => refund.overdue).length : 0),
       itens: pagaveis,
     },
     indicadores: {
@@ -275,11 +286,3 @@ export async function getMatrizFinanceiroVisao(
     },
   };
 }
-
-// ─── LOGÍSTICA DA MATRIZ (0121) — entregas da 'main' + diário de rota ─────────
-// Espelho do parceiro (0068/0069) no pedido da MATRIZ: em separação → saiu →
-// entregue / não entregue. Decisões do dono 07-03: diário por SAÍDA (rota com
-// km inicial/final + gasolina + comprovantes; as entregas penduram na rota).
-// Termômetro NÃO mexe na régua de faturamento (0117 conta não-cancelado);
-// "não entregue" CANCELA no caminho atômico (galpão volta pela trilha fdd9148).
-// Guard em toda escrita: só pedido de ENTREGA da unit 'main' (parceiro intocado).

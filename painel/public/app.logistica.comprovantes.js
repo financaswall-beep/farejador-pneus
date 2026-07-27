@@ -164,5 +164,25 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
         this.receiptReviewBusy[receipt.id] = false;
       }
     },
+    async repairReceiptExpense(receipt) {
+      if (!receipt?.id || !receipt.expense_removed || this.adminUser?.role !== 'owner') return;
+      this.receiptReviewBusy[receipt.id] = true;
+      try {
+        const result = await this.apiPost('/admin/api/logistica/comprovantes/reparar-despesa', {
+          receipt_id: receipt.id,
+          idempotency_key: this.receiptActionKey(receipt.id, 'repair-expense'),
+        });
+        this.receiptCompleteAction(receipt.id, 'repair-expense');
+        this.logisticaMsg = { ok: true, text: result.restored
+          ? 'Despesa restaurada. O comprovante voltou a participar do Financeiro.'
+          : 'A despesa já estava ativa; nenhuma duplicidade foi criada.' };
+        await this.loadLogistica();
+      } catch (error) {
+        this.logisticaMsg = { ok: false,
+          text: `Não consegui restaurar a despesa (${error.message}).` };
+      } finally {
+        this.receiptReviewBusy[receipt.id] = false;
+      }
+    },
   };
 };

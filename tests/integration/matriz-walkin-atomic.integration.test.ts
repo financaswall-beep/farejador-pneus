@@ -13,6 +13,8 @@ describe('venda walk-in atomica da Matriz', () => {
   let getVarejoResumo: typeof import('../../src/admin/painel/queries-galpao.js').getVarejoResumo;
   let addWholesaleStockEntry: typeof import('../../src/admin/painel/queries-galpao.js').addWholesaleStockEntry;
   let setWholesaleStock: typeof import('../../src/admin/painel/queries-galpao.js').setWholesaleStock;
+  let addStockEntryWithLabel: typeof import('../../src/admin/painel/queries-galpao-movimentos.js').addWholesaleStockEntryComRotulo;
+  let applyManualStockDecrement: typeof import('../../src/admin/painel/queries-galpao-movimentos.js').applyGalpaoBaixaManual;
   let getMatrizFinanceiroVisao: typeof import('../../src/admin/painel/queries-financeiro-visao.js').getMatrizFinanceiroVisao;
   let getMatrizStockReconciliation: typeof import('../../src/admin/painel/queries-stock-reconciliation.js').getMatrizStockReconciliation;
 
@@ -27,6 +29,9 @@ describe('venda walk-in atomica da Matriz', () => {
     db = await startPostgres();
     ({ registerWalkinOrder, cancelManualOrder } = await import('../../src/admin/painel/queries-pedidos-acoes.js'));
     ({ getVarejoResumo, addWholesaleStockEntry, setWholesaleStock } = await import('../../src/admin/painel/queries-galpao.js'));
+    ({ addWholesaleStockEntryComRotulo: addStockEntryWithLabel,
+      applyGalpaoBaixaManual: applyManualStockDecrement }
+      = await import('../../src/admin/painel/queries-galpao-movimentos.js'));
     ({ getMatrizFinanceiroVisao } = await import('../../src/admin/painel/queries-financeiro-visao.js'));
     ({ getMatrizStockReconciliation } = await import('../../src/admin/painel/queries-stock-reconciliation.js'));
 
@@ -408,6 +413,49 @@ describe('venda walk-in atomica da Matriz', () => {
     const after = await getMatrizFinanceiroVisao('test', db.pool);
     expect(Number(after.indicadores.capital_parado) - Number(before.indicadores.capital_parado)).toBe(140);
     expect(after.indicadores.pneus_galpao - before.indicadores.pneus_galpao).toBe(7);
+  });
+
+  it('entrada avulsa e baixa manual geram efeito financeiro idempotente', async () => {
+    const fixture = await createProduct({ withStock: false });
+    const entryKey = key('entrada-financeira');
+    const entryInput = {
+      environment: 'test' as const, measure: fixture.measure, quantity_in: 2, unit_cost: 50,
+      entry_nature: 'inventory_found' as const, reason: 'encontrado na contagem física',
+      actor_label: 'Vitest Estoquista', idempotency_key: entryKey,
+    };
+    const firstEntry = await addStockEntryWithLabel(entryInput, db.pool);
+    const replayedEntry = await addStockEntryWithLabel(entryInput, db.pool);
+    expect(firstEntry.quantity_on_hand).toBe(2);
+    expect(replayedEntry).toEqual(firstEntry);
+
+    const lossKey = key('baixa-financeira');
+    const lossInput = {
+      environment: 'test' as const, measure: fixture.measure, quantity: 1,
+      nature: 'breakage' as const, reason: 'quebra na montagem',
+      actor_label: 'Vitest Estoquista', idempotency_key: lossKey,
+    };
+    const firstLoss = await applyManualStockDecrement(lossInput, db.pool);
+    const replayedLoss = await applyManualStockDecrement(lossInput, db.pool);
+    expect(firstLoss.quantity_on_hand).toBe(1);
+    expect(replayedLoss).toEqual(firstLoss);
+
+    const effects = await db.pool.query<{
+      direction: string; nature: string; amount: string;
+    }>(
+      `SELECT direction,nature,amount::text
+         FROM finance.matriz_inventory_adjustments
+        WHERE environment='test' AND measure=$1 ORDER BY occurred_at`,
+      [fixture.measure],
+    );
+    expect(effects.rows).toEqual([
+      { direction: 'gain', nature: 'inventory_found', amount: '100.00' },
+      { direction: 'loss', nature: 'breakage', amount: '50.00' },
+    ]);
+
+    const finance = await getMatrizFinanceiroVisao('test', db.pool);
+    expect(finance.verdade.competencia.ajustes_estoque).toEqual({
+      ganhos: '100.00', perdas: '50.00', efeito_liquido: '50.00',
+    });
   });
 
   it('concilia produto sem estoque, estoque sem produto e isola prod de test', async () => {

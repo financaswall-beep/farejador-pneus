@@ -9,6 +9,9 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica-read.js';
+import {
+  postMatrizRetailCancellation, postMatrizRetailPaymentIfRealized,
+} from './matriz-ledger-retail-sales.js';
 export * from './queries-logistica-read.js';
 
 /** Saiu pra entrega / entregue. "Não entregue" NÃO passa aqui — é failMatrizDelivery. */
@@ -62,6 +65,8 @@ export async function setMatrizDeliveryStatus(
        input.payment_method ?? null, tripId],
     );
     if (!r.rows[0]) throw new Error('delivery_not_found');
+    if (input.status === 'delivered') await postMatrizRetailPaymentIfRealized(
+      client, environment, input.order_id, input.courier ?? 'logistica-matriz');
     await client.query('COMMIT');
     return r.rows[0];
   } catch (err) {
@@ -111,6 +116,13 @@ export async function failMatrizDelivery(
       input.reason ?? 'entrega falhou',
     ]);
     await applyMatrizGalpaoReturn(client, environment, input.order_id);
+    const cancelled = await client.query<{ updated_at: string }>(
+      `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,
+      [input.order_id, environment],
+    );
+    await postMatrizRetailCancellation(client, environment, input.order_id,
+      cancelled.rows[0]!.updated_at, input.actor_label ?? 'logistica-matriz',
+      input.reason ?? 'entrega falhou');
     await client.query('COMMIT');
     return { order_id: input.order_id, delivery_status: 'failed' };
   } catch (err) {

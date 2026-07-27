@@ -1,6 +1,4 @@
 // Obra 300 (2026-07-05): fatia do painel da MATRIZ — estoque do galpão por medida: busca, custo médio, entrada.
-// VERBATIM das linhas 1744-1859 do app.js pré-obra (commit dd64a35).
-// Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
@@ -97,12 +95,14 @@ window.PAINEL_MODULES.galpao = function () {
       const measure = (this.stockForm.measure || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
+      const reason = (this.stockForm.entry_reason || '').trim();
       const minRaw = String(this.stockForm.min_quantity ?? '').trim();
       const min = minRaw === '' ? null : Number(minRaw); // vazio = sem mínimo (limpa)
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
       if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
       if (min !== null && (!Number.isInteger(min) || min < 0)) { this.stockMsg = { ok: false, text: 'Mínimo inválido (número inteiro, 0 ou mais).' }; return; }
+      if (reason.length < 2) { this.stockMsg = { ok: false, text: 'Explique a origem dessa entrada.' }; return; }
       this.stockSaving = true;
       this.stockMsg = null;
       try {
@@ -114,7 +114,7 @@ window.PAINEL_MODULES.galpao = function () {
           notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
         });
         this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
@@ -125,7 +125,7 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '' };
+      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
@@ -139,9 +139,11 @@ window.PAINEL_MODULES.galpao = function () {
       this.stockSaving = true;
       this.stockMsg = null;
       try {
-        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost });
+        this.stockForm.idempotency_key = this.stockForm.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-entry', 'form').key;
+        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature, reason, idempotency_key: this.stockForm.idempotency_key });
+        window.PAINEL_INTEGRITY.complete('stock-entry', 'form');
         this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // entrada pode ter tirado a medida do "repor"
@@ -190,23 +192,26 @@ window.PAINEL_MODULES.galpao = function () {
     },
     // ── BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo ──
     stockBaixaOpen(row) {
-      this.stockBaixaForm = { measure: row.measure, quantity: '', tipo: 'quebra', texto: '' };
+      this.stockBaixaForm = { measure: row.measure, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
       this.stockMsg = null;
       this.$nextTick(() => { const el = document.getElementById('galpao-baixa-qtd'); if (el) el.focus(); });
     },
     stockBaixaFechar() {
-      this.stockBaixaForm = { measure: null, quantity: '', tipo: 'quebra', texto: '' };
+      this.stockBaixaForm = { measure: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
     },
     async stockBaixaSubmit() {
       const f = this.stockBaixaForm;
       const qty = Number(f.quantity);
       if (!Number.isInteger(qty) || qty <= 0) { this.stockMsg = { ok: false, text: 'Quantos pneus saem?' }; return; }
-      const reason = f.tipo + (f.texto && f.texto.trim() ? ': ' + f.texto.trim() : '');
+      const labels = { breakage: 'quebra', loss: 'perda', internal_use: 'uso interno', other: 'outro' };
+      const reason = labels[f.tipo] + (f.texto && f.texto.trim() ? ': ' + f.texto.trim() : '');
       this.stockBaixaSaving = true;
       this.stockMsg = null;
       try {
-        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, quantity: qty, reason });
-        this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${f.tipo}) — sobraram ${row.quantity_on_hand} un.` };
+        f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-manual-decrement', 'form').key;
+        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, quantity: qty, nature: f.tipo, reason, idempotency_key: f.idempotency_key });
+        window.PAINEL_INTEGRITY.complete('stock-manual-decrement', 'form');
+        this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${labels[f.tipo]}) — sobraram ${row.quantity_on_hand} un.` };
         this.stockBaixaFechar();
         await this.loadAtacado();
         void this.loadStockReconciliation();
@@ -291,6 +296,5 @@ window.PAINEL_MODULES.galpao = function () {
       if (b == null) return this.formatCurrency(a);
       return this.formatCurrency(b) + ' → ' + this.formatCurrency(a);
     },
-
   };
 };

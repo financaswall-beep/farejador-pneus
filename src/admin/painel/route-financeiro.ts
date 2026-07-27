@@ -9,8 +9,10 @@ import { logger } from '../../shared/logger.js';
 import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseCategory, getMatrizExpenses, getMatrizFinanceiroVisao, listMatrizExpenseCategories, removeMatrizExpense, settleMatrizExpense, sweepCommissionEntries } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpenseRemoveSchema, matrizExpensesQuerySchema } from './route-schemas.js';
+import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
+  await registerPainelFinanceiroLedger(fastify);
   fastify.get('/admin/api/matriz/financeiro', { preHandler: requireAdminAuth }, async (_request, reply) => {
     // Varredura da comissão ANTES da visão (auditoria 07-08): sem ela, venda 2W
     // realizada com o painel já aberto só virava lançamento ao entrar na Rede —

@@ -21,6 +21,7 @@ import { env } from '../../shared/config/env.js';
 import { hashPassword, verifyPassword, fakeVerify, hashSessionToken } from '../../parceiro/password.js';
 import { MAIN_DELIVERY_GUARD, closeMatrizTrip, addMatrizTripReceipt,
   type MatrizReceiptUploadResult } from '../painel/queries.js';
+import { postMatrizRetailPaymentIfRealized } from '../painel/matriz-ledger-retail-sales.js';
 export { reportEntregadorFail } from './queries-report-fail.js';
 
 void hashPassword; // reservado (troca de senha do próprio entregador — fatia futura)
@@ -314,6 +315,8 @@ export async function setEntregadorDeliveryStatus(
        input.payment_method ?? null, auth.displayName, tripId],
     );
     if (!r.rows[0]) throw new Error('delivery_not_found');
+    if (input.status === 'delivered') await postMatrizRetailPaymentIfRealized(
+      client, environment, input.order_id, auth.displayName);
     await client.query('COMMIT');
     return r.rows[0];
   } catch (err) {

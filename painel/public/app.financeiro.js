@@ -89,7 +89,14 @@ window.PAINEL_MODULES.financeiro = function () {
       return 'aberta';
     },
     cobrancaOrigem(item) {
-      return item.tipo === 'comissao' ? 'Comissão da rede' : 'Fiado atacado';
+      const nomes = {
+        comissao: 'Comissão da rede',
+        mensalidade: 'Mensalidade da rede',
+        varejo: 'Venda varejo',
+        devolucao_fornecedor: 'Devolução de fornecedor',
+        devolucao_despesa: 'Recuperação de despesa',
+      };
+      return nomes[item.tipo] || 'Fiado atacado';
     },
     cobrancaSemTelefone(item) {
       return !String(item.phone || '').replace(/\D/g, '');
@@ -158,6 +165,9 @@ window.PAINEL_MODULES.financeiro = function () {
       const msg = item.tipo === 'comissao'
         ? 'Fala! Fechou ' + this.formatCurrency(Number(item.valor || 0)) +
           ' de comissão das vendas que o Farejador mandou pra você. Como prefere acertar?'
+        : item.tipo === 'mensalidade'
+        ? 'Fala! A mensalidade de ' + this.formatCurrency(Number(item.valor || 0)) +
+          ' está em aberto. Como prefere acertar?'
         : 'Fala! Tem ' + this.formatCurrency(Number(item.valor || 0)) +
           ' em aberto aqui do pneu que você levou no atacado' +
           (item.overdue ? ' (já venceu)' : '') + '. Como prefere acertar?';
@@ -169,15 +179,67 @@ window.PAINEL_MODULES.financeiro = function () {
       if (!item.due_date) return 'sem vencimento';
       return (item.overdue ? 'VENCEU ' : 'vence ') + this.financeDate(item.due_date);
     },
+    finValorBaixa(item, acao) {
+      const atual = Number(item.valor || 0);
+      const raw = window.prompt(
+        `${acao} quanto? Saldo atual: ${this.formatCurrency(atual)}`,
+        atual.toFixed(2).replace('.', ','),
+      );
+      if (raw === null) return null;
+      const valor = Number(String(raw).trim().replace(/\./g, '').replace(',', '.'));
+      if (!Number.isFinite(valor) || valor <= 0 || valor > atual + 0.001) {
+        window.alert('Valor inválido ou maior que o saldo em aberto.');
+        return null;
+      }
+      return Math.round(valor * 100) / 100;
+    },
+    async finBaixaCentral(item, direcao) {
+      const amount = this.finValorBaixa(item, direcao === 'receivable' ? 'Receber' : 'Pagar');
+      if (amount === null) return false;
+      let paymentMethod;
+      if (item.settlement_mode === 'retail_sale'
+        && Math.abs(amount - Number(item.valor)) < 0.001) {
+        paymentMethod = window.prompt('Forma de pagamento recebida (pix, dinheiro, cartão...):', 'pix');
+        if (!paymentMethod || paymentMethod.trim().length < 2) return false;
+      }
+      const target = item.settlement_mode === 'central_account'
+        ? { account_code: item.account_code }
+        : { obligation_id: item.obligation_id };
+      const operation = window.PAINEL_INTEGRITY.operation(
+        'central-ledger-settlement', `${target.obligation_id || target.account_code}:${amount}`,
+      );
+      await this.apiPost('/admin/api/matriz/financeiro/ledger/settle', {
+        ...target, amount, payment_method: paymentMethod,
+        idempotency_key: operation.key,
+      });
+      window.PAINEL_INTEGRITY.complete(
+        'central-ledger-settlement', `${target.obligation_id || target.account_code}:${amount}`,
+      );
+      return true;
+    },
     // "Recebi" direto da tela: fiado quita a venda; comissão quita o acumulado do parceiro.
     async finReceber(item) {
       if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
       const rotulo = item.tipo === 'comissao' ? 'a comissão de ' + item.nome : 'de ' + item.nome;
-      if (!window.confirm(`Recebeu ${this.formatCurrency(Number(item.valor))} ${rotulo}?`)) return;
+      const central = ['retail_sale', 'central_obligation'].includes(item.settlement_mode);
+      if (!central && !window.confirm(`Recebeu ${this.formatCurrency(Number(item.valor))} ${rotulo}?`)) return;
       this.finQuitando = true;
       try {
-        if (item.tipo === 'comissao') {
-          await this.apiPost('/admin/api/rede/comissoes/settle', { partner_id: item.id });
+        if (central) {
+          if (!(await this.finBaixaCentral(item, 'receivable'))) return;
+        } else if (item.tipo === 'comissao') {
+          const operation = window.PAINEL_INTEGRITY.operation('commission-settle', item.id);
+          await this.apiPost('/admin/api/rede/comissoes/settle', {
+            partner_id: item.id, idempotency_key: operation.key,
+            reason: 'Recebimento confirmado no Financeiro',
+          });
+          window.PAINEL_INTEGRITY.complete('commission-settle', item.id);
+        } else if (item.tipo === 'mensalidade') {
+          const operation = window.PAINEL_INTEGRITY.operation('monthly-fee-settle', item.id);
+          await this.apiPost('/admin/api/rede/mensalidades/settle', {
+            fee_id: item.id, idempotency_key: operation.key,
+          });
+          window.PAINEL_INTEGRITY.complete('monthly-fee-settle', item.id);
         } else {
           const operation = window.PAINEL_INTEGRITY.operation('wholesale-sale-payment', item.id);
           await this.apiPost('/admin/api/wholesale/finance/settle', {
@@ -196,10 +258,20 @@ window.PAINEL_MODULES.financeiro = function () {
     // "Paguei" direto da agenda: fornecedor quita a compra; despesa quita a despesa.
     async finPagar(item) {
       if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
-      if (!window.confirm(`Pagar ${this.formatCurrency(Number(item.valor))} (${item.nome})?`)) return;
+      const central = ['central_obligation', 'central_account'].includes(item.settlement_mode);
+      if (!central && !window.confirm(`Pagar ${this.formatCurrency(Number(item.valor))} (${item.nome})?`)) return;
       this.finQuitando = true;
       try {
-        if (item.tipo === 'despesa' || item.tipo === 'folha') {
+        if (central) {
+          if (!(await this.finBaixaCentral(item, 'payable'))) return;
+        } else if (item.tipo === 'estorno_comissao') {
+          const operation = window.PAINEL_INTEGRITY.operation('commission-refund', item.id);
+          await this.apiPost('/admin/api/rede/comissoes/refund', {
+            reversal_id: item.id, idempotency_key: operation.key,
+            reason: 'Devolução confirmada no Financeiro',
+          });
+          window.PAINEL_INTEGRITY.complete('commission-refund', item.id);
+        } else if (item.tipo === 'despesa' || item.tipo === 'folha') {
           const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-payment', item.id);
           await this.apiPost('/admin/api/matriz/despesas/settle', {
             id: item.id, idempotency_key: operation.key,

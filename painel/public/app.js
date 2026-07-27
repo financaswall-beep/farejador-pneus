@@ -102,7 +102,7 @@ function painelApp() {
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '' },
+    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' },
     stockSaving: false,
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
@@ -110,7 +110,7 @@ function painelApp() {
     stockFiltro: 'todos',
     stockOperacao: null,
     stockBusca: '',
-    stockBaixaForm: { measure: null, quantity: '', tipo: 'quebra', texto: '' },
+    stockBaixaForm: { measure: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' },
     stockBaixaSaving: false,
     galpaoFilme: { rows: [], measure: null, loading: false },
     stockReconciliation: { rows: [], summary: null, loading: false, error: null },
@@ -122,6 +122,7 @@ function painelApp() {
     // ── REDE — comissões como lançamento (0118, flag NETWORK_COMMISSION_LEDGER) ──
     comissoes: null, // null ou enabled:false = flag desligada (o bloco some sozinho)
     comissaoSettling: null, // partner_id em quitação (trava o botão Recebi)
+    comissaoRefunding: null, // reversal_id em devolução (0146)
     termsForm: { model: 'commission', percent: '', fee: '' }, // editor do modelo comercial
     termsSaving: false,
     termsMsg: null,
@@ -284,7 +285,6 @@ function painelApp() {
     pedidos: [],
     produtos: [],
     redeKpis: [],
-
     parceirosRede: [],
     // Raio de entrega (proximidade-primeiro Fase 2): estado do editor na matriz.
     savingRaio: false,

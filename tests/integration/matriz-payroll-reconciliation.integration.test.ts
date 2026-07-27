@@ -6,6 +6,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
   let getManagement: typeof import('../../src/admin/painel/queries-colaboradores-gestao.js').getMatrizCollaboratorManagement;
   let saveCompensation: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').saveMatrizCollaboratorCompensation;
   let saveCommission: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').saveMatrizCollaboratorCommission;
+  let addAdjustment: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').addMatrizPayrollAdjustment;
   let closePayroll: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').closeMatrizPayroll;
   let payPayrollItem: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').payMatrizPayrollItem;
   let reviewAdjustment: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').reviewMatrizPayrollCausalAdjustment;
@@ -20,6 +21,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     ({
       saveMatrizCollaboratorCompensation: saveCompensation,
       saveMatrizCollaboratorCommission: saveCommission,
+      addMatrizPayrollAdjustment: addAdjustment,
       closeMatrizPayroll: closePayroll,
       payMatrizPayrollItem: payPayrollItem,
       reviewMatrizPayrollCausalAdjustment: reviewAdjustment,
@@ -163,6 +165,101 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     expect(paid.rows[0]).toEqual({ payment_status: 'paid', status: 'paid', expense_status: 'paid' });
   });
 
+  it('inclui na folha quem foi desligado dentro da competência', async () => {
+    const person = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.partner_people (environment,username)
+       VALUES ('test','desligado.na.competencia') RETURNING id`,
+    );
+    const collaborator = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Desligado no Mes','colaborador','Auxiliar','other',
+               '2026-02-10T12:00:00Z') RETURNING id`,
+      [person.rows[0]!.id],
+    );
+    await saveCompensation({
+      collaborator_id: collaborator.rows[0]!.id, employment_type: 'clt',
+      base_salary: 1800, payment_day: 5, payment_method: 'pix',
+      starts_on: '2026-03-01', environment: 'test',
+    }, db.pool);
+    await db.pool.query(
+      `UPDATE network.matriz_collaborators
+          SET revoked_at='2026-03-15T12:00:00Z' WHERE id=$1`,
+      [collaborator.rows[0]!.id],
+    );
+    await addAdjustment({
+      collaborator_id: collaborator.rows[0]!.id, competence: '2026-03-01',
+      kind: 'addition', description: 'saldo de horas',
+      amount: 100, environment: 'test', actor_label: 'owner-vitest',
+    }, db.pool);
+
+    const preview = await getManagement('2026-03-01', 'test', db.pool);
+    const row = preview.collaborators.find((item) => item.id === collaborator.rows[0]!.id)!;
+    expect(row).toMatchObject({
+      active: false, eligible_in_competence: true, total_due: 1900,
+    });
+
+    const closed = await closePayroll({
+      competence: '2026-03-01', environment: 'test', actor_label: 'owner-vitest',
+    }, db.pool);
+    const item = await db.pool.query(
+      `SELECT total_due::text FROM finance.matriz_payroll_items
+        WHERE payroll_period_id=$1 AND collaborator_id=$2`,
+      [closed.period_id, collaborator.rows[0]!.id],
+    );
+    expect(item.rows[0]).toEqual({ total_due: '1900.00' });
+  });
+
+  it('bloqueia comissão quando a venda não tem vendedor atribuído', async () => {
+    const person = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.partner_people (environment,username)
+       VALUES ('test','vendedor.atribuicao') RETURNING id`,
+    );
+    const collaborator = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Atribuicao','vendedor','Vendedor','sales',
+               '2026-12-01T12:00:00Z') RETURNING id`,
+      [person.rows[0]!.id],
+    );
+    await saveCommission({
+      collaborator_id: collaborator.rows[0]!.id, kind: 'fixed', basis: 'sale',
+      value: 15, starts_on: '2027-01-01', environment: 'test',
+    }, db.pool);
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
+       VALUES ('test',91004,'Cliente sem vendedor') RETURNING id`,
+    );
+    const unit = await db.pool.query<{ id: string }>(
+      `SELECT id FROM core.units WHERE environment='test' AND slug='main'`,
+    );
+    const order = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders
+         (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,created_at)
+       VALUES ('test',$1,$2,150,'confirmed','pickup','2027-01-10T15:00:00Z')
+       RETURNING id`,
+      [contact.rows[0]!.id, unit.rows[0]!.id],
+    );
+
+    await expect(closePayroll({ competence: '2027-01-01', environment: 'test' }, db.pool))
+      .rejects.toThrow('payroll_has_unassigned_events');
+
+    await db.pool.query(
+      `UPDATE commerce.orders SET seller_collaborator_id=$2 WHERE id=$1`,
+      [order.rows[0]!.id, collaborator.rows[0]!.id],
+    );
+    const closed = await closePayroll({
+      competence: '2027-01-01', environment: 'test',
+    }, db.pool);
+    const item = await db.pool.query(
+      `SELECT commission_amount::text,total_due::text
+         FROM finance.matriz_payroll_items
+        WHERE payroll_period_id=$1 AND collaborator_id=$2`,
+      [closed.period_id, collaborator.rows[0]!.id],
+    );
+    expect(item.rows[0]).toEqual({ commission_amount: '15.00', total_due: '15.00' });
+  });
+
   it('bloqueia contaminacao entre ambientes e total de folha adulterado', async () => {
     const person = await db.pool.query<{ id: string }>(
       `INSERT INTO network.partner_people (environment,username)
@@ -254,8 +351,9 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Vendedor Causal','vendedor','Vendedor','sales') RETURNING id`,
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Causal','vendedor','Vendedor','sales',
+               '2026-05-01T12:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     const collaboratorId = collaborator.rows[0]!.id;
@@ -367,8 +465,9 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Vendedor Atacado Causal','vendedor','Vendedor','sales') RETURNING id`,
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Atacado Causal','vendedor','Vendedor','sales',
+               '2026-03-01T12:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     await saveCompensation({

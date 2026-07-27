@@ -39,6 +39,7 @@ import { cachedReverseGeocode } from '../shared/geo/geo-cache.js';
 import { buildOrderIdempotencyKey } from './order-idempotency.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
+import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
@@ -1154,6 +1155,7 @@ async function insertCommerceOrderMirror(
         input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
         env.WHOLESALE_MATRIZ_RETAIL_COST,
       );
+      await postMatrizRetailSaleFacts(client, environment, order.id);
     }
     return order;
   }
@@ -1796,6 +1798,12 @@ async function cancelarPedido(
       reason,
     ]);
     await applyMatrizGalpaoReturn(client, environment, order.id);
+    const cancelled = await client.query<{ updated_at: string }>(
+      `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,
+      [order.id, environment],
+    );
+    await postMatrizRetailCancellation(client, environment, order.id,
+      cancelled.rows[0]!.updated_at, 'agent_v2_bot', reason);
     await client.query('COMMIT');
 
     logger.info(

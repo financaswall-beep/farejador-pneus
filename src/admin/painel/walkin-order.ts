@@ -5,6 +5,7 @@ import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import type { RegisterWalkinOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { applyMatrizWalkinStockSale, prepareMatrizWalkinStock } from './matriz-walkin-stock.js';
+import { postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
 
 interface ExistingOrder {
   id: string;
@@ -198,6 +199,7 @@ export async function registerWalkinOrder(
       [orderId, environment, input.actor_label],
     );
     if (confirmed.rowCount !== 1) throw new Error('walkin_order_not_confirmed');
+    await postMatrizRetailSaleFacts(client, environment, orderId);
 
     await client.query('COMMIT');
     return { order_id: orderId };

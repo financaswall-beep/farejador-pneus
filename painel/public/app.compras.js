@@ -223,6 +223,16 @@ window.PAINEL_MODULES.compras = function () {
       const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
       return this.pagarFiltro ? itens.filter((i) => this.pagarClasse(i) === this.pagarFiltro) : itens;
     },
+    pagarOrigem(i) {
+      const nomes = {
+        fornecedor: 'Fornecedor de pneus',
+        folha: 'Folha salarial',
+        estorno_comissao: 'Devolução de comissão',
+        marketing: 'Marketing',
+        devolucao_cliente: 'Devolução ao cliente',
+      };
+      return nomes[i.tipo] || this.despesaLabel(i.categoria || 'outros');
+    },
     pagarPainel() { // cards do topo + calendário + quebra por categoria, num passo só
       const itens = (this.financeiroVisao && this.financeiroVisao.a_pagar.itens) || [];
       const base = new Date(new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date()) + 'T00:00:00Z').getTime();
@@ -245,7 +255,7 @@ window.PAINEL_MODULES.compras = function () {
         else if (c === 'hoje') { cards.hoje.total += v; cards.hoje.count++; cal[1].total += v; cal[1].count++; }
         else if (c === 'sete') { cards.sete.total += v; cards.sete.count++; const d = this.pagarDias(i.due_date); const k = d <= 6 ? d + 1 : cal.length - 1; cal[k].total += v; cal[k].count++; }
         else if (c === 'depois') { cal[cal.length - 1].total += v; cal[cal.length - 1].count++; }
-        const ck = i.tipo === 'fornecedor' ? 'Fornecedor de pneus' : this.despesaLabel(i.categoria || 'outros');
+        const ck = this.pagarOrigem(i);
         cats.set(ck, (cats.get(ck) || 0) + v);
       }
       const grand = cards.aberto.total;

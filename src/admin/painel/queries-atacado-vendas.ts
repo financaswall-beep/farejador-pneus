@@ -6,6 +6,9 @@ import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyWholesaleStockDecrement } from './wholesale-stock.js';
 import {
+  ensureWholesaleSaleCogs, ensureWholesaleSaleRevenue, getWholesaleSaleLedgerState,
+} from './matriz-ledger-wholesale-sales.js';
+import {
   beginIntegrityOperation, completeIntegrityOperation, moneyCents,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
@@ -231,6 +234,11 @@ export async function registerWholesaleSale(
       `UPDATE commerce.wholesale_orders SET total_amount=COALESCE(
          (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0)
        WHERE id=$1 RETURNING total_amount`, [orderId]);
+    if (env.MATRIZ_CENTRAL_LEDGER) {
+      const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
+      await ensureWholesaleSaleRevenue(client, ledgerState);
+      await ensureWholesaleSaleCogs(client, ledgerState);
+    }
     const result = { order_id: orderId, buyer_id: buyer.id, buyer_name: buyer.name,
       total_amount: total.rows[0]!.total_amount, items_count: items.length };
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_sale',

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   approveApplicationSchema, partnerTermsSchema, settleComissaoSchema,
+  settleCommissionRefundSchema,
 } from '../../../src/admin/painel/route-schemas.js';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -68,5 +69,28 @@ describe('Etapa 6 — comissão causal', () => {
     expect(source).toContain('commission_entry_events');
     expect(source).toContain('completeIntegrityOperation');
     expect(source).not.toContain('Date.now()');
+  });
+
+  it('preserva estorno por competência e exige owner para registrar devolução', () => {
+    const migration = read('db/migrations/0146_matriz_commission_reversal_refunds.sql');
+    const action = read('src/admin/painel/queries-comissoes-estornos.ts');
+    const route = read('src/admin/painel/route-atacado.ts');
+
+    expect(migration).toContain('finance.matriz_commission_reversals');
+    expect(migration).toContain("refund_status IN ('not_due','pending','paid')");
+    expect(migration).toContain('record_matriz_commission_reversal');
+    expect(migration).toContain('commission_reversal_immutable');
+    expect(action).toContain("domain: 'commission.refund'");
+    expect(action).toContain("refund_status='paid'");
+    expect(settleCommissionRefundSchema.safeParse({
+      reversal_id: crypto.randomUUID(),
+      idempotency_key: 'refund-key-123',
+      reason: 'devolvido ao parceiro',
+    }).success).toBe(true);
+    const refundRoute = route.slice(
+      route.indexOf("'/admin/api/rede/comissoes/refund'"),
+      route.indexOf('// Editor do modelo comercial'),
+    );
+    expect(refundRoute).toContain('preHandler: requireAdminOwner');
   });
 });
