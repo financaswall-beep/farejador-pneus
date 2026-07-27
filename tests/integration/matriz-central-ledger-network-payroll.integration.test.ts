@@ -24,8 +24,13 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
   }, 180_000);
 
   afterAll(async () => {
+    const { partnerPool } = await import('../../src/parceiro/db.js');
+    await partnerPool.end();
     if (db) await stopPostgres(db);
+    delete process.env.PARTNER_DATABASE_URL;
     process.env.MATRIZ_CENTRAL_LEDGER = 'false';
+    process.env.MATRIZ_CENTRAL_LEDGER_READ = 'false';
+    vi.resetModules();
   });
 
   it('comissão recebida e depois estornada preserva caixa até a devolução', async () => {

@@ -35,8 +35,10 @@ describe('Etapa 8 — fluxo financeiro central ponta a ponta', () => {
     const { partnerPool } = await import('../../src/parceiro/db.js');
     await partnerPool.end();
     if (db) await stopPostgres(db);
+    delete process.env.PARTNER_DATABASE_URL;
     process.env.MATRIZ_CENTRAL_LEDGER = 'false';
     process.env.MATRIZ_CENTRAL_LEDGER_READ = 'false';
+    vi.resetModules();
   });
 
   it('encerra a cadeia operacional sem saldo fantasma nem divergencia', async () => {
