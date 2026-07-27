@@ -84,7 +84,7 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
       }
     },
     async despesaSubmit() {
-      const valor = Number(String(this.despesaForm.amount).replace(',', '.'));
+      const valor = this.finParseValor(this.despesaForm.amount);
       if (!valor || valor <= 0) {
         this.despesaMsg = { ok: false, text: 'Valor da despesa precisa ser maior que zero.' };
         return;
@@ -142,24 +142,51 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         settlement_mode: 'expense',
       });
     },
-    async despesaRemove(row) {
-      if (!window.confirm(`Remover a despesa de ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})? Ela some das contas (a trilha fica no banco).`)) return;
-      const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-remove', row.id);
-      if (!Object.hasOwn(operation, 'reason')) {
-        const reason = window.prompt('Motivo da remoção (obrigatório):');
-        if (reason === null) { window.PAINEL_INTEGRITY.complete('matriz-expense-remove', row.id); return; }
-        if (reason.trim().length < 2) { window.alert('Informe um motivo com pelo menos 2 caracteres.'); return; }
-        operation.reason = reason.trim();
-        window.PAINEL_INTEGRITY.save();
+    despesaRemove(row) {
+      if (this.despesaRemoveDialog?.saving) return;
+      this.despesaRemoveDialog = {
+        open: true, row, reason: '', error: null, saving: false,
+      };
+      this.$nextTick(() => {
+        window.lucide && window.lucide.createIcons();
+        this.$refs?.despesaRemoveReason?.focus();
+      });
+    },
+    despesaFecharRemocao(force = false) {
+      if (this.despesaRemoveDialog?.saving && !force) return;
+      this.despesaRemoveDialog = {
+        open: false, row: null, reason: '', error: null, saving: false,
+      };
+    },
+    async despesaConfirmarRemocao() {
+      const dialog = this.despesaRemoveDialog;
+      const row = dialog?.row;
+      if (!row || dialog.saving) return;
+      const reason = String(dialog.reason || '').trim();
+      if (reason.length < 2) {
+        dialog.error = 'Informe um motivo com pelo menos 2 caracteres.';
+        return;
       }
+      const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-remove', row.id);
+      operation.reason = reason;
+      window.PAINEL_INTEGRITY.save();
+      dialog.saving = true;
+      dialog.error = null;
       try {
         await this.apiPost('/admin/api/matriz/despesas/remove', {
-          id: row.id, reason: operation.reason, idempotency_key: operation.key,
+          id: row.id, reason, idempotency_key: operation.key,
         });
         window.PAINEL_INTEGRITY.complete('matriz-expense-remove', row.id);
+        this.despesaFecharRemocao(true);
+        this.despesaMsg = {
+          ok: true,
+          text: 'Despesa removida. A trilha de auditoria foi preservada.',
+        };
         await this.loadFinanceiro();
       } catch (err) {
-        window.alert(`Não consegui remover (${err.message}).`);
+        dialog.error = `Não consegui remover (${err.message}).`;
+      } finally {
+        if (this.despesaRemoveDialog === dialog) dialog.saving = false;
       }
     },
   };

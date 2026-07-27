@@ -10,6 +10,21 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
     finMesAtual() {
       return this.finHoje().slice(0, 7);
     },
+    finParseValor(value) {
+      let normalized = String(value ?? '').trim().replace(/\s/g, '').replace(/^R\$/i, '');
+      const comma = normalized.lastIndexOf(',');
+      const dot = normalized.lastIndexOf('.');
+      if (comma >= 0 && dot >= 0) {
+        if (comma > dot) {
+          normalized = normalized.replace(/\./g, '').replace(',', '.');
+        } else {
+          normalized = normalized.replace(/,/g, '');
+        }
+      } else if (comma >= 0) {
+        normalized = normalized.replace(',', '.');
+      }
+      return Number(normalized);
+    },
     finSettlementMode(item) {
       if (item.settlement_mode) return item.settlement_mode;
       const modes = {
@@ -44,7 +59,7 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       const modal = this.finBaixaModal;
       const item = modal.item;
       if (!item || this.finQuitando) return;
-      const amount = Number(String(modal.amount).trim().replace(/\./g, '').replace(',', '.'));
+      const amount = this.finParseValor(modal.amount);
       const balance = Number(item.valor || 0);
       if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) {
         modal.error = 'O valor precisa ser maior que zero e não pode ultrapassar o saldo.';

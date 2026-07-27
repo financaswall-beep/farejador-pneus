@@ -134,7 +134,10 @@ export async function getMatrizLedgerStatement(
                   FROM finance.matriz_ledger_payments p
                  WHERE p.environment=t.environment
                    AND p.obligation_transaction_id=t.id),0)::numeric(14,2)::text paid_amount,
-                (SELECT max(e.amount) FILTER (WHERE e.account_code=ANY($3::text[]))
+                (SELECT max(e.amount) FILTER (
+                   WHERE e.account_code=ANY($3::text[])
+                     AND ((e.account_class='asset' AND e.side='debit')
+                       OR (e.account_class='liability' AND e.side='credit')))
                    FROM finance.matriz_ledger_entries e
                   WHERE e.environment=t.environment AND e.transaction_id=t.id)
                   ::numeric(14,2)::text obligation_amount

@@ -242,6 +242,17 @@ describe('0149 — fundacao do livro financeiro central', () => {
     );
     expect(Number(paidBalance.rows[0]!.balance)).toBe(0);
 
+    const statement = await getStatement({
+      environment: 'test', period: '2026-07', basis: 'caixa', limit: 200,
+    }, db.pool);
+    for (const sourceId of ['payment-400', 'payment-600']) {
+      expect(statement.rows.find((row) => row.source_id === sourceId)).toMatchObject({
+        transaction_kind: 'payment',
+        status: 'registrado',
+        open_amount: null,
+      });
+    }
+
     const excess = await post(
       'test', 'bank.payment', 'payment-excess', 'payment', 1, paymentLines(1),
       { cashOn: '2026-07-12' },
