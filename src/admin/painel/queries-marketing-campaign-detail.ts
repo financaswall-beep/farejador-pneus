@@ -7,6 +7,8 @@ import {
   getMarketingAttributionReport,
   type MarketingAttributionReport,
 } from '../../marketing/reporting.js';
+import { loadCampaignAttributionDetailData } from './queries-marketing-campaign-detail-data.js';
+import { buildCampaignDetailEnrichment } from './queries-marketing-campaign-detail-enrichment.js';
 
 interface DetailConfig {
   attributionEnabled: boolean;
@@ -45,6 +47,7 @@ export interface MarketingCampaignDetailDependencies {
   dbPool?: Pool;
   config?: DetailConfig;
   attributionProvider?: typeof getMarketingAttributionReport;
+  attributionDetailProvider?: typeof loadCampaignAttributionDetailData;
 }
 
 const ACTIONS = {
@@ -226,6 +229,28 @@ export async function getMarketingCampaignDetail(
 
   const first = campaignRows[0]!;
   const deliveryDates = [...byDate.keys()].sort();
+  const ads = [...adGroups.entries()].map(([id, rows]) => {
+    const values = derivedMetrics(aggregate(rows));
+    return {
+      id,
+      name: rows[0]?.entity_name || id,
+      adset_id: rows[0]?.adset_id ?? null,
+      adset_name: rows[0]?.adset_name ?? null,
+      ...values,
+    };
+  }).sort((a, b) => b.investment - a.investment || a.name.localeCompare(b.name));
+  const enrichment = await buildCampaignDetailEnrichment({
+    campaignId,
+    since: window.since,
+    until: window.until,
+    dbPool,
+    attributionStatus,
+    attributed,
+    investment: summary.investment,
+    conversations: summary.conversations_started,
+    ads,
+    dataProvider: dependencies.attributionDetailProvider,
+  });
   return {
     environment: env.FAREJADOR_ENV,
     generated_at: now.toISOString(),
@@ -244,16 +269,7 @@ export async function getMarketingCampaignDetail(
       date,
       ...derivedMetrics(aggregate(rows)),
     })),
-    ads: [...adGroups.entries()].map(([id, rows]) => {
-      const values = derivedMetrics(aggregate(rows));
-      return {
-        id,
-        name: rows[0]?.entity_name || id,
-        adset_id: rows[0]?.adset_id ?? null,
-        adset_name: rows[0]?.adset_name ?? null,
-        ...values,
-      };
-    }).sort((a, b) => b.investment - a.investment || a.name.localeCompare(b.name)),
+    ads: enrichment.ads,
     attribution: {
       status: attributionStatus,
       method: 'last_click_ctwa_7d' as const,
@@ -264,20 +280,12 @@ export async function getMarketingCampaignDetail(
         ? attributed?.pending_margin_orders ?? 0
         : null,
     },
-    financial: {
-      attributed_sales: attributionStatus === 'ready' ? sales : null,
-      attributed_revenue: attributionStatus === 'ready' ? revenue : null,
-      gross_margin: attributionStatus === 'ready' ? grossMargin : null,
-      net_after_media: attributionStatus === 'ready' && grossMargin != null
-        ? round(grossMargin - summary.investment)
-        : null,
-      roas: attributionStatus === 'ready' && revenue != null && summary.investment > 0
-        ? round(revenue / summary.investment)
-        : null,
-      cac: attributionStatus === 'ready' && sales != null && sales > 0
-        ? round(summary.investment / sales)
-        : null,
-    },
+    manager_url: enrichment.manager_url,
+    tracking: enrichment.tracking,
+    orders: enrichment.orders,
+    orders_total: enrichment.orders_total,
+    quality: enrichment.quality,
+    financial: enrichment.financial,
     decision: decision(summary),
   };
 }

@@ -43,17 +43,39 @@ function marketingCampaignDetailMock(row, period) {
       conversations_started: conversations, first_replies: replies,
       response_rate: conversations ? replies / conversations * 100 : null,
       cost_per_replied: replies ? investment / replies : null,
+      attributed_sales: sales, attributed_revenue: revenue, gross_margin: margin,
+      net_after_media: margin - investment,
+      roas: investment ? revenue / investment : null,
     }],
     attribution: {
       status: 'ready', method: 'last_click_ctwa_7d', attributed_sales: sales,
       attributed_revenue: revenue, gross_margin: margin, pending_margin_orders: 0,
     },
     financial: {
-      attributed_sales: sales, attributed_revenue: revenue, gross_margin: margin,
+      attributed_sales: sales, attributed_revenue: revenue,
+      product_cost: Math.max(0, revenue - margin - 650), operation_cost: 650,
+      gross_margin: margin, pending_margin_orders: 0,
       net_after_media: margin - investment,
+      retained_percent: revenue ? (margin - investment) / revenue * 100 : null,
       roas: investment ? revenue / investment : null,
       cac: sales ? investment / sales : null,
     },
+    manager_url: 'https://adsmanager.facebook.com/adsmanager/manage/campaigns',
+    tracking: { available: true, ctwa_referrals: 28 },
+    quality: {
+      conversations_meta: conversations, ctwa_referrals: 28,
+      attributed_sales: sales, complete_cost_orders: Math.max(0, sales - 1),
+      conversion_rate: sales ? sales / 28 * 100 : null,
+    },
+    orders_total: sales,
+    orders: [
+      { order_number: 'PED-10482', realized_at: '2026-07-24T14:32:00.000Z', origin: 'CTWA',
+        revenue: 890, gross_margin: 312, time_to_sale_minutes: 138, status: 'confirmed' },
+      { order_number: 'PED-10471', realized_at: '2026-07-23T10:08:00.000Z', origin: 'CTWA',
+        revenue: 1240, gross_margin: 405, time_to_sale_minutes: 1122, status: 'confirmed' },
+      { order_number: 'PED-10455', realized_at: '2026-07-21T16:51:00.000Z', origin: 'CTWA',
+        revenue: 650, gross_margin: 208, time_to_sale_minutes: 4320, status: 'confirmed' },
+    ],
     decision: {
       tone: 'attention', title: 'Há espaço para recuperar conversas sem resposta',
       detail: 'Antes de ampliar a verba, verifique fila, escala e horário de atendimento.',
@@ -145,16 +167,67 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
       const investment = this.marketingCampaignDetail?.summary?.investment;
       return [
         { id: 'revenue', label: 'Receita atribuída', value: financial.attributed_revenue, kind: 'positive' },
-        { id: 'margin', label: 'Margem bruta dos pedidos', value: financial.gross_margin, kind: 'neutral' },
+        { id: 'products', label: 'Custo dos produtos', value: financial.product_cost == null ? null : -Number(financial.product_cost), kind: 'neutral' },
+        { id: 'operation', label: 'Custos, repasses e operação', value: financial.operation_cost == null ? null : -Number(financial.operation_cost), kind: 'neutral' },
         { id: 'media', label: 'Investimento Meta', value: investment == null ? null : -Number(investment), kind: 'media' },
         { id: 'result', label: 'Resultado após mídia', value: financial.net_after_media, kind: 'result' },
       ];
     },
 
-    marketingCampaignDetailBar(value, field) {
-      const rows = this.marketingCampaignDetail?.trend || [];
-      const max = Math.max(1, ...rows.map((row) => Number(row[field]) || 0));
-      return `${Math.max(4, (Number(value) || 0) / max * 100)}%`;
+    marketingCampaignFinancialPercent(value) {
+      const revenue = Number(this.marketingCampaignDetail?.financial?.attributed_revenue || 0);
+      if (value == null || revenue <= 0) return null;
+      return Math.abs(Number(value)) / revenue * 100;
+    },
+
+    marketingCampaignFinancialBar(value) {
+      const percent = this.marketingCampaignFinancialPercent(value);
+      return `${Math.min(100, Math.max(0, percent || 0))}%`;
+    },
+
+    marketingCampaignOrderDate(value) {
+      if (!value) return '—';
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+      }).format(new Date(value)).replace('.', '');
+    },
+
+    marketingCampaignSaleTime(minutes) {
+      const value = Number(minutes || 0);
+      if (value < 60) return `${value} min`;
+      if (value < 1440) return `${Math.floor(value / 60)}h ${value % 60}min`;
+      const days = Math.floor(value / 1440);
+      const hours = Math.floor((value % 1440) / 60);
+      return hours ? `${days}d ${hours}h` : `${days} dia(s)`;
+    },
+
+    marketingCampaignQualityKpis() {
+      const quality = this.marketingCampaignDetail?.quality || {};
+      return [
+        { id: 'conversations', label: 'Conversas Meta', value: quality.conversations_meta ?? '—', source: 'META', icon: 'messages-square' },
+        { id: 'ctwa', label: 'CTWAs identificados', value: quality.ctwa_referrals ?? '—', source: 'FAREJADOR', icon: 'map-pin-check' },
+        { id: 'sales', label: 'Vendas atribuídas', value: quality.attributed_sales ?? '—', source: 'FAREJADOR', icon: 'shopping-bag' },
+        { id: 'costs', label: 'Pedidos com custo completo',
+          value: quality.attributed_sales == null ? '—' : `${quality.complete_cost_orders || 0} de ${quality.attributed_sales}`,
+          source: 'FAREJADOR', icon: 'clipboard-check' },
+      ];
+    },
+
+    marketingCampaignDecisionItems() {
+      const detail = this.marketingCampaignDetail || {};
+      const result = detail.financial?.net_after_media;
+      const conversion = detail.quality?.conversion_rate;
+      return [
+        result == null
+          ? 'Resultado financeiro aguardando atribuição e custos'
+          : result >= 0 ? 'Campanha pagou a mídia e gerou resultado positivo'
+            : 'Campanha ainda não pagou o investimento em mídia',
+        conversion == null
+          ? 'Conversão CTWA → venda ainda não calculada'
+          : `Conversão CTWA → venda: ${Number(conversion).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`,
+        'Nenhuma verba será alterada automaticamente',
+      ];
     },
 
     marketingCampaignDetailDecisionClass(tone) {

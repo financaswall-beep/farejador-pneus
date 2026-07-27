@@ -3,6 +3,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let getMarketingCampaignDetail:
   typeof import('../../../src/admin/painel/queries-marketing-campaign-detail.js').getMarketingCampaignDetail;
+let loadCampaignAttributionDetailData:
+  typeof import('../../../src/admin/painel/queries-marketing-campaign-detail-data.js').loadCampaignAttributionDetailData;
 
 beforeAll(async () => {
   Object.assign(process.env, {
@@ -15,6 +17,9 @@ beforeAll(async () => {
   ({ getMarketingCampaignDetail } = await import(
     '../../../src/admin/painel/queries-marketing-campaign-detail.js'
   ));
+  ({ loadCampaignAttributionDetailData } = await import(
+    '../../../src/admin/painel/queries-marketing-campaign-detail-data.js'
+  ));
 });
 
 function action(action_type: string, value: number) {
@@ -22,6 +27,56 @@ function action(action_type: string, value: number) {
 }
 
 describe('Marketing — detalhe da campanha', () => {
+  it('carrega somente referências CTWA e pedidos atribuídos da campanha, sem dados do cliente', async () => {
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes('count(*)::int AS referrals')) {
+        return { rows: [{ referrals: 4 }] };
+      }
+      return {
+        rows: [{
+          order_number: 'PED-10482',
+          realized_at: '2026-07-25T10:00:00.000Z',
+          referral_captured_at: '2026-07-25T08:00:00.000Z',
+          source_id: 'ad-1',
+          ad_id: 'ad-1',
+          revenue: '890',
+          product_cost: '520',
+          operation_cost: '50',
+          gross_margin: '320',
+          cost_complete: true,
+          time_to_sale_minutes: '120',
+        }],
+      };
+    });
+
+    const payload = await loadCampaignAttributionDetailData(
+      'camp-1',
+      '2026-07-01',
+      '2026-07-25',
+      { query } as unknown as Pool,
+    );
+
+    expect(payload).toEqual({
+      available: true,
+      referrals: 4,
+      orders: [{
+        order_number: 'PED-10482',
+        realized_at: '2026-07-25T10:00:00.000Z',
+        origin: 'CTWA',
+        ad_id: 'ad-1',
+        revenue: 890,
+        product_cost: 520,
+        operation_cost: 50,
+        gross_margin: 320,
+        cost_complete: true,
+        time_to_sale_minutes: 120,
+        status: 'confirmed',
+      }],
+    });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(payload)).not.toMatch(/contact|phone|email|name/i);
+  });
+
   it('cruza entrega, resposta Meta e financeiro atribuído sem inventar valores', async () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
@@ -72,12 +127,31 @@ describe('Marketing — detalhe da campanha', () => {
         pending_margin_orders: 0,
       }],
     });
+    const attributionDetailProvider = vi.fn().mockResolvedValue({
+      available: true,
+      referrals: 3,
+      orders: [
+        {
+          order_number: 'PED-1', realized_at: '2026-07-25T10:00:00.000Z',
+          origin: 'CTWA', ad_id: 'ad-1', revenue: 300, product_cost: 150,
+          operation_cost: 30, gross_margin: 120, cost_complete: true,
+          time_to_sale_minutes: 120, status: 'confirmed',
+        },
+        {
+          order_number: 'PED-2', realized_at: '2026-07-24T10:00:00.000Z',
+          origin: 'CTWA', ad_id: 'ad-1', revenue: 200, product_cost: 100,
+          operation_cost: 20, gross_margin: 80, cost_complete: true,
+          time_to_sale_minutes: 60, status: 'confirmed',
+        },
+      ],
+    });
 
     const payload = await getMarketingCampaignDetail('camp-1', '30d', {
       now: new Date('2026-07-25T12:00:00.000Z'),
       dbPool: { query } as unknown as Pool,
       config: { attributionEnabled: true },
       attributionProvider,
+      attributionDetailProvider,
     });
 
     expect(payload?.campaign).toMatchObject({ id: 'camp-1', name: 'WhatsApp' });
@@ -97,8 +171,12 @@ describe('Marketing — detalhe da campanha', () => {
     expect(payload?.financial).toEqual({
       attributed_sales: 2,
       attributed_revenue: 500,
+      product_cost: 250,
+      operation_cost: 50,
       gross_margin: 200,
+      pending_margin_orders: 0,
       net_after_media: 100,
+      retained_percent: 20,
       roas: 5,
       cac: 50,
     });
@@ -107,7 +185,20 @@ describe('Marketing — detalhe da campanha', () => {
       name: 'Criativo 01',
       conversations_started: 18,
       first_replies: 13,
+      attributed_sales: 2,
+      attributed_revenue: 500,
+      gross_margin: 200,
+      net_after_media: 140,
+      roas: 8.33,
     });
+    expect(payload?.quality).toEqual({
+      conversations_meta: 30,
+      ctwa_referrals: 3,
+      attributed_sales: 2,
+      complete_cost_orders: 2,
+      conversion_rate: 66.7,
+    });
+    expect(payload?.orders).toHaveLength(2);
   });
 
   it('mantém vendas e lucro nulos quando a atribuição está desligada', async () => {
@@ -124,14 +215,23 @@ describe('Marketing — detalhe da campanha', () => {
       now: new Date('2026-07-25T12:00:00.000Z'),
       dbPool: { query } as unknown as Pool,
       config: { attributionEnabled: false },
+      attributionDetailProvider: vi.fn().mockResolvedValue({
+        available: true,
+        referrals: 0,
+        orders: [],
+      }),
     });
 
     expect(payload?.attribution.status).toBe('disabled');
     expect(payload?.financial).toEqual({
       attributed_sales: null,
       attributed_revenue: null,
+      product_cost: null,
+      operation_cost: null,
       gross_margin: null,
+      pending_margin_orders: null,
       net_after_media: null,
+      retained_percent: null,
       roas: null,
       cac: null,
     });

@@ -40,10 +40,10 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(staticRoute).toContain("'app.marketing.js'");
     expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-detail1');
     expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2');
-    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail1');
+    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260726-marketing-meta2');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-detail1');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-detail2');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
     expect(staticRoute).toContain("'app.marketing.campaign-detail.js'");
@@ -159,7 +159,14 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('Voltar para campanhas');
     expect(marketingHtml).toContain('Eficiência do atendimento');
     expect(marketingHtml).toContain('Raio-X financeiro');
+    expect(marketingHtml).toContain('Vendas atribuídas à campanha');
+    expect(marketingHtml).toContain('Qualidade da atribuição');
     expect(marketingHtml).toContain('Resultado por anúncio');
+    expect(marketingHtml).toContain('Leitura para decisão');
+    expect(marketingHtml).toContain('Abrir no Gerenciador');
+    expect(campaignDetailFront).toContain('Custos, repasses e operação');
+    expect(marketingHtml).not.toContain('Entrega ao longo do período');
+    expect(marketingHtml).not.toContain('Diagnóstico de mídia');
     expect(campaignDetailFront).toContain('/admin/api/marketing/campaigns/${encodeURIComponent(campaignId)}?period=');
     expect(campaignDetailFront).toContain('closeMarketingCampaignDetail()');
     expect(route).toContain("fastify.get('/admin/api/marketing/campaigns/:campaignId'");
