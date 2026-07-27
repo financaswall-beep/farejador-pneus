@@ -13,6 +13,7 @@ export const resolveIntegrityOperationSchema = z.object({
     'matriz_expense.create',
     'stock.entry',
     'stock.manual_decrement',
+    'stock.physical_count',
   ]),
   idempotency_key: idempotencyKeySchema,
 });
@@ -88,10 +89,11 @@ export const registerWholesaleSaleSchema = z
       .nullable()
       .optional(),
     items: z.array(wholesaleItemSchema).min(1).max(50),
-    sold_at: z.string().min(1).nullable().optional(),
+    sold_at: z.string().datetime({ offset: true }).nullable().optional(),
+    paid_at: z.string().datetime({ offset: true }).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
     idempotency_key: idempotencyKeySchema,
-    // FINANCEIRO (0115): 'pending' = fiado (a receber), vencimento opcional.
+    // FINANCEIRO (0115): 'pending' = fiado (a receber), com vencimento obrigatório.
     // Ignorados com WHOLESALE_FINANCE off (a venda nasce 'paid', como hoje).
     payment_status: z.enum(['paid', 'pending']).optional(),
     due_date: z.string().date().nullable().optional(),
@@ -99,6 +101,10 @@ export const registerWholesaleSaleSchema = z
   .refine(
     (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
     { message: 'buyer_required' },
+  )
+  .refine(
+    (d) => d.payment_status !== 'pending' || Boolean(d.due_date),
+    { message: 'due_date_required', path: ['due_date'] },
   );
 
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
@@ -129,6 +135,14 @@ export const baixaWholesaleStockSchema = z.object({
   reason: z.string().min(2).max(300),
   idempotency_key: idempotencyKeySchema,
 });
+export const physicalStockCountSchema = z.object({
+  rows: z.array(z.object({
+    measure: z.string().trim().min(1).max(60),
+    counted_quantity: z.number().int().min(0).max(1_000_000),
+  })).min(1).max(500),
+  reason: z.string().trim().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
+});
 
 // ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.
 export const registerSupplierSchema = z.object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(), notes: z.string().max(1000).nullable().optional() });
@@ -148,7 +162,8 @@ export const registerPurchaseSchema = z
       .nullable()
       .optional(),
     items: z.array(purchaseItemSchema).min(1).max(50),
-    purchased_at: z.string().min(1).nullable().optional(),
+    purchased_at: z.string().datetime({ offset: true }).nullable().optional(),
+    paid_at: z.string().datetime({ offset: true }).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
     // FINANCEIRO (0115): 'pending' = compra fiada (a pagar ao fornecedor).
     payment_status: z.enum(['paid', 'pending']).optional(),
@@ -158,6 +173,10 @@ export const registerPurchaseSchema = z
   })
   .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
     message: 'supplier_required',
+  })
+  .refine((d) => d.payment_status !== 'pending' || Boolean(d.due_date), {
+    message: 'due_date_required',
+    path: ['due_date'],
   });
 
 // Cancelar compra: sai sem apagar; motivo obrigatório fica na trilha.
@@ -174,6 +193,10 @@ export const archiveWholesaleSupplierSchema = z.object({
 export const settleWholesaleFinanceSchema = z.object({
   kind: z.enum(['sale', 'purchase']),
   id: z.string().uuid(),
+  paid_at: z.string().datetime({ offset: true }).optional(),
+  payment_method: z.string().trim().min(2).max(40).nullable().optional(),
+  cash_account: z.string().trim().min(2).max(80).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
 });
 
@@ -186,11 +209,23 @@ export const createMatrizExpenseSchema = z.object({
   amount: z.number().positive(),
   payment_status: z.enum(['paid', 'pending']).optional(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  paid_at: z.string().datetime({ offset: true }).nullable().optional(),
+  occurred_at: z.string().datetime({ offset: true }).nullable().optional(),
+  document_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  competence_month: z.string().regex(/^\d{4}-\d{2}-01$/).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
+}).superRefine((body, ctx) => {
+  if (body.payment_status === 'pending' && !body.due_date) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['due_date'], message: 'due_date_required' });
+  }
 });
 
 export const matrizExpenseIdSchema = z.object({
   id: z.string().uuid(),
+  paid_at: z.string().datetime({ offset: true }).optional(),
+  payment_method: z.string().trim().min(2).max(40).nullable().optional(),
+  cash_account: z.string().trim().min(2).max(80).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
 });
 
@@ -249,52 +284,4 @@ export const approveApplicationSchema = z.object({
   slug: z.string().min(1).nullable().optional(),
 });
 
-export const orderItemSchema = z.object({
-  product_id: z.string().uuid(),
-  quantity: z.number().int().positive(),
-  unit_price: z.number().nonnegative(),
-  discount_amount: z.number().nonnegative().optional(),
-});
-
-// S6 da auditoria 2026-05-21: pedido de entrega exige endereco.
-export const requireDeliveryAddress = (data: { fulfillment_mode: string; delivery_address?: string | null }): boolean =>
-  data.fulfillment_mode !== 'delivery' || !!(data.delivery_address && data.delivery_address.trim().length > 0);
-export const deliveryAddressRefineOpts = {
-  message: 'delivery_address obrigatorio quando fulfillment_mode=delivery',
-  path: ['delivery_address'] as (string | number)[],
-};
-
-export const registerManualOrderSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
-  contact_id: z.string().uuid().optional(),
-  conversation_id: z.string().uuid(),
-  draft_id: z.string().uuid().nullable().optional(),
-  unit_id: z.string().uuid().nullable().optional(),
-  items: z.array(orderItemSchema).min(1),
-  payment_method: z.string().min(1).nullable(),
-  fulfillment_mode: z.enum(['delivery', 'pickup']),
-  delivery_address: z.string().min(1).nullable().optional(),
-  idempotency_key: z.string().min(8),
-  source_tag: z.enum(['chatwoot_com_bot', 'chatwoot_sem_bot']).nullable().optional(),
-}).refine(requireDeliveryAddress, deliveryAddressRefineOpts);
-
-export const registerWalkinOrderSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
-  customer_name: z.string().min(1).max(200).nullable().optional(),
-  customer_phone: z.string().min(1).max(40).nullable().optional(),
-  unit_id: z.string().uuid().nullable().optional(),
-  items: z.array(orderItemSchema).min(1),
-  payment_method: z.string().min(1).nullable(),
-  fulfillment_mode: z.enum(['delivery', 'pickup']),
-  delivery_address: z.string().min(1).nullable().optional(),
-  idempotency_key: z.string().min(8),
-  source_tag: z.enum(['walkin_balcao', 'walkin_telefone', 'walkin_outro']),
-}).refine(requireDeliveryAddress, deliveryAddressRefineOpts);
-
-export const cancelParamsSchema = z.object({
-  order_id: z.string().uuid(),
-});
-
-export const cancelBodySchema = z.object({
-  reason: z.string().min(1).max(500),
-});
+export * from './route-schemas-orders.js';

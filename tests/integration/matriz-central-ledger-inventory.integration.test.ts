@@ -17,6 +17,9 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
   let removeStock: typeof import(
     '../../src/admin/painel/queries-galpao-movimentos.js'
   ).deleteWholesaleStockComRotulo;
+  let applyPhysicalCount: typeof import(
+    '../../src/admin/painel/queries-stock-physical-count.js'
+  ).applyMatrizPhysicalStockCount;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -32,6 +35,9 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       setWholesaleStockComRotulo: setStock,
       deleteWholesaleStockComRotulo: removeStock,
     } = await import('../../src/admin/painel/queries-galpao-movimentos.js'));
+    ({ applyMatrizPhysicalStockCount: applyPhysicalCount } = await import(
+      '../../src/admin/painel/queries-stock-physical-count.js'
+    ));
   }, 180_000);
 
   afterAll(async () => {
@@ -172,5 +178,47 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
         entries: { inventory_loss: 'debit', inventory: 'credit' },
       },
     ]);
+  });
+
+  it('contagem fisica ajusta saldo, livro e auditoria com replay idempotente', async () => {
+    const measure = await fixture();
+    await setStock({
+      environment: 'test', measure, quantity_on_hand: 5, unit_cost: 12,
+    }, db.pool);
+    const idempotencyKey = randomUUID();
+    const input = {
+      environment: 'test' as const,
+      rows: [{ measure, counted_quantity: 3 }],
+      reason: 'inventario mensal',
+      idempotency_key: idempotencyKey,
+      actor_label: 'owner:inventory',
+    };
+    const first = await applyPhysicalCount(input, db.pool);
+    expect(first).toMatchObject({ checked: 1, changed: 1, gains: 0, losses: 2 });
+    expect(await applyPhysicalCount(input, db.pool)).toEqual(first);
+
+    const stock = await db.pool.query(
+      `SELECT quantity_on_hand FROM commerce.wholesale_stock
+        WHERE environment='test' AND measure=$1`,
+      [measure],
+    );
+    expect(stock.rows[0]?.quantity_on_hand).toBe(3);
+    const proof = await postingByRef(idempotencyKey);
+    expect(proof.rows).toHaveLength(1);
+    expect(proof.rows[0]).toMatchObject({
+      direction: 'loss',
+      nature: 'inventory_count',
+      amount: '24.00',
+      transaction_kind: 'inventory_loss',
+      entries: { inventory_loss: 'debit', inventory: 'credit' },
+      transaction_count: 1,
+    });
+    const audit = await db.pool.query(
+      `SELECT count(*)::int count FROM audit.events
+        WHERE environment='test' AND idempotency_key=$1
+          AND event_type='physical_count_confirmed'`,
+      [idempotencyKey],
+    );
+    expect(audit.rows[0]?.count).toBe(1);
   });
 });

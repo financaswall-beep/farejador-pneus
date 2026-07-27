@@ -89,6 +89,10 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         this.despesaMsg = { ok: false, text: 'Valor da despesa precisa ser maior que zero.' };
         return;
       }
+      if (this.despesaForm.payment_status === 'pending' && !this.despesaForm.due_date) {
+        this.despesaMsg = { ok: false, text: 'Informe o vencimento da despesa a pagar.' };
+        return;
+      }
       this.despesaSaving = true;
       this.despesaMsg = null;
       try {
@@ -98,6 +102,14 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
           amount: valor,
           payment_status: this.despesaForm.payment_status,
         };
+        const occurredDate = this.despesaForm.occurred_at || this.finHoje();
+        const paymentDate = this.despesaForm.payment_date || occurredDate;
+        body.occurred_at = new Date(`${occurredDate}T12:00:00-03:00`).toISOString();
+        body.document_date = this.despesaForm.document_date || occurredDate;
+        body.competence_month = `${this.despesaForm.competence_month || occurredDate.slice(0, 7)}-01`;
+        if (body.payment_status === 'paid') {
+          body.paid_at = new Date(`${paymentDate}T12:00:00-03:00`).toISOString();
+        }
         this.despesaForm.idempotency_key = this.despesaForm.idempotency_key
           || window.PAINEL_INTEGRITY.operation('matriz-expense-create', 'form').key;
         body.idempotency_key = this.despesaForm.idempotency_key;
@@ -108,7 +120,11 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         const fiadoTxt = body.payment_status === 'pending' ? ' (foi pro A PAGAR)' : '';
         this.despesaMsg = { ok: true, text: `Despesa lançada — ${this.formatCurrency(valor)}${fiadoTxt}.` };
         window.PAINEL_INTEGRITY.complete('matriz-expense-create', 'form');
-        this.despesaForm = { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '', idempotency_key: '' };
+        this.despesaForm = {
+          category: 'outros', description: '', amount: '', payment_status: 'paid',
+          occurred_at: '', document_date: '', competence_month: '',
+          payment_date: '', due_date: '', idempotency_key: '',
+        };
         await this.loadFinanceiro();
       } catch (err) {
         this.despesaMsg = { ok: false, text: `Não consegui lançar (${err.message}).` };
@@ -116,23 +132,15 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         this.despesaSaving = false;
       }
     },
-    async despesaSettle(row) {
-      if (this.finQuitando) return; // trava: 2º clique não dispara 2º settle (nem erro à toa)
-      if (!window.confirm(`Pagar ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})?`)) return;
-      this.finQuitando = true;
-      try {
-        const operation = window.PAINEL_INTEGRITY.operation('matriz-expense-payment', row.id);
-        await this.apiPost('/admin/api/matriz/despesas/settle', {
-          id: row.id, idempotency_key: operation.key,
-        });
-        window.PAINEL_INTEGRITY.complete('matriz-expense-payment', row.id);
-        await this.loadFinanceiro();
-        await this.loadSino(); // sino atualiza NA HORA (não espera o ciclo de 15s)
-      } catch (err) {
-        window.alert(`Não consegui quitar (${err.message}). Recarrega a página e tenta de novo.`);
-      } finally {
-        this.finQuitando = false;
-      }
+    despesaSettle(row) {
+      this.finPagar({
+        tipo: row.payroll_item_id ? 'folha' : 'despesa',
+        id: row.id,
+        nome: row.description || this.despesaLabel(row.category),
+        valor: row.amount,
+        due_date: row.due_date,
+        settlement_mode: 'expense',
+      });
     },
     async despesaRemove(row) {
       if (!window.confirm(`Remover a despesa de ${this.formatCurrency(Number(row.amount))} (${this.despesaLabel(row.category)})? Ela some das contas (a trilha fica no banco).`)) return;

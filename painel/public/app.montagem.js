@@ -39,8 +39,10 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.marketingJourneys, // Marketing: jornada Meta → CTWA → analytics → venda
     window.PAINEL_MODULES.marketingIntegrations, // Marketing: conexões, rastreamento e auditoria read-only
     window.PAINEL_MODULES.financeiro, // app.financeiro.js (linhas 1630-1743 pré-obra): aba Financeiro — visão geral + cobranças + Recebi/Paguei
+    window.PAINEL_MODULES.financeiroBaixas, // baixa auditável e extrato do livro central
     window.PAINEL_MODULES.financeiroIndicadores, // app.financeiro.indicadores.js (fatia 07-14): fluxo de caixa + análise + inadimplência
     window.PAINEL_MODULES.financeiroDespesas, // app.financeiro.despesas.js (fatia 07-14): despesas (0120/0130) — form, modalidades, extrato
+    window.PAINEL_MODULES.galpaoContagem, // contagem física auditável do estoque oficial
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)
     window.PAINEL_MODULES.pedidosParceiros, // app.pedidos.parceiros.js (linhas 2098-2248 pré-obra): pedido manual + novo parceiro + candidaturas (Etapa 3)

@@ -124,6 +124,7 @@ export async function postWholesalePurchasePayment(
   purchase: WholesalePurchaseLedgerState,
   paidAt: string,
   paidBy?: string | null,
+  details: import('./matriz-ledger-posting.js').MatrizLedgerPaymentDetails = {},
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   const amount = matrizLedgerAmount(purchase.totalAmount, 'purchase_ledger_amount_invalid');
@@ -146,7 +147,12 @@ export async function postWholesalePurchasePayment(
       { account_code: 'accounts_payable', account_class: 'liability', side: 'debit', amount },
       { account_code: 'cash', account_class: 'asset', side: 'credit', amount },
     ],
-    metadata: { purchase_id: purchase.purchaseId, supplier_id: purchase.supplierId },
+    metadata: {
+      purchase_id: purchase.purchaseId, supplier_id: purchase.supplierId,
+      payment_method: details.payment_method?.trim() || null,
+      cash_account: details.cash_account?.trim() || null,
+      note: details.note?.trim() || null,
+    },
   });
   await client.query(
     `SELECT finance.record_matriz_ledger_payment(

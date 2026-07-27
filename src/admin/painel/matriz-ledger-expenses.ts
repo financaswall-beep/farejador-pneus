@@ -99,6 +99,7 @@ export async function postMatrizExpensePayment(
   expense: MatrizExpenseLedgerState,
   paidAt: string,
   actorLabel?: string | null,
+  details: import('./matriz-ledger-posting.js').MatrizLedgerPaymentDetails = {},
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   const amount = matrizLedgerAmount(expense.amount, 'expense_ledger_amount_invalid');
@@ -116,7 +117,12 @@ export async function postMatrizExpensePayment(
       { account_code: 'accounts_payable', account_class: 'liability', side: 'debit', amount },
       { account_code: 'cash', account_class: 'asset', side: 'credit', amount },
     ],
-    metadata: { expense_id: expense.expenseId, category: expense.category },
+    metadata: {
+      expense_id: expense.expenseId, category: expense.category,
+      payment_method: details.payment_method?.trim() || null,
+      cash_account: details.cash_account?.trim() || null,
+      note: details.note?.trim() || null,
+    },
   });
   await client.query(
     `SELECT finance.record_matriz_ledger_payment(

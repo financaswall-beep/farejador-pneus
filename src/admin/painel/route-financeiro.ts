@@ -131,7 +131,11 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
     }
     try {
       const result = await settleMatrizExpense(parsed.data.id, env.FAREJADOR_ENV, undefined,
-        { idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request) });
+        {
+          idempotency_key: parsed.data.idempotency_key, actor_label: operatorLabel(request),
+          paid_at: parsed.data.paid_at, payment_method: parsed.data.payment_method,
+          cash_account: parsed.data.cash_account, note: parsed.data.note,
+        });
       return reply.status(200).send({ settled: true, ...result });
     } catch (err) {
       if (err instanceof Error && err.message === 'expense_not_found') {

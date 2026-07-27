@@ -12,6 +12,10 @@ export interface SettleCommissionInput {
   settled_by: string;
   idempotency_key: string;
   reason: string;
+  settled_at?: string | null;
+  payment_method?: string | null;
+  cash_account?: string | null;
+  note?: string | null;
   environment?: 'prod' | 'test';
 }
 
@@ -22,7 +26,13 @@ export async function settleCommissionEntries(
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const operation = { environment,domain: 'commission.settle',
     idempotencyKey: input.idempotency_key,
-    fingerprint: operationFingerprint({ partner_id: input.partner_id,reason: input.reason }) };
+    fingerprint: operationFingerprint({
+      partner_id: input.partner_id, reason: input.reason,
+      settled_at: input.settled_at ?? null,
+      payment_method: input.payment_method?.trim().toLowerCase() ?? null,
+      cash_account: input.cash_account?.trim().toLowerCase() ?? null,
+      note: input.note?.trim() || null,
+    }) };
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -37,10 +47,11 @@ export async function settleCommissionEntries(
       id: string; partner_order_id: string; commission_amount: string;
     }>(
       `UPDATE network.commission_entries
-          SET status='settled',settled_at=now(),settled_by=$3,settlement_operation_key=$4
+          SET status='settled',settled_at=COALESCE($5::timestamptz,now()),
+              settled_by=$3,settlement_operation_key=$4
         WHERE environment=$1 AND partner_id=$2 AND status='open'
       RETURNING id,partner_order_id,commission_amount`,
-      [environment,input.partner_id,input.settled_by,input.idempotency_key],
+      [environment,input.partner_id,input.settled_by,input.idempotency_key,input.settled_at ?? null],
     );
     if (rows.rowCount === 0) throw new Error('nothing_open');
     for (const row of rows.rows) {
@@ -61,7 +72,13 @@ export async function settleCommissionEntries(
       entityTable: 'network.partners',entityId: input.partner_id,
       eventType: 'partner_commissions_settled',actorLabel: input.settled_by,
       idempotencyKey: input.idempotency_key,before: { status: 'open' },
-      after: { ...result,reason: input.reason } });
+      after: {
+        ...result, reason: input.reason,
+        settled_at: input.settled_at ?? null,
+        payment_method: input.payment_method?.trim() || null,
+        cash_account: input.cash_account?.trim() || null,
+        note: input.note?.trim() || null,
+      } });
     await completeIntegrityOperation(client,operation,'network.partners',input.partner_id,result);
     await client.query('COMMIT');
     return result;

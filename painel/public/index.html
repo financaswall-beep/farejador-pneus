@@ -49,10 +49,12 @@
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260727-marketing-capi1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260727-ledger-agenda1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260727-ledger-agenda2"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-ledger-agenda2"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.galpao.js?v=20260724-estoque-movimentos1"></script>
+<script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
@@ -600,10 +602,10 @@
                              class="inline-flex min-w-[58px] items-center justify-center rounded-md border border-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-50">
                             Cobrar
                           </a>
-                          <button @click="settleComissao(p)"
-                                  :disabled="!livroComissaoOn() || comissaoSettling === p.partner_id"
-                                  class="inline-flex min-w-[58px] items-center justify-center rounded-md bg-emerald-700 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40">
-                            <span x-text="comissaoSettling === p.partner_id ? 'Salvando' : 'Recebi'"></span>
+                          <button @click="currentPage = 'financeiro'; finOpenTab('cobrancas')"
+                                  :disabled="!livroComissaoOn()"
+                                  class="inline-flex min-w-[92px] items-center justify-center rounded-md bg-emerald-700 px-2.5 py-1 text-[10px] font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40">
+                            Ir ao Financeiro
                           </button>
                         </div>
                       </td>
@@ -881,9 +883,9 @@
                 <span class="text-sm font-semibold" x-text="formatCurrency(Number(p.open_total || 0))"></span>
                 <a x-show="comissaoEstourou(p) && comissaoWhatsLink(p)" :href="comissaoWhatsLink(p)" target="_blank"
                    class="text-xs px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800">Cobrar no WhatsApp</a>
-                <button @click="settleComissao(p)" :disabled="comissaoSettling === p.partner_id"
-                        class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white disabled:opacity-50">
-                  <span x-text="comissaoSettling === p.partner_id ? 'Quitando...' : 'Recebi'"></span>
+	                <button @click="currentPage = 'financeiro'; finOpenTab('cobrancas')"
+	                        class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white">
+	                  Ir ao Financeiro
                 </button>
               </div>
             </div>
@@ -1152,7 +1154,7 @@
             <div class="font-semibold" x-text="formatCurrency(redeComissaoAReceber())"></div>
           </div>
         </div>
-        <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro (o Recebi desconta na hora; frete fica fora). Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
+        <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro; a baixa é feita exclusivamente no Financeiro. Frete fica fora. Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
       </div>
 
       <div x-show="redeSection === 'operacao' && redeOperacaoLegadaAtiva()" class="grid grid-cols-1 gap-4 mb-4">
@@ -2352,7 +2354,8 @@
                 <div class="px-4 py-3 border-t border-gray-100"><button @click="atacadoAddItem()" class="inline-flex items-center gap-1.5 text-sm text-emerald-700 font-medium hover:underline"><i data-lucide="plus" class="w-4 h-4"></i>Adicionar pneu</button></div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div x-show="atacadoFinance"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Pagamento</span><div class="inline-flex rounded-lg border border-gray-200 overflow-hidden"><button @click="atacadoForm.payment_status = 'paid'" class="px-5 py-2 text-sm font-medium" :class="atacadoForm.payment_status === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">À vista</button><button @click="atacadoForm.payment_status = 'pending'" class="px-5 py-2 text-sm font-medium border-l border-gray-200" :class="atacadoForm.payment_status === 'pending' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">Fiado</button></div></div><label x-show="atacadoFinance && atacadoForm.payment_status === 'pending'"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Vencimento</span><input x-model="atacadoForm.due_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><div x-show="!atacadoFinance" class="text-sm text-gray-500 flex items-center gap-2"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Venda registrada como recebida à vista</div></div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><label><span class="text-xs font-medium text-gray-500 mb-1.5 block">Data da venda</span><input x-model="atacadoForm.sold_at" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><label x-show="atacadoForm.payment_status === 'paid'"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Data do recebimento</span><input x-model="atacadoForm.payment_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label></div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div x-show="atacadoFinance"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Pagamento</span><div class="inline-flex rounded-lg border border-gray-200 overflow-hidden"><button @click="atacadoForm.payment_status = 'paid'; atacadoForm.due_date = ''" class="px-5 py-2 text-sm font-medium" :class="atacadoForm.payment_status === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">À vista</button><button @click="atacadoForm.payment_status = 'pending'; atacadoForm.payment_date = ''" class="px-5 py-2 text-sm font-medium border-l border-gray-200" :class="atacadoForm.payment_status === 'pending' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">Fiado</button></div></div><label x-show="atacadoFinance && atacadoForm.payment_status === 'pending'"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Vencimento</span><input x-model="atacadoForm.due_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><div x-show="!atacadoFinance" class="text-sm text-gray-500 flex items-center gap-2"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Venda registrada como recebida à vista</div></div>
               <input x-model="atacadoForm.notes" type="text" placeholder="Observação da venda (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
             <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p class="text-xs text-gray-400">Total do pedido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoFormTotal())"></p></div><button @click="atacadoSubmit()" :disabled="atacadoSaving" class="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50"><span x-show="!atacadoSaving">Registrar venda</span><span x-show="atacadoSaving">Salvando…</span></button></div>
@@ -2669,6 +2672,7 @@
 
             <section class="pt-5 border-t border-gray-100">
               <div class="flex items-center gap-3 mb-4"><span class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm font-semibold flex items-center justify-center">3</span><h4 class="font-semibold">Pagamento e recebimento</h4></div>
+              <label class="block mb-4"><span class="block text-xs font-medium text-gray-600 mb-1.5">Data da compra / documento</span><input x-model="compraForm.purchased_at" type="date" class="w-full lg:w-64 px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <p class="text-xs font-medium text-gray-600 mb-2">Condição de pagamento</p>
@@ -2676,6 +2680,7 @@
                     <button type="button" @click="compraForm.payment_status='paid'; compraForm.due_date=''" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.payment_status === 'paid' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">À vista</button>
                     <button type="button" x-show="atacadoFinance" @click="compraForm.payment_status='pending'" class="px-3 py-3 rounded-lg border text-sm font-medium" :class="compraForm.payment_status === 'pending' ? 'border-emerald-700 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-600'">A prazo</button>
                   </div>
+                  <label x-show="compraForm.payment_status === 'paid'" class="block mt-3"><span class="block text-xs font-medium text-gray-600 mb-1.5">Data do pagamento</span><input x-model="compraForm.payment_date" type="date" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                   <label x-show="atacadoFinance && compraForm.payment_status === 'pending'" class="block mt-3"><span class="block text-xs font-medium text-gray-600 mb-1.5">Vencimento</span><input x-model="compraForm.due_date" type="date" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                 </div>
                 <div>
@@ -4000,31 +4005,48 @@
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div class="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-start md:justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold">Estoque oficial x cadastro antigo</h3>
-            <p class="text-xs text-gray-500 mt-1">Relatório somente leitura. O saldo usado para vender e calcular custo é commerce.wholesale_stock.</p>
+            <h3 class="text-base font-semibold">Contagem física do galpão</h3>
+            <p class="text-xs text-gray-500 mt-1">Digite o que existe fisicamente. Diferenças geram ajuste auditado de estoque e reflexo automático no Financeiro.</p>
           </div>
-          <button @click="loadStockReconciliation()" :disabled="stockReconciliation.loading" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Atualizar</button>
+          <button @click="loadStockReconciliation()" :disabled="stockReconciliation.loading" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Recarregar saldo</button>
         </div>
-        <div x-show="stockReconciliation.loading" class="p-6 text-sm text-gray-500">Comparando as duas fontesâ€¦</div>
+        <div x-show="stockReconciliation.loading" class="p-6 text-sm text-gray-500">Carregando o estoque oficial…</div>
         <div x-show="stockReconciliation.error" class="m-5 px-4 py-3 rounded-lg bg-slate-100 text-slate-700 text-sm">NÃ£o foi possÃ­vel carregar a conciliaÃ§Ã£o.</div>
         <template x-if="stockReconciliation.summary">
           <div>
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 p-5 bg-gray-50/70 border-b border-gray-100">
-              <div><p class="text-xs text-gray-500">Medidas comparadas</p><p class="text-xl font-semibold num" x-text="stockReconciliation.summary.total"></p></div>
-              <div><p class="text-xs text-gray-500">Alinhadas</p><p class="text-xl font-semibold text-emerald-700 num" x-text="stockReconciliation.summary.aligned"></p></div>
-              <div><p class="text-xs text-gray-500">Divergentes</p><p class="text-xl font-semibold text-emerald-900 num" x-text="stockReconciliation.summary.divergent"></p></div>
-              <div><p class="text-xs text-gray-500">Sem linha oficial</p><p class="text-xl font-semibold text-slate-700 num" x-text="stockReconciliation.summary.catalog_only"></p></div>
+              <div><p class="text-xs text-gray-500">Medidas no estoque</p><p class="text-xl font-semibold num" x-text="stockReconciliation.rows.length"></p></div>
+              <div><p class="text-xs text-gray-500">Já contadas</p><p class="text-xl font-semibold text-emerald-700 num" x-text="stockCountSummary().counted"></p></div>
+              <div><p class="text-xs text-gray-500">Com diferença</p><p class="text-xl font-semibold text-slate-700 num" x-text="stockCountSummary().divergent"></p></div>
+              <div><p class="text-xs text-gray-500">Saldo da contagem</p><p class="text-sm font-semibold text-slate-700"><span class="text-emerald-700" x-text="'+' + stockCountSummary().gains"></span> / <span class="text-slate-700" x-text="'−' + stockCountSummary().losses"></span></p></div>
             </div>
-            <p class="px-5 pt-4 text-xs text-gray-500">Marcas sÃ£o apenas referÃªncia do catÃ¡logo. O galpÃ£o controla quantidade e custo por medida, sem inventar divisÃ£o por marca.</p>
+            <p class="px-5 pt-4 text-xs text-gray-500">Conte cada medida. Saldo a mais vira ganho de inventário; saldo a menos vira perda pelo custo médio atual.</p>
             <div class="overflow-x-auto mt-3">
               <table class="w-full text-sm min-w-[920px]">
-                <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Marcas no catÃ¡logo</th><th class="px-4 py-3 font-medium text-center">Oficial</th><th class="px-4 py-3 font-medium text-center">Antigo</th><th class="px-4 py-3 font-medium text-right">Custo oficial</th><th class="px-5 py-3 font-medium">SituaÃ§Ã£o</th></tr></thead>
+                <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Saldo no sistema</th><th class="px-4 py-3 font-medium text-center">Contagem física</th><th class="px-4 py-3 font-medium text-center">Diferença</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-5 py-3 font-medium text-right">Efeito estimado</th></tr></thead>
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in stockReconciliation.rows" :key="row.key">
-                    <tr class="hover:bg-gray-50"><td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.catalog_measures[0] || row.key"></td><td class="px-4 py-3 text-gray-500" x-text="row.catalog_brands.join(', ') || 'â€”'"></td><td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity == null ? 'â€”' : row.official_quantity"></td><td class="px-4 py-3 text-center text-gray-500 num" x-text="row.legacy_quantity == null ? 'â€”' : row.legacy_quantity"></td><td class="px-4 py-3 text-right num" x-text="row.official_unit_cost == null ? 'â€”' : formatCurrency(row.official_unit_cost)"></td><td class="px-5 py-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium" :class="row.status === 'aligned' ? 'bg-emerald-50 text-emerald-700' : 'border border-emerald-500/40 bg-white text-emerald-900'" x-text="reconciliationStatusText(row.status)"></span></td></tr>
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.key"></td>
+                      <td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity"></td>
+                      <td class="px-4 py-3 text-center"><input type="number" min="0" step="1" x-model="row.counted_quantity" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-center text-sm font-semibold" placeholder="—"></td>
+                      <td class="px-4 py-3 text-center font-semibold num" :class="stockCountDifference(row) > 0 ? 'text-emerald-700' : stockCountDifference(row) < 0 ? 'text-slate-700' : 'text-gray-500'" x-text="stockCountDifference(row) == null ? '—' : (stockCountDifference(row) > 0 ? '+' : '') + stockCountDifference(row)"></td>
+                      <td class="px-4 py-3 text-right num" x-text="row.official_unit_cost == null ? '—' : formatCurrency(row.official_unit_cost)"></td>
+                      <td class="px-5 py-3 text-right font-medium num" :class="stockCountDifference(row) < 0 ? 'text-slate-700' : stockCountDifference(row) > 0 ? 'text-emerald-700' : 'text-gray-400'" x-text="stockCountDifference(row) == null ? '—' : formatCurrency(Math.abs(stockCountDifference(row)) * Number(row.official_unit_cost || 0))"></td>
+                    </tr>
                   </template>
                 </tbody>
               </table>
+            </div>
+            <div class="p-5 border-t border-gray-100 bg-gray-50/50">
+              <div class="flex flex-col lg:flex-row lg:items-end gap-3">
+                <label class="flex-1"><span class="block text-xs font-medium text-gray-600 mb-1.5">Responsável / motivo da contagem</span><input type="text" maxlength="300" x-model="stockCount.reason" placeholder="Ex.: inventário mensal — Wallace e João" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm bg-white"></label>
+                <div class="flex gap-2">
+                  <button type="button" @click="stockCountClear()" :disabled="stockCount.saving" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium hover:bg-white disabled:opacity-50">Limpar</button>
+                  <button x-show="adminUser?.role === 'owner'" type="button" @click="stockCountApply()" :disabled="stockCount.saving || !stockCountSummary().counted" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800 disabled:opacity-50" x-text="stockCount.saving ? 'Aplicando…' : 'Aplicar contagem'"></button>
+                </div>
+              </div>
+              <p x-show="stockCount.message" class="mt-3 text-sm rounded-lg px-3 py-2" :class="stockCount.message?.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'" x-text="stockCount.message?.text"></p>
             </div>
           </div>
         </template>
@@ -4496,7 +4518,7 @@
               </section>
 
               <aside x-ref="logisticaDespesas" class="xl:col-span-4 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm scroll-mt-6">
-                <div class="p-5 border-b border-gray-100"><h3 class="text-base font-semibold">Despesas da rota</h3><p class="text-xs text-gray-500 mt-1">Valores reais dos comprovantes e lançamentos vinculados.</p></div>
+	                <div class="p-5 border-b border-gray-100 flex items-start justify-between gap-3"><div><h3 class="text-base font-semibold">Despesas da rota</h3><p class="text-xs text-gray-500 mt-1">Valores reais dos comprovantes e lançamentos vinculados.</p></div><button type="button" @click="currentPage = 'financeiro'; finOpenTab('despesas')" class="shrink-0 text-xs font-semibold text-emerald-700 hover:underline">Ver no Financeiro</button></div>
                 <div class="divide-y divide-gray-100">
                   <template x-for="e in rotaResultado(logisticaRotaSelecionada()).despesasDetalhadas" :key="e.id">
                     <div class="p-4 flex items-center gap-3">
@@ -4583,9 +4605,10 @@
           { id: 'cobrancas', label: 'Cobranças' },
           { id: 'pagar', label: 'Contas a pagar' },
           { id: 'despesas', label: 'Despesas' },
+          { id: 'extrato', label: 'Lançamentos' },
           { id: 'indicadores', label: 'Indicadores' }
         ]" :key="t.id">
-          <button @click="finTab = t.id; $nextTick(() => window.lucide && window.lucide.createIcons())"
+          <button @click="finOpenTab(t.id)"
                   :class="finTab === t.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700'"
                   class="px-4 py-2.5 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors" x-text="t.label"></button>
         </template>
@@ -4787,7 +4810,7 @@
                         <td class="px-5 py-3"><div class="flex justify-end items-center gap-2">
                           <a x-show="finWhatsLink(item)" :href="finWhatsLink(item)" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-700 text-emerald-700 hover:bg-emerald-50 font-medium whitespace-nowrap"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>Cobrar</a>
                           <span x-show="!finWhatsLink(item)" class="text-[11px] text-gray-400 whitespace-nowrap">Sem telefone</span>
-                          <button x-show="!['retail_sale','central_obligation','monthly_fee'].includes(item.settlement_mode) || adminUser?.role === 'owner'" @click="finReceber(item)" :disabled="finQuitando" class="text-xs px-3 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Recebi</button>
+                          <button x-show="adminUser?.role === 'owner'" @click="finReceber(item)" :disabled="finQuitando" class="text-xs px-3 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">Recebi</button>
                           <span x-show="['retail_sale','central_obligation','monthly_fee'].includes(item.settlement_mode) && adminUser?.role !== 'owner'" class="text-[11px] text-gray-400 whitespace-nowrap">Somente dono</span>
                         </div></td>
                       </tr>
@@ -4894,7 +4917,7 @@
                             <td class="py-2.5 pr-3 text-right font-bold text-gray-900 num whitespace-nowrap" x-text="formatCurrency(Number(item.valor))"></td>
                             <td class="py-2.5 pr-3 whitespace-nowrap"><span class="inline-block text-xs rounded-full px-2.5 py-0.5" :class="pagarStatus(item).cls" x-text="pagarStatus(item).label"></span></td>
                             <td class="py-2.5 text-right whitespace-nowrap">
-                              <button x-show="!['central_obligation','central_account','commission_refund'].includes(item.settlement_mode) || adminUser?.role === 'owner'" @click="finPagar(item)" :disabled="finQuitando"
+                              <button x-show="adminUser?.role === 'owner'" @click="finPagar(item)" :disabled="finQuitando"
                                       class="text-xs px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 font-medium disabled:opacity-50 disabled:cursor-not-allowed">Paguei</button>
                               <span x-show="['central_obligation','central_account','commission_refund'].includes(item.settlement_mode) && adminUser?.role !== 'owner'" class="text-[11px] text-gray-400">Somente dono</span>
                             </td>
@@ -4992,6 +5015,63 @@
 
       <!-- ═══════ SUB-ABA: INDICADORES ═══════ -->
       <template x-if="financeiroVisao">
+        <!-- EXTRATO AUDITÁVEL DO LIVRO CENTRAL -->
+        <div x-show="finTab === 'extrato'" class="w-full space-y-5">
+          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+              <div>
+                <h2 class="text-base font-semibold text-gray-900">Lançamentos do livro central</h2>
+                <p class="text-xs text-gray-500 mt-1">Cada linha mostra origem, competência, caixa, status e estornos sem apagar histórico.</p>
+              </div>
+              <div class="flex flex-wrap items-end gap-3">
+                <label><span class="block text-[11px] font-medium text-gray-500 mb-1">Mês</span>
+                  <input type="month" x-model="finExtratoFiltro.mes" @change="loadFinExtrato()" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                </label>
+                <label><span class="block text-[11px] font-medium text-gray-500 mb-1">Data-base</span>
+                  <select x-model="finExtratoFiltro.base" @change="loadFinExtrato()" class="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="competencia">Competência</option>
+                    <option value="caixa">Caixa</option>
+                  </select>
+                </label>
+                <button type="button" @click="loadFinExtrato()" :disabled="finExtratoLoading" class="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">Atualizar</button>
+              </div>
+            </div>
+          </div>
+
+          <template x-if="finExtrato">
+            <div class="space-y-5">
+              <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Entradas de caixa</p><p class="text-xl font-bold text-emerald-700 num mt-1" x-text="formatCurrency(Number(finExtrato.summary.entradas))"></p></div>
+                <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Saídas de caixa</p><p class="text-xl font-bold text-rose-600 num mt-1" x-text="formatCurrency(Number(finExtrato.summary.saidas))"></p></div>
+                <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Receitas por competência</p><p class="text-xl font-bold text-gray-900 num mt-1" x-text="formatCurrency(Number(finExtrato.summary.receitas))"></p></div>
+                <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Custos e despesas</p><p class="text-xl font-bold text-gray-900 num mt-1" x-text="formatCurrency(Number(finExtrato.summary.despesas))"></p></div>
+              </div>
+              <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500"><tr><th class="px-5 py-3 text-left">Competência / caixa</th><th class="px-4 py-3 text-left">Origem</th><th class="px-4 py-3 text-left">Descrição</th><th class="px-4 py-3 text-left">Status</th><th class="px-5 py-3 text-right">Valor</th></tr></thead>
+                    <tbody class="divide-y divide-gray-100">
+                      <template x-for="row in finExtrato.rows" :key="row.id">
+                        <tr class="hover:bg-gray-50/60">
+                          <td class="px-5 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="financeDate(row.competence_on)"></p><p class="text-[11px] text-gray-400" x-text="row.cash_on ? 'Caixa ' + financeDate(row.cash_on) : 'Sem movimento de caixa'"></p></td>
+                          <td class="px-4 py-3 whitespace-nowrap"><p class="font-medium text-gray-700" x-text="row.origin"></p><p class="text-[10px] text-gray-400 font-mono" x-text="row.source_type"></p></td>
+                          <td class="px-4 py-3 max-w-[360px]"><p class="font-medium text-gray-800 truncate" x-text="row.description"></p><p class="text-[11px] text-gray-400 truncate" x-text="row.created_by"></p></td>
+                          <td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span><p x-show="row.open_amount !== null && Number(row.open_amount) > 0" class="text-[11px] text-gray-500 mt-1" x-text="'Saldo ' + formatCurrency(Number(row.open_amount))"></p></td>
+                          <td class="px-5 py-3 text-right font-semibold num" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td>
+                        </tr>
+                      </template>
+                      <tr x-show="!finExtrato.rows.length"><td colspan="5" class="px-5 py-14 text-center text-sm text-gray-400">Nenhum lançamento neste recorte.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500"><span x-text="finExtrato.total"></span> lançamento(s) no período.</div>
+              </div>
+            </div>
+          </template>
+          <div x-show="finExtratoLoading" class="bg-white border border-gray-200 rounded-xl p-12 text-center text-sm text-gray-500">Carregando lançamentos…</div>
+          <div x-show="!finExtratoLoading && !finExtrato" class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-800">O extrato central está indisponível. Verifique as flags de leitura e a saúde da integração.</div>
+        </div>
+
         <div x-show="finTab === 'indicadores'" class="w-full space-y-5">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-gray-200">
             <div class="flex items-center gap-1 overflow-x-auto">
@@ -5038,7 +5118,7 @@
             <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               <div class="px-6 py-5 border-b border-gray-100"><h3 class="text-base font-semibold">Próximos movimentos</h3><p class="text-xs text-gray-500 mt-1">Agenda unificada de cobranças, fornecedores e despesas em aberto.</p></div>
               <div class="overflow-x-auto"><table class="w-full min-w-[920px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-6 py-3 text-left font-medium">Vencimento</th><th class="px-4 py-3 text-left font-medium">Origem</th><th class="px-4 py-3 text-left font-medium">Descrição</th><th class="px-4 py-3 text-right font-medium">Entrada</th><th class="px-4 py-3 text-right font-medium">Saída</th><th class="px-4 py-3 text-left font-medium">Status</th><th class="px-6 py-3 text-right font-medium">Ação</th></tr></thead><tbody class="divide-y divide-gray-100">
-                <template x-for="item in finFluxoPainel().movimentos" :key="item.direcao + ':' + item.tipo + ':' + item.id"><tr class="hover:bg-gray-50/60"><td class="px-6 py-3 text-gray-600 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'Sem data'"></td><td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="item.origem"></td><td class="px-4 py-3 font-medium text-gray-800 max-w-[270px] truncate" x-text="item.descricao"></td><td class="px-4 py-3 text-right font-semibold text-emerald-700 num" x-text="item.direcao === 'entrada' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3 text-right font-semibold text-rose-600 num" x-text="item.direcao === 'saida' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></td><td class="px-6 py-3 text-right"><button type="button" @click="item.direcao === 'entrada' ? finReceber(item) : finPagar(item)" :disabled="finQuitando || (['retail_sale','central_obligation','central_account','monthly_fee','commission_refund'].includes(item.settlement_mode) && adminUser?.role !== 'owner')" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50" x-text="item.direcao === 'entrada' ? 'Receber' : 'Pagar'"></button></td></tr></template>
+                <template x-for="item in finFluxoPainel().movimentos" :key="item.direcao + ':' + item.tipo + ':' + item.id"><tr class="hover:bg-gray-50/60"><td class="px-6 py-3 text-gray-600 whitespace-nowrap" x-text="item.due_date ? financeDate(item.due_date) : 'Sem data'"></td><td class="px-4 py-3 text-gray-600 whitespace-nowrap" x-text="item.origem"></td><td class="px-4 py-3 font-medium text-gray-800 max-w-[270px] truncate" x-text="item.descricao"></td><td class="px-4 py-3 text-right font-semibold text-emerald-700 num" x-text="item.direcao === 'entrada' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3 text-right font-semibold text-rose-600 num" x-text="item.direcao === 'saida' ? formatCurrency(Number(item.valor)) : '—'"></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></td><td class="px-6 py-3 text-right"><button x-show="adminUser?.role === 'owner'" type="button" @click="item.direcao === 'entrada' ? finReceber(item) : finPagar(item)" :disabled="finQuitando" class="px-3 py-1.5 rounded-lg border border-emerald-700 text-emerald-800 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50" x-text="item.direcao === 'entrada' ? 'Receber' : 'Pagar'"></button></td></tr></template>
               </tbody></table><div x-show="!finFluxoPainel().movimentos.length" class="py-12 text-center"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center mx-auto"><i data-lucide="badge-check" class="w-5 h-5 text-emerald-700"></i></div><p class="text-sm font-medium text-gray-700 mt-3">Nenhum movimento previsto.</p><p class="text-xs text-gray-400 mt-1">Contas e cobranças com vencimento aparecerão aqui.</p></div></div>
             </div>
           </div>
@@ -5200,9 +5280,15 @@
             </select>
           </label>
         </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data da despesa</span><input x-model="despesaForm.occurred_at" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data do documento</span><input x-model="despesaForm.document_date" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Competência</span><input x-model="despesaForm.competence_month" type="month" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block" x-show="despesaForm.payment_status === 'paid'"><span class="text-xs text-gray-500 mb-1 block">Data do pagamento</span><input x-model="despesaForm.payment_date" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+        </div>
         <div class="flex flex-wrap items-end gap-3 mt-3">
           <label class="block" x-show="despesaForm.payment_status === 'pending'">
-            <span class="text-xs text-gray-500 mb-1 block">Vencimento <span class="text-gray-300">(opcional)</span></span>
+            <span class="text-xs text-gray-500 mb-1 block">Vencimento <span class="text-rose-500">*</span></span>
             <input x-model="despesaForm.due_date" type="date" class="border border-gray-200 rounded-lg px-2.5 py-2 text-sm" />
           </label>
           <p class="text-xs flex-1 min-w-[160px] pb-2.5" :class="despesaMsg?.ok ? 'text-emerald-700' : 'text-rose-600'" x-text="despesaMsg?.text || ''"></p>
@@ -5323,6 +5409,35 @@
         </div>
       </div>
       </div><!-- /finTab despesas -->
+
+      <!-- Baixa financeira única: atualiza a origem e o livro central na mesma operação. -->
+      <div x-show="finBaixaModal.open" x-cloak @keydown.escape.window="finFecharBaixa()"
+           class="fixed inset-0 z-[90] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-950/45" @click="finFecharBaixa()"></div>
+        <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+          <div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between gap-4">
+            <div><p class="text-xs font-semibold uppercase tracking-wide text-emerald-700" x-text="finBaixaModal.direction === 'receivable' ? 'Recebimento' : 'Pagamento'"></p><h2 class="text-lg font-semibold text-gray-900 mt-1" x-text="finBaixaModal.item?.nome || 'Baixa financeira'"></h2><p class="text-xs text-gray-500 mt-1" x-text="'Saldo em aberto: ' + formatCurrency(Number(finBaixaModal.item?.valor || 0))"></p></div>
+            <button type="button" @click="finFecharBaixa()" :disabled="finQuitando" class="p-2 rounded-lg text-gray-400 hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Valor da baixa</span><input type="text" inputmode="decimal" x-model="finBaixaModal.amount" :readonly="!finPermiteParcial(finBaixaModal.item || {})" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-semibold num read-only:bg-gray-50"></label>
+              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Data efetiva</span><input type="date" x-model="finBaixaModal.payment_date" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Forma</span><select x-model="finBaixaModal.payment_method" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option><option value="transferencia">Transferência</option><option value="boleto">Boleto</option><option value="outro">Outro</option></select></label>
+              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Conta / caixa</span><input type="text" maxlength="80" x-model="finBaixaModal.cash_account" placeholder="Caixa principal" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+            </div>
+            <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Observação</span><textarea rows="3" maxlength="500" x-model="finBaixaModal.note" placeholder="Comprovante, referência ou observação da baixa" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm resize-none"></textarea></label>
+            <p class="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">A baixa atualiza o lançamento de origem e o livro central com a mesma chave de segurança.</p>
+            <p x-show="finBaixaModal.error" class="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2" x-text="finBaixaModal.error"></p>
+          </div>
+          <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+            <button type="button" @click="finFecharBaixa()" :disabled="finQuitando" class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+            <button type="button" @click="finConfirmarBaixa()" :disabled="finQuitando" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-semibold hover:bg-emerald-800 disabled:opacity-50" x-text="finQuitando ? 'Salvando…' : (finBaixaModal.direction === 'receivable' ? 'Confirmar recebimento' : 'Confirmar pagamento')"></button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ TELA: COLABORADORES — equipe, remuneração, comissão, folha e desempenho (0133) ═══ -->
@@ -5548,7 +5663,7 @@
             <div class="bg-white border border-gray-200 rounded-xl p-5"><p class="text-xs text-gray-500">Pagos</p><p class="text-2xl font-semibold mt-2" x-text="(colabSummary.paid_count || 0)+' de '+(colabSummary.payroll_count || 0)"></p><p class="text-xs text-gray-400 mt-1" x-text="formatCurrency(colabSummary.payroll_paid || 0)"></p></div>
           </div>
           <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="p-5 flex flex-wrap items-center gap-3"><div class="mr-auto"><h3 class="font-semibold">Folha de pagamento</h3><p class="text-xs text-gray-500 mt-1">Ao fechar, os títulos entram automaticamente no Financeiro.</p></div><button x-show="colabSummary.payroll_period_status === 'preview'" @click="colabFecharFolha()" :disabled="colabSaving" class="bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Fechar competência</button></div>
+	            <div class="p-5 flex flex-wrap items-center gap-3"><div class="mr-auto"><h3 class="font-semibold">Folha de pagamento</h3><p class="text-xs text-gray-500 mt-1">Ao fechar, os títulos entram automaticamente no Financeiro; pagamentos são baixados somente lá.</p></div><button type="button" x-show="colabSummary.payroll_period_status !== 'preview'" @click="currentPage = 'financeiro'; finOpenTab('pagar')" class="border border-emerald-700 text-emerald-800 rounded-lg px-4 py-2 text-sm font-semibold">Ir ao Financeiro</button><button x-show="colabSummary.payroll_period_status === 'preview'" @click="colabFecharFolha()" :disabled="colabSaving" class="bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Fechar competência</button></div>
             <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs text-gray-400 border-y border-gray-100"><th class="p-4">Colaborador</th><th>Cargo</th><th>Salário base</th><th>Comissão</th><th>Extras / descontos</th><th>Total do mês</th><th>Status</th><th class="pr-4 text-right">Ação</th></tr></thead>
               <tbody><template x-for="c in colabFolhaRows" :key="'folha-'+c.id"><tr class="border-b border-gray-100"><td class="p-4 font-medium" x-text="c.display_name"></td><td x-text="c.job_title"></td><td x-text="formatCurrency(c.base_salary)"></td><td x-text="formatCurrency(c.commission_amount)"></td><td><span class="text-emerald-700" x-text="c.additions ? '+ '+formatCurrency(c.additions) : ''"></span><span class="text-rose-600 ml-1" x-text="c.deductions ? '− '+formatCurrency(c.deductions) : (!c.additions ? '—' : '')"></span></td><td class="font-semibold" x-text="formatCurrency(c.total_due)"></td><td><span class="text-xs px-2 py-1 rounded-full" :class="c.payroll_status === 'paid' ? 'bg-emerald-50 text-emerald-700' : c.payroll_status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'" x-text="colabStatusLabel(c)"></span></td><td class="pr-4 text-right"><button @click="colabOpen(c,'folha')" class="text-emerald-700 text-xs font-medium">Ver cálculo</button></td></tr></template></tbody>
             </table></div>
@@ -5623,7 +5738,7 @@
               </template>
             </div>
             <div x-show="colabSummary.payroll_period_status === 'preview'" class="border border-gray-200 rounded-xl p-4 space-y-3"><p class="font-medium text-sm">Adicionar bônus ou desconto</p><select x-model="colabAjusteForm.kind" class="w-full border rounded-lg px-3 py-2 text-sm bg-white"><option value="addition">Adição / bônus</option><option value="deduction">Desconto / adiantamento</option></select><input x-model="colabAjusteForm.description" placeholder="Motivo" class="w-full border rounded-lg px-3 py-2 text-sm"><input x-model="colabAjusteForm.amount" inputmode="decimal" placeholder="Valor" class="w-full border rounded-lg px-3 py-2 text-sm"><button @click="colabAdicionarAjuste()" class="w-full border border-emerald-700 text-emerald-700 rounded-lg py-2 text-sm font-medium">Incluir ajuste</button></div>
-            <button x-show="colabSelected.payroll_status === 'pending'" @click="colabPagar(colabSelected)" :disabled="colabSaving" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Marcar como pago</button>
+	            <button x-show="colabSelected.payroll_status === 'pending'" @click="colabDrawer = null; colabSelected = null; currentPage = 'financeiro'; finOpenTab('pagar')" class="w-full bg-emerald-700 text-white rounded-xl py-3 text-sm font-semibold">Pagar no Financeiro</button>
             <p x-show="colabSelected.payroll_status === 'paid'" class="text-sm text-emerald-700 bg-emerald-50 rounded-lg p-3 text-center">Pagamento conciliado com o Financeiro.</p>
           </div>
         </div></template>
@@ -7068,7 +7183,7 @@
                       <th class="px-3 py-3 text-right font-medium">Conversas</th>
                       <th class="px-3 py-3 text-right font-medium">Custo/conversa</th>
                       <th class="px-3 py-3 font-medium">Venda / lucro</th>
-                      <th class="px-3 py-3 font-medium">Estoque</th>
+	                      <th class="px-3 py-3 font-medium">Custos / margem</th>
                       <th class="px-5 py-3 font-medium">Decisão</th>
                     </tr>
                   </thead>
@@ -7126,7 +7241,11 @@
                             </span>
                           </template>
                         </td>
-                        <td class="px-3 py-4"><span class="text-[11px] font-medium text-gray-500">A conciliar</span></td>
+	                        <td class="px-3 py-4">
+	                          <span class="text-[11px] font-medium"
+	                                :class="row.cost_status === 'ready' ? 'text-emerald-700' : row.cost_status === 'disabled' ? 'text-gray-400' : 'text-amber-700'"
+	                                x-text="row.cost_status === 'ready' ? 'Custos conciliados' : row.cost_status === 'disabled' ? 'Sem atribuição' : 'Custo pendente'"></span>
+	                        </td>
                         <td class="px-5 py-4">
                           <span class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                                 :class="marketingCampaignDecisionClass(row.decision)"
@@ -7581,7 +7700,7 @@
                     :disabled="Boolean(marketingIntegrationActionLoading)"
                     class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 disabled:opacity-50">
               <i data-lucide="route" class="h-4 w-4"></i>
-              Reconciliar
+	              Reconciliar atribuição
             </button>
             <button type="button" @click="marketingRunIntegrationAction('capi_test')"
                     :disabled="Boolean(marketingIntegrationActionLoading)"
@@ -8397,6 +8516,7 @@
             <option value="Cartão crédito">Cartão crédito</option>
             <option value="Cartão débito">Cartão débito</option>
             <option value="Dinheiro">Dinheiro</option>
+            <option value="A receber">A receber</option>
           </select>
         </div>
         <div>
@@ -8408,6 +8528,12 @@
           </select>
         </div>
       </div>
+
+      <label x-show="String(saleForm.payment_method || '').toLowerCase() === 'a receber'" class="block">
+        <span class="text-xs font-medium text-gray-700 mb-2 block">Vencimento do recebimento</span>
+        <input type="date" x-model="saleForm.payment_due_on"
+               class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm">
+      </label>
 
       <div>
         <label class="text-xs font-medium text-gray-700 mb-2 block">Endereço de entrega</label>
@@ -8475,7 +8601,7 @@
 
       <div x-show="compraDialog.kind === 'cancel'">
         <label class="block"><span class="block text-sm font-medium text-gray-700 mb-2">Motivo do cancelamento</span><textarea x-ref="compraDialogReason" x-model="compraDialog.reason" maxlength="300" rows="4" placeholder="Explique o motivo para preservar a trilha de auditoria" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-300"></textarea></label>
-        <div x-show="compraDialog.purchase?.payment_status === 'paid'" class="mt-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-xs flex gap-2"><i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0"></i><span>Esta compra consta como paga. O acerto ou reembolso com o fornecedor precisa ser tratado externamente.</span></div>
+        <div x-show="compraDialog.purchase?.payment_status === 'paid'" class="mt-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-xs flex gap-2"><i data-lucide="triangle-alert" class="w-4 h-4 flex-shrink-0"></i><span>Esta compra consta como paga. Ao cancelar, o Financeiro criará um valor a receber do fornecedor.</span></div>
       </div>
 
       <div x-show="compraDialog.kind === 'supplier-create'" class="grid grid-cols-1 md:grid-cols-2 gap-4">

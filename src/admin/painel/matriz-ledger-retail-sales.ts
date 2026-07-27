@@ -13,6 +13,7 @@ interface RetailSaleLedgerState {
   occurredAt: string;
   cashAt: string;
   paymentMethod: string | null;
+  dueDate: string | null;
   fulfillmentMode: string;
   cashRealized: boolean;
   stockDecremented: boolean;
@@ -27,6 +28,7 @@ async function getRetailSaleState(
   const result = await client.query<{
     customer_id: string | null; total_amount: string; cogs_amount: string;
     occurred_at: string; cash_at: string; payment_method: string | null;
+    payment_due_on: string | null;
     fulfillment_mode: string; cash_realized: boolean;
     stock_decremented: boolean; created_by: string | null;
   }>(
@@ -35,7 +37,7 @@ async function getRetailSaleState(
               FILTER (WHERE i.matriz_unit_cost IS NOT NULL),0)::numeric(14,2)::text cogs_amount,
             o.created_at occurred_at,
             COALESCE(o.delivered_at,o.closed_at,o.created_at) cash_at,
-            o.payment_method,o.fulfillment_mode,o.closed_by created_by,
+            o.payment_method,o.payment_due_on,o.fulfillment_mode,o.closed_by created_by,
             (o.payment_method IS NOT NULL
               AND lower(btrim(o.payment_method))<>'a receber'
               AND (
@@ -57,7 +59,7 @@ async function getRetailSaleState(
          ON i.environment=o.environment AND i.order_id=o.id
       WHERE o.environment=$1 AND o.id=$2 AND o.partner_order_id IS NULL
       GROUP BY o.id,o.customer_id,o.contact_id,o.total_amount,o.created_at,
-               o.delivered_at,o.closed_at,o.payment_method,o.fulfillment_mode,
+               o.delivered_at,o.closed_at,o.payment_method,o.payment_due_on,o.fulfillment_mode,
                o.delivery_status,o.status,o.closed_by`,
     [environment, orderId],
   );
@@ -66,7 +68,8 @@ async function getRetailSaleState(
     environment, orderId, customerId: row.customer_id,
     totalAmount: row.total_amount, cogsAmount: row.cogs_amount,
     occurredAt: row.occurred_at, cashAt: row.cash_at,
-    paymentMethod: row.payment_method, fulfillmentMode: row.fulfillment_mode,
+    paymentMethod: row.payment_method, dueDate: row.payment_due_on,
+    fulfillmentMode: row.fulfillment_mode,
     cashRealized: row.cash_realized, stockDecremented: row.stock_decremented,
     createdBy: row.created_by,
   } : null;
@@ -100,6 +103,7 @@ async function ensureRetailRevenue(
     environment: sale.environment, sourceType, sourceId: sale.orderId,
     kind: sale.cashRealized ? 'sale_cash' : 'sale_receivable',
     amount, occurredAt: sale.occurredAt,
+    dueDate: sale.cashRealized ? null : sale.dueDate,
     cashAt: sale.cashRealized ? sale.cashAt : null,
     description: 'Receita de venda no varejo da Matriz',
     createdBy: matrizLedgerActor(sale.createdBy),

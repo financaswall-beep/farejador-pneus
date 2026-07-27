@@ -4,7 +4,10 @@ import { resolve } from 'node:path';
 
 describe('Estoque — lista com painel da medida', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
-  const galpao = readFileSync(resolve('painel/public/app.galpao.js'), 'utf8');
+  const galpao = [
+    readFileSync(resolve('painel/public/app.galpao.contagem.js'), 'utf8'),
+    readFileSync(resolve('painel/public/app.galpao.js'), 'utf8'),
+  ].join('\n');
   const atacado = readFileSync(resolve('painel/public/app.atacado.js'), 'utf8');
   const stockStart = html.indexOf('<div x-show="currentPage === \'estoque\'"');
   const stockEnd = html.indexOf('<div x-show="currentPage === \'logistica\'"', stockStart);

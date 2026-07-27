@@ -119,6 +119,7 @@ export async function postWholesaleSalePayment(
   sale: WholesaleSaleLedgerState,
   paidAt: string,
   paidBy?: string | null,
+  details: import('./matriz-ledger-posting.js').MatrizLedgerPaymentDetails = {},
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
   const amount = matrizLedgerAmount(sale.totalAmount, 'sale_ledger_amount_invalid');
@@ -137,7 +138,12 @@ export async function postWholesaleSalePayment(
       { account_code: 'cash', account_class: 'asset', side: 'debit', amount },
       { account_code: 'accounts_receivable', account_class: 'asset', side: 'credit', amount },
     ],
-    metadata: { order_id: sale.orderId, buyer_id: sale.buyerId },
+    metadata: {
+      order_id: sale.orderId, buyer_id: sale.buyerId,
+      payment_method: details.payment_method?.trim() || null,
+      cash_account: details.cash_account?.trim() || null,
+      note: details.note?.trim() || null,
+    },
   });
   await client.query(
     `SELECT finance.record_matriz_ledger_payment(

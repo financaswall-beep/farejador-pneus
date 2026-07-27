@@ -32,7 +32,7 @@ describe('estoque oficial no navegador da matriz', () => {
   });
 
   it('carrega a conciliacao somente leitura pelo endpoint dedicado', async () => {
-    const module = loadModule('painel/public/app.galpao.js', 'galpao');
+    const module = loadModule('painel/public/app.galpao.contagem.js', 'galpaoContagem');
     const report = { summary: { total: 4, divergent: 3 }, rows: [{ key: '90-90-18' }] };
     const context = {
       stockReconciliation: { loading: false, error: null, summary: null, rows: [] },
@@ -41,6 +41,8 @@ describe('estoque oficial no navegador da matriz', () => {
     await module.loadStockReconciliation.call(context);
     expect(context.apiGet).toHaveBeenCalledWith('/admin/api/wholesale/stock/reconciliation');
     expect(context.stockReconciliation.summary).toEqual(report.summary);
-    expect(context.stockReconciliation.rows).toEqual(report.rows);
+    expect(context.stockReconciliation.rows).toEqual([
+      { key: '90-90-18', counted_quantity: '' },
+    ]);
   });
 });

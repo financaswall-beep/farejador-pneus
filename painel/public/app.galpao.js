@@ -2,34 +2,6 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
-    async loadStockReconciliation() {
-      if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
-        this.stockReconciliation.loading = false;
-        this.stockReconciliation.error = null;
-        this.stockReconciliation.summary = { ...window.PAINEL_STOCK_PREVIEW.reconciliation.summary };
-        this.stockReconciliation.rows = window.PAINEL_STOCK_PREVIEW.reconciliation.rows.map((row) => ({ ...row }));
-        return;
-      }
-      this.stockReconciliation.loading = true;
-      this.stockReconciliation.error = null;
-      try {
-        const report = await this.apiGet('/admin/api/wholesale/stock/reconciliation');
-        this.stockReconciliation.summary = report.summary || null;
-        this.stockReconciliation.rows = report.rows || [];
-      } catch (err) {
-        this.stockReconciliation.error = err instanceof Error ? err.message : String(err);
-      } finally {
-        this.stockReconciliation.loading = false;
-      }
-    },
-    reconciliationStatusText(status) {
-      const labels = {
-        aligned: 'Alinhado', quantity_divergent: 'Saldo diferente', catalog_only: 'SÃ³ no catÃ¡logo legado',
-        official_only: 'SÃ³ no estoque oficial', official_ambiguous: 'Cadastro oficial duplicado',
-        official_cost_missing: 'Custo oficial ausente',
-      };
-      return labels[status] || status;
-    },
     measureOnHand(measure) {
       // Quanto tem de uma medida (pro form de venda mostrar "em estoque"). null = não cadastrada.
       const m = (measure || '').trim();
@@ -133,9 +105,11 @@ window.PAINEL_MODULES.galpao = function () {
       const measure = (this.stockForm.measure || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
+      const reason = (this.stockForm.entry_reason || '').trim();
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
       if (!Number.isInteger(qty) || qty <= 0) { this.stockMsg = { ok: false, text: 'Quantos pneus entraram?' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
+      if (reason.length < 2) { this.stockMsg = { ok: false, text: 'Explique a origem dessa entrada.' }; return; }
       this.stockSaving = true;
       this.stockMsg = null;
       try {
@@ -279,7 +253,8 @@ window.PAINEL_MODULES.galpao = function () {
         cancelamento_varejo: 'Varejo cancelado (voltou)', baixa_manual: 'Baixa manual',
         remocao: 'Medida removida', sem_rotulo: 'mexida sem rótulo',
       };
-      let t = map[m.source] || m.source;
+      let t = m.source === 'definir' && String(m.reason || '').startsWith('Contagem física:')
+        ? 'Contagem física' : (map[m.source] || m.source);
       if (m.source === 'baixa_manual' && m.reason) t += ' — ' + m.reason;
       else if (m.source === 'compra' && m.reason) t += ' (' + m.reason + ')';
       return t;

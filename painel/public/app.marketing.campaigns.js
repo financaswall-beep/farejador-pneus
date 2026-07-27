@@ -3,7 +3,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 
 function marketingCampaignMockRows() {
   const base = {
-    status: 'with_delivery', stock_status: 'not_reconciled', attribution_status: 'ready',
+    status: 'with_delivery', stock_status: 'not_reconciled', cost_status: 'ready', attribution_status: 'ready',
   };
   return [
     { ...base, id: 'meta:1', platform_id: '1', channel: 'meta', name: '205/55 R16 • Curitiba',

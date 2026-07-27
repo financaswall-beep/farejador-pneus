@@ -137,6 +137,8 @@ export async function generateCurrentMatrizPartnerMonthlyFees(
 export async function settleMatrizPartnerMonthlyFee(
   input: {
     fee_id: string; actor_label: string; idempotency_key: string;
+    settled_at?: string | null; payment_method?: string | null;
+    cash_account?: string | null; note?: string | null;
     environment?: 'prod' | 'test';
   },
   dbPool: Pool = defaultPool,
@@ -145,7 +147,12 @@ export async function settleMatrizPartnerMonthlyFee(
   const operation = {
     environment, domain: 'network.monthly_fee.settle',
     idempotencyKey: input.idempotency_key,
-    fingerprint: operationFingerprint({ fee_id: input.fee_id }),
+    fingerprint: operationFingerprint({
+      fee_id: input.fee_id, settled_at: input.settled_at ?? null,
+      payment_method: input.payment_method?.trim().toLowerCase() ?? null,
+      cash_account: input.cash_account?.trim().toLowerCase() ?? null,
+      note: input.note?.trim() || null,
+    }),
   };
   const client = await dbPool.connect();
   try {
@@ -159,11 +166,12 @@ export async function settleMatrizPartnerMonthlyFee(
     }
     const paid = await client.query<{ settled_at: string }>(
       `UPDATE finance.matriz_partner_monthly_fees
-          SET status='settled',settled_at=now(),settled_by=$3,
+          SET status='settled',settled_at=COALESCE($5::timestamptz,now()),settled_by=$3,
               settlement_operation_key=$4
         WHERE environment=$1 AND id=$2 AND status='open'
         RETURNING settled_at`,
-      [environment, input.fee_id, input.actor_label, input.idempotency_key],
+      [environment, input.fee_id, input.actor_label, input.idempotency_key,
+       input.settled_at ?? null],
     );
     if (!paid.rows[0]) throw new Error('monthly_fee_not_found');
     await syncMonthlyFee(
@@ -177,7 +185,11 @@ export async function settleMatrizPartnerMonthlyFee(
       entityTable: 'finance.matriz_partner_monthly_fees', entityId: input.fee_id,
       eventType: 'monthly_fee_settled', actorLabel: input.actor_label,
       idempotencyKey: input.idempotency_key,
-      before: { status: 'open' }, after: result,
+      before: { status: 'open' }, after: {
+        ...result, payment_method: input.payment_method?.trim() || null,
+        cash_account: input.cash_account?.trim() || null,
+        note: input.note?.trim() || null,
+      },
     });
     await completeIntegrityOperation(
       client, operation, 'finance.matriz_partner_monthly_fees', input.fee_id, result,

@@ -31,6 +31,11 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         this.orderError = 'Informe o endereco de entrega ou troque para retirada.';
         return;
       }
+      if (String(this.saleForm.payment_method || '').trim().toLowerCase() === 'a receber'
+        && !this.saleForm.payment_due_on) {
+        this.orderError = 'Informe o vencimento da venda a receber.';
+        return;
+      }
 
       const items = [{
         product_id: this.saleForm.product_id,
@@ -51,6 +56,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
             draft_id: this.modalConv.draft_id || null,
             items,
             payment_method: this.saleForm.payment_method || null,
+            payment_due_on: this.saleForm.payment_due_on || null,
             fulfillment_mode: this.saleForm.fulfillment_mode,
             delivery_address: deliveryAddress,
             idempotency_key: this.saleForm.idempotency_key,
@@ -62,6 +68,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
             customer_phone: this.saleForm.customer_phone?.trim() || null,
             items,
             payment_method: this.saleForm.payment_method || null,
+            payment_due_on: this.saleForm.payment_due_on || null,
             fulfillment_mode: this.saleForm.fulfillment_mode,
             delivery_address: deliveryAddress,
             idempotency_key: this.saleForm.idempotency_key,

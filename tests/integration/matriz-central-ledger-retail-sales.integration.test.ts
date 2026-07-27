@@ -88,6 +88,7 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
         product_id: productId, quantity: 2, unit_price: 60, discount_amount: 10,
       }],
       payment_method: paymentMethod, fulfillment_mode: fulfillmentMode,
+      payment_due_on: paymentMethod.toLowerCase() === 'a receber' ? '2026-08-15' : null,
       delivery_address: fulfillmentMode === 'delivery' ? 'Rua Teste, 10' : null,
       actor_label: 'owner:retail', seller_collaborator_id: null,
       idempotency_key: `retail-ledger-${Date.now()}-${sequence}`,
@@ -231,7 +232,11 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
       await import('../../src/admin/painel/matriz-ledger-settlement.js');
     const item = (await getMatrizLedgerOpenItems('test', db.pool)).a_receber.itens
       .find((row) => row.tipo === 'varejo' && row.id === sale.order_id);
-    expect(item).toMatchObject({ valor: '110.00', settlement_mode: 'retail_sale' });
+    expect(item).toMatchObject({
+      valor: '110.00',
+      due_date: '2026-08-15',
+      settlement_mode: 'retail_sale',
+    });
     await settleMatrizLedgerOpenItem({
       obligation_id: item!.obligation_id!, amount: 40,
       idempotency_key: randomUUID(), actor_label: 'owner:retail-partial',

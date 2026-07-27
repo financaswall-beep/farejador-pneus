@@ -3,15 +3,19 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
-  addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, deleteWholesaleStockComRotulo,
+  addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, applyMatrizPhysicalStockCount,
+  deleteWholesaleStockComRotulo,
   getMatrizStockReconciliation, listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
 } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
-import { baixaWholesaleStockSchema, entryWholesaleStockSchema, removeWholesaleStockSchema, setWholesaleStockSchema } from './route-schemas.js';
+import {
+  baixaWholesaleStockSchema, entryWholesaleStockSchema, physicalStockCountSchema,
+  removeWholesaleStockSchema, setWholesaleStockSchema,
+} from './route-schemas.js';
 
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -20,6 +24,34 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
 
   fastify.get('/admin/api/wholesale/stock/reconciliation', { preHandler: requireAdminAuth }, async (_request, reply) => {
     return reply.status(200).send(await getMatrizStockReconciliation());
+  });
+
+  fastify.post('/admin/api/wholesale/stock/physical-count', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = physicalStockCountSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.issues[0]?.message ?? 'invalid_body',
+      });
+    }
+    try {
+      return reply.status(200).send(await applyMatrizPhysicalStockCount({
+        ...parsed.data, actor_label: operatorLabel(request),
+      }));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'internal_server_error';
+      if (['reason_required', 'physical_count_rows_required', 'physical_count_invalid',
+        'physical_count_duplicate_measure'].includes(code)) {
+        return reply.status(400).send({ error: code });
+      }
+      if (code === 'physical_count_measure_not_found') {
+        return reply.status(409).send({ error: code });
+      }
+      const mapped = mapWriteError(error);
+      logger.error({ error, status: mapped.status }, 'physical stock count failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   // ENTRADA de compra: soma a quantidade e recalcula o custo MÉDIO ponderado da medida.

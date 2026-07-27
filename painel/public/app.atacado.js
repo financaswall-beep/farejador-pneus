@@ -225,6 +225,8 @@ window.PAINEL_MODULES.atacado = function () {
     async atacadoSubmit() {
       const f = this.atacadoForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
+      const soldDate = f.sold_at || this.finHoje();
+      body.sold_at = new Date(`${soldDate}T12:00:00-03:00`).toISOString();
       if (f.buyerKey === 'new') {
         if (!f.newName.trim()) { this.atacadoMsg = { ok: false, text: 'Diga o nome do novo cliente.' }; return; }
         body.new_customer = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
@@ -245,10 +247,18 @@ window.PAINEL_MODULES.atacado = function () {
         }));
       if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
       body.items = items;
-      // FINANCEIRO (0115): fiado só quando o financeiro está ligado (flag). Vencimento opcional.
+      // FINANCEIRO (0115): fiado só quando o financeiro está ligado e com vencimento.
       if (this.atacadoFinance && f.payment_status === 'pending') {
+        if (!f.due_date) {
+          this.atacadoMsg = { ok: false, text: 'Informe o vencimento da venda fiada.' };
+          return;
+        }
         body.payment_status = 'pending';
-        if (f.due_date) body.due_date = f.due_date;
+        body.due_date = f.due_date;
+      } else {
+        body.payment_status = 'paid';
+        const paidDate = f.payment_date || soldDate;
+        body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
       }
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-sale-create', 'form').key;
       body.idempotency_key = f.idempotency_key;
@@ -260,7 +270,11 @@ window.PAINEL_MODULES.atacado = function () {
         const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
         this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.` };
         window.PAINEL_INTEGRITY.complete('wholesale-sale-create', 'form');
-        this.atacadoForm = { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] };
+        this.atacadoForm = {
+          buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
+          payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
+          items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }],
+        };
         await this.loadAtacadoVendas();
       } catch (err) {
         this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };

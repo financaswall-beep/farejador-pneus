@@ -9,19 +9,19 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   moneyCents, operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
-
 type Environment = 'prod' | 'test';
 type Target = { obligation_id: string; account_code?: never }
   | { obligation_id?: never; account_code: 'marketing_payable' };
-
 export type MatrizLedgerSettlementInput = Target & {
   amount?: number;
   payment_method?: string;
+  paid_at?: string;
+  cash_account?: string;
+  note?: string;
   actor_label?: string | null;
   idempotency_key: string;
   environment?: Environment;
 };
-
 export interface MatrizLedgerSettlementResult {
   target_id: string;
   direction: 'receivable' | 'payable';
@@ -30,7 +30,6 @@ export interface MatrizLedgerSettlementResult {
   payment_ids: string[];
   settled_at: string;
 }
-
 interface ObligationRow {
   id: string;
   source_type: string;
@@ -39,12 +38,10 @@ interface ObligationRow {
   account_class: MatrizLedgerAccountClass;
   open_amount: string;
 }
-
 const CENTRAL_ACCOUNTS = new Set([
   'supplier_refund_receivable', 'expense_refund_receivable',
   'customer_refund_payable',
 ]);
-
 function requestedAmount(value: number | undefined, balance: number): number {
   const amount = value === undefined ? balance : moneyCents(value) / 100;
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('settlement_amount_invalid');
@@ -53,11 +50,9 @@ function requestedAmount(value: number | undefined, balance: number): number {
   }
   return amount;
 }
-
 function paymentSourceId(key: string, fingerprint: string, index = 0): string {
   return `${key.trim().slice(0, 120)}:${fingerprint.slice(0, 40)}:${index}`;
 }
-
 async function recordPayment(
   client: PoolClient,
   environment: Environment,
@@ -92,7 +87,6 @@ async function recordPayment(
   );
   return paymentId;
 }
-
 async function lockObligation(
   client: PoolClient,
   environment: Environment,
@@ -124,7 +118,6 @@ async function lockObligation(
   if (Number(row.open_amount) <= 0) throw new Error('central_obligation_not_open');
   return row;
 }
-
 async function settleObligation(
   client: PoolClient,
   operation: ReturnType<typeof settlementOperation>,
@@ -155,6 +148,8 @@ async function settleObligation(
     sourceType, sourceId, {
       obligation_id: obligation.id, source_type: obligation.source_type,
       source_id: obligation.source_id, payment_method: method ?? null,
+      cash_account: input.cash_account?.trim() || null,
+      note: input.note?.trim() || null,
     },
   );
   if (retail && full) {
@@ -174,7 +169,6 @@ async function settleObligation(
     payment_ids: [paymentId], settled_at: paidAt,
   });
 }
-
 async function marketingBalance(client: PoolClient, environment: Environment): Promise<number> {
   await client.query(
     `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`,
@@ -222,7 +216,12 @@ async function settleMarketing(
       client, operation.environment, obligation, chunk, paidAt, actor,
       'finance.matriz_ledger_account.settlement',
       paymentSourceId(operation.idempotencyKey, operation.fingerprint, index),
-      { account_code: 'marketing_payable', obligation_id: obligation.id },
+      {
+        account_code: 'marketing_payable', obligation_id: obligation.id,
+        payment_method: input.payment_method?.trim() || null,
+        cash_account: input.cash_account?.trim() || null,
+        note: input.note?.trim() || null,
+      },
     ));
     pending = (moneyCents(pending) - moneyCents(chunk)) / 100;
   }
@@ -245,6 +244,9 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
     fingerprint: operationFingerprint({
       target, amount_cents: input.amount === undefined ? null : moneyCents(input.amount),
       payment_method: input.payment_method?.trim().toLowerCase() ?? null,
+      paid_at: input.paid_at ?? null,
+      cash_account: input.cash_account?.trim().toLowerCase() ?? null,
+      note: input.note?.trim() || null,
     }),
   };
 }
@@ -266,7 +268,7 @@ export async function settleMatrizLedgerOpenItem(
       await client.query('COMMIT');
       return started.result;
     }
-    const paidAt = new Date().toISOString();
+    const paidAt = input.paid_at ?? new Date().toISOString();
     const actor = matrizLedgerActor(input.actor_label);
     const result = input.obligation_id
       ? await settleObligation(client, operation, input, paidAt, actor)

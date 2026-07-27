@@ -42,6 +42,10 @@ export async function registerWalkinOrder(
   input: RegisterWalkinOrderInput,
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string }> {
+  if (input.payment_method?.trim().toLowerCase() === 'a receber'
+    && !input.payment_due_on) {
+    throw new Error('payment_due_on_required');
+  }
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
   const total = calculateTotal(input);
@@ -125,18 +129,19 @@ export async function registerWalkinOrder(
       `INSERT INTO commerce.orders (
          environment, contact_id, customer_id, source_conversation_id,
          total_amount, status, fulfillment_mode, payment_method,
-         delivery_address, closed_by, closed_at,
+         delivery_address, payment_due_on, closed_by, closed_at,
          idempotency_key, source, unit_id
        ) VALUES (
          $1, NULL, $2, NULL,
          $3, 'open', $4, $5,
-         $6, NULL, NULL,
+         $6, $10::date, NULL, NULL,
          $7, $8, $9
        )
        RETURNING id`,
       [
         environment, customerId, total, input.fulfillment_mode, input.payment_method,
         input.delivery_address ?? null, input.idempotency_key, input.source_tag, unitId,
+        input.payment_due_on ?? null,
       ],
     );
     const orderId = order.rows[0]?.id;
@@ -187,6 +192,7 @@ export async function registerWalkinOrder(
         customer_phone: normalizedPhone,
         source_tag: input.source_tag,
         payment_method: input.payment_method,
+        payment_due_on: input.payment_due_on ?? null,
         fulfillment_mode: input.fulfillment_mode,
       })],
     );

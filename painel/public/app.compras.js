@@ -60,6 +60,8 @@ window.PAINEL_MODULES.compras = function () {
     compraBuildSubmission() {
       const f = this.compraForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
+      const purchasedDate = f.purchased_at || this.finHoje();
+      body.purchased_at = new Date(`${purchasedDate}T12:00:00-03:00`).toISOString();
       if (f.supplierKey === 'new') {
         if (!f.newName.trim()) {
           this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' };
@@ -98,8 +100,16 @@ window.PAINEL_MODULES.compras = function () {
       body.items = items;
       // FINANCEIRO (0115): compra fiada só com o financeiro ligado (flag).
       if (this.atacadoFinance && f.payment_status === 'pending') {
+        if (!f.due_date) {
+          this.compraMsg = { ok: false, text: 'Informe o vencimento da compra a prazo.' };
+          return null;
+        }
         body.payment_status = 'pending';
-        if (f.due_date) body.due_date = f.due_date;
+        body.due_date = f.due_date;
+      } else {
+        body.payment_status = 'paid';
+        const paidDate = f.payment_date || purchasedDate;
+        body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
       }
       body.receipt_status = f.receipt_status;
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;
@@ -135,7 +145,12 @@ window.PAINEL_MODULES.compras = function () {
         const estoqueTxt = result.stock_applied ? ' O galpão já recebeu.' : ' Aguardando recebimento; o galpão não mudou.';
         this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}` };
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
-        this.compraForm = { supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '', payment_status: 'paid', due_date: '', receipt_status: 'received', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] };
+        this.compraForm = {
+          supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
+          purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
+          receipt_status: 'received', idempotency_key: '',
+          items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }],
+        };
         this.compraPendingSubmission = null;
         this.comprasTab = 'visao';
         await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);

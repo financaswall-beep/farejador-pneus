@@ -1,4 +1,3 @@
-/** Campanhas Meta e atribuição determinística, sem estimar canais desconectados. */
 import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { pool as defaultPool } from '../../persistence/db.js';
@@ -13,11 +12,8 @@ import {
   getMarketingAttributionReport,
   type MarketingAttributionReport,
 } from '../../marketing/reporting.js';
-
 export type MarketingCampaignChannel = 'all' | 'meta' | 'google' | 'tiktok';
-
 type ChannelStatus = 'connected' | 'disabled' | 'not_configured' | 'error' | 'not_connected' | 'planned';
-
 interface CampaignConfig {
   metaEnabled: boolean;
   attributionEnabled: boolean;
@@ -25,7 +21,6 @@ interface CampaignConfig {
   adAccountId?: string;
   apiVersion: string;
 }
-
 export interface MarketingCampaignDependencies {
   now?: Date;
   dbPool?: Pool;
@@ -35,7 +30,6 @@ export interface MarketingCampaignDependencies {
   ) => Promise<MetaMarketingSnapshot>;
   attributionProvider?: typeof getMarketingAttributionReport;
 }
-
 export interface MarketingCampaignsPayload {
   environment: 'prod' | 'test';
   generated_at: string;
@@ -74,7 +68,12 @@ export interface MarketingCampaignsPayload {
     attributed_revenue: number | null;
     gross_margin: number | null;
     profit: number | null;
+    /**
+     * Compatibilidade temporária com clientes antigos. Campanha não concilia
+     * estoque; o estado correto para a decisão é cost_status.
+     */
     stock_status: 'not_reconciled';
+    cost_status: 'ready' | 'pending' | 'disabled';
     attribution_status: 'ready' | 'pending' | 'disabled';
     delivery_days: number;
     last_delivery: string;
@@ -93,7 +92,6 @@ export interface MarketingCampaignsPayload {
     target: string;
   }>;
 }
-
 function defaultConfig(): CampaignConfig {
   return {
     metaEnabled: env.MARKETING_META_ENABLED,
@@ -103,7 +101,6 @@ function defaultConfig(): CampaignConfig {
     apiVersion: env.META_GRAPH_API_VERSION,
   };
 }
-
 function campaignDecision(row: MetaCampaignMetric, averageCost: number | null) {
   if (row.spend > 0 && row.conversations === 0) {
     return {
@@ -129,7 +126,6 @@ function campaignDecision(row: MetaCampaignMetric, averageCost: number | null) {
     tone: 'safe' as const,
   };
 }
-
 export async function getMarketingCampaigns(
   period: MarketingPeriod = '30d',
   channel: MarketingCampaignChannel = 'all',
@@ -140,7 +136,6 @@ export async function getMarketingCampaigns(
   const config = dependencies.config ?? defaultConfig();
   const metaProvider = dependencies.metaProvider;
   const window = marketingDateWindow(period, now);
-
   let meta: MetaMarketingSnapshot | null = null;
   let metaStatus: ChannelStatus = config.metaEnabled ? 'not_configured' : 'disabled';
   if (config.metaEnabled && config.accessToken && config.adAccountId) {
@@ -158,7 +153,6 @@ export async function getMarketingCampaigns(
       metaStatus = 'error';
     }
   }
-
   const includesMeta = channel === 'all' || channel === 'meta';
   const sourceRows = includesMeta ? meta?.current.campaign_rows ?? [] : [];
   const averageCost = includesMeta ? meta?.current.cost_per_conversation ?? null : null;
@@ -195,6 +189,11 @@ export async function getMarketingCampaigns(
       ? Math.round((grossMargin - row.spend) * 100) / 100
       : null,
     stock_status: 'not_reconciled' as const,
+    cost_status: !config.attributionEnabled
+      ? 'disabled' as const
+      : attributed && grossMargin != null
+        ? 'ready' as const
+        : 'pending' as const,
     attribution_status: config.attributionEnabled
       ? attributed ? 'ready' as const : 'pending' as const
       : 'disabled' as const,
@@ -203,7 +202,6 @@ export async function getMarketingCampaigns(
     decision: campaignDecision(row, averageCost),
   };
   });
-
   const alerts: MarketingCampaignsPayload['alerts'] = [];
   if (channel === 'google') {
     alerts.push({
@@ -230,7 +228,6 @@ export async function getMarketingCampaigns(
       target: 'integracoes',
     });
   }
-
   const withoutConversation = campaigns.filter((row) => row.investment > 0 && row.conversations === 0).length;
   const highCost = campaigns.filter((row) => row.decision.label === 'Revisar custo').length;
   if (withoutConversation > 0) {
@@ -260,7 +257,6 @@ export async function getMarketingCampaigns(
       target: 'jornadas',
     });
   }
-
   const hasMeta = includesMeta && metaStatus === 'connected';
   const netAfterMedia = config.attributionEnabled && attribution?.available
     && attribution.gross_margin != null && meta

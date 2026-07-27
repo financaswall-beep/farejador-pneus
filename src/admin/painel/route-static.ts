@@ -26,8 +26,9 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.format.js', 'app.varejo.js', 'app.vendas.historico.js', 'app.comissoes.js', 'app.atacado.js', 'app.compras.js', 'app.compras.relatorios.js', 'app.compras.acoes.js',
     'app.logistica.js', 'app.logistica.resultado.js', 'app.logistica.comprovantes.js',
     'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.gestao.js', 'app.sino.js', 'app.financeiro.js',
+    'app.financeiro.baixas.js',
     'app.financeiro.indicadores.js', 'app.financeiro.despesas.js', // fatia 07-14 do financeiro (fiscal 300)
-    'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
+    'app.galpao.contagem.js', 'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js', 'app.clientes.js', 'app.clientes.identity.js',
     'app.marketing.js', 'app.marketing.campaigns.js', 'app.marketing.campaign-detail.js', 'app.marketing.journeys.js', 'app.marketing.integrations.js',

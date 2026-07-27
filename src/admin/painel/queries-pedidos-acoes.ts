@@ -77,6 +77,10 @@ export async function registerManualOrder(
   input: RegisterManualOrderInput,
   dbPool: Pool = defaultPool,
 ): Promise<{ order_id: string }> {
+  if (input.payment_method?.trim().toLowerCase() === 'a receber'
+    && !input.payment_due_on) {
+    throw new Error('payment_due_on_required');
+  }
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
   let orderId: string;
@@ -92,6 +96,15 @@ export async function registerManualOrder(
        input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag ?? null],
     );
     orderId = result.rows[0]!.order_id;
+    // Durante rolling deploy, código novo ainda precisa conviver com o schema
+    // anterior. Só toca a coluna nova quando a venda realmente usa vencimento.
+    if (input.payment_due_on) {
+      await client.query(
+        `UPDATE commerce.orders SET payment_due_on=$3::date
+          WHERE id=$1 AND environment=$2`,
+        [orderId, environment, input.payment_due_on],
+      );
+    }
     if (input.seller_collaborator_id && await hasMatrizSellerColumn(client, 'orders')) {
       const seller = await client.query(
         `UPDATE commerce.orders o SET seller_collaborator_id=COALESCE(o.seller_collaborator_id,mc.id)

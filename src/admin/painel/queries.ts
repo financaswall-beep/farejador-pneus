@@ -1,4 +1,5 @@
 export * from './queries-stock-reconciliation.js';
+export * from './queries-stock-physical-count.js';
 export * from './queries-rede-custos.js';
 export * from './queries-marketing.js';
 export * from './queries-marketing-campaigns.js';

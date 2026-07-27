@@ -14,23 +14,14 @@ function painelApp() {
   localStorage.removeItem('farejador_admin_token');
   sessionStorage.removeItem('farejador_admin_token');
   const estado = {
-    // ─── ESTADO ─────────────────────────────────────
     currentPage: 'resumo',
     currentTime: 'semana',
     saleModalOpen: false,
     modalConv: null,
     saleForm: {
-      product_id: '',
-      quantity: 1,
-      unit_price: 0,
-      payment_method: 'Pix',
-      fulfillment_mode: 'delivery',
-      delivery_address: '',
-      notes: '',
-      idempotency_key: '',
-      source_tag: 'chatwoot_sem_bot',
-      customer_name: '',
-      customer_phone: '',
+      product_id: '', quantity: 1, unit_price: 0, payment_method: 'Pix', payment_due_on: '',
+      fulfillment_mode: 'delivery', delivery_address: '', notes: '', idempotency_key: '',
+      source_tag: 'chatwoot_sem_bot', customer_name: '', customer_phone: '',
     },
     orderSubmitting: false,
     orderError: null,
@@ -39,14 +30,8 @@ function painelApp() {
     partnerError: null,
     partnerResult: null,
     partnerForm: {
-      trade_name: '',
-      responsible_name: '',
-      whatsapp_phone: '',
-      email: '',
-      address: '',
-      commission_percent: '',
-      municipios: '',
-      slug: '',
+      trade_name: '', responsible_name: '', whatsapp_phone: '', email: '',
+      address: '', commission_percent: '', municipios: '', slug: '',
     },
     // Etapa 3: fila de candidaturas
     applicationsModalOpen: false,
@@ -98,7 +83,11 @@ function painelApp() {
     atacadoMsg: null,
     vendaAtacadoSelecionada: null,
     atacadoStaleDays: 30,
-    atacadoForm: { buyerKey: '', newName: '', newPhone: '', notes: '', payment_status: 'paid', due_date: '', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }] },
+    atacadoForm: {
+      buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
+      payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
+      items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }],
+    },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
@@ -114,6 +103,7 @@ function painelApp() {
     stockBaixaSaving: false,
     galpaoFilme: { rows: [], measure: null, loading: false },
     stockReconciliation: { rows: [], summary: null, loading: false, error: null },
+    stockCount: { reason: '', saving: false, message: null },
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
     atacadoPeriodo: 'tudo', // recorte do card do atacado: 'tudo' | 'mes' (0117)
     // ── VAREJO da matriz (0117 — fatia 2): resumo com custo CONGELADO na venda ──
@@ -138,13 +128,23 @@ function painelApp() {
     matrizDespesas: null,
     despesasLoaded: false,
     financeiroVisao: null,
-    finTab: 'visao', // redesign 07-12 (desenho do dono): sub-abas visao|cobrancas|pagar|despesas|indicadores
+    finTab: 'visao', // sub-abas visao|cobrancas|pagar|despesas|extrato|indicadores
     finIndicadorTab: 'fluxo', // Indicadores: fluxo|analise|inadimplencia (sem misturar assuntos no mesmo card)
     finFluxoDias: 30, // horizonte da agenda real: 7|30|90 dias
     finQuitando: false, // a chave de cada mutacao vive no gerenciador global da API
+    finExtrato: null,
+    finExtratoLoading: false,
+    finExtratoFiltro: { mes: '', base: 'competencia' },
+    finBaixaModal: {
+      open: false, item: null, direction: 'receivable', amount: '',
+      payment_date: '', payment_method: 'pix', cash_account: 'Caixa principal',
+      note: '', error: null,
+    },
     despesaSaving: false,
     despesaMsg: null,
-    despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid', due_date: '', idempotency_key: '' },
+    despesaForm: { category: 'outros', description: '', amount: '', payment_status: 'paid',
+      occurred_at: '', document_date: '', competence_month: '', payment_date: '',
+      due_date: '', idempotency_key: '' },
     // Recorte da lista (0130): mês (competência SP — preenchido no 1º load) × modalidade.
     despesaFiltro: { mes: '', categoria: '' },
     // Sub-aba Contas a pagar (07-13): filtro da fila vindo do card Atenção rápida
@@ -189,15 +189,16 @@ function painelApp() {
     compras: [],
     compraSaving: false,
     compraMsg: null,
-    compraForm: { supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '', payment_status: 'paid', due_date: '', receipt_status: 'received', idempotency_key: '', items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }] },
+    compraForm: {
+      supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
+      purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
+      receipt_status: 'received', idempotency_key: '',
+      items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }],
+    },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),
-    redePeriods: [
-      { id: 'today', label: 'Hoje' },
-      { id: '7d', label: '7 dias' },
-      { id: '30d', label: '30 dias' },
-      { id: 'month', label: 'Mês atual' },
-    ],
+    redePeriods: [{ id: 'today', label: 'Hoje' }, { id: '7d', label: '7 dias' },
+      { id: '30d', label: '30 dias' }, { id: 'month', label: 'Mês atual' }],
     redeFilter: 'todos', redeSection: 'visao', redeBusca: '',
     redeFilters: [
       { id: 'todos', label: 'Todos' },
@@ -292,7 +293,6 @@ function painelApp() {
     // 2026-06-01: alertas fake removidos — os alertas reais saem de redeAlertasOperacionais (computa de parceirosRede).
     alertasRede: [],
 
-    // ─── COMPUTED ───────────────────────────────────
   };
 
   // Montagem (lista de fábricas + compositor) mora em app.montagem.js — fatia 07-14.

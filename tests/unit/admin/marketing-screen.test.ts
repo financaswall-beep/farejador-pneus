@@ -137,7 +137,8 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('Aguardando atribuição');
     expect(marketingHtml).toContain('Impressões');
     expect(marketingHtml).toContain('Cliques');
-    expect(marketingHtml).toContain('A conciliar');
+    expect(marketingHtml).toContain('Custos conciliados');
+    expect(marketingHtml).toContain('Custo pendente');
     expect(marketingHtml).toContain('Nenhuma verba é alterada automaticamente');
     expect(campaignsFront).toContain('/admin/api/marketing/campaigns?period=');
     expect(campaignsFront).toContain('&channel=');

@@ -12,6 +12,10 @@ export interface SettleCommissionRefundInput {
   actor_label: string;
   idempotency_key: string;
   reason: string;
+  refunded_at?: string | null;
+  payment_method?: string | null;
+  cash_account?: string | null;
+  note?: string | null;
   environment?: 'prod' | 'test';
 }
 
@@ -28,7 +32,13 @@ export async function settleCommissionRefund(
     environment,
     domain: 'commission.refund',
     idempotencyKey: input.idempotency_key,
-    fingerprint: operationFingerprint({ reversal_id: input.reversal_id, reason }),
+    fingerprint: operationFingerprint({
+      reversal_id: input.reversal_id, reason,
+      refunded_at: input.refunded_at ?? null,
+      payment_method: input.payment_method?.trim().toLowerCase() ?? null,
+      cash_account: input.cash_account?.trim().toLowerCase() ?? null,
+      note: input.note?.trim() || null,
+    }),
   };
   const client = await dbPool.connect();
   try {
@@ -53,11 +63,12 @@ export async function settleCommissionRefund(
     if (row.refund_status !== 'pending') throw new Error('commission_refund_not_pending');
     const paid = await client.query<{ refunded_at: string }>(
       `UPDATE finance.matriz_commission_reversals
-          SET refund_status='paid',refunded_at=now(),refunded_by=$3,
+          SET refund_status='paid',refunded_at=COALESCE($6::timestamptz,now()),refunded_by=$3,
               refund_operation_key=$4,refund_reason=$5
         WHERE environment=$1 AND id=$2 AND refund_status='pending'
         RETURNING refunded_at`,
-      [environment, input.reversal_id, actorLabel, operation.idempotencyKey, reason],
+      [environment, input.reversal_id, actorLabel, operation.idempotencyKey, reason,
+       input.refunded_at ?? null],
     );
     if (!paid.rows[0]) throw new Error('commission_refund_not_pending');
     const result = integrityResult({
@@ -77,7 +88,10 @@ export async function settleCommissionRefund(
       idempotencyKey: operation.idempotencyKey,
       before: { refund_status: 'pending', amount: row.amount },
       after: { ...result, refund_status: 'paid', reason,
-        commission_entry_id: row.commission_entry_id },
+        commission_entry_id: row.commission_entry_id,
+        payment_method: input.payment_method?.trim() || null,
+        cash_account: input.cash_account?.trim() || null,
+        note: input.note?.trim() || null },
     });
     await completeIntegrityOperation(
       client, operation, 'finance.matriz_commission_reversals', row.id, result,

@@ -82,6 +82,7 @@ describe('Marketing — campanhas multicanal', () => {
       attributed_sales: null,
       profit: null,
       stock_status: 'not_reconciled',
+      cost_status: 'disabled',
       attribution_status: 'disabled',
     });
     expect(payload.campaigns[1]?.decision.id).toBe('review');

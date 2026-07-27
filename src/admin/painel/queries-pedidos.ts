@@ -28,6 +28,7 @@ export interface RegisterManualOrderInput {
     discount_amount?: number;
   }>;
   payment_method: string | null;
+  payment_due_on?: string | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   actor_label: string;
@@ -48,6 +49,7 @@ export interface RegisterWalkinOrderInput {
     discount_amount?: number;
   }>;
   payment_method: string | null;
+  payment_due_on?: string | null;
   fulfillment_mode: 'delivery' | 'pickup';
   delivery_address?: string | null;
   actor_label: string;

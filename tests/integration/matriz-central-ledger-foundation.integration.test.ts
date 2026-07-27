@@ -10,9 +10,22 @@ type LedgerLine = {
 
 describe('0149 — fundacao do livro financeiro central', () => {
   let db: IntegrationDb;
+  let getStatement: typeof import(
+    '../../src/admin/painel/matriz-ledger-statement.js'
+  ).getMatrizLedgerStatement;
 
   beforeAll(async () => {
+    Object.assign(process.env, {
+      NODE_ENV: 'test',
+      FAREJADOR_ENV: 'test',
+      DATABASE_URL: 'postgres://test',
+      CHATWOOT_HMAC_SECRET: 'test-secret',
+      ADMIN_AUTH_TOKEN: 'emergency-token',
+    });
     db = await startPostgres();
+    ({ getMatrizLedgerStatement: getStatement } = await import(
+      '../../src/admin/painel/matriz-ledger-statement.js'
+    ));
   }, 120_000);
   afterAll(async () => { if (db) await stopPostgres(db); });
 
@@ -285,5 +298,35 @@ describe('0149 — fundacao do livro financeiro central', () => {
     );
     expect(functions.rows).toHaveLength(4);
     expect(functions.rows.every((row) => row.allowed === false)).toBe(true);
+  });
+
+  it('expoe extrato central por competencia e caixa sem vazar campo interno', async () => {
+    await post(
+      'test', 'finance.statement.proof', 'statement-001', 'cash_sale', 42,
+      [
+        { account_code: 'cash', account_class: 'asset', side: 'debit', amount: 42 },
+        { account_code: 'sales_revenue', account_class: 'revenue', side: 'credit', amount: 42 },
+      ],
+      { competence: '2026-07-20', cashOn: '2026-07-20' },
+    );
+
+    const competence = await getStatement({
+      environment: 'test', period: '2026-07', basis: 'competencia', limit: 200,
+    }, db.pool);
+    const cash = await getStatement({
+      environment: 'test', period: '2026-07', basis: 'caixa', limit: 200,
+    }, db.pool);
+    const row = cash.rows.find((item) => item.source_id === 'statement-001');
+
+    expect(competence.rows.some((item) => item.source_id === 'statement-001')).toBe(true);
+    expect(row).toMatchObject({
+      direction: 'entrada',
+      status: 'registrado',
+      origin: 'Financeiro',
+      amount: '42.00',
+    });
+    expect(row).not.toHaveProperty('total_count');
+    expect(cash.total).toBeGreaterThanOrEqual(1);
+    expect(Number(cash.summary.entradas)).toBeGreaterThanOrEqual(42);
   });
 });

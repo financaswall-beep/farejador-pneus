@@ -27,6 +27,7 @@ export interface RegisterWholesalePurchaseInput {
   new_supplier?: { name: string; phone?: string | null; document?: string | null } | null;
   items: PurchaseItemInput[];
   purchased_at?: string | null;
+  paid_at?: string | null;
   notes?: string | null;
   created_by: string;
   payment_status?: 'paid' | 'pending';
@@ -126,7 +127,8 @@ export async function registerWholesalePurchase(
         new_supplier: input.new_supplier ? { name: input.new_supplier.name.trim(),
           phone: input.new_supplier.phone ? normalizeBrazilianPhone(input.new_supplier.phone) : null,
           document: input.new_supplier.document?.replace(/\D/g, '') || null } : null,
-        purchased_at: input.purchased_at ?? null, notes: input.notes?.trim() || null,
+        purchased_at: input.purchased_at ?? null, paid_at: input.paid_at ?? null,
+        notes: input.notes?.trim() || null,
         payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
         receipt_status: receiptStatus,
         items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
@@ -149,7 +151,8 @@ export async function registerWholesalePurchase(
        RETURNING id,purchased_at,paid_at`,
       [environment, supplier.id, input.purchased_at ?? null, input.created_by, input.notes ?? null,
        pendingPayment ? 'pending' : 'paid', pendingPayment ? (input.due_date ?? null) : null,
-       env.WHOLESALE_FINANCE && !pendingPayment ? new Date().toISOString() : null]);
+       env.WHOLESALE_FINANCE && !pendingPayment
+         ? input.paid_at ?? input.purchased_at ?? new Date().toISOString() : null]);
     const purchaseId = purchase.rows[0]!.id;
     for (const item of items) {
       await client.query(

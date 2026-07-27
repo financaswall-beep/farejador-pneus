@@ -74,6 +74,7 @@ export interface RegisterWholesaleSaleInput {
   new_customer?: { name: string; phone?: string | null } | null;
   items: SaleItemInput[];
   sold_at?: string | null;
+  paid_at?: string | null;
   notes?: string | null;
   created_by: string;
   seller_collaborator_id?: string | null;
@@ -161,7 +162,8 @@ async function insertSaleHeader(
   const pending = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
   const values = [environment, buyerId, input.sold_at ?? null, input.created_by,
     input.notes ?? null, pending ? 'pending' : 'paid', pending ? (input.due_date ?? null) : null,
-    env.WHOLESALE_FINANCE && !pending ? new Date().toISOString() : null,
+    env.WHOLESALE_FINANCE && !pending
+      ? input.paid_at ?? input.sold_at ?? new Date().toISOString() : null,
     input.seller_collaborator_id ?? null];
   const sellerReady = await hasMatrizSellerColumn(client, 'wholesale_orders');
   const sellerSql = sellerReady
@@ -189,7 +191,8 @@ export async function registerWholesaleSale(
       customer_id: input.customer_id ?? null, partner_id: input.partner_id ?? null,
       new_customer: input.new_customer ? { name: input.new_customer.name.trim(),
         phone: input.new_customer.phone ? normalizeBrazilianPhone(input.new_customer.phone) : null } : null,
-      sold_at: input.sold_at ?? null, notes: input.notes?.trim() || null,
+      sold_at: input.sold_at ?? null, paid_at: input.paid_at ?? null,
+      notes: input.notes?.trim() || null,
       payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
       seller_collaborator_id: input.seller_collaborator_id ?? null,
       items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,

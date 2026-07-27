@@ -207,7 +207,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
     },
     async atacadoCancelSale(v) {
       const pago = v.payment_status === 'paid';
-      const aviso = pago ? '\n\n⚠️ A venda consta como paga; o acerto financeiro é externo.'
+      const aviso = pago ? '\n\n⚠️ A venda consta como paga; o Financeiro criará uma devolução ao cliente em aberto.'
         : '\n\nEla sai do ranking, do resumo e do a receber.';
       if (!window.confirm(`Cancelar a venda de ${v.buyer_name} (${this.formatCurrency(Number(v.total_amount))})?${aviso}`)) return;
       const operation = window.PAINEL_INTEGRITY.operation('wholesale-sale-cancel', v.id);

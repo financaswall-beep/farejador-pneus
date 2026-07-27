@@ -10,6 +10,12 @@ export interface MatrizLedgerLine {
   amount: number;
 }
 
+export interface MatrizLedgerPaymentDetails {
+  payment_method?: string | null;
+  cash_account?: string | null;
+  note?: string | null;
+}
+
 export interface MatrizLedgerPostInput {
   environment: 'prod' | 'test';
   sourceType: string;
