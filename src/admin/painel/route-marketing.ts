@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
 import {
+  getMarketingCampaignDetail,
   getMarketingCampaigns,
   getMarketingIntegrations,
   getMarketingJourneys,
@@ -24,6 +25,10 @@ const querySchema = z.object({
 const campaignQuerySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
   channel: z.enum(['all', 'meta', 'google', 'tiktok']).default('all'),
+}).strict();
+
+const campaignParamsSchema = z.object({
+  campaignId: z.string().min(1).max(100),
 }).strict();
 
 const syncBodySchema = z.object({
@@ -49,6 +54,23 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
       return reply.status(200).send(await getMarketingCampaigns(parsed.data.period, parsed.data.channel));
     } catch (err) {
       logger.error({ err }, 'painel marketing campaigns failed');
+      return reply.status(500).send({ error: 'internal_error' });
+    }
+  });
+
+  fastify.get('/admin/api/marketing/campaigns/:campaignId', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = campaignParamsSchema.safeParse(request.params ?? {});
+    const query = querySchema.safeParse(request.query ?? {});
+    if (!params.success || !query.success) {
+      return reply.status(400).send({ error: 'invalid_query' });
+    }
+    try {
+      const detail = await getMarketingCampaignDetail(params.data.campaignId, query.data.period);
+      return detail
+        ? reply.status(200).send(detail)
+        : reply.status(404).send({ error: 'campaign_not_found' });
+    } catch (err) {
+      logger.error({ err }, 'painel marketing campaign detail failed');
       return reply.status(500).send({ error: 'internal_error' });
     }
   });

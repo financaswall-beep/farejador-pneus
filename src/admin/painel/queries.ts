@@ -2,6 +2,7 @@ export * from './queries-stock-reconciliation.js';
 export * from './queries-rede-custos.js';
 export * from './queries-marketing.js';
 export * from './queries-marketing-campaigns.js';
+export * from './queries-marketing-campaign-detail.js';
 export * from './queries-marketing-integrations.js';
 export * from './queries-marketing-journeys.js';
 

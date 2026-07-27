@@ -92,6 +92,9 @@ window.PAINEL_MODULES.marketing = function () {
     },
 
     marketingSetTab(tab) {
+      if (tab === 'campanhas' && this.marketingCampaignDetailId) {
+        this.closeMarketingCampaignDetail();
+      }
       this.marketingTab = tab;
       if (tab === 'campanhas') void this.loadMarketingCampaigns();
       if (tab === 'jornadas') void this.loadMarketingJourneys();
@@ -102,8 +105,14 @@ window.PAINEL_MODULES.marketing = function () {
     marketingPeriodChanged() {
       void this.loadMarketing();
       if (this.marketingTab === 'campanhas') {
+        const openedCampaign = this.marketingCampaignDetailId;
         this.marketingCampaigns = null;
-        void this.loadMarketingCampaigns();
+        if (openedCampaign) this.marketingCampaignDetail = null;
+        void this.loadMarketingCampaigns().then(() => {
+          if (openedCampaign && this.marketingCampaignDetailId === openedCampaign) {
+            void this.loadMarketingCampaignDetail();
+          }
+        });
       }
       if (this.marketingTab === 'jornadas') {
         this.marketingJourneys = null;

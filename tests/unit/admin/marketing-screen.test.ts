@@ -6,6 +6,7 @@ describe('Marketing — primeira tela da matriz', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const front = readFileSync(resolve('painel/public/app.marketing.js'), 'utf8');
   const campaignsFront = readFileSync(resolve('painel/public/app.marketing.campaigns.js'), 'utf8');
+  const campaignDetailFront = readFileSync(resolve('painel/public/app.marketing.campaign-detail.js'), 'utf8');
   const journeysFront = readFileSync(resolve('painel/public/app.marketing.journeys.js'), 'utf8');
   const integrationsFront = readFileSync(resolve('painel/public/app.marketing.integrations.js'), 'utf8');
   const route = readFileSync(resolve('src/admin/painel/route-marketing.ts'), 'utf8');
@@ -37,13 +38,15 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("{ preHandler: requireAdminOwner }");
     expect(route).toContain("z.enum(['7d', '30d'])");
     expect(staticRoute).toContain("'app.marketing.js'");
-    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/app.marketing.js?v=20260726-marketing-detail1');
     expect(html).toContain('/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail1');
     expect(html).toContain('/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2');
     expect(html).toContain('/admin/painel/app.marketing.integrations.js?v=20260726-marketing-meta2');
-    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-meta2');
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260726-marketing-detail1');
     expect(staticRoute).toContain("fastify.get('/admin/painel/assets/marketing-hero.webp'");
     expect(staticRoute).toContain("'app.marketing.campaigns.js'");
+    expect(staticRoute).toContain("'app.marketing.campaign-detail.js'");
     expect(staticRoute).toContain("'app.marketing.journeys.js'");
     expect(staticRoute).toContain("'app.marketing.integrations.js'");
     expect(front).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
@@ -144,6 +147,23 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(route).toContain("z.enum(['all', 'meta', 'google', 'tiktok'])");
     expect(campaignsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
+  });
+
+  it('abre o detalhe real ao clicar numa campanha e preserva o retorno à lista', () => {
+    const marketingStart = html.indexOf('<div x-show="currentPage === \'marketing\'"');
+    const marketingEnd = html.indexOf('TELA: PLACEHOLDERS', marketingStart);
+    const marketingHtml = html.slice(marketingStart, marketingEnd);
+
+    expect(marketingHtml).toContain('data-marketing-campaign-detail-screen');
+    expect(marketingHtml).toContain('@click="openMarketingCampaignDetail(row)"');
+    expect(marketingHtml).toContain('Voltar para campanhas');
+    expect(marketingHtml).toContain('Eficiência do atendimento');
+    expect(marketingHtml).toContain('Raio-X financeiro');
+    expect(marketingHtml).toContain('Resultado por anúncio');
+    expect(campaignDetailFront).toContain('/admin/api/marketing/campaigns/${encodeURIComponent(campaignId)}?period=');
+    expect(campaignDetailFront).toContain('closeMarketingCampaignDetail()');
+    expect(route).toContain("fastify.get('/admin/api/marketing/campaigns/:campaignId'");
+    expect(campaignDetailFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
   });
 
   it('implementa Integrações sem expor segredo nem inventar conexão ou auditoria', () => {

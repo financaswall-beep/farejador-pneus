@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-meta2" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-detail1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -44,8 +44,9 @@
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
-<script src="/admin/painel/app.marketing.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.js?v=20260726-marketing-detail1"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail1"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260716-etapa5"></script>
@@ -58,8 +59,8 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260726-marketing-integrations1"></script>
-<script src="/admin/painel/app.js?v=20260726-marketing-integrations1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260726-marketing-detail1"></script>
+<script src="/admin/painel/app.js?v=20260726-marketing-detail1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -6910,7 +6911,7 @@
         </div>
       </div>
 
-      <section x-show="marketingTab === 'campanhas'"
+      <section x-show="marketingTab === 'campanhas' && !marketingCampaignDetailId"
                class="space-y-4"
                data-marketing-campaigns-screen
                x-cloak>
@@ -7047,7 +7048,10 @@
                   </thead>
                   <tbody class="divide-y divide-gray-100">
                     <template x-for="row in marketingCampaignPageRows()" :key="row.id">
-                      <tr class="hover:bg-emerald-50/30">
+                      <tr @click="openMarketingCampaignDetail(row)"
+                          @keydown.enter.prevent="openMarketingCampaignDetail(row)"
+                          tabindex="0" role="link"
+                          class="cursor-pointer outline-none hover:bg-emerald-50/50 focus:bg-emerald-50 focus:ring-2 focus:ring-inset focus:ring-emerald-500">
                         <td class="px-5 py-4">
                           <p class="max-w-[250px] truncate text-sm font-semibold text-gray-900" x-text="row.name"></p>
                           <p class="mt-1 text-[11px] text-gray-400" x-text="row.delivery_days + ' dia(s) com entrega • até ' + marketingDateLabel(row.last_delivery)"></p>
@@ -7197,6 +7201,280 @@
               </div>
             </aside>
           </div>
+        </div>
+      </section>
+
+      <section x-show="marketingTab === 'campanhas' && marketingCampaignDetailId"
+               data-marketing-campaign-detail-screen
+               class="space-y-4"
+               x-cloak>
+        <header class="space-y-3">
+          <button type="button" @click="closeMarketingCampaignDetail()"
+                  class="inline-flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-emerald-800">
+            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+            Voltar para campanhas
+          </button>
+          <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">resultado da campanha</p>
+                <span x-show="marketingIsMock()"
+                      class="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
+                  Amostra navegável
+                </span>
+              </div>
+              <h2 class="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950"
+                  x-text="marketingCampaignDetail?.campaign?.name || 'Detalhe da campanha'"></h2>
+              <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 font-semibold text-emerald-800">
+                  <span class="relative h-4 w-5" aria-hidden="true">
+                    <img src="/assets/brands/facebook.svg" alt="" class="absolute left-0 top-0 h-3.5 w-3.5">
+                    <img src="/assets/brands/instagram.svg" alt="" class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded bg-white ring-1 ring-white">
+                  </span>
+                  Com entrega
+                </span>
+                <span>Meta Ads</span><span>•</span>
+                <span x-text="marketingCampaignDetail?.period ? `${marketingDateLabel(marketingCampaignDetail.period.since)} — ${marketingDateLabel(marketingCampaignDetail.period.until)}` : 'Período selecionado'"></span>
+              </div>
+            </div>
+            <button type="button" @click="loadMarketingCampaignDetail()"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-700 hover:border-emerald-200 hover:text-emerald-800">
+              <i data-lucide="refresh-cw" class="h-4 w-4" :class="marketingCampaignDetailLoading ? 'animate-spin' : ''"></i>
+              Atualizar campanha
+            </button>
+          </div>
+        </header>
+
+        <div x-show="marketingCampaignDetailLoading && !marketingCampaignDetail"
+             class="rounded-xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">
+          Carregando os dados reais desta campanha…
+        </div>
+        <div x-show="marketingCampaignDetailError"
+             class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <span x-text="marketingCampaignDetailError"></span>
+          <button type="button" @click="loadMarketingCampaignDetail()" class="font-semibold underline">Tentar novamente</button>
+        </div>
+
+        <div x-show="marketingCampaignDetail && !marketingCampaignDetailError" class="space-y-4">
+          <section class="grid overflow-hidden rounded-xl border border-emerald-900 bg-gradient-to-r from-emerald-950 to-emerald-900 text-white shadow-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <template x-for="(kpi, index) in marketingCampaignDetailKpis()" :key="kpi.id">
+              <article class="min-h-[108px] border-emerald-800/80 px-3 py-4"
+                       :class="index ? 'border-t sm:border-l sm:border-t-0' : ''">
+                <p class="text-[11px] text-emerald-100/75" x-text="kpi.label"></p>
+                <p class="mt-1.5 whitespace-nowrap text-lg font-semibold tracking-tight num"
+                   :class="kpi.tone === 'positive' ? 'text-emerald-300' : kpi.tone === 'negative' ? 'text-rose-300' : 'text-white'"
+                   x-text="kpi.value"></p>
+                <span class="mt-2 inline-flex rounded border px-1.5 py-0.5 text-[9px] font-semibold"
+                      :class="marketingCampaignDetailSourceClass(kpi.source)"
+                      x-text="kpi.source"></span>
+              </article>
+            </template>
+          </section>
+
+          <div x-show="marketingCampaignDetail?.attribution?.status !== 'ready'"
+               class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <i data-lucide="lock-keyhole" class="mt-0.5 h-5 w-5 shrink-0"></i>
+            <div>
+              <p class="text-sm font-semibold" x-text="marketingCampaignAttributionLabel(marketingCampaignDetail?.attribution?.status)"></p>
+              <p class="mt-1 text-xs leading-relaxed">Vendas, receita, margem, resultado, ROAS e CAC ficam em branco até existir vínculo CTWA rastreável. Zero atribuído não é exibido como zero vendido.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-7">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-950">Eficiência do atendimento</h3>
+                <p class="mt-1 text-xs text-gray-500">O anúncio trouxe a conversa. A operação conseguiu responder?</p>
+              </div>
+              <div class="mt-5 grid gap-5 lg:grid-cols-[180px_1fr]">
+                <div class="flex flex-col items-center justify-center">
+                  <div class="grid h-40 w-40 place-items-center rounded-full p-3"
+                       :style="`background:conic-gradient(#047857 ${Math.min(100, marketingCampaignDetail?.summary?.response_rate || 0)}%, #f59e0b 0)`">
+                    <div class="grid h-full w-full place-items-center rounded-full bg-white text-center shadow-inner">
+                      <div>
+                        <strong class="block text-4xl font-semibold text-emerald-800 num"
+                                x-text="marketingCampaignDetail?.summary?.response_rate == null ? '—' : `${Number(marketingCampaignDetail.summary.response_rate).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></strong>
+                        <span class="mt-1 block text-[11px] text-gray-500">resposta registrada<br>pela Meta</span>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="mt-3 inline-flex rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-[9px] font-semibold text-sky-700">META</span>
+                </div>
+                <div class="space-y-4">
+                  <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <article class="rounded-xl border border-gray-200 p-3 text-center">
+                      <strong class="block text-3xl font-semibold num text-gray-950" x-text="marketingCampaignDetail?.summary?.conversations_started || 0"></strong>
+                      <span class="mt-1 block text-[11px] text-gray-500">Conversas iniciadas</span>
+                    </article>
+                    <article class="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 text-center">
+                      <strong class="block text-3xl font-semibold num text-emerald-800" x-text="marketingCampaignDetail?.summary?.first_replies || 0"></strong>
+                      <span class="mt-1 block text-[11px] text-gray-500">Primeiras respostas</span>
+                    </article>
+                    <article class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
+                      <strong class="block text-3xl font-semibold num text-amber-700" x-text="marketingCampaignDetail?.summary?.unanswered || 0"></strong>
+                      <span class="mt-1 block text-[11px] text-gray-500">Sem primeira resposta</span>
+                    </article>
+                  </div>
+                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-center">
+                    <div>
+                      <span class="block text-[10px] text-gray-500">Custo por conversa iniciada</span>
+                      <strong class="mt-1 block text-xl font-semibold text-emerald-800 num"
+                              x-text="marketingCampaignDetail?.summary?.cost_per_started == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cost_per_started))"></strong>
+                    </div>
+                    <div class="text-center">
+                      <strong class="block text-sm text-emerald-800"
+                              x-text="marketingCampaignResponseDelta() == null ? '→' : `+${Number(marketingCampaignResponseDelta()).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></strong>
+                      <i data-lucide="arrow-right" class="mx-auto mt-1 h-4 w-4 text-gray-400"></i>
+                    </div>
+                    <div>
+                      <span class="block text-[10px] text-gray-500">Custo por conversa respondida</span>
+                      <strong class="mt-1 block text-xl font-semibold text-amber-700 num"
+                              x-text="marketingCampaignDetail?.summary?.cost_per_replied == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cost_per_replied))"></strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <i data-lucide="circle-alert" class="mt-0.5 h-4 w-4 shrink-0"></i>
+                <p class="text-xs leading-relaxed">
+                  <strong x-text="marketingCampaignDetail?.summary?.unanswered_investment == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.unanswered_investment))"></strong>
+                  de mídia estão associados proporcionalmente a conversas sem primeira resposta. Antes de aumentar a verba, verifique escala, fila e horário.
+                </p>
+              </div>
+              <p class="mt-3 text-[10px] leading-relaxed text-gray-400">A primeira resposta é a métrica registrada pela Meta. Atendimento humano e tempo de resposta por campanha serão confirmados pelo Chatwoot quando houver vínculo CTWA.</p>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-5">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-950">Raio-X financeiro</h3>
+                <p class="mt-1 text-xs text-gray-500">O que a campanha vendeu e quanto sobrou depois da mídia.</p>
+              </div>
+              <div class="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-200">
+                <template x-for="row in marketingCampaignDetailFinancialRows()" :key="row.id">
+                  <div class="flex items-center justify-between gap-3 px-4 py-3"
+                       :class="row.kind === 'result' ? 'bg-emerald-50' : ''">
+                    <span class="text-xs" :class="row.kind === 'result' ? 'font-semibold text-emerald-900' : 'text-gray-600'" x-text="row.label"></span>
+                    <strong class="text-sm num"
+                            :class="row.kind === 'result' && Number(row.value) >= 0 ? 'text-emerald-700' : row.kind === 'media' ? 'text-amber-700' : 'text-gray-900'"
+                            x-text="row.value == null ? '—' : formatCurrency(Number(row.value))"></strong>
+                  </div>
+                </template>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <article class="rounded-xl bg-gray-50 p-4">
+                  <span class="text-[10px] text-gray-500">ROAS real</span>
+                  <strong class="mt-1 block text-2xl font-semibold text-gray-950 num"
+                          x-text="marketingCampaignDetail?.financial?.roas == null ? '—' : `${Number(marketingCampaignDetail.financial.roas).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x`"></strong>
+                </article>
+                <article class="rounded-xl bg-gray-50 p-4">
+                  <span class="text-[10px] text-gray-500">CAC real</span>
+                  <strong class="mt-1 block text-2xl font-semibold text-gray-950 num"
+                          x-text="marketingCampaignDetail?.financial?.cac == null ? '—' : formatCurrency(Number(marketingCampaignDetail.financial.cac))"></strong>
+                </article>
+              </div>
+              <div class="mt-4 flex items-start gap-2 text-[10px] leading-relaxed text-gray-400">
+                <i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>
+                <span>Resultado = margem bruta dos pedidos atribuídos − investimento Meta. A margem só é exibida quando todos os custos estão disponíveis.</span>
+              </div>
+            </section>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-7">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-base font-semibold text-gray-950">Entrega ao longo do período</h3>
+                  <p class="mt-1 text-[11px] text-gray-500">Investimento e conversas por dia com entrega.</p>
+                </div>
+                <span class="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700">META</span>
+              </div>
+              <div class="mt-5 flex h-44 items-end gap-2 overflow-x-auto border-b border-gray-200 pb-1">
+                <template x-for="day in marketingCampaignDetail?.trend || []" :key="day.date">
+                  <div class="flex min-w-[42px] flex-1 flex-col items-center justify-end gap-1">
+                    <span class="text-[9px] font-semibold text-emerald-800" x-text="day.conversations_started || 0"></span>
+                    <div class="w-full rounded-t bg-emerald-700/85"
+                         :style="`height:${marketingCampaignDetailBar(day.investment, 'investment')}`"
+                         :title="`${marketingDateLabel(day.date)} • ${formatCurrency(Number(day.investment))}`"></div>
+                    <span class="text-[9px] text-gray-400" x-text="marketingDateLabel(day.date)"></span>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-5">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-base font-semibold text-gray-950">Diagnóstico de mídia</h3>
+                  <p class="mt-1 text-[11px] text-gray-500">Contexto para entender a entrega, sem copiar o Gerenciador.</p>
+                </div>
+                <span class="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700">META</span>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">Impressões</span><strong class="mt-1 block text-lg num" x-text="Number(marketingCampaignDetail?.summary?.impressions || 0).toLocaleString('pt-BR')"></strong></article>
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">Cliques</span><strong class="mt-1 block text-lg num" x-text="Number(marketingCampaignDetail?.summary?.clicks || 0).toLocaleString('pt-BR')"></strong></article>
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">CTR</span><strong class="mt-1 block text-lg num" x-text="marketingCampaignDetail?.summary?.ctr == null ? '—' : `${Number(marketingCampaignDetail.summary.ctr).toLocaleString('pt-BR')}%`"></strong></article>
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">CPC total</span><strong class="mt-1 block text-lg num" x-text="marketingCampaignDetail?.summary?.cpc == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cpc))"></strong></article>
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">CPM</span><strong class="mt-1 block text-lg num" x-text="marketingCampaignDetail?.summary?.cpm == null ? '—' : formatCurrency(Number(marketingCampaignDetail.summary.cpm))"></strong></article>
+                <article class="rounded-lg bg-gray-50 p-3"><span class="text-[10px] text-gray-500">Visualizações</span><strong class="mt-1 block text-lg num" x-text="Number(marketingCampaignDetail?.summary?.video_views || 0).toLocaleString('pt-BR')"></strong></article>
+              </div>
+            </section>
+          </div>
+
+          <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+              <div>
+                <h3 class="text-base font-semibold text-gray-950">Resultado por anúncio</h3>
+                <p class="mt-1 text-[11px] text-gray-500">Quais anúncios trouxeram conversa e qual foi o custo da resposta registrada.</p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-semibold text-gray-600"
+                    x-text="`${marketingCampaignDetail?.ads?.length || 0} anúncio(s)`"></span>
+            </header>
+            <div x-show="marketingCampaignDetail?.ads?.length" class="overflow-x-auto">
+              <table class="w-full min-w-[920px] text-xs">
+                <thead class="bg-gray-50 text-left text-[11px] text-gray-500">
+                  <tr>
+                    <th class="px-5 py-3 font-medium">Anúncio</th>
+                    <th class="px-3 py-3 text-right font-medium">Investimento</th>
+                    <th class="px-3 py-3 text-right font-medium">Conversas</th>
+                    <th class="px-3 py-3 text-right font-medium">Respostas</th>
+                    <th class="px-3 py-3 text-right font-medium">Taxa de resposta</th>
+                    <th class="px-5 py-3 text-right font-medium">Custo/respondida</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="ad in marketingCampaignDetail?.ads || []" :key="ad.id">
+                    <tr>
+                      <td class="px-5 py-3.5"><strong class="block text-gray-900" x-text="ad.name"></strong><span class="mt-1 block text-[10px] text-gray-400" x-text="ad.adset_name || 'Conjunto não informado'"></span></td>
+                      <td class="px-3 py-3.5 text-right font-semibold num" x-text="formatCurrency(Number(ad.investment || 0))"></td>
+                      <td class="px-3 py-3.5 text-right num" x-text="ad.conversations_started || 0"></td>
+                      <td class="px-3 py-3.5 text-right num" x-text="ad.first_replies || 0"></td>
+                      <td class="px-3 py-3.5 text-right num" x-text="ad.response_rate == null ? '—' : `${Number(ad.response_rate).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`"></td>
+                      <td class="px-5 py-3.5 text-right font-semibold num" x-text="ad.cost_per_replied == null ? '—' : formatCurrency(Number(ad.cost_per_replied))"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <p x-show="!marketingCampaignDetail?.ads?.length" class="px-5 py-8 text-center text-xs text-gray-500">A campanha tem entrega, mas o detalhamento por anúncio ainda não foi sincronizado.</p>
+          </section>
+
+          <section class="flex flex-col gap-4 rounded-xl border p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                   :class="marketingCampaignDetailDecisionClass(marketingCampaignDetail?.decision?.tone)">
+            <div class="flex items-start gap-3">
+              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70">
+                <i :data-lucide="marketingCampaignDetail?.decision?.tone === 'positive' ? 'circle-check' : 'scan-search'" class="h-5 w-5"></i>
+              </span>
+              <div>
+                <p class="text-sm font-semibold" x-text="marketingCampaignDetail?.decision?.title"></p>
+                <p class="mt-1 text-xs leading-relaxed opacity-80" x-text="marketingCampaignDetail?.decision?.detail"></p>
+              </div>
+            </div>
+            <button type="button" @click="marketingNavigate('jornadas')"
+                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-current bg-white/70 px-3 py-2 text-xs font-semibold">
+              Ver jornadas atribuídas
+              <i data-lucide="arrow-right" class="h-4 w-4"></i>
+            </button>
+          </section>
         </div>
       </section>
 
