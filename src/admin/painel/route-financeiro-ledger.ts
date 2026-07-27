@@ -47,7 +47,10 @@ const settleFinanceItemSchema = z.object({
   settlement_mode: settlementModeSchema,
   target_id: z.string().min(1).max(200),
   obligation_id: z.string().uuid().optional(),
-  account_code: z.literal('marketing_payable').optional(),
+  // Compatibilidade com a versão anterior do painel: itens do ledger trazem
+  // account_code para exibição e o formulário antigo o reenviava em qualquer
+  // baixa. Fora de central_account esse campo não escolhe o alvo e é ignorado.
+  account_code: z.string().trim().min(1).max(80).optional(),
   amount: z.number().positive().max(999_999_999.99).optional(),
   idempotency_key: z.string().trim().min(8).max(200),
 }).merge(requiredPaymentDetailsSchema).superRefine((body, ctx) => {
@@ -59,7 +62,8 @@ const settleFinanceItemSchema = z.object({
       message: 'settlement_target_invalid',
     });
   }
-  if (body.settlement_mode === 'central_account' && !body.account_code) {
+  if (body.settlement_mode === 'central_account'
+    && body.account_code !== 'marketing_payable') {
     ctx.addIssue({
       code: z.ZodIssueCode.custom, path: ['account_code'],
       message: 'settlement_target_invalid',

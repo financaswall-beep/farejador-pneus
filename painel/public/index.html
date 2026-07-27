@@ -25,7 +25,7 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
 <script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.varejo.js?v=20260716-etapa4"></script>
+<script src="/admin/painel/app.varejo.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260724-estoque-mock1"></script>
@@ -50,13 +50,13 @@
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260727-marketing-capi1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260727-ledger-agenda2"></script>
-<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-ledger-agenda2"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-settle-fix1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
-<script src="/admin/painel/app.pedidos.parceiros.js?v=20260716-stock-source1"></script>
+<script src="/admin/painel/app.pedidos.parceiros.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
@@ -7605,7 +7605,7 @@
               <div x-show="Number(marketingCampaignDetail?.financial?.pending_margin_orders || 0) > 0"
                    class="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-800">
                 <i data-lucide="circle-alert" class="h-4 w-4"></i>
-                <span x-text="`${marketingCampaignDetail.financial.pending_margin_orders} venda(s) sem margem calculada.`"></span>
+                <span x-text="`${Number(marketingCampaignDetail?.financial?.pending_margin_orders || 0)} venda(s) sem margem calculada.`"></span>
               </div>
             </section>
           </div>

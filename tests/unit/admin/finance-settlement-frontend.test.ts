@@ -66,4 +66,84 @@ describe('baixa pela porta unica do Financeiro', () => {
     expect(context.finBaixaModal.item).toBeNull();
     expect(integrity.complete).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    ['retail_sale', 'accounts_receivable'],
+    ['central_obligation', 'accounts_payable'],
+  ])('envia somente obligation_id para %s', async (settlementMode, accountCode) => {
+    const { module } = loadModule();
+    const apiPost = vi.fn().mockResolvedValue({ settled: true });
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      finQuitando: false,
+      finBaixaModal: {
+        open: true,
+        item: {
+          id: 'ledger-item-1',
+          tipo: 'despesa',
+          valor: 120,
+          settlement_mode: settlementMode,
+          obligation_id: '11111111-1111-4111-8111-111111111111',
+          account_code: accountCode,
+        },
+        direction: 'payable',
+        amount: '120,00',
+        payment_date: '2026-07-27',
+        payment_method: 'pix',
+        cash_account: 'Caixa principal',
+        note: '',
+        error: null,
+      },
+      apiPost,
+      loadFinanceiro: vi.fn(),
+      loadSino: vi.fn(),
+      loadFinExtrato: vi.fn(),
+      $nextTick: vi.fn(),
+    };
+
+    await module.finConfirmarBaixa.call(context);
+
+    const payload = apiPost.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload.obligation_id).toBe('11111111-1111-4111-8111-111111111111');
+    expect(payload).not.toHaveProperty('account_code');
+  });
+
+  it('envia marketing_payable somente para a conta central de Marketing', async () => {
+    const { module } = loadModule();
+    const apiPost = vi.fn().mockResolvedValue({ settled: true });
+    const context = {
+      ...module,
+      adminUser: { role: 'owner' },
+      finQuitando: false,
+      finBaixaModal: {
+        open: true,
+        item: {
+          id: 'marketing_payable',
+          tipo: 'marketing',
+          valor: 120,
+          settlement_mode: 'central_account',
+          account_code: 'marketing_payable',
+        },
+        direction: 'payable',
+        amount: '120,00',
+        payment_date: '2026-07-27',
+        payment_method: 'pix',
+        cash_account: 'Caixa principal',
+        note: '',
+        error: null,
+      },
+      apiPost,
+      loadFinanceiro: vi.fn(),
+      loadSino: vi.fn(),
+      loadFinExtrato: vi.fn(),
+      $nextTick: vi.fn(),
+    };
+
+    await module.finConfirmarBaixa.call(context);
+
+    const payload = apiPost.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(payload.account_code).toBe('marketing_payable');
+    expect(payload).not.toHaveProperty('obligation_id');
+  });
 });

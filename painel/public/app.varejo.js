@@ -270,8 +270,11 @@ window.PAINEL_MODULES.varejo = function () {
       if (!reason.trim()) { window.alert('Informe o motivo do cancelamento.'); return; }
       try {
         await this.apiPost(`/admin/api/orders/${row.id}/cancel`, { reason: reason.trim() });
-        await this.loadRealData();
-        await this.loadVendasData();
+        await Promise.allSettled([
+          this.loadRealData(),
+          this.loadVendasData(),
+          this.loadFinanceiro(),
+        ]);
       } catch (err) {
         window.alert(`Não consegui cancelar: ${err instanceof Error ? err.message : String(err)}`);
       }

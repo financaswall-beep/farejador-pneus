@@ -32,6 +32,7 @@ async function submitWalkinWithError(code: string) {
     },
     apiPost: vi.fn().mockRejectedValue(new Error(code)),
     loadRealData: vi.fn(),
+    loadFinanceiro: vi.fn(),
     loadVarejoResumo: vi.fn(),
   };
 
@@ -54,5 +55,38 @@ describe('mensagens da venda de balcão da matriz', () => {
     await expect(submitWalkinWithError('internal_server_error')).resolves.toBe(
       'Não consegui registrar a venda. Confira os dados e tente novamente.',
     );
+  });
+
+  it('atualiza o Financeiro depois de registrar a venda', async () => {
+    const module = pedidosModule();
+    const context = {
+      orderSubmitting: false,
+      orderError: null as string | null,
+      modalConv: null,
+      saleModalOpen: true,
+      saleForm: {
+        product_id: 'produto-1',
+        quantity: 1,
+        unit_price: 100,
+        fulfillment_mode: 'pickup',
+        delivery_address: '',
+        payment_method: 'a receber',
+        payment_due_on: '2026-08-10',
+        idempotency_key: 'walkin-teste-refresh',
+        source_tag: 'walkin_balcao',
+        customer_name: 'Cliente teste',
+        customer_phone: '',
+      },
+      apiPost: vi.fn().mockResolvedValue({ id: 'venda-1' }),
+      loadRealData: vi.fn().mockResolvedValue(undefined),
+      loadFinanceiro: vi.fn().mockResolvedValue(undefined),
+      loadVarejoResumo: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await module.submitManualOrder.call(context);
+
+    expect(context.loadFinanceiro).toHaveBeenCalledOnce();
+    expect(context.loadRealData).toHaveBeenCalledOnce();
+    expect(context.saleModalOpen).toBe(false);
   });
 });

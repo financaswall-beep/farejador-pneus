@@ -63,14 +63,18 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
       const operation = window.PAINEL_INTEGRITY.operation(
         'finance-settlement-facade', targetKey,
       );
+      const target = mode === 'central_account'
+        ? { account_code: item.account_code || undefined }
+        : ['retail_sale', 'central_obligation'].includes(mode)
+          ? { obligation_id: item.obligation_id || undefined }
+          : {};
       this.finQuitando = true;
       modal.error = null;
       try {
         await this.apiPost('/admin/api/matriz/financeiro/settle', {
           settlement_mode: mode,
           target_id: item.id,
-          obligation_id: item.obligation_id || undefined,
-          account_code: item.account_code || undefined,
+          ...target,
           amount: this.finPermiteParcial(item) ? amount : undefined,
           paid_at: new Date(`${modal.payment_date}T12:00:00-03:00`).toISOString(),
           payment_method: String(modal.payment_method).trim(),

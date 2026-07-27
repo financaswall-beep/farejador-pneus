@@ -43,6 +43,17 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('aria-label="Buscar cliente ou conversa"');
   });
 
+  it('protege o detalhe financeiro de Marketing antes do carregamento', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+
+    expect(html).toContain(
+      'marketingCampaignDetail?.financial?.pending_margin_orders || 0',
+    );
+    expect(html).not.toContain(
+      '${marketingCampaignDetail.financial.pending_margin_orders}',
+    );
+  });
+
   it('usa dialogo interno nas mutacoes de compra e preserva os modulos novos', () => {
     const source = readFileSync('painel/public/app.compras.acoes.js', 'utf8');
     const purchaseActions = source.slice(

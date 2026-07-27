@@ -77,7 +77,10 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         }
 
         this.saleModalOpen = false;
-        await this.loadRealData();
+        await Promise.allSettled([
+          this.loadRealData(),
+          this.loadFinanceiro(),
+        ]);
         void this.loadVarejoResumo(); // venda nova entra nos cards do varejo (0117)
       } catch (err) {
         this.orderError = this.modalConv
