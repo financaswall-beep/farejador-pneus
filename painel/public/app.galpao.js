@@ -56,6 +56,7 @@ window.PAINEL_MODULES.galpao = function () {
         quantity_invalid: 'Quantidade inválida.',
         cost_invalid: 'Custo inválido.',
         min_invalid: 'Mínimo inválido (número inteiro, 0 ou mais).',
+        reason_required: 'Informe o motivo da alteração de saldo ou custo.',
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
     },
@@ -74,7 +75,10 @@ window.PAINEL_MODULES.galpao = function () {
       if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
       if (min !== null && (!Number.isInteger(min) || min < 0)) { this.stockMsg = { ok: false, text: 'Mínimo inválido (número inteiro, 0 ou mais).' }; return; }
-      if (reason.length < 2) { this.stockMsg = { ok: false, text: 'Explique a origem dessa entrada.' }; return; }
+      if (this.stockAdjustmentChangesValue() && reason.length < 2) {
+        this.stockMsg = { ok: false, text: 'Informe o motivo da alteração de saldo ou custo.' };
+        return;
+      }
       this.stockSaving = true;
       this.stockMsg = null;
       try {
@@ -84,9 +88,10 @@ window.PAINEL_MODULES.galpao = function () {
           unit_cost: cost,
           min_quantity: min,
           notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
+          reason: reason || undefined,
         });
         this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
@@ -97,7 +102,7 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
+      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand, original_unit_cost: row.unit_cost ?? 0 };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
@@ -117,7 +122,7 @@ window.PAINEL_MODULES.galpao = function () {
         const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature, reason, idempotency_key: this.stockForm.idempotency_key });
         window.PAINEL_INTEGRITY.complete('stock-entry', 'form');
         this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' };
+        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // entrada pode ter tirado a medida do "repor"

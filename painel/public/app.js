@@ -91,7 +91,7 @@ function painelApp() {
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' },
+    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null },
     stockSaving: false,
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──

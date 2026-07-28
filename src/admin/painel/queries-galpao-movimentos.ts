@@ -12,6 +12,7 @@ import { env } from '../../shared/config/env.js';
 import {
   addWholesaleStockEntry, deleteWholesaleStock, setWholesaleStock, type WholesaleStockRow,
 } from './queries-galpao.js';
+import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
@@ -61,19 +62,53 @@ async function comRotulo<T>(
 
 /** Definir (upsert da tela) com rótulo 'definir' no filme. Mesmo contrato do setWholesaleStock. */
 export async function setWholesaleStockComRotulo(
-  input: Parameters<typeof setWholesaleStock>[0],
+  input: Parameters<typeof setWholesaleStock>[0] & {
+    reason?: string;
+    actor_label?: string;
+  },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const movementRef = randomUUID();
-  return comRotulo(dbPool, { source: 'definir', nature: 'inventory_count',
-    reason: 'ajuste manual de saldo/custo', ref: movementRef }, async (client) => {
+  const reason = input.reason?.trim() ?? '';
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const catalogMeasure = await resolveMeasureInCatalog(client, environment, input.measure);
+    if (!catalogMeasure) throw new Error('measure_not_in_catalog');
+    const current = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
+      `SELECT quantity_on_hand,unit_cost::text
+         FROM commerce.wholesale_stock
+        WHERE environment=$1 AND measure=$2
+        FOR UPDATE`,
+      [environment, catalogMeasure.measure],
+    );
+    const before = current.rows[0];
+    const nextCostCents = Math.round(Number(input.unit_cost ?? 0) * 100);
+    const currentCostCents = Math.round(Number(before?.unit_cost ?? 0) * 100);
+    const valueChanged = !before
+      || Number(before.quantity_on_hand) !== input.quantity_on_hand
+      || currentCostCents !== nextCostCents;
+    if (valueChanged && reason.length < 2) throw new Error('reason_required');
+
+    await setGalpaoMovContext(client, {
+      source: 'definir',
+      nature: 'inventory_count',
+      reason: valueChanged ? reason : (reason || 'atualização de estoque mínimo/observações'),
+      ref: movementRef,
+    });
     const result = await setWholesaleStock(input, client);
     await postMatrizInventoryAdjustmentsByMovementRef(
-      client, environment, movementRef, 'system:stock-count',
+      client, environment, movementRef, input.actor_label ?? 'system:stock-adjustment',
     );
+    await client.query('COMMIT');
     return result;
-  });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** "+ Entrada" da tela com rótulo 'entrada' (compra avulsa sem ficha de fornecedor). */

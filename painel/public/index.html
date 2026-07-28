@@ -54,15 +54,16 @@
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
-<script src="/admin/painel/app.galpao.js?v=20260727-contagem-fisica1"></script>
+<script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.core.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260726-marketing-detail1"></script>
-<script src="/admin/painel/app.js?v=20260726-marketing-detail1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260727-stock-adjustment1"></script>
+<script src="/admin/painel/app.js?v=20260727-stock-adjustment1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -2868,11 +2869,11 @@
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
           </nav>
           <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
-            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm">
               <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
             </button>
-            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 text-xs font-medium px-4 py-2 rounded-lg">
               <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Ajustar estoque
             </button>
@@ -2934,10 +2935,53 @@
             <label x-show="stockOperacao === 'ajuste'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Estoque mínimo</span><input x-model="stockForm.min_quantity" type="number" min="0" placeholder="Sem aviso" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <div :class="stockOperacao === 'ajuste' ? 'xl:col-span-3' : 'xl:col-span-5'" class="flex justify-end gap-2">
               <button @click="stockOperacao = null" class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button @click="stockOperacao === 'entrada' ? stockEntry() : stockSubmit()" :disabled="stockSaving" class="px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50">
+              <button @click="stockOperacao === 'entrada' ? stockEntry() : stockSubmit()"
+                      :disabled="stockSaving || (stockOperacao === 'ajuste' && stockAdjustmentChangesValue() && String(stockForm.entry_reason || '').trim().length < 2)"
+                      class="px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
                 <span x-show="!stockSaving" x-text="stockOperacao === 'entrada' ? 'Confirmar entrada' : 'Salvar ajuste'"></span><span x-show="stockSaving">Salvando…</span>
               </button>
             </div>
+          </div>
+          <div x-show="stockOperacao === 'ajuste'" class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div class="flex items-start gap-3">
+                <i data-lucide="scale" class="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-700"></i>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold text-emerald-950">Impacto do ajuste</p>
+                  <template x-if="stockAdjustmentImpact()">
+                    <div class="mt-1 space-y-1 text-xs text-emerald-800">
+                      <p>
+                        <span x-text="stockAdjustmentImpact().quantityBefore + ' un × ' + formatCurrency(stockAdjustmentImpact().costBefore)"></span>
+                        <span class="px-1">→</span>
+                        <span x-text="stockAdjustmentImpact().quantityAfter + ' un × ' + formatCurrency(stockAdjustmentImpact().costAfter)"></span>
+                      </p>
+                      <p class="font-medium"
+                         x-text="'Variação no valor do estoque: ' + formatCurrency(stockAdjustmentImpact().valueDelta)"></p>
+                    </div>
+                  </template>
+                  <p x-show="!stockAdjustmentImpact()" class="mt-1 text-xs text-emerald-800">
+                    Novo cadastro ou saldo sem referência anterior. O servidor conferirá a alteração.
+                  </p>
+                  <p x-show="stockAdjustmentChangesValue()" class="mt-2 text-[11px] leading-4 text-emerald-700">
+                    Alterar saldo ou custo gera uma movimentação conciliada com o Financeiro. Compras novas devem ser lançadas na aba Compras.
+                  </p>
+                  <p x-show="!stockAdjustmentChangesValue()" class="mt-2 text-[11px] leading-4 text-emerald-700">
+                    Somente estoque mínimo ou observações mudaram; não haverá impacto financeiro.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <label class="block rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <span class="block text-xs font-semibold text-gray-700">
+                Motivo do ajuste
+                <span x-show="stockAdjustmentChangesValue()" class="text-emerald-700">*</span>
+              </span>
+              <textarea x-model="stockForm.entry_reason" maxlength="300" rows="2"
+                        placeholder="Ex.: correção após contagem física; custo digitado incorretamente"
+                        class="mt-2 w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"></textarea>
+              <p class="mt-1 text-[11px] text-gray-500"
+                 x-text="stockAdjustmentChangesValue() ? 'Obrigatório para alterar saldo ou custo.' : 'Opcional quando apenas mínimo ou observações mudarem.'"></p>
+            </label>
           </div>
         </div>
 
@@ -3097,7 +3141,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 border-b border-gray-100 p-4 sm:grid-cols-2 2xl:grid-cols-1">
-                  <button @click="stockForm = { measure: selectedRow.measure, quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                  <button @click="stockForm = { measure: selectedRow.measure, quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                           class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-medium text-white hover:bg-emerald-800">
                     <i data-lucide="plus" class="h-4 w-4"></i> Registrar entrada
                   </button>
@@ -3150,7 +3194,7 @@
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
                         <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
-                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '' }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
+                        <button @click="stockForm = { measure: row.measure, quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
                       </div>
                     </template>
                     <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-4 text-center text-xs text-emerald-700">Todas as medidas estão dentro do mínimo.</div>
