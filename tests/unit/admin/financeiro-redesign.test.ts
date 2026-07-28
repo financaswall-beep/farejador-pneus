@@ -34,6 +34,9 @@ describe('Visão geral redesenhada do Financeiro', () => {
 
     expect(html).toContain('financeiroVisao.verdade.competencia.lucro_confirmado');
     expect(html).toContain('financeiroVisao.verdade.caixa.movimento_liquido');
+    expect(html).toContain('Caixa do período');
+    expect(html).toContain('Margem líquida confirmada');
+    expect(html).toContain('financeiroVisao.verdade.competencia.receita_custo_conhecido');
     expect(html).toContain('finFluxoPainel().buckets');
     expect(html).toContain("(finExtrato?.rows || []).slice(0, 4)");
     expect(html).toContain('financeiroVisao.verdade.conciliacao.origens');
