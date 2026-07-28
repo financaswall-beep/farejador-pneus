@@ -83,7 +83,7 @@ describe('Etapa 6 — livro causal de comissão 2W', () => {
     expect(reversal.rows[0]).toMatchObject({
       amount: '14.00', refund_status: 'pending',
     });
-    const beforeRefund = await admin.getMatrizFinancialTruth('test', db.pool);
+    const beforeRefund = await admin.getLegacyMatrizFinancialTruth('test', db.pool);
     expect(beforeRefund.caixa.recebimentos.comissao).toBe('14.00');
     expect(beforeRefund.caixa.pagamentos.devolucoes_comissao).toBe('0.00');
     expect(beforeRefund.posicao.a_pagar).toBe('14.00');
@@ -99,7 +99,7 @@ describe('Etapa 6 — livro causal de comissão 2W', () => {
     const refund = await admin.settleCommissionRefund(refundInput, db.pool);
     const refundReplay = await admin.settleCommissionRefund(refundInput, db.pool);
     expect(refundReplay).toEqual(refund);
-    const afterRefund = await admin.getMatrizFinancialTruth('test', db.pool);
+    const afterRefund = await admin.getLegacyMatrizFinancialTruth('test', db.pool);
     expect(afterRefund.caixa.recebimentos.comissao).toBe('14.00');
     expect(afterRefund.caixa.pagamentos.devolucoes_comissao).toBe('14.00');
     expect(afterRefund.posicao.a_pagar).toBe('0.00');

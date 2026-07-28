@@ -10,6 +10,7 @@ import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseC
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { createMatrizExpenseSchema, matrizExpenseCategoryArchiveSchema, matrizExpenseCategoryCreateSchema, matrizExpenseIdSchema, matrizExpenseRemoveSchema, matrizExpensesQuerySchema } from './route-schemas.js';
 import { registerPainelFinanceiroLedger } from './route-financeiro-ledger.js';
+import { MatrizCentralLedgerUnavailableError } from './queries-financeiro-read-switch.js';
 
 export async function registerPainelFinanceiro(fastify: FastifyInstance): Promise<void> {
   await registerPainelFinanceiroLedger(fastify);
@@ -25,7 +26,23 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
         logger.warn({ err }, 'painel financeiro: sweep da comissão falhou (visão segue)');
       }
     }
-    return reply.status(200).send({ ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao()) });
+    try {
+      return reply.status(200).send({
+        ...dashboardPayload([]), ...(await getMatrizFinanceiroVisao()),
+      });
+    } catch (error) {
+      if (error instanceof MatrizCentralLedgerUnavailableError) {
+        logger.error(
+          { reason: error.reason },
+          'painel financeiro: livro central indisponivel; legado nao sera usado',
+        );
+        return reply.status(503).send({
+          error: 'central_ledger_unavailable',
+          reason: error.reason,
+        });
+      }
+      throw error;
+    }
   });
 
   // ── MATRIZ — DESPESAS GERAIS (0120, flag MATRIZ_EXPENSES): Fase A do livro-caixa ──

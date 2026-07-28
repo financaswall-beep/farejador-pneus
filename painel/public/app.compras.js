@@ -178,14 +178,18 @@ window.PAINEL_MODULES.compras = function () {
     async loadFinanceiro() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
+      this.financeiroLoadError = null;
       const [visao] = await Promise.all([
         this.apiGet('/admin/api/matriz/financeiro').catch((err) => {
           console.warn('financeiro visão falhou:', err.message);
+          this.financeiroLoadError = err.message === 'api_503'
+            ? 'O livro financeiro central está indisponível. O cálculo antigo não será usado.'
+            : 'Não foi possível atualizar o Financeiro. Tente novamente.';
           return null;
         }),
         this.loadDespesas(),
       ]);
-      // Rede piscou → mantém a visão anterior (dado de 15s atrás > tela apagada).
+      // Mantém somente o último snapshot CENTRAL; nunca consulta nem exibe o cálculo legado.
       this.financeiroVisao = visao ?? this.financeiroVisao;
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },

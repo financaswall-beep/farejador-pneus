@@ -17,7 +17,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
   let settleExpense: typeof import('../../src/admin/painel/queries-financeiro-integridade.js').settleMatrizExpense;
   let removeExpense: typeof import('../../src/admin/painel/queries-financeiro-integridade.js').removeMatrizExpense;
   let getFinance: typeof import('../../src/admin/painel/queries-fiado-despesas.js').getWholesaleFinance;
-  let getTruth: typeof import('../../src/admin/painel/queries-financeiro-verdade.js').getMatrizFinancialTruth;
+  let getTruth: typeof import('../../src/admin/painel/queries-financeiro-verdade.js').getLegacyMatrizFinancialTruth;
   let getNotifications: typeof import('../../src/admin/painel/queries-notificacoes.js').getMatrizNotificacoes;
   let resolveOperation: typeof import('../../src/admin/painel/stage5-integrity.js').resolveIntegrityOperation;
 
@@ -42,7 +42,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
       = await import('../../src/admin/painel/queries-financeiro-integridade.js'));
     ({ getWholesaleFinance: getFinance }
       = await import('../../src/admin/painel/queries-fiado-despesas.js'));
-    ({ getMatrizFinancialTruth: getTruth }
+    ({ getLegacyMatrizFinancialTruth: getTruth }
       = await import('../../src/admin/painel/queries-financeiro-verdade.js'));
     ({ getMatrizNotificacoes: getNotifications }
       = await import('../../src/admin/painel/queries-notificacoes.js'));

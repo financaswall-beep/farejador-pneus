@@ -127,7 +127,7 @@ function painelApp() {
     // (aluguel/funcionário/combustível/frete/manutenção). null = flag off (bloco some).
     matrizDespesas: null,
     despesasLoaded: false,
-    financeiroVisao: null,
+    financeiroVisao: null, financeiroLoadError: null,
     finTab: 'visao', // sub-abas visao|cobrancas|pagar|despesas|extrato|indicadores
     finIndicadorTab: 'fluxo', // Indicadores: fluxo|analise|inadimplencia (sem misturar assuntos no mesmo card)
     finFluxoDias: 30, // horizonte da agenda real: 7|30|90 dias

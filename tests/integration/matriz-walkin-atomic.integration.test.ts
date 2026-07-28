@@ -25,6 +25,8 @@ describe('venda walk-in atomica da Matriz', () => {
       DATABASE_URL: 'postgres://test',
       CHATWOOT_HMAC_SECRET: 'test-secret',
       ADMIN_AUTH_TOKEN: 'emergency-token',
+      MATRIZ_CENTRAL_LEDGER: 'true',
+      MATRIZ_CENTRAL_LEDGER_READ: 'true',
     });
     db = await startPostgres();
     ({ registerWalkinOrder, cancelManualOrder } = await import('../../src/admin/painel/queries-pedidos-acoes.js'));
@@ -60,7 +62,11 @@ describe('venda walk-in atomica da Matriz', () => {
     sellerId = seller.rows[0]!.id;
   }, 180_000);
 
-  afterAll(async () => { if (db) await stopPostgres(db); });
+  afterAll(async () => {
+    if (db) await stopPostgres(db);
+    process.env.MATRIZ_CENTRAL_LEDGER = 'false';
+    process.env.MATRIZ_CENTRAL_LEDGER_READ = 'false';
+  });
 
   function key(prefix: string): string {
     sequence += 1;

@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 vi.mock('../../../src/shared/config/env.js', () => ({ env: { FAREJADOR_ENV: 'test' } }));
 
-import { getMatrizFinancialTruth } from '../../../src/admin/painel/queries-financeiro-verdade.js';
+import { getLegacyMatrizFinancialTruth } from '../../../src/admin/painel/queries-financeiro-verdade.js';
 
-describe('régua financeira única da Matriz', () => {
+describe('calculador antigo preservado somente para rollback do primeiro corte', () => {
   it('não fabrica lucro e fecha competência/caixa em centavos', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{
       retail_header: '253.64', retail_items: '233.54', retail_known: '133.43',
@@ -28,7 +28,7 @@ describe('régua financeira única da Matriz', () => {
     }] });
     const pool = { query } as unknown as Pool;
 
-    const truth = await getMatrizFinancialTruth('test', pool);
+    const truth = await getLegacyMatrizFinancialTruth('test', pool);
 
     expect(truth.competencia).toEqual({
       receita_total: '519.40', receita_custo_conhecido: '419.29',
@@ -75,7 +75,7 @@ describe('régua financeira única da Matriz', () => {
       reversed_after_settlement: 0, suspected_test_rows: 0,
     };
     const pool = { query: vi.fn().mockResolvedValue({ rows: [base] }) } as unknown as Pool;
-    const truth = await getMatrizFinancialTruth('test', pool);
+    const truth = await getLegacyMatrizFinancialTruth('test', pool);
     expect(truth.competencia.status).toBe('divergente');
     expect(truth.conciliacao).toMatchObject({ status: 'divergente', diferenca_total: '0.01' });
   });

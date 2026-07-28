@@ -262,10 +262,10 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
     );
     const selected = await readSwitch.getMatrizFinancialRead('test', db.pool);
     expect(selected).toMatchObject({
-      source: 'central_ledger', requested_source: 'central_ledger',
-      fallback_reason: null, integration_status: 'green',
+      source: 'central_ledger', integration_status: 'green',
       truth: { competencia: { receita_total: '150.00' } },
-      comparison: { matched: false },
     });
+    expect(selected).not.toHaveProperty('comparison');
+    expect(selected).not.toHaveProperty('fallback_reason');
   });
 });

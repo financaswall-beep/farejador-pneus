@@ -68,7 +68,7 @@ describe('Rede — apresentação e contratos auditados', () => {
     expect(html).toContain("currentPage === item.id");
     expect(html).toContain('Fase 2 · próximos');
     expect(html).toContain('Em operação');
-    expect(html).toContain('Configurações');
+    expect(html).not.toContain('Configurações');
     expect(html).toContain(":class=\"mockTopbar ? 'bg-gray-50 px-3 pt-3 pb-2' : 'bg-white/80 backdrop-blur-md border-b border-gray-200'\"");
     expect(html).toContain('class="sticky top-0 z-30"');
     expect(html).not.toContain('<div x-show="currentPage !== \'rede\'" class="sticky top-0');

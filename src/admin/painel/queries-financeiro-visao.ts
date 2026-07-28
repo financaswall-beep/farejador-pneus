@@ -11,8 +11,6 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { getWholesaleResumo, getVarejoResumo } from './queries-galpao.js';
-import { getWholesaleFinance, getMatrizExpenses } from './queries-fiado-despesas.js';
-import { getCommissionLedger } from './queries-comissoes.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
 import { getMatrizFinancialRead, type MatrizFinancialRead } from './queries-financeiro-read-switch.js';
 import {
@@ -65,13 +63,10 @@ export async function getMatrizFinanceiroVisao(
 ): Promise<FinanceiroVisao> {
   const mesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
   const expenseMesWhere = `>= date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')::date`;
-  const [atacado, varejo, fiado, despesas, ledger, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes, verdade] =
+  const [atacado, varejo, comissaoMes, fiadoAbertoMes, capital, despCat, custo30d, freteMes, verdade] =
     await Promise.all([
       getWholesaleResumo(environment, dbPool, 'mes'),
       getVarejoResumo('mes', environment, dbPool),
-      env.WHOLESALE_FINANCE ? getWholesaleFinance(environment, dbPool) : Promise.resolve(null),
-      env.MATRIZ_EXPENSES ? getMatrizExpenses(environment, dbPool) : Promise.resolve(null),
-      env.NETWORK_COMMISSION_LEDGER ? getCommissionLedger(environment, dbPool) : Promise.resolve(null),
       env.NETWORK_COMMISSION_LEDGER
         ? dbPool.query<{ realizado: string }>(
             `SELECT
@@ -155,8 +150,7 @@ export async function getMatrizFinanceiroVisao(
       ).then((r) => r.rows[0]!.frete),
       getMatrizFinancialRead(environment, dbPool),
     ]);
-  const centralAgenda = verdade.source === 'central_ledger'
-    ? await getMatrizLedgerOpenItems(environment, dbPool) : null;
+  const centralAgenda = await getMatrizLedgerOpenItems(environment, dbPool);
 
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
   // Frete entra CHEIO no lucro (não tem custo de pneu; o custo dele — gasolina da
@@ -169,54 +163,6 @@ export async function getMatrizFinanceiroVisao(
   const lucroBruto = Number(atacado.lucro_total) + Number(varejo.lucro_total) + comissaoRealizada + freteRecebido;
   const lucro = lucroBruto - (despesasMes ?? 0);
   const margemPct = faturamento > 0 ? Math.round((lucro / faturamento) * 1000) / 10 : null;
-
-  // A RECEBER: fiado do atacado (linha a linha) + comissão acumulada por parceiro.
-  const recebiveis: FinanceiroReceivableItem[] = [];
-  if (fiado) {
-    for (const r of fiado.receivables) {
-      recebiveis.push({ tipo: 'fiado', id: r.id, nome: r.counterparty, valor: r.total_amount,
-        due_date: r.due_date, overdue: r.overdue, phone: r.phone });
-    }
-  }
-  if (ledger) {
-    for (const p of ledger.partners) {
-      recebiveis.push({ tipo: 'comissao', id: p.partner_id, nome: p.partner_name,
-        valor: p.open_total, due_date: null, overdue: false, phone: p.whatsapp_phone,
-        count: p.open_count });
-    }
-  }
-  recebiveis.sort((a, b) => Number(b.overdue) - Number(a.overdue) || Number(b.valor) - Number(a.valor));
-
-  // A PAGAR (agenda): vencido primeiro, depois vencimento mais perto, sem data no fim.
-  const pagaveis: FinanceiroPayableItem[] = [];
-  if (fiado) {
-    for (const p of fiado.payables) {
-      pagaveis.push({ tipo: 'fornecedor', id: p.id, nome: p.counterparty, valor: p.total_amount,
-        due_date: p.due_date, overdue: p.overdue });
-    }
-  }
-  if (despesas) {
-    for (const d of despesas.entries) {
-      if (d.payment_status !== 'pending') continue;
-      pagaveis.push({ tipo: d.payroll_item_id ? 'folha' : 'despesa', id: d.id, nome: d.description || d.category,
-        categoria: d.category, valor: d.amount, due_date: d.due_date, overdue: d.overdue });
-    }
-  }
-  if (ledger) {
-    for (const refund of ledger.refunds_pending) {
-      pagaveis.push({ tipo: 'estorno_comissao', id: refund.reversal_id,
-        nome: `Devolução de comissão · ${refund.partner_name}`,
-        categoria: 'estorno_comissao', valor: refund.amount,
-        due_date: refund.due_date, overdue: refund.overdue });
-    }
-  }
-  pagaveis.sort((a, b) => {
-    if (a.overdue !== b.overdue) return Number(b.overdue) - Number(a.overdue);
-    if (!a.due_date && !b.due_date) return Number(b.valor) - Number(a.valor);
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0;
-  });
 
   // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
   const capitalParado = Number(capital.capital);
@@ -239,9 +185,10 @@ export async function getMatrizFinanceiroVisao(
 
   return {
     verdade: verdade.truth,
-    leitura: { source: verdade.source, requested_source: verdade.requested_source,
-      fallback_reason: verdade.fallback_reason, integration_status: verdade.integration_status,
-      comparison: verdade.comparison },
+    leitura: {
+      source: verdade.source,
+      integration_status: verdade.integration_status,
+    },
     fontes: {
       fiado: Boolean(env.WHOLESALE_FINANCE),
       comissao: Boolean(env.NETWORK_COMMISSION_LEDGER),
@@ -262,20 +209,8 @@ export async function getMatrizFinanceiroVisao(
       },
       despesas_categoria: despCat,
     },
-    a_receber: centralAgenda?.a_receber ?? {
-      total: ((fiado ? Number(fiado.a_receber_total) : 0) + (ledger ? Number(ledger.total_aberto) : 0)).toFixed(2),
-      vencidos_count: fiado ? fiado.a_receber_vencidos : 0,
-      itens: recebiveis,
-    },
-    a_pagar: centralAgenda?.a_pagar ?? {
-      total: ((fiado ? Number(fiado.a_pagar_total) : 0)
-        + (despesas ? Number(despesas.a_pagar_total) : 0)
-        + (ledger ? Number(ledger.refund_total_pending) : 0)).toFixed(2),
-      vencidos_count: (fiado ? fiado.a_pagar_vencidos : 0)
-        + (despesas ? despesas.a_pagar_vencidos : 0)
-        + (ledger ? ledger.refunds_pending.filter((refund) => refund.overdue).length : 0),
-      itens: pagaveis,
-    },
+    a_receber: centralAgenda.a_receber,
+    a_pagar: centralAgenda.a_pagar,
     indicadores: {
       capital_parado: capitalParado.toFixed(2),
       pneus_galpao: capital.pneus,

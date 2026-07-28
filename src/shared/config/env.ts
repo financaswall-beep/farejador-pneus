@@ -167,7 +167,7 @@ const envSchema = z.object({
   // Coolify pós-Deploy. Fase B (0121, livro-razão) lê esta tabela com a mesma régua.
   MATRIZ_EXPENSES: booleanStringSchema,
   MATRIZ_CENTRAL_LEDGER: booleanStringSchema, // 0149: adaptadores futuros; default OFF.
-  MATRIZ_CENTRAL_LEDGER_READ: booleanStringSchema, // Etapa 7: leitura com fallback.
+  MATRIZ_CENTRAL_LEDGER_READ: booleanStringSchema, // Corte central: OFF deixa Financeiro indisponível, sem fallback.
   // LOGÍSTICA DA MATRIZ (0121): aba Logística no painel da matriz — entregas da 'main'
   // nos moldes do parceiro (em separação → saiu → entregue/não entregue) + DIÁRIO DE ROTA
   // do entregador (decisão do dono 07-03: por SAÍDA, não por entrega — km inicial/final,

@@ -17,6 +17,7 @@ describe('verdade financeira na interface da Matriz', () => {
 
   it('não chama competência de realizado e lê o movimento de caixa do backend', () => {
     const indicadores = readFileSync(`${ROOT}/painel/public/app.financeiro.indicadores.js`, 'utf8');
+    const compras = readFileSync(`${ROOT}/painel/public/app.compras.js`, 'utf8');
     const html = readFileSync(`${ROOT}/painel/public/index.html`, 'utf8');
 
     expect(indicadores).toContain('v.verdade.caixa.movimento_liquido');
@@ -32,12 +33,15 @@ describe('verdade financeira na interface da Matriz', () => {
     expect(extrato).toBeGreaterThan(-1);
     expect(indicadorHtml).toBeGreaterThan(extrato);
     expect(templateIndicadores).toBeGreaterThan(extrato);
-    expect(html).toContain('Cálculo anterior × livro financeiro central');
-    expect(html).toContain('financeiroVisao.leitura.comparison.fields[campo.id]');
+    expect(html).not.toContain('Cálculo anterior × livro financeiro central');
+    expect(html).not.toContain('financeiroVisao.leitura.comparison');
+    expect(html).not.toContain('Fallback automático');
     expect(html).toContain('despesaRemoveDialog.open');
     expect(html).toContain('despesaConfirmarRemocao()');
     expect(html).toContain('Livro financeiro central');
-    expect(html).toContain('Fallback automático');
+    expect(html).toContain('Integração conciliada');
+    expect(compras).toContain('O cálculo antigo não será usado.');
+    expect(html).not.toMatch(/<a href="#"[^>]*>[\s\S]{0,300}<span>Configurações<\/span>/);
   });
 
   it('baixa a agenda central sem desviar marketing e devoluções para rotas legadas', () => {

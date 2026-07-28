@@ -3,7 +3,7 @@ import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postg
 
 describe('Etapa 4 — verdade financeira da Matriz', () => {
   let db: IntegrationDb;
-  let getTruth: typeof import('../../src/admin/painel/queries-financeiro-verdade.js').getMatrizFinancialTruth;
+  let getTruth: typeof import('../../src/admin/painel/queries-financeiro-verdade.js').getLegacyMatrizFinancialTruth;
   let mainUnitId: string;
   let productId: string;
   let contactId: string;
@@ -17,7 +17,8 @@ describe('Etapa 4 — verdade financeira da Matriz', () => {
       CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
     });
     db = await startPostgres();
-    ({ getMatrizFinancialTruth: getTruth } = await import('../../src/admin/painel/queries-financeiro-verdade.js'));
+    ({ getLegacyMatrizFinancialTruth: getTruth }
+      = await import('../../src/admin/painel/queries-financeiro-verdade.js'));
 
     const unit = await db.pool.query<{ id: string }>(
       `INSERT INTO core.units (environment,slug,name,is_active)

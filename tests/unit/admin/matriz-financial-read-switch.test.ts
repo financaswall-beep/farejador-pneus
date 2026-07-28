@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const truth = (revenue: string) => ({
@@ -31,9 +32,10 @@ const truth = (revenue: string) => ({
 });
 
 async function loadSwitch(input: {
-  writer: boolean; reader: boolean; health?: 'green' | 'yellow' | 'red';
+  writer: boolean;
+  reader: boolean;
+  health?: 'green' | 'yellow' | 'red' | 'disabled';
 }) {
-  const legacy = vi.fn().mockResolvedValue(truth('100.00'));
   const central = vi.fn().mockResolvedValue(truth('110.00'));
   const health = vi.fn().mockResolvedValue({ status: input.health ?? 'green' });
   vi.doMock('../../../src/persistence/db.js', () => ({ pool: {} }));
@@ -42,9 +44,6 @@ async function loadSwitch(input: {
       FAREJADOR_ENV: 'test', MATRIZ_CENTRAL_LEDGER: input.writer,
       MATRIZ_CENTRAL_LEDGER_READ: input.reader,
     },
-  }));
-  vi.doMock('../../../src/admin/painel/queries-financeiro-verdade.js', () => ({
-    getLegacyMatrizFinancialTruth: legacy,
   }));
   vi.doMock('../../../src/admin/painel/matriz-ledger-financial-read.js', () => ({
     getMatrizCentralLedgerFinancialTruth: central,
@@ -55,50 +54,63 @@ async function loadSwitch(input: {
   const module = await import(
     '../../../src/admin/painel/queries-financeiro-read-switch.js'
   );
-  return { module, legacy, central, health };
+  return { module, central, health };
 }
 
-describe('troca controlada da leitura financeira', () => {
+describe('corte da leitura financeira antiga', () => {
   beforeEach(() => vi.resetModules());
 
-  it('mantem a leitura antiga quando a flag de leitura esta desligada', async () => {
-    const loaded = await loadSwitch({ writer: true, reader: false });
-    const result = await loaded.module.getMatrizFinancialRead('test', {} as never);
-    expect(result).toMatchObject({
-      source: 'legacy', requested_source: 'legacy', fallback_reason: null,
-    });
+  it.each([
+    { writer: false, reader: false },
+    { writer: false, reader: true },
+    { writer: true, reader: false },
+  ])('falha fechado quando o livro central nao esta integralmente ativo', async (flags) => {
+    const loaded = await loadSwitch(flags);
+    await expect(
+      loaded.module.getMatrizFinancialRead('test', {} as never),
+    ).rejects.toThrow('central_ledger_disabled');
     expect(loaded.central).not.toHaveBeenCalled();
     expect(loaded.health).not.toHaveBeenCalled();
   });
 
-  it('faz fallback se pedirem leitura nova sem o writer central', async () => {
-    const loaded = await loadSwitch({ writer: false, reader: true });
-    const result = await loaded.module.getMatrizFinancialRead('test', {} as never);
-    expect(result).toMatchObject({
-      source: 'legacy', requested_source: 'central_ledger',
-      fallback_reason: 'central_ledger_disabled',
-    });
-  });
+  it.each(['red', 'disabled'] as const)(
+    'falha fechado quando a integracao esta %s',
+    async (healthStatus) => {
+      const loaded = await loadSwitch({
+        writer: true, reader: true, health: healthStatus,
+      });
+      await expect(
+        loaded.module.getMatrizFinancialRead('test', {} as never),
+      ).rejects.toThrow(`central_ledger_integration_${healthStatus}`);
+      expect(loaded.central).not.toHaveBeenCalled();
+    },
+  );
 
-  it('faz fallback automatico quando o monitor esta vermelho', async () => {
-    const loaded = await loadSwitch({ writer: true, reader: true, health: 'red' });
-    const result = await loaded.module.getMatrizFinancialRead('test', {} as never);
-    expect(result).toMatchObject({
-      source: 'legacy', fallback_reason: 'integration_red',
-      integration_status: 'red',
-    });
-    expect(loaded.central).not.toHaveBeenCalled();
-  });
+  it.each(['green', 'yellow'] as const)(
+    'usa exclusivamente o livro central quando a integracao esta %s',
+    async (healthStatus) => {
+      const loaded = await loadSwitch({
+        writer: true, reader: true, health: healthStatus,
+      });
+      const result = await loaded.module.getMatrizFinancialRead(
+        'test', {} as never,
+      );
+      expect(result).toEqual({
+        source: 'central_ledger',
+        integration_status: healthStatus,
+        truth: truth('110.00'),
+      });
+      expect(loaded.central).toHaveBeenCalledOnce();
+    },
+  );
 
-  it('usa o livro e devolve comparacao quando o gate esta verde', async () => {
-    const loaded = await loadSwitch({ writer: true, reader: true, health: 'green' });
-    const result = await loaded.module.getMatrizFinancialRead('test', {} as never);
-    expect(result).toMatchObject({
-      source: 'central_ledger', fallback_reason: null,
-      truth: { competencia: { receita_total: '110.00' } },
-      comparison: {
-        matched: false, fields: { receita: { difference: '10.00' } },
-      },
-    });
+  it('nao importa nem chama o calculador financeiro antigo', () => {
+    const source = readFileSync(
+      'src/admin/painel/queries-financeiro-read-switch.ts',
+      'utf8',
+    );
+    expect(source).not.toContain('getLegacyMatrizFinancialTruth');
+    expect(source).not.toContain("source: 'legacy'");
+    expect(source).not.toContain('fallback_reason');
   });
 });
