@@ -110,7 +110,7 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
     },
     async finOpenTab(tab) {
       this.finTab = tab;
-      if (tab === 'extrato') await this.loadFinExtrato();
+      if (tab === 'extrato' || tab === 'visao') await this.loadFinExtrato();
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async loadFinExtrato() {

@@ -59,6 +59,10 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/bot-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/compras-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/compras-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/financeiro-hero.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/financeiro-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/financeiro-fechamento.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/financeiro-fechamento.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/estoque-hero.webp', async (request, reply) => {
     const query = request.query as { preview?: string };
     const asset = query.preview === 'warehouse'

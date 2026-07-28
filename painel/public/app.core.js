@@ -123,7 +123,10 @@ window.PAINEL_MODULES.core = function () {
         // Colaboradores (0124): o staff da matriz — vendedor/entregador.
         if (page === 'colaboradores') void this.loadColaboradores();
         // Financeiro: visão consolidada (Onda 1) + despesas (0120) num carregador só.
-        if (page === 'financeiro') void this.loadFinanceiro();
+        if (page === 'financeiro') {
+          void this.loadFinanceiro();
+          void this.loadFinExtrato();
+        }
         // Bot (2026-07-06): visão (cards/mapa/radar) ao entrar na aba.
         if (page === 'bot') void this.loadBotVisao();
         if (page === 'marketing') void this.loadMarketing();

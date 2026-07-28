@@ -49,15 +49,15 @@
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260727-marketing-capi1"></script>
-<script src="/admin/painel/app.financeiro.js?v=20260727-ledger-agenda2"></script>
-<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-settle-fix1"></script>
+<script src="/admin/painel/app.financeiro.js?v=20260727-financeiro-visao1"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260727-finance-refresh1"></script>
-<script src="/admin/painel/app.core.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.core.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
@@ -4584,11 +4584,64 @@
       </div>
     </div>
 
-    <!-- ═══ TELA: FINANCEIRO da matriz (Onda 1 — visão consolidada SÓ-LEITURA + despesas 0120) ═══ -->
-    <div x-show="currentPage === 'financeiro'" class="p-8">
-      <div class="mb-5">
-        <h1 class="text-2xl font-semibold tracking-tight">Financeiro</h1>
-        <p class="text-sm text-gray-500 mt-1">O caixa da Matriz — resultado, cobranças, contas e despesas <span class="text-gray-400">· competência do mês corrente</span></p>
+    <!-- ═══ TELA: FINANCEIRO da matriz — livro central + sub-abas operacionais ═══ -->
+    <div x-show="currentPage === 'financeiro'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+      <section aria-labelledby="financeiro-heading"
+               class="relative min-h-[164px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+        <img src="/admin/painel/assets/financeiro-hero.webp?v=20260727-financeiro-visao1"
+             alt=""
+             class="absolute inset-0 h-full w-full object-cover object-center"
+             aria-hidden="true">
+        <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/90 to-emerald-950/10"></div>
+        <div class="relative z-10 flex min-h-[164px] flex-col justify-center px-8 py-7 xl:px-10">
+          <div class="max-w-xl">
+            <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">Livro financeiro central</p>
+            <h1 id="financeiro-heading" class="text-3xl font-bold tracking-tight text-white lg:text-[34px]">Financeiro</h1>
+            <p class="mt-3 max-w-lg text-sm text-emerald-50/90">Receitas, custos, despesas e compromissos reunidos numa única verdade financeira.</p>
+          </div>
+          <div class="absolute right-3 top-3 flex flex-wrap items-center justify-end gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/30 bg-emerald-900/85 px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm">
+              <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-emerald-200"></i>
+              <span x-text="new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date())"></span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-white shadow-sm backdrop-blur-sm"
+                  :class="financeiroVisao?.leitura?.integration_status === 'green' ? 'border-emerald-300/30 bg-emerald-800/90' : 'border-amber-300/40 bg-amber-700/90'">
+              <i :data-lucide="financeiroVisao?.leitura?.integration_status === 'green' ? 'badge-check' : 'triangle-alert'" class="h-3.5 w-3.5"></i>
+              <span x-text="financeiroVisao?.leitura?.integration_status === 'green' ? 'Integração conciliada' : 'Integração requer atenção'"></span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- As seis sub-abas continuam sendo a navegação principal do Financeiro. -->
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <div class="flex flex-col gap-3 px-5 xl:flex-row xl:items-center xl:justify-between">
+          <nav aria-label="Seções do Financeiro" class="flex items-center gap-1 overflow-x-auto">
+            <template x-for="t in [
+              { id: 'visao', label: 'Visão geral' },
+              { id: 'cobrancas', label: 'Cobranças' },
+              { id: 'pagar', label: 'Contas a pagar' },
+              { id: 'despesas', label: 'Despesas' },
+              { id: 'extrato', label: 'Lançamentos' },
+              { id: 'indicadores', label: 'Indicadores' }
+            ]" :key="t.id">
+              <button @click="finOpenTab(t.id)"
+                      :class="finTab === t.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-800'"
+                      class="border-b-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                      x-text="t.label"></button>
+            </template>
+          </nav>
+          <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
+            <button type="button" @click="loadFinanceiro()"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3.5 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
+              <i data-lucide="refresh-cw" class="h-4 w-4"></i> Atualizar
+            </button>
+            <button type="button" @click="finOpenTab('despesas')"
+                    class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-800">
+              <i data-lucide="plus" class="h-4 w-4"></i> Nova despesa
+            </button>
+          </div>
+        </div>
       </div>
 
       <div x-show="financeiroLoadError" class="mb-5 flex items-start justify-between gap-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -4604,147 +4657,187 @@
         </button>
       </div>
 
-      <!-- SUB-ABAS (redesign 07-12, desenho do dono) — mesmo padrão da tela do Bot -->
-      <div class="flex items-center gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
-        <template x-for="t in [
-          { id: 'visao', label: 'Visão geral' },
-          { id: 'cobrancas', label: 'Cobranças' },
-          { id: 'pagar', label: 'Contas a pagar' },
-          { id: 'despesas', label: 'Despesas' },
-          { id: 'extrato', label: 'Lançamentos' },
-          { id: 'indicadores', label: 'Indicadores' }
-        ]" :key="t.id">
-          <button @click="finOpenTab(t.id)"
-                  :class="finTab === t.id ? 'border-emerald-700 text-emerald-800 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                  class="px-4 py-2.5 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors" x-text="t.label"></button>
-        </template>
-      </div>
-
       <!-- ═══════ SUB-ABA: VISÃO GERAL ═══════ -->
       <template x-if="financeiroVisao">
         <div x-show="finTab === 'visao'" class="w-full space-y-5">
-          <div class="flex flex-wrap items-center gap-2 text-xs">
-            <span class="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-              Livro financeiro central
-            </span>
-            <span class="rounded-full px-3 py-1 font-semibold"
-              :class="financeiroVisao.leitura?.integration_status === 'green' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-              x-text="financeiroVisao.leitura?.integration_status === 'green' ? 'Integração conciliada' : 'Integração requer atenção'"></span>
-          </div>
-
-          <!-- 4 cards do topo -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
-              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="trending-up" class="w-5 h-5 text-emerald-700"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Lucro confirmado</p>
-                <p class="text-2xl font-bold leading-tight num" :class="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.lucro_confirmado))"></p><p class="text-xs text-gray-400 mt-1">competência do mês</p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
-              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-down-left" class="w-5 h-5 text-emerald-700"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Receita por competência</p>
-                <p class="text-2xl font-bold leading-tight text-gray-900 num" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_total))"></p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
-              <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5 text-rose-600"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Entradas registradas</p>
-                <p class="text-2xl font-bold leading-tight text-emerald-700 num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.entradas_registradas))"></p><p class="text-xs text-gray-400 mt-1">movimento de caixa do mês</p></div>
-            </div>
-            <div class="bg-white border border-gray-200 rounded-xl p-6 min-h-[132px] flex items-center gap-5 shadow-sm">
-              <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="bell" class="w-5 h-5 text-amber-600"></i></div>
-              <div class="min-w-0"><p class="text-xs text-gray-500">Saídas registradas</p>
-                <p class="text-2xl font-bold leading-tight text-rose-600 num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.saidas_registradas))"></p><p class="text-xs text-gray-400 mt-1">pagamentos do mês</p></div>
-            </div>
-          </div>
-
-          <!-- Resultado do período (barra) | Atenção rápida -->
-          <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
-            <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <h3 class="text-base font-semibold mb-4">Resultado do período</h3>
-              <p class="text-xs text-gray-500 mb-5">Competência: custo conhecido, custo pendente, despesas e lucro confirmado.</p>
-              <div class="flex h-3.5 rounded-full overflow-hidden bg-gray-100">
-                <div class="bg-gray-400 h-full" :style="'width:' + finResSeg('custo')" title="custo do pneu"></div>
-                <div class="bg-amber-400 h-full" :style="'width:' + finResSeg('pendente')" title="receita com custo pendente"></div>
-                <div class="bg-rose-500 h-full" :style="'width:' + finResSeg('despesa')" title="despesas"></div>
-                <div class="bg-emerald-600 h-full" :style="'width:' + finResSeg('lucro')" title="lucro"></div>
-              </div>
-              <div class="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs text-gray-500">
-                <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-gray-400"></span>Custo <span class="text-gray-700 font-medium num" x-text="finResPct('custo') + '%'"></span></span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span>Custo pendente <span class="text-gray-700 font-medium num" x-text="finResPct('pendente') + '%'"></span></span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>Despesas <span class="text-gray-700 font-medium num" x-text="finResPct('despesa') + '%'"></span></span>
-                <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-600"></span>Lucro <span class="text-gray-700 font-medium num" x-text="finResPct('lucro') + '%'"></span></span>
-              </div>
-              <p class="text-xs text-amber-600 mt-3" x-show="financeiroVisao.verdade.competencia.receita_custo_pendente !== '0.00'"
-                 x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente)) + ' de receita está com custo pendente e ficou fora do lucro.'"></p>
-              <p class="text-xs text-rose-600 mt-2" x-show="Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas || 0) > 0"
-                 x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque.perdas)) + ' de perdas/baixas do estoque já descontadas do lucro.'"></p>
-            </div>
-
-            <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <h3 class="text-base font-semibold mb-4">Atenção rápida</h3>
-              <div class="space-y-3">
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="file-warning" class="w-4 h-4 text-rose-600"></i></div>
-                  <div class="min-w-0"><p class="text-xs text-gray-500">Contas vencidas</p><p class="text-base font-semibold num" x-text="financeiroVisao.a_pagar.vencidos_count"></p></div>
-                  <button @click="finTab = 'pagar'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver contas</button>
+          <!-- Fechamento executivo: uma única leitura do livro central. -->
+          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <section class="relative min-h-[300px] overflow-hidden rounded-xl border border-emerald-900 bg-emerald-950 text-white shadow-sm xl:col-span-8">
+              <img src="/admin/painel/assets/financeiro-fechamento.webp?v=20260727-financeiro-visao1"
+                   alt=""
+                   class="absolute inset-0 h-full w-full object-cover object-center opacity-70"
+                   aria-hidden="true">
+              <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/95 to-emerald-950/45"></div>
+              <div class="relative z-10 flex min-h-[300px] flex-col p-6 lg:p-7">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase tracking-[0.14em] text-emerald-200/75">Fechamento do período</p>
+                    <h2 class="mt-1 text-xl font-semibold" x-text="new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date())"></h2>
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-900/70 px-3 py-1.5 text-[11px] font-medium text-emerald-50">
+                    <i data-lucide="book-check" class="h-3.5 w-3.5 text-emerald-200"></i> Competência
+                  </span>
                 </div>
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="hand-coins" class="w-4 h-4 text-amber-600"></i></div>
-                  <div class="min-w-0"><p class="text-xs text-gray-500">Cobranças abertas</p><p class="text-base font-semibold num" x-text="finCobrancasAbertas()"></p></div>
-                  <button @click="finTab = 'cobrancas'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver cobranças</button>
+                <div class="mt-6">
+                  <p class="text-sm text-emerald-100/80">Lucro líquido confirmado</p>
+                  <div class="mt-1 flex flex-wrap items-center gap-3">
+                    <p class="num text-4xl font-bold tracking-tight lg:text-5xl"
+                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.lucro_confirmado))"></p>
+                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          :class="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'bg-emerald-400/15 text-emerald-100' : 'bg-rose-400/15 text-rose-200'">
+                      <i :data-lucide="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'arrow-up-right' : 'arrow-down-right'" class="h-3.5 w-3.5"></i>
+                      <span x-text="Number(financeiroVisao.verdade.competencia.lucro_confirmado) >= 0 ? 'Positivo' : 'Negativo'"></span>
+                    </span>
+                  </div>
                 </div>
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="package" class="w-4 h-4 text-emerald-700"></i></div>
-                  <div class="min-w-0"><p class="text-xs text-gray-500">Capital parado</p><p class="text-base font-semibold"><span class="num" x-text="financeiroVisao.indicadores.pneus_galpao"></span> <span class="text-xs font-normal text-gray-500">pneus · </span><span class="num" x-text="formatCurrency(Number(financeiroVisao.indicadores.capital_parado))"></span></p></div>
-                  <button @click="currentPage = 'estoque'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium whitespace-nowrap">Ver estoque</button>
+                <div class="mt-6 grid grid-cols-1 divide-y divide-emerald-700/60 border-y border-emerald-700/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                  <div class="py-3 sm:pr-5"><p class="text-xs text-emerald-100/70">Receita</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_total))"></p></div>
+                  <div class="py-3 sm:px-5"><p class="text-xs text-emerald-100/70">Custo conhecido</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.custo_conhecido))"></p></div>
+                  <div class="py-3 sm:pl-5"><p class="text-xs text-emerald-100/70">Despesas</p><p class="num mt-1 text-lg font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.despesas))"></p></div>
                 </div>
-                <div x-show="Number(financeiroVisao.verdade.caixa.recebimento_pendente) > 0" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0"><i data-lucide="circle-dollar-sign" class="w-4 h-4 text-amber-600"></i></div>
-                  <div class="min-w-0"><p class="text-xs text-gray-500">Recebimento ainda não comprovado</p><p class="text-base font-semibold num" x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.recebimento_pendente))"></p></div>
-                </div>
-                <div x-show="Number(financeiroVisao.verdade.posicao.varejo_a_receber_sem_baixa) > 0" class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="badge-alert" class="w-4 h-4 text-rose-600"></i></div>
-                  <div class="min-w-0"><p class="text-xs text-gray-500">Varejo “A receber” sem baixa financeira</p><p class="text-base font-semibold num" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.varejo_a_receber_sem_baixa))"></p></div>
+                <div class="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
+                  <div>
+                    <p class="text-xs text-emerald-100/65">Resultado consolidado no livro financeiro central.</p>
+                    <p x-show="Number(financeiroVisao.verdade.competencia.receita_custo_pendente || 0) > 0"
+                       class="mt-1 text-xs font-medium text-amber-200"
+                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.receita_custo_pendente)) + ' com custo pendente ficou fora do lucro.'"></p>
+                    <p x-show="Number(financeiroVisao.verdade.competencia.ajustes_estoque?.perdas || 0) > 0"
+                       class="mt-1 text-xs font-medium text-rose-200"
+                       x-text="formatCurrency(Number(financeiroVisao.verdade.competencia.ajustes_estoque.perdas)) + ' de perdas/baixas do estoque já descontadas do lucro.'"></p>
+                  </div>
+                  <button type="button" @click="finIndicadorTab = 'analise'; finOpenTab('indicadores')"
+                          class="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-emerald-950/25 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10">
+                    Ver demonstrativo <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
+            </section>
 
-          <!-- De onde veio o dinheiro (valor + lucro por fonte) -->
-          <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-            <div class="flex items-center justify-between mb-4 max-w-6xl mx-auto">
-              <h3 class="text-base font-semibold">Composição da receita por competência</h3>
-            </div>
-            <div class="hidden lg:grid lg:grid-cols-[220px_minmax(240px,1fr)_140px_190px] gap-5 items-center max-w-6xl mx-auto mb-3 text-xs text-gray-400">
-              <span></span><span></span><span class="text-right">Valor</span><span class="text-right">Lucro bruto</span>
-            </div>
-            <div class="space-y-3.5 text-sm max-w-6xl mx-auto">
-              <template x-for="f in [
-                { id: 'atacado', label: 'Atacado', cor: 'bg-emerald-600', valor: Number(financeiroVisao.mes.pernas.atacado.faturamento), on: true },
-                { id: 'varejo', label: 'Varejo (bot + balcão)', cor: 'bg-emerald-500', valor: Number(financeiroVisao.mes.pernas.varejo.faturamento), on: true },
-                { id: 'frete', label: 'Frete de entrega', cor: 'bg-teal-500', valor: Number((financeiroVisao.mes.pernas.frete && financeiroVisao.mes.pernas.frete.recebido) || 0), on: !!financeiroVisao.mes.pernas.frete },
-                { id: 'comissao', label: 'Comissão da rede', cor: 'bg-lime-600', valor: Number((financeiroVisao.mes.pernas.comissao && financeiroVisao.mes.pernas.comissao.realizado) || 0), on: !!financeiroVisao.mes.pernas.comissao }
-              ]" :key="f.id">
-                <div class="grid grid-cols-12 lg:grid-cols-[220px_minmax(240px,1fr)_140px_190px] gap-3 lg:gap-5 items-center" x-show="f.on">
-                  <span class="col-span-4 sm:col-span-3 lg:col-auto text-gray-600 flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" :class="f.cor"></span><span x-text="f.label"></span></span>
-                  <div class="hidden sm:block col-span-4 lg:col-auto bg-gray-100 rounded h-2.5"><div class="h-2.5 rounded" :class="f.cor" :style="'width:' + finBarWidth(f.valor)"></div></div>
-                  <span class="col-span-4 sm:col-span-2 lg:col-auto text-right text-gray-900 num" x-text="formatCurrency(f.valor)"></span>
-                  <span class="col-span-4 sm:col-span-3 lg:col-auto text-right text-emerald-700 num"
-                        x-text="formatCurrency(finLucroPerna(f.id)) + (finPctLucro(f.valor, finLucroPerna(f.id)) !== null ? ' (' + String(finPctLucro(f.valor, finLucroPerna(f.id))).replace('.', ',') + '%)' : '')"></span>
+            <section class="flex min-h-[300px] flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm xl:col-span-4">
+              <div class="flex items-start justify-between gap-3">
+                <div><h2 class="text-lg font-semibold">Pulso do caixa</h2><p class="mt-1 text-xs text-gray-500">Movimento realizado e posição em aberto</p></div>
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="activity" class="h-5 w-5 text-emerald-700"></i></div>
+              </div>
+              <div class="mt-6">
+                <p class="text-xs text-gray-500">Caixa no período</p>
+                <p class="num mt-1 text-3xl font-bold tracking-tight"
+                   :class="Number(financeiroVisao.verdade.caixa.movimento_liquido) >= 0 ? 'text-emerald-800' : 'text-rose-600'"
+                   x-text="formatCurrency(Number(financeiroVisao.verdade.caixa.movimento_liquido))"></p>
+              </div>
+              <div class="mt-5 divide-y divide-gray-100 border-y border-gray-100">
+                <div class="flex items-center justify-between gap-3 py-3"><span class="inline-flex items-center gap-2 text-sm text-gray-600"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>A receber</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_receber))"></span></div>
+                <div class="flex items-center justify-between gap-3 py-3"><span class="inline-flex items-center gap-2 text-sm text-gray-600"><span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>A pagar</span><span class="num font-semibold" x-text="formatCurrency(Number(financeiroVisao.verdade.posicao.a_pagar))"></span></div>
+              </div>
+              <div class="mt-4">
+                <div class="mb-2 flex items-center justify-between text-[11px] text-gray-500"><span>Exposição financeira</span><span>posição aberta</span></div>
+                <div class="flex h-2.5 overflow-hidden rounded-full bg-gray-100">
+                  <div class="h-full bg-emerald-500" :style="'width:' + Math.round(100 * Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) / Math.max(1, Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) + Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)))) + '%'"></div>
+                  <div class="h-full bg-amber-400" :style="'width:' + Math.round(100 * Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)) / Math.max(1, Math.max(0, Number(financeiroVisao.verdade.posicao.a_receber || 0)) + Math.max(0, Number(financeiroVisao.verdade.posicao.a_pagar || 0)))) + '%'"></div>
                 </div>
-              </template>
-            </div>
-            <p class="text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">Lucro <b>bruto</b> por fonte (antes de ratear as despesas gerais). Frete e comissão entram cheios — o custo do frete, a gasolina, já desconta na perna Despesas.</p>
+              </div>
+              <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')"
+                      class="mt-auto inline-flex items-center gap-2 pt-5 text-left text-xs font-semibold text-emerald-700 hover:text-emerald-900">
+                Ver agenda financeira <i data-lucide="arrow-right" class="h-4 w-4"></i>
+              </button>
+            </section>
           </div>
 
-          <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-              <div><h3 class="text-base font-semibold">Conciliação por origem</h3><p class="text-xs text-gray-500 mt-1">Compara o total da fonte com o valor usado nas contas, centavo a centavo.</p></div>
-              <span class="text-xs font-semibold rounded-full px-3 py-1" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'" x-text="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'Tudo conciliado' : 'Revisão necessária'"></span>
-            </div>
-            <div class="overflow-x-auto"><table class="w-full min-w-[680px] text-sm"><thead class="bg-gray-50 text-xs text-gray-500"><tr><th class="px-5 py-3 text-left font-medium">Origem</th><th class="px-4 py-3 text-right font-medium">Na fonte</th><th class="px-4 py-3 text-right font-medium">Contabilizado</th><th class="px-5 py-3 text-right font-medium">Diferença</th></tr></thead><tbody class="divide-y divide-gray-100">
-              <template x-for="linha in financeiroVisao.verdade.conciliacao.origens" :key="linha.origem"><tr><td class="px-5 py-3 font-medium capitalize" x-text="linha.origem"></td><td class="px-4 py-3 text-right num" x-text="formatCurrency(Number(linha.origem_total))"></td><td class="px-4 py-3 text-right num" x-text="formatCurrency(Number(linha.contabilizado))"></td><td class="px-5 py-3 text-right font-semibold num" :class="Number(linha.diferenca) === 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(linha.diferenca))"></td></tr></template>
-            </tbody></table></div>
+          <!-- Fluxo previsto e compromissos: usam apenas títulos abertos com vencimento. -->
+          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-8">
+              <div class="flex flex-col gap-4 border-b border-gray-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                <div><h2 class="text-base font-semibold">Fluxo financeiro</h2><p class="mt-1 text-xs text-gray-500">Agenda dos títulos abertos; não representa saldo bancário.</p></div>
+                <div class="flex overflow-hidden rounded-lg border border-gray-200">
+                  <template x-for="dias in [7, 30, 90]" :key="'visao-fluxo-'+dias">
+                    <button type="button" @click="finFluxoDias = dias"
+                            :class="Number(finFluxoDias) === dias ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                            class="px-3 py-2 text-xs font-medium" x-text="dias + ' dias'"></button>
+                  </template>
+                </div>
+              </div>
+              <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Entradas previstas <strong class="num text-gray-800" x-text="formatCurrency(finFluxoPainel().entradas)"></strong></span>
+                <span class="inline-flex items-center gap-2 text-gray-500"><span class="h-2.5 w-2.5 rounded-sm bg-rose-400"></span>Saídas previstas <strong class="num text-gray-800" x-text="formatCurrency(finFluxoPainel().saidas)"></strong></span>
+              </div>
+              <div class="mt-5 flex h-[190px] items-end gap-2 border-b border-gray-200 px-1 sm:gap-4">
+                <template x-for="bucket in finFluxoPainel().buckets" :key="'visao-bucket-'+bucket.label">
+                  <div class="flex h-full min-w-0 flex-1 flex-col justify-end">
+                    <div class="flex h-[145px] items-end justify-center gap-1 sm:gap-2">
+                      <div class="w-3 rounded-t-sm bg-emerald-500 transition-all sm:w-5" :style="'height:' + bucket.entradaPct + '%'" :title="'Entradas: ' + formatCurrency(bucket.entrada)"></div>
+                      <div class="w-3 rounded-t-sm bg-rose-400 transition-all sm:w-5" :style="'height:' + bucket.saidaPct + '%'" :title="'Saídas: ' + formatCurrency(bucket.saida)"></div>
+                    </div>
+                    <p class="mt-2 truncate text-center text-[10px] text-gray-500 sm:text-[11px]" x-text="bucket.label"></p>
+                  </div>
+                </template>
+              </div>
+              <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-xs text-gray-500">Impacto previsto: <strong class="num" :class="finFluxoPainel().impacto >= 0 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(finFluxoPainel().impacto)"></strong></p>
+                <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Abrir fluxo completo →</button>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
+              <div class="flex items-center justify-between gap-3"><div><h2 class="text-base font-semibold">Próximos compromissos</h2><p class="mt-1 text-xs text-gray-500">Recebimentos e pagamentos em ordem de vencimento</p></div><i data-lucide="calendar-clock" class="h-5 w-5 text-emerald-700"></i></div>
+              <div class="relative mt-5">
+                <div class="absolute bottom-3 left-[7px] top-3 w-px bg-emerald-200"></div>
+                <div class="space-y-1">
+                  <template x-for="item in finFluxoPainel().movimentos.slice(0, 4)" :key="'visao-agenda-'+item.direcao+':'+item.tipo+':'+item.id">
+                    <button type="button" @click="finOpenTab(item.direcao === 'entrada' ? 'cobrancas' : 'pagar')"
+                            class="relative grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-0 py-3 text-left hover:bg-gray-50">
+                      <span class="relative z-10 h-3.5 w-3.5 rounded-full border-2 border-emerald-600 bg-white"></span>
+                      <span class="min-w-0"><span class="block truncate text-sm font-semibold text-gray-800" x-text="item.descricao"></span><span class="mt-0.5 block text-[11px] text-gray-500"><span x-text="item.due_date ? financeDate(item.due_date) : 'Sem vencimento'"></span> · <span x-text="item.origem"></span></span></span>
+                      <span class="text-right"><span class="num block text-sm font-semibold" :class="item.direcao === 'entrada' ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(item.valor))"></span><span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap" :class="finFluxoStatus(item).cls" x-text="finFluxoStatus(item).label"></span></span>
+                    </button>
+                  </template>
+                </div>
+                <div x-show="!finFluxoPainel().movimentos.length" class="py-10 text-center">
+                  <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50"><i data-lucide="badge-check" class="h-5 w-5 text-emerald-700"></i></div>
+                  <p class="mt-3 text-sm font-medium text-gray-700">Agenda limpa</p><p class="mt-1 text-xs text-gray-400">Nenhum título previsto neste recorte.</p>
+                </div>
+              </div>
+              <button type="button" @click="finIndicadorTab = 'fluxo'; finOpenTab('indicadores')" class="mt-4 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">Ver todos</button>
+            </section>
+          </div>
+
+          <!-- Extrato recente e saúde da comunicação entre as origens. -->
+          <div class="grid grid-cols-1 gap-5 xl:grid-cols-12">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-8">
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+                <div><h2 class="text-base font-semibold">Movimentações recentes</h2><p class="mt-1 text-xs text-gray-500">Últimos registros do livro financeiro central</p></div>
+                <button type="button" @click="finOpenTab('extrato')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">Ver lançamentos →</button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[720px] text-sm">
+                  <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500"><tr><th class="px-5 py-3 font-medium">Data</th><th class="px-4 py-3 font-medium">Origem</th><th class="px-4 py-3 font-medium">Descrição</th><th class="px-4 py-3 font-medium">Tipo</th><th class="px-4 py-3 font-medium">Status</th><th class="px-5 py-3 text-right font-medium">Valor</th></tr></thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <template x-for="row in (finExtrato?.rows || []).slice(0, 4)" :key="'visao-extrato-'+row.id">
+                      <tr class="hover:bg-gray-50/60"><td class="px-5 py-3 whitespace-nowrap text-gray-600" x-text="financeDate(row.competence_on)"></td><td class="px-4 py-3 font-medium text-gray-700" x-text="row.origin"></td><td class="max-w-[260px] px-4 py-3"><p class="truncate font-medium text-gray-800" x-text="row.description"></p></td><td class="px-4 py-3"><span class="inline-flex items-center gap-1.5 text-xs text-gray-600"><span class="h-2 w-2 rounded-full" :class="['entrada','receita'].includes(row.direction) ? 'bg-emerald-500' : ['saida','despesa'].includes(row.direction) ? 'bg-rose-400' : 'bg-gray-400'"></span><span x-text="row.direction === 'entrada' ? 'Entrada' : row.direction === 'saida' ? 'Saída' : row.direction === 'receita' ? 'Receita' : row.direction === 'despesa' ? 'Despesa' : row.direction === 'estoque' ? 'Estoque' : 'Ajuste'"></span></span></td><td class="px-4 py-3"><span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap" :class="finExtratoStatus(row).cls" x-text="finExtratoStatus(row).label"></span></td><td class="num px-5 py-3 text-right font-semibold" :class="['entrada','receita'].includes(row.direction) ? 'text-emerald-700' : ['saida','despesa'].includes(row.direction) ? 'text-rose-600' : 'text-gray-800'" x-text="formatCurrency(Number(row.amount))"></td></tr>
+                    </template>
+                    <tr x-show="finExtratoLoading"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Carregando lançamentos…</td></tr>
+                    <tr x-show="!finExtratoLoading && !(finExtrato?.rows || []).length"><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">Nenhum lançamento no período.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-4">
+              <div class="flex items-start justify-between gap-3">
+                <div><h2 class="text-base font-semibold">Conciliação por origem</h2><p class="mt-1 text-xs text-gray-500">Fonte operacional × livro central</p></div>
+                <div class="flex h-10 w-10 items-center justify-center rounded-full" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50' : 'bg-amber-50'"><i :data-lucide="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'badge-check' : 'triangle-alert'" class="h-5 w-5" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-700' : 'text-amber-600'"></i></div>
+              </div>
+              <div class="mt-5 divide-y divide-gray-100">
+                <template x-for="linha in (financeiroVisao.verdade.conciliacao.origens || [])" :key="'visao-conciliacao-'+linha.origem">
+                  <div class="flex items-center justify-between gap-3 py-2.5"><span class="inline-flex min-w-0 items-center gap-2 text-sm text-gray-700"><span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="Math.abs(Number(linha.diferenca || 0)) < 0.005 ? 'bg-emerald-500' : 'bg-amber-500'"></span><span class="truncate capitalize" x-text="linha.origem"></span></span><span class="num text-xs font-semibold" :class="Math.abs(Number(linha.diferenca || 0)) < 0.005 ? 'text-emerald-700' : 'text-rose-600'" x-text="formatCurrency(Number(linha.diferenca))"></span></div>
+                </template>
+                <div x-show="!(financeiroVisao.verdade.conciliacao.origens || []).length" class="py-8 text-center text-xs text-gray-400">Nenhuma origem disponível.</div>
+              </div>
+              <div class="mt-5 rounded-xl p-4" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'bg-emerald-50' : 'bg-amber-50'">
+                <p class="text-sm font-semibold" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-800' : 'text-amber-800'"
+                   x-text="(financeiroVisao.verdade.conciliacao.origens || []).filter((linha) => Math.abs(Number(linha.diferenca || 0)) < 0.005).length + ' de ' + (financeiroVisao.verdade.conciliacao.origens || []).length + ' origens conciliadas'"></p>
+                <p class="mt-1 text-xs" :class="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'text-emerald-700' : 'text-amber-700'"
+                   x-text="financeiroVisao.verdade.conciliacao.status === 'ok' ? 'As fontes conferem centavo a centavo.' : ((financeiroVisao.verdade.conciliacao.origens || []).length - (financeiroVisao.verdade.conciliacao.origens || []).filter((linha) => Math.abs(Number(linha.diferenca || 0)) < 0.005).length) + ' origem(ns) precisam de revisão.'"></p>
+              </div>
+            </section>
           </div>
 
         </div>
