@@ -45,11 +45,15 @@ describe('catalogo no painel', () => {
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
+    expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
     expect(html).toContain('app.catalogo.js?v=20260729-catalog-brand3');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
     expect(html).toContain('catalogoBrandLogo(catalogoSelecionado?.brand)');
+    expect(html).toContain('data-testid="catalog-margin-presets" class="flex w-full gap-2"');
+    expect(html).toContain('data-testid="catalog-margin-summary" class="flex w-full gap-2"');
+    expect(html).toContain('data-testid="catalog-editor-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm"');
     expect(html).not.toContain('catalogoBrandStyle(');
     expect(html).not.toContain('rounded-full border-[5px] border-gray-800 bg-gray-200');
     expect(html).toMatch(/x-model\.number="saleForm\.unit_price"[^>]*readonly/);

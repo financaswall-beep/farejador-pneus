@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260726-marketing-detail2" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260729-catalog-layout1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -8553,7 +8553,7 @@
     </div>
 
     <div x-show="catalogoSelecionado" x-cloak style="display:none" class="fixed inset-0 z-[70]">
-      <div class="absolute inset-0 bg-gray-950/30 backdrop-blur-[1px]" @click="catalogoClose()"></div>
+      <div data-testid="catalog-editor-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoClose()"></div>
       <aside class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
              style="width:min(440px, calc(100vw - 24px));"
              @keydown.escape.window="catalogoClose()">
@@ -8597,14 +8597,14 @@
             </div>
             <div class="mt-4">
               <p class="mb-2 text-[11px] font-medium text-gray-500">Ajuste rápido de margem</p>
-              <div class="grid grid-cols-4 gap-2"><template x-for="percent in [30,35,40,45]" :key="percent"><button type="button" @click="catalogoApplyMargin(percent)" :aria-pressed="catalogoPriceForm.marginPreset === percent" :class="catalogoPriceForm.marginPreset === percent ? 'border-emerald-800 bg-emerald-800 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'" class="rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" x-text="percent + '%'"></button></template></div>
+              <div data-testid="catalog-margin-presets" class="flex w-full gap-2"><template x-for="percent in [30,35,40,45]" :key="percent"><button type="button" @click="catalogoApplyMargin(percent)" :aria-pressed="catalogoPriceForm.marginPreset === percent" :class="catalogoPriceForm.marginPreset === percent ? 'border-emerald-800 bg-emerald-800 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'" class="h-10 min-w-0 flex-1 rounded-lg border text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" x-text="percent + '%'"></button></template></div>
             </div>
           </section>
 
-          <section class="grid grid-cols-3 gap-2">
-            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Lucro por pneu</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoLucro() == null ? '—' : formatCurrency(catalogoLucro())"></p></article>
-            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Margem</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPercent(catalogoMargem())"></p></article>
-            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Mínimo sugerido</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPrecoMinimo() == null ? '—' : formatCurrency(catalogoPrecoMinimo())"></p></article>
+          <section data-testid="catalog-margin-summary" class="flex w-full gap-2">
+            <article class="flex min-h-[76px] min-w-0 flex-1 flex-col justify-center rounded-xl border border-gray-200 p-2 text-center"><p class="text-[10px] text-gray-500">Lucro por pneu</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoLucro() == null ? '—' : formatCurrency(catalogoLucro())"></p></article>
+            <article class="flex min-h-[76px] min-w-0 flex-1 flex-col justify-center rounded-xl border border-gray-200 p-2 text-center"><p class="text-[10px] text-gray-500">Margem</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPercent(catalogoMargem())"></p></article>
+            <article class="flex min-h-[76px] min-w-0 flex-1 flex-col justify-center rounded-xl border border-gray-200 p-2 text-center"><p class="text-[10px] text-gray-500">Mínimo sugerido</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPrecoMinimo() == null ? '—' : formatCurrency(catalogoPrecoMinimo())"></p></article>
           </section>
 
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Motivo da alteração *</span><textarea x-model="catalogoPriceForm.reason" maxlength="500" rows="3" class="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700" placeholder="Ex.: reposicionamento de margem ou nova tabela comercial"></textarea><span class="mt-1 block text-right text-[10px] text-gray-400" x-text="String(catalogoPriceForm.reason || '').length + '/500'"></span></label>
