@@ -8593,11 +8593,11 @@
             <p class="mt-1 text-xs leading-5 text-gray-500">Este é o valor oficial da Matriz consultado pelo bot e pela venda avulsa.</p>
             <div class="mt-4 grid grid-cols-2 gap-3">
               <label><span class="mb-1.5 block text-xs text-gray-500">Preço atual</span><div class="flex h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-500" x-text="catalogoSelecionado?.price_amount == null ? 'Sem preço' : formatCurrency(Number(catalogoSelecionado.price_amount))"></div></label>
-              <label><span class="mb-1.5 block text-xs font-semibold text-gray-700">Novo preço *</span><div class="flex rounded-lg border border-emerald-700 bg-white focus-within:ring-2 focus-within:ring-emerald-100"><span class="border-r border-gray-100 px-3 py-2 text-sm text-gray-400">R$</span><input type="number" min="0.01" step="0.01" x-model="catalogoPriceForm.price" class="min-w-0 flex-1 rounded-r-lg px-3 py-2 text-sm font-semibold outline-none"></div></label>
+              <label><span class="mb-1.5 block text-xs font-semibold text-gray-700">Novo preço *</span><div class="flex rounded-lg border border-emerald-700 bg-white focus-within:ring-2 focus-within:ring-emerald-100"><span class="border-r border-gray-100 px-3 py-2 text-sm text-gray-400">R$</span><input type="number" min="0.01" step="0.01" x-model="catalogoPriceForm.price" @input="catalogoPriceForm.marginPreset = null" class="min-w-0 flex-1 rounded-r-lg px-3 py-2 text-sm font-semibold outline-none"></div></label>
             </div>
             <div class="mt-4">
               <p class="mb-2 text-[11px] font-medium text-gray-500">Ajuste rápido de margem</p>
-              <div class="grid grid-cols-4 gap-2"><template x-for="percent in [30,35,40,45]" :key="percent"><button type="button" @click="catalogoApplyMargin(percent)" class="rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800" x-text="percent + '%'"></button></template></div>
+              <div class="grid grid-cols-4 gap-2"><template x-for="percent in [30,35,40,45]" :key="percent"><button type="button" @click="catalogoApplyMargin(percent)" :aria-pressed="catalogoPriceForm.marginPreset === percent" :class="catalogoPriceForm.marginPreset === percent ? 'border-emerald-800 bg-emerald-800 text-white shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800'" class="rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" x-text="percent + '%'"></button></template></div>
             </div>
           </section>
 

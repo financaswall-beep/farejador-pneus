@@ -90,6 +90,7 @@ window.PAINEL_MODULES.catalogo = function () {
       this.catalogoPriceForm = {
         price: row.price_amount == null ? '' : Number(row.price_amount).toFixed(2),
         reason: '',
+        marginPreset: null,
       };
       this.catalogoHistory = [];
       this.catalogoMessage = null;
@@ -141,6 +142,7 @@ window.PAINEL_MODULES.catalogo = function () {
       const cost = Number(this.catalogoSelecionado?.official_unit_cost);
       if (!Number.isFinite(cost) || cost <= 0 || percent >= 100) return;
       this.catalogoPriceForm.price = (cost / (1 - percent / 100)).toFixed(2);
+      this.catalogoPriceForm.marginPreset = percent;
     },
 
     catalogoPodeSalvar() {

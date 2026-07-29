@@ -13,13 +13,14 @@ describe('catalogo no painel', () => {
     const module = loadCatalogModule();
     const context = {
       catalogoSelecionado: { official_unit_cost: 82 },
-      catalogoPriceForm: { price: '', reason: '' },
+      catalogoPriceForm: { price: '', reason: '', marginPreset: null },
       catalogoNovoPreco: module.catalogoNovoPreco,
       catalogoLucro: module.catalogoLucro,
     };
 
     module.catalogoApplyMargin.call(context, 40);
     expect(context.catalogoPriceForm.price).toBe('136.67');
+    expect(context.catalogoPriceForm.marginPreset).toBe(40);
     expect(module.catalogoLucro.call(context)).toBeCloseTo(54.67);
     expect(module.catalogoMargem.call(context)).toBeCloseTo(40);
     expect(module.catalogoPrecoMinimo.call(context)).toBeCloseTo(126.1538);
