@@ -10,9 +10,12 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
+import { CATALOG_BRAND_STOCK_PROJECTION, syncCatalogBrandForMeasure } from './catalog-brand.js';
 
 export interface WholesaleStockRow {
   measure: string;
+  /** Marca do produto no Catálogo para esta medida. Não altera saldo nem custo. */
+  brand?: string | null;
   quantity_on_hand: number;
   unit_cost: number;
   /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
@@ -30,11 +33,12 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
-            tire_width_mm, tire_aspect_ratio, tire_rim_diameter
-       FROM commerce.wholesale_stock
-      WHERE environment = $1
-      ORDER BY measure`,
+    `SELECT ws.measure, ws.quantity_on_hand, ws.unit_cost, ws.min_quantity, ws.notes, ws.updated_at,
+            ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter,
+            ${CATALOG_BRAND_STOCK_PROJECTION} brand
+       FROM commerce.wholesale_stock ws
+      WHERE ws.environment = $1
+      ORDER BY ws.measure`,
     [environment],
   );
   return r.rows;
@@ -44,7 +48,7 @@ export async function listWholesaleStock(
  *  min_quantity: null LIMPA o mínimo (campo vazio no form = sem alerta); o form
  *  "Definir" sempre manda o valor completo — não há merge parcial. */
 export async function setWholesaleStock(
-  input: { measure: string; quantity_on_hand: number; unit_cost?: number; min_quantity?: number | null; notes?: string | null; environment?: 'prod' | 'test' },
+  input: { measure: string; brand?: string | null; quantity_on_hand: number; unit_cost?: number; min_quantity?: number | null; notes?: string | null; actor_label?: string | null; environment?: 'prod' | 'test' },
   dbPool: Pool | PoolClient = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
@@ -62,6 +66,10 @@ export async function setWholesaleStock(
   // Fase 4: casa com o catálogo → grava o formato OFICIAL + os números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
+  const brand = await syncCatalogBrandForMeasure(dbPool, {
+    environment, measure: cat.measure, brand: input.brand, actorLabel: input.actor_label,
+    allowReplace: true,
+  });
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
             (environment, measure, quantity_on_hand, unit_cost, min_quantity, notes,
@@ -80,7 +88,7 @@ export async function setWholesaleStock(
     [environment, cat.measure, input.quantity_on_hand, unitCost, minQuantity, input.notes?.trim() || null,
      cat.width, cat.aspect, cat.rim],
   );
-  return r.rows[0]!;
+  return { ...r.rows[0]!, ...(brand ? { brand } : {}) };
 }
 
 /** ENTRADA de compra (custo médio): soma quantity_in ao estoque da medida e recalcula o
@@ -88,7 +96,7 @@ export async function setWholesaleStock(
  *  É como "a contabilidade bate" comprando a precos diferentes. Atômico no ON CONFLICT
  *  (usa os valores ANTIGOS da linha no DO UPDATE). Primeira entrada = grava o custo direto. */
 export async function addWholesaleStockEntry(
-  input: { measure: string; quantity_in: number; unit_cost: number; environment?: 'prod' | 'test' },
+  input: { measure: string; brand?: string | null; quantity_in: number; unit_cost: number; actor_label?: string | null; environment?: 'prod' | 'test' },
   dbPool: Pool | PoolClient = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
@@ -99,6 +107,9 @@ export async function addWholesaleStockEntry(
   // Fase 4: casa com o catálogo → formato OFICIAL + números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
+  const brand = await syncCatalogBrandForMeasure(dbPool, {
+    environment, measure: cat.measure, brand: input.brand, actorLabel: input.actor_label,
+  });
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
             (environment, measure, quantity_on_hand, unit_cost,
@@ -117,7 +128,7 @@ export async function addWholesaleStockEntry(
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, input.quantity_in, input.unit_cost, cat.width, cat.aspect, cat.rim],
   );
-  return r.rows[0]!;
+  return { ...r.rows[0]!, ...(brand ? { brand } : {}) };
 }
 
 /** Remove uma medida do estoque do galpão (ex.: cadastrou errado). */

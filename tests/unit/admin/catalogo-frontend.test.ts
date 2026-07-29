@@ -44,7 +44,7 @@ describe('catalogo no painel', () => {
   it('mantem preco da venda avulsa somente leitura e expõe a tela real', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
-    expect(html).toContain('app.catalogo.js?v=20260729-catalogo3');
+    expect(html).toContain('app.catalogo.js?v=20260729-catalog-brand3');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -72,5 +72,17 @@ describe('catalogo no painel', () => {
     }
     expect(module.catalogoBrandLogo('Magion')).toBe(module.catalogoBrandLogo('Maggion'));
     expect(module.catalogoBrandLogo('Marca futura')).toBeNull();
+  });
+
+  it('mantem o editor como painel lateral e compartilha as marcas com Compras e Estoque', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('style="width:min(440px, calc(100vw - 24px));"');
+    expect(html).toContain('id="catalog-brand-options"');
+    expect(html).toContain('x-model="stockForm.brand"');
+    expect(html).toContain('x-model="it.brand" list="catalog-brand-options"');
+    expect(html).toContain(':disabled="!catalogoRows.some((row) => row.brand === brand)"');
+    for (const brand of ['Pirelli', 'Michelin', 'Maggion', 'Kenda']) {
+      expect(html).toContain(`<option value="${brand}"></option>`);
+    }
   });
 });

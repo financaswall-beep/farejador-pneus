@@ -4,7 +4,6 @@ import { env } from '../../shared/config/env.js';
 import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { addWholesaleStockEntry } from './queries-galpao.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
-import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import {
   ensureWholesalePurchaseAccrual,
   postWholesalePurchaseReceipt,
@@ -13,13 +12,8 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult, moneyCents,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
-
-interface PurchaseItemInput {
-  measure: string;
-  brand?: string | null;
-  quantity: number;
-  unit_cost: number;
-}
+import { canonicalCatalogBrand } from './catalog-brand.js';
+import { canonicalPurchaseItems, type PurchaseItemInput } from './purchase-brand.js';
 
 export interface RegisterWholesalePurchaseInput {
   environment?: 'prod' | 'test';
@@ -44,26 +38,6 @@ export interface RegisterWholesalePurchaseResult {
   items_count: number;
   status: 'pending' | 'confirmed';
   stock_applied: boolean;
-}
-
-async function canonicalPurchaseItems(
-  client: PoolClient,
-  environment: 'prod' | 'test',
-  items: PurchaseItemInput[],
-): Promise<PurchaseItemInput[]> {
-  if (!items.length) throw new Error('items_required');
-  const measures = new Map<string, string>();
-  for (const item of items) {
-    if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new Error('quantity_invalid');
-    if (!Number.isFinite(item.unit_cost) || item.unit_cost < 0) throw new Error('cost_invalid');
-    const raw = item.measure.trim();
-    if (!measures.has(raw)) {
-      const catalog = await resolveMeasureInCatalog(client, environment, raw);
-      if (!catalog) throw new Error('measure_not_in_catalog');
-      measures.set(raw, catalog.measure);
-    }
-  }
-  return items.map((item) => ({ ...item, measure: measures.get(item.measure.trim())! }));
 }
 
 async function resolveSupplier(
@@ -98,16 +72,20 @@ async function applyPurchaseStock(
   items: PurchaseItemInput[],
 ): Promise<void> {
   await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
-  const consolidated = new Map<string, { quantity: number; valueCents: number }>();
+  const consolidated = new Map<string, { quantity: number; valueCents: number; brand: string | null }>();
   for (const item of items) {
-    const current = consolidated.get(item.measure) ?? { quantity: 0, valueCents: 0 };
+    const brand = canonicalCatalogBrand(item.brand);
+    const current = consolidated.get(item.measure) ?? { quantity: 0, valueCents: 0, brand };
+    if (brand && current.brand && brand !== current.brand) throw new Error('stock_measure_brand_conflict');
+    if (brand) current.brand = brand;
     current.quantity += item.quantity;
     current.valueCents += moneyCents(item.unit_cost) * item.quantity;
     consolidated.set(item.measure, current);
   }
   for (const [measure, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
-    await addWholesaleStockEntry({ measure, quantity_in: item.quantity,
-      unit_cost: item.valueCents / item.quantity / 100, environment }, client);
+    await addWholesaleStockEntry({ measure, brand: item.brand, quantity_in: item.quantity,
+      unit_cost: item.valueCents / item.quantity / 100, environment,
+      actor_label: `compra:${purchaseId}` }, client);
   }
 }
 
@@ -131,7 +109,8 @@ export async function registerWholesalePurchase(
         notes: input.notes?.trim() || null,
         payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
         receipt_status: receiptStatus,
-        items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
+        items: rawItems.map((item) => ({ measure: item.measure.trim(),
+          brand: canonicalCatalogBrand(item.brand),
           quantity: item.quantity, unit_cost_cents: moneyCents(item.unit_cost) })),
       }) };
     const started = await beginIntegrityOperation<RegisterWholesalePurchaseResult>(client, operation);
@@ -140,7 +119,7 @@ export async function registerWholesalePurchase(
       return started.result;
     }
 
-    const items = await canonicalPurchaseItems(client, environment, rawItems);
+    const items = await canonicalPurchaseItems(client, environment, rawItems, input.created_by);
     const supplier = await resolveSupplier(client, environment, input);
     const pendingPayment = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
     const purchase = await client.query<{ id: string; purchased_at: string; paid_at: string | null }>(

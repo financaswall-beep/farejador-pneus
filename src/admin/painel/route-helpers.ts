@@ -61,6 +61,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (err.message.startsWith('purchase_stock_consumed')
       || err.message.startsWith('purchase_stock_changed')
       || err.message.startsWith('stock_measure_missing')
+      || err.message === 'stock_measure_brand_conflict'
+      || err.message === 'catalog_product_not_found'
       || err.message === 'payroll_payment_conflict') {
     return { status: 409, error: err.message };
   }

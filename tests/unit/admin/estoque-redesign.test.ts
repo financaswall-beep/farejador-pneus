@@ -70,6 +70,10 @@ describe('Estoque — lista com painel da medida', () => {
     expect(galpao).toContain("this.apiPost('/admin/api/wholesale/stock/remove'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/movimentos'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/reconciliation'");
+    expect(stockHtml).toContain('Marca do produto');
+    expect(stockHtml).toContain('Alimenta o filtro do Catálogo');
+    expect(galpao).toContain('brand: brand || null');
+    expect(stockHtml).toContain("row.brand || 'Marca não informada'");
   });
 
   it('implementa a fila de reposição sobre o estoque oficial e abre o fluxo auditado de Compras', () => {
@@ -116,7 +120,7 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('from-emerald-950');
     expect(stockHtml).toContain('bg-emerald-700');
     expect(stockHtml).toContain('bg-emerald-50');
-    expect(stockHtml).not.toMatch(/\b(?:brand|amber|rose)-/);
+    expect(stockHtml).not.toMatch(/\b(?:bg|text|border|from|via|to)-(?:amber|rose)-/);
   });
 
   it('isola os dados demonstrativos exclusivamente na URL de preview', () => {

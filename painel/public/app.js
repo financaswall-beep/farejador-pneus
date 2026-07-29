@@ -91,7 +91,7 @@ function painelApp() {
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null },
+    stockForm: { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null },
     stockSaving: false,
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
@@ -282,7 +282,7 @@ function painelApp() {
     customerIdentityLoading: false, customerIdentityError: null, customerIdentityNotice: '', customerPrivacyPreview: null,
     kpis: [], leadsRecuperar: [], resumoSeries: [],
     pedidos: [], produtos: [],
-    catalogoRows: [], catalogoBrands: [], catalogoSummary: { products: 0, brands: 0, without_price: 0, with_stock: 0 },
+    catalogoRows: [], catalogoBrands: ['Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda'], catalogoSummary: { products: 0, brands: 0, without_price: 0, with_stock: 0 },
     catalogoLoading: false, catalogoError: null, catalogoBusca: '', catalogoMarca: 'todas', catalogoFiltro: 'todos', catalogoPagina: 1, catalogoPorPagina: 7, catalogoSelecionado: null, catalogoHistory: [], catalogoPriceForm: { price: '', reason: '' }, catalogoSaving: false, catalogoMessage: null,
     redeKpis: [],
     parceirosRede: [],

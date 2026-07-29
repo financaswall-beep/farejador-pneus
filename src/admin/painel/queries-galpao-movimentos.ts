@@ -127,7 +127,8 @@ export async function addWholesaleStockEntryComRotulo(
   const operation = { environment, domain: 'stock.entry',
     idempotencyKey: input.idempotency_key ?? '', fingerprint: operationFingerprint({
       measure: input.measure.trim(), quantity_in: input.quantity_in,
-      unit_cost: input.unit_cost, entry_nature: nature, reason,
+      brand: input.brand?.trim() || null, unit_cost: input.unit_cost,
+      entry_nature: nature, reason,
     }) };
   const client = await dbPool.connect();
   try {
@@ -150,7 +151,8 @@ export async function addWholesaleStockEntryComRotulo(
     await recordIntegrityEvent(client, { environment, domain: 'stock',
       entityTable: 'commerce.wholesale_stock', entityId, eventType: 'manual_entry',
       actorLabel: input.actor_label, idempotencyKey: operation.idempotencyKey,
-      after: { measure: result.measure, quantity_in: input.quantity_in,
+      after: { measure: result.measure, brand: result.brand ?? input.brand ?? null,
+        quantity_in: input.quantity_in,
         unit_cost: input.unit_cost, nature, reason } });
     await completeIntegrityOperation(client, operation, 'commerce.wholesale_stock', entityId, result);
     await postMatrizInventoryAdjustmentsByMovementRef(

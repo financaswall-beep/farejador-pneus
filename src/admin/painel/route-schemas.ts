@@ -110,6 +110,7 @@ export const registerWholesaleSaleSchema = z
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
 export const setWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
+  brand: z.string().max(60).nullable().optional(),
   quantity_on_hand: z.number().int().min(0).max(1000000),
   unit_cost: z.number().min(0).max(9999999.99).optional(),
   min_quantity: z.number().int().min(0).max(1000000).nullable().optional(), // 0126: null/ausente = sem alerta
@@ -122,6 +123,7 @@ export const removeWholesaleStockSchema = z.object({
 // Entrada de compra (custo médio): soma quantidade + recalcula o custo médio ponderado.
 export const entryWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
+  brand: z.string().max(60).nullable().optional(),
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
   entry_nature: z.enum(['inventory_found', 'owner_contribution', 'opening_balance', 'other']),

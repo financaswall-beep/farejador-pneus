@@ -1,4 +1,8 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
+const CATALOGO_KNOWN_BRANDS = Object.freeze([
+  'Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin',
+  'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda',
+]);
 window.PAINEL_MODULES.catalogo = function () {
   return {
     async loadCatalogo() {
@@ -8,7 +12,11 @@ window.PAINEL_MODULES.catalogo = function () {
       try {
         const data = await this.apiGet('/admin/api/catalog');
         this.catalogoRows = Array.isArray(data.rows) ? data.rows : [];
-        this.catalogoBrands = Array.isArray(data.brands) ? data.brands : [];
+        const actualBrands = Array.isArray(data.brands) ? data.brands : [];
+        this.catalogoBrands = [
+          ...CATALOGO_KNOWN_BRANDS,
+          ...actualBrands.filter((brand) => !CATALOGO_KNOWN_BRANDS.includes(brand)),
+        ];
         this.catalogoSummary = data.summary || { products: 0, brands: 0, without_price: 0, with_stock: 0 };
         this.catalogoPagina = Math.min(this.catalogoPagina, this.catalogoTotalPaginas());
       } catch (error) {

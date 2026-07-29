@@ -42,6 +42,10 @@ window.PAINEL_MODULES.galpao = function () {
     },
     measurePick(value, obj) {
       obj.measure = value;
+      const stock = this.atacadoStock.find((row) => row.measure === value);
+      if (Object.prototype.hasOwnProperty.call(obj, 'brand') && !obj.brand && stock?.brand) {
+        obj.brand = stock.brand;
+      }
       this.measureBox = { key: null, hits: [] };
     },
     measureBlur() {
@@ -57,6 +61,8 @@ window.PAINEL_MODULES.galpao = function () {
         cost_invalid: 'Custo inválido.',
         min_invalid: 'Mínimo inválido (número inteiro, 0 ou mais).',
         reason_required: 'Informe o motivo da alteração de saldo ou custo.',
+        catalog_product_not_found: 'A medida existe, mas o produto correspondente não foi encontrado no Catálogo.',
+        stock_measure_brand_conflict: 'O estoque atual aceita uma marca por medida. Separe ou corrija as marcas informadas.',
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
     },
@@ -66,6 +72,7 @@ window.PAINEL_MODULES.galpao = function () {
     },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
+      const brand = (this.stockForm.brand || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
       const reason = (this.stockForm.entry_reason || '').trim();
@@ -84,14 +91,15 @@ window.PAINEL_MODULES.galpao = function () {
       try {
         await this.apiPost('/admin/api/wholesale/stock', {
           measure,
+          brand: brand || null,
           quantity_on_hand: qty,
           unit_cost: cost,
           min_quantity: min,
           notes: this.stockForm.notes ? this.stockForm.notes.trim() : null,
           reason: reason || undefined,
         });
-        this.stockMsg = { ok: true, text: `${measure}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
+        this.stockMsg = { ok: true, text: `${measure}${brand ? ` · ${brand}` : ''}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
+        this.stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
@@ -102,12 +110,13 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand, original_unit_cost: row.unit_cost ?? 0 };
+      this.stockForm = { measure: row.measure, brand: row.brand || '', quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand, original_unit_cost: row.unit_cost ?? 0 };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
     async stockEntry() {
       const measure = (this.stockForm.measure || '').trim();
+      const brand = (this.stockForm.brand || '').trim();
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
       const reason = (this.stockForm.entry_reason || '').trim();
@@ -119,10 +128,10 @@ window.PAINEL_MODULES.galpao = function () {
       this.stockMsg = null;
       try {
         this.stockForm.idempotency_key = this.stockForm.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-entry', 'form').key;
-        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature, reason, idempotency_key: this.stockForm.idempotency_key });
+        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, brand: brand || null, quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature, reason, idempotency_key: this.stockForm.idempotency_key });
         window.PAINEL_INTEGRITY.complete('stock-entry', 'form');
-        this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
-        this.stockForm = { measure: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
+        this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure}${brand ? ` · ${brand}` : ''} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
+        this.stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // entrada pode ter tirado a medida do "repor"
@@ -151,7 +160,9 @@ window.PAINEL_MODULES.galpao = function () {
       const q = (this.stockBusca || '').trim().toLowerCase();
       const qd = digits(q);
       let rows = this.atacadoStock;
-      if (q) rows = rows.filter((r) => r.measure.toLowerCase().includes(q) || (qd !== '' && digits(r.measure).includes(qd)));
+      if (q) rows = rows.filter((r) => r.measure.toLowerCase().includes(q)
+        || String(r.brand || '').toLowerCase().includes(q)
+        || (qd !== '' && digits(r.measure).includes(qd)));
       const peso = (r) => (Number(r.quantity_on_hand) === 0 ? 0 : (this.stockPrecisaRepor(r) ? 1 : 2));
       return [...rows].sort((a, b) => peso(a) - peso(b) || a.measure.localeCompare(b.measure));
     },
