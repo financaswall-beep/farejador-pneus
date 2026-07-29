@@ -5673,27 +5673,39 @@
     </div>
 
     <!-- ═══ TELA: COLABORADORES — equipe, remuneração, comissão, folha e desempenho (0133) ═══ -->
-    <div x-show="currentPage === 'colaboradores'" class="p-8 bg-gray-50/30 min-h-screen">
-      <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-tight">Colaboradores</h1>
-          <p class="text-sm text-gray-500 mt-1">Equipe, remuneração, comissões e desempenho da Matriz</p>
+    <div x-show="currentPage === 'colaboradores'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5">
+      <section aria-labelledby="colaboradores-heading"
+               class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+        <img src="/admin/painel/assets/colaboradores-hero.webp?v=20260729-colaboradores-banner1"
+             alt="Equipe da 2W Pneus trabalhando em conjunto no galpão"
+             class="absolute inset-0 h-full w-full object-cover object-center">
+        <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5"></div>
+        <div class="relative z-20 flex min-h-[148px] flex-col justify-center gap-5 px-8 py-6 sm:flex-row sm:items-center sm:justify-between xl:px-10">
+          <div>
+            <h1 id="colaboradores-heading"
+                class="text-3xl font-bold tracking-tight text-white lg:text-[34px] lg:leading-tight">Colaboradores</h1>
+            <p class="mt-3 max-w-md text-sm text-emerald-50/90">Equipe, remuneração, comissões e desempenho da Matriz</p>
+          </div>
+          <button @click="abrirNovoColaborador()" type="button"
+                  class="inline-flex w-fit flex-shrink-0 items-center gap-2 rounded-xl border border-white/40 bg-white/95 px-4 py-2.5 text-sm font-semibold text-emerald-950 shadow-sm backdrop-blur-sm transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300">
+            <i data-lucide="user-plus" class="h-4 w-4"></i>
+            Novo colaborador
+          </button>
         </div>
-        <button @click="abrirNovoColaborador()"
-                class="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300">
-          <span class="text-base leading-none">＋</span> Novo colaborador
-        </button>
-      </div>
+      </section>
 
-      <div class="flex items-center gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
-        <template x-for="tab in [
-          {id:'equipe',label:'Equipe'}, {id:'remuneracao',label:'Remuneração'},
-          {id:'comissoes',label:'Comissões'}, {id:'folha',label:'Folha'}, {id:'desempenho',label:'Desempenho'}
-        ]" :key="tab.id">
-          <button @click="colabSetTab(tab.id)" class="px-5 py-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors"
-                  :class="colabTab === tab.id ? 'text-emerald-800 border-emerald-700 bg-emerald-50/40' : 'text-gray-500 border-transparent hover:text-gray-800 hover:bg-gray-50'"
-                  x-text="tab.label"></button>
-        </template>
+      <div class="mb-6 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <nav aria-label="Seções de Colaboradores" class="flex items-center gap-1 overflow-x-auto px-5">
+          <template x-for="tab in [
+            {id:'equipe',label:'Equipe'}, {id:'remuneracao',label:'Remuneração'},
+            {id:'comissoes',label:'Comissões'}, {id:'folha',label:'Folha'}, {id:'desempenho',label:'Desempenho'}
+          ]" :key="tab.id">
+            <button @click="colabSetTab(tab.id)"
+                    class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    :class="colabTab === tab.id ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'"
+                    x-text="tab.label"></button>
+          </template>
+        </nav>
       </div>
 
       <div class="space-y-4 max-w-[1500px]">
