@@ -6736,17 +6736,38 @@
     </div>
 
     <!-- ═══ TELA: CLIENTES — versão fiel ao board aprovado ═══ -->
-    <div x-show="currentPage === 'clientes'" class="p-6 lg:p-8" x-cloak>
-      <header class="flex items-center justify-between gap-4 mb-5">
-        <div><h1 class="text-2xl font-semibold tracking-tight">Clientes</h1><p class="text-xs text-gray-500 mt-1">Relacionamento, atendimento e recompra em uma visão única</p></div>
-        <button @click="exportarClientes()" class="h-9 inline-flex items-center gap-2 px-3.5 border border-gray-200 bg-white rounded-lg text-xs font-medium hover:bg-gray-50"><i data-lucide="download" class="w-3.5 h-3.5"></i>Exportar<i data-lucide="chevron-down" class="w-3 h-3 text-gray-400"></i></button>
-      </header>
+    <div x-show="currentPage === 'clientes'" class="min-h-screen bg-gray-50/70 p-4 lg:p-5" x-cloak>
+      <section aria-labelledby="clientes-heading"
+               class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl border border-emerald-950/20 bg-emerald-950 shadow-sm">
+        <img src="/admin/painel/assets/clientes-hero.webp?v=20260729-clientes-banner1"
+             alt="Clientes recebendo atendimento personalizado da equipe 2W Pneus"
+             class="absolute inset-0 h-full w-full object-cover object-center">
+        <div class="absolute inset-0 bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5"></div>
+        <div class="relative z-20 flex min-h-[148px] flex-col justify-center gap-5 px-8 py-6 sm:flex-row sm:items-center sm:justify-between xl:px-10">
+          <div>
+            <h1 id="clientes-heading"
+                class="text-3xl font-bold tracking-tight text-white lg:text-[34px] lg:leading-tight">Clientes</h1>
+            <p class="mt-3 max-w-md text-sm text-emerald-50/90">Relacionamento, atendimento e recompra em uma visão única</p>
+          </div>
+          <button @click="exportarClientes()" type="button"
+                  class="inline-flex h-10 w-fit flex-shrink-0 items-center gap-2 rounded-xl border border-white/40 bg-white/95 px-4 text-xs font-semibold text-emerald-950 shadow-sm backdrop-blur-sm transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300">
+            <i data-lucide="download" class="h-3.5 w-3.5"></i>
+            Exportar
+            <i data-lucide="chevron-down" class="h-3 w-3 text-emerald-800/60"></i>
+          </button>
+        </div>
+      </section>
 
-      <nav class="flex gap-7 border-b border-gray-200 mb-5 overflow-x-auto">
-        <template x-for="tab in [{id:'todos',label:'Todos'},{id:'leads',label:'Leads'},{id:'compradores',label:'Compradores'},{id:'recompra',label:'Recompra'},{id:'parceiros',label:'Parceiros'},...(customerIdentityEnabled?[{id:'identidade',label:'Identidade e privacidade'}]:[])]" :key="'clientes-v2-'+tab.id">
-          <button @click="setClientesTab(tab.id)" class="pb-3 px-0.5 text-sm whitespace-nowrap border-b-2 -mb-px" :class="clientesTab===tab.id?'border-emerald-700 text-emerald-800 font-semibold':'border-transparent text-gray-500 hover:text-gray-800'" x-text="tab.label"></button>
-        </template>
-      </nav>
+      <div class="mb-5 rounded-b-xl border border-gray-200 border-t-0 bg-white">
+        <nav aria-label="Seções de Clientes" class="flex items-center gap-1 overflow-x-auto px-5">
+          <template x-for="tab in [{id:'todos',label:'Todos'},{id:'leads',label:'Leads'},{id:'compradores',label:'Compradores'},{id:'recompra',label:'Recompra'},{id:'parceiros',label:'Parceiros'},...(customerIdentityEnabled?[{id:'identidade',label:'Identidade e privacidade'}]:[])]" :key="'clientes-v2-'+tab.id">
+            <button @click="setClientesTab(tab.id)"
+                    class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    :class="clientesTab===tab.id?'border-emerald-700 text-emerald-800':'border-transparent text-gray-500 hover:text-gray-800'"
+                    x-text="tab.label"></button>
+          </template>
+        </nav>
+      </div>
 
       <div x-show="clientesLoading" class="bg-white border border-gray-200 rounded-xl p-12 text-center text-sm text-gray-500">Carregando clientes reais…</div>
       <div x-show="clientesError" class="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-4 text-sm">Não foi possível carregar os clientes. <button @click="loadClientes()" class="font-semibold underline">Tentar novamente</button></div>
