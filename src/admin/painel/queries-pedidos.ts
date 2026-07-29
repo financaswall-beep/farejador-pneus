@@ -105,7 +105,7 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts
          ON ts.product_id = p.id AND ts.environment = p.environment
-       LEFT JOIN commerce.current_prices cp
+       LEFT JOIN commerce.matriz_current_prices cp
          ON cp.product_id = p.id AND cp.environment = p.environment
       WHERE p.environment = $1 AND p.deleted_at IS NULL`,
     [env.FAREJADOR_ENV],
@@ -127,8 +127,8 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
       official_quantity_on_hand: official.quantity_on_hand,
       official_unit_cost: official.unit_cost,
       stock_source: 'commerce.wholesale_stock',
-      walkin_sellable: official.sellable,
-      walkin_block_reason: official.block_reason,
+      walkin_sellable: official.sellable && product.price_amount !== null,
+      walkin_block_reason: product.price_amount === null ? 'catalog_price_missing' : official.block_reason,
     };
   }).sort((a, b) => {
     if (a.walkin_sellable !== b.walkin_sellable) return a.walkin_sellable ? -1 : 1;

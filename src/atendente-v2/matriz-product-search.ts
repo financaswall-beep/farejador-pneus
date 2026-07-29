@@ -160,7 +160,7 @@ export async function buscarCompatibilidadeMatriz(
          ON ts.id = vf.tire_spec_id AND ts.environment = vf.environment
        JOIN commerce.products p
          ON p.id = ts.product_id AND p.environment = ts.environment AND p.deleted_at IS NULL
-       LEFT JOIN commerce.current_prices cp
+       LEFT JOIN commerce.matriz_current_prices cp
          ON cp.product_id = p.id AND cp.environment = p.environment
       WHERE vf.environment = $1 AND vf.vehicle_model_id = ANY($2::uuid[])
         AND ($3::text IS NULL OR vf.position = $3 OR vf.position = 'both')`,
@@ -201,7 +201,7 @@ function catalogSql(filters: string[]): string {
             FROM commerce.products p
             LEFT JOIN commerce.tire_specs ts
               ON ts.product_id = p.id AND ts.environment = p.environment
-            LEFT JOIN commerce.current_prices cp
+            LEFT JOIN commerce.matriz_current_prices cp
               ON cp.product_id = p.id AND cp.environment = p.environment
            WHERE ${filters.join(' AND ')}`;
 }

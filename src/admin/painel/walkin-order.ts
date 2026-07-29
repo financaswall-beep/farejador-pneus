@@ -6,6 +6,7 @@ import type { RegisterWalkinOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { applyMatrizWalkinStockSale, prepareMatrizWalkinStock } from './matriz-walkin-stock.js';
 import { postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
+import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 
 interface ExistingOrder {
   id: string;
@@ -89,6 +90,7 @@ export async function registerWalkinOrder(
     );
     const unitId = unit.rows[0]?.id;
     if (!unitId) throw new Error('walkin_unit_not_found');
+    await assertCurrentCatalogPrices(client, environment, input.items);
 
     if (input.seller_collaborator_id) {
       if (!await hasMatrizSellerColumn(client, 'orders')) {

@@ -130,6 +130,7 @@ window.PAINEL_MODULES.core = function () {
         // Bot (2026-07-06): visão (cards/mapa/radar) ao entrar na aba.
         if (page === 'bot') void this.loadBotVisao();
         if (page === 'marketing') void this.loadMarketing();
+        if (page === 'catalogo') void this.loadCatalogo();
       });
 
       this.startLiveRefresh();

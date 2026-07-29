@@ -98,6 +98,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     'walkin_stock_insufficient',
     'walkin_stock_ambiguous',
     'walkin_idempotency_conflict',
+    'catalog_price_missing',
+    'catalog_price_changed',
   ].includes(err.message)) {
     return { status: 409, error: err.message };
   }

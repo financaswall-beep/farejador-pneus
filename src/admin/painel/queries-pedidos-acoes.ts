@@ -15,6 +15,7 @@ import { hashPassword } from '../../parceiro/password.js';
 import type { RegisterManualOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
+import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -86,6 +87,7 @@ export async function registerManualOrder(
   let orderId: string;
   try {
     await client.query('BEGIN');
+    await assertCurrentCatalogPrices(client, environment, input.items);
     const contactId = await resolveContactId(client as unknown as Pool, environment, input.conversation_id, input.contact_id);
     const result = await client.query<{ order_id: string }>(
       `SELECT commerce.register_manual_order(

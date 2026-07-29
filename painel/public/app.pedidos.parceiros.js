@@ -11,8 +11,11 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       walkin_stock_insufficient: 'Não há pneus suficientes dessa medida no galpão. Confira o estoque e tente novamente.',
       walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpão. Corrija o estoque antes de vender.',
       walkin_idempotency_conflict: 'Os dados dessa venda mudaram durante o envio. Feche, abra novamente e confira antes de finalizar.',
+      catalog_price_missing: 'Esse pneu está sem preço oficial. Defina o valor no Catálogo antes de vender.',
+      catalog_price_changed: 'O preço mudou no Catálogo. A lista foi atualizada; confira o novo valor antes de confirmar.',
     };
-    return messages[code] || 'Não consegui registrar a venda. Confira os dados e tente novamente.';
+    const known = Object.keys(messages).find((key) => code.includes(key));
+    return known ? messages[known] : 'Não consegui registrar a venda. Confira os dados e tente novamente.';
   };
 
   return {
@@ -83,9 +86,9 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
         ]);
         void this.loadVarejoResumo(); // venda nova entra nos cards do varejo (0117)
       } catch (err) {
-        this.orderError = this.modalConv
-          ? (err instanceof Error ? err.message : String(err))
-          : walkinOrderErrText(err);
+        this.orderError = walkinOrderErrText(err);
+        const code = err instanceof Error ? err.message : String(err);
+        if (code.includes('catalog_price_')) void this.loadRealData();
       } finally {
         this.orderSubmitting = false;
       }

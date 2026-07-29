@@ -16,6 +16,10 @@ import {
   verificarEstoqueMatriz,
 } from '../../src/atendente-v2/matriz-product-search.js';
 
+let getCatalogOverview: typeof import('../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
+let getCatalogPriceHistory: typeof import('../../src/admin/painel/queries-catalogo.js').getCatalogPriceHistory;
+let setCatalogPrice: typeof import('../../src/admin/painel/queries-catalogo.js').setCatalogPrice;
+
 let db: IntegrationDb;
 let client: PoolClient;
 let fallbackPool: Pool | null = null;
@@ -29,6 +33,16 @@ let policyKey: string;
 let policyVersion: string;
 
 beforeAll(async () => {
+  Object.assign(process.env, {
+    NODE_ENV: 'test',
+    FAREJADOR_ENV: 'test',
+    DATABASE_URL: 'postgres://test',
+    CHATWOOT_HMAC_SECRET: 'test-secret',
+    ADMIN_AUTH_TOKEN: 'emergency-token',
+  });
+  ({ getCatalogOverview, getCatalogPriceHistory, setCatalogPrice } = await import(
+    '../../src/admin/painel/queries-catalogo.js'
+  ));
   try {
     db = await startPostgres();
     client = db.pool as unknown as PoolClient;
@@ -175,6 +189,43 @@ describe('Atendente commerce tools - integracao Postgres', () => {
       },
     ]);
   });
+
+  it('catalogo central une estoque e preco e preserva historico auditavel', async () => {
+    const catalogPool = fallbackPool ?? db.pool;
+    const before = await getCatalogOverview('test', catalogPool);
+    expect(before.rows.find((row) => (
+      row as { product_id?: string }
+    ).product_id === productId)).toMatchObject({
+      price_amount: 175,
+      official_quantity_on_hand: 3,
+      official_unit_cost: 40,
+      gross_profit: 135,
+      sellable: true,
+    });
+
+    const changed = await setCatalogPrice({
+      productId,
+      priceAmount: 189.5,
+      reason: 'Teste integrado do catálogo',
+      actorLabel: 'Vitest',
+      environment: 'test',
+    }, catalogPool);
+    expect(changed).toMatchObject({ changed: true, price_amount: 189.5 });
+
+    const after = await getCatalogOverview('test', catalogPool);
+    expect(after.rows.find((row) => (
+      row as { product_id?: string }
+    ).product_id === productId)).toMatchObject({
+      price_amount: 189.5,
+      gross_profit: 149.5,
+    });
+    const history = await getCatalogPriceHistory(productId, 'test', catalogPool);
+    expect(history[0]).toMatchObject({
+      price_amount: '189.50',
+      actor_label: 'Vitest',
+      reason: 'Teste integrado do catálogo',
+    });
+  });
 });
 
 async function seedCommerceFixtures(
@@ -231,6 +282,12 @@ async function seedCommerceFixtures(
     `INSERT INTO commerce.product_prices
        (environment, product_id, price_amount, currency, price_type, valid_from)
      VALUES ('test', $1, 175.00, 'BRL', 'regular', '2026-01-01T00:00:00Z')`,
+    [createdProductId],
+  );
+  await client.query(
+    `INSERT INTO commerce.matriz_product_prices
+       (environment, product_id, price_amount, currency, valid_from)
+     VALUES ('test', $1, 175.00, 'BRL', '2026-01-01T00:00:00Z')`,
     [createdProductId],
   );
 
@@ -302,6 +359,13 @@ async function cleanupCommerceFixtures(
     SELECT id FROM commerce.tire_specs WHERE product_id = $1
   )`, [ids.productId]);
   await client.query(`DELETE FROM commerce.vehicle_models WHERE id = $1`, [ids.vehicleId]);
+  await client.query(
+    `DELETE FROM audit.events
+      WHERE environment='test' AND entity_table='commerce.matriz_product_prices'
+        AND entity_id IN (SELECT id FROM commerce.matriz_product_prices WHERE product_id=$1)`,
+    [ids.productId],
+  );
+  await client.query(`DELETE FROM commerce.matriz_product_prices WHERE product_id = $1`, [ids.productId]);
   await client.query(`DELETE FROM commerce.product_prices WHERE product_id = $1`, [ids.productId]);
   await client.query(`DELETE FROM commerce.stock_levels WHERE product_id = $1`, [ids.productId]);
   await client.query(`DELETE FROM commerce.tire_specs WHERE product_id = $1`, [ids.productId]);

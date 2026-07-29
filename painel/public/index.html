@@ -24,7 +24,7 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
-<script src="/admin/painel/app.format.js?v=20260716-stock-source1"></script>
+<script src="/admin/painel/app.format.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
@@ -56,14 +56,15 @@
 <script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.js?v=20260727-stock-adjustment1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260729-catalogo3"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
-<script src="/admin/painel/app.pedidos.parceiros.js?v=20260727-finance-refresh1"></script>
-<script src="/admin/painel/app.core.js?v=20260727-financeiro-visao1"></script>
+<script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
+<script src="/admin/painel/app.core.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260727-stock-adjustment1"></script>
-<script src="/admin/painel/app.js?v=20260727-stock-adjustment1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260729-catalogo1"></script>
+<script src="/admin/painel/app.js?v=20260729-catalogo1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -8410,8 +8411,214 @@
       </section>
     </div>
 
+    <!-- ═══ TELA: CATÁLOGO CENTRAL ═══ -->
+    <div x-show="currentPage === 'catalogo'" class="space-y-5">
+      <section class="relative overflow-hidden rounded-2xl min-h-[190px] border border-emerald-900 shadow-sm text-white"
+               style="background-image:linear-gradient(90deg,rgba(2,44,34,.98) 0%,rgba(2,78,58,.91) 55%,rgba(2,44,34,.70) 100%),url('/admin/painel/assets/estoque-hero.webp?preview=tire');background-size:cover;background-position:center;">
+        <div class="relative z-10 flex min-h-[190px] items-center justify-between gap-8 px-8 py-7">
+          <div class="max-w-xl">
+            <p class="text-[11px] font-semibold uppercase tracking-[.2em] text-emerald-200">Fonte oficial de venda</p>
+            <h1 class="mt-2 text-3xl font-bold tracking-tight">Catálogo e preços</h1>
+            <p class="mt-2 text-sm text-emerald-100/85">Controle o preço oficial que o bot e a venda avulsa usam quando o pedido fica na Matriz.</p>
+            <div class="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-white/10 px-3 py-1.5 text-xs text-emerald-50">
+              <i data-lucide="link-2" class="h-3.5 w-3.5"></i>
+              Custo do Estoque · preço do Catálogo · venda congelada
+            </div>
+          </div>
+          <div class="grid min-w-[360px] grid-cols-3 divide-x divide-white/20 text-center">
+            <div class="px-5"><i data-lucide="package" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.products"></p><p class="text-xs text-emerald-100/70">produtos</p></div>
+            <div class="px-5"><i data-lucide="tags" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.brands"></p><p class="text-xs text-emerald-100/70">marcas</p></div>
+            <div class="px-5"><i data-lucide="triangle-alert" class="mx-auto h-5 w-5 text-amber-300"></i><p class="mt-2 text-3xl font-bold text-amber-300" x-text="catalogoSummary.without_price"></p><p class="text-xs text-amber-100/75">sem preço</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <p class="text-sm font-semibold text-gray-950">Filtrar por marca</p>
+            <p class="mt-1 text-xs text-gray-500">A marca vem do cadastro técnico do produto.</p>
+          </div>
+          <button type="button" @click="currentPage='estoque'" class="inline-flex items-center gap-2 rounded-lg border border-emerald-700 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
+            <i data-lucide="warehouse" class="h-4 w-4"></i>Abrir Estoque
+          </button>
+        </div>
+        <div class="mt-4 flex gap-3 overflow-x-auto pb-1">
+          <button type="button" @click="catalogoSetMarca('todas')"
+                  :class="catalogoMarca === 'todas' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700' : 'border-gray-200 bg-white text-gray-600'"
+                  class="min-w-[125px] rounded-xl border px-4 py-3 text-xs font-semibold transition-colors">
+            Todas as marcas
+          </button>
+          <template x-for="brand in catalogoBrands" :key="brand">
+            <button type="button" @click="catalogoSetMarca(brand)"
+                    :class="catalogoMarca === brand ? 'border-emerald-700 ring-1 ring-emerald-700' : 'border-gray-200'"
+                    class="flex h-[64px] min-w-[145px] items-center justify-center rounded-xl border bg-white px-3 py-2 transition-colors hover:bg-gray-50">
+              <template x-if="catalogoBrandLogo(brand)">
+                <img :src="catalogoBrandLogo(brand)" :alt="`Logo ${brand}`"
+                     class="h-9 w-[110px] object-contain" loading="lazy">
+              </template>
+              <template x-if="!catalogoBrandLogo(brand)">
+                <span class="flex h-8 items-center justify-center rounded-md bg-gray-100 px-2 text-xs font-semibold text-gray-600"
+                      x-text="String(brand).toUpperCase()"></span>
+              </template>
+            </button>
+          </template>
+        </div>
+      </section>
+
+      <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-5">
+          <label class="relative min-w-[300px] flex-1 max-w-xl">
+            <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400"></i>
+            <input x-model.debounce.250ms="catalogoBusca" @input="catalogoPagina=1"
+                   class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-700"
+                   placeholder="Buscar por medida, marca, produto ou código">
+          </label>
+          <div class="flex items-center gap-2">
+            <button type="button" @click="catalogoSetFiltro('todos')" :class="catalogoFiltro==='todos' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Todos</button>
+            <button type="button" @click="catalogoSetFiltro('estoque')" :class="catalogoFiltro==='estoque' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Com estoque</button>
+            <button type="button" @click="catalogoSetFiltro('sem_preco')" :class="catalogoFiltro==='sem_preco' ? 'bg-amber-500 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Sem preço</button>
+          </div>
+        </div>
+
+        <div x-show="catalogoLoading" class="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Carregando catálogo...</div>
+        <div x-show="catalogoError && !catalogoLoading" class="m-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          Não foi possível carregar o Catálogo. <button @click="loadCatalogo()" class="font-semibold underline">Tentar novamente</button>
+        </div>
+        <div x-show="!catalogoLoading && !catalogoError" class="overflow-x-auto">
+          <table class="w-full min-w-[1050px] text-left">
+            <thead class="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              <tr><th class="px-5 py-3">Produto</th><th class="px-4 py-3">Estoque</th><th class="px-4 py-3">Custo no estoque</th><th class="px-4 py-3">Preço varejo</th><th class="px-4 py-3">Lucro bruto</th><th class="px-4 py-3">Margem</th><th class="px-4 py-3">Status</th><th class="px-5 py-3 text-right">Ações</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="row in catalogoPaginaRows()" :key="row.product_id">
+                <tr class="hover:bg-emerald-50/30">
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center gap-3">
+                      <span class="flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                        <img src="/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1"
+                             alt="" aria-hidden="true"
+                             class="h-full w-full object-contain mix-blend-multiply">
+                      </span>
+                      <div class="min-w-0">
+                        <template x-if="catalogoBrandLogo(row.brand)">
+                          <img :src="catalogoBrandLogo(row.brand)" :alt="`Logo ${row.brand}`"
+                               class="h-5 w-[86px] object-contain object-left">
+                        </template>
+                        <template x-if="!catalogoBrandLogo(row.brand)">
+                          <span class="inline-flex rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-600"
+                                x-text="String(row.brand || 'SEM MARCA').toUpperCase()"></span>
+                        </template>
+                        <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="[row.product_name,row.tire_size].filter(Boolean).join(' · ')"></p>
+                        <p class="text-[11px] text-gray-400" x-text="row.product_code"></p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5"><p class="text-sm font-semibold" x-text="Number(row.official_quantity_on_hand || 0) + ' un.'"></p><p class="text-[10px] text-gray-400">Galpão central</p></td>
+                  <td class="px-4 py-3.5"><p class="text-sm font-medium" x-text="row.official_unit_cost == null ? '—' : formatCurrency(Number(row.official_unit_cost))"></p><p class="flex items-center gap-1 text-[10px] text-gray-400"><i data-lucide="lock" class="h-2.5 w-2.5"></i>Somente leitura</p></td>
+                  <td class="px-4 py-3.5"><p class="text-base font-bold text-gray-950" x-text="row.price_amount == null ? '—' : formatCurrency(Number(row.price_amount))"></p><p class="text-[10px] text-gray-400" x-text="row.price_amount == null ? 'sem preço' : 'oficial da Matriz'"></p></td>
+                  <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400">por pneu</p></td>
+                  <td class="px-4 py-3.5 text-sm font-medium" x-text="catalogoPercent(row.margin_percent)"></td>
+                  <td class="px-4 py-3.5">
+                    <span x-show="row.sellable" class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Ativo</span>
+                    <span x-show="row.price_amount == null" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
+                    <span x-show="row.price_amount != null && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
+                  </td>
+                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" class="rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" x-text="row.price_amount == null ? 'Definir preço' : 'Editar preço'"></button></td>
+                </tr>
+              </template>
+              <tr x-show="catalogoPaginaRows().length === 0"><td colspan="8" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex items-center justify-between border-t border-gray-100 px-5 py-4 text-xs text-gray-500">
+          <span x-text="catalogoFiltrados().length + ' produto(s) encontrado(s)'"></span>
+          <div class="flex items-center gap-2"><button @click="catalogoPagina=Math.max(1,catalogoPagina-1)" :disabled="catalogoPagina<=1" class="rounded-lg border border-gray-200 p-2 disabled:opacity-30"><i data-lucide="chevron-left" class="h-3.5 w-3.5"></i></button><span class="font-semibold text-gray-700" x-text="catalogoPagina + ' / ' + catalogoTotalPaginas()"></span><button @click="catalogoPagina=Math.min(catalogoTotalPaginas(),catalogoPagina+1)" :disabled="catalogoPagina>=catalogoTotalPaginas()" class="rounded-lg border border-gray-200 p-2 disabled:opacity-30"><i data-lucide="chevron-right" class="h-3.5 w-3.5"></i></button></div>
+        </div>
+      </section>
+    </div>
+
+    <div x-show="catalogoSelecionado" x-cloak style="display:none" class="fixed inset-0 z-[70]">
+      <div class="absolute inset-0 bg-gray-950/30 backdrop-blur-[1px]" @click="catalogoClose()"></div>
+      <aside class="absolute inset-y-0 right-0 flex w-full max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
+             @keydown.escape.window="catalogoClose()">
+        <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+          <div class="min-w-0">
+            <template x-if="catalogoBrandLogo(catalogoSelecionado?.brand)">
+              <img :src="catalogoBrandLogo(catalogoSelecionado?.brand)"
+                   :alt="`Logo ${catalogoSelecionado?.brand}`"
+                   class="h-8 w-[150px] object-contain object-left">
+            </template>
+            <template x-if="!catalogoBrandLogo(catalogoSelecionado?.brand)">
+              <span class="inline-flex rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-600"
+                    x-text="String(catalogoSelecionado?.brand || 'SEM MARCA').toUpperCase()"></span>
+            </template>
+            <h2 class="mt-3 truncate text-xl font-bold text-gray-950" x-text="[catalogoSelecionado?.product_name,catalogoSelecionado?.tire_size].filter(Boolean).join(' · ')"></h2>
+            <p class="mt-1 text-xs text-gray-400" x-text="catalogoSelecionado?.product_code"></p>
+          </div>
+          <button type="button" @click="catalogoClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+
+        <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <section class="overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/50">
+            <div class="flex items-center gap-2 border-b border-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900"><i data-lucide="warehouse" class="h-4 w-4"></i>Dados trazidos do Estoque</div>
+            <div class="grid grid-cols-3 divide-x divide-emerald-100 px-2 py-4 text-center">
+              <div class="px-2"><p class="text-[10px] text-gray-500">Custo médio atual</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="catalogoSelecionado?.official_unit_cost == null ? '—' : formatCurrency(Number(catalogoSelecionado.official_unit_cost))"></p></div>
+              <div class="px-2"><p class="text-[10px] text-gray-500">Estoque disponível</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="Number(catalogoSelecionado?.official_quantity_on_hand || 0) + ' un.'"></p></div>
+              <div class="px-2"><p class="text-[10px] text-gray-500">Última compra</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="catalogoSelecionado?.last_purchase_cost == null ? '—' : formatCurrency(Number(catalogoSelecionado.last_purchase_cost))"></p></div>
+            </div>
+            <div class="flex items-center justify-between border-t border-emerald-100 px-4 py-2.5 text-[10px] text-emerald-800">
+              <span x-text="'Atualizado: ' + catalogoDate(catalogoSelecionado?.stock_updated_at)"></span>
+              <span class="flex items-center gap-1 font-semibold"><i data-lucide="lock" class="h-3 w-3"></i>O custo não é editado aqui</span>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="text-sm font-semibold text-gray-950">Definir preço de varejo</h3>
+            <p class="mt-1 text-xs leading-5 text-gray-500">Este é o valor oficial da Matriz consultado pelo bot e pela venda avulsa.</p>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <label><span class="mb-1.5 block text-xs text-gray-500">Preço atual</span><div class="flex h-10 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-500" x-text="catalogoSelecionado?.price_amount == null ? 'Sem preço' : formatCurrency(Number(catalogoSelecionado.price_amount))"></div></label>
+              <label><span class="mb-1.5 block text-xs font-semibold text-gray-700">Novo preço *</span><div class="flex rounded-lg border border-emerald-700 bg-white focus-within:ring-2 focus-within:ring-emerald-100"><span class="border-r border-gray-100 px-3 py-2 text-sm text-gray-400">R$</span><input type="number" min="0.01" step="0.01" x-model="catalogoPriceForm.price" class="min-w-0 flex-1 rounded-r-lg px-3 py-2 text-sm font-semibold outline-none"></div></label>
+            </div>
+            <div class="mt-4">
+              <p class="mb-2 text-[11px] font-medium text-gray-500">Ajuste rápido de margem</p>
+              <div class="grid grid-cols-4 gap-2"><template x-for="percent in [30,35,40,45]" :key="percent"><button type="button" @click="catalogoApplyMargin(percent)" class="rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-600 hover:border-emerald-700 hover:bg-emerald-50 hover:text-emerald-800" x-text="percent + '%'"></button></template></div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-3 gap-2">
+            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Lucro por pneu</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoLucro() == null ? '—' : formatCurrency(catalogoLucro())"></p></article>
+            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Margem</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPercent(catalogoMargem())"></p></article>
+            <article class="rounded-xl border border-gray-200 p-3 text-center"><p class="text-[10px] text-gray-500">Mínimo sugerido</p><p class="mt-2 text-base font-bold text-emerald-700" x-text="catalogoPrecoMinimo() == null ? '—' : formatCurrency(catalogoPrecoMinimo())"></p></article>
+          </section>
+
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Motivo da alteração *</span><textarea x-model="catalogoPriceForm.reason" maxlength="500" rows="3" class="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-700" placeholder="Ex.: reposicionamento de margem ou nova tabela comercial"></textarea><span class="mt-1 block text-right text-[10px] text-gray-400" x-text="String(catalogoPriceForm.reason || '').length + '/500'"></span></label>
+
+          <div x-show="catalogoMessage" :class="catalogoMessage?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoMessage?.text"></div>
+
+          <section class="border-t border-gray-100 pt-5">
+            <div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-gray-950">Histórico de preços</h3><span class="text-[10px] text-gray-400">últimas 20 alterações</span></div>
+            <div class="mt-3 divide-y divide-gray-100">
+              <template x-for="item in catalogoHistory.slice(0,5)" :key="item.id">
+                <div class="flex items-start justify-between gap-3 py-3 text-xs">
+                  <div><p class="font-medium text-gray-700" x-text="catalogoDate(item.valid_from)"></p><p class="mt-1 text-[10px] text-gray-400" x-text="[item.actor_label,item.reason].filter(Boolean).join(' · ') || 'Registro anterior'"></p></div>
+                  <p class="font-semibold text-gray-950" x-text="formatCurrency(Number(item.price_amount))"></p>
+                </div>
+              </template>
+              <p x-show="catalogoHistory.length === 0" class="py-5 text-center text-xs text-gray-400">Nenhuma alteração anterior.</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="border-t border-gray-100 bg-white px-6 py-4">
+          <p class="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900"><i data-lucide="info" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>Depois de salvar, bot e Vendas usarão o novo preço somente na Matriz. Parceiros e vendas antigas não mudam.</p>
+          <button type="button" @click="catalogoSavePrice()" :disabled="!catalogoPodeSalvar()" class="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40"><i data-lucide="save" class="h-4 w-4"></i><span x-text="catalogoSaving ? 'Salvando...' : 'Salvar novo preço'"></span></button>
+        </div>
+      </aside>
+    </div>
+
     <!-- ═══ TELA: PLACEHOLDERS ═══ -->
-    <div x-show="['catalogo','relatorios','config'].includes(currentPage)"
+    <div x-show="['relatorios','config'].includes(currentPage)"
          class="flex items-center justify-center min-h-[80vh] p-8">
       <div class="text-center max-w-md">
         <div class="w-16 h-16 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -8762,13 +8969,20 @@
             <div class="col-span-3">
               <label class="text-xs text-gray-500 block mb-1">Preço un.</label>
               <input type="number" min="0" step="0.01" x-model.number="saleForm.unit_price"
-                     class="w-full bg-white border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                     readonly
+                     class="w-full bg-gray-100 border border-gray-200 rounded px-3 py-2 text-sm font-semibold text-gray-700 cursor-not-allowed" />
             </div>
             <div class="col-span-1"></div>
           </div>
           <p x-show="saleForm.product_id" class="mt-2 text-xs"
              :class="saleStockError() ? 'text-rose-600' : 'text-emerald-700'"
              x-text="saleStockError() || ('DisponÃ­vel no galpÃ£o: ' + selectedProduct()?.official_quantity_on_hand + ' un')"></p>
+          <div x-show="saleForm.product_id && selectedProduct()?.walkin_sellable"
+               class="mt-3 grid grid-cols-3 gap-2 border-t border-gray-200 pt-3 text-xs">
+            <div><p class="text-gray-400">Custo do estoque</p><p class="mt-1 font-semibold" x-text="formatCurrency(Number(selectedProduct()?.official_unit_cost || 0))"></p></div>
+            <div><p class="text-gray-400">Preço do Catálogo</p><p class="mt-1 font-semibold" x-text="formatCurrency(Number(selectedProduct()?.price_amount || 0))"></p></div>
+            <div><p class="text-gray-400">Lucro bruto estimado</p><p class="mt-1 font-semibold text-emerald-700" x-text="formatCurrency(Number(selectedProduct()?.price_amount || 0) - Number(selectedProduct()?.official_unit_cost || 0))"></p></div>
+          </div>
         </div>
       </div>
 

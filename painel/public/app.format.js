@@ -67,6 +67,7 @@ window.PAINEL_MODULES.format = function () {
         walkin_cost_missing: 'Essa medida estÃ¡ sem custo no galpÃ£o. Cadastre o custo antes de vender.',
         walkin_stock_insufficient: 'Essa medida estÃ¡ sem saldo no galpÃ£o.',
         walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpÃ£o. Corrija o estoque antes de vender.',
+        catalog_price_missing: 'Esse pneu está sem preço oficial. Defina o valor no Catálogo antes de vender.',
       };
       if (!product.walkin_sellable) {
         return messages[product.walkin_block_reason] || 'Esse produto nÃ£o pode ser vendido agora.';

@@ -40,6 +40,13 @@ import { buildOrderIdempotencyKey } from './order-idempotency.js';
 import { createPhotoRequest, linkPhotoRequestsToOrder } from './photo-requests.js';
 import { lookupChatwootConversationId } from './history.js';
 import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from '../admin/painel/matriz-ledger-retail-sales.js';
+import {
+  applyMatrizPricesToCompatibility,
+  applyMatrizPricesToProducts,
+  applyPartnerPricesToCompatibility,
+  applyPartnerPricesToProducts,
+  repriceMatrizQuotedItems,
+} from './channel-pricing.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
@@ -519,6 +526,9 @@ export async function executeTool(
           ? await buscarCompatibilidadeMatriz(client, compatInput, { deferLimit: true })
           : await buscarCompatibilidade(client, compatInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhuma moto encontrada com esse modelo.' });
+        if (!env.WHOLESALE_UNIFIED_STOCK) {
+          await applyMatrizPricesToCompatibility(client, environment, result);
+        }
         // Unificação atacado×varejo (flag WHOLESALE_UNIFIED_STOCK): o estoque BASE da matriz
         // vem do GALPÃO (por medida), não da view genérica. Os overrides de loja perto abaixo
         // mandam por cima — parceiro perto que TEM o pneu ganha (trava do dono). OFF = view, hoje.
@@ -554,23 +564,17 @@ export async function executeTool(
               clientNeighborhoodCanonical,
               productIds,
             });
-            for (const v of result) {
-              for (const p of v.produtos) {
-                const a = avail.get(p.product_id);
-                if (a) { p.total_stock = a.available; estoqueLojaPertoCompat = true; }
-              }
-            }
+            estoqueLojaPertoCompat = await applyPartnerPricesToCompatibility(
+              client, environment, result, avail,
+            );
             lojaResolvidaCompat = true;
           } else if (bairro && municipio) {
             // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
             if (partnerStock.size > 0) {
-              for (const v of result) {
-                for (const p of v.produtos) {
-                  const q = partnerStock.get(p.product_id);
-                  if (q != null) { p.total_stock = q; estoqueLojaPertoCompat = true; }
-                }
-              }
+              estoqueLojaPertoCompat = await applyPartnerPricesToCompatibility(
+                client, environment, result, partnerStock,
+              );
             }
             lojaResolvidaCompat = true;
           }
@@ -607,6 +611,9 @@ export async function executeTool(
           ? await buscarProdutoMatriz(client, productInput, { deferAvailabilityFilter: true })
           : await buscarProduto(client, productInput);
         if (result.length === 0) return JSON.stringify({ encontrado: false, mensagem: 'Nenhum produto encontrado.' });
+        if (!env.WHOLESALE_UNIFIED_STOCK) {
+          await applyMatrizPricesToProducts(client, environment, result);
+        }
         // Unificação atacado×varejo (flag): estoque BASE da matriz vem do GALPÃO (por medida);
         // os overrides de loja perto abaixo mandam por cima (parceiro que tem ganha). OFF = view, hoje.
         // C2: a busca mostra o estoque da loja que VAI ATENDER, por PROXIMIDADE. SEM
@@ -641,10 +648,9 @@ export async function executeTool(
               clientNeighborhoodCanonical,
               productIds: result.map((p) => p.product_id),
             });
-            for (const p of result) {
-              const a = avail.get(p.product_id);
-              if (a) { p.total_stock_available = a.available; estoqueLojaPerto = true; }
-            }
+            estoqueLojaPerto = await applyPartnerPricesToProducts(
+              client, environment, result, avail,
+            );
             // ROUTING_MATRIZ_AS_STORE: se nenhum parceiro próximo tem o produto, verifica se a
             // MATRIZ está no anel de entrega (≤40 km) e se o galpão tem o produto. Nesse caso,
             // a matriz conta como "loja perto" — total_stock_available já foi setado do galpão
@@ -665,10 +671,9 @@ export async function executeTool(
             // fallback por CIDADE (ROUTING_GEO off ou sem coordenada) — comportamento de hoje.
             const partnerStock = await getPartnerStockMap(client, environment, municipio);
             if (partnerStock.size > 0) {
-              for (const p of result) {
-                const q = partnerStock.get(p.product_id);
-                if (q != null) { p.total_stock_available = q; estoqueLojaPerto = true; }
-              }
+              estoqueLojaPerto = await applyPartnerPricesToProducts(
+                client, environment, result, partnerStock,
+              );
             }
             lojaResolvida = true;
           }
@@ -1179,8 +1184,10 @@ async function criarPedido(
   conversationId: string,
   args: Record<string, unknown>,
 ): Promise<string> {
-  const itens = args.itens as PedidoItem[];
-  const subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
+  const quotedItems = Array.isArray(args.itens) ? args.itens as PedidoItem[] : [];
+  if (quotedItems.length === 0) return JSON.stringify({ erro: 'itens_obrigatorios' });
+  let itens = quotedItems;
+  let subtotal = itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0);
   const modalidade = args.modalidade as string;
   // let: o frete da MATRIZ por distância é reescrito por CÓDIGO no roteamento abaixo
   // (não confiar no valor_frete do LLM). Parceiro/retirada não tocam aqui.
@@ -1425,6 +1432,14 @@ async function criarPedido(
     );
   } else {
     // ── CAMINHO MATRIZ (= Etapa 1): carimba unit_id da matriz, sem partner_order ──
+    // O Catálogo é a verdade SOMENTE quando o roteamento terminou na Matriz.
+    // Parceiros continuam no preço regular que o fluxo da Rede já utilizava.
+    const repriced = await repriceMatrizQuotedItems(client, environment, quotedItems);
+    if (!repriced.ok) return JSON.stringify(repriced.response);
+    itens = repriced.items;
+    subtotal = itens.reduce((sum, item) => sum + item.quantidade * item.preco_unitario, 0);
+    totalAmount = subtotal + valorFrete;
+
     // Dedup: chave estável (conversa+loja+itens+modalidade) como no parceiro — em
     // dupla-chamada do MESMO pedido o ON CONFLICT devolve o existente em vez de duplicar.
     // Defensivo: unit_id NULL se não achar a matriz. (Fix Vitor Fernando 06-15: PED-0045/0046.)

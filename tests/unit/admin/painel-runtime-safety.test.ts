@@ -76,7 +76,7 @@ describe('seguranca de inicializacao do painel', () => {
     expect(html).toContain('app.atacado.js?v=20260724-estoque-mock1');
     expect(html).toContain('app.compras.relatorios.js?v=20260723-compras2');
     expect(html).toContain('app.compras.acoes.js?v=20260723-compras2');
-    expect(html).toContain('app.core.js?v=20260727-financeiro-visao1');
+    expect(html).toContain('app.core.js?v=20260729-catalogo1');
     expect(html).toContain('app.clientes.js?v=20260718-etapa9');
     expect(html).toContain('app.clientes.identity.js?v=20260718-etapa9');
   });

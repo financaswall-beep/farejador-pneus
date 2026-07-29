@@ -28,7 +28,7 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     'app.logistica.acoes.js', 'app.colaboradores.js', 'app.colaboradores.gestao.js', 'app.sino.js', 'app.financeiro.js',
     'app.financeiro.baixas.js',
     'app.financeiro.indicadores.js', 'app.financeiro.despesas.js', // fatia 07-14 do financeiro (fiscal 300)
-    'app.galpao.contagem.js', 'app.galpao.ajuste.js', 'app.galpao.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
+    'app.galpao.contagem.js', 'app.galpao.ajuste.js', 'app.galpao.js', 'app.catalogo.js', 'app.rede.apply.js', 'app.pedidos.parceiros.js', 'app.core.js',
     'app.charts.rede.js', 'app.charts.saude.js', 'app.charts.unidade.js',
     'mapa-rm-dados.js', 'app.bot.js', 'app.bot.mapa.js', 'app.clientes.js', 'app.clientes.identity.js',
     'app.marketing.js', 'app.marketing.campaigns.js', 'app.marketing.campaign-detail.js', 'app.marketing.journeys.js', 'app.marketing.integrations.js',
@@ -80,6 +80,23 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/vendas-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/marketing-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/marketing-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/catalog-tire.webp', async (_request, reply) =>
+    sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/catalog-tire.webp', 'image/webp'));
+  const catalogBrandAssets = new Set([
+    'pirelli.webp', 'metzeler.webp', 'michelin.webp', 'bridgestone.webp', 'dunlop.webp', 'levorin.webp',
+    'rinaldi.webp', 'maggion.webp', 'technic.webp', 'vipal.webp', 'mitas.webp', 'kenda.webp',
+  ]);
+  fastify.get('/admin/painel/assets/catalog-brands/:asset', async (request, reply) => {
+    const { asset } = request.params as { asset: string };
+    if (!catalogBrandAssets.has(asset)) {
+      return reply.code(404).send({ error: 'catalog_brand_asset_not_found' });
+    }
+    return sendStatic(
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
+      `assets/catalog-brands/${asset}`,
+      'image/webp',
+    );
+  });
   fastify.get('/admin/painel/assets/rede-hero-v2.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=31536000, immutable'), 'assets/rede-hero-v2.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/rede-hero-visao-v3.webp', async (_request, reply) =>
