@@ -30,14 +30,16 @@ export async function getWholesaleFinance(
 ): Promise<WholesaleFinanceResumo> {
   const receivables = await dbPool.query<WholesaleFinanceOpenRow>(
     `SELECT o.id,c.name AS counterparty,c.phone,o.total_amount,o.sold_at AS registered_at,
-            o.due_date,(o.due_date IS NOT NULL AND o.due_date<current_date) AS overdue
+            o.due_date,(o.due_date IS NOT NULL
+              AND o.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
       WHERE o.environment=$1 AND o.status='confirmed' AND o.payment_status='pending'
       ORDER BY (o.due_date IS NULL),o.due_date,o.sold_at`, [environment]);
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
     `SELECT p.id,s.name AS counterparty,s.phone,p.total_amount,p.purchased_at AS registered_at,
-            p.due_date,(p.due_date IS NOT NULL AND p.due_date<current_date) AS overdue
+            p.due_date,(p.due_date IS NOT NULL
+              AND p.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.wholesale_purchases p
        JOIN commerce.wholesale_suppliers s ON s.id=p.supplier_id AND s.environment=p.environment
       WHERE p.environment=$1 AND p.status<>'cancelled' AND p.payment_status='pending'
@@ -115,7 +117,8 @@ export async function getMatrizExpenses(
     `SELECT id,category,description,amount,occurred_at,document_date,competence_month,
             payment_status,due_date,paid_at,
             ${payrollProjection} AS payroll_item_id,
-            (payment_status='pending' AND due_date IS NOT NULL AND due_date<current_date) AS overdue
+            (payment_status='pending' AND due_date IS NOT NULL
+              AND due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.matriz_expenses WHERE ${where.join(' AND ')}
       ORDER BY ${order} LIMIT $${params.length + 1}`, [...params, limit]);
   let periodo: MatrizExpensesResumo['periodo'] = null;
@@ -131,7 +134,7 @@ export async function getMatrizExpenses(
     `SELECT COALESCE(sum(amount) FILTER (WHERE payment_status='pending'),0) AS a_pagar_total,
             count(*) FILTER (WHERE payment_status='pending')::int AS a_pagar_count,
             count(*) FILTER (WHERE payment_status='pending' AND due_date IS NOT NULL
-              AND due_date<current_date)::int AS a_pagar_vencidos,
+              AND due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date)::int AS a_pagar_vencidos,
             COALESCE(sum(amount) FILTER (WHERE payment_status='paid'
               AND (COALESCE(paid_at,occurred_at) AT TIME ZONE 'America/Sao_Paulo')
                 >=date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')),0) AS pago_mes_total

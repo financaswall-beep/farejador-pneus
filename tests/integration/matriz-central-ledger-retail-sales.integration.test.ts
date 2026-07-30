@@ -52,7 +52,7 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
     process.env.MATRIZ_CENTRAL_LEDGER = 'false';
   });
 
-  async function fixture(cost = 40) {
+  async function fixture(cost = 40, price = 60) {
     sequence += 1;
     const measure = `${270 + sequence}/${30 + sequence}-${14 + sequence}`;
     const product = await db.pool.query<{ id: string }>(
@@ -71,6 +71,12 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
          (environment,measure,quantity_on_hand,unit_cost)
        VALUES ('test',$1,5,$2)`,
       [measure, cost],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.matriz_product_prices
+         (environment,product_id,price_amount,currency,valid_from)
+       VALUES ('test',$1,$2,'BRL','2026-01-01T00:00:00Z')`,
+      [product.rows[0]!.id, price],
     );
     return { productId: product.rows[0]!.id, measure };
   }
@@ -126,7 +132,7 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
   });
 
   it('venda manual da Matriz baixa estoque e reconhece o custo', async () => {
-    const f = await fixture(32);
+    const f = await fixture(32, 70);
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
        VALUES ('test',$1,'Cliente manual livro') RETURNING id`,

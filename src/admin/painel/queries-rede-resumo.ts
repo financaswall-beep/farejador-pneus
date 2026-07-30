@@ -77,11 +77,12 @@ export async function getMatrizResumo(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
 ): Promise<MatrizResumo> {
   // Janela por `dia` (date). Expressao constante (sem input) -> sem injection.
+  const todaySql = `(now() AT TIME ZONE 'America/Sao_Paulo')::date`;
   const sinceSql =
-    period === 'today' ? `current_date`
-    : period === '7d' ? `(current_date - 6)`
-    : period === '30d' ? `(current_date - 29)`
-    : `date_trunc('month', current_date)::date`;
+    period === 'today' ? todaySql
+    : period === '7d' ? `(${todaySql} - 6)`
+    : period === '30d' ? `(${todaySql} - 29)`
+    : `date_trunc('month', ${todaySql})::date`;
 
   let metrics: Record<string, unknown> | null = null;
   let series: unknown[] = [];

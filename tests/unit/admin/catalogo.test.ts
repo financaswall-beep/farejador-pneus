@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
 
 let getCatalogOverview: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
+let getCatalogPriceHistory: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogPriceHistory;
 let setCatalogPrice: typeof import('../../../src/admin/painel/queries-catalogo.js').setCatalogPrice;
 
 beforeAll(async () => {
@@ -12,7 +13,8 @@ beforeAll(async () => {
     CHATWOOT_HMAC_SECRET: 'test-secret',
     ADMIN_AUTH_TOKEN: 'emergency-token',
   });
-  ({ getCatalogOverview, setCatalogPrice } = await import('../../../src/admin/painel/queries-catalogo.js'));
+  ({ getCatalogOverview, getCatalogPriceHistory, setCatalogPrice }
+    = await import('../../../src/admin/painel/queries-catalogo.js'));
 });
 
 describe('catalogo conciliado com estoque e precos', () => {
@@ -96,6 +98,19 @@ describe('catalogo conciliado com estoque e precos', () => {
     expect(auditCall?.[1]?.[4]).toContain('Nova tabela comercial');
     expect(query).toHaveBeenCalledWith('COMMIT');
     expect(release).toHaveBeenCalledOnce();
+  });
+
+  it('le o historico com o tipo sintetico da Matriz', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    await getCatalogPriceHistory(
+      'produto-1',
+      'test',
+      { query } as unknown as Pool,
+    );
+
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain("'matriz'::text AS price_type");
+    expect(sql).not.toContain('pp.price_type');
   });
 
   it('recusa alteracao sem motivo antes de abrir transacao', async () => {

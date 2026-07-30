@@ -48,26 +48,32 @@ export async function getMatrizNotificacoes(
 
        (SELECT count(*)::int FROM commerce.wholesale_orders w
          WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
-           AND w.due_date IS NOT NULL AND w.due_date < current_date) AS fiado_count,
+           AND w.due_date IS NOT NULL
+           AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_count,
        (SELECT COALESCE(sum(w.total_amount), 0)::text FROM commerce.wholesale_orders w
          WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
-           AND w.due_date IS NOT NULL AND w.due_date < current_date) AS fiado_total,
+           AND w.due_date IS NOT NULL
+           AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_total,
 
        (SELECT count(*)::int + (SELECT count(*)::int FROM commerce.matriz_expenses e
                                  WHERE e.environment = $1 AND e.deleted_at IS NULL
                                    AND e.payment_status = 'pending'
-                                   AND e.due_date IS NOT NULL AND e.due_date < current_date)
+                                   AND e.due_date IS NOT NULL
+                                   AND e.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date)
           FROM commerce.wholesale_purchases p
          WHERE p.environment = $1 AND p.status <> 'cancelled' AND p.payment_status = 'pending'
-           AND p.due_date IS NOT NULL AND p.due_date < current_date) AS pagar_count,
+           AND p.due_date IS NOT NULL
+           AND p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS pagar_count,
        (SELECT (COALESCE(sum(p.total_amount), 0)
                 + (SELECT COALESCE(sum(e.amount), 0) FROM commerce.matriz_expenses e
                     WHERE e.environment = $1 AND e.deleted_at IS NULL
                       AND e.payment_status = 'pending'
-                      AND e.due_date IS NOT NULL AND e.due_date < current_date))::text
+                      AND e.due_date IS NOT NULL
+                      AND e.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date))::text
           FROM commerce.wholesale_purchases p
          WHERE p.environment = $1 AND p.status <> 'cancelled' AND p.payment_status = 'pending'
-           AND p.due_date IS NOT NULL AND p.due_date < current_date) AS pagar_total,
+           AND p.due_date IS NOT NULL
+           AND p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS pagar_total,
 
        (SELECT json_agg(json_build_object(
                  'measure', s.measure, 'quantity_on_hand', s.quantity_on_hand,
