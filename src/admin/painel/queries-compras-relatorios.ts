@@ -140,7 +140,7 @@ export async function getWholesaleSupplierInsights(
             count(p.id) FILTER (WHERE p.status<>'cancelled')::int AS purchases_count,
             COALESCE(sum(p.total_amount) FILTER (WHERE p.status<>'cancelled'),0) AS total_spent,
             max(p.purchased_at) FILTER (WHERE p.status<>'cancelled') AS last_purchase_at,
-            current_date-(max(p.purchased_at)
+            (now() AT TIME ZONE 'America/Sao_Paulo')::date-(max(p.purchased_at)
               FILTER (WHERE p.status<>'cancelled'))::date AS days_since_last,
             count(p.id) FILTER (WHERE p.status='pending')::int AS pending_receipts,
             count(p.id) FILTER (WHERE p.status<>'cancelled'

@@ -32,8 +32,17 @@ import { logger } from '../shared/logger.js';
 import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
 import { resolvePartnerPermissions, PARTNER_SCREENS, type PartnerContext, type PartnerPermissions } from './auth.js';
-import { lineCommission, type PartnerCommissionConfig } from './commission.js';
+import type { PartnerCommissionConfig } from './commission.js';
 export type { PartnerCommissionConfig } from './commission.js';
+export {
+  getPartnerCommissionTeam,
+  getPartnerMyPerformance,
+} from './commission-ledger.js';
+export type {
+  PartnerCommissionTeamRow,
+  PartnerMyPerformance,
+  PartnerMyPerformanceSale,
+} from './commission-ledger.js';
 
 export interface PartnerOrderItemInput {
   partner_stock_id: string;
@@ -2210,8 +2219,13 @@ export async function registerPartnerExpense(
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_expenses (
          environment, unit_id, expense_date, category, description, amount,
-         payment_method, created_by, idempotency_key
-       ) VALUES ($1, $2, COALESCE($3::date, CURRENT_DATE), $4, $5, $6, $7, $8, $9)
+         payment_method, created_by, idempotency_key, competence_month
+       ) VALUES ($1, $2,
+                 COALESCE($3::date, (now() AT TIME ZONE 'America/Sao_Paulo')::date),
+                 $4, $5, $6, $7, $8, $9,
+                 date_trunc('month',
+                   COALESCE($3::date,(now() AT TIME ZONE 'America/Sao_Paulo')::date)
+                 )::date)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
@@ -2389,6 +2403,7 @@ async function _settlePartnerPayableWithClient(
       amount: string;
       payment_method: string | null;
       source_purchase_id: string | null;
+      competence_month: string;
     }>(
       `UPDATE finance.partner_payables
        SET status = 'paid',
@@ -2399,7 +2414,8 @@ async function _settlePartnerPayableWithClient(
          AND unit_id = $3
          AND status = 'open'
          AND deleted_at IS NULL
-       RETURNING id, description, category, amount, payment_method, source_purchase_id`,
+       RETURNING id, description, category, amount, payment_method,
+                 source_purchase_id, competence_month::text`,
       [payableId, ctx.environment, ctx.unitId, paidAt, input.payment_method ?? null],
     );
 
@@ -2468,10 +2484,11 @@ async function _settlePartnerPayableWithClient(
     await client.query(
       `INSERT INTO finance.partner_expenses (
          environment, unit_id, expense_date, category, description, amount,
-         payment_method, created_by, idempotency_key, source_payable_id
+         payment_method, created_by, idempotency_key, source_payable_id,
+         competence_month
        ) VALUES (
          $1, $2, ($3::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date,
-         $4, $5, $6, $7, $8, $9, $10
+         $4, $5, $6, $7, $8, $9, $10, $11::date
        )
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key`,
@@ -2486,6 +2503,7 @@ async function _settlePartnerPayableWithClient(
         `partner:${ctx.slug}`,
         idempotencyKey,
         payableId,
+        row.competence_month,
       ],
     );
 
@@ -3301,12 +3319,10 @@ export async function revokePartnerFuncionario(
 // pool admin (as tabelas network.* não têm GRANT no pool restrito), por isso o escopo por
 // unit/env é EXPLÍCITO no WHERE — não há RLS de rede pra cair de fallback.
 //
-// 💰 Conciliação (regra do dono): a comissão soma o MESMO recorte de "venda realizada no
-// mês" da view 0078 (orders_month): status<>cancelled, deleted_at NULL, entrega só se
-// delivered, data por delivered_at (entrega)/created_at (resto). Calculada AO VIVO →
-// cancelar uma venda derruba a comissão sozinho (nada de dívida fantasma). Comissão é
-// somada POR PEDIDO (round por linha) → o total da equipe == o total do "Meu desempenho"
-// == a soma das linhas, no centavo. Base = VALOR CHEIO (total_amount).
+// 💰 Conciliação (0154): a regra e o valor ficam congelados quando a venda é realizada.
+// No fechamento, cada funcionário gera no máximo uma conta a pagar por competência.
+// Cancelamento antes do fechamento elimina a comissão; depois dele, cria ajuste negativo
+// para o próximo mês, sem reescrever a conta já fechada. Base = total_amount da venda.
 // ─────────────────────────────────────────────────────────────────────────
 
 export class FuncionarioNotFoundError extends Error {
@@ -3314,38 +3330,6 @@ export class FuncionarioNotFoundError extends Error {
   constructor() {
     super('funcionario_not_found');
   }
-}
-
-export interface PartnerCommissionTeamRow {
-  token_id: string;
-  label: string | null;
-  username: string | null;
-  finalized_sales: number;
-  gross_sales: number;
-  commission_kind: 'percent' | 'fixed' | null;
-  commission_value: number;
-  commission_active: boolean;
-  commission_amount: number;
-}
-
-export interface PartnerMyPerformanceSale {
-  order_id: string;
-  created_at: string;
-  canal: 'balcao' | '2w';
-  fulfillment_mode: string;
-  status: string;
-  amount: number;
-  commission_amount: number;
-}
-
-export interface PartnerMyPerformance {
-  finalized_sales: number;
-  gross_sales: number;
-  commission_kind: 'percent' | 'fixed' | null;
-  commission_value: number;
-  commission_active: boolean;
-  commission_amount: number;
-  sales: PartnerMyPerformanceSale[];
 }
 
 /** Confirma que o token é um funcionário ATIVO da unidade do dono. Senão, 404 lógico. */
@@ -3478,137 +3462,6 @@ export async function upsertPartnerTokenCommission(
     [tokenId, ctx.environment, ctx.partnerUnitId, kind, value, active, `owner:${ctx.slug}`],
   );
   return { kind, value, active };
-}
-
-/**
- * Resumo da comissão da EQUIPE no mês (card do dono no Financeiro). Owner-only.
- * Soma por PEDIDO (round por linha) o recorte de venda realizada da 0078.
- * Só funcionários ativos da unidade. Total = soma das linhas (bate com Meu desempenho).
- */
-export async function getPartnerCommissionTeam(
-  ctx: PartnerContext,
-): Promise<{ rows: PartnerCommissionTeamRow[]; total_commission: number }> {
-  const res = await pool.query<{
-    token_id: string; label: string | null; username: string | null;
-    finalized_sales: string; gross_sales: string;
-    commission_kind: 'percent' | 'fixed' | null; commission_value: string;
-    commission_active: boolean; commission_amount: string;
-  }>(
-    `WITH mb AS (
-       SELECT (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo') AS month_start_at
-     ),
-     priced AS (
-       SELECT po.operator_token_id AS token_id,
-              COALESCE(po.total_amount, 0)::numeric AS amount,
-              CASE WHEN cc.active IS NOT TRUE THEN 0
-                   WHEN cc.kind = 'percent' THEN round(COALESCE(po.total_amount, 0) * cc.value / 100.0, 2)
-                   WHEN cc.kind = 'fixed'   THEN cc.value
-                   ELSE 0 END AS line_commission
-       FROM commerce.partner_orders po
-       CROSS JOIN mb
-       LEFT JOIN network.partner_token_commission cc ON cc.token_id = po.operator_token_id
-       WHERE po.environment = $1
-         AND po.unit_id = $2
-         AND po.operator_token_id IS NOT NULL
-         AND po.status <> 'cancelled'
-         AND po.deleted_at IS NULL
-         AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')
-         AND (CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE po.created_at END) >= mb.month_start_at
-     )
-     SELECT pat.id AS token_id, pat.label, pat.login_username AS username,
-            COALESCE(count(p.token_id), 0)::int   AS finalized_sales,
-            COALESCE(sum(p.amount), 0)::numeric    AS gross_sales,
-            cfg.kind AS commission_kind,
-            COALESCE(cfg.value, 0)::numeric        AS commission_value,
-            COALESCE(cfg.active, false)            AS commission_active,
-            COALESCE(sum(p.line_commission), 0)::numeric AS commission_amount
-       FROM network.partner_access_tokens pat
-       LEFT JOIN priced p ON p.token_id = pat.id
-       LEFT JOIN network.partner_token_commission cfg ON cfg.token_id = pat.id
-      WHERE pat.environment = $1 AND pat.partner_unit_id = $3
-        AND pat.role = 'funcionario' AND pat.revoked_at IS NULL
-      GROUP BY pat.id, pat.label, pat.login_username, cfg.kind, cfg.value, cfg.active
-      ORDER BY commission_amount DESC, username ASC`,
-    [ctx.environment, ctx.unitId, ctx.partnerUnitId],
-  );
-  const rows: PartnerCommissionTeamRow[] = res.rows.map((r) => ({
-    token_id: r.token_id,
-    label: r.label,
-    username: r.username,
-    finalized_sales: Number(r.finalized_sales),
-    gross_sales: Number(r.gross_sales),
-    commission_kind: r.commission_kind,
-    commission_value: Number(r.commission_value),
-    commission_active: r.commission_active,
-    commission_amount: Number(r.commission_amount),
-  }));
-  const total_commission = Math.round(rows.reduce((s, r) => s + r.commission_amount, 0) * 100) / 100;
-  return { rows, total_commission };
-}
-
-/**
- * "Meu desempenho" do funcionário logado (pelo chip do topo). Amarrado a ctx.tokenId —
- * a pessoa só vê o PRÓPRIO. Lista as vendas dela no mês com canal/status/valor/comissão;
- * o total bate com a soma das linhas (mesma fonte `lineCommission` da equipe).
- */
-export async function getPartnerMyPerformance(ctx: PartnerContext): Promise<PartnerMyPerformance> {
-  const cfgRes = await pool.query<{ kind: 'percent' | 'fixed'; value: string; active: boolean }>(
-    `SELECT kind, value, active FROM network.partner_token_commission
-      WHERE token_id = $1 AND environment = $2`,
-    [ctx.tokenId, ctx.environment],
-  );
-  const cfgRow = cfgRes.rows[0];
-  const cfg: PartnerCommissionConfig = cfgRow
-    ? { kind: cfgRow.kind, value: Number(cfgRow.value), active: cfgRow.active }
-    : { kind: 'percent', value: 0, active: false };
-
-  const salesRes = await pool.query<{
-    order_id: string; created_at: string; source_tag: string | null;
-    fulfillment_mode: string; status: string; amount: string;
-  }>(
-    `WITH mb AS (
-       SELECT (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo') AS month_start_at
-     )
-     SELECT po.id AS order_id, po.created_at, po.source_tag,
-            po.fulfillment_mode, po.status, COALESCE(po.total_amount, 0)::numeric AS amount
-       FROM commerce.partner_orders po
-       CROSS JOIN mb
-      WHERE po.environment = $1
-        AND po.unit_id = $2
-        AND po.operator_token_id = $3
-        AND po.status <> 'cancelled'
-        AND po.deleted_at IS NULL
-        AND NOT (po.fulfillment_mode = 'delivery' AND po.delivery_status <> 'delivered')
-        AND (CASE WHEN po.fulfillment_mode = 'delivery' THEN po.delivered_at ELSE po.created_at END) >= mb.month_start_at
-      ORDER BY po.created_at DESC
-      LIMIT 200`,
-    [ctx.environment, ctx.unitId, ctx.tokenId],
-  );
-
-  const sales: PartnerMyPerformanceSale[] = salesRes.rows.map((r) => {
-    const amount = Number(r.amount);
-    return {
-      order_id: r.order_id,
-      created_at: r.created_at,
-      canal: r.source_tag === '2w' ? '2w' : 'balcao',
-      fulfillment_mode: r.fulfillment_mode,
-      status: r.status,
-      amount,
-      commission_amount: lineCommission(cfg, amount),
-    };
-  });
-  // Soma em centavos (sem fuzz de float) → bate com a soma das linhas exibidas.
-  const gross_sales = sales.reduce((s, v) => s + Math.round(v.amount * 100), 0) / 100;
-  const commission_amount = sales.reduce((s, v) => s + Math.round(v.commission_amount * 100), 0) / 100;
-  return {
-    finalized_sales: sales.length,
-    gross_sales,
-    commission_kind: cfg.active ? cfg.kind : null,
-    commission_value: cfg.value,
-    commission_active: cfg.active,
-    commission_amount,
-    sales,
-  };
 }
 
 /**

@@ -147,7 +147,8 @@ export async function getMatrizLedgerOpenItems(
      SELECT t.id obligation_id,t.source_type,t.source_id,e.account_code,
             (e.amount-COALESCE(paid.amount,0))::numeric(14,2)::text balance,
             t.due_on::text due_date,
-            (t.due_on IS NOT NULL AND t.due_on<current_date) overdue,
+            (t.due_on IS NOT NULL
+              AND t.due_on<(now() AT TIME ZONE 'America/Sao_Paulo')::date) overdue,
             t.description,t.metadata->>'category' category,
             t.metadata->>'partner_id' partner_id,
             COALESCE(np.trade_name,np.legal_name) partner_name,np.whatsapp_phone partner_phone,

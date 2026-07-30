@@ -9,18 +9,30 @@ window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.relatorios = () => ({
   // Período escolhido → { from, to } ISO (início inclusivo, fim EXCLUSIVO).
   relPeriodo() {
-    const now = new Date();
-    const dia = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const today = this.dateKeySaoPaulo(new Date());
+    const addDays = (dateKey, days) => {
+      const [year, month, day] = dateKey.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+    };
+    const monthStart = (dateKey, offset = 0) => {
+      const [year, month] = dateKey.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1 + offset, 1)).toISOString().slice(0, 10);
+    };
+    const saoPauloMidnight = (dateKey) => dateKey ? `${dateKey}T00:00:00-03:00` : '';
     let from = null, to = null;
-    if (this.relRange === 'hoje') { from = dia(now); to = new Date(from.getTime() + 864e5); }
-    else if (this.relRange === 'semana') { const dow = (now.getDay() + 6) % 7; from = dia(new Date(now.getTime() - dow * 864e5)); to = new Date(from.getTime() + 7 * 864e5); }
-    else if (this.relRange === 'mes') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth() + 1, 1); }
-    else if (this.relRange === 'mes_passado') { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 1); }
-    else if (this.relRange === 'custom') {
-      from = this.relFrom ? new Date(this.relFrom + 'T00:00:00') : null;
-      to = this.relTo ? new Date(new Date(this.relTo + 'T00:00:00').getTime() + 864e5) : null;
+    if (this.relRange === 'hoje') { from = today; to = addDays(today, 1); }
+    else if (this.relRange === 'semana') {
+      const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7;
+      from = addDays(today, -dow);
+      to = addDays(from, 7);
     }
-    return { from: from ? from.toISOString() : '', to: to ? to.toISOString() : '' };
+    else if (this.relRange === 'mes') { from = monthStart(today); to = monthStart(today, 1); }
+    else if (this.relRange === 'mes_passado') { from = monthStart(today, -1); to = monthStart(today); }
+    else if (this.relRange === 'custom') {
+      from = this.relFrom || null;
+      to = this.relTo ? addDays(this.relTo, 1) : null;
+    }
+    return { from: saoPauloMidnight(from), to: saoPauloMidnight(to) };
   },
 
   async loadRelatorio() {

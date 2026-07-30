@@ -103,6 +103,12 @@ describe('venda walk-in atomica da Matriz', () => {
         [measure, options.quantity ?? 5, options.cost ?? 40],
       );
     }
+    await db.pool.query(
+      `INSERT INTO commerce.matriz_product_prices
+         (environment,product_id,price_amount,currency,valid_from)
+       VALUES ('test',$1,120,'BRL','2026-01-01T00:00:00Z')`,
+      [productId],
+    );
     return { productId, measure };
   }
 

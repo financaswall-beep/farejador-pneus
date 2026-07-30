@@ -103,7 +103,8 @@ export async function getCatalogPriceHistory(
   dbPool: Pool = defaultPool,
 ): Promise<unknown[]> {
   const result = await dbPool.query(
-    `SELECT pp.id,pp.price_amount,pp.currency,pp.price_type,pp.valid_from,pp.valid_until,
+    `SELECT pp.id,pp.price_amount,pp.currency,'matriz'::text AS price_type,
+            pp.valid_from,pp.valid_until,
             ae.actor_label,ae.payload_after->>'reason' reason
        FROM commerce.matriz_product_prices pp
        LEFT JOIN LATERAL (

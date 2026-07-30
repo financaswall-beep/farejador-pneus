@@ -49,11 +49,12 @@ export async function getBotVisao(
   dbPool: Pool = defaultPool,
 ): Promise<BotVisaoPayload> {
   // Janela constante por id (sem input do usuário na string) — mesma régua do getMatrizResumo.
+  const todaySql = `(now() AT TIME ZONE 'America/Sao_Paulo')::date`;
   const sinceSql =
-    period === 'today' ? `current_date`
-    : period === '7d' ? `(current_date - 6)`
-    : period === '30d' ? `(current_date - 29)`
-    : `date_trunc('month', current_date)::date`;
+    period === 'today' ? todaySql
+    : period === '7d' ? `(${todaySql} - 6)`
+    : period === '30d' ? `(${todaySql} - 29)`
+    : `date_trunc('month', ${todaySql})::date`;
 
   const out: BotVisaoPayload = {
     cards: null, mapa: [], sem_regiao: 0, radar: [],

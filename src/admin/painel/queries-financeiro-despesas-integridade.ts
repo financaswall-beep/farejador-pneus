@@ -51,7 +51,8 @@ export async function insertMatrizExpenseInTransaction(
         WHERE c.environment=$1::env_t AND c.slug=$2 AND c.archived_at IS NULL)
      RETURNING id,category,description,amount,occurred_at,payment_status,due_date,paid_at,
        NULL::uuid AS payroll_item_id,
-       (payment_status='pending' AND due_date IS NOT NULL AND due_date<current_date) AS overdue`,
+       (payment_status='pending' AND due_date IS NOT NULL
+        AND due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue`,
     [input.environment, input.category, input.description?.trim() || null, input.amount,
      input.payment_status, input.payment_status === 'pending' ? input.due_date ?? null : null,
      input.payment_status === 'paid' ? input.paid_at ?? null : null,

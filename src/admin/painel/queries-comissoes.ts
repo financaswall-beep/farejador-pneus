@@ -207,7 +207,7 @@ export async function getCommissionLedger(
     `SELECT r.id AS reversal_id,r.commission_entry_id,
             COALESCE(p.trade_name,p.legal_name,'Parceiro') AS partner_name,
             r.amount::text,r.refund_due_date::text AS due_date,
-            (r.refund_due_date<current_date) AS overdue
+            (r.refund_due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM finance.matriz_commission_reversals r
        JOIN network.partners p ON p.id=r.partner_id AND p.environment=r.environment
       WHERE r.environment=$1 AND r.refund_status='pending'

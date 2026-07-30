@@ -49,6 +49,12 @@ describe('Etapa 3 — backfill e paridade do livro central', () => {
        VALUES ('test',$1,$2,299,49,19)`,
       [product.rows[0]!.id, measure],
     );
+    await db.pool.query(
+      `INSERT INTO commerce.matriz_product_prices
+         (environment,product_id,price_amount,currency,valid_from)
+       VALUES ('test',$1,70,'BRL','2026-01-01T00:00:00Z')`,
+      [product.rows[0]!.id],
+    );
     const legacyContact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
        VALUES ('test',990001,'Cliente cancelado sem movimento') RETURNING id`,

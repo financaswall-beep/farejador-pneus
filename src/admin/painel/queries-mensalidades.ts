@@ -96,23 +96,51 @@ export async function generateCurrentMatrizPartnerMonthlyFees(
   client: PoolClient,
   environment: 'prod' | 'test',
 ): Promise<number> {
-  if (!env.MATRIZ_CENTRAL_LEDGER) return 0;
   const inserted = await client.query<{ id: string }>(
-    `WITH competence AS (
+    `WITH month_limit AS (
        SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date value
+     ),
+     competences AS (
+       SELECT p.environment,p.id AS partner_id,g.value::date AS competence
+         FROM network.partners p
+         CROSS JOIN month_limit ml
+         CROSS JOIN LATERAL generate_series(
+           date_trunc('month',p.created_at AT TIME ZONE 'America/Sao_Paulo')::date,
+           ml.value,interval '1 month'
+         ) AS g(value)
+        WHERE p.environment=$1
+     ),
+     applicable AS (
+       SELECT c.environment,c.partner_id,c.competence,h.monthly_fee
+         FROM competences c
+         CROSS JOIN LATERAL (
+           SELECT history.commercial_model,history.monthly_fee,
+                  history.partner_status,history.partner_deleted
+             FROM network.partner_commercial_terms_history history
+            WHERE history.environment=c.environment
+              AND history.partner_id=c.partner_id
+              AND history.valid_from<
+                ((c.competence+interval '1 month')::timestamp
+                  AT TIME ZONE 'America/Sao_Paulo')
+              AND (history.valid_until IS NULL OR history.valid_until>
+                (c.competence::timestamp AT TIME ZONE 'America/Sao_Paulo'))
+            ORDER BY history.valid_from DESC
+            LIMIT 1
+         ) h
+        WHERE h.partner_status='active' AND NOT h.partner_deleted
+          AND h.commercial_model IN ('monthly','hybrid')
+          AND h.monthly_fee>0
      )
      INSERT INTO finance.matriz_partner_monthly_fees
        (environment,partner_id,competence,amount,due_date)
-     SELECT p.environment,p.id,c.value,p.monthly_fee,
-            (c.value+interval '1 month 9 days')::date
-       FROM network.partners p CROSS JOIN competence c
-      WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.status='active'
-        AND p.commercial_model IN ('monthly','hybrid') AND p.monthly_fee>0
-        AND p.created_at<(c.value+interval '1 month')
+     SELECT a.environment,a.partner_id,a.competence,a.monthly_fee,
+            (a.competence+interval '1 month 9 days')::date
+       FROM applicable a
      ON CONFLICT (environment,partner_id,competence) DO NOTHING
      RETURNING id`,
     [environment],
   );
+  if (!env.MATRIZ_CENTRAL_LEDGER) return inserted.rowCount ?? 0;
   const pending = await client.query<{ id: string }>(
     `SELECT f.id FROM finance.matriz_partner_monthly_fees f
       WHERE f.environment=$1 AND (

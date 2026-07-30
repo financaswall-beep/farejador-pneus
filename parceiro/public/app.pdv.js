@@ -98,7 +98,7 @@ window.PARCEIRO_MODULES.pdv = () => ({
       this.saleForm.payment_method = method;
       this.saleForm.payment_status = status;
       if (status === 'receivable' && !this.saleForm.receivable_due_date) {
-        this.saleForm.receivable_due_date = new Date().toISOString().slice(0, 10);
+        this.saleForm.receivable_due_date = this.dateKeySaoPaulo(new Date());
       }
     },
 

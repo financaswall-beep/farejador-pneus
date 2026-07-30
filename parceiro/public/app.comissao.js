@@ -42,9 +42,13 @@ window.PARCEIRO_MODULES.comissao = () => ({
   closeMeuDesempenho() { this.perfOpen = false; },
 
   // Canal da venda (balcão x robô) e status legível, pra lista do desempenho.
-  perfCanal(s) { return s && s.canal === '2w' ? 'Robô (2W)' : 'Balcão'; },
+  perfCanal(s) {
+    if (s && s.canal === 'ajuste') return 'Ajuste';
+    return s && s.canal === '2w' ? 'Robô (2W)' : 'Balcão';
+  },
   perfStatus(s) {
     if (!s) return '';
+    if (s.fulfillment_mode === 'adjustment') return 'Estorno de comissão';
     if (s.fulfillment_mode === 'delivery') return s.status === 'paid' ? 'Entregue' : 'A confirmar';
     if (s.fulfillment_mode === 'pickup') return s.status === 'paid' ? 'Retirado' : 'A confirmar';
     return 'Concluída';

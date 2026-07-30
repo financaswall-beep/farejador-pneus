@@ -148,6 +148,8 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
     const measure = await fixture();
     await setStock({
       environment: 'test', measure, quantity_on_hand: 5, unit_cost: 12,
+      reason: 'definicao inicial do teste',
+      actor_label: 'owner:inventory',
     }, db.pool);
     await removeStock(measure, 'test', db.pool);
 
@@ -184,6 +186,8 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
     const measure = await fixture();
     await setStock({
       environment: 'test', measure, quantity_on_hand: 5, unit_cost: 12,
+      reason: 'saldo anterior a contagem',
+      actor_label: 'owner:inventory',
     }, db.pool);
     const idempotencyKey = randomUUID();
     const input = {
