@@ -3,15 +3,26 @@ import vm from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 
 function loadCatalogModule() {
-  const sandbox = { window: { PAINEL_MODULES: {} }, console, setTimeout };
+  const integrity = {
+    operation: vi.fn(() => ({ key: 'brand-correction-key' })),
+    complete: vi.fn(),
+  };
+  const sandbox = {
+    window: { PAINEL_MODULES: {}, PAINEL_INTEGRITY: integrity },
+    console,
+    setTimeout,
+  };
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
   vm.runInNewContext(
     readFileSync('painel/public/app.catalogo.compatibilidade.js', 'utf8'),
     sandbox,
   );
+  vm.runInNewContext(readFileSync('painel/public/app.catalogo.marca.js', 'utf8'), sandbox);
   return {
     ...sandbox.window.PAINEL_MODULES.catalogo(),
     ...sandbox.window.PAINEL_MODULES.catalogoCompatibilidade(),
+    ...sandbox.window.PAINEL_MODULES.catalogoMarca(),
+    __integrity: integrity,
   };
 }
 
@@ -53,7 +64,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
-    expect(html).toContain('app.catalogo.js?v=20260731-compat1');
+    expect(html).toContain('app.catalogo.js?v=20260731-brand1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -164,8 +175,80 @@ describe('catalogo no painel', () => {
     expect(html).toContain('data-testid="catalog-create-drawer"');
     expect(html).toContain('class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col');
     expect(html).not.toContain('w-[min(520px,calc(100vw-24px))] -translate-x-1/2');
-    expect(html).toContain('x-show="!catalogoCadastro.open && !catalogoSelecionado && !catalogoCompatibilidade.open"');
-    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(3);
+    expect(html).toContain('!catalogoCompatibilidade.open && !catalogoMarcaCorrecao.open');
+    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(4);
+  });
+
+  it('corrige Sem marca antes do cadastro e oferece continuar para o produto', async () => {
+    const module = loadCatalogModule();
+    const sourceRow = {
+      row_key: 'stock:1008018::meia_vida',
+      product_id: null,
+      catalogued: false,
+      brand: 'Sem marca',
+      tire_size: '100/80-18',
+      tire_condition: 'meia_vida',
+      official_quantity_on_hand: 10,
+      official_unit_cost: 55.4,
+    };
+    const targetRow = {
+      ...sourceRow,
+      row_key: 'stock:1008018:rinaldi:meia_vida',
+      brand: 'Rinaldi',
+    };
+    const context = {
+      ...module,
+      catalogoSelecionado: null,
+      catalogoCadastro: { open: false },
+      catalogoCompatibilidade: { open: false },
+      catalogoMarcaCorrecao: {
+        open: false, row: null, from_brand: '', to_brand: '', reason: '',
+        confirmed: false, idempotency_key: '', saving: false, message: null,
+        result: null, result_row: null,
+      },
+      catalogoRows: [sourceRow],
+      apiPost: vi.fn().mockResolvedValue({
+        stock_id: 'stock-1', measure: '100/80-18', from_brand: 'Sem marca',
+        to_brand: 'Rinaldi', tire_condition: 'meia_vida', quantity_on_hand: 10,
+        unit_cost: 55.4, catalog_product_id: null, catalog_product_updated: false,
+      }),
+      loadCatalogo: vi.fn(async function (this: { catalogoRows: unknown[] }) {
+        this.catalogoRows = [targetRow];
+      }),
+      $nextTick: vi.fn(),
+    };
+
+    await module.catalogoOpen.call(context, sourceRow);
+    expect(context.catalogoMarcaCorrecao).toMatchObject({
+      open: true,
+      from_brand: 'Sem marca',
+      row: sourceRow,
+    });
+    context.catalogoMarcaCorrecao.to_brand = 'Rinaldi';
+    context.catalogoMarcaCorrecao.reason = 'Marca conferida fisicamente';
+    context.catalogoMarcaCorrecao.confirmed = true;
+    await module.catalogoBrandCorrectionSave.call(context);
+
+    expect(context.apiPost).toHaveBeenCalledWith(
+      '/admin/api/wholesale/stock/brand-correction',
+      expect.objectContaining({
+        measure: '100/80-18', from_brand: 'Sem marca', to_brand: 'Rinaldi',
+        tire_condition: 'meia_vida', idempotency_key: 'brand-correction-key',
+      }),
+    );
+    expect(context.catalogoMarcaCorrecao).toMatchObject({
+      result_row: targetRow,
+      message: { ok: true, text: expect.stringContaining('foram preservados') },
+    });
+    expect(module.__integrity.complete).toHaveBeenCalledWith(
+      'stock-brand-correction', sourceRow.row_key,
+    );
+
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('data-testid="catalog-brand-correction-drawer"');
+    expect(html).toContain("catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca'");
+    expect(html).toContain('Confirmo que');
+    expect(html).toContain('Cadastrar produto agora');
   });
 
   it('habilita compatibilidade apos o cadastro e abre as motos em painel lateral', async () => {

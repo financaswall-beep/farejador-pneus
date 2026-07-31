@@ -110,10 +110,26 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
     expect(html).toContain('stockAdjustmentChangesValue()');
     expect(html).toContain('stockAdjustmentImpact()');
     expect(html).toContain('app.galpao.ajuste.js?v=20260727-stock-adjustment1');
-    expect(html).toContain('app.montagem.js?v=20260731-condicao2');
-    expect(html).toContain('app.js?v=20260731-condicao2');
+    expect(html).toContain('app.montagem.js?v=20260731-brand1');
+    expect(html).toContain('app.js?v=20260731-brand1');
     expect(montagem).toContain('window.PAINEL_MODULES.galpaoAjuste');
     expect(staticRoutes).toContain("'app.galpao.ajuste.js'");
+  });
+
+  it('trava a identidade no ajuste comum e direciona a troca para Corrigir marca', () => {
+    const app = context();
+    app.stockEdit({
+      measure: '100/80-18', brand: 'Sem marca', tire_condition: 'meia_vida',
+      quantity_on_hand: 10, unit_cost: 55.4, min_quantity: 2, notes: null,
+    });
+
+    expect(app.stockForm).toMatchObject({
+      measure: '100/80-18', brand: 'Sem marca', tire_condition: 'meia_vida',
+      identity_locked: true,
+    });
+    expect(html).toContain(':disabled="stockForm.identity_locked"');
+    expect(html).toContain('catalogoBrandCorrectionFromStock(selectedRow)');
+    expect(html).toContain('Para trocar a marca, use Corrigir marca.');
   });
 
   it('bloqueia alteração de saldo ou custo sem motivo', async () => {

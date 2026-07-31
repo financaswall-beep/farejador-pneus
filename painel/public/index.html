@@ -57,17 +57,18 @@
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.galpao.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260731-compat1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260731-brand1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260731-compat1"></script>
+<script src="/admin/painel/app.catalogo.marca.js?v=20260731-brand1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.montagem.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.js?v=20260731-brand1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -2938,7 +2939,7 @@
             <label class="xl:col-span-3 block relative">
               <span class="block text-xs font-medium text-gray-600 mb-1.5">Medida</span>
               <input id="estoque-medida" x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
-                     type="text" autocomplete="off" placeholder="Ex.: 185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
+                     :disabled="stockForm.identity_locked" type="text" autocomplete="off" placeholder="Ex.: 185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">
               <div x-show="measureBox.key === 'estoque' && measureBox.hits.length" class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
                 <template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template>
               </div>
@@ -2946,10 +2947,10 @@
             <label class="xl:col-span-2 block">
               <span class="block text-xs font-medium text-gray-600 mb-1.5">Marca da variante</span>
               <input x-model="stockForm.brand" list="catalog-brand-options" type="text" maxlength="60"
-                     placeholder="Ex.: Michelin" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
-              <span class="mt-1 block text-[10px] text-emerald-700">Separa saldo e custo; também aparece no Catálogo</span>
+                     :disabled="stockForm.identity_locked" placeholder="Ex.: Michelin" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">
+              <span class="mt-1 block text-[10px] text-emerald-700" x-text="stockForm.identity_locked ? 'Para trocar a marca, use Corrigir marca.' : 'Separa saldo e custo; também aparece no Catálogo'"></span>
             </label>
-            <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Condição</span><select x-model="stockForm.tire_condition" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="">Selecione</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
+            <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Condição</span><select x-model="stockForm.tire_condition" :disabled="stockForm.identity_locked" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500"><option value="">Selecione</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Custo unitário</span><input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label x-show="stockOperacao === 'entrada'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Origem</span><select x-model="stockForm.entry_nature" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="inventory_found">Encontrado na contagem</option><option value="owner_contribution">Aporte do proprietário</option><option value="opening_balance">Saldo inicial/teste</option><option value="other">Outra origem</option></select></label>
@@ -3231,6 +3232,10 @@
                   <button @click="stockConditionCorrectionOpen(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="replace" class="h-4 w-4"></i> Corrigir condição
+                  </button>
+                  <button @click="catalogoBrandCorrectionFromStock(selectedRow)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
+                    <i data-lucide="tags" class="h-4 w-4"></i> Corrigir marca
                   </button>
                   <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure, selectedRow.brand, selectedRow.tire_condition)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
@@ -8357,7 +8362,7 @@
               Custo do Estoque · preço do Catálogo · venda congelada
             </div>
           </div>
-          <div x-show="!catalogoCadastro.open && !catalogoSelecionado && !catalogoCompatibilidade.open"
+          <div x-show="!catalogoCadastro.open && !catalogoSelecionado && !catalogoCompatibilidade.open && !catalogoMarcaCorrecao.open"
                class="grid min-w-[360px] grid-cols-3 divide-x divide-white/20 text-center">
             <div class="px-5"><i data-lucide="package" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.products"></p><p class="text-xs text-emerald-100/70">produtos</p></div>
             <div class="px-5"><i data-lucide="tags" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.brands"></p><p class="text-xs text-emerald-100/70">marcas</p></div>
@@ -8475,7 +8480,7 @@
                       <span x-text="row.catalogued === false ? 'Após cadastrar' : (Number(row.compatibility_count || 0) > 0 ? Number(row.compatibility_count) + ' moto(s)' : 'Ver motos')"></span>
                     </button>
                   </td>
-                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" class="rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" x-text="row.catalogued === false ? 'Cadastrar produto' : (row.price_amount == null ? 'Definir preço' : 'Editar preço')"></button></td>
+                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" :class="catalogoIsUnknownBrand(row.brand) ? 'border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-emerald-700 text-emerald-800 hover:bg-emerald-50'" class="rounded-lg border px-3 py-2 text-xs font-semibold" x-text="catalogoIsUnknownBrand(row.brand) ? 'Corrigir marca' : (row.catalogued === false ? 'Cadastrar produto' : (row.price_amount == null ? 'Definir preço' : 'Editar preço'))"></button></td>
                 </tr>
               </template>
               <tr x-show="catalogoPaginaRows().length === 0"><td colspan="9" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
@@ -8513,6 +8518,69 @@
         <div class="grid grid-cols-2 gap-2 border-t border-gray-100 bg-white px-6 py-4">
           <button type="button" @click="catalogoCreateViewStock()" :disabled="catalogoCadastro.saving" class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Ver no Estoque</button>
           <button type="button" @click="catalogoCreateSave()" :disabled="!catalogoCreateCanSave()" class="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40" x-text="catalogoCadastro.saving ? 'Cadastrando...' : 'Cadastrar produto'"></button>
+        </div>
+      </aside>
+    </div>
+
+    <div x-show="catalogoMarcaCorrecao.open" x-cloak style="display:none;z-index:100" class="fixed inset-0">
+      <div data-testid="catalog-brand-correction-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoBrandCorrectionClose()"></div>
+      <aside data-testid="catalog-brand-correction-drawer"
+             class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
+             style="width:min(440px, calc(100vw - 24px));"
+             @keydown.escape.window="catalogoBrandCorrectionClose()">
+        <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Correção auditada</p>
+            <h2 class="mt-1 text-xl font-bold text-gray-950">Corrigir marca</h2>
+            <p class="mt-1 text-xs leading-5 text-gray-500">Transfere a identidade da variante sem alterar saldo, custo ou condição.</p>
+          </div>
+          <button type="button" @click="catalogoBrandCorrectionClose()" :disabled="catalogoMarcaCorrecao.saving" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+
+        <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <section class="grid grid-cols-3 divide-x divide-amber-100 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/70 text-center">
+            <div class="p-3"><p class="text-[10px] text-gray-500">Medida</p><p class="mt-1 text-sm font-bold text-amber-950" x-text="catalogoMarcaCorrecao.row?.tire_size || catalogoMarcaCorrecao.row?.measure || '—'"></p></div>
+            <div class="p-3"><p class="text-[10px] text-gray-500">Marca atual</p><p class="mt-1 text-sm font-bold text-amber-950" x-text="catalogoMarcaCorrecao.from_brand"></p></div>
+            <div class="p-3"><p class="text-[10px] text-gray-500">Condição</p><p class="mt-1 text-sm font-bold text-amber-950" x-text="catalogoConditionLabel(catalogoMarcaCorrecao.row?.tire_condition)"></p></div>
+          </section>
+
+          <div class="rounded-xl border border-gray-200 p-4">
+            <div class="flex items-center justify-between text-sm"><span class="text-gray-500">Saldo preservado</span><strong x-text="Number(catalogoMarcaCorrecao.row?.official_quantity_on_hand || catalogoMarcaCorrecao.row?.quantity_on_hand || 0) + ' un.'"></strong></div>
+            <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-sm"><span class="text-gray-500">Custo médio preservado</span><strong x-text="catalogoMarcaCorrecao.row?.official_unit_cost == null && catalogoMarcaCorrecao.row?.unit_cost == null ? '—' : formatCurrency(Number(catalogoMarcaCorrecao.row?.official_unit_cost ?? catalogoMarcaCorrecao.row?.unit_cost))"></strong></div>
+          </div>
+
+          <template x-if="!catalogoMarcaCorrecao.result">
+            <div class="space-y-5">
+              <label class="block">
+                <span class="mb-1.5 block text-xs font-semibold text-gray-700">Marca correta *</span>
+                <input id="catalog-brand-correction-target" x-model="catalogoMarcaCorrecao.to_brand" list="catalog-brand-options" type="text" maxlength="60" autocomplete="off" placeholder="Ex.: Pirelli" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100">
+                <span class="mt-1 block text-[10px] text-gray-400">Se a variante de destino já existir, o sistema bloqueará a operação para não misturar custos.</span>
+              </label>
+              <label class="block">
+                <span class="mb-1.5 block text-xs font-semibold text-gray-700">Motivo da correção *</span>
+                <textarea x-model="catalogoMarcaCorrecao.reason" maxlength="300" rows="3" placeholder="Ex.: marca não informada no cadastro inicial" class="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"></textarea>
+              </label>
+              <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950">
+                <input x-model="catalogoMarcaCorrecao.confirmed" type="checkbox" class="mt-1 h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-500">
+                <span>Confirmo que <strong x-text="Number(catalogoMarcaCorrecao.row?.official_quantity_on_hand || catalogoMarcaCorrecao.row?.quantity_on_hand || 0)"></strong> pneu(s) desta variante pertencem à marca informada.</span>
+              </label>
+            </div>
+          </template>
+
+          <div x-show="catalogoMarcaCorrecao.message" :class="catalogoMarcaCorrecao.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-xl border p-4 text-xs leading-5" x-text="catalogoMarcaCorrecao.message?.text"></div>
+
+          <div x-show="catalogoMarcaCorrecao.result" class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs leading-5 text-emerald-900">
+            <p class="font-semibold">O que foi preservado</p>
+            <ul class="mt-2 list-inside list-disc space-y-1"><li>Mesmo saldo e custo médio</li><li>Mesma condição do pneu</li><li>Preços e compatibilidades do produto, quando existentes</li><li>Histórico antigo intacto e nova correção registrada no filme</li></ul>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 bg-white px-6 py-4">
+          <div x-show="!catalogoMarcaCorrecao.result" class="grid grid-cols-2 gap-2">
+            <button type="button" @click="catalogoBrandCorrectionClose()" :disabled="catalogoMarcaCorrecao.saving" class="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Cancelar</button>
+            <button type="button" @click="catalogoBrandCorrectionSave()" :disabled="!catalogoBrandCorrectionCanSave()" class="rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40" x-text="catalogoMarcaCorrecao.saving ? 'Corrigindo...' : 'Confirmar correção'"></button>
+          </div>
+          <button x-show="catalogoMarcaCorrecao.result" type="button" @click="catalogoBrandCorrectionContinue()" class="w-full rounded-lg bg-emerald-800 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-900" x-text="catalogoMarcaCorrecao.result_row?.catalogued === false ? 'Cadastrar produto agora' : 'Concluir'"></button>
         </div>
       </aside>
     </div>

@@ -73,7 +73,7 @@ window.PAINEL_MODULES.galpao = function () {
         unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '',
         notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '',
         idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand,
-        original_unit_cost: row.unit_cost ?? 0 };
+        original_unit_cost: row.unit_cost ?? 0, identity_locked: true };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
@@ -264,6 +264,7 @@ window.PAINEL_MODULES.galpao = function () {
         cancelamento_venda: 'Venda de atacado cancelada', varejo: 'Venda do varejo (bot/balcão)',
         cancelamento_varejo: 'Varejo cancelado (voltou)', baixa_manual: 'Baixa manual',
         correcao_condicao: 'Correção de condição',
+        correcao_marca: 'Correção de marca',
         remocao: 'Medida removida', sem_rotulo: 'mexida sem rótulo',
       };
       let t = m.source === 'definir' && String(m.reason || '').startsWith('Contagem física:')

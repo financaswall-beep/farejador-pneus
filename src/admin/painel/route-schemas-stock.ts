@@ -32,6 +32,15 @@ export const transferWholesaleStockConditionSchema = z.object({
   { message: 'condition_transfer_same', path: ['to_condition'] },
 );
 
+export const correctWholesaleStockBrandSchema = z.object({
+  measure: variantSchema.measure,
+  from_brand: variantSchema.brand,
+  to_brand: variantSchema.brand,
+  tire_condition: tireConditionSchema,
+  reason: z.string().trim().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
+});
+
 export const entryWholesaleStockSchema = z.object({
   ...variantSchema,
   quantity_in: z.number().int().positive().max(1_000_000),

@@ -25,6 +25,8 @@ describe('estoque do galpão por medida, marca e condição', () => {
     typeof import('../../src/atendente-v2/matriz-product-search.js').buscarProdutoMatriz;
   let transferCondition:
     typeof import('../../src/admin/painel/queries-stock-condition-transfer.js').transferWholesaleStockCondition;
+  let correctBrand:
+    typeof import('../../src/admin/painel/queries-stock-brand-correction.js').correctWholesaleStockBrand;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -54,6 +56,8 @@ describe('estoque do galpão por medida, marca e condição', () => {
       = await import('../../src/atendente-v2/matriz-product-search.js'));
     ({ transferWholesaleStockCondition: transferCondition }
       = await import('../../src/admin/painel/queries-stock-condition-transfer.js'));
+    ({ correctWholesaleStockBrand: correctBrand }
+      = await import('../../src/admin/painel/queries-stock-brand-correction.js'));
 
     const product = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.products
@@ -403,9 +407,188 @@ describe('estoque do galpão por medida, marca e condição', () => {
     }, db.pool)).toEqual(corrected);
     const correctionAudit = await db.pool.query<{ event_type: string }>(
       `SELECT event_type FROM audit.events
-        WHERE environment='test' AND idempotency_key=$1`,
+        WHERE environment='test' AND idempotency_key=$1
+          AND event_type='condition_transferred'`,
       [correctionKey],
     );
     expect(correctionAudit.rows).toEqual([{ event_type: 'condition_transferred' }]);
+  });
+
+  it('corrige marca sem alterar saldo, custo, identidade do estoque ou histórico', async () => {
+    const inserted = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.wholesale_stock
+         (environment,measure,brand,tire_condition,quantity_on_hand,unit_cost,
+          min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter)
+       VALUES ('test','100/80-18','Sem marca','meia_vida',10,55.40,2,
+               'entrada antiga sem marca',100,80,18)
+       RETURNING id`,
+    );
+    const correctionKey = randomUUID();
+    const corrected = await correctBrand({
+      measure: '100/80-18',
+      from_brand: 'Sem marca',
+      to_brand: 'Rinaldi',
+      tire_condition: 'meia_vida',
+      reason: 'marca conferida no estoque físico',
+      idempotency_key: correctionKey,
+      actor_label: 'teste-correcao-marca',
+      environment: 'test',
+    }, db.pool);
+    expect(corrected).toEqual({
+      stock_id: inserted.rows[0]!.id,
+      measure: '100/80-18',
+      from_brand: 'Sem marca',
+      to_brand: 'Rinaldi',
+      tire_condition: 'meia_vida',
+      quantity_on_hand: 10,
+      unit_cost: 55.4,
+      catalog_product_id: null,
+      catalog_product_updated: false,
+    });
+    await expect(correctBrand({
+      measure: '100/80-18',
+      from_brand: 'Sem marca',
+      to_brand: 'Rinaldi',
+      tire_condition: 'meia_vida',
+      reason: 'marca conferida no estoque físico',
+      idempotency_key: correctionKey,
+      actor_label: 'teste-correcao-marca',
+      environment: 'test',
+    }, db.pool)).resolves.toEqual(corrected);
+
+    const stock = await db.pool.query<{
+      id: string; brand: string; quantity_on_hand: number; unit_cost: string;
+      min_quantity: number | null; notes: string | null;
+    }>(
+      `SELECT id,brand,quantity_on_hand,unit_cost::text,min_quantity,notes
+         FROM commerce.wholesale_stock
+        WHERE environment='test' AND measure='100/80-18'`,
+    );
+    expect(stock.rows).toEqual([{
+      id: inserted.rows[0]!.id,
+      brand: 'Rinaldi',
+      quantity_on_hand: 10,
+      unit_cost: '55.40',
+      min_quantity: 2,
+      notes: 'entrada antiga sem marca',
+    }]);
+
+    const movements = await db.pool.query<{
+      brand: string; op: string; qty_before: number; qty_after: number;
+      qty_delta: number; source: string;
+    }>(
+      `SELECT brand,op,qty_before,qty_after,qty_delta,source
+         FROM commerce.wholesale_stock_movements
+        WHERE environment='test' AND ref=$1
+        ORDER BY brand`,
+      [correctionKey],
+    );
+    expect(movements.rows).toEqual([
+      {
+        brand: 'Rinaldi', op: 'insert', qty_before: 0, qty_after: 10,
+        qty_delta: 10, source: 'correcao_marca',
+      },
+      {
+        brand: 'Sem marca', op: 'delete', qty_before: 10, qty_after: 0,
+        qty_delta: -10, source: 'correcao_marca',
+      },
+    ]);
+    const financialEffect = await db.pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count
+         FROM finance.matriz_inventory_adjustments
+        WHERE environment='test' AND movement_ref=$1`,
+      [correctionKey],
+    );
+    expect(financialEffect.rows[0]?.count).toBe(0);
+    const audit = await db.pool.query<{ event_type: string }>(
+      `SELECT event_type FROM audit.events
+        WHERE environment='test' AND idempotency_key=$1
+          AND event_type='brand_corrected'`,
+      [correctionKey],
+    );
+    expect(audit.rows).toEqual([{ event_type: 'brand_corrected' }]);
+
+    const overview = await catalogOverview('test', db.pool);
+    expect(overview.rows).toContainEqual(expect.objectContaining({
+      tire_size: '100/80-18', brand: 'Rinaldi', catalogued: false,
+      official_quantity_on_hand: 10, official_unit_cost: 55.4,
+    }));
+    expect(overview.rows).not.toContainEqual(expect.objectContaining({
+      tire_size: '100/80-18', brand: 'Sem marca',
+    }));
+
+    const product = await createCatalogProduct({
+      measure: '100/80-18',
+      brand: 'Rinaldi',
+      tireCondition: 'meia_vida',
+      productCode: `RIN-1008018-${Date.now()}`,
+      productName: 'Pneu Rinaldi 100/80-18',
+      actorLabel: 'teste-correcao-marca',
+      environment: 'test',
+    }, db.pool);
+    await setCatalogPrice({
+      productId: product.product_id,
+      priceAmount: 129.9,
+      reason: 'preço inicial após correção',
+      actorLabel: 'teste-correcao-marca',
+      environment: 'test',
+    }, db.pool);
+    const renamedAgain = await correctBrand({
+      measure: '100/80-18',
+      from_brand: 'Rinaldi',
+      to_brand: 'Technic',
+      tire_condition: 'meia_vida',
+      reason: 'marca física revisada novamente',
+      idempotency_key: randomUUID(),
+      actor_label: 'teste-correcao-marca',
+      environment: 'test',
+    }, db.pool);
+    expect(renamedAgain).toMatchObject({
+      stock_id: inserted.rows[0]!.id,
+      catalog_product_id: product.product_id,
+      catalog_product_updated: true,
+      to_brand: 'Technic',
+      quantity_on_hand: 10,
+      unit_cost: 55.4,
+    });
+    const preservedProduct = await db.pool.query<{
+      brand: string; price_amount: string;
+    }>(
+      `SELECT p.brand,mp.price_amount::text
+         FROM commerce.products p
+         JOIN commerce.matriz_current_prices mp
+           ON mp.environment=p.environment AND mp.product_id=p.id
+        WHERE p.environment='test' AND p.id=$1`,
+      [product.product_id],
+    );
+    expect(preservedProduct.rows).toEqual([{ brand: 'Technic', price_amount: '129.90' }]);
+  });
+
+  it('bloqueia correção quando a variante de destino já existe', async () => {
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock
+         (environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+       VALUES ('test','130/70-13','Sem marca','meia_vida',15,40),
+              ('test','130/70-13','Pirelli','meia_vida',1,60)`,
+    );
+    await expect(correctBrand({
+      measure: '130/70-13',
+      from_brand: 'Sem marca',
+      to_brand: 'Pirelli',
+      tire_condition: 'meia_vida',
+      reason: 'tentativa que não pode misturar custos',
+      idempotency_key: randomUUID(),
+      environment: 'test',
+    }, db.pool)).rejects.toThrow('brand_correction_target_exists');
+    const stock = await db.pool.query<{ brand: string; quantity_on_hand: number }>(
+      `SELECT brand,quantity_on_hand
+         FROM commerce.wholesale_stock
+        WHERE environment='test' AND measure='130/70-13'
+        ORDER BY brand`,
+    );
+    expect(stock.rows).toEqual([
+      { brand: 'Pirelli', quantity_on_hand: 1 },
+      { brand: 'Sem marca', quantity_on_hand: 15 },
+    ]);
   });
 });

@@ -8,13 +8,15 @@ import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
   addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, applyMatrizPhysicalStockCount,
+  correctWholesaleStockBrand,
   deleteWholesaleStockComRotulo,
   getMatrizStockReconciliation, listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
   transferWholesaleStockCondition,
 } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import {
-  baixaWholesaleStockSchema, entryWholesaleStockSchema, physicalStockCountSchema,
+  baixaWholesaleStockSchema, correctWholesaleStockBrandSchema,
+  entryWholesaleStockSchema, physicalStockCountSchema,
   removeWholesaleStockSchema, setWholesaleStockSchema,
   transferWholesaleStockConditionSchema,
 } from './route-schemas-stock.js';
@@ -138,6 +140,43 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       }
       const mapped = mapWriteError(error);
       logger.error({ error, status: mapped.status }, 'stock condition transfer failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/wholesale/stock/brand-correction', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = correctWholesaleStockBrandSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.issues[0]?.message ?? 'invalid_body',
+      });
+    }
+    try {
+      return reply.status(200).send(await correctWholesaleStockBrand({
+        ...parsed.data,
+        actor_label: operatorLabel(request),
+      }));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'internal_server_error';
+      if (code === 'brand_correction_source_not_found') {
+        return reply.status(404).send({ error: code });
+      }
+      if ([
+        'brand_correction_source_ambiguous', 'brand_correction_target_exists',
+        'brand_correction_catalog_ambiguous', 'brand_correction_catalog_conflict',
+      ].includes(code)) {
+        return reply.status(409).send({ error: code });
+      }
+      if ([
+        'brand_correction_measure_invalid', 'brand_correction_target_required',
+        'brand_correction_same', 'reason_required',
+      ].includes(code)) {
+        return reply.status(400).send({ error: code });
+      }
+      const mapped = mapWriteError(error);
+      logger.error({ error, status: mapped.status }, 'stock brand correction failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

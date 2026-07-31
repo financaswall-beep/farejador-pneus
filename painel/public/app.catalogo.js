@@ -94,6 +94,10 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoOpen(row) {
+      if (this.catalogoIsUnknownBrand(row?.brand)) {
+        this.catalogoBrandCorrectionOpen(row);
+        return;
+      }
       if (!row?.product_id || row.catalogued === false) {
         this.catalogoCreateOpen(row);
         return;
