@@ -113,7 +113,7 @@ window.PAINEL_MODULES.catalogo = function () {
         row,
         form: {
           product_code: `${brandCode}-${measureCode}`,
-          product_name: `Pneu ${row.brand} ${row.tire_size}`,
+          product_name: `Pneu ${row.brand}`,
         },
         saving: false,
         message: null,

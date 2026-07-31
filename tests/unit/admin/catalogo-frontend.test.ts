@@ -46,7 +46,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
-    expect(html).toContain('app.catalogo.js?v=20260731-catalog-create1');
+    expect(html).toContain('app.catalogo.js?v=20260731-catalog-create2');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -125,7 +125,7 @@ describe('catalogo no painel', () => {
       open: true,
       form: {
         product_code: 'MET-909018',
-        product_name: 'Pneu Metzeler 90/90-18',
+        product_name: 'Pneu Metzeler',
       },
     });
 
@@ -134,7 +134,7 @@ describe('catalogo no painel', () => {
       measure: '90/90-18',
       brand: 'Metzeler',
       product_code: 'MET-909018',
-      product_name: 'Pneu Metzeler 90/90-18',
+      product_name: 'Pneu Metzeler',
     });
     expect(context.catalogoSelecionado).toMatchObject({
       product_id: 'produto-metzeler',
@@ -151,5 +151,8 @@ describe('catalogo no painel', () => {
     expect(html).toContain("'Cadastrar produto'");
     expect(html).toContain('@click="catalogoCreateSave()"');
     expect(html).toContain('continuará bloqueado para venda');
+    expect(html).toContain('data-testid="catalog-create-drawer"');
+    expect(html).toContain('class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col');
+    expect(html).not.toContain('w-[min(520px,calc(100vw-24px))] -translate-x-1/2');
   });
 });

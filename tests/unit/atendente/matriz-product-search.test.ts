@@ -42,6 +42,27 @@ describe('tools do Bot usam a fonte oficial da Matriz', () => {
     expect(result.map((row) => row.product_id)).toEqual(['p-matriz', 'p-parceiro']);
   });
 
+  it('busca medida pelo campo tecnico e retorna todas as marcas correspondentes', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [
+        { ...product('p-pirelli', 'PIR', '90/90-18'), brand: 'Pirelli', product_name: 'City Dragon' },
+        { ...product('p-metzeler', 'MET', '90/90-18'), brand: 'Metzeler', product_name: 'Pneu Metzeler' },
+        { ...product('p-outra', 'OUT', '100/90-18'), brand: 'Technic', product_name: 'Sport' },
+      ] })
+      .mockResolvedValueOnce({ rows: [
+        { measure: '90/90-18', brand: 'Pirelli', quantity_on_hand: 2, unit_cost: 100 },
+        { measure: '90/90-18', brand: 'Metzeler', quantity_on_hand: 3, unit_cost: 120 },
+        { measure: '100/90-18', brand: 'Technic', quantity_on_hand: 4, unit_cost: 90 },
+      ] });
+
+    const result = await buscarProdutoMatriz({ query } as unknown as PoolClient, {
+      environment: 'prod', medida_pneu: '90/90-18', limit: 10,
+    });
+
+    expect(result.map((row) => row.brand)).toEqual(['Metzeler', 'Pirelli']);
+    expect(allSql(query)).not.toMatch(/product_name\s+ILIKE/i);
+  });
+
   it('verificar estoque responde pelo galpao e informa a origem', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [product('p1', 'P1', '90/90-18')] })

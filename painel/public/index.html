@@ -57,7 +57,7 @@
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.galpao.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260731-catalog-create1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260731-catalog-create2"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
@@ -8413,29 +8413,30 @@
     </div>
 
     <div x-show="catalogoCadastro.open" x-cloak style="display:none" class="fixed inset-0 z-[72]">
-      <div class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoCreateClose()"></div>
-      <section class="absolute left-1/2 top-1/2 w-[min(520px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
-               @keydown.escape.window="catalogoCreateClose()">
+      <div data-testid="catalog-create-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoCreateClose()"></div>
+      <aside data-testid="catalog-create-drawer"
+             class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
+             style="width:min(440px, calc(100vw - 24px));"
+             @keydown.escape.window="catalogoCreateClose()">
         <div class="flex items-start justify-between border-b border-gray-100 px-6 py-5">
           <div><p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Transformar estoque em produto</p><h2 class="mt-1 text-xl font-bold text-gray-950">Cadastrar no Catálogo</h2><p class="mt-1 text-xs text-gray-500">Cria o produto comercial sem alterar saldo ou custo.</p></div>
           <button type="button" @click="catalogoCreateClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
-        <div class="space-y-5 px-6 py-5">
+        <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <div class="grid grid-cols-2 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60">
             <div class="border-r border-emerald-100 p-4"><p class="text-[10px] text-gray-500">Medida confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.tire_size"></p></div>
             <div class="p-4"><p class="text-[10px] text-gray-500">Marca confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.brand"></p></div>
           </div>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Código do produto *</span><input id="catalog-product-code" x-model="catalogoCadastro.form.product_code" @input="catalogoCadastro.form.product_code = String(catalogoCadastro.form.product_code || '').toUpperCase()" type="text" maxlength="80" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Único no sistema. Aceita letras, números, ponto, barra, hífen e sublinhado.</span></label>
-          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome comercial *</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome comercial *</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] leading-4 text-gray-400">Use o modelo ou a linha quando souber, por exemplo: Metzeler ME Street. A medida e a marca já ficam salvas em campos separados.</span></label>
           <div class="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><i data-lucide="shield-check" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><p>Após cadastrar, o produto continuará bloqueado para venda até você definir o preço oficial na próxima tela.</p></div>
           <div x-show="catalogoCadastro.message" :class="catalogoCadastro.message?.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-700'" class="rounded-lg border p-3 text-xs" x-text="catalogoCadastro.message?.text"></div>
         </div>
-        <div class="grid grid-cols-1 gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4 sm:grid-cols-3">
+        <div class="grid grid-cols-2 gap-2 border-t border-gray-100 bg-white px-6 py-4">
           <button type="button" @click="catalogoCreateViewStock()" :disabled="catalogoCadastro.saving" class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Ver no Estoque</button>
-          <button type="button" @click="catalogoCreateClose()" :disabled="catalogoCadastro.saving" class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">Cancelar</button>
           <button type="button" @click="catalogoCreateSave()" :disabled="!catalogoCreateCanSave()" class="rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40" x-text="catalogoCadastro.saving ? 'Cadastrando...' : 'Cadastrar produto'"></button>
         </div>
-      </section>
+      </aside>
     </div>
 
     <div x-show="catalogoSelecionado" x-cloak style="display:none" class="fixed inset-0 z-[70]">
