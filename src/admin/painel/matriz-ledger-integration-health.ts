@@ -160,6 +160,7 @@ export async function getMatrizLedgerIntegrationHealth(
   const totalSignals = stage3.total_problems + stage4.total_errors
     + stage5.total_errors + globalErrors;
   const pending = stage4.pending_operational.fuel_notes_without_approved_receipt
+    + stage4.pending_operational.marketing_campaigns_unclassified
     + stage5.pending_operational.payroll_assignment_gaps_current_month;
   return {
     enabled: env.MATRIZ_CENTRAL_LEDGER,
@@ -175,7 +176,10 @@ export async function getMatrizLedgerIntegrationHealth(
         logisticsErrors,
         stage4.pending_operational.fuel_notes_without_approved_receipt,
       ),
-      marketing: moduleHealth(marketingErrors),
+      marketing: moduleHealth(
+        marketingErrors,
+        stage4.pending_operational.marketing_campaigns_unclassified,
+      ),
       rede: moduleHealth(networkErrors),
       colaboradores: moduleHealth(
         payrollErrors,

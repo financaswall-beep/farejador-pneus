@@ -191,6 +191,16 @@ export async function getMarketingOverview(
       target: 'integracoes',
     });
   }
+  const pendingScopeCampaigns = (meta?.current.campaign_rows ?? [])
+    .filter((row) => row.scope === 'pending' && row.spend > 0).length;
+  if (pendingScopeCampaigns > 0) {
+    alerts.push({
+      id: 'campaign-scope-pending', severity: 'high',
+      title: `${pendingScopeCampaigns} campanha(s) aguardando classificação`,
+      detail: 'Esses gastos não entram no Financeiro e bloqueiam o fechamento.',
+      target: 'campanhas',
+    });
+  }
 
   let attributed: MarketingAttributionReport | null = null;
   if (config.attributionEnabled) {
@@ -251,6 +261,11 @@ export async function getMarketingOverview(
       { id: 'tiktok', label: 'TikTok', status: 'planned' },
     ],
     quality: [
+      {
+        id: 'campaign_scope',
+        label: 'Escopo das campanhas',
+        status: pendingScopeCampaigns > 0 ? 'blocked' : 'ok',
+      },
       { id: 'campaigns', label: 'Campanhas', status: meta ? 'ok' : 'pending' },
       { id: 'investment', label: 'Investimento', status: meta ? 'ok' : 'pending' },
       { id: 'conversations', label: 'Conversas', status: meta ? 'ok' : 'pending' },

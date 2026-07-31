@@ -3,6 +3,7 @@ import {
   clearMetaMarketingCache,
   getMetaMarketingSnapshot,
   marketingDateWindow,
+  summarizeMetaRows,
 } from '../../../src/admin/painel/marketing-meta.js';
 
 const config = {
@@ -72,8 +73,11 @@ describe('Marketing Meta read-only', () => {
     expect(snapshot.current.campaign_rows).toEqual([
       {
         id: 'camp-2',
+        ad_account_id: null,
         name: 'Pneus para moto • Sul',
+        scope: 'matrix',
         spend: 20,
+        financial_spend: 20,
         conversations: 2,
         impressions: 0,
         clicks: 0,
@@ -84,8 +88,11 @@ describe('Marketing Meta read-only', () => {
       },
       {
         id: 'camp-1',
+        ad_account_id: null,
         name: '205/55 R16 • Curitiba',
+        scope: 'matrix',
         spend: 10,
+        financial_spend: 10,
         conversations: 4,
         impressions: 0,
         clicks: 0,
@@ -133,6 +140,29 @@ describe('Marketing Meta read-only', () => {
     });
 
     expect(snapshot.current.conversations).toBe(4);
+  });
+
+  it('mantém campanha externa visível sem somá-la ao consolidado financeiro', () => {
+    const summary = summarizeMetaRows([
+      {
+        ad_account_id: 'act_123', campaign_id: 'matrix', campaign_name: 'Matriz',
+        date_start: '2026-07-25', spend: '10', financial_spend: '10',
+        campaign_scope: 'matrix', summary_included: true,
+        actions: [{ action_type: 'lead', value: '2' }],
+      },
+      {
+        ad_account_id: 'act_123', campaign_id: 'external', campaign_name: 'Externa',
+        date_start: '2026-07-25', spend: '90', financial_spend: '0',
+        campaign_scope: 'external', summary_included: false,
+        actions: [{ action_type: 'lead', value: '9' }],
+      },
+    ], '2026-07-25', '2026-07-25');
+
+    expect(summary).toMatchObject({ spend: 10, conversations: 2, campaigns: 1 });
+    expect(summary.campaign_rows).toHaveLength(2);
+    expect(summary.campaign_rows.find((row) => row.id === 'external')).toMatchObject({
+      scope: 'external', spend: 90, financial_spend: 0,
+    });
   });
 
   it('recusa paginação que tente retirar o token do domínio oficial', async () => {

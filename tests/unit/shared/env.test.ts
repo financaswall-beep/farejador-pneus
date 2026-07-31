@@ -131,6 +131,7 @@ describe('environment security validation', () => {
     const parsed = parseEnv(baseEnv);
     expect(parsed.MARKETING_META_ENABLED).toBe(false);
     expect(parsed.MARKETING_SYNC_ENABLED).toBe(false);
+    expect(parsed.MARKETING_SCOPE_ENFORCEMENT_ENABLED).toBe(false);
     expect(parsed.MARKETING_ATTRIBUTION).toBe(false);
     expect(parsed.MARKETING_CAPI_ENABLED).toBe(false);
     expect(parsed.CAPI_EXTENDED_MATCHING).toBe(false);

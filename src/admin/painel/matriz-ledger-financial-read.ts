@@ -2,7 +2,6 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
-type Environment = 'prod' | 'test';
 interface LedgerTruthRow {
   revenue: string; known_cost: string; operating_expenses: string; inventory_gain: string; inventory_loss: string;
   cash_in: string; cash_out: string; cash_retail: string;
@@ -25,7 +24,7 @@ interface LedgerTruthRow {
 const cents = (value: string | number): number => Math.round(Number(value || 0) * 100);
 const money = (value: number): string => (value / 100).toFixed(2);
 export async function getMatrizCentralLedgerFinancialTruth(
-  environment: Environment = env.FAREJADOR_ENV, dbPool: Pool = defaultPool,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV, dbPool: Pool = defaultPool,
 ): Promise<MatrizFinancialTruth> {
   const result = await dbPool.query<LedgerTruthRow>(
      `WITH bounds AS (
@@ -190,7 +189,8 @@ export async function getMatrizCentralLedgerFinancialTruth(
        COALESCE((SELECT sum(CASE side WHEN 'debit' THEN amount ELSE -amount END)
          FROM month_ledger WHERE account_class='expense'
            AND account_code LIKE 'expense_%'),0) ledger_expenses,
-       COALESCE((SELECT sum(spend) FROM marketing.meta_insights_daily,bounds b
+       COALESCE((SELECT sum(CASE WHEN $2::boolean THEN financial_spend ELSE spend END) FROM
+         marketing.meta_insights_daily_scoped,bounds b
          WHERE environment=$1 AND entity_level='campaign' AND account_currency='BRL'
            AND metric_date>=b.month_start AND metric_date<b.month_end),0)
          source_marketing,
@@ -218,7 +218,7 @@ export async function getMatrizCentralLedgerFinancialTruth(
          WHEN account_code IN ('inventory_loss','inventory_internal_use')
            THEN CASE side WHEN 'credit' THEN amount ELSE -amount END
          ELSE 0 END) FROM month_ledger),0) ledger_inventory`,
-    [environment],
+    [environment, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
   );
   const row = result.rows[0]!;
   const originPairs: Array<[MatrizFinancialTruth['conciliacao']['origens'][number]['origem'], number, number]> = [

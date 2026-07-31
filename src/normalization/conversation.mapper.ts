@@ -42,6 +42,22 @@ function readNestedNumber(source: unknown, key: string): number | null {
   return typeof value === 'number' ? value : null;
 }
 
+function canonicalChannelType(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  const normalized = value.trim().toLowerCase();
+  const known: Record<string, string> = {
+    'channel::whatsapp': 'whatsapp',
+    'channel::facebookpage': 'facebook',
+    'channel::instagram': 'instagram',
+    'channel::webwidget': 'web',
+    whatsapp: 'whatsapp',
+    facebook: 'facebook',
+    instagram: 'instagram',
+    web: 'web',
+  };
+  return known[normalized] ?? value.trim();
+}
+
 export function mapConversation(
   payload: unknown,
   environment: string,
@@ -72,7 +88,8 @@ export function mapConversation(
     chatwootConversationId: p.id,
     chatwootAccountId: p.account_id ?? 0,
     chatwootInboxId: p.inbox_id ?? null,
-    channelType: (additionalAttributes.channel_type as string) ?? null,
+    channelType: canonicalChannelType(rawPayload.channel)
+      ?? canonicalChannelType(additionalAttributes.channel_type),
     chatwootContactId: chatwootContactId ?? null,
     currentStatus: p.status ?? 'open',
     currentAssigneeId: p.assignee_id ?? null,

@@ -32,6 +32,7 @@ export interface MarketingPipelineHealth {
     sent: number;
     failed: number;
     dead_letter: number;
+    suppressed: number;
   };
 }
 
@@ -91,33 +92,37 @@ const REALIZED_CTE = `
     WHERE a.environment=$1 AND a.status='active' AND a.superseded_by IS NULL
       AND a.realized_at>=$2::date AND a.realized_at<($3::date+1)
   ),
-  attributed AS (
+  attributed_resolved AS (
     SELECT aa.*,o.total_amount,o.partner_order_id,
       CASE
         WHEN o.partner_order_id IS NOT NULL THEN ce.commission_amount
         WHEN COALESCE(c.item_count,0)>0 AND COALESCE(c.missing_cost,0)=0
           THEN o.total_amount-COALESCE(c.cost_total,0)
         ELSE NULL
-      END AS gross_margin,
-      COALESCE((
-        SELECT mi.campaign_id
-        FROM marketing.meta_insights_daily mi
-        WHERE mi.environment=$1 AND mi.entity_level='ad'
-          AND mi.entity_id=aa.source_id
-        ORDER BY mi.metric_date DESC,mi.collected_at DESC LIMIT 1
-      ),(
-        SELECT mi.campaign_id
-        FROM marketing.meta_insights_daily mi
-        WHERE mi.environment=$1 AND mi.entity_level='campaign'
-          AND mi.entity_id=aa.source_id
-        ORDER BY mi.metric_date DESC,mi.collected_at DESC LIMIT 1
-      )) AS campaign_id
+      END AS gross_margin,map.ad_account_id,map.campaign_id
     FROM active_attribution aa
     JOIN commerce.orders o ON o.environment=$1 AND o.id=aa.order_id
     LEFT JOIN costs c ON c.order_id=o.id
     LEFT JOIN network.commission_entries ce
       ON ce.environment=o.environment AND ce.partner_order_id=o.partner_order_id
       AND ce.status<>'reversed'
+    LEFT JOIN LATERAL (
+      SELECT mi.ad_account_id,mi.campaign_id
+        FROM marketing.meta_insights_daily mi
+       WHERE mi.environment=$1 AND mi.entity_id=aa.source_id
+         AND mi.entity_level IN ('ad','campaign')
+       ORDER BY CASE WHEN mi.entity_level='ad' THEN 0 ELSE 1 END,
+                mi.metric_date DESC,mi.collected_at DESC
+       LIMIT 1
+    ) map ON true
+  ),
+  attributed AS (
+    SELECT ar.* FROM attributed_resolved ar
+     WHERE NOT $4::boolean OR EXISTS (
+       SELECT 1 FROM marketing.campaign_scopes s
+        WHERE s.environment=$1 AND s.ad_account_id=ar.ad_account_id
+          AND s.campaign_id=ar.campaign_id AND s.scope='matrix'
+     )
   )`;
 
 export async function getMarketingAttributionReport(
@@ -145,7 +150,7 @@ export async function getMarketingAttributionReport(
            sum(gross_margin) AS gross_margin,
            count(*) FILTER (WHERE gross_margin IS NULL)::int AS pending_margin_orders
          FROM attributed`,
-        [env.FAREJADOR_ENV, since, until],
+        [env.FAREJADOR_ENV, since, until, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
       ),
       dbPool.query<CampaignAttribution>(
         `${REALIZED_CTE}
@@ -156,7 +161,7 @@ export async function getMarketingAttributionReport(
          FROM attributed
          WHERE campaign_id IS NOT NULL
          GROUP BY campaign_id`,
-        [env.FAREJADOR_ENV, since, until],
+        [env.FAREJADOR_ENV, since, until, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
       ),
     ]);
     const row = summary.rows[0];
@@ -231,6 +236,7 @@ export async function getMarketingPipelineHealth(
         sent: count('sent'),
         failed: count('failed'),
         dead_letter: count('dead_letter'),
+        suppressed: count('suppressed'),
       },
     };
   } catch {
@@ -239,7 +245,7 @@ export async function getMarketingPipelineHealth(
       last_sync_at: null,
       last_sync_status: null,
       rows_upserted: 0,
-      capi: { pending: 0, sent: 0, failed: 0, dead_letter: 0 },
+      capi: { pending: 0, sent: 0, failed: 0, dead_letter: 0, suppressed: 0 },
     };
   }
 }

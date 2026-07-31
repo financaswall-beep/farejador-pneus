@@ -41,7 +41,7 @@ function marketingIntegrationMockPayload() {
     ],
     next_step: 'Validar Purchase no Test Events e ativar a CAPI',
     sync: { available: true, status: 'succeeded', rows_upserted: 146 },
-    capi: { enabled: false, pending: 0, processing: 0, sent: 0, dead_letter: 0 },
+    capi: { enabled: false, pending: 0, processing: 0, sent: 0, dead_letter: 0, suppressed: 0 },
     audit_events: [
       { id: '1', event_type: 'Meta sincronizada', actor_label: 'Sistema', created_at: '2026-07-26T11:35:00.000Z' },
       { id: '2', event_type: 'Credencial validada', actor_label: 'Sistema', created_at: '2026-07-26T11:34:00.000Z' },
@@ -108,6 +108,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
 
     marketingIntegrationAuditLabel(eventType) {
       const labels = {
+        marketing_campaign_scope_set: 'Escopo da campanha',
         marketing_sync_manual: 'Sincronização manual da Meta',
         marketing_attribution_reconciled: 'Atribuição reconciliada',
         marketing_capi_test: 'Teste CAPI',

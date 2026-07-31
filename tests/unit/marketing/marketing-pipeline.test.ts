@@ -82,6 +82,9 @@ describe('pipeline determinístico de Marketing', () => {
       realized_at: '2026-07-26T12:00:00.000Z',
       phone_e164: '+55 (21) 99999-0000',
       ctwa_clid: 'clid-real',
+      ad_account_id: 'act_123',
+      campaign_id: 'camp-1',
+      campaign_scope_id: 'scope-1',
       city_name: 'São Gonçalo',
       state_code: 'RJ',
       postal_code_prefix: '24400',
@@ -138,7 +141,7 @@ describe('pipeline determinístico de Marketing', () => {
 
     expect(query.mock.calls[0]?.[0]).toContain("interval '6 days 23 hours'");
     expect(query.mock.calls[0]?.[0]).toContain('NOT EXISTS');
-    const persistedPayload = JSON.parse(String(query.mock.calls[1]?.[1]?.[3])) as {
+    const persistedPayload = JSON.parse(String(query.mock.calls[1]?.[1]?.[4])) as {
       test_event_code?: string;
     };
     expect(persistedPayload.test_event_code).toBeUndefined();
@@ -153,6 +156,9 @@ describe('pipeline determinístico de Marketing', () => {
         realized_at: '2026-07-26T13:00:00.000Z',
         phone_e164: '+5521988880000',
         ctwa_clid: 'clid-test',
+        ad_account_id: 'act_123',
+        campaign_id: 'camp-1',
+        campaign_scope_id: 'scope-1',
         city_name: null,
         state_code: null,
         postal_code_prefix: null,
@@ -204,10 +210,15 @@ describe('pipeline determinístico de Marketing', () => {
           environment: 'test',
           payload: { data: [{ event_time: eventTime }] },
           attempts: 1,
+          attribution_id: 'attr-old',
+          campaign_scope_id: 'scope-1',
         }],
       })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ scope: 'matrix' }] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
     const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
     const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
     const fetcher = vi.fn();
@@ -216,19 +227,109 @@ describe('pipeline determinístico de Marketing', () => {
       dbPool,
       fetcher: fetcher as typeof fetch,
       now: new Date('2026-07-26T12:00:00.000Z'),
+      scopeEnforcement: true,
     })).resolves.toBe(true);
 
     expect(fetcher).not.toHaveBeenCalled();
-    expect(clientQuery.mock.calls[4]?.[0]).toContain("status='dead_letter'");
-    expect(clientQuery.mock.calls[4]?.[0]).toContain("last_error_code='event_time_expired'");
+    const deadLetterQuery = clientQuery.mock.calls.find(([sql]) => (
+      String(sql).includes("status='dead_letter'")
+    ));
+    expect(deadLetterQuery?.[0]).toContain("last_error_code='event_time_expired'");
     expect(client.release).toHaveBeenCalledOnce();
   });
 
+  it('suprime Purchase se a campanha sair do escopo antes do envio', async () => {
+    const clientQuery = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'outbox-external',
+          environment: 'test',
+          payload: { data: [{ event_time: 1785528000 }] },
+          attempts: 1,
+          attribution_id: 'attr-external',
+          campaign_scope_id: 'scope-external',
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ scope: 'external' }] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
+    const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
+    const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+    const fetcher = vi.fn();
+
+    await expect(pollCapiOutbox({
+      dbPool,
+      fetcher: fetcher as typeof fetch,
+      now: new Date('2026-07-31T20:00:00Z'),
+      scopeEnforcement: true,
+    })).resolves.toBe(true);
+
+    expect(fetcher).not.toHaveBeenCalled();
+    const suppression = clientQuery.mock.calls.find(([sql]) => (
+      String(sql).includes("status='suppressed'")
+    ));
+    expect(suppression?.[1]?.[2]).toBe('campaign_scope_external');
+    expect(client.release).toHaveBeenCalledOnce();
+  });
+
+  it('preserva o envio legado enquanto o enforcement de escopo está desligado', async () => {
+    const eventTime = Math.floor(new Date('2026-07-31T19:00:00Z').getTime() / 1000);
+    const clientQuery = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'outbox-legacy', environment: 'test', attempts: 1,
+          attribution_id: 'attr-legacy', campaign_scope_id: null,
+          payload: { data: [{ event_time: eventTime }] },
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [] });
+    const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
+    const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      events_received: 1,
+      fbtrace_id: 'legacy-trace',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    await expect(pollCapiOutbox({
+      dbPool,
+      fetcher: fetcher as typeof fetch,
+      now: new Date('2026-07-31T20:00:00Z'),
+      scopeEnforcement: false,
+    })).resolves.toBe(true);
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(clientQuery.mock.calls.some(([sql]) => (
+      String(sql).includes('FROM marketing.campaign_scopes')
+    ))).toBe(false);
+  });
+
   it('persiste campanha e anúncio por dia, substituindo a recoleta', async () => {
-    const clientQuery = vi.fn(async (sql: string) => ({
-      rows: [],
-      rowCount: sql.includes('INSERT INTO marketing.meta_insights_daily') ? 1 : 0,
-    }));
+    const clientQuery = vi.fn(async (sql: string) => {
+      if (sql.includes('INSERT INTO marketing.campaign_scopes')) {
+        return {
+          rows: [{
+            id: 'scope-1', environment: 'test', ad_account_id: 'act_123',
+            campaign_id: 'camp-1', campaign_name: 'WhatsApp', scope: 'pending',
+            classification_reason: null, classified_by: null, classified_at: null,
+            updated_at: '2026-07-26T18:00:00Z',
+          }],
+          rowCount: 1,
+        };
+      }
+      if (sql.includes('INSERT INTO marketing.meta_insights_daily')) {
+        return { rows: [{ id: sql.includes("$6,$7") ? 'insight-1' : 'insight-2' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
     const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
     const poolQuery = vi.fn(async (sql: string) => (
       sql.includes('INSERT INTO marketing.meta_sync_runs')

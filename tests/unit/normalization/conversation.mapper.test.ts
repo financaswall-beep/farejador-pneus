@@ -66,4 +66,30 @@ describe('conversation.mapper', () => {
 
     expect(result.chatwootContactId).toBe(302);
   });
+
+  it('normaliza o canal Facebook informado no topo da conversa', () => {
+    const result = mapConversation({
+      ...conversationCreated,
+      channel: 'Channel::FacebookPage',
+      additional_attributes: {},
+    }, environment, lastEventAt);
+
+    expect(result.channelType).toBe('facebook');
+  });
+
+  it('prioriza o canal superior e mantém fallback determinístico', () => {
+    const facebook = mapConversation({
+      ...conversationCreated,
+      channel: 'Channel::FacebookPage',
+      additional_attributes: { channel_type: 'Channel::Whatsapp' },
+    }, environment, lastEventAt);
+    const whatsapp = mapConversation({
+      ...conversationCreated,
+      channel: undefined,
+      additional_attributes: { channel_type: 'Channel::Whatsapp' },
+    }, environment, lastEventAt);
+
+    expect(facebook.channelType).toBe('facebook');
+    expect(whatsapp.channelType).toBe('whatsapp');
+  });
 });

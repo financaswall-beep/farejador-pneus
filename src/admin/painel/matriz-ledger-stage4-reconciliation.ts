@@ -20,7 +20,10 @@ export interface MatrizStage4Reconciliation {
     marketing_spend_mismatch: number;
     marketing_currency_unsupported: number;
   };
-  pending_operational: { fuel_notes_without_approved_receipt: number };
+  pending_operational: {
+    fuel_notes_without_approved_receipt: number;
+    marketing_campaigns_unclassified: number;
+  };
   total_errors: number;
 }
 
@@ -33,6 +36,7 @@ export async function getMatrizStage4LedgerReconciliation(
     expense_remove_missing: number; receipt_expense_missing: number;
     marketing_spend_mismatch: number; marketing_currency_unsupported: number;
     fuel_notes_without_approved_receipt: number;
+    marketing_campaigns_unclassified: number;
   }>(
     `SELECT
        (SELECT count(*)::int FROM commerce.matriz_expenses e
@@ -63,9 +67,11 @@ export async function getMatrizStage4LedgerReconciliation(
              WHERE t.environment=r.environment
                AND t.source_type='commerce.matriz_expense.accrual'
                AND t.source_id=r.ai_expense_id::text)) receipt_expense_missing,
-       (SELECT count(*)::int FROM marketing.meta_insights_daily i
+       (SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
          WHERE i.environment=$1 AND i.entity_level='campaign'
-           AND i.account_currency='BRL' AND abs(i.spend-COALESCE((
+           AND i.account_currency='BRL'
+           AND abs((CASE WHEN $2::boolean THEN i.financial_spend ELSE i.spend END)
+             -COALESCE((
              SELECT sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
                FROM finance.matriz_ledger_transactions t
                JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
@@ -74,16 +80,23 @@ export async function getMatrizStage4LedgerReconciliation(
                 AND t.metadata->>'insight_id'=i.id::text
                 AND e.account_code='marketing_expense'),0))>0.009)
          marketing_spend_mismatch,
-       (SELECT count(*)::int FROM marketing.meta_insights_daily i
+       (SELECT count(*)::int FROM marketing.meta_insights_daily_scoped i
          WHERE i.environment=$1 AND i.entity_level='campaign' AND i.spend>0
-           AND i.account_currency<>'BRL') marketing_currency_unsupported,
+           AND i.account_currency<>'BRL'
+           AND (NOT $2::boolean OR i.campaign_scope='matrix'))
+         marketing_currency_unsupported,
+       (SELECT count(DISTINCT (i.ad_account_id,i.campaign_id))::int
+          FROM marketing.meta_insights_daily_scoped i
+         WHERE $2::boolean AND i.environment=$1 AND i.entity_level='campaign'
+           AND i.spend>0 AND i.campaign_scope='pending')
+         marketing_campaigns_unclassified,
        (SELECT count(*)::int FROM commerce.matriz_delivery_trips t
          WHERE t.environment=$1 AND COALESCE(t.fuel_spent,0)>0
            AND NOT EXISTS (SELECT 1 FROM commerce.matriz_trip_receipts r
              WHERE r.environment=t.environment AND r.trip_id=t.id
                AND r.workflow_status IN ('linked','legacy_linked')))
          fuel_notes_without_approved_receipt`,
-    [environment],
+    [environment, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
   );
   const row = result.rows[0]!;
   const errors = {
@@ -95,11 +108,16 @@ export async function getMatrizStage4LedgerReconciliation(
     marketing_currency_unsupported: row.marketing_currency_unsupported,
   };
   const total = Object.values(errors).reduce((sum, count) => sum + count, 0);
-  const pending = row.fuel_notes_without_approved_receipt;
+  const pending = row.fuel_notes_without_approved_receipt
+    + row.marketing_campaigns_unclassified;
   return {
     enabled: env.MATRIZ_CENTRAL_LEDGER,
     status: total > 0 ? 'red' : pending > 0 ? 'yellow' : 'green',
-    errors, pending_operational: { fuel_notes_without_approved_receipt: pending },
+    errors,
+    pending_operational: {
+      fuel_notes_without_approved_receipt: row.fuel_notes_without_approved_receipt,
+      marketing_campaigns_unclassified: row.marketing_campaigns_unclassified,
+    },
     total_errors: total,
   };
 }
@@ -171,8 +189,13 @@ export async function runMatrizStage4LedgerBackfill(
     const insights = await client.query<{ id: string; sync_run_id: string | null }>(
       `SELECT i.id,i.sync_run_id
          FROM marketing.meta_insights_daily i
+         JOIN marketing.campaign_scopes s
+           ON s.environment=i.environment AND s.ad_account_id=i.ad_account_id
+          AND s.campaign_id=i.campaign_id
         WHERE i.environment=$1 AND i.entity_level='campaign'
-          AND i.account_currency='BRL' AND abs(i.spend-COALESCE((
+          AND i.account_currency='BRL'
+          AND abs((CASE WHEN $3::boolean AND s.scope<>'matrix' THEN 0 ELSE i.spend END)
+            -COALESCE((
             SELECT sum(CASE e.side WHEN 'debit' THEN e.amount ELSE -e.amount END)
               FROM finance.matriz_ledger_transactions t
               JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
@@ -181,7 +204,7 @@ export async function runMatrizStage4LedgerBackfill(
                AND t.metadata->>'insight_id'=i.id::text
                AND e.account_code='marketing_expense'),0))>0.009
         ORDER BY i.metric_date,i.id LIMIT $2 FOR UPDATE OF i SKIP LOCKED`,
-      [environment, limit],
+      [environment, limit, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
     );
     for (const insight of insights.rows) await reconcileMatrizMarketingSpend(
       client, insight.id, insight.sync_run_id ?? `backfill:${insight.id}`,

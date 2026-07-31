@@ -4,6 +4,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 function marketingCampaignMockRows() {
   const base = {
     status: 'with_delivery', stock_status: 'not_reconciled', cost_status: 'ready', attribution_status: 'ready',
+    ad_account_id: 'act_123456789', scope: 'matrix',
   };
   return [
     { ...base, id: 'meta:1', platform_id: '1', channel: 'meta', name: '205/55 R16 • Curitiba',
@@ -170,6 +171,47 @@ window.PAINEL_MODULES.marketingCampaigns = function () {
 
     marketingCampaignChannelName(channel) {
       return channel === 'meta' ? 'Meta' : channel === 'google' ? 'Google' : channel === 'tiktok' ? 'TikTok' : 'Consolidado';
+    },
+
+    marketingCampaignScopeLabel(scope) {
+      return scope === 'matrix' ? 'Matriz' : scope === 'external' ? 'Externa' : 'Pendente';
+    },
+
+    marketingCampaignScopeClass(scope) {
+      if (scope === 'matrix') return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+      if (scope === 'external') return 'border-slate-200 bg-slate-50 text-slate-700';
+      return 'border-amber-300 bg-amber-50 text-amber-800';
+    },
+
+    async updateMarketingCampaignScope(row, event) {
+      const nextScope = event?.target?.value;
+      const previous = row.scope || 'pending';
+      if (!['pending', 'matrix', 'external'].includes(nextScope) || nextScope === previous) return;
+      const defaultReason = nextScope === 'matrix'
+        ? 'Campanha própria da matriz'
+        : nextScope === 'external'
+          ? 'Campanha de operação externa à matriz'
+          : 'Classificação reaberta para revisão';
+      const reason = window.prompt('Justificativa da classificação:', defaultReason);
+      if (!reason || reason.trim().length < 3) {
+        event.target.value = previous;
+        return;
+      }
+      row.scope_updating = true;
+      try {
+        const result = await this.apiPut(
+          `/admin/api/marketing/ad-accounts/${encodeURIComponent(row.ad_account_id)}/campaigns/${encodeURIComponent(row.platform_id)}/scope`,
+          { scope: nextScope, reason: reason.trim() },
+        );
+        row.scope = result.scope.scope;
+        row.financial_investment = row.scope === 'matrix' ? Number(row.investment || 0) : 0;
+        await this.loadMarketingCampaigns();
+      } catch {
+        event.target.value = previous;
+        window.alert('Não foi possível classificar a campanha. Nenhum valor foi alterado.');
+      } finally {
+        row.scope_updating = false;
+      }
     },
 
     marketingCampaignRecommendations() {

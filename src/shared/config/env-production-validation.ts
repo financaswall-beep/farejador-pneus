@@ -20,6 +20,7 @@ interface ProductionEnvConfig {
   CHATWOOT_ACCOUNT_ID?: number;
   MARKETING_META_ENABLED?: boolean;
   MARKETING_SYNC_ENABLED?: boolean;
+  MARKETING_SCOPE_ENFORCEMENT_ENABLED?: boolean;
   MARKETING_CAPI_ENABLED?: boolean;
   MARKETING_ATTRIBUTION?: boolean;
   META_ADS_ACCOUNT_ID?: string;

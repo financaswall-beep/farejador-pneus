@@ -7,6 +7,7 @@ const booleanStringSchema = z.enum(['true', 'false']).default('false')
 export const marketingEnvShape = {
   MARKETING_META_ENABLED: booleanStringSchema,
   MARKETING_SYNC_ENABLED: booleanStringSchema,
+  MARKETING_SCOPE_ENFORCEMENT_ENABLED: booleanStringSchema,
   MARKETING_ATTRIBUTION: booleanStringSchema,
   MARKETING_CAPI_ENABLED: booleanStringSchema,
   CAPI_EXTENDED_MATCHING: booleanStringSchema,

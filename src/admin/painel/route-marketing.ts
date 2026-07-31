@@ -19,6 +19,7 @@ import { enqueueCapiPurchases } from '../../marketing/capi.js';
 import { sendLatestCapiTestPurchase } from '../../marketing/capi-test.js';
 import { env } from '../../shared/config/env.js';
 import { recordMarketingAudit } from './marketing-audit.js';
+import { setCampaignScope } from '../../marketing/campaign-scope.js';
 
 const querySchema = z.object({
   period: z.enum(['7d', '30d']).default('30d'),
@@ -31,6 +32,16 @@ const campaignQuerySchema = z.object({
 
 const campaignParamsSchema = z.object({
   campaignId: z.string().min(1).max(100),
+}).strict();
+
+const campaignScopeParamsSchema = z.object({
+  adAccountId: z.string().regex(/^act_[0-9]+$/),
+  campaignId: z.string().min(1).max(100),
+}).strict();
+
+const campaignScopeBodySchema = z.object({
+  scope: z.enum(['pending', 'matrix', 'external']),
+  reason: z.string().trim().min(3).max(500),
 }).strict();
 
 const syncBodySchema = z.object({
@@ -77,6 +88,35 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
     }
   });
 
+  fastify.put(
+    '/admin/api/marketing/ad-accounts/:adAccountId/campaigns/:campaignId/scope',
+    { preHandler: requireAdminOwner },
+    async (request, reply) => {
+      const params = campaignScopeParamsSchema.safeParse(request.params ?? {});
+      const body = campaignScopeBodySchema.safeParse(request.body ?? {});
+      if (!params.success || !body.success) {
+        return reply.status(400).send({ error: 'invalid_campaign_scope' });
+      }
+      try {
+        const result = await setCampaignScope({
+          adAccountId: params.data.adAccountId,
+          campaignId: params.data.campaignId,
+          scope: body.data.scope,
+          reason: body.data.reason,
+          actor: getAdminContext(request).displayName,
+          idempotencyKey: String(request.id),
+        });
+        return reply.status(200).send(result);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'marketing_campaign_not_found') {
+          return reply.status(404).send({ error: 'campaign_not_found' });
+        }
+        logger.error({ err: error }, 'painel marketing campaign scope failed');
+        return reply.status(500).send({ error: 'marketing_campaign_scope_failed' });
+      }
+    },
+  );
+
   fastify.get('/admin/api/marketing/integrations', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
@@ -102,6 +142,9 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
   fastify.post('/admin/api/marketing/sync', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = syncBodySchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
+    if (!env.MARKETING_SYNC_ENABLED) {
+      return reply.status(409).send({ error: 'marketing_sync_disabled' });
+    }
     try {
       const result = await syncMetaInsights({
         triggerType: 'manual',
