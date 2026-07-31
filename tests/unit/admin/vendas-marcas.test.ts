@@ -87,14 +87,14 @@ describe('ranking de marcas em Vendas', () => {
       html.indexOf('</section>', commercialVisionStart) + '</section>'.length,
     );
     expect(html).toContain('data-testid="sales-commercial-vision" class="space-y-3"');
-    expect(html).toContain('data-testid="sales-channel-performance" class="rounded-xl border border-gray-200 bg-white p-5 xl:col-span-7 xl:row-span-2"');
-    expect(html).toContain('data-testid="sales-commercial-focus" class="rounded-xl border border-amber-300');
-    expect(html).toContain('data-testid="sales-brand-ranking" class="overflow-hidden rounded-xl');
-    expect(html).toContain('Visão comercial');
-    expect(html).toContain('Resultado do período');
-    expect(html).toContain('Prioridade agora');
-    expect(html).toContain('Ranking de marcas');
-    expect(html).toContain('grid grid-cols-1 gap-4 xl:grid-cols-12');
+    expect(html).toContain('data-testid="sales-channel-performance" class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-4 xl:col-span-5 xl:h-[220px]"');
+    expect(html).toContain('data-testid="sales-commercial-focus" class="relative overflow-hidden rounded-xl border border-amber-300 bg-amber-50 p-4 xl:col-span-3 xl:h-[220px]"');
+    expect(html).toContain('data-testid="sales-brand-ranking" class="rounded-xl border border-gray-200 bg-white p-4 xl:col-span-4 xl:h-[220px]"');
+    expect(html).toContain('Placar comercial');
+    expect(html).toContain('Faturamento confirmado');
+    expect(html).toContain('Próxima jogada');
+    expect(html).toContain('Marcas que puxam receita');
+    expect(html).toContain('grid grid-cols-1 gap-3 xl:grid-cols-12');
     expect(commercialVision).toContain('vendasMarcas.rows.slice(0, 2)');
     expect(commercialVision).not.toContain('catalogoBrandLogo(marca.brand)');
     expect(commercialVision).not.toContain('bg-gradient');
