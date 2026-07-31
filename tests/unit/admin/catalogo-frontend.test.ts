@@ -5,7 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 function loadCatalogModule() {
   const sandbox = { window: { PAINEL_MODULES: {} }, console, setTimeout };
   vm.runInNewContext(readFileSync('painel/public/app.catalogo.js', 'utf8'), sandbox);
-  return sandbox.window.PAINEL_MODULES.catalogo();
+  vm.runInNewContext(
+    readFileSync('painel/public/app.catalogo.compatibilidade.js', 'utf8'),
+    sandbox,
+  );
+  return {
+    ...sandbox.window.PAINEL_MODULES.catalogo(),
+    ...sandbox.window.PAINEL_MODULES.catalogoCompatibilidade(),
+  };
 }
 
 describe('catalogo no painel', () => {
@@ -46,7 +53,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
-    expect(html).toContain('app.catalogo.js?v=20260731-condicao2');
+    expect(html).toContain('app.catalogo.js?v=20260731-compat1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -157,7 +164,51 @@ describe('catalogo no painel', () => {
     expect(html).toContain('data-testid="catalog-create-drawer"');
     expect(html).toContain('class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col');
     expect(html).not.toContain('w-[min(520px,calc(100vw-24px))] -translate-x-1/2');
-    expect(html).toContain('x-show="!catalogoCadastro.open && !catalogoSelecionado"');
-    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(2);
+    expect(html).toContain('x-show="!catalogoCadastro.open && !catalogoSelecionado && !catalogoCompatibilidade.open"');
+    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(3);
+  });
+
+  it('habilita compatibilidade apos o cadastro e abre as motos em painel lateral', async () => {
+    const module = loadCatalogModule();
+    const context = {
+      ...module,
+      catalogoSelecionado: { product_id: 'outro-produto' },
+      catalogoCadastro: { open: false },
+      catalogoCompatibilidade: {
+        open: false, row: null, rows: [], summary: { models: 0, fitments: 0 },
+        loading: false, error: null,
+      },
+      apiGet: vi.fn().mockResolvedValue({
+        summary: { models: 1, fitments: 1 },
+        rows: [{
+          vehicle_model_id: 'neo-125', make: 'Yamaha', model: 'Neo 125', variant: 'UBS',
+          year_start: 2017, year_end: 2026, position: 'front', is_oem: true,
+          source: 'manual',
+        }],
+      }),
+      $nextTick: vi.fn(),
+    };
+
+    await module.catalogoCompatibilityOpen.call(context, {
+      product_id: 'produto-neo', product_name: 'Pneu Pirelli', tire_size: '80/80-14',
+      catalogued: true,
+    });
+
+    expect(context.catalogoSelecionado).toBeNull();
+    expect(context.catalogoCompatibilidade).toMatchObject({
+      open: true,
+      loading: false,
+      summary: { models: 1, fitments: 1 },
+    });
+    expect(context.apiGet).toHaveBeenCalledWith('/admin/api/catalog/produto-neo/compatibility');
+    expect(module.catalogoCompatibilityPositionLabel('front')).toBe('Dianteiro');
+    expect(module.catalogoCompatibilityYearLabel({ year_start: 2017, year_end: 2026 }))
+      .toBe('2017 a 2026');
+
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain('<th class="px-4 py-3">Compatibilidade</th>');
+    expect(html).toContain('data-testid="catalog-compatibility-drawer"');
+    expect(html).toContain(':disabled="row.catalogued === false || !row.product_id"');
+    expect(html).toContain('Nenhuma moto associada');
   });
 });

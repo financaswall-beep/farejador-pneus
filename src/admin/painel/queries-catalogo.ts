@@ -11,6 +11,7 @@ interface CatalogRow {
   tire_condition: TireCondition | null;
   brand: string | null; tire_size: string | null; tire_position: string | null;
   price_amount: string | null; currency: string | null; price_type: string | null;
+  compatibility_count: number | string;
 }
 interface StockRow {
   measure: string; brand: string; quantity_on_hand: number | string;
@@ -50,7 +51,13 @@ export async function getCatalogOverview(
       `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
               p.tire_condition,p.brand,
               ts.tire_size,ts.position tire_position,
-              cp.price_amount,cp.currency,cp.price_type
+              cp.price_amount,cp.currency,cp.price_type,
+              COALESCE((
+                SELECT count(DISTINCT vf.vehicle_model_id)::int
+                  FROM commerce.vehicle_fitments vf
+                 WHERE vf.environment=p.environment
+                   AND vf.tire_spec_id=ts.id
+              ),0) AS compatibility_count
          FROM commerce.products p
          LEFT JOIN commerce.tire_specs ts
            ON ts.product_id=p.id AND ts.environment=p.environment
@@ -99,6 +106,7 @@ export async function getCatalogOverview(
     const price = product.price_amount === null ? null : Number(product.price_amount);
     return {
       ...product,
+      compatibility_count: Number(product.compatibility_count ?? 0),
       row_key: `product:${product.product_id}`,
       catalogued: true,
       price_amount: price,
@@ -133,6 +141,7 @@ export async function getCatalogOverview(
         price_amount: null,
         currency: null,
         price_type: null,
+        compatibility_count: null,
         row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
         catalogued: false,
         official_quantity_on_hand: Number(row.quantity_on_hand),

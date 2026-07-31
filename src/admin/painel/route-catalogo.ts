@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdminAuth } from '../auth.js';
 import { logger } from '../../shared/logger.js';
 import { getCatalogOverview, getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
+import { getCatalogCompatibility } from './queries-catalogo-compatibilidade.js';
 import { createCatalogProductFromStock } from './queries-catalogo-create.js';
 import { operatorLabel } from './route-helpers.js';
 
@@ -52,6 +53,19 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     const params = productParams.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'invalid_product_id' });
     return reply.status(200).send({ rows: await getCatalogPriceHistory(params.data.product_id) });
+  });
+
+  fastify.get('/admin/api/catalog/:product_id/compatibility', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const params = productParams.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_product_id' });
+    try {
+      return reply.status(200).send(await getCatalogCompatibility(params.data.product_id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'internal_server_error';
+      const status = message === 'catalog_product_not_found' ? 404 : 500;
+      if (status === 500) logger.error({ error }, 'painel catalog compatibility failed');
+      return reply.status(status).send({ error: status === 500 ? 'internal_server_error' : message });
+    }
   });
 
   fastify.post('/admin/api/catalog/:product_id/price', { preHandler: requireAdminAuth }, async (request, reply) => {

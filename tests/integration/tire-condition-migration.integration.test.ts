@@ -5,7 +5,7 @@ import {
 } from './helpers/postgres.js';
 import { createPartnerFixture } from './helpers/partner-fixtures.js';
 
-describe('0156 - migração segura das condições de pneu', () => {
+describe('0156 a 0158 - migração segura das variantes de pneu', () => {
   let db: IntegrationDb;
   let unitId: string;
   let usedId: string;
@@ -13,6 +13,7 @@ describe('0156 - migração segura das condições de pneu', () => {
   let newId: string;
   let reviewId: string;
   let oldProductId: string;
+  let fitmentTargetSpecId: string;
 
   beforeAll(async () => {
     db = await startPostgres({ throughMigration: '0155_wholesale_stock_multi_brand.sql' });
@@ -61,6 +62,47 @@ describe('0156 - migração segura das condições de pneu', () => {
 
     await applyMigrationFile(db.pool, '0156_tire_condition_variants.sql');
     await applyMigrationFile(db.pool, '0157_partner_condition_routing_guard.sql');
+
+    const vehicle = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.vehicle_models
+         (environment,vehicle_type,make,model,variant,year_start,year_end)
+       VALUES ('test','motorcycle','Yamaha',$1,'UBS',2017,2026)
+       RETURNING id`,
+      [`Neo ${randomUUID().slice(0, 6)}`],
+    );
+    const fitmentProducts = await db.pool.query<{ id: string; product_name: string }>(
+      `INSERT INTO commerce.products
+         (environment,product_code,product_name,product_type,brand,tire_condition)
+       VALUES
+         ('test',$1,'Fonte 80/80-14','tire','Pirelli','meia_vida'),
+         ('test',$2,'Destino 80/80-14','tire','Technic','meia_vida')
+       RETURNING id,product_name`,
+      [`FIT-SOURCE-${randomUUID()}`, `FIT-TARGET-${randomUUID()}`],
+    );
+    const sourceProductId = fitmentProducts.rows.find(
+      (row) => row.product_name === 'Fonte 80/80-14',
+    )!.id;
+    const targetProductId = fitmentProducts.rows.find(
+      (row) => row.product_name === 'Destino 80/80-14',
+    )!.id;
+    const sourceSpec = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.tire_specs(environment,product_id,tire_size)
+       VALUES ('test',$1,'80/80-14') RETURNING id`,
+      [sourceProductId],
+    );
+    const targetSpec = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.tire_specs(environment,product_id,tire_size)
+       VALUES ('test',$1,'80-80-14') RETURNING id`,
+      [targetProductId],
+    );
+    fitmentTargetSpecId = targetSpec.rows[0]!.id;
+    await db.pool.query(
+      `INSERT INTO commerce.vehicle_fitments
+         (environment,vehicle_model_id,tire_spec_id,position,is_oem,source,confidence_level)
+       VALUES ('test',$1,$2,'front',true,'manual',0.95)`,
+      [vehicle.rows[0]!.id, sourceSpec.rows[0]!.id],
+    );
+    await applyMigrationFile(db.pool, '0158_catalog_fitments_measure_backfill.sql');
   }, 180_000);
 
   afterAll(async () => { if (db) await stopPostgres(db); });
@@ -129,5 +171,23 @@ describe('0156 - migração segura das condições de pneu', () => {
       [reviewId],
     );
     expect(audit.rows).toHaveLength(1);
+  });
+
+  it('copia compatibilidade conhecida para todo produto ativo da mesma medida', async () => {
+    const target = await db.pool.query<{
+      make: string; position: string; is_oem: boolean; source: string;
+    }>(
+      `SELECT vm.make,vf.position,vf.is_oem,vf.source
+         FROM commerce.vehicle_fitments vf
+         JOIN commerce.vehicle_models vm
+           ON vm.id=vf.vehicle_model_id AND vm.environment=vf.environment
+        WHERE vf.environment='test' AND vf.tire_spec_id=$1`,
+      [fitmentTargetSpecId],
+    );
+    expect(target.rows).toEqual([
+      expect.objectContaining({
+        make: 'Yamaha', position: 'front', is_oem: true, source: 'manual',
+      }),
+    ]);
   });
 });

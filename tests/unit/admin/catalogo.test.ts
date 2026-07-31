@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
 
 let getCatalogOverview: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
+let getCatalogCompatibility: typeof import('../../../src/admin/painel/queries-catalogo-compatibilidade.js').getCatalogCompatibility;
 let getCatalogPriceHistory: typeof import('../../../src/admin/painel/queries-catalogo.js').getCatalogPriceHistory;
 let setCatalogPrice: typeof import('../../../src/admin/painel/queries-catalogo.js').setCatalogPrice;
 
@@ -15,6 +16,8 @@ beforeAll(async () => {
   });
   ({ getCatalogOverview, getCatalogPriceHistory, setCatalogPrice }
     = await import('../../../src/admin/painel/queries-catalogo.js'));
+  ({ getCatalogCompatibility }
+    = await import('../../../src/admin/painel/queries-catalogo-compatibilidade.js'));
 });
 
 describe('catalogo conciliado com estoque e precos', () => {
@@ -60,6 +63,7 @@ describe('catalogo conciliado com estoque e precos', () => {
     });
     expect(result.rows[0]).toMatchObject({
       product_id: 'produto-1',
+      compatibility_count: 0,
       official_quantity_on_hand: 28,
       official_unit_cost: 82,
       last_purchase_cost: 79.5,
@@ -67,6 +71,59 @@ describe('catalogo conciliado com estoque e precos', () => {
       sellable: true,
       block_reason: null,
     });
+  });
+
+  it('lista somente as compatibilidades gravadas no produto selecionado', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT p.id AS product_id')) return {
+        rows: [{
+          product_id: 'produto-neo',
+          product_code: 'PIR-808014-MV',
+          product_name: 'Pneu Pirelli 80/80-14',
+          brand: 'Pirelli',
+          tire_condition: 'meia_vida',
+          tire_size: '80/80-14',
+        }],
+      };
+      if (sql.includes('SELECT vm.id AS vehicle_model_id')) return {
+        rows: [
+          {
+            vehicle_model_id: 'neo-125', make: 'Yamaha', model: 'Neo 125', variant: 'UBS',
+            year_start: 2017, year_end: 2026, position: 'front', is_oem: true,
+            source: 'manual', confidence_level: '0.95',
+          },
+          {
+            vehicle_model_id: 'neo-125', make: 'Yamaha', model: 'Neo 125', variant: 'UBS',
+            year_start: 2017, year_end: 2026, position: 'rear', is_oem: false,
+            source: 'manual', confidence_level: '0.90',
+          },
+        ],
+      };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+
+    const result = await getCatalogCompatibility(
+      'produto-neo',
+      'test',
+      { query } as unknown as Pool,
+    );
+
+    expect(result.product).toMatchObject({ product_id: 'produto-neo', tire_size: '80/80-14' });
+    expect(result.summary).toEqual({ models: 1, fitments: 2 });
+    expect(result.rows[0]).toMatchObject({ make: 'Yamaha', model: 'Neo 125' });
+    const fitmentSql = String(query.mock.calls[1]?.[0]);
+    expect(fitmentSql).toContain('vf.tire_spec_id=ts.id');
+    expect(fitmentSql).toContain('p.id=$2');
+  });
+
+  it('recusa compatibilidade de produto inexistente ou arquivado', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    await expect(getCatalogCompatibility(
+      'produto-ausente',
+      'test',
+      { query } as unknown as Pool,
+    )).rejects.toThrow('catalog_product_not_found');
+    expect(query).toHaveBeenCalledOnce();
   });
 
   it('mostra variante com saldo ainda sem produto comercial sem liberá-la para venda', async () => {
