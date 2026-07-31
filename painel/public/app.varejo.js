@@ -241,7 +241,7 @@ window.PAINEL_MODULES.varejo = function () {
       }
     },
     async loadVendasData() {
-      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas(), this.logisticaLoaded ? Promise.resolve() : this.loadLogistica()]);
+      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas(), this.loadVendasMarcas(), this.logisticaLoaded ? Promise.resolve() : this.loadLogistica()]);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     async setVendasPeriodo(period) {

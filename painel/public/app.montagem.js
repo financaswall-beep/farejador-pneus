@@ -16,6 +16,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.api, // app.api.js (linhas 605-704 pré-obra): credenciais + apiGet/Post/Put + salvar raio de entrega
     window.PAINEL_MODULES.format, // app.format.js (linhas 705-768 pré-obra): moeda/data/tempo/iniciais + widgets do form de venda
     window.PAINEL_MODULES.varejo, // app.varejo.js (linhas 769-843 pré-obra): pedidos do varejo + resumo do varejo (0117) + períodos
+    window.PAINEL_MODULES.vendasMarcas, // ranking de marcas por vendas confirmadas da Matriz
     window.PAINEL_MODULES.vendasHistorico, // histórico unificado: filtros, cards, paginação, detalhes e CSV
     window.PAINEL_MODULES.comissoes, // app.comissoes.js (linhas 844-914 pré-obra): comissões da Rede (0118): carregar/quitar/alarme/termos
     window.PAINEL_MODULES.atacado, // app.atacado.js (linhas 915-1058 pré-obra): venda de atacado: form, status, submit, ranking de recompra

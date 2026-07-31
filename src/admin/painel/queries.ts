@@ -9,6 +9,7 @@ export * from './queries-marketing-campaign-detail.js';
 export * from './queries-marketing-integrations.js';
 export * from './queries-marketing-journeys.js';
 export * from './queries-catalogo.js';
+export * from './queries-vendas-marcas.js';
 
 /**
  * Banco da MATRIZ — PORTA DE ENTRADA (obra 300, 2026-07-05).

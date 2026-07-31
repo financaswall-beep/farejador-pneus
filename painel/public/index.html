@@ -25,7 +25,8 @@
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
 <script src="/admin/painel/app.format.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.varejo.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.varejo.js?v=20260731-vendas-marcas1"></script>
+<script src="/admin/painel/app.vendas.marcas.js?v=20260731-vendas-marcas1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260731-condicao2"></script>
@@ -67,7 +68,7 @@
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260731-vendas-marcas1"></script>
 <script src="/admin/painel/app.js?v=20260731-brand1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
@@ -2205,6 +2206,41 @@
             <div><p class="text-xs text-gray-500">Oportunidades de recompra</p><p class="text-2xl font-bold num" x-text="vendasInativos().length"></p><p class="text-xs text-gray-400 mt-1">sem comprar há 30 dias</p></div>
           </button>
         </div>
+
+        <section data-testid="sales-brand-ranking" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+            <div class="flex items-center gap-2">
+              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="trophy" class="h-4 w-4"></i></span>
+              <div><h3 class="text-base font-semibold text-gray-950">Marcas mais vendidas</h3><p class="mt-0.5 text-xs text-gray-400">Vendas confirmadas da Matriz · varejo + atacado</p></div>
+            </div>
+            <div class="text-right">
+              <p class="text-xs font-semibold text-emerald-800" x-text="vendasHistoricoPeriodoLabel()"></p>
+              <p class="mt-0.5 text-[11px] text-gray-400"><span x-text="Number(vendasMarcas?.summary?.units || 0)"></span> pneus com marca identificada</p>
+            </div>
+          </div>
+
+          <div x-show="vendasMarcasLoading" class="flex items-center justify-center gap-2 px-5 py-10 text-sm text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Calculando ranking...</div>
+          <div x-show="!vendasMarcasLoading && vendasMarcasError" class="m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">O ranking de marcas está temporariamente indisponível. Os demais dados de Vendas continuam normais.</div>
+          <div x-show="!vendasMarcasLoading && !vendasMarcasError && !vendasMarcas?.rows?.length" class="px-5 py-10 text-center text-sm text-gray-400">Nenhuma venda confirmada com marca identificada neste período.</div>
+
+          <div x-show="!vendasMarcasLoading && !vendasMarcasError && vendasMarcas?.rows?.length" class="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-3 md:divide-x md:divide-y-0">
+            <template x-for="(marca, index) in vendasMarcas.rows.slice(0, 3)" :key="marca.brand">
+              <article class="relative p-5">
+                <span class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold" :class="index === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'" x-text="'#' + marca.rank"></span>
+                <div class="flex h-9 items-center pr-10">
+                  <template x-if="catalogoBrandLogo(marca.brand)"><img :src="catalogoBrandLogo(marca.brand)" :alt="`Logo ${marca.brand}`" class="max-h-8 w-[108px] object-contain object-left"></template>
+                  <template x-if="!catalogoBrandLogo(marca.brand)"><span class="text-sm font-bold uppercase tracking-wide text-gray-800" x-text="marca.brand"></span></template>
+                </div>
+                <div class="mt-4 flex items-end justify-between gap-3">
+                  <div><p class="text-2xl font-bold text-gray-950 num"><span x-text="marca.units"></span><span class="ml-1 text-sm font-medium text-gray-400">pneus</span></p><p class="mt-1 text-xs text-gray-500 num" x-text="formatCurrency(Number(marca.revenue || 0)) + ' vendidos'"></p></div>
+                  <span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700" x-text="Number(marca.share_percent || 0).toFixed(1).replace('.', ',') + '%'"></span>
+                </div>
+                <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-emerald-600" :style="'width:' + Math.max(0, Math.min(100, Number(marca.share_percent || 0))) + '%' "></div></div>
+                <p class="mt-3 text-[11px] text-gray-400"><span x-text="marca.retail_units"></span> varejo · <span x-text="marca.wholesale_units"></span> atacado</p>
+              </article>
+            </template>
+          </div>
+        </section>
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
           <div class="xl:col-span-7 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
