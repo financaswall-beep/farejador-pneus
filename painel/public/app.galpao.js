@@ -1,53 +1,7 @@
-// Obra 300 (2026-07-05): fatia do painel da MATRIZ — estoque do galpão por medida: busca, custo médio, entrada.
+// Estoque do galpão por variante (medida + marca): busca, custo médio e entrada.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
-    measureOnHand(measure) {
-      // Quanto tem de uma medida (pro form de venda mostrar "em estoque"). null = não cadastrada.
-      const m = (measure || '').trim();
-      if (!m) return null;
-      const row = this.atacadoMeasures.find((x) => x.measure === m);
-      return row && row.quantity_on_hand != null ? Number(row.quantity_on_hand) : null;
-    },
-    // Custo unitário cadastrado da medida (null = sem estoque/custo). Fase 3.
-    measureCost(measure) {
-      const m = (measure || '').trim();
-      if (!m) return null;
-      const row = this.atacadoMeasures.find((x) => x.measure === m);
-      return row && row.unit_cost != null ? Number(row.unit_cost) : null;
-    },
-    // Lucro estimado de um item da venda = (preço − custo) × qtd. null se a medida não tem custo.
-    itemProfit(it) {
-      const cost = this.measureCost(it.measure);
-      if (cost == null) return null;
-      return (Number(it.unit_price || 0) - cost) * (Number(it.quantity) || 0);
-    },
-    // Autocomplete da medida: casa por TEXTO e por DÍGITOS (ignora / - e espaço — ex.:
-    // "90 90 18" acha "90/90-18"). Campo vazio na VENDA mostra o que TEM no galpão (atalho
-    // pra escolher clicando); no cadastro do galpão (key='estoque') não abre nada vazio.
-    measureFind(query, key) {
-      const raw = (query || '').trim().toLowerCase();
-      const digits = (s) => (s || '').replace(/\D/g, ''); // só números: casa qualquer separador
-      const qd = digits(raw);
-      let hits;
-      if (!raw) {
-        hits = key === 'estoque' ? [] : this.atacadoMeasures.filter((m) => Number(m.quantity_on_hand) > 0).slice(0, 12);
-      } else {
-        hits = this.atacadoMeasures.filter((m) => {
-          const mm = m.measure.toLowerCase();
-          return mm.includes(raw) || (qd !== '' && digits(mm).includes(qd));
-        }).slice(0, 12);
-      }
-      this.measureBox = { key, hits };
-    },
-    measurePick(value, obj) {
-      obj.measure = value;
-      const stock = this.atacadoStock.find((row) => row.measure === value);
-      if (Object.prototype.hasOwnProperty.call(obj, 'brand') && !obj.brand && stock?.brand) {
-        obj.brand = stock.brand;
-      }
-      this.measureBox = { key: null, hits: [] };
-    },
     measureBlur() {
       // delay pra o clique numa sugestão (mousedown) acontecer antes de fechar
       setTimeout(() => { this.measureBox = { key: null, hits: [] }; }, 150);
@@ -143,10 +97,11 @@ window.PAINEL_MODULES.galpao = function () {
     },
     async stockRemove(row) {
       const measure = row.measure;
-      if (!window.confirm(`Remover ${measure} do estoque do galpão?`)) return;
+      const brand = row.brand || 'Sem marca';
+      if (!window.confirm(`Remover ${measure} · ${brand} do estoque do galpão?`)) return;
       try {
         await this.apiPost('/admin/api/wholesale/stock/remove', {
-          measure, brand: row.brand,
+          measure, brand,
         });
         await this.loadAtacado();
         void this.loadStockReconciliation();
@@ -170,7 +125,7 @@ window.PAINEL_MODULES.galpao = function () {
       return [...rows].sort((a, b) => peso(a) - peso(b) || a.measure.localeCompare(b.measure));
     },
     // Resumo do topo: pneus no galpão, capital parado (Σ qty × custo médio — a MESMA conta
-    // do indicador da aba Financeiro), medidas zeradas e pra repor. Calculado da lista
+    // do indicador da aba Financeiro), variantes zeradas e pra repor. Calculado da lista
     // que JÁ veio (nunca diverge da tabela ao lado).
     stockResumo() {
       let pneus = 0, capital = 0, zeradas = 0, repor = 0;
@@ -232,12 +187,15 @@ window.PAINEL_MODULES.galpao = function () {
     // ── O FILME (0128): a movimentação do galpão — quem mexeu, quanto, quando ──
     async loadGalpaoFilme(measure, brand) {
       if (measure !== undefined) this.galpaoFilme.measure = measure;
+      if (measure === null && brand === undefined) this.galpaoFilme.brand = null;
       if (brand !== undefined) this.galpaoFilme.brand = brand;
       if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
         const selected = this.galpaoFilme.measure;
+        const selectedBrand = this.galpaoFilme.brand;
         this.galpaoFilme.loading = false;
         this.galpaoFilme.rows = window.PAINEL_STOCK_PREVIEW.movements
-          .filter((row) => !selected || row.measure === selected)
+          .filter((row) => (!selected || row.measure === selected)
+            && (!selectedBrand || row.brand === selectedBrand))
           .map((row) => ({ ...row }));
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
         return;

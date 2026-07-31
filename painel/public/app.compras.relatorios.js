@@ -103,8 +103,8 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
         this.comprasPriceRows = payload.rows || [];
         this.fornecedorBreakdown = this.comprasPriceRows;
         const groups = this.comprasPriceGroups();
-        if (!groups.some((group) => group.measure === this.comprasPriceSelectedMeasure)) {
-          this.comprasPriceSelectedMeasure = groups[0]?.measure || null;
+        if (!groups.some((group) => group.variant_key === this.comprasPriceSelectedMeasure)) {
+          this.comprasPriceSelectedMeasure = groups[0]?.variant_key || null;
         }
       } catch (err) {
         this.comprasErrors.prices = err.message;
@@ -213,22 +213,26 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
     comprasPriceGroups() {
       const groups = new Map();
       for (const row of this.comprasPriceRows) {
-        if (!groups.has(row.measure)) groups.set(row.measure, []);
-        groups.get(row.measure).push({ ...row });
+        const key = this.stockVariantKey(row);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ ...row });
       }
-      return [...groups.entries()].map(([measure, rows]) => {
+      return [...groups.entries()].map(([variantKey, rows]) => {
         rows.sort((a, b) => Number(a.avg_cost) - Number(b.avg_cost));
         const best = Number(rows[0]?.avg_cost || 0);
         rows.forEach((row, index) => {
           row.cheapest = index === 0;
           row.diff_pct = best > 0 ? ((Number(row.avg_cost) - best) / best) * 100 : 0;
         });
-        return { measure, suppliers: rows, qty: rows.reduce((sum, row) => sum + Number(row.qty_total || 0), 0) };
+        return {
+          variant_key: variantKey, measure: rows[0]?.measure, brand: rows[0]?.brand,
+          suppliers: rows, qty: rows.reduce((sum, row) => sum + Number(row.qty_total || 0), 0),
+        };
       }).sort((a, b) => b.qty - a.qty || a.measure.localeCompare(b.measure));
     },
     comprasPriceSelected() {
       return this.comprasPriceGroups().find((group) =>
-        group.measure === this.comprasPriceSelectedMeasure) || null;
+        group.variant_key === this.comprasPriceSelectedMeasure) || null;
     },
     comprasPriceCards() {
       const groups = this.comprasPriceGroups();
@@ -244,7 +248,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
       }
       const top = [...wins.entries()].sort((a, b) => b[1] - a[1])[0] || null;
       return {
-        measures: groups.length,
+        variants: groups.length,
         top: top ? { name: top[0], count: top[1] } : null,
         spread: spreads.length ? spreads.reduce((sum, value) => sum + value, 0) / spreads.length : 0,
       };
@@ -257,6 +261,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
         item = this.compraForm.items[this.compraForm.items.length - 1];
       }
       item.measure = row.measure;
+      item.brand = row.brand || '';
       this.compraMsg = {
         ok: true,
         text: row.supplier_archived

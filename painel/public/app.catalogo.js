@@ -17,7 +17,7 @@ window.PAINEL_MODULES.catalogo = function () {
           ...CATALOGO_KNOWN_BRANDS,
           ...actualBrands.filter((brand) => !CATALOGO_KNOWN_BRANDS.includes(brand)),
         ];
-        this.catalogoSummary = data.summary || { products: 0, brands: 0, without_price: 0, with_stock: 0 };
+        this.catalogoSummary = data.summary || { products: 0, stock_only: 0, brands: 0, without_price: 0, with_stock: 0 };
         this.catalogoPagina = Math.min(this.catalogoPagina, this.catalogoTotalPaginas());
       } catch (error) {
         this.catalogoError = error instanceof Error ? error.message : String(error);
@@ -86,6 +86,12 @@ window.PAINEL_MODULES.catalogo = function () {
     },
 
     async catalogoOpen(row) {
+      if (!row?.product_id || row.catalogued === false) {
+        this.stockBusca = row?.tire_size || '';
+        this.stockTab = 'visao';
+        this.currentPage = 'estoque';
+        return;
+      }
       this.catalogoSelecionado = row;
       this.catalogoPriceForm = {
         price: row.price_amount == null ? '' : Number(row.price_amount).toFixed(2),

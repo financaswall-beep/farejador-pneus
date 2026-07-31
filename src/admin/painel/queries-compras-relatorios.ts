@@ -184,11 +184,12 @@ export async function getWholesalePriceReport(
   const search = input.search?.trim().toLowerCase();
   if (search) {
     params.push(`%${search}%`);
-    where.push(`lower(i.measure) LIKE $${params.length}`);
+    where.push(`(lower(i.measure) LIKE $${params.length}
+      OR lower(i.brand) LIKE $${params.length})`);
   }
   const result = await dbPool.query(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,
-            s.deleted_at IS NOT NULL AS supplier_archived,i.measure,
+            s.deleted_at IS NOT NULL AS supplier_archived,i.measure,i.brand,
             sum(i.quantity)::int AS qty_total,
             round(sum(i.line_total)/NULLIF(sum(i.quantity),0),2) AS avg_cost,
             max(p.purchased_at) AS last_purchased_at,
@@ -199,8 +200,8 @@ export async function getWholesalePriceReport(
        JOIN commerce.wholesale_suppliers s
          ON s.id=p.supplier_id AND s.environment=p.environment
       WHERE ${where.join(' AND ')}
-      GROUP BY s.id,i.measure
-      ORDER BY i.measure,avg_cost,qty_total DESC
+      GROUP BY s.id,i.measure,i.brand
+      ORDER BY i.measure,i.brand,avg_cost,qty_total DESC
       LIMIT 1000`,
     params,
   );

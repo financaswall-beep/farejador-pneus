@@ -9,6 +9,9 @@ import {
   getWholesalePurchaseReport,
   getWholesaleSupplierInsights,
 } from '../../../src/admin/painel/queries-compras-relatorios.js';
+import {
+  getWholesaleSupplierMeasureBreakdown,
+} from '../../../src/admin/painel/queries-fornecedores.js';
 
 describe('relatórios conciliados de compras', () => {
   it('pagina o histórico e mantém recebimento separado do compromisso financeiro', async () => {
@@ -57,8 +60,19 @@ describe('relatórios conciliados de compras', () => {
 
     expect(query.mock.calls[0]![0]).toContain(`p.status='confirmed'`);
     expect(query.mock.calls[0]![0]).toContain(`interval '90 days'`);
+    expect(query.mock.calls[0]![0]).toContain(`i.measure,i.brand`);
+    expect(query.mock.calls[0]![0]).toContain(`GROUP BY s.id,i.measure,i.brand`);
+    expect(query.mock.calls[0]![0]).toContain(`lower(i.brand) LIKE`);
     expect(query.mock.calls[0]![1]).toEqual([
       'test', '11111111-1111-4111-8111-111111111111', '%100/80%',
     ]);
+  });
+
+  it('mantém marca na comparação resumida de fornecedores', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    await getWholesaleSupplierMeasureBreakdown('test', { query } as unknown as Pool);
+
+    expect(query.mock.calls[0]![0]).toContain(`pi.measure,pi.brand`);
+    expect(query.mock.calls[0]![0]).toContain(`GROUP BY s.id,s.name,pi.measure,pi.brand`);
   });
 });

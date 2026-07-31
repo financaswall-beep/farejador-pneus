@@ -14,6 +14,13 @@ interface MockPool {
   query: ReturnType<typeof vi.fn>;
 }
 
+function healthyPool(): MockPool {
+  return {
+    query: vi.fn(async (sql: string) =>
+      sql === 'SELECT 1' ? { rows: [{ '?column?': 1 }] } : { rows: [{ ready: true }] }),
+  };
+}
+
 async function loadHealthRoute(
   poolMock: MockPool,
   partnerPoolMock: MockPool = poolMock,
@@ -101,8 +108,8 @@ describe('registerHealthRoute', () => {
   });
 
   it('readyz retorna 200 somente quando os dois bancos respondem', async () => {
-    const poolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
-    const partnerPoolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }) };
+    const poolMock = healthyPool();
+    const partnerPoolMock = healthyPool();
     const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
     const fastify = createFastify();
     await registerHealthRoute(fastify);
@@ -113,7 +120,7 @@ describe('registerHealthRoute', () => {
     expect(reply.statusCode).toBe(200);
     expect(reply.payload).toEqual({
       status: 'ok',
-      checks: { database: 'ok', partner_database: 'ok' },
+      checks: { database: 'ok', database_schema: 'ok', partner_database: 'ok' },
       commit: 'a'.repeat(40),
     });
     expect(poolMock.query).toHaveBeenCalledWith('SELECT 1');
@@ -134,13 +141,13 @@ describe('registerHealthRoute', () => {
     expect(reply.payload).toEqual({
       status: 'error',
       reason: 'dependency_unavailable',
-      checks: { database: 'error', partner_database: 'ok' },
+      checks: { database: 'error', database_schema: 'error', partner_database: 'ok' },
       commit: 'a'.repeat(40),
     });
   });
 
   it('healthz preserva compatibilidade como alias da prontidao', async () => {
-    const poolMock: MockPool = { query: vi.fn().mockResolvedValue({ rows: [] }) };
+    const poolMock = healthyPool();
     const registerHealthRoute = await loadHealthRoute(poolMock);
     const fastify = createFastify();
     await registerHealthRoute(fastify);
@@ -151,7 +158,7 @@ describe('registerHealthRoute', () => {
     expect(reply.statusCode).toBe(200);
     expect(reply.payload).toMatchObject({
       status: 'ok',
-      checks: { database: 'ok', partner_database: 'ok' },
+      checks: { database: 'ok', database_schema: 'ok', partner_database: 'ok' },
     });
   });
 
@@ -175,8 +182,28 @@ describe('registerHealthRoute', () => {
     expect(reply.payload).toEqual({
       status: 'error',
       reason: 'dependency_unavailable',
-      checks: { database: 'error', partner_database: 'ok' },
+      checks: { database: 'error', database_schema: 'error', partner_database: 'ok' },
       commit: 'a'.repeat(40),
+    });
+  });
+
+  it('readyz bloqueia banco conectado sem a migration obrigatória', async () => {
+    const poolMock: MockPool = {
+      query: vi.fn(async (sql: string) =>
+        sql === 'SELECT 1' ? { rows: [{ '?column?': 1 }] } : { rows: [{ ready: false }] }),
+    };
+    const partnerPoolMock = healthyPool();
+    const registerHealthRoute = await loadHealthRoute(poolMock, partnerPoolMock);
+    const fastify = createFastify();
+    await registerHealthRoute(fastify);
+
+    const reply = createReply();
+    await fastify._routes['/readyz'].handler({ id: 'schema-missing' }, reply);
+
+    expect(reply.statusCode).toBe(503);
+    expect(reply.payload).toMatchObject({
+      status: 'error',
+      checks: { database: 'ok', database_schema: 'error', partner_database: 'ok' },
     });
   });
 });

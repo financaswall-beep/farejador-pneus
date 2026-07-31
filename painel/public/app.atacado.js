@@ -7,36 +7,39 @@ window.PAINEL_STOCK_PREVIEW = {
     return /(?:^|[?&])mock=1(?:&|$)/.test(window.location?.search || '');
   },
   rows: [
-    { measure: '215/75 R17.5', quantity_on_hand: 42, min_quantity: 18, unit_cost: 748.90, notes: 'Linha pesada · giro alto' },
-    { measure: '90/90-18', quantity_on_hand: 27, min_quantity: 10, unit_cost: 184.60, notes: 'Linha 2W · reposição semanal' },
-    { measure: '175/70 R14', quantity_on_hand: 18, min_quantity: 15, unit_cost: 312.40, notes: 'Giro estável no balcão' },
-    { measure: '185/65 R15', quantity_on_hand: 8, min_quantity: 12, unit_cost: 346.80, notes: 'Repor no próximo pedido' },
-    { measure: '205/55 R16', quantity_on_hand: 4, min_quantity: 8, unit_cost: 438.50, notes: 'Saldo abaixo do mínimo' },
-    { measure: '195/60 R15', quantity_on_hand: 0, min_quantity: 6, unit_cost: 368.90, notes: 'Sem saldo · prioridade de compra' },
+    { measure: '215/75 R17.5', brand: 'Roadmax', quantity_on_hand: 42, min_quantity: 18, unit_cost: 748.90, notes: 'Linha pesada · giro alto' },
+    { measure: '90/90-18', brand: 'Pirelli', quantity_on_hand: 15, min_quantity: 10, unit_cost: 184.60, notes: 'Linha 2W · reposição semanal' },
+    { measure: '90/90-18', brand: 'Metzeler', quantity_on_hand: 12, min_quantity: 10, unit_cost: 169.90, notes: 'Mesma medida · marca independente' },
+    { measure: '175/70 R14', brand: 'Pirelli', quantity_on_hand: 18, min_quantity: 15, unit_cost: 312.40, notes: 'Giro estável no balcão' },
+    { measure: '185/65 R15', brand: 'Michelin', quantity_on_hand: 8, min_quantity: 12, unit_cost: 346.80, notes: 'Repor no próximo pedido' },
+    { measure: '205/55 R16', brand: 'Dunlop', quantity_on_hand: 4, min_quantity: 8, unit_cost: 438.50, notes: 'Saldo abaixo do mínimo' },
+    { measure: '195/60 R15', brand: 'Rinaldi', quantity_on_hand: 0, min_quantity: 6, unit_cost: 368.90, notes: 'Sem saldo · prioridade de compra' },
   ],
   movements: [
-    { created_at: '2026-07-24T12:42:00-03:00', source: 'venda_atacado', measure: '195/60 R15', qty_delta: -3, qty_before: 3, qty_after: 0, cost_before: 368.90, cost_after: 368.90, reason: 'Borracharia Central', ref: 'ATC-2842' },
-    { created_at: '2026-07-24T11:18:00-03:00', source: 'compra', measure: '215/75 R17.5', qty_delta: 18, qty_before: 24, qty_after: 42, cost_before: 732.40, cost_after: 748.90, reason: 'Fornecedor Estrada', ref: 'CMP-731' },
-    { created_at: '2026-07-24T10:05:00-03:00', source: 'varejo', measure: '185/65 R15', qty_delta: -4, qty_before: 12, qty_after: 8, cost_before: 346.80, cost_after: 346.80, reason: 'Pedido #2841', ref: '2841' },
-    { created_at: '2026-07-24T09:14:00-03:00', source: 'baixa_manual', measure: '205/55 R16', qty_delta: -1, qty_before: 5, qty_after: 4, cost_before: 438.50, cost_after: 438.50, reason: 'quebra: lateral danificada', ref: 'BXM-81' },
-    { created_at: '2026-07-23T17:36:00-03:00', source: 'venda_atacado', measure: '205/55 R16', qty_delta: -5, qty_before: 10, qty_after: 5, cost_before: 438.50, cost_after: 438.50, reason: 'Pneus Sul', ref: 'ATC-2839' },
-    { created_at: '2026-07-23T15:20:00-03:00', source: 'entrada', measure: '90/90-18', qty_delta: 12, qty_before: 15, qty_after: 27, cost_before: 181.20, cost_after: 184.60, reason: 'Wallace', ref: 'ENT-184' },
-    { created_at: '2026-07-23T09:14:00-03:00', source: 'varejo', measure: '175/70 R14', qty_delta: -2, qty_before: 20, qty_after: 18, cost_before: 312.40, cost_after: 312.40, reason: 'Pedido #2830', ref: '2830' },
+    { created_at: '2026-07-24T12:42:00-03:00', source: 'venda_atacado', measure: '195/60 R15', brand: 'Rinaldi', qty_delta: -3, qty_before: 3, qty_after: 0, cost_before: 368.90, cost_after: 368.90, reason: 'Borracharia Central', ref: 'ATC-2842' },
+    { created_at: '2026-07-24T11:18:00-03:00', source: 'compra', measure: '215/75 R17.5', brand: 'Roadmax', qty_delta: 18, qty_before: 24, qty_after: 42, cost_before: 732.40, cost_after: 748.90, reason: 'Fornecedor Estrada', ref: 'CMP-731' },
+    { created_at: '2026-07-24T10:05:00-03:00', source: 'varejo', measure: '185/65 R15', brand: 'Michelin', qty_delta: -4, qty_before: 12, qty_after: 8, cost_before: 346.80, cost_after: 346.80, reason: 'Pedido #2841', ref: '2841' },
+    { created_at: '2026-07-24T09:14:00-03:00', source: 'baixa_manual', measure: '205/55 R16', brand: 'Dunlop', qty_delta: -1, qty_before: 5, qty_after: 4, cost_before: 438.50, cost_after: 438.50, reason: 'quebra: lateral danificada', ref: 'BXM-81' },
+    { created_at: '2026-07-23T17:36:00-03:00', source: 'venda_atacado', measure: '205/55 R16', brand: 'Dunlop', qty_delta: -5, qty_before: 10, qty_after: 5, cost_before: 438.50, cost_after: 438.50, reason: 'Pneus Sul', ref: 'ATC-2839' },
+    { created_at: '2026-07-23T15:20:00-03:00', source: 'entrada', measure: '90/90-18', brand: 'Metzeler', qty_delta: 12, qty_before: 0, qty_after: 12, cost_before: null, cost_after: 169.90, reason: 'Wallace', ref: 'ENT-184' },
+    { created_at: '2026-07-23T09:14:00-03:00', source: 'varejo', measure: '175/70 R14', brand: 'Pirelli', qty_delta: -2, qty_before: 20, qty_after: 18, cost_before: 312.40, cost_after: 312.40, reason: 'Pedido #2830', ref: '2830' },
   ].concat(Array.from({ length: 22 }, (_, index) => ({
     created_at: `2026-07-22T${String(21 - index).padStart(2, '0')}:10:00-03:00`, source: index % 3 === 0 ? 'entrada' : 'varejo',
-    measure: ['215/75 R17.5', '90/90-18', '175/70 R14', '185/65 R15'][index % 4], qty_delta: index % 3 === 0 ? 2 : -1,
+    measure: ['215/75 R17.5', '90/90-18', '175/70 R14', '185/65 R15'][index % 4],
+    brand: ['Roadmax', 'Pirelli', 'Pirelli', 'Michelin'][index % 4], qty_delta: index % 3 === 0 ? 2 : -1,
     qty_before: 20 + index, qty_after: 20 + index + (index % 3 === 0 ? 2 : -1), cost_before: 320, cost_after: 320,
     reason: 'Histórico demonstrativo', ref: `MOV-${String(index + 1).padStart(3, '0')}`,
   }))),
   reconciliation: {
-    summary: { total: 6, aligned: 5, divergent: 1, catalog_only: 0 },
+    summary: { total: 7, aligned: 6, divergent: 1, catalog_only: 0 },
     rows: [
-      { key: '21575175', official_measures: ['215/75 R17.5'], catalog_measures: ['215/75 R17.5'], catalog_brands: ['2W Cargo', 'Roadmax'], official_quantity: 42, legacy_quantity: 42, official_unit_cost: 748.90, status: 'aligned' },
-      { key: '909018', official_measures: ['90/90-18'], catalog_measures: ['90/90-18'], catalog_brands: ['2W Moto'], official_quantity: 27, legacy_quantity: 27, official_unit_cost: 184.60, status: 'aligned' },
-      { key: '1757014', official_measures: ['175/70 R14'], catalog_measures: ['175/70 R14'], catalog_brands: ['2W Touring'], official_quantity: 18, legacy_quantity: 18, official_unit_cost: 312.40, status: 'aligned' },
-      { key: '1856515', official_measures: ['185/65 R15'], catalog_measures: ['185/65 R15'], catalog_brands: ['2W Touring'], official_quantity: 8, legacy_quantity: 8, official_unit_cost: 346.80, status: 'aligned' },
-      { key: '2055516', official_measures: ['205/55 R16'], catalog_measures: ['205/55 R16'], catalog_brands: ['2W Sport'], official_quantity: 4, legacy_quantity: 5, official_unit_cost: 438.50, status: 'quantity_divergent' },
-      { key: '1956015', official_measures: ['195/60 R15'], catalog_measures: ['195/60 R15'], catalog_brands: ['2W Touring'], official_quantity: 0, legacy_quantity: 0, official_unit_cost: 368.90, status: 'aligned' },
+      { key: '21575175:roadmax', official_measures: ['215/75 R17.5'], official_brand: 'Roadmax', catalog_measures: ['215/75 R17.5'], catalog_brands: ['Roadmax'], official_quantity: 42, legacy_quantity: 42, official_unit_cost: 748.90, status: 'aligned' },
+      { key: '909018:pirelli', official_measures: ['90/90-18'], official_brand: 'Pirelli', catalog_measures: ['90/90-18'], catalog_brands: ['Pirelli'], official_quantity: 15, legacy_quantity: 15, official_unit_cost: 184.60, status: 'aligned' },
+      { key: '909018:metzeler', official_measures: ['90/90-18'], official_brand: 'Metzeler', catalog_measures: ['90/90-18'], catalog_brands: ['Metzeler'], official_quantity: 12, legacy_quantity: 12, official_unit_cost: 169.90, status: 'aligned' },
+      { key: '1757014:pirelli', official_measures: ['175/70 R14'], official_brand: 'Pirelli', catalog_measures: ['175/70 R14'], catalog_brands: ['Pirelli'], official_quantity: 18, legacy_quantity: 18, official_unit_cost: 312.40, status: 'aligned' },
+      { key: '1856515:michelin', official_measures: ['185/65 R15'], official_brand: 'Michelin', catalog_measures: ['185/65 R15'], catalog_brands: ['Michelin'], official_quantity: 8, legacy_quantity: 8, official_unit_cost: 346.80, status: 'aligned' },
+      { key: '2055516:dunlop', official_measures: ['205/55 R16'], official_brand: 'Dunlop', catalog_measures: ['205/55 R16'], catalog_brands: ['Dunlop'], official_quantity: 4, legacy_quantity: 5, official_unit_cost: 438.50, status: 'quantity_divergent' },
+      { key: '1956015:rinaldi', official_measures: ['195/60 R15'], official_brand: 'Rinaldi', catalog_measures: ['195/60 R15'], catalog_brands: ['Rinaldi'], official_quantity: 0, legacy_quantity: 0, official_unit_cost: 368.90, status: 'aligned' },
     ],
   },
 };
@@ -45,8 +48,7 @@ window.PAINEL_MODULES.atacado = function () {
     atacadoBuyerKey(b) {
       return b.customer_id ? `c:${b.customer_id}` : `p:${b.partner_id}`;
     },
-    // Carregador enxuto da tela Vendas. Compras e fornecedores ficam fora para uma
-    // falha neles não derrubar o caixa do atacado nem atrasar a visão comercial.
+    // Compras e fornecedores ficam fora: uma falha neles não derruba o caixa do atacado.
     async loadAtacadoVendas() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
@@ -195,9 +197,7 @@ window.PAINEL_MODULES.atacado = function () {
         return { label: `sumiu (${b.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600', dot: 'bg-rose-400' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
     },
-    // RECIBO no WhatsApp (2026-07-06): "manda o papel" do borracheiro sem custo —
-    // deep-link wa.me com o texto pronto (padrão da casa, fora da API Meta).
-    // Sem telefone no cadastro → null e o botão some (a UI esconde).
+    // Recibo via wa.me; sem telefone retorna null e a UI esconde o botão.
     reciboWhatsLink(v) {
       if (!v) return null;
       const digits = String(v.buyer_phone || '').replace(/\D/g, '');
