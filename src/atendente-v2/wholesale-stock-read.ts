@@ -1,6 +1,9 @@
 import type { PoolClient } from 'pg';
 import { tireSizeKey } from '../shared/tire-size.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../shared/matriz-stock-source.js';
+import {
+  loadMatrizOfficialStock, loadMatrizProductStockSpecs, stockBrandKey,
+} from './matriz-stock-variants.js';
 export { tireSizeKey } from '../shared/tire-size.js';
 
 /**
@@ -30,18 +33,12 @@ export async function getMatrizWholesaleStockQty(
   environment: 'prod' | 'test',
   productId: string,
 ): Promise<number> {
-  const spec = await client.query<{ tire_size: string | null }>(
-    `SELECT tire_size FROM commerce.tire_specs WHERE product_id = $1 AND environment = $2 LIMIT 1`,
-    [productId, environment],
-  );
-  const key = tireSizeKey(spec.rows[0]?.tire_size);
+  const spec = (await loadMatrizProductStockSpecs(client, environment, [productId]))[0];
+  const key = tireSizeKey(spec?.tire_size);
   if (!key) return 0; // produto sem medida casável → não inventa estoque (nem consulta o galpão)
 
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
-    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
-    [environment],
-  );
-  const state = matrizStockForMeasure(buildMatrizStockIndex(stock.rows), key);
+  const stock = await loadMatrizOfficialStock(client, environment);
+  const state = matrizStockForMeasure(buildMatrizStockIndex(stock), key, spec?.brand);
   return state.sellable ? state.quantity_on_hand : 0;
 }
 
@@ -59,23 +56,17 @@ export async function getMatrizWholesaleStockMap(
   const out = new Map<string, number>();
   if (productIds.length === 0) return out;
 
-  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
-    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
-    [environment, productIds],
-  );
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
-    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
-    [environment],
-  );
-  const stockIndex = buildMatrizStockIndex(stock.rows);
-  for (const s of specs.rows) {
-    const state = matrizStockForMeasure(stockIndex, s.tire_size);
+  const specs = await loadMatrizProductStockSpecs(client, environment, productIds);
+  const stockIndex = buildMatrizStockIndex(await loadMatrizOfficialStock(client, environment));
+  for (const s of specs) {
+    const state = matrizStockForMeasure(stockIndex, s.tire_size, s.brand);
     out.set(s.product_id, state.sellable ? state.quantity_on_hand : 0);
   }
   return out;
 }
 
 export interface GalpaoShortfall {
+  brand: string | null;
   measure: string; // rótulo da medida pedida (o que o cliente quer), pra mensagem ao cliente
   available: number; // soma disponível no galpão pra aquela medida (por chave canônica)
   requested: number; // quanto o pedido pediu pra aquela medida
@@ -107,43 +98,52 @@ export async function checkMatrizGalpaoShortfall(
 
   // 2. produto → medida (tire_size); agrega a quantidade pedida por CHAVE canônica e guarda
   //    um rótulo (a medida crua do produto) pra a mensagem ao cliente.
-  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
-    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
-    [environment, [...qtyByProduct.keys()]],
-  );
+  const specs = await loadMatrizProductStockSpecs(client, environment, [...qtyByProduct.keys()]);
   const tireSizeByProduct = new Map<string, string | null>();
-  for (const s of specs.rows) tireSizeByProduct.set(s.product_id, s.tire_size);
+  const brandByProduct = new Map<string, string | null>();
+  for (const s of specs) {
+    tireSizeByProduct.set(s.product_id, s.tire_size);
+    brandByProduct.set(s.product_id, s.brand);
+  }
 
   const requestedByKey = new Map<string, number>();
   const labelByKey = new Map<string, string>();
+  const brandByKey = new Map<string, string | null>();
   const shortfalls: GalpaoShortfall[] = [];
   for (const [productId, qty] of qtyByProduct) {
     const tireSize = tireSizeByProduct.get(productId) ?? null;
+    const brand = brandByProduct.get(productId) ?? null;
     const key = tireSizeKey(tireSize);
     if (!key) {
       // produto sem medida casável (ou sem spec) → não casa NADA no galpão → falta tudo
-      shortfalls.push({ measure: tireSize ?? 'medida não identificada', available: 0, requested: qty });
+      shortfalls.push({
+        measure: tireSize ?? 'medida não identificada', brand, available: 0, requested: qty,
+      });
       continue;
     }
-    requestedByKey.set(key, (requestedByKey.get(key) ?? 0) + qty);
-    if (!labelByKey.has(key)) labelByKey.set(key, tireSize ?? key);
+    const variantKey = `${key}\u0000${stockBrandKey(brand)}`;
+    requestedByKey.set(variantKey, (requestedByKey.get(variantKey) ?? 0) + qty);
+    if (!labelByKey.has(variantKey)) labelByKey.set(variantKey, tireSize ?? key);
+    brandByKey.set(variantKey, brand);
   }
 
   if (requestedByKey.size === 0) return shortfalls;
 
   // 3. soma o disponível no galpão por chave — COM FOR UPDATE (trava a corrida até o commit)
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: number | string | null }>(
-    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1 FOR UPDATE`,
-    [environment],
+  const stockIndex = buildMatrizStockIndex(
+    await loadMatrizOfficialStock(client, environment, true),
   );
-  const stockIndex = buildMatrizStockIndex(stock.rows);
 
   // 4. compara pedido × disponível por chave → falta quando disponível < pedido
-  for (const [key, requested] of requestedByKey) {
-    const state = matrizStockForMeasure(stockIndex, key);
+  for (const [variantKey, requested] of requestedByKey) {
+    const key = variantKey.split('\u0000')[0]!;
+    const brand = brandByKey.get(variantKey) ?? null;
+    const state = matrizStockForMeasure(stockIndex, key, brand);
     const available = state.sellable ? state.quantity_on_hand : 0;
     if (available < requested) {
-      shortfalls.push({ measure: labelByKey.get(key) ?? key, available, requested });
+      shortfalls.push({
+        measure: labelByKey.get(variantKey) ?? key, brand, available, requested,
+      });
     }
   }
   return shortfalls;
@@ -177,36 +177,30 @@ export async function applyMatrizGalpaoDecrement(
   if (qtyByProduct.size === 0) return;
 
   // 2. produto → medida (tire_size) → chave canônica; soma a quantidade por chave
-  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
-    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
-    [environment, [...qtyByProduct.keys()]],
-  );
-  const sizeByProduct = new Map(specs.rows.map((row) => [row.product_id, row.tire_size]));
-  const qtyByKey = new Map<string, number>();
+  const specs = await loadMatrizProductStockSpecs(client, environment, [...qtyByProduct.keys()]);
+  const sizeByProduct = new Map(specs.map((row) => [row.product_id, row.tire_size]));
+  const brandByProduct = new Map(specs.map((row) => [row.product_id, row.brand]));
+  const qtyByKey = new Map<string, { key: string; brand: string | null; quantity: number }>();
   for (const [productId, quantity] of qtyByProduct) {
     const key = tireSizeKey(sizeByProduct.get(productId));
     if (!key) throw new Error('walkin_measure_not_found');
-    qtyByKey.set(key, (qtyByKey.get(key) ?? 0) + quantity);
+    const brand = brandByProduct.get(productId) ?? null;
+    const variantKey = `${key}\u0000${stockBrandKey(brand)}`;
+    const current = qtyByKey.get(variantKey) ?? { key, brand, quantity: 0 };
+    current.quantity += quantity;
+    qtyByKey.set(variantKey, current);
   }
 
   // 3. trava e valida a mesma linha oficial usada pelas demais leituras.
-  const stock = await client.query<{
-    measure: string; quantity_on_hand: number | string; unit_cost: number | string | null;
-  }>(
-    `SELECT measure, quantity_on_hand, unit_cost
-       FROM commerce.wholesale_stock
-      WHERE environment = $1
-      ORDER BY measure
-      FOR UPDATE`,
-    [environment],
+  const stockIndex = buildMatrizStockIndex(
+    await loadMatrizOfficialStock(client, environment, true),
   );
-  const stockIndex = buildMatrizStockIndex(stock.rows);
-  const plan: Array<{ measure: string; qty: number }> = [];
-  for (const [key, qty] of qtyByKey) {
-    const state = matrizStockForMeasure(stockIndex, key);
+  const plan: Array<{ measure: string; brand: string; qty: number }> = [];
+  for (const { key, brand, quantity: qty } of qtyByKey.values()) {
+    const state = matrizStockForMeasure(stockIndex, key, brand);
     if (state.block_reason) throw new Error(state.block_reason);
     if (state.quantity_on_hand < qty) throw new Error('walkin_stock_insufficient');
-    plan.push({ measure: state.measure!, qty });
+    plan.push({ measure: state.measure!, brand: state.brand!, qty });
   }
 
   // rótulo pro filme do galpão (0128): o trigger grava a baixa com origem 'varejo'
@@ -219,10 +213,11 @@ export async function applyMatrizGalpaoDecrement(
   for (const line of plan) {
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
-          SET quantity_on_hand = quantity_on_hand - $3
-        WHERE environment = $1 AND measure = $2 AND quantity_on_hand >= $3
+          SET quantity_on_hand = quantity_on_hand - $4
+        WHERE environment = $1 AND measure = $2 AND brand = $3
+          AND quantity_on_hand >= $4
         RETURNING quantity_on_hand`,
-      [environment, line.measure, line.qty],
+      [environment, line.measure, line.brand, line.qty],
     );
     if (updated.rowCount !== 1) throw new Error('walkin_stock_insufficient');
     movements.push(line);
@@ -264,7 +259,9 @@ export async function applyMatrizGalpaoReturn(
   if (already.rows.length > 0) return;
 
   // o que a venda REALMENTE tirou (última baixa registrada deste pedido).
-  const dec = await client.query<{ payload_after: { movements?: Array<{ measure: string; qty: number }> } }>(
+  const dec = await client.query<{
+    payload_after: { movements?: Array<{ measure: string; brand?: string; qty: number }> };
+  }>(
     `SELECT payload_after FROM audit.events
       WHERE environment = $1 AND entity_id = $2 AND event_type = 'matriz_galpao_decrement'
       ORDER BY created_at DESC LIMIT 1`,
@@ -281,12 +278,29 @@ export async function applyMatrizGalpaoReturn(
 
   for (const mv of movements) {
     if (!mv.measure || !(mv.qty > 0)) continue;
+    let brand = mv.brand ?? null;
+    if (!brand) {
+      const filmed = await client.query<{ brand: string }>(
+        `SELECT brand
+           FROM commerce.wholesale_stock_movements
+          WHERE environment=$1 AND measure=$2 AND source='varejo'
+            AND ref=$3 AND qty_delta<0
+          GROUP BY brand
+          HAVING count(*) > 0
+          LIMIT 2`,
+        [environment, mv.measure, orderId],
+      );
+      if (filmed.rows.length !== 1) {
+        throw new Error(`stock_variant_history_missing:${mv.measure}`);
+      }
+      brand = filmed.rows[0]!.brand;
+    }
     const updated = await client.query(
       `UPDATE commerce.wholesale_stock
-          SET quantity_on_hand = quantity_on_hand + $3
-        WHERE environment = $1 AND measure = $2
+          SET quantity_on_hand = quantity_on_hand + $4
+        WHERE environment = $1 AND measure = $2 AND brand = $3
         RETURNING quantity_on_hand`,
-      [environment, mv.measure, mv.qty],
+      [environment, mv.measure, brand, mv.qty],
     );
     if (updated.rowCount !== 1) throw new Error(`stock_measure_missing:${mv.measure}`);
   }
@@ -314,20 +328,11 @@ export async function getMatrizGalpaoCostByProduct(
   const out = new Map<string, number>();
   if (productIds.length === 0) return out;
 
-  const specs = await client.query<{ product_id: string; tire_size: string | null }>(
-    `SELECT product_id, tire_size FROM commerce.tire_specs WHERE environment = $1 AND product_id = ANY($2)`,
-    [environment, productIds],
-  );
-  const stock = await client.query<{ measure: string; quantity_on_hand: number | string; unit_cost: string | null }>(
-    `SELECT measure, quantity_on_hand, unit_cost FROM commerce.wholesale_stock WHERE environment = $1`,
-    [environment],
-  );
-
-  const stockIndex = buildMatrizStockIndex(stock.rows);
-  for (const s of specs.rows) {
-    const key = tireSizeKey(s.tire_size);
-    const matches = key ? stockIndex.get(key) ?? [] : [];
-    const cost = matches.length === 1 ? Number(matches[0]?.unit_cost) : Number.NaN;
+  const specs = await loadMatrizProductStockSpecs(client, environment, productIds);
+  const stockIndex = buildMatrizStockIndex(await loadMatrizOfficialStock(client, environment));
+  for (const s of specs) {
+    const state = matrizStockForMeasure(stockIndex, s.tire_size, s.brand);
+    const cost = state.sellable ? Number(state.unit_cost) : Number.NaN;
     if (Number.isFinite(cost) && cost > 0) out.set(s.product_id, cost);
   }
   return out;

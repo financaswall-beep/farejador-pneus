@@ -21,6 +21,7 @@ interface LegacyRow {
 
 interface OfficialRow {
   measure: string;
+  brand: string;
   quantity_on_hand: number | string;
   unit_cost: number | string | null;
 }
@@ -32,6 +33,7 @@ export interface MatrizStockReconciliationRow {
   catalog_product_count: number;
   legacy_quantity: number | null;
   official_measures: string[];
+  official_brand: string | null;
   official_quantity: number | null;
   official_unit_cost: number | null;
   official_rows_count: number;
@@ -67,17 +69,20 @@ export async function getMatrizStockReconciliation(
     [environment],
   );
   const official = await dbPool.query<OfficialRow>(
-    `SELECT measure, quantity_on_hand, unit_cost
+    `SELECT measure, brand, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1
-      ORDER BY measure`,
+      ORDER BY measure, brand`,
     [environment],
   );
 
   const catalogByKey = groupCatalog(legacy.rows);
+  const officialByKey = groupOfficial(official.rows);
   const officialIndex = buildMatrizStockIndex(official.rows);
-  const keys = [...new Set([...catalogByKey.keys(), ...officialIndex.keys()])].sort();
-  const rows = keys.map((key) => reconcileKey(key, catalogByKey.get(key), officialIndex));
+  const keys = [...new Set([...catalogByKey.keys(), ...officialByKey.keys()])].sort();
+  const rows = keys.map((variantKey) => reconcileKey(
+    variantKey, catalogByKey.get(variantKey), officialByKey.get(variantKey), officialIndex,
+  ));
   const aligned = rows.filter((row) => row.status === 'aligned').length;
   return {
     environment,
@@ -102,11 +107,18 @@ interface CatalogGroup {
   quantity: number;
 }
 
+interface OfficialGroup {
+  measureKey: string;
+  brand: string;
+  rows: OfficialRow[];
+}
+
 function groupCatalog(rows: LegacyRow[]): Map<string, CatalogGroup> {
   const out = new Map<string, CatalogGroup>();
   for (const row of rows) {
-    const key = tireSizeKey(row.tire_size);
-    if (!key) continue;
+    const measureKey = tireSizeKey(row.tire_size);
+    if (!measureKey) continue;
+    const key = variantKey(measureKey, row.brand);
     const group = out.get(key) ?? {
       measures: new Set<string>(), brands: new Set<string>(), products: new Set<string>(), quantity: 0,
     };
@@ -119,13 +131,31 @@ function groupCatalog(rows: LegacyRow[]): Map<string, CatalogGroup> {
   return out;
 }
 
+function groupOfficial(rows: OfficialRow[]): Map<string, OfficialGroup> {
+  const out = new Map<string, OfficialGroup>();
+  for (const row of rows) {
+    const measureKey = tireSizeKey(row.measure);
+    if (!measureKey) continue;
+    const key = variantKey(measureKey, row.brand);
+    const group = out.get(key) ?? { measureKey, brand: row.brand, rows: [] };
+    group.rows.push(row);
+    out.set(key, group);
+  }
+  return out;
+}
+
 function reconcileKey(
   key: string,
   catalog: CatalogGroup | undefined,
+  official: OfficialGroup | undefined,
   officialIndex: ReturnType<typeof buildMatrizStockIndex>,
 ): MatrizStockReconciliationRow {
-  const officialRows = officialIndex.get(key) ?? [];
-  const state = matrizStockForMeasure(officialIndex, key);
+  const officialRows = official?.rows ?? [];
+  const measureKey = official?.measureKey ?? key.split('\u0000')[0]!;
+  const brand = official?.brand ?? first(catalog?.brands) ?? null;
+  const state = officialRows.length
+    ? matrizStockForMeasure(officialIndex, measureKey, brand)
+    : matrizStockForMeasure(new Map(), measureKey, brand);
   const officialQuantity = officialRows.length === 0
     ? null
     : officialRows.reduce((sum, row) => sum + (Number(row.quantity_on_hand) || 0), 0);
@@ -139,12 +169,14 @@ function reconcileKey(
   else status = 'quantity_divergent';
 
   return {
-    key,
+    key: officialRows.length === 1 && (officialIndex.get(measureKey)?.length ?? 0) === 1
+      ? measureKey : key.replace('\u0000', ':'),
     catalog_measures: [...(catalog?.measures ?? [])].sort(),
     catalog_brands: [...(catalog?.brands ?? [])].sort(),
     catalog_product_count: catalog?.products.size ?? 0,
     legacy_quantity: legacyQuantity,
     official_measures: officialRows.map((row) => row.measure).sort(),
+    official_brand: official?.brand ?? null,
     official_quantity: officialQuantity,
     official_unit_cost: state.unit_cost,
     official_rows_count: officialRows.length,
@@ -152,4 +184,18 @@ function reconcileKey(
     official_block_reason: state.block_reason,
     status,
   };
+}
+
+function variantKey(measureKey: string, brand: string | null | undefined): string {
+  return `${measureKey}\u0000${brandKey(brand)}`;
+}
+
+function brandKey(value: string | null | undefined): string {
+  const key = (value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return key === 'semmarca' ? '' : key;
+}
+
+function first(values: Set<string> | undefined): string | null {
+  return values ? [...values][0] ?? null : null;
 }

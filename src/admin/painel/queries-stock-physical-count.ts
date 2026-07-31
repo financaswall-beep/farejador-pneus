@@ -11,6 +11,7 @@ import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inv
 interface StockCountRow {
   id: string;
   measure: string;
+  brand: string;
   quantity_on_hand: number;
   unit_cost: string | null;
 }
@@ -22,6 +23,7 @@ export interface MatrizPhysicalStockCountResult {
   losses: number;
   differences: Array<{
     measure: string;
+    brand: string;
     previous_quantity: number;
     counted_quantity: number;
     difference: number;
@@ -30,7 +32,7 @@ export interface MatrizPhysicalStockCountResult {
 
 export async function applyMatrizPhysicalStockCount(
   input: {
-    rows: Array<{ measure: string; counted_quantity: number }>;
+    rows: Array<{ measure: string; brand: string; counted_quantity: number }>;
     reason: string;
     idempotency_key: string;
     actor_label?: string | null;
@@ -44,13 +46,15 @@ export async function applyMatrizPhysicalStockCount(
   if (!input.rows.length) throw new Error('physical_count_rows_required');
   const normalized = input.rows.map((row) => ({
     measure: row.measure.trim(),
+    brand: row.brand?.trim() || 'Sem marca',
     counted_quantity: row.counted_quantity,
-  })).sort((a, b) => a.measure.localeCompare(b.measure));
-  if (normalized.some((row) => !row.measure
+  })).sort((a, b) => `${a.measure}\u0000${a.brand}`.localeCompare(`${b.measure}\u0000${b.brand}`));
+  if (normalized.some((row) => !row.measure || !row.brand
     || !Number.isInteger(row.counted_quantity) || row.counted_quantity < 0)) {
     throw new Error('physical_count_invalid');
   }
-  if (new Set(normalized.map((row) => row.measure)).size !== normalized.length) {
+  if (new Set(normalized.map((row) => `${row.measure}\u0000${row.brand}`)).size
+    !== normalized.length) {
     throw new Error('physical_count_duplicate_measure');
   }
   const operation = {
@@ -69,16 +73,22 @@ export async function applyMatrizPhysicalStockCount(
       return started.result;
     }
     const current = await client.query<StockCountRow>(
-      `SELECT id,measure,quantity_on_hand,unit_cost::text
+      `SELECT id,measure,brand,quantity_on_hand,unit_cost::text
          FROM commerce.wholesale_stock
-        WHERE environment=$1 AND measure=ANY($2::text[])
-        ORDER BY measure FOR UPDATE`,
-      [environment, normalized.map((row) => row.measure)],
+        WHERE environment=$1
+          AND (measure,brand) IN (
+            SELECT x.measure,x.brand
+              FROM jsonb_to_recordset($2::jsonb) AS x(measure text,brand text)
+          )
+        ORDER BY measure,brand FOR UPDATE`,
+      [environment, JSON.stringify(normalized.map(({ measure, brand }) => ({ measure, brand })))],
     );
     if (current.rows.length !== normalized.length) {
       throw new Error('physical_count_measure_not_found');
     }
-    const byMeasure = new Map(current.rows.map((row) => [row.measure, row]));
+    const byVariant = new Map(current.rows.map((row) => [
+      `${row.measure}\u0000${row.brand}`, row,
+    ]));
     // O trigger financeiro 0147 reconhece `definir` como contagem de inventário.
     // Mantemos esse contrato histórico para que código novo funcione antes e depois
     // do deploy, diferenciando a operação pelo motivo e pelo evento de auditoria.
@@ -88,7 +98,7 @@ export async function applyMatrizPhysicalStockCount(
     });
     const differences: MatrizPhysicalStockCountResult['differences'] = [];
     for (const counted of normalized) {
-      const before = byMeasure.get(counted.measure)!;
+      const before = byVariant.get(`${counted.measure}\u0000${counted.brand}`)!;
       const difference = counted.counted_quantity - Number(before.quantity_on_hand);
       if (difference !== 0) {
         await client.query(
@@ -98,6 +108,7 @@ export async function applyMatrizPhysicalStockCount(
         );
         differences.push({
           measure: counted.measure,
+          brand: counted.brand,
           previous_quantity: Number(before.quantity_on_hand),
           counted_quantity: counted.counted_quantity,
           difference,
@@ -109,11 +120,13 @@ export async function applyMatrizPhysicalStockCount(
         eventType: 'physical_count_confirmed', actorLabel: input.actor_label,
         idempotencyKey: operation.idempotencyKey,
         before: {
-          measure: before.measure, quantity_on_hand: Number(before.quantity_on_hand),
+          measure: before.measure, brand: before.brand,
+          quantity_on_hand: Number(before.quantity_on_hand),
           unit_cost: before.unit_cost,
         },
         after: {
-          measure: before.measure, counted_quantity: counted.counted_quantity,
+          measure: before.measure, brand: before.brand,
+          counted_quantity: counted.counted_quantity,
           difference, reason,
         },
       });

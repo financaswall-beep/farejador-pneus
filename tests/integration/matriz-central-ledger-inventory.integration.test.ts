@@ -151,7 +151,7 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       reason: 'definicao inicial do teste',
       actor_label: 'owner:inventory',
     }, db.pool);
-    await removeStock(measure, 'test', db.pool);
+    await removeStock(measure, 'Sem marca', 'test', db.pool);
 
     const proof = await db.pool.query(
       `SELECT a.source,a.direction,t.transaction_kind,
@@ -192,7 +192,7 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
     const idempotencyKey = randomUUID();
     const input = {
       environment: 'test' as const,
-      rows: [{ measure, counted_quantity: 3 }],
+      rows: [{ measure, brand: 'Sem marca', counted_quantity: 3 }],
       reason: 'inventario mensal',
       idempotency_key: idempotencyKey,
       actor_label: 'owner:inventory',

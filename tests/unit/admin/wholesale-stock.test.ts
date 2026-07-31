@@ -24,17 +24,19 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
 
   it('flag ON: rotula o movimento e só decrementa quando há saldo', async () => {
     const { client, query } = mockClient();
-    await applyWholesaleStockDecrement(client, 'prod', [{ measure: '90/90-18', quantity: 3 }], true, 'order-x');
+    await applyWholesaleStockDecrement(client, 'prod', [{
+      measure: '90/90-18', brand: 'Pirelli', quantity: 3,
+    }], true, 'order-x');
     expect(query).toHaveBeenCalledTimes(2);
     const [rotuloSql, rotuloParams] = query.mock.calls[0];
     expect(rotuloSql).toContain("set_config('app.galpao_source', 'venda_atacado', true)");
     expect(rotuloParams).toEqual(['order-x']);
     const [sql, params] = query.mock.calls[1];
-    expect(sql).toContain('quantity_on_hand = quantity_on_hand - $3');
-    expect(sql).toContain('quantity_on_hand >= $3');
+    expect(sql).toContain('quantity_on_hand = quantity_on_hand - $4');
+    expect(sql).toContain('quantity_on_hand >= $4');
     expect(sql).toContain('RETURNING quantity_on_hand');
     expect(sql).not.toContain('GREATEST');
-    expect(params).toEqual(['prod', '90/90-18', 3]);
+    expect(params).toEqual(['prod', '90/90-18', 'Pirelli', 3]);
   });
 
   it('recusa a baixa sem saldo em vez de zerar artificialmente', async () => {
@@ -48,8 +50,10 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     const client = { query } as unknown as PoolClient;
 
     await expect(applyWholesaleStockDecrement(
-      client, 'test', [{ measure: '90/90-18', quantity: 3 }], true,
-    )).rejects.toThrow('oversell:[{"measure":"90/90-18","available":2,"requested":3}]');
+      client, 'test', [{ measure: '90/90-18', brand: 'Pirelli', quantity: 3 }], true,
+    )).rejects.toThrow(
+      'oversell:[{"measure":"90/90-18","brand":"Pirelli","available":2,"requested":3}]',
+    );
 
     const updateSql = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE commerce.wholesale_stock'))?.[0];
     expect(updateSql).not.toContain('GREATEST');
@@ -60,11 +64,12 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     await applyWholesaleStockDecrement(
       client,
       'test',
-      [{ measure: '90/90-18', quantity: 2 }, { measure: '90/90-18', quantity: 1 }],
+      [{ measure: '90/90-18', brand: 'Pirelli', quantity: 2 },
+       { measure: '90/90-18', brand: 'Pirelli', quantity: 1 }],
       true,
     );
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 3]);
+    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 'Pirelli', 3]);
   });
 
   it('ordena medidas diferentes e faz uma baixa por medida', async () => {
@@ -72,12 +77,13 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     await applyWholesaleStockDecrement(
       client,
       'test',
-      [{ measure: '100/90-18', quantity: 1 }, { measure: '90/90-18', quantity: 2 }],
+      [{ measure: '100/90-18', brand: 'Levorin', quantity: 1 },
+       { measure: '90/90-18', brand: 'Pirelli', quantity: 2 }],
       true,
     );
     expect(query).toHaveBeenCalledTimes(3);
-    expect(query.mock.calls[1][1]).toEqual(['test', '100/90-18', 1]);
-    expect(query.mock.calls[2][1]).toEqual(['test', '90/90-18', 2]);
+    expect(query.mock.calls[1][1]).toEqual(['test', '100/90-18', 'Levorin', 1]);
+    expect(query.mock.calls[2][1]).toEqual(['test', '90/90-18', 'Pirelli', 2]);
   });
 
   it('ignora medida vazia sem gerar baixa fantasma nem rótulo', async () => {
@@ -88,7 +94,9 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
 
   it('normaliza espaços na medida antes de bater a chave', async () => {
     const { client, query } = mockClient();
-    await applyWholesaleStockDecrement(client, 'test', [{ measure: '  90/90-18 ', quantity: 1 }], true);
-    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 1]);
+    await applyWholesaleStockDecrement(client, 'test', [{
+      measure: '  90/90-18 ', brand: 'Pirelli', quantity: 1,
+    }], true);
+    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 'Pirelli', 1]);
   });
 });

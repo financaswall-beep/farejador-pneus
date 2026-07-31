@@ -20,10 +20,10 @@ const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
 describe('Estoque — efeito financeiro dos caminhos manuais', () => {
   it('exige natureza, explicação e idempotência na entrada e na baixa', () => {
     expect(entryWholesaleStockSchema.safeParse({
-      measure: '90/90-12', quantity_in: 2, unit_cost: 50,
+      measure: '90/90-12', brand: 'Pirelli', quantity_in: 2, unit_cost: 50,
     }).success).toBe(false);
     expect(entryWholesaleStockSchema.safeParse({
-      measure: '90/90-12', quantity_in: 2, unit_cost: 50,
+      measure: '90/90-12', brand: 'Pirelli', quantity_in: 2, unit_cost: 50,
       entry_nature: 'inventory_found', reason: 'contagem física',
       idempotency_key: 'stock-entry-1',
     }).success).toBe(true);
@@ -31,7 +31,7 @@ describe('Estoque — efeito financeiro dos caminhos manuais', () => {
       measure: '90/90-12', quantity: 1, reason: 'quebra',
     }).success).toBe(false);
     expect(baixaWholesaleStockSchema.safeParse({
-      measure: '90/90-12', quantity: 1, nature: 'breakage',
+      measure: '90/90-12', brand: 'Pirelli', quantity: 1, nature: 'breakage',
       reason: 'quebra na montagem', idempotency_key: 'stock-loss-1',
     }).success).toBe(true);
   });

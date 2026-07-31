@@ -111,16 +111,17 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
     [env.FAREJADOR_ENV],
   );
   const stock = await dbPool.query<{
-    measure: string; quantity_on_hand: number | string; unit_cost: number | string | null;
+    measure: string; brand: string; quantity_on_hand: number | string;
+    unit_cost: number | string | null;
   }>(
-    `SELECT measure, quantity_on_hand, unit_cost
+    `SELECT measure, brand, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [env.FAREJADOR_ENV],
   );
   const stockIndex = buildMatrizStockIndex(stock.rows);
   return catalog.rows.map((product) => {
-    const official = matrizStockForMeasure(stockIndex, product.tire_size);
+    const official = matrizStockForMeasure(stockIndex, product.tire_size, product.brand);
     return {
       ...product,
       total_stock_available: official.sellable ? official.quantity_on_hand : 0,

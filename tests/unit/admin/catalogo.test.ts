@@ -37,6 +37,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       if (sql.includes('FROM commerce.wholesale_stock')) return {
         rows: [{
           measure: '90-90-18',
+          brand: 'Rinaldi',
           quantity_on_hand: '28',
           unit_cost: '82.00',
           updated_at: '2026-07-29T14:32:00.000Z',
@@ -45,6 +46,7 @@ describe('catalogo conciliado com estoque e precos', () => {
       if (sql.includes('FROM commerce.wholesale_purchase_items')) return {
         rows: [{
           measure: '90/90-18',
+          brand: 'Rinaldi',
           unit_cost: '79.50',
           purchased_at: '2026-07-28T10:00:00.000Z',
         }],

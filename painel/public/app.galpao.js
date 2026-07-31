@@ -62,7 +62,7 @@ window.PAINEL_MODULES.galpao = function () {
         min_invalid: 'Mínimo inválido (número inteiro, 0 ou mais).',
         reason_required: 'Informe o motivo da alteração de saldo ou custo.',
         catalog_product_not_found: 'A medida existe, mas o produto correspondente não foi encontrado no Catálogo.',
-        stock_measure_brand_conflict: 'O estoque atual aceita uma marca por medida. Separe ou corrija as marcas informadas.',
+        brand_required: 'Informe a marca do pneu.',
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
     },
@@ -141,10 +141,13 @@ window.PAINEL_MODULES.galpao = function () {
         this.stockSaving = false;
       }
     },
-    async stockRemove(measure) {
+    async stockRemove(row) {
+      const measure = row.measure;
       if (!window.confirm(`Remover ${measure} do estoque do galpão?`)) return;
       try {
-        await this.apiPost('/admin/api/wholesale/stock/remove', { measure });
+        await this.apiPost('/admin/api/wholesale/stock/remove', {
+          measure, brand: row.brand,
+        });
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadGalpaoFilme(); // a remoção entra no filme
@@ -182,12 +185,12 @@ window.PAINEL_MODULES.galpao = function () {
     },
     // ── BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo ──
     stockBaixaOpen(row) {
-      this.stockBaixaForm = { measure: row.measure, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
+      this.stockBaixaForm = { measure: row.measure, brand: row.brand, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
       this.stockMsg = null;
       this.$nextTick(() => { const el = document.getElementById('galpao-baixa-qtd'); if (el) el.focus(); });
     },
     stockBaixaFechar() {
-      this.stockBaixaForm = { measure: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
+      this.stockBaixaForm = { measure: null, brand: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
     },
     async stockBaixaSubmit() {
       const f = this.stockBaixaForm;
@@ -199,7 +202,7 @@ window.PAINEL_MODULES.galpao = function () {
       this.stockMsg = null;
       try {
         f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-manual-decrement', 'form').key;
-        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, quantity: qty, nature: f.tipo, reason, idempotency_key: f.idempotency_key });
+        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, brand: f.brand, quantity: qty, nature: f.tipo, reason, idempotency_key: f.idempotency_key });
         window.PAINEL_INTEGRITY.complete('stock-manual-decrement', 'form');
         this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${labels[f.tipo]}) — sobraram ${row.quantity_on_hand} un.` };
         this.stockBaixaFechar();
@@ -227,8 +230,9 @@ window.PAINEL_MODULES.galpao = function () {
       return map[code] || `Não consegui dar a baixa (${code}).`;
     },
     // ── O FILME (0128): a movimentação do galpão — quem mexeu, quanto, quando ──
-    async loadGalpaoFilme(measure) {
+    async loadGalpaoFilme(measure, brand) {
       if (measure !== undefined) this.galpaoFilme.measure = measure;
+      if (brand !== undefined) this.galpaoFilme.brand = brand;
       if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
         const selected = this.galpaoFilme.measure;
         this.galpaoFilme.loading = false;
@@ -244,7 +248,11 @@ window.PAINEL_MODULES.galpao = function () {
       this.galpaoFilme.loading = true;
       try {
         const m = this.galpaoFilme.measure;
-        const r = await this.apiGet('/admin/api/wholesale/stock/movimentos' + (m ? '?measure=' + encodeURIComponent(m) : ''));
+        const b = this.galpaoFilme.brand;
+        const params = new URLSearchParams();
+        if (m) params.set('measure', m);
+        if (b) params.set('brand', b);
+        const r = await this.apiGet('/admin/api/wholesale/stock/movimentos' + (params.size ? '?' + params.toString() : ''));
         if (req !== this.galpaoFilme.req) return; // resposta velha: descarta
         this.galpaoFilme.rows = r.rows || [];
       } catch (err) {
@@ -257,8 +265,8 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     // Clicou "filme" numa medida: filtra a movimentação e desce até ela.
-    filmeDaMedida(measure) {
-      void this.loadGalpaoFilme(measure);
+    filmeDaMedida(measure, brand) {
+      void this.loadGalpaoFilme(measure, brand);
       this.$nextTick(() => { const el = document.getElementById('galpao-filme'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     },
     movRotulo(m) {

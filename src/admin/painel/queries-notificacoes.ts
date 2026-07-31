@@ -76,7 +76,8 @@ export async function getMatrizNotificacoes(
            AND p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS pagar_total,
 
        (SELECT json_agg(json_build_object(
-                 'measure', s.measure, 'quantity_on_hand', s.quantity_on_hand,
+                 'measure', s.measure, 'brand', s.brand,
+                 'quantity_on_hand', s.quantity_on_hand,
                  'min_quantity', s.min_quantity)
                ORDER BY s.quantity_on_hand::numeric / NULLIF(s.min_quantity, 0))
           FROM commerce.wholesale_stock s

@@ -194,8 +194,12 @@ export async function getBotVisao(
               count(*) FILTER (WHERE cf.fact_value->>'motivo' = 'sem_estoque_perto')::int AS sem_estoque_perto,
               max(s.quantity_on_hand)::int AS galpao_qty
        FROM analytics.conversation_facts cf
-       LEFT JOIN commerce.wholesale_stock s
-         ON s.environment = $1 AND lower(s.measure) = lower(cf.fact_value->>'medida')
+       LEFT JOIN LATERAL (
+         SELECT sum(ws.quantity_on_hand)::int AS quantity_on_hand
+           FROM commerce.wholesale_stock ws
+          WHERE ws.environment=$1
+            AND lower(ws.measure)=lower(cf.fact_value->>'medida')
+       ) s ON true
        WHERE cf.environment = $1 AND cf.fact_key = 'faltou_estoque'
          AND cf.created_at >= ${sinceSql}
          AND (cf.fact_value->>'medida') IS NOT NULL
@@ -214,8 +218,12 @@ export async function getBotVisao(
               count(*)::int AS consultas,
               max(s.quantity_on_hand)::int AS galpao_qty
        FROM analytics.conversation_facts cf
-       LEFT JOIN commerce.wholesale_stock s
-         ON s.environment = $1 AND lower(s.measure) = lower(replace(cf.fact_value::text, '"', ''))
+       LEFT JOIN LATERAL (
+         SELECT sum(ws.quantity_on_hand)::int AS quantity_on_hand
+           FROM commerce.wholesale_stock ws
+          WHERE ws.environment=$1
+            AND lower(ws.measure)=lower(replace(cf.fact_value::text, '"', ''))
+       ) s ON true
        WHERE cf.environment = $1 AND cf.fact_key = 'medida_consultada'
          AND cf.created_at >= ${sinceSql}
        GROUP BY 1

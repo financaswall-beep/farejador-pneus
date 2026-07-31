@@ -28,7 +28,7 @@ describe('Estoque — lista com painel da medida', () => {
   it('usa lista mestre e painel de detalhe sem criar paginação ou mapa paralelos', () => {
     expect(stockHtml).toContain('id="estoque-lista-heading"');
     expect(stockHtml).toContain('Painel da medida');
-    expect(stockHtml).toContain('selectedMeasure');
+    expect(stockHtml).toContain('selectedVariant');
     expect(stockHtml).toContain('visibleRows()');
     expect(stockHtml).toContain('get selectedRow()');
     expect(stockHtml).toContain('selectRow(row)');
@@ -53,8 +53,8 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain("stockOperacao = 'entrada'");
     expect(stockHtml).toContain("stockOperacao = 'ajuste'");
     expect(stockHtml).toContain('stockBaixaOpen(selectedRow)');
-    expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure)');
-    expect(stockHtml).toContain('stockRemove(selectedRow.measure)');
+    expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure, selectedRow.brand)');
+    expect(stockHtml).toContain('stockRemove(selectedRow)');
     expect(stockHtml).toContain('Entrada recalcula o custo médio ponderado');
   });
 

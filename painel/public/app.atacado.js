@@ -246,6 +246,7 @@ window.PAINEL_MODULES.atacado = function () {
           unit_price: Number(it.unit_price) || 0,
         }));
       if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
+      if (items.some((item) => !item.brand)) { this.atacadoMsg = { ok: false, text: 'Informe a marca de cada pneu.' }; return; }
       body.items = items;
       // FINANCEIRO (0115): fiado só quando o financeiro está ligado e com vencimento.
       if (this.atacadoFinance && f.payment_status === 'pending') {

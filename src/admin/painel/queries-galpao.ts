@@ -10,12 +10,12 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
-import { CATALOG_BRAND_STOCK_PROJECTION, syncCatalogBrandForMeasure } from './catalog-brand.js';
+import { canonicalCatalogBrand } from './catalog-brand.js';
 
 export interface WholesaleStockRow {
   measure: string;
   /** Marca do produto no Catálogo para esta medida. Não altera saldo nem custo. */
-  brand?: string | null;
+  brand: string;
   quantity_on_hand: number;
   unit_cost: number;
   /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
@@ -33,12 +33,11 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT ws.measure, ws.quantity_on_hand, ws.unit_cost, ws.min_quantity, ws.notes, ws.updated_at,
-            ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter,
-            ${CATALOG_BRAND_STOCK_PROJECTION} brand
+    `SELECT ws.measure, ws.brand, ws.quantity_on_hand, ws.unit_cost, ws.min_quantity, ws.notes,
+            ws.updated_at, ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter
        FROM commerce.wholesale_stock ws
       WHERE ws.environment = $1
-      ORDER BY ws.measure`,
+      ORDER BY ws.measure, ws.brand`,
     [environment],
   );
   return r.rows;
@@ -66,16 +65,13 @@ export async function setWholesaleStock(
   // Fase 4: casa com o catálogo → grava o formato OFICIAL + os números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
-  const brand = await syncCatalogBrandForMeasure(dbPool, {
-    environment, measure: cat.measure, brand: input.brand, actorLabel: input.actor_label,
-    allowReplace: true,
-  });
+  const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
-            (environment, measure, quantity_on_hand, unit_cost, min_quantity, notes,
+            (environment, measure, brand, quantity_on_hand, unit_cost, min_quantity, notes,
              tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT (environment, measure)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (environment, measure, brand)
      DO UPDATE SET quantity_on_hand  = EXCLUDED.quantity_on_hand,
                    unit_cost         = EXCLUDED.unit_cost,
                    min_quantity      = EXCLUDED.min_quantity,
@@ -83,12 +79,12 @@ export async function setWholesaleStock(
                    tire_width_mm     = EXCLUDED.tire_width_mm,
                    tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
                    tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
+       RETURNING measure, brand, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
-    [environment, cat.measure, input.quantity_on_hand, unitCost, minQuantity, input.notes?.trim() || null,
-     cat.width, cat.aspect, cat.rim],
+    [environment, cat.measure, brand, input.quantity_on_hand, unitCost, minQuantity,
+     input.notes?.trim() || null, cat.width, cat.aspect, cat.rim],
   );
-  return { ...r.rows[0]!, ...(brand ? { brand } : {}) };
+  return r.rows[0]!;
 }
 
 /** ENTRADA de compra (custo médio): soma quantity_in ao estoque da medida e recalcula o
@@ -107,15 +103,13 @@ export async function addWholesaleStockEntry(
   // Fase 4: casa com o catálogo → formato OFICIAL + números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
-  const brand = await syncCatalogBrandForMeasure(dbPool, {
-    environment, measure: cat.measure, brand: input.brand, actorLabel: input.actor_label,
-  });
+  const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
   const r = await dbPool.query<WholesaleStockRow>(
     `INSERT INTO commerce.wholesale_stock
-            (environment, measure, quantity_on_hand, unit_cost,
+            (environment, measure, brand, quantity_on_hand, unit_cost,
              tire_width_mm, tire_aspect_ratio, tire_rim_diameter)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (environment, measure) DO UPDATE SET
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (environment, measure, brand) DO UPDATE SET
        unit_cost = round(
          (commerce.wholesale_stock.quantity_on_hand * commerce.wholesale_stock.unit_cost
             + EXCLUDED.quantity_on_hand * EXCLUDED.unit_cost)
@@ -124,27 +118,31 @@ export async function addWholesaleStockEntry(
        tire_width_mm     = EXCLUDED.tire_width_mm,
        tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
        tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
+       RETURNING measure, brand, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
-    [environment, cat.measure, input.quantity_in, input.unit_cost, cat.width, cat.aspect, cat.rim],
+    [environment, cat.measure, brand, input.quantity_in, input.unit_cost,
+     cat.width, cat.aspect, cat.rim],
   );
-  return { ...r.rows[0]!, ...(brand ? { brand } : {}) };
+  return r.rows[0]!;
 }
 
 /** Remove uma medida do estoque do galpão (ex.: cadastrou errado). */
 export async function deleteWholesaleStock(
   measure: string,
+  brand: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool | PoolClient = defaultPool,
 ): Promise<void> {
   await dbPool.query(
-    `DELETE FROM commerce.wholesale_stock WHERE environment = $1 AND measure = $2`,
-    [environment, measure.trim()],
+    `DELETE FROM commerce.wholesale_stock
+      WHERE environment = $1 AND measure = $2 AND brand = $3`,
+    [environment, measure.trim(), canonicalCatalogBrand(brand)],
   );
 }
 
 export interface WholesaleMeasureRow {
   measure: string;
+  brand: string | null;
   quantity_on_hand: number | null; // null = conhecida no catálogo, sem estoque cadastrado
   unit_cost: number | null;        // custo unitário cadastrado (null = sem estoque)
 }
@@ -156,7 +154,7 @@ export async function listWholesaleMeasures(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleMeasureRow[]> {
   const r = await dbPool.query<WholesaleMeasureRow>(
-    `SELECT m.measure, ws.quantity_on_hand, ws.unit_cost
+    `SELECT m.measure, ws.brand, ws.quantity_on_hand, ws.unit_cost
        FROM (
               SELECT DISTINCT tire_size AS measure
                 FROM commerce.tire_specs
@@ -166,7 +164,7 @@ export async function listWholesaleMeasures(
             ) m
        LEFT JOIN commerce.wholesale_stock ws
               ON ws.environment = $1 AND ws.measure = m.measure
-      ORDER BY m.measure`,
+      ORDER BY m.measure, ws.brand NULLS LAST`,
     [environment],
   );
   return r.rows;

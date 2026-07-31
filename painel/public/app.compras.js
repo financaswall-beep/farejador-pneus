@@ -87,6 +87,10 @@ window.PAINEL_MODULES.compras = function () {
         this.compraMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' };
         return null;
       }
+      if (items.some((item) => !item.brand)) {
+        this.compraMsg = { ok: false, text: 'Informe a marca de cada pneu.' };
+        return null;
+      }
       // Auditoria 07-06: linha PREENCHIDA mas inválida (sem medida / sem quantidade) era
       // descartada em silêncio — a tela mostrava um total e registrava outro. Linha 100%
       // vazia (sobrou do "+ Adicionar pneu") segue ignorada sem pergunta.

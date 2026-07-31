@@ -72,18 +72,21 @@ async function applyPurchaseStock(
   items: PurchaseItemInput[],
 ): Promise<void> {
   await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
-  const consolidated = new Map<string, { quantity: number; valueCents: number; brand: string | null }>();
+  const consolidated = new Map<string, {
+    measure: string; quantity: number; valueCents: number; brand: string;
+  }>();
   for (const item of items) {
-    const brand = canonicalCatalogBrand(item.brand);
-    const current = consolidated.get(item.measure) ?? { quantity: 0, valueCents: 0, brand };
-    if (brand && current.brand && brand !== current.brand) throw new Error('stock_measure_brand_conflict');
-    if (brand) current.brand = brand;
+    const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
+    const key = `${item.measure}\u0000${brand}`;
+    const current = consolidated.get(key) ?? {
+      measure: item.measure, quantity: 0, valueCents: 0, brand,
+    };
     current.quantity += item.quantity;
     current.valueCents += moneyCents(item.unit_cost) * item.quantity;
-    consolidated.set(item.measure, current);
+    consolidated.set(key, current);
   }
-  for (const [measure, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
-    await addWholesaleStockEntry({ measure, brand: item.brand, quantity_in: item.quantity,
+  for (const [, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
+    await addWholesaleStockEntry({ measure: item.measure, brand: item.brand, quantity_in: item.quantity,
       unit_cost: item.valueCents / item.quantity / 100, environment,
       actor_label: `compra:${purchaseId}` }, client);
   }

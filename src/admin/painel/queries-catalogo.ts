@@ -11,11 +11,12 @@ interface CatalogRow {
   price_amount: string | null; currency: string | null; price_type: string | null;
 }
 interface StockRow {
-  measure: string; quantity_on_hand: number | string; unit_cost: number | string | null;
+  measure: string; brand: string; quantity_on_hand: number | string;
+  unit_cost: number | string | null;
   updated_at: string | null;
 }
 interface PurchaseRow {
-  measure: string; unit_cost: number | string; purchased_at: string;
+  measure: string; brand: string | null; unit_cost: number | string; purchased_at: string;
 }
 export interface CatalogPriceInput {
   productId: string; priceAmount: number; reason: string; actorLabel: string;
@@ -41,12 +42,12 @@ export async function getCatalogOverview(
       [environment],
     ),
     dbPool.query<StockRow>(
-      `SELECT measure,quantity_on_hand,unit_cost,updated_at
+      `SELECT measure,brand,quantity_on_hand,unit_cost,updated_at
          FROM commerce.wholesale_stock WHERE environment=$1`,
       [environment],
     ),
     dbPool.query<PurchaseRow>(
-      `SELECT i.measure,i.unit_cost,p.purchased_at
+      `SELECT i.measure,i.brand,i.unit_cost,p.purchased_at
          FROM commerce.wholesale_purchase_items i
          JOIN commerce.wholesale_purchases p
            ON p.id=i.purchase_id AND p.environment=i.environment
@@ -56,17 +57,20 @@ export async function getCatalogOverview(
     ),
   ]);
   const stockIndex = buildMatrizStockIndex(stock.rows);
-  const stockByKey = new Map(stock.rows.map((row) => [tireSizeKey(row.measure), row]));
+  const stockByKey = new Map(stock.rows.map((row) => [
+    `${tireSizeKey(row.measure)}\u0000${row.brand}`, row,
+  ]));
   const lastPurchase = new Map<string, PurchaseRow>();
   for (const row of purchases.rows) {
-    const key = tireSizeKey(row.measure);
+    const key = `${tireSizeKey(row.measure)}\u0000${row.brand ?? ''}`;
     if (key && !lastPurchase.has(key)) lastPurchase.set(key, row);
   }
   const rows = catalog.rows.map((product) => {
-    const state = matrizStockForMeasure(stockIndex, product.tire_size);
+    const state = matrizStockForMeasure(stockIndex, product.tire_size, product.brand);
     const key = tireSizeKey(product.tire_size);
-    const officialStock = key ? stockByKey.get(key) : undefined;
-    const purchase = key ? lastPurchase.get(key) : undefined;
+    const variantKey = `${key}\u0000${product.brand ?? ''}`;
+    const officialStock = key ? stockByKey.get(variantKey) : undefined;
+    const purchase = key ? lastPurchase.get(variantKey) : undefined;
     const cost = state.unit_cost;
     const price = product.price_amount === null ? null : Number(product.price_amount);
     return {

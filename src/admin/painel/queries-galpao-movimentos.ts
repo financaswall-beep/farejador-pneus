@@ -13,6 +13,7 @@ import {
   addWholesaleStockEntry, deleteWholesaleStock, setWholesaleStock, type WholesaleStockRow,
 } from './queries-galpao.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
+import { canonicalCatalogBrand } from './catalog-brand.js';
 import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
@@ -60,7 +61,6 @@ async function comRotulo<T>(
   }
 }
 
-/** Definir (upsert da tela) com rótulo 'definir' no filme. Mesmo contrato do setWholesaleStock. */
 export async function setWholesaleStockComRotulo(
   input: Parameters<typeof setWholesaleStock>[0] & {
     reason?: string;
@@ -76,12 +76,13 @@ export async function setWholesaleStockComRotulo(
     await client.query('BEGIN');
     const catalogMeasure = await resolveMeasureInCatalog(client, environment, input.measure);
     if (!catalogMeasure) throw new Error('measure_not_in_catalog');
+    const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
     const current = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
       `SELECT quantity_on_hand,unit_cost::text
          FROM commerce.wholesale_stock
-        WHERE environment=$1 AND measure=$2
+        WHERE environment=$1 AND measure=$2 AND brand=$3
         FOR UPDATE`,
-      [environment, catalogMeasure.measure],
+      [environment, catalogMeasure.measure, brand],
     );
     const before = current.rows[0];
     const nextCostCents = Math.round(Number(input.unit_cost ?? 0) * 100);
@@ -143,8 +144,9 @@ export async function addWholesaleStockEntryComRotulo(
     });
     const result = integrityResult(await addWholesaleStockEntry(input, client));
     const entity = await client.query<{ id: string }>(
-      `SELECT id FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`,
-      [environment, result.measure],
+      `SELECT id FROM commerce.wholesale_stock
+        WHERE environment=$1 AND measure=$2 AND brand=$3`,
+      [environment, result.measure, result.brand],
     );
     const entityId = entity.rows[0]?.id;
     if (!entityId) throw new Error('stock_measure_missing');
@@ -168,16 +170,16 @@ export async function addWholesaleStockEntryComRotulo(
   }
 }
 
-/** Remover medida (tela) com rótulo 'remocao'. */
 export async function deleteWholesaleStockComRotulo(
   measure: string,
+  brand: string,
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<void> {
   const movementRef = randomUUID();
   return comRotulo(dbPool, { source: 'remocao', nature: 'inventory_writeoff',
     reason: 'medida removida manualmente', ref: movementRef }, async (client) => {
-    await deleteWholesaleStock(measure, environment, client);
+    await deleteWholesaleStock(measure, brand, environment, client);
     await postMatrizInventoryAdjustmentsByMovementRef(
       client, environment, movementRef, 'system:stock-removal',
     );
@@ -190,13 +192,14 @@ export async function deleteWholesaleStockComRotulo(
  *  régua é a verdade do galpão. NÃO mexe no custo médio (sai quantidade; o prejuízo
  *  fica legível no filme: qty × custo da época). Motivo é OBRIGATÓRIO. */
 export async function applyGalpaoBaixaManual(
-  input: { measure: string; quantity: number; reason: string;
+  input: { measure: string; brand: string; quantity: number; reason: string;
     nature?: 'breakage' | 'loss' | 'internal_use' | 'other';
     actor_label?: string; idempotency_key?: string; environment?: 'prod' | 'test' },
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const measure = input.measure.trim();
+  const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
   const reason = (input.reason ?? '').trim();
   if (!measure) throw new Error('measure_required');
   if (!Number.isInteger(input.quantity) || input.quantity <= 0) throw new Error('quantity_invalid');
@@ -204,7 +207,7 @@ export async function applyGalpaoBaixaManual(
   if (!input.nature) throw new Error('stock_decrement_nature_required');
   const operation = { environment, domain: 'stock.manual_decrement',
     idempotencyKey: input.idempotency_key ?? '', fingerprint: operationFingerprint({
-      measure, quantity: input.quantity, nature: input.nature, reason,
+      measure, brand, quantity: input.quantity, nature: input.nature, reason,
     }) };
   const client = await dbPool.connect();
   try {
@@ -218,11 +221,12 @@ export async function applyGalpaoBaixaManual(
       nature: input.nature, reason, ref: operation.idempotencyKey });
     const r = await client.query<WholesaleStockRow & { id: string }>(
       `UPDATE commerce.wholesale_stock
-          SET quantity_on_hand = quantity_on_hand - $3
-        WHERE environment = $1 AND measure = $2 AND quantity_on_hand >= $3
-        RETURNING id, measure, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
+          SET quantity_on_hand = quantity_on_hand - $4
+        WHERE environment = $1 AND measure = $2 AND brand = $3
+          AND quantity_on_hand >= $4
+        RETURNING id, measure, brand, quantity_on_hand, unit_cost, min_quantity, notes, updated_at,
                   tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
-      [environment, measure, input.quantity],
+      [environment, measure, brand, input.quantity],
     );
     if (r.rows[0]) {
       const { id, ...row } = r.rows[0];
@@ -231,7 +235,7 @@ export async function applyGalpaoBaixaManual(
         entityTable: 'commerce.wholesale_stock', entityId: id,
         eventType: 'manual_decrement', actorLabel: input.actor_label,
         idempotencyKey: operation.idempotencyKey,
-        after: { measure, quantity: input.quantity, nature: input.nature, reason } });
+        after: { measure, brand, quantity: input.quantity, nature: input.nature, reason } });
       await completeIntegrityOperation(client, operation, 'commerce.wholesale_stock', id, result);
       await postMatrizInventoryAdjustmentsByMovementRef(
         client, environment, operation.idempotencyKey, input.actor_label,
@@ -241,8 +245,9 @@ export async function applyGalpaoBaixaManual(
     }
     // 0 linhas: medida não existe OU saldo insuficiente — dizer QUAL (erro honesto)
     const cur = await client.query<{ quantity_on_hand: number }>(
-      `SELECT quantity_on_hand FROM commerce.wholesale_stock WHERE environment = $1 AND measure = $2`,
-      [environment, measure],
+      `SELECT quantity_on_hand FROM commerce.wholesale_stock
+        WHERE environment = $1 AND measure = $2 AND brand = $3`,
+      [environment, measure, brand],
     );
     if (!cur.rows[0]) throw new Error('measure_not_found');
     throw new Error('baixa_maior_que_estoque:' + cur.rows[0].quantity_on_hand);
@@ -256,6 +261,7 @@ export async function applyGalpaoBaixaManual(
 
 export interface GalpaoMovementRow {
   measure: string;
+  brand: string;
   op: 'insert' | 'update' | 'delete';
   qty_before: number;
   qty_after: number;
@@ -270,20 +276,25 @@ export interface GalpaoMovementRow {
 
 /** O filme pra tela: últimos movimentos (todos ou de UMA medida), mais novo primeiro. */
 export async function listGalpaoMovements(
-  opts: { measure?: string | null; limit?: number; environment?: 'prod' | 'test' } = {},
+  opts: {
+    measure?: string | null; brand?: string | null; limit?: number;
+    environment?: 'prod' | 'test';
+  } = {},
   dbPool: Pool = defaultPool,
 ): Promise<GalpaoMovementRow[]> {
   const environment = opts.environment ?? env.FAREJADOR_ENV;
   const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
   const measure = opts.measure?.trim() || null;
+  const brand = opts.brand?.trim() || null;
   const r = await dbPool.query<GalpaoMovementRow>(
-    `SELECT measure, op, qty_before, qty_after, qty_delta, cost_before, cost_after,
+    `SELECT measure, brand, op, qty_before, qty_after, qty_delta, cost_before, cost_after,
             source, reason, ref, created_at
        FROM commerce.wholesale_stock_movements
       WHERE environment = $1 AND ($2::text IS NULL OR measure = $2)
+        AND ($3::text IS NULL OR brand = $3)
       ORDER BY created_at DESC, id DESC
-      LIMIT $3`,
-    [environment, measure, limit],
+      LIMIT $4`,
+    [environment, measure, brand, limit],
   );
   return r.rows;
 }
