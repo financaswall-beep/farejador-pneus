@@ -27,9 +27,9 @@ describe('conciliação sombra do estoque da Matriz', () => {
         { product_id: 'p4', tire_size: '120/80-17', brand: null, legacy_quantity: 0 },
       ] })
       .mockResolvedValueOnce({ rows: [
-        { measure: '100/80-18', quantity_on_hand: 2, unit_cost: 15 },
-        { measure: '90/90-18', quantity_on_hand: 7, unit_cost: 20 },
-        { measure: '130/70-17', quantity_on_hand: 4, unit_cost: 25 },
+        { measure: '100/80-18', brand: 'Pirelli', quantity_on_hand: 2, unit_cost: 15 },
+        { measure: '90/90-18', brand: 'Rinaldi', quantity_on_hand: 7, unit_cost: 20 },
+        { measure: '130/70-17', brand: 'Pirelli', quantity_on_hand: 4, unit_cost: 25 },
       ] });
     const db = { query } as unknown as Pool;
 
@@ -38,16 +38,17 @@ describe('conciliação sombra do estoque da Matriz', () => {
     expect(report.summary).toMatchObject({
       official_source: 'commerce.wholesale_stock',
       legacy_source: 'commerce.product_full',
-      total: 4,
+      total: 5,
       aligned: 1,
-      divergent: 3,
-      catalog_only: 1,
+      divergent: 4,
+      catalog_only: 2,
       official_only: 1,
     });
     expect(report.rows.find((row) => row.key === '100-80-18')).toMatchObject({
-      catalog_brands: ['Levorin', 'Pirelli'],
-      legacy_quantity: 15,
+      catalog_brands: ['Pirelli'],
+      legacy_quantity: 10,
       official_quantity: 2,
+      official_brand: 'Pirelli',
       status: 'quantity_divergent',
     });
     expect(report.rows.find((row) => row.key === '90-90-18')?.status).toBe('aligned');

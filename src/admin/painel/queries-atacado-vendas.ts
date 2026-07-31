@@ -5,6 +5,7 @@ import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyWholesaleStockDecrement } from './wholesale-stock.js';
+import { canonicalCatalogBrand } from './catalog-brand.js';
 import {
   ensureWholesaleSaleCogs, ensureWholesaleSaleRevenue, getWholesaleSaleLedgerState,
 } from './matriz-ledger-wholesale-sales.js';
@@ -108,7 +109,10 @@ async function canonicalSaleItems(
       measures.set(raw, catalog.measure);
     }
   }
-  return items.map((item) => ({ ...item, measure: measures.get(item.measure.trim())! }));
+  return items.map((item) => {
+    const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
+    return { ...item, measure: measures.get(item.measure.trim())!, brand };
+  });
 }
 
 async function resolveBuyer(
@@ -209,17 +213,27 @@ export async function registerWholesaleSale(
     const items = await canonicalSaleItems(client, environment, rawItems);
     const buyer = await resolveBuyer(client, environment, input);
     const orderId = await insertSaleHeader(client, environment, buyer.id, input);
-    const requested = new Map<string, number>();
-    for (const item of items) requested.set(item.measure, (requested.get(item.measure) ?? 0) + item.quantity);
+    const requested = new Map<string, { measure: string; brand: string; quantity: number }>();
+    for (const item of items) {
+      const brand = item.brand!;
+      const key = `${item.measure}\u0000${brand}`;
+      const current = requested.get(key) ?? { measure: item.measure, brand, quantity: 0 };
+      current.quantity += item.quantity;
+      requested.set(key, current);
+    }
     const costs = new Map<string, number>();
-    const short: Array<{ measure: string; available: number; requested: number }> = [];
-    for (const [measure, quantity] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
+    const short: Array<{ measure: string; brand: string; available: number; requested: number }> = [];
+    for (const [key, variant] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
       const stock = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
         `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
-          WHERE environment=$1 AND measure=$2 FOR UPDATE`, [environment, measure]);
+          WHERE environment=$1 AND measure=$2 AND brand=$3 FOR UPDATE`,
+        [environment, variant.measure, variant.brand]);
       const available = Number(stock.rows[0]?.quantity_on_hand ?? 0);
-      if (available < quantity) short.push({ measure, available, requested: quantity });
-      costs.set(measure, Number(stock.rows[0]?.unit_cost ?? 0));
+      if (available < variant.quantity) short.push({
+        measure: variant.measure, brand: variant.brand,
+        available, requested: variant.quantity,
+      });
+      costs.set(key, Number(stock.rows[0]?.unit_cost ?? 0));
     }
     if (short.length) throw new Error('oversell:' + JSON.stringify(short));
 
@@ -229,7 +243,7 @@ export async function registerWholesaleSale(
            (environment,order_id,measure,brand,quantity,unit_price,unit_cost)
          VALUES ($1,$2,$3,$4,$5,$6,$7)`,
         [environment, orderId, item.measure, item.brand ?? null, item.quantity,
-         item.unit_price, costs.get(item.measure) ?? 0],
+         item.unit_price, costs.get(`${item.measure}\u0000${item.brand}`) ?? 0],
       );
     }
     await applyWholesaleStockDecrement(client, environment, items, true, orderId);

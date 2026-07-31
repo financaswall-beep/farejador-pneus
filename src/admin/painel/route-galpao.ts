@@ -97,7 +97,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      await deleteWholesaleStockComRotulo(parsed.data.measure);
+      await deleteWholesaleStockComRotulo(parsed.data.measure, parsed.data.brand);
       return reply.status(200).send({ ok: true });
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -126,9 +126,13 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
 
   // O FILME do galpão (0128): últimos movimentos, todos ou de uma medida (?measure=&limit=).
   fastify.get('/admin/api/wholesale/stock/movimentos', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const q = request.query as { measure?: string; limit?: string };
+    const q = request.query as { measure?: string; brand?: string; limit?: string };
     const limit = Math.min(Math.max(1, Number(q.limit) || 50), 200);
-    const rows = await listGalpaoMovements({ measure: q.measure?.slice(0, 60) || null, limit });
+    const rows = await listGalpaoMovements({
+      measure: q.measure?.slice(0, 60) || null,
+      brand: q.brand?.slice(0, 60) || null,
+      limit,
+    });
     return reply.status(200).send(dashboardPayload(rows));
   });
 

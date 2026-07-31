@@ -59,6 +59,7 @@ window.PAINEL_MODULES.galpaoContagem = function () {
           && row.counted_quantity !== '' && row.counted_quantity != null)
         .map((row) => ({
           measure: row.official_measures[0] || row.key,
+          brand: row.official_brand,
           counted_quantity: Number(row.counted_quantity),
         }));
       if (!rows.length || rows.some((row) =>
@@ -70,7 +71,8 @@ window.PAINEL_MODULES.galpaoContagem = function () {
         this.stockCount.message = { ok: false, text: 'Informe quem contou ou o motivo desta contagem.' };
         return;
       }
-      const keyTarget = rows.map((row) => `${row.measure}:${row.counted_quantity}`).join('|');
+      const keyTarget = rows.map((row) =>
+        `${row.measure}:${row.brand}:${row.counted_quantity}`).join('|');
       const operation = window.PAINEL_INTEGRITY.operation('stock-physical-count', keyTarget);
       this.stockCount.saving = true;
       this.stockCount.message = null;

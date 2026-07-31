@@ -25,6 +25,7 @@ function context(overrides: Record<string, unknown> = {}) {
     ...module,
     stockForm: {
       measure: '90/90-18',
+      brand: 'Pirelli',
       quantity_on_hand: 10,
       unit_cost: 100,
       min_quantity: 2,
@@ -63,10 +64,11 @@ function stockPool(current = { quantity_on_hand: 10, unit_cost: '100.00' }) {
       return {
         rows: [{
           measure: '90/90-18',
-          quantity_on_hand: params?.[2],
-          unit_cost: String(params?.[3] ?? 0),
-          min_quantity: params?.[4] ?? null,
-          notes: params?.[5] ?? null,
+          brand: params?.[2],
+          quantity_on_hand: params?.[3],
+          unit_cost: String(params?.[4] ?? 0),
+          min_quantity: params?.[5] ?? null,
+          notes: params?.[6] ?? null,
           updated_at: '2026-07-27T00:00:00.000Z',
           tire_width_mm: 90,
           tire_aspect_ratio: 90,
@@ -107,7 +109,7 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
     expect(html).toContain('stockAdjustmentImpact()');
     expect(html).toContain('app.galpao.ajuste.js?v=20260727-stock-adjustment1');
     expect(html).toContain('app.montagem.js?v=20260729-catalogo1');
-    expect(html).toContain('app.js?v=20260729-catalog-brand2');
+    expect(html).toContain('app.js?v=20260730-multimarca1');
     expect(montagem).toContain('window.PAINEL_MODULES.galpaoAjuste');
     expect(staticRoutes).toContain("'app.galpao.ajuste.js'");
   });
@@ -160,11 +162,11 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
 
   it('aceita o motivo no contrato HTTP e o servidor o exige quando há impacto', () => {
     expect(setWholesaleStockSchema.safeParse({
-      measure: '90/90-18', quantity_on_hand: 10, unit_cost: 100,
+      measure: '90/90-18', brand: 'Pirelli', quantity_on_hand: 10, unit_cost: 100,
       reason: 'Contagem física conferida',
     }).success).toBe(true);
     expect(setWholesaleStockSchema.safeParse({
-      measure: '90/90-18', quantity_on_hand: 10, unit_cost: 100,
+      measure: '90/90-18', brand: 'Pirelli', quantity_on_hand: 10, unit_cost: 100,
       reason: '',
     }).success).toBe(false);
     expect(actions).toContain("if (valueChanged && reason.length < 2) throw new Error('reason_required')");
@@ -179,6 +181,7 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
     await expect(setWholesaleStockComRotulo({
       environment: 'test',
       measure: '90/90-18',
+      brand: 'Pirelli',
       quantity_on_hand: 9,
       unit_cost: 100,
     }, pool)).rejects.toThrow('reason_required');
@@ -196,6 +199,7 @@ describe('Ajuste manual do Estoque com motivo auditável', () => {
     await expect(setWholesaleStockComRotulo({
       environment: 'test',
       measure: '90/90-18',
+      brand: 'Pirelli',
       quantity_on_hand: 8,
       unit_cost: 100,
       reason: 'Contagem física conferida pelo responsável',

@@ -28,8 +28,8 @@
 <script src="/admin/painel/app.varejo.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260724-estoque-mock1"></script>
-<script src="/admin/painel/app.compras.js?v=20260727-ledger-agenda1"></script>
+<script src="/admin/painel/app.atacado.js?v=20260730-multimarca1"></script>
+<script src="/admin/painel/app.compras.js?v=20260730-multimarca1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
@@ -53,9 +53,9 @@
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.galpao.contagem.js?v=20260727-contagem-fisica1"></script>
+<script src="/admin/painel/app.galpao.contagem.js?v=20260730-multimarca1"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
-<script src="/admin/painel/app.galpao.js?v=20260729-catalog-brand1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260730-multimarca1"></script>
 <script src="/admin/painel/app.catalogo.js?v=20260729-catalog-brand3"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
@@ -64,7 +64,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.js?v=20260729-catalog-brand2"></script>
+<script src="/admin/painel/app.js?v=20260730-multimarca1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -3005,7 +3005,7 @@
 
         <div
           x-data="{
-            selectedMeasure: '',
+            selectedVariant: '',
             visibleRows() {
               return stockRowsView().filter((row) =>
                 stockFiltro === 'todos' ||
@@ -3016,11 +3016,11 @@
             },
             get selectedRow() {
               const rows = this.visibleRows();
-              return rows.find((row) => row.measure === this.selectedMeasure) || rows[0] || null;
+              return rows.find((row) => `${row.measure}\u0000${row.brand}` === this.selectedVariant) || rows[0] || null;
             },
             selectRow(row) {
-              this.selectedMeasure = row.measure;
-              loadGalpaoFilme(row.measure);
+              this.selectedVariant = `${row.measure}\u0000${row.brand}`;
+              loadGalpaoFilme(row.measure, row.brand);
             }
           }"
           class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
@@ -3060,13 +3060,13 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <template x-for="row in visibleRows()" :key="row.measure">
+                  <template x-for="row in visibleRows()" :key="row.measure + '\u0000' + row.brand">
                     <tr role="button" tabindex="0"
                         @click="selectRow(row)"
                         @keydown.enter.prevent="selectRow(row)"
                         @keydown.space.prevent="selectRow(row)"
-                        :aria-selected="selectedRow && selectedRow.measure === row.measure"
-                        :class="selectedRow && selectedRow.measure === row.measure ? 'bg-emerald-50/90 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/80'"
+                        :aria-selected="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand"
+                        :class="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand ? 'bg-emerald-50/90 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/80'"
                         class="cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
                       <td class="px-5 py-3.5">
                         <div class="flex items-center gap-3">
@@ -3094,7 +3094,7 @@
                           <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
                                 :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(row) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
                                 x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span>
-                          <i x-show="selectedRow && selectedRow.measure === row.measure" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
+                          <i x-show="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
                         </div>
                       </td>
                     </tr>
@@ -3164,11 +3164,11 @@
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/70 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="arrow-down-to-line" class="h-4 w-4"></i> Baixa manual
                   </button>
-                  <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure)"
+                  <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure, selectedRow.brand)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     <i data-lucide="history" class="h-4 w-4"></i> Ver histórico
                   </button>
-                  <button @click="stockRemove(selectedRow.measure)"
+                  <button @click="stockRemove(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 sm:col-span-2 2xl:col-span-1">
                     <i data-lucide="trash-2" class="h-4 w-4"></i> Remover medida
                   </button>
@@ -4075,7 +4075,7 @@
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in stockReconciliation.rows" :key="row.key">
                     <tr class="hover:bg-gray-50">
-                      <td class="px-5 py-3 font-medium" x-text="row.official_measures[0] || row.key"></td>
+                      <td class="px-5 py-3"><p class="font-medium" x-text="row.official_measures[0] || row.key"></p><p class="text-[11px] text-gray-500" x-text="row.official_brand || 'Sem marca'"></p></td>
                       <td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity"></td>
                       <td class="px-4 py-3 text-center"><input type="number" min="0" step="1" x-model="row.counted_quantity" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-center text-sm font-semibold" placeholder="—"></td>
                       <td class="px-4 py-3 text-center font-semibold num" :class="stockCountDifference(row) > 0 ? 'text-emerald-700' : stockCountDifference(row) < 0 ? 'text-slate-700' : 'text-gray-500'" x-text="stockCountDifference(row) == null ? '—' : (stockCountDifference(row) > 0 ? '+' : '') + stockCountDifference(row)"></td>

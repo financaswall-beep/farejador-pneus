@@ -24,6 +24,7 @@ interface CancelWholesalePurchaseResult {
 
 interface PurchaseStockRemoval {
   measure: string;
+  brand: string;
   quantity: number;
   movement_count: number;
   before_quantity: number | null;
@@ -39,35 +40,38 @@ async function reversePurchaseStock(
 ): Promise<PurchaseStockRemoval[]> {
   const items = await client.query<PurchaseStockRemoval>(
     `WITH purchased AS (
-       SELECT measure,sum(quantity)::int AS quantity
+       SELECT measure,brand,sum(quantity)::int AS quantity
          FROM commerce.wholesale_purchase_items
-        WHERE environment=$1 AND purchase_id=$2 GROUP BY measure
+        WHERE environment=$1 AND purchase_id=$2 GROUP BY measure,brand
      )
-     SELECT p.measure,p.quantity,count(m.id)::int AS movement_count,
+     SELECT p.measure,p.brand,p.quantity,count(m.id)::int AS movement_count,
             min(m.qty_before)::int AS before_quantity,min(m.cost_before)::text AS before_cost,
             min(m.qty_after)::int AS applied_quantity,min(m.cost_after)::text AS applied_cost
        FROM purchased p
        LEFT JOIN commerce.wholesale_stock_movements m
-         ON m.environment=$1 AND m.measure=p.measure AND m.source='compra'
+         ON m.environment=$1 AND m.measure=p.measure AND m.brand=p.brand AND m.source='compra'
         AND m.ref=$2::text AND m.qty_delta>0
-      GROUP BY p.measure,p.quantity ORDER BY p.measure`, [environment, purchaseId]);
-  const problems: Array<{ measure: string; available: number; required: number; reason: string }> = [];
+      GROUP BY p.measure,p.brand,p.quantity ORDER BY p.measure,p.brand`, [environment, purchaseId]);
+  const problems: Array<{
+    measure: string; brand: string; available: number; required: number; reason: string;
+  }> = [];
   for (const item of items.rows) {
     const stock = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
       `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
-        WHERE environment=$1 AND measure=$2 FOR UPDATE`, [environment, item.measure]);
+        WHERE environment=$1 AND measure=$2 AND brand=$3 FOR UPDATE`,
+      [environment, item.measure, item.brand]);
     const quantity = Number(stock.rows[0]?.quantity_on_hand ?? 0);
     const cost = Number(stock.rows[0]?.unit_cost ?? 0);
     if (item.movement_count !== 1 || item.before_quantity === null
       || item.applied_quantity === null || item.applied_cost === null
       || item.applied_quantity - item.before_quantity !== item.quantity) {
-      problems.push({ measure: item.measure, available: quantity,
+      problems.push({ measure: item.measure, brand: item.brand, available: quantity,
         required: item.quantity, reason: 'movement_history_missing' });
     } else if (!stock.rows[0] || quantity !== item.applied_quantity) {
-      problems.push({ measure: item.measure, available: quantity,
+      problems.push({ measure: item.measure, brand: item.brand, available: quantity,
         required: item.quantity, reason: 'quantity_consumed' });
     } else if (Math.abs(cost - Number(item.applied_cost)) > 0.001) {
-      problems.push({ measure: item.measure, available: quantity,
+      problems.push({ measure: item.measure, brand: item.brand, available: quantity,
         required: item.quantity, reason: 'inventory_cost_changed' });
     }
   }
@@ -77,14 +81,17 @@ async function reversePurchaseStock(
   for (const item of items.rows) {
     const changed = await client.query(
       `UPDATE commerce.wholesale_stock
-          SET quantity_on_hand=$3,
-              unit_cost=COALESCE($4::numeric,unit_cost)
-        WHERE environment=$1 AND measure=$2 AND quantity_on_hand=$5 AND unit_cost=$6::numeric
+          SET quantity_on_hand=$4,
+              unit_cost=COALESCE($5::numeric,unit_cost)
+        WHERE environment=$1 AND measure=$2 AND brand=$3
+          AND quantity_on_hand=$6 AND unit_cost=$7::numeric
         RETURNING quantity_on_hand`,
-      [environment, item.measure, item.before_quantity, item.before_cost,
+      [environment, item.measure, item.brand, item.before_quantity, item.before_cost,
        item.applied_quantity, item.applied_cost],
     );
-    if (!changed.rows[0]) throw new Error(`purchase_stock_changed:${item.measure}`);
+    if (!changed.rows[0]) {
+      throw new Error(`purchase_stock_changed:${item.measure}:${item.brand}`);
+    }
   }
   return items.rows;
 }

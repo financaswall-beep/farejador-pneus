@@ -125,7 +125,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
       [{ measure: '90/90-18', quantity_on_hand: 3 }],
     );
     expect(await checkMatrizGalpaoShortfall(client, 'prod', [{ productId: 'p1', quantity: 5 }])).toEqual([
-      { measure: '90/90-18', available: 3, requested: 5 },
+      { measure: '90/90-18', brand: null, available: 3, requested: 5 },
     ]);
   });
 
@@ -138,14 +138,14 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
       ],
     );
     expect(await checkMatrizGalpaoShortfall(client, 'prod', [{ productId: 'p1', quantity: 12 }])).toEqual([
-      { measure: '90/90-18', available: 0, requested: 12 },
+      { measure: '90/90-18', brand: null, available: 0, requested: 12 },
     ]);
   });
 
   it('galpão vazio → falta tudo (não vende do vazio)', async () => {
     const { client } = mockClient([{ product_id: 'p1', tire_size: '90/90-18' }], []);
     expect(await checkMatrizGalpaoShortfall(client, 'test', [{ productId: 'p1', quantity: 1 }])).toEqual([
-      { measure: '90/90-18', available: 0, requested: 1 },
+      { measure: '90/90-18', brand: null, available: 0, requested: 1 },
     ]);
   });
 
@@ -153,7 +153,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
     const query = vi.fn().mockResolvedValueOnce({ rows: [{ product_id: 'p1', tire_size: null }] });
     const client = { query } as unknown as PoolClient;
     expect(await checkMatrizGalpaoShortfall(client, 'prod', [{ productId: 'p1', quantity: 2 }])).toEqual([
-      { measure: 'medida não identificada', available: 0, requested: 2 },
+      { measure: 'medida não identificada', brand: null, available: 0, requested: 2 },
     ]);
     expect(query).toHaveBeenCalledTimes(1); // parou na medida, não travou o galpão à toa
   });
@@ -174,7 +174,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
         { productId: 'p1', quantity: 2 },
         { productId: 'p2', quantity: 4 },
       ]),
-    ).toEqual([{ measure: '100/90-18', available: 1, requested: 4 }]);
+    ).toEqual([{ measure: '100/90-18', brand: null, available: 1, requested: 4 }]);
   });
 
   it('mesma medida em 2 produtos soma o PEDIDO por chave → falta no agregado', async () => {
@@ -190,7 +190,7 @@ describe('checkMatrizGalpaoShortfall — trava de oversell da matriz no varejo (
         { productId: 'p1', quantity: 3 },
         { productId: 'p2', quantity: 3 }, // total 6 > 5
       ]),
-    ).toEqual([{ measure: '90/90-18', available: 5, requested: 6 }]);
+    ).toEqual([{ measure: '90/90-18', brand: null, available: 5, requested: 6 }]);
   });
 
   it('lista vazia (ou qty 0) → sem falta e sem tocar no banco', async () => {

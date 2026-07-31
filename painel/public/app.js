@@ -99,9 +99,9 @@ function painelApp() {
     stockFiltro: 'todos',
     stockOperacao: null,
     stockBusca: '',
-    stockBaixaForm: { measure: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' },
+    stockBaixaForm: { measure: null, brand: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' },
     stockBaixaSaving: false,
-    galpaoFilme: { rows: [], measure: null, loading: false },
+    galpaoFilme: { rows: [], measure: null, brand: null, loading: false },
     stockReconciliation: { rows: [], summary: null, loading: false, error: null },
     stockCount: { reason: '', saving: false, message: null },
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado

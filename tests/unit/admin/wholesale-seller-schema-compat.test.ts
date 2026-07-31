@@ -50,7 +50,7 @@ describe('compatibilidade da coluna opcional de vendedor na venda de atacado', (
     await expect(registerWholesaleSale({
       environment: 'test', new_customer: { name: 'Cliente' }, created_by: 'teste',
       seller_collaborator_id: '33333333-3333-4333-8333-333333333333',
-      items: [{ measure: '90/90-18', quantity: 1, unit_price: 50 }],
+      items: [{ measure: '90/90-18', brand: 'Pirelli', quantity: 1, unit_price: 50 }],
       idempotency_key: 'sale-schema-test-1',
     }, pool)).resolves.toMatchObject({ order_id: 'order-1', total_amount: '50.00' });
 
@@ -65,7 +65,7 @@ describe('compatibilidade da coluna opcional de vendedor na venda de atacado', (
     await registerWholesaleSale({
       environment: 'test', new_customer: { name: 'Cliente' }, created_by: 'teste',
       seller_collaborator_id: '33333333-3333-4333-8333-333333333333',
-      items: [{ measure: '90/90-18', quantity: 1, unit_price: 50 }],
+      items: [{ measure: '90/90-18', brand: 'Pirelli', quantity: 1, unit_price: 50 }],
       idempotency_key: 'sale-schema-test-2',
     }, pool);
 

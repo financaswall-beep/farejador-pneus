@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
-import { canonicalCatalogBrand, syncCatalogBrandForMeasure } from './catalog-brand.js';
+import { canonicalCatalogBrand } from './catalog-brand.js';
 
 export interface PurchaseItemInput {
   measure: string;
@@ -28,25 +28,13 @@ export async function canonicalPurchaseItems(
       measures.set(raw, catalog.measure);
     }
   }
-  const canonical = items.map((item) => ({
-    ...item,
-    measure: measures.get(item.measure.trim())!,
-    brand: canonicalCatalogBrand(item.brand),
-  }));
-  const brandsByMeasure = new Map<string, Set<string>>();
-  for (const item of canonical) {
-    if (!item.brand) continue;
-    const brands = brandsByMeasure.get(item.measure) ?? new Set<string>();
-    brands.add(item.brand);
-    brandsByMeasure.set(item.measure, brands);
-  }
-  if ([...brandsByMeasure.values()].some((brands) => brands.size > 1)) {
-    throw new Error('stock_measure_brand_conflict');
-  }
-  for (const [measure, brands] of brandsByMeasure) {
-    await syncCatalogBrandForMeasure(client, {
-      environment, measure, brand: [...brands][0], actorLabel,
-    });
-  }
-  return canonical;
+  void actorLabel;
+  return items.map((item) => {
+    const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
+    return {
+      ...item,
+      measure: measures.get(item.measure.trim())!,
+      brand,
+    };
+  });
 }

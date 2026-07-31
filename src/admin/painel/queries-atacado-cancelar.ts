@@ -20,7 +20,7 @@ export interface WholesaleSaleRow {
   due_date: string | null;
   status: string;
   items_count: number;
-  items: Array<{ measure: string; quantity: number; unit_price: string }>;
+  items: Array<{ measure: string; brand: string | null; quantity: number; unit_price: string }>;
 }
 
 export async function listWholesaleSales(
@@ -33,7 +33,8 @@ export async function listWholesaleSales(
             o.payment_status,o.due_date,o.status,
             (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id=o.id)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'measure',i.measure,'quantity',i.quantity,'unit_price',i.unit_price) ORDER BY i.measure)
+              'measure',i.measure,'brand',i.brand,'quantity',i.quantity,'unit_price',i.unit_price)
+              ORDER BY i.measure,i.brand)
               FROM commerce.wholesale_order_items i WHERE i.order_id=o.id),'[]'::json) AS items
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
@@ -53,6 +54,7 @@ export interface CancelWholesaleSaleInput {
 
 interface StockHistoryItem {
   measure: string;
+  brand: string;
   quantity: number;
 }
 
@@ -95,28 +97,29 @@ export async function cancelWholesaleSale(
       ? await getWholesaleSaleLedgerState(client, environment, input.order_id) : null;
 
     const history = await client.query<{
-      measure: string; returned_quantity: number; unverified_quantity: number;
+      measure: string; brand: string; returned_quantity: number; unverified_quantity: number;
     }>(
       `WITH nominal AS (
-         SELECT measure,sum(quantity)::int AS quantity
+         SELECT measure,brand,sum(quantity)::int AS quantity
            FROM commerce.wholesale_order_items
-          WHERE environment=$1 AND order_id=$2 GROUP BY measure
+          WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand
        ), filmed AS (
-         SELECT measure,(-sum(qty_delta))::int AS quantity
+         SELECT measure,brand,(-sum(qty_delta))::int AS quantity
            FROM commerce.wholesale_stock_movements
           WHERE environment=$1 AND source='venda_atacado' AND ref=$2::text AND qty_delta<0
-          GROUP BY measure HAVING -sum(qty_delta)>0
+          GROUP BY measure,brand HAVING -sum(qty_delta)>0
        )
-       SELECT n.measure,LEAST(n.quantity,COALESCE(f.quantity,0))::int AS returned_quantity,
+       SELECT n.measure,n.brand,
+              LEAST(n.quantity,COALESCE(f.quantity,0))::int AS returned_quantity,
               GREATEST(n.quantity-COALESCE(f.quantity,0),0)::int AS unverified_quantity
-         FROM nominal n LEFT JOIN filmed f USING (measure) ORDER BY n.measure`,
+         FROM nominal n LEFT JOIN filmed f USING (measure,brand) ORDER BY n.measure,n.brand`,
       [environment, input.order_id]);
     const stockReturned = history.rows
       .filter((row) => row.returned_quantity > 0)
-      .map((row) => ({ measure: row.measure, quantity: row.returned_quantity }));
+      .map((row) => ({ measure: row.measure, brand: row.brand, quantity: row.returned_quantity }));
     const stockUnverified = history.rows
       .filter((row) => row.unverified_quantity > 0)
-      .map((row) => ({ measure: row.measure, quantity: row.unverified_quantity }));
+      .map((row) => ({ measure: row.measure, brand: row.brand, quantity: row.unverified_quantity }));
     if (stockReturned.length === 0) {
       throw new Error(`sale_stock_history_missing:${JSON.stringify(stockUnverified)}`);
     }

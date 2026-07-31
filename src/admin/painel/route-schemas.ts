@@ -76,7 +76,7 @@ export const setDeliveryRadiusBodySchema = z.object({
 // Preço DIGITADO por item. Admin-only (dado só da matriz).
 export const wholesaleItemSchema = z.object({
   measure: z.string().min(1).max(60),
-  brand: z.string().min(1).max(60).nullable().optional(),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
   quantity: z.number().int().positive().max(100000),
   unit_price: z.number().min(0).max(9999999.99),
 });
@@ -110,7 +110,7 @@ export const registerWholesaleSaleSchema = z
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
 export const setWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
-  brand: z.string().max(60).nullable().optional(),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
   quantity_on_hand: z.number().int().min(0).max(1000000),
   unit_cost: z.number().min(0).max(9999999.99).optional(),
   min_quantity: z.number().int().min(0).max(1000000).nullable().optional(), // 0126: null/ausente = sem alerta
@@ -119,11 +119,12 @@ export const setWholesaleStockSchema = z.object({
 });
 export const removeWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
 });
 // Entrada de compra (custo médio): soma quantidade + recalcula o custo médio ponderado.
 export const entryWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
-  brand: z.string().max(60).nullable().optional(),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
   quantity_in: z.number().int().positive().max(1000000),
   unit_cost: z.number().min(0).max(9999999.99),
   entry_nature: z.enum(['inventory_found', 'owner_contribution', 'opening_balance', 'other']),
@@ -133,6 +134,7 @@ export const entryWholesaleStockSchema = z.object({
 // Baixa MANUAL com motivo (0128 — quebra/perda/uso interno): recusa acima do saldo.
 export const baixaWholesaleStockSchema = z.object({
   measure: z.string().min(1).max(60),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
   quantity: z.number().int('quantidade_inteira').positive().max(1000000),
   nature: z.enum(['breakage', 'loss', 'internal_use', 'other']),
   reason: z.string().min(2).max(300),
@@ -141,6 +143,7 @@ export const baixaWholesaleStockSchema = z.object({
 export const physicalStockCountSchema = z.object({
   rows: z.array(z.object({
     measure: z.string().trim().min(1).max(60),
+    brand: z.string().trim().min(1, 'brand_required').max(60),
     counted_quantity: z.number().int().min(0).max(1_000_000),
   })).min(1).max(500),
   reason: z.string().trim().min(2).max(300),
@@ -151,7 +154,7 @@ export const physicalStockCountSchema = z.object({
 export const registerSupplierSchema = z.object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(), notes: z.string().max(1000).nullable().optional() });
 export const purchaseItemSchema = z.object({
   measure: z.string().min(1).max(60),
-  brand: z.string().min(1).max(60).nullable().optional(),
+  brand: z.string().trim().min(1, 'brand_required').max(60),
   // 'quantidade_inteira' = código que o front traduz (o texto cru do zod vaza inglês).
   quantity: z.number().int('quantidade_inteira').positive().max(100000),
   unit_cost: z.number().min(0).max(9999999.99),
