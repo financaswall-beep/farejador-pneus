@@ -154,5 +154,7 @@ describe('catalogo no painel', () => {
     expect(html).toContain('data-testid="catalog-create-drawer"');
     expect(html).toContain('class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col');
     expect(html).not.toContain('w-[min(520px,calc(100vw-24px))] -translate-x-1/2');
+    expect(html).toContain('x-show="!catalogoCadastro.open && !catalogoSelecionado"');
+    expect(html.match(/style="display:none;z-index:100" class="fixed inset-0"/g)).toHaveLength(2);
   });
 });

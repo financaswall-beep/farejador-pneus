@@ -8290,7 +8290,8 @@
               Custo do Estoque · preço do Catálogo · venda congelada
             </div>
           </div>
-          <div class="grid min-w-[360px] grid-cols-3 divide-x divide-white/20 text-center">
+          <div x-show="!catalogoCadastro.open && !catalogoSelecionado"
+               class="grid min-w-[360px] grid-cols-3 divide-x divide-white/20 text-center">
             <div class="px-5"><i data-lucide="package" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.products"></p><p class="text-xs text-emerald-100/70">produtos</p></div>
             <div class="px-5"><i data-lucide="tags" class="mx-auto h-5 w-5 text-emerald-200"></i><p class="mt-2 text-3xl font-bold" x-text="catalogoSummary.brands"></p><p class="text-xs text-emerald-100/70">marcas</p></div>
             <div class="px-5"><i data-lucide="triangle-alert" class="mx-auto h-5 w-5 text-amber-300"></i><p class="mt-2 text-3xl font-bold text-amber-300" x-text="catalogoSummary.without_price"></p><p class="text-xs text-amber-100/75">sem preço</p></div>
@@ -8412,7 +8413,7 @@
       </section>
     </div>
 
-    <div x-show="catalogoCadastro.open" x-cloak style="display:none" class="fixed inset-0 z-[72]">
+    <div x-show="catalogoCadastro.open" x-cloak style="display:none;z-index:100" class="fixed inset-0">
       <div data-testid="catalog-create-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoCreateClose()"></div>
       <aside data-testid="catalog-create-drawer"
              class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
@@ -8439,7 +8440,7 @@
       </aside>
     </div>
 
-    <div x-show="catalogoSelecionado" x-cloak style="display:none" class="fixed inset-0 z-[70]">
+    <div x-show="catalogoSelecionado" x-cloak style="display:none;z-index:100" class="fixed inset-0">
       <div data-testid="catalog-editor-backdrop" class="absolute inset-0 bg-gray-950/30 backdrop-blur-sm" @click="catalogoClose()"></div>
       <aside class="absolute inset-y-0 right-0 flex max-w-[440px] flex-col border-l border-gray-200 bg-white shadow-2xl"
              style="width:min(440px, calc(100vw - 24px));"
