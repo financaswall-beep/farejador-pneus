@@ -120,6 +120,6 @@ describe('Colaboradores - dialogos e carregamento confiaveis', () => {
   it('invalida o cache dos tres scripts alterados', () => {
     expect(html).toContain('app.colaboradores.js?v=20260719-colab-dialog1');
     expect(html).toContain('app.colaboradores.gestao.js?v=20260719-colab-dialog1');
-    expect(html).toContain('app.js?v=20260731-multimarca3');
+    expect(html).toContain('app.js?v=20260731-catalog-create1');
   });
 });

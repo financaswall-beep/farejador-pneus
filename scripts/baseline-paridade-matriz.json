@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-07-31T03:08:45.106Z",
+  "geradoEm": "2026-07-31T04:14:20.937Z",
   "commitBase": "dd64a35",
-  "total": 986,
+  "total": 992,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -110,7 +110,13 @@
     "catalogoBrandLogo": "function",
     "catalogoBrands": "value:array",
     "catalogoBusca": "value:string",
+    "catalogoCadastro": "value:object",
     "catalogoClose": "function",
+    "catalogoCreateCanSave": "function",
+    "catalogoCreateClose": "function",
+    "catalogoCreateOpen": "function",
+    "catalogoCreateSave": "function",
+    "catalogoCreateViewStock": "function",
     "catalogoDate": "function",
     "catalogoError": "value:null",
     "catalogoFiltrados": "function",

@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs';
 import vm from 'node:vm';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 function loadCatalogModule() {
   const sandbox = { window: { PAINEL_MODULES: {} }, console, setTimeout };
@@ -46,7 +46,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
-    expect(html).toContain('app.catalogo.js?v=20260731-multimarca3');
+    expect(html).toContain('app.catalogo.js?v=20260731-catalog-create1');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -89,5 +89,67 @@ describe('catalogo no painel', () => {
     for (const brand of ['Pirelli', 'Michelin', 'Maggion', 'Kenda']) {
       expect(html).toContain(`<option value="${brand}"></option>`);
     }
+  });
+
+  it('abre o cadastro somente para variante de estoque e segue para definir preco', async () => {
+    const module = loadCatalogModule();
+    const context = {
+      ...module,
+      catalogoCadastro: {
+        open: false, row: null, form: { product_code: '', product_name: '' },
+        saving: false, message: null,
+      },
+      catalogoRows: [],
+      catalogoSelecionado: null,
+      catalogoHistory: [],
+      catalogoPriceForm: { price: '', reason: '', marginPreset: null },
+      catalogoMessage: null,
+      apiPost: vi.fn().mockResolvedValue({ product_id: 'produto-metzeler' }),
+      loadCatalogo: vi.fn(async function (this: { catalogoRows: unknown[] }) {
+        this.catalogoRows = [{
+          product_id: 'produto-metzeler',
+          catalogued: true,
+          brand: 'Metzeler',
+          tire_size: '90/90-18',
+          price_amount: null,
+        }];
+      }),
+      catalogoLoadHistory: vi.fn().mockResolvedValue(undefined),
+      $nextTick: vi.fn(),
+    };
+
+    module.catalogoCreateOpen.call(context, {
+      catalogued: false, brand: 'Metzeler', tire_size: '90/90-18',
+    });
+    expect(context.catalogoCadastro).toMatchObject({
+      open: true,
+      form: {
+        product_code: 'MET-909018',
+        product_name: 'Pneu Metzeler 90/90-18',
+      },
+    });
+
+    await module.catalogoCreateSave.call(context);
+    expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
+      measure: '90/90-18',
+      brand: 'Metzeler',
+      product_code: 'MET-909018',
+      product_name: 'Pneu Metzeler 90/90-18',
+    });
+    expect(context.catalogoSelecionado).toMatchObject({
+      product_id: 'produto-metzeler',
+      price_amount: null,
+    });
+    expect(context.catalogoMessage).toMatchObject({
+      ok: true,
+      text: expect.stringContaining('defina o pre'),
+    });
+  });
+
+  it('exibe o comando de cadastro e avisa que o preco ainda bloqueia a venda', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    expect(html).toContain("'Cadastrar produto'");
+    expect(html).toContain('@click="catalogoCreateSave()"');
+    expect(html).toContain('continuará bloqueado para venda');
   });
 });

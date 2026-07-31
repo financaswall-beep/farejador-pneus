@@ -283,7 +283,7 @@ function painelApp() {
     kpis: [], leadsRecuperar: [], resumoSeries: [],
     pedidos: [], produtos: [],
     catalogoRows: [], catalogoBrands: ['Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda'], catalogoSummary: { products: 0, stock_only: 0, brands: 0, without_price: 0, with_stock: 0 },
-    catalogoLoading: false, catalogoError: null, catalogoBusca: '', catalogoMarca: 'todas', catalogoFiltro: 'todos', catalogoPagina: 1, catalogoPorPagina: 7, catalogoSelecionado: null, catalogoHistory: [], catalogoPriceForm: { price: '', reason: '', marginPreset: null }, catalogoSaving: false, catalogoMessage: null,
+    catalogoLoading: false, catalogoError: null, catalogoBusca: '', catalogoMarca: 'todas', catalogoFiltro: 'todos', catalogoPagina: 1, catalogoPorPagina: 7, catalogoSelecionado: null, catalogoHistory: [], catalogoPriceForm: { price: '', reason: '', marginPreset: null }, catalogoSaving: false, catalogoMessage: null, catalogoCadastro: { open: false, row: null, form: { product_code: '', product_name: '' }, saving: false, message: null },
     redeKpis: [],
     parceirosRede: [],
     // Raio de entrega (proximidade-primeiro Fase 2): estado do editor na matriz.

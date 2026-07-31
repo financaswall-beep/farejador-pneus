@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-07-31T03:08:59.984Z",
-  "total": 214,
+  "geradoEm": "2026-07-31T04:14:23.863Z",
+  "total": 215,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -139,6 +139,7 @@
     "POST /admin/api/bot/resiliencia/reprocessar AUTH(1)",
     "POST /admin/api/bot/resiliencia/resolver AUTH(1)",
     "POST /admin/api/catalog/:product_id/price AUTH(1)",
+    "POST /admin/api/catalog/products AUTH(1)",
     "POST /admin/api/clientes-v2/:id/split AUTH(1)",
     "POST /admin/api/clientes-v2/backfill AUTH(1)",
     "POST /admin/api/clientes-v2/candidates/:id/approve AUTH(1)",

@@ -13,6 +13,10 @@ describe('estoque do galpão por medida e marca', () => {
     typeof import('../../src/admin/painel/queries-compras-relatorios.js').getWholesalePriceReport;
   let catalogOverview:
     typeof import('../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
+  let setCatalogPrice:
+    typeof import('../../src/admin/painel/queries-catalogo.js').setCatalogPrice;
+  let createCatalogProduct:
+    typeof import('../../src/admin/painel/queries-catalogo-create.js').createCatalogProductFromStock;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -30,8 +34,10 @@ describe('estoque do galpão por medida e marca', () => {
       = await import('../../src/admin/painel/wholesale-stock.js'));
     ({ getWholesalePriceReport: priceReport }
       = await import('../../src/admin/painel/queries-compras-relatorios.js'));
-    ({ getCatalogOverview: catalogOverview }
+    ({ getCatalogOverview: catalogOverview, setCatalogPrice }
       = await import('../../src/admin/painel/queries-catalogo.js'));
+    ({ createCatalogProductFromStock: createCatalogProduct }
+      = await import('../../src/admin/painel/queries-catalogo-create.js'));
 
     const product = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.products
@@ -99,6 +105,42 @@ describe('estoque do galpão por medida e marca', () => {
         official_quantity_on_hand: 3, block_reason: 'catalog_product_missing',
       }),
     ]));
+
+    const created = await createCatalogProduct({
+      measure: '90/90-18',
+      brand: 'Metzeler',
+      productCode: `MULTI-MET-${Date.now()}`,
+      productName: 'Pneu Metzeler 90/90-18',
+      actorLabel: 'teste-multimarcas',
+      environment: 'test',
+    }, db.pool);
+    const withoutPrice = await catalogOverview('test', db.pool);
+    expect(withoutPrice.rows).toContainEqual(expect.objectContaining({
+      product_id: created.product_id,
+      tire_size: '90/90-18',
+      brand: 'Metzeler',
+      catalogued: true,
+      official_quantity_on_hand: 3,
+      price_amount: null,
+      sellable: false,
+      block_reason: 'catalog_price_missing',
+    }));
+
+    await setCatalogPrice({
+      productId: created.product_id,
+      priceAmount: 180,
+      reason: 'Preco inicial do produto',
+      actorLabel: 'teste-multimarcas',
+      environment: 'test',
+    }, db.pool);
+    const sellable = await catalogOverview('test', db.pool);
+    expect(sellable.rows).toContainEqual(expect.objectContaining({
+      product_id: created.product_id,
+      brand: 'Metzeler',
+      price_amount: 180,
+      sellable: true,
+      block_reason: null,
+    }));
 
     const client = await db.pool.connect();
     try {
