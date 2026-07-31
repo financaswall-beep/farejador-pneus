@@ -12,16 +12,18 @@ interface GateRow {
   source_total: string;
   ledger_total: string;
   difference: string;
+  pending_marketing_campaigns: number;
 }
 
 export interface MatrizLedgerCompetenceGate {
-  status: 'green' | 'red';
+  status: 'green' | 'yellow' | 'red';
   required_competences: number;
   checked_competences: number;
   total_abs_difference: string;
   competences: Array<{
     competence: string;
-    status: 'green' | 'red';
+    status: 'green' | 'yellow' | 'red';
+    pending_marketing_campaigns: number;
     total_abs_difference: string;
     origins: Array<{
       origin: Origin;
@@ -109,7 +111,8 @@ export async function getMatrizLedgerCompetenceGate(
              AND deleted_at>=m.month_ts AND deleted_at<m.month_end_ts),0) FROM months m
        UNION ALL
        SELECT m.competence,'marketing',
-         COALESCE((SELECT sum(spend) FROM marketing.meta_insights_daily
+         COALESCE((SELECT sum(CASE WHEN $3::boolean THEN financial_spend ELSE spend END)
+           FROM marketing.meta_insights_daily_scoped
            WHERE environment=$1 AND entity_level='campaign'
              AND account_currency='BRL' AND metric_date>=m.competence
              AND metric_date<m.month_end),0) FROM months m
@@ -166,12 +169,19 @@ export async function getMatrizLedgerCompetenceGate(
      SELECT m.competence::text,o.origin,
             COALESCE(s.value,0)::numeric(14,2)::text source_total,
             COALESCE(l.value,0)::numeric(14,2)::text ledger_total,
-            (COALESCE(s.value,0)-COALESCE(l.value,0))::numeric(14,2)::text difference
+            (COALESCE(s.value,0)-COALESCE(l.value,0))::numeric(14,2)::text difference,
+            (SELECT count(DISTINCT (mi.ad_account_id,mi.campaign_id))::int
+               FROM marketing.meta_insights_daily_scoped mi
+              WHERE $3::boolean AND mi.environment=$1
+                AND mi.entity_level='campaign' AND mi.spend>0
+                AND mi.campaign_scope='pending'
+                AND mi.metric_date>=m.competence AND mi.metric_date<m.month_end)
+              AS pending_marketing_campaigns
        FROM months m CROSS JOIN origins o
        LEFT JOIN source_values s ON s.competence=m.competence AND s.origin=o.origin
        LEFT JOIN ledger_values l ON l.competence=m.competence AND l.origin=o.origin
       ORDER BY m.competence,o.origin`,
-    [environment, months],
+    [environment, months, env.MARKETING_SCOPE_ENFORCEMENT_ENABLED],
   );
   const grouped = new Map<string, GateRow[]>();
   for (const row of result.rows) {
@@ -180,12 +190,18 @@ export async function getMatrizLedgerCompetenceGate(
     grouped.set(row.competence, current);
   }
   let total = 0;
+  let pendingTotal = 0;
   const reports = months.map((competence) => {
     const rows = grouped.get(competence) ?? [];
     const difference = rows.reduce((sum, row) => sum + Math.abs(cents(row.difference)), 0);
+    const pendingMarketing = rows[0]?.pending_marketing_campaigns ?? 0;
     total += difference;
+    pendingTotal += pendingMarketing;
     return {
-      competence, status: difference === 0 ? 'green' as const : 'red' as const,
+      competence,
+      status: difference > 0 ? 'red' as const
+        : pendingMarketing > 0 ? 'yellow' as const : 'green' as const,
+      pending_marketing_campaigns: pendingMarketing,
       total_abs_difference: money(difference),
       origins: rows.map((row) => ({
         origin: row.origin, source_total: row.source_total,
@@ -195,7 +211,7 @@ export async function getMatrizLedgerCompetenceGate(
     };
   });
   return {
-    status: total === 0 ? 'green' : 'red',
+    status: total > 0 ? 'red' : pendingTotal > 0 ? 'yellow' : 'green',
     required_competences: 2, checked_competences: reports.length,
     total_abs_difference: money(total), competences: reports,
   };

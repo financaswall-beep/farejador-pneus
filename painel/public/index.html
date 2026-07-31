@@ -46,10 +46,10 @@
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260726-marketing-detail1"></script>
-<script src="/admin/painel/app.marketing.campaigns.js?v=20260726-marketing-meta2"></script>
+<script src="/admin/painel/app.marketing.campaigns.js?v=20260731-marketing-scope1"></script>
 <script src="/admin/painel/app.marketing.campaign-detail.js?v=20260726-marketing-detail2"></script>
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
-<script src="/admin/painel/app.marketing.integrations.js?v=20260727-marketing-capi1"></script>
+<script src="/admin/painel/app.marketing.integrations.js?v=20260731-marketing-scope1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
@@ -7443,6 +7443,7 @@
                     <tr>
                       <th class="px-5 py-3 font-medium">Campanha</th>
                       <th class="px-3 py-3 font-medium">Canal</th>
+                      <th class="px-3 py-3 font-medium">Escopo financeiro</th>
                       <th class="px-3 py-3 font-medium">Entrega</th>
                       <th class="px-3 py-3 text-right font-medium">Investimento</th>
                       <th class="px-3 py-3 text-right font-medium">Impressões</th>
@@ -7484,6 +7485,21 @@
                             </template>
                             <span x-text="marketingCampaignChannelName(row.channel)"></span>
                           </span>
+                        </td>
+                        <td class="px-3 py-4" @click.stop @keydown.stop>
+                          <label class="sr-only" :for="`scope-${row.platform_id}`">Escopo financeiro</label>
+                          <select :id="`scope-${row.platform_id}`"
+                                  :value="row.scope || 'pending'"
+                                  :disabled="row.scope_updating || !row.ad_account_id"
+                                  @change.stop="updateMarketingCampaignScope(row, $event)"
+                                  class="rounded-lg border px-2 py-1 text-[11px] font-semibold outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                                  :class="marketingCampaignScopeClass(row.scope)">
+                            <option value="pending">Pendente</option>
+                            <option value="matrix">Matriz</option>
+                            <option value="external">Externa</option>
+                          </select>
+                          <p class="mt-1 text-[10px] text-gray-400"
+                             x-text="row.scope === 'matrix' ? 'entra no Financeiro' : row.scope === 'external' ? 'somente visível' : 'bloqueia fechamento'"></p>
                         </td>
                         <td class="px-3 py-4">
                           <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">Com entrega</span>

@@ -1,4 +1,5 @@
 import type {
+  MetaCampaignScope,
   MetaInsightRow,
   MetaPeriodSummary,
 } from './marketing-meta.js';
@@ -13,6 +14,14 @@ const LEAD_ACTION_TYPES = new Set<string>(LEAD_ACTION_PRIORITY);
 function numberValue(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function campaignScope(value: unknown): MetaCampaignScope {
+  return value === 'pending' || value === 'external' ? value : 'matrix';
+}
+
+function includedInSummary(value: unknown): boolean {
+  return value !== false && value !== 'false' && value !== 0 && value !== '0';
 }
 
 export function canonicalConversationAction(actions: unknown): {
@@ -45,8 +54,11 @@ export function summarizeMetaRows(
   const byDate = new Map<string, MetaPeriodSummary['daily'][number]>();
   const byCampaign = new Map<string, {
     id: string;
+    adAccountId: string | null;
     name: string;
+    scope: MetaCampaignScope;
     spend: number;
+    financialSpend: number;
     conversations: number;
     impressions: number;
     clicks: number;
@@ -61,44 +73,54 @@ export function summarizeMetaRows(
     const date = String(row.date_start ?? '');
     if (date < since || date > until) continue;
     const rowSpend = numberValue(row.spend);
+    const rowFinancialSpend = numberValue(row.financial_spend ?? row.spend);
     const rowConversations = canonicalConversationAction(row.actions).value;
     const rowImpressions = numberValue(row.impressions);
     const rowClicks = numberValue(row.clicks);
-    spend += rowSpend;
-    conversations += rowConversations;
-    impressions += rowImpressions;
-    clicks += rowClicks;
+    const included = includedInSummary(row.summary_included);
+    if (included) {
+      spend += rowFinancialSpend;
+      conversations += rowConversations;
+      impressions += rowImpressions;
+      clicks += rowClicks;
+    }
     if (row.campaign_id) {
       const id = String(row.campaign_id);
-      campaigns.add(id);
+      if (included) campaigns.add(id);
       const current = byCampaign.get(id) ?? {
         id,
+        adAccountId: row.ad_account_id ? String(row.ad_account_id) : null,
         name: String(row.campaign_name || id),
+        scope: campaignScope(row.campaign_scope),
         spend: 0,
+        financialSpend: 0,
         conversations: 0,
         impressions: 0,
         clicks: 0,
         deliveryDates: new Set<string>(),
       };
       current.spend += rowSpend;
+      current.financialSpend += rowFinancialSpend;
       current.conversations += rowConversations;
       current.impressions += rowImpressions;
       current.clicks += rowClicks;
       if (date) current.deliveryDates.add(date);
       byCampaign.set(id, current);
     }
-    const daily = byDate.get(date) ?? {
-      date,
-      spend: 0,
-      conversations: 0,
-      impressions: 0,
-      clicks: 0,
-    };
-    daily.spend += rowSpend;
-    daily.conversations += rowConversations;
-    daily.impressions += rowImpressions;
-    daily.clicks += rowClicks;
-    byDate.set(date, daily);
+    if (included) {
+      const daily = byDate.get(date) ?? {
+        date,
+        spend: 0,
+        conversations: 0,
+        impressions: 0,
+        clicks: 0,
+      };
+      daily.spend += rowFinancialSpend;
+      daily.conversations += rowConversations;
+      daily.impressions += rowImpressions;
+      daily.clicks += rowClicks;
+      byDate.set(date, daily);
+    }
   }
 
   const roundedSpend = Math.round(spend * 100) / 100;
@@ -123,11 +145,15 @@ export function summarizeMetaRows(
     campaign_rows: [...byCampaign.values()]
       .map((row) => {
         const rounded = Math.round(row.spend * 100) / 100;
+        const roundedFinancial = Math.round(row.financialSpend * 100) / 100;
         const dates = [...row.deliveryDates].sort();
         return {
           id: row.id,
+          ad_account_id: row.adAccountId,
           name: row.name,
+          scope: row.scope,
           spend: rounded,
+          financial_spend: roundedFinancial,
           conversations: Math.round(row.conversations),
           impressions: Math.round(row.impressions),
           clicks: Math.round(row.clicks),

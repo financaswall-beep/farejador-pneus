@@ -11,6 +11,7 @@ export {
 } from './marketing-meta-summary.js';
 
 export type MarketingPeriod = '7d' | '30d';
+export type MetaCampaignScope = 'pending' | 'matrix' | 'external';
 
 export interface MetaMarketingConfig {
   accessToken: string;
@@ -28,8 +29,11 @@ export interface MetaDailyMetric {
 
 export interface MetaCampaignMetric {
   id: string;
+  ad_account_id?: string | null;
   name: string;
+  scope?: MetaCampaignScope;
   spend: number;
+  financial_spend?: number;
   conversations: number;
   impressions: number;
   clicks: number;
@@ -60,6 +64,7 @@ export interface MetaMarketingSnapshot {
 export type MetaInsightLevel = 'campaign' | 'ad';
 
 export interface MetaInsightRow {
+  ad_account_id?: unknown;
   account_currency?: unknown;
   campaign_id?: unknown;
   campaign_name?: unknown;
@@ -69,6 +74,9 @@ export interface MetaInsightRow {
   ad_name?: unknown;
   date_start?: unknown;
   spend?: unknown;
+  financial_spend?: unknown;
+  campaign_scope?: unknown;
+  summary_included?: unknown;
   impressions?: unknown;
   clicks?: unknown;
   reach?: unknown;

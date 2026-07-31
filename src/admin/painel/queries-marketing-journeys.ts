@@ -180,7 +180,10 @@ export async function getMarketingJourneys(
     ledgerAvailable: attributionReport.available,
   });
 
-  const campaigns = (meta?.current.campaign_rows ?? []).map((row) => {
+  const scopedCampaignRows = (meta?.current.campaign_rows ?? []).filter((row) => (
+    !env.MARKETING_SCOPE_ENFORCEMENT_ENABLED || row.scope === 'matrix'
+  ));
+  const campaigns = scopedCampaignRows.map((row) => {
     const noConversations = row.conversations === 0;
     const noCtwaAnywhere = operational.available && operational.ctwa === 0;
     const campaignAttribution = attributionReport?.campaigns

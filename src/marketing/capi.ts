@@ -18,6 +18,8 @@ export interface CapiOutboxRow {
   environment: 'prod' | 'test';
   payload: Record<string, unknown>;
   attempts: number;
+  attribution_id: string;
+  campaign_scope_id: string | null;
 }
 
 function normalize(value: string | null): string | null {
@@ -97,10 +99,21 @@ export async function enqueueCapiPurchases(options: {
     });
     const inserted = await dbPool.query(
       `INSERT INTO marketing.capi_outbox
-         (environment,attribution_id,event_name,event_id,payload)
-       VALUES ($1,$2,'Purchase',$3,$4)
-       ON CONFLICT (environment,event_name,event_id) DO NOTHING`,
-      [env.FAREJADOR_ENV, row.attribution_id, row.order_number, JSON.stringify(payload)],
+         (environment,attribution_id,campaign_scope_id,event_name,event_id,payload)
+       VALUES ($1,$2,$3,'Purchase',$4,$5)
+       ON CONFLICT (environment,event_name,event_id) DO UPDATE
+         SET attribution_id=EXCLUDED.attribution_id,
+             campaign_scope_id=EXCLUDED.campaign_scope_id,
+             payload=EXCLUDED.payload,status='pending',attempts=0,not_before=now(),
+             suppressed_at=NULL,suppression_reason=NULL,updated_at=now()
+       WHERE marketing.capi_outbox.status='suppressed'`,
+      [
+        env.FAREJADOR_ENV,
+        row.attribution_id,
+        row.campaign_scope_id,
+        row.order_number,
+        JSON.stringify(payload),
+      ],
     );
     enqueued += inserted.rowCount ?? 0;
   }
@@ -126,10 +139,28 @@ async function pickCapiEvent(client: PoolClient): Promise<CapiOutboxRow | null> 
      UPDATE marketing.capi_outbox q
         SET status='processing',attempts=attempts+1,locked_at=now(),locked_by=$2,updated_at=now()
        FROM candidate c WHERE q.id=c.id
-     RETURNING q.id,q.environment,q.payload,q.attempts`,
+     RETURNING q.id,q.environment,q.payload,q.attempts,q.attribution_id,
+               q.campaign_scope_id`,
     [env.FAREJADOR_ENV, WORKER_ID],
   );
   return result.rows[0] ?? null;
+}
+
+async function lockCapiCampaignScope(
+  client: PoolClient,
+  row: CapiOutboxRow,
+): Promise<'matrix' | 'pending' | 'external' | 'unresolved'> {
+  if (!row.campaign_scope_id) return 'unresolved';
+  const result = await client.query<{ scope: 'matrix' | 'pending' | 'external' }>(
+    `SELECT s.scope
+       FROM marketing.campaign_scopes s
+       JOIN marketing.capi_outbox q
+         ON q.environment=s.environment AND q.campaign_scope_id=s.id
+      WHERE q.environment=$1 AND q.id=$2
+      FOR SHARE OF s`,
+    [row.environment, row.id],
+  );
+  return result.rows[0]?.scope ?? 'unresolved';
 }
 
 function capiPayloadExpired(payload: Record<string, unknown>, now: Date): boolean {
@@ -145,6 +176,7 @@ export async function pollCapiOutbox(options: {
   dbPool?: Pool;
   fetcher?: typeof fetch;
   now?: Date;
+  scopeEnforcement?: boolean;
 } = {}): Promise<boolean> {
   const dbPool = options.dbPool ?? defaultPool;
   const client = await dbPool.connect();
@@ -154,6 +186,23 @@ export async function pollCapiOutbox(options: {
     row = await pickCapiEvent(client);
     await client.query('COMMIT');
     if (!row) return false;
+    await client.query('BEGIN');
+    const scopeEnforcement = options.scopeEnforcement
+      ?? env.MARKETING_SCOPE_ENFORCEMENT_ENABLED;
+    const campaignScope = scopeEnforcement
+      ? await lockCapiCampaignScope(client, row)
+      : 'matrix';
+    if (scopeEnforcement && campaignScope !== 'matrix') {
+      await client.query(
+        `UPDATE marketing.capi_outbox
+            SET status='suppressed',locked_at=NULL,locked_by=NULL,
+                suppressed_at=now(),suppression_reason=$3,updated_at=now()
+          WHERE environment=$1 AND id=$2`,
+        [row.environment, row.id, `campaign_scope_${campaignScope}`],
+      );
+      await client.query('COMMIT');
+      return true;
+    }
     if (capiPayloadExpired(row.payload, options.now ?? new Date())) {
       await client.query(
         `UPDATE marketing.capi_outbox
@@ -164,6 +213,7 @@ export async function pollCapiOutbox(options: {
           WHERE environment=$1 AND id=$2`,
         [row.environment, row.id],
       );
+      await client.query('COMMIT');
       return true;
     }
     const ack = await sendCapiPayload(row.payload, { fetcher: options.fetcher });
@@ -175,6 +225,7 @@ export async function pollCapiOutbox(options: {
         WHERE environment=$1 AND id=$4`,
       [row.environment, ack.eventsReceived, ack.fbtraceId, row.id],
     );
+    await client.query('COMMIT');
     return true;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

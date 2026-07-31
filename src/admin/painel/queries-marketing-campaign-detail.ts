@@ -9,37 +9,17 @@ import {
 } from '../../marketing/reporting.js';
 import { loadCampaignAttributionDetailData } from './queries-marketing-campaign-detail-data.js';
 import { buildCampaignDetailEnrichment } from './queries-marketing-campaign-detail-enrichment.js';
+import {
+  aggregate,
+  decision,
+  derivedMetrics,
+  numberValue,
+  round,
+  type InsightRow,
+} from './queries-marketing-campaign-detail-metrics.js';
 
 interface DetailConfig {
   attributionEnabled: boolean;
-}
-
-interface InsightRow {
-  entity_level: 'campaign' | 'ad';
-  entity_id: string;
-  entity_name: string | null;
-  campaign_id: string;
-  campaign_name: string | null;
-  adset_id: string | null;
-  adset_name: string | null;
-  metric_date: string;
-  account_currency: string;
-  spend: unknown;
-  impressions: unknown;
-  clicks: unknown;
-  conversations: unknown;
-  actions_raw: unknown;
-}
-
-interface Aggregate {
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversations: number;
-  firstReplies: number;
-  linkClicks: number;
-  videoViews: number;
-  postEngagements: number;
 }
 
 export interface MarketingCampaignDetailDependencies {
@@ -48,127 +28,6 @@ export interface MarketingCampaignDetailDependencies {
   config?: DetailConfig;
   attributionProvider?: typeof getMarketingAttributionReport;
   attributionDetailProvider?: typeof loadCampaignAttributionDetailData;
-}
-
-const ACTIONS = {
-  firstReplies: new Set([
-    'onsite_conversion.messaging_first_reply',
-    'messaging_first_reply',
-  ]),
-  linkClicks: new Set(['link_click']),
-  videoViews: new Set(['video_view']),
-  postEngagements: new Set(['post_engagement']),
-};
-
-function numberValue(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function round(value: number, decimals = 2): number {
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
-}
-
-function parseActions(value: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(value)) return value.filter((row) => row && typeof row === 'object');
-  if (typeof value !== 'string') return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((row) => row && typeof row === 'object') : [];
-  } catch {
-    return [];
-  }
-}
-
-function actionTotal(actions: unknown, accepted: Set<string>): number {
-  return parseActions(actions).reduce((total, action) => (
-    accepted.has(String(action.action_type ?? ''))
-      ? total + numberValue(action.value)
-      : total
-  ), 0);
-}
-
-function aggregate(rows: InsightRow[]): Aggregate {
-  return rows.reduce<Aggregate>((total, row) => ({
-    spend: total.spend + numberValue(row.spend),
-    impressions: total.impressions + numberValue(row.impressions),
-    clicks: total.clicks + numberValue(row.clicks),
-    conversations: total.conversations + numberValue(row.conversations),
-    firstReplies: total.firstReplies + actionTotal(row.actions_raw, ACTIONS.firstReplies),
-    linkClicks: total.linkClicks + actionTotal(row.actions_raw, ACTIONS.linkClicks),
-    videoViews: total.videoViews + actionTotal(row.actions_raw, ACTIONS.videoViews),
-    postEngagements: total.postEngagements
-      + actionTotal(row.actions_raw, ACTIONS.postEngagements),
-  }), {
-    spend: 0,
-    impressions: 0,
-    clicks: 0,
-    conversations: 0,
-    firstReplies: 0,
-    linkClicks: 0,
-    videoViews: 0,
-    postEngagements: 0,
-  });
-}
-
-function derivedMetrics(values: Aggregate) {
-  const unanswered = Math.max(0, Math.round(values.conversations - values.firstReplies));
-  return {
-    investment: round(values.spend),
-    impressions: Math.round(values.impressions),
-    clicks: Math.round(values.clicks),
-    link_clicks: Math.round(values.linkClicks),
-    video_views: Math.round(values.videoViews),
-    post_engagements: Math.round(values.postEngagements),
-    conversations_started: Math.round(values.conversations),
-    first_replies: Math.round(values.firstReplies),
-    unanswered,
-    ctr: values.impressions > 0 ? round((values.clicks / values.impressions) * 100) : null,
-    cpc: values.clicks > 0 ? round(values.spend / values.clicks) : null,
-    cpm: values.impressions > 0 ? round((values.spend / values.impressions) * 1_000) : null,
-    response_rate: values.conversations > 0
-      ? round((values.firstReplies / values.conversations) * 100, 1)
-      : null,
-    cost_per_started: values.conversations > 0
-      ? round(values.spend / values.conversations)
-      : null,
-    cost_per_replied: values.firstReplies > 0
-      ? round(values.spend / values.firstReplies)
-      : null,
-    unanswered_investment: values.conversations > 0
-      ? round(values.spend * (unanswered / values.conversations))
-      : null,
-  };
-}
-
-function decision(metrics: ReturnType<typeof derivedMetrics>) {
-  if (metrics.conversations_started > 0 && metrics.first_replies === 0) {
-    return {
-      tone: 'critical' as const,
-      title: 'Conversas chegaram, mas nenhuma primeira resposta foi registrada',
-      detail: 'Revise imediatamente fila, escala e automações de atendimento.',
-    };
-  }
-  if (metrics.response_rate != null && metrics.response_rate < 70) {
-    return {
-      tone: 'critical' as const,
-      title: 'Atendimento abaixo de 70%',
-      detail: 'Antes de ampliar a verba, verifique fila, escala e horário de atendimento.',
-    };
-  }
-  if (metrics.response_rate != null && metrics.response_rate < 85) {
-    return {
-      tone: 'attention' as const,
-      title: 'Há espaço para recuperar conversas sem resposta',
-      detail: 'A campanha entrega demanda; a prioridade é elevar a resposta registrada.',
-    };
-  }
-  return {
-    tone: 'positive' as const,
-    title: 'Resposta registrada em nível saudável',
-    detail: 'Mantenha a operação monitorada antes de qualquer aumento de verba.',
-  };
 }
 
 export async function getMarketingCampaignDetail(
@@ -183,17 +42,30 @@ export async function getMarketingCampaignDetail(
   const result = await dbPool.query<InsightRow>(
     `SELECT entity_level,entity_id,entity_name,campaign_id,campaign_name,
             adset_id,adset_name,metric_date::text,account_currency,
-            spend,impressions,clicks,conversations,actions_raw
-       FROM marketing.meta_insights_daily
+            spend,
+            CASE WHEN $5::boolean THEN financial_spend ELSE spend END
+              AS financial_spend,
+            campaign_scope,impressions,clicks,conversations,actions_raw
+       FROM marketing.meta_insights_daily_scoped
       WHERE environment=$1 AND campaign_id=$2
         AND metric_date BETWEEN $3::date AND $4::date
       ORDER BY metric_date,entity_level,entity_id`,
-    [env.FAREJADOR_ENV, campaignId, window.since, window.until],
+    [
+      env.FAREJADOR_ENV,
+      campaignId,
+      window.since,
+      window.until,
+      env.MARKETING_SCOPE_ENFORCEMENT_ENABLED,
+    ],
   );
   const campaignRows = result.rows.filter((row) => row.entity_level === 'campaign');
   if (campaignRows.length === 0) return null;
 
   const summary = derivedMetrics(aggregate(campaignRows));
+  const financialInvestment = round(campaignRows.reduce(
+    (total, row) => total + numberValue(row.financial_spend ?? row.spend),
+    0,
+  ));
   const byDate = new Map<string, InsightRow[]>();
   for (const row of campaignRows) {
     const rows = byDate.get(row.metric_date) ?? [];
@@ -246,7 +118,7 @@ export async function getMarketingCampaignDetail(
     dbPool,
     attributionStatus,
     attributed,
-    investment: summary.investment,
+    investment: financialInvestment,
     conversations: summary.conversations_started,
     ads,
     dataProvider: dependencies.attributionDetailProvider,
@@ -259,12 +131,13 @@ export async function getMarketingCampaignDetail(
       id: campaignId,
       name: first.campaign_name || first.entity_name || campaignId,
       channel: 'meta' as const,
+      scope: first.campaign_scope,
       status: 'with_delivery' as const,
       currency: first.account_currency,
       delivery_days: deliveryDates.length,
       last_delivery: deliveryDates.at(-1) ?? window.until,
     },
-    summary,
+    summary: { ...summary, financial_investment: financialInvestment },
     trend: [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, rows]) => ({
       date,
       ...derivedMetrics(aggregate(rows)),

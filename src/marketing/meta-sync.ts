@@ -15,6 +15,7 @@ import {
   type MetaMarketingSnapshot,
 } from '../admin/painel/marketing-meta.js';
 import { reconcileMatrizMarketingSpend } from './matriz-ledger-spend.js';
+import { ensureCampaignScope } from './campaign-scope.js';
 
 type SyncTrigger = 'startup' | 'scheduled' | 'manual';
 
@@ -108,10 +109,21 @@ export async function syncMetaInsights(options: {
     let rowsUpserted = 0;
     try {
       await client.query('BEGIN');
+      const ensuredCampaigns = new Set<string>();
       for (const group of fetched) {
         for (const row of group.rows) {
           const value = insightValues(row, group.level);
           if (!value) continue;
+          const campaignKey = `${config.adAccountId}:${value.campaignId}`;
+          if (!ensuredCampaigns.has(campaignKey)) {
+            await ensureCampaignScope(client, {
+              environment: env.FAREJADOR_ENV,
+              adAccountId: config.adAccountId,
+              campaignId: value.campaignId,
+              campaignName: value.campaignName,
+            });
+            ensuredCampaigns.add(campaignKey);
+          }
           const upserted = await client.query<{ id: string }>(
             `INSERT INTO marketing.meta_insights_daily (
                environment,sync_run_id,ad_account_id,api_version,account_currency,
@@ -181,16 +193,35 @@ export async function getPersistedMetaSnapshot(
   const window = marketingDateWindow(period, now);
   try {
     const result = await (options.dbPool ?? defaultPool).query<MetaInsightRow & { collected_at: string }>(
-      `SELECT campaign_id,campaign_name,metric_date::text AS date_start,spend::text,
+      `SELECT ad_account_id,campaign_id,campaign_name,
+              metric_date::text AS date_start,spend::text,
+              CASE WHEN $5::boolean THEN financial_spend ELSE spend END::text
+                AS financial_spend,
+              campaign_scope,
+              CASE WHEN $5::boolean THEN campaign_scope='matrix' ELSE true END
+                AS summary_included,
               impressions::text,clicks::text,reach::text,actions_raw AS actions,
               account_currency,collected_at::text
-         FROM marketing.meta_insights_daily
+         FROM marketing.meta_insights_daily_scoped
         WHERE environment=$1 AND ad_account_id=$2 AND entity_level='campaign'
           AND metric_date BETWEEN $3::date AND $4::date
         ORDER BY metric_date,entity_id`,
-      [env.FAREJADOR_ENV, config.adAccountId, window.previousSince, window.until],
+      [
+        env.FAREJADOR_ENV,
+        config.adAccountId,
+        window.previousSince,
+        window.until,
+        env.MARKETING_SCOPE_ENFORCEMENT_ENABLED,
+      ],
     );
-    if (result.rows.length === 0) return null;
+    if (result.rows.length === 0) {
+      if (!env.MARKETING_SCOPE_ENFORCEMENT_ENABLED) return null;
+      return {
+        current: summarizeMetaRows([], window.since, window.until),
+        previous: summarizeMetaRows([], window.previousSince, window.previousUntil),
+        fetched_at: now.toISOString(),
+      };
+    }
     const fetchedAt = result.rows.reduce(
       (latest, row) => String(row.collected_at) > latest ? String(row.collected_at) : latest,
       '',
@@ -211,5 +242,9 @@ export async function getPersistedOrLiveMetaSnapshot(
   options: { now?: Date; fetcher?: typeof fetch; cacheMs?: number; dbPool?: Pool } = {},
 ): Promise<MetaMarketingSnapshot> {
   const persisted = await getPersistedMetaSnapshot(config, period, options);
-  return persisted ?? getMetaMarketingSnapshot(config, period, options);
+  if (persisted) return persisted;
+  if (env.MARKETING_SCOPE_ENFORCEMENT_ENABLED) {
+    throw new Error('marketing_scoped_snapshot_unavailable');
+  }
+  return getMetaMarketingSnapshot(config, period, options);
 }
