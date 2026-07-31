@@ -3,44 +3,140 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#065f46" />
   <title>Entrar na Matriz — Farejador</title>
-  <link rel="stylesheet" href="/admin/login.css?v=20260710-admin-login1" />
-  <script defer src="/admin/login.js?v=20260710-admin-login1"></script>
+  <link rel="stylesheet" href="/admin/login.css?v=20260731-matriz-login1" />
+  <script defer src="/admin/login.js?v=20260731-matriz-login1"></script>
 </head>
 <body>
-  <main class="shell">
-    <section class="card" aria-labelledby="title">
-      <div class="brand"><span>2W</span> Farejador</div>
-      <h1 id="title">Acesso à Matriz</h1>
-      <p class="subtitle">Entre com sua conta individual. Sua sessão fica protegida em cookie seguro.</p>
+  <main class="login-shell">
+    <section class="visual-panel" aria-labelledby="hero-title">
+      <div class="brand" aria-label="2W Pneus Farejador Matriz">
+        <span class="brand-mark">2W</span>
+        <span class="brand-copy">
+          <strong>2W PNEUS</strong>
+          <small>Farejador · Matriz</small>
+        </span>
+      </div>
 
-      <div id="loading" class="notice">Verificando o acesso…</div>
+      <div class="hero-copy">
+        <p class="hero-kicker">Gestão integrada</p>
+        <h2 id="hero-title">A gestão que move <span>sua operação</span></h2>
+        <p class="hero-subtitle">Controle estoque, vendas, equipe e financeiro em um só lugar.</p>
+        <ul class="benefits" aria-label="Recursos da Matriz">
+          <li>
+            <span class="benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="m3 8 9 5 9-5M3 8v8l9 5 9-5V8M12 13v8"/></svg>
+            </span>
+            <span>Estoque<strong>conectado</strong></span>
+          </li>
+          <li>
+            <span class="benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/><path d="m3 12 6-5 5 3 7-7"/></svg>
+            </span>
+            <span>Vendas em<strong>tempo real</strong></span>
+          </li>
+          <li>
+            <span class="benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.8-1.8-1.2-3.1-1.2-1.7 0-2.9.8-2.9 2s1 1.8 2.8 2.2c1.8.4 2.7 1 2.7 2.2s-1.2 2.1-3 2.1c-1.4 0-2.7-.5-3.5-1.5M12 5.5v13"/></svg>
+            </span>
+            <span>Financeiro<strong>integrado</strong></span>
+          </li>
+          <li>
+            <span class="benefit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <span>Equipe<strong>organizada</strong></span>
+          </li>
+        </ul>
+      </div>
+    </section>
 
-      <form id="login-form" class="hidden" novalidate>
-        <label for="username">Usuário</label>
-        <input id="username" name="username" autocomplete="username" required maxlength="60" />
-        <label for="password">Senha</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" />
-        <p id="login-error" class="error" role="alert"></p>
-        <button type="submit">Entrar</button>
-      </form>
+    <section class="auth-region" aria-label="Autenticação da Matriz">
+      <article class="card" aria-labelledby="title">
+        <header class="card-header">
+          <p id="form-eyebrow" class="eyebrow">Acesso à Matriz</p>
+          <h1 id="title">Bem-vindo de volta!</h1>
+          <p id="form-subtitle" class="subtitle">Entre com seu usuário para acessar a gestão da 2W Pneus.</p>
+        </header>
 
-      <form id="bootstrap-form" class="hidden" novalidate>
-        <div class="notice warning">
-          Primeiro acesso: crie a conta proprietária. O token emergencial será usado somente nesta operação e não será salvo.
+        <div id="loading" class="notice loading" role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          Verificando o acesso…
         </div>
-        <label for="display-name">Seu nome</label>
-        <input id="display-name" name="display_name" autocomplete="name" required maxlength="120" />
-        <label for="bootstrap-username">Novo usuário</label>
-        <input id="bootstrap-username" name="username" autocomplete="username" required maxlength="60" />
-        <label for="bootstrap-password">Nova senha</label>
-        <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="200" />
-        <small>Use pelo menos 12 caracteres e não reutilize outra senha.</small>
-        <label for="emergency-token">ADMIN_AUTH_TOKEN atual</label>
-        <input id="emergency-token" name="token" type="password" autocomplete="off" required />
-        <p id="bootstrap-error" class="error" role="alert"></p>
-        <button type="submit">Criar conta proprietária</button>
-      </form>
+
+        <form id="login-form" class="hidden" novalidate>
+          <div class="field">
+            <label for="username">Usuário</label>
+            <div class="input-wrap">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="60" placeholder="Digite seu usuário" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">Senha</label>
+            <div class="input-wrap has-action">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+              <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" placeholder="Digite sua senha" />
+              <button class="password-toggle" type="button" data-password-toggle="password" aria-label="Mostrar senha" aria-pressed="false">
+                <svg class="eye-open" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                <svg class="eye-closed" aria-hidden="true" viewBox="0 0 24 24"><path d="m3 3 18 18M10.6 6.2A11.7 11.7 0 0 1 12 6c6.5 0 10 6 10 6a17.6 17.6 0 0 1-2.1 2.8M6.7 6.7C3.7 8.5 2 12 2 12s3.5 6 10 6c1.7 0 3.2-.4 4.5-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <p id="login-error" class="error" role="alert" aria-live="assertive"></p>
+          <button class="primary-button" type="submit">
+            <span class="button-label">Entrar na Matriz</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+          </button>
+        </form>
+
+        <form id="bootstrap-form" class="hidden bootstrap-form" novalidate>
+          <div class="notice warning">
+            Primeiro acesso: crie a conta proprietária. O token emergencial será usado somente nesta operação e não será salvo.
+          </div>
+          <div class="field">
+            <label for="display-name">Seu nome</label>
+            <input id="display-name" name="display_name" autocomplete="name" required maxlength="120" placeholder="Nome da pessoa proprietária" />
+          </div>
+          <div class="field">
+            <label for="bootstrap-username">Novo usuário</label>
+            <input id="bootstrap-username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="60" placeholder="Crie um usuário" />
+          </div>
+          <div class="field">
+            <label for="bootstrap-password">Nova senha</label>
+            <div class="input-wrap has-action no-leading-icon">
+              <input id="bootstrap-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="200" placeholder="No mínimo 12 caracteres" />
+              <button class="password-toggle" type="button" data-password-toggle="bootstrap-password" aria-label="Mostrar nova senha" aria-pressed="false">
+                <svg class="eye-open" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                <svg class="eye-closed" aria-hidden="true" viewBox="0 0 24 24"><path d="m3 3 18 18M10.6 6.2A11.7 11.7 0 0 1 12 6c6.5 0 10 6 10 6a17.6 17.6 0 0 1-2.1 2.8M6.7 6.7C3.7 8.5 2 12 2 12s3.5 6 10 6c1.7 0 3.2-.4 4.5-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+              </button>
+            </div>
+            <small>Use pelo menos 12 caracteres e não reutilize outra senha.</small>
+          </div>
+          <div class="field">
+            <label for="emergency-token">ADMIN_AUTH_TOKEN atual</label>
+            <input id="emergency-token" name="token" type="password" autocomplete="off" required placeholder="Token emergencial" />
+          </div>
+          <p id="bootstrap-error" class="error" role="alert" aria-live="assertive"></p>
+          <button class="primary-button" type="submit">
+            <span class="button-label">Criar conta proprietária</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+          </button>
+        </form>
+
+        <footer class="card-footer">
+          <div class="secure-copy">
+            <span></span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+            <p>Acesso seguro e protegido</p>
+            <span></span>
+          </div>
+          <p class="copyright">© 2026 2W Pneus</p>
+        </footer>
+      </article>
     </section>
   </main>
 </body>

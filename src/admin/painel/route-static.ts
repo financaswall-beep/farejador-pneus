@@ -15,6 +15,12 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.js', 'text/javascript; charset=utf-8'));
   fastify.get('/admin/login.css', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'no-store'), 'login.css', 'text/css; charset=utf-8'));
+  fastify.get('/admin/login/hero-v1.webp', async (_request, reply) =>
+    sendStatic(
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
+      'assets/login-matriz-hero-v1.webp',
+      'image/webp',
+    ));
   fastify.get('/admin/painel', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'no-store'), 'index.html', 'text/html; charset=utf-8'));
   fastify.get('/admin/painel/', async (_request, reply) =>

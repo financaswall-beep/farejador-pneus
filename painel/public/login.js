@@ -2,11 +2,41 @@
   const loading = document.getElementById('loading');
   const loginForm = document.getElementById('login-form');
   const bootstrapForm = document.getElementById('bootstrap-form');
+  const eyebrow = document.getElementById('form-eyebrow');
+  const title = document.getElementById('title');
+  const subtitle = document.getElementById('form-subtitle');
+
+  function setButtonBusy(button, busy, busyLabel) {
+    const label = button.querySelector('.button-label');
+    if (label && !button.dataset.defaultLabel) button.dataset.defaultLabel = label.textContent;
+    if (label) label.textContent = busy ? busyLabel : button.dataset.defaultLabel;
+    button.disabled = busy;
+  }
+
+  document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (!input) return;
+    button.addEventListener('click', () => {
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      button.setAttribute('aria-pressed', String(!visible));
+      button.setAttribute('aria-label', visible ? 'Mostrar senha' : 'Ocultar senha');
+      input.focus({ preventScroll: true });
+    });
+  });
 
   function show(form) {
+    const bootstrap = form === bootstrapForm;
+    eyebrow.textContent = bootstrap ? 'Configuração inicial' : 'Acesso à Matriz';
+    title.textContent = bootstrap ? 'Prepare a conta proprietária' : 'Bem-vindo de volta!';
+    subtitle.textContent = bootstrap
+      ? 'Esta etapa aparece somente antes da criação da primeira conta da Matriz.'
+      : 'Entre com seu usuário para acessar a gestão da 2W Pneus.';
     loading.classList.add('hidden');
     loginForm.classList.toggle('hidden', form !== loginForm);
     bootstrapForm.classList.toggle('hidden', form !== bootstrapForm);
+    const firstInput = form.querySelector('input');
+    if (firstInput) firstInput.focus({ preventScroll: true });
   }
 
   function message(error) {
@@ -26,9 +56,9 @@
 
   loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const button = loginForm.querySelector('button');
+    const button = loginForm.querySelector('button[type="submit"]');
     const error = document.getElementById('login-error');
-    button.disabled = true; error.textContent = '';
+    setButtonBusy(button, true, 'Entrando…'); error.textContent = '';
     const data = new FormData(loginForm);
     try {
       const response = await fetch('/admin/api/auth/login', {
@@ -42,15 +72,15 @@
       location.replace('/admin/painel');
     } catch (failure) {
       error.textContent = message(failure instanceof Error ? failure.message : 'unknown');
-      button.disabled = false;
+      setButtonBusy(button, false, 'Entrando…');
     }
   });
 
   bootstrapForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const button = bootstrapForm.querySelector('button');
+    const button = bootstrapForm.querySelector('button[type="submit"]');
     const error = document.getElementById('bootstrap-error');
-    button.disabled = true; error.textContent = '';
+    setButtonBusy(button, true, 'Criando conta…'); error.textContent = '';
     const data = new FormData(bootstrapForm);
     try {
       const response = await fetch('/admin/api/auth/bootstrap', {
@@ -72,7 +102,7 @@
       location.replace('/admin/painel');
     } catch (failure) {
       error.textContent = message(failure instanceof Error ? failure.message : 'unknown');
-      button.disabled = false;
+      setButtonBusy(button, false, 'Criando conta…');
     }
   });
 
