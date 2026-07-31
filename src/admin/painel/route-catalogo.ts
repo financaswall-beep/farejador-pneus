@@ -40,7 +40,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     } catch (error) {
       const message = error instanceof Error ? error.message : 'internal_server_error';
       const status = message === 'catalog_stock_variant_not_found' ? 404
-        : ['catalog_stock_variant_ambiguous', 'catalog_variant_already_exists', 'catalog_variant_archived',
+        : ['catalog_stock_variant_ambiguous', 'catalog_variant_already_exists',
            'catalog_product_code_duplicate'].includes(message) ? 409
           : message.startsWith('catalog_') ? 400 : 500;
       if (status === 500) logger.error({ error }, 'painel catalog product create failed');

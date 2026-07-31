@@ -38,12 +38,13 @@ export const REQUIRED_SCHEMA_SQL = `
     )
     AND to_regclass('commerce.wholesale_stock_variant_uniq') IS NOT NULL
     AND to_regclass('commerce.wholesale_stock_movements_variant_idx') IS NOT NULL
+    AND to_regclass('commerce.partner_stock_routable_product_idx') IS NOT NULL
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0156. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0157. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0156_tire_condition_variants');
+    throw new Error('required_schema_missing:0157_partner_condition_routing_guard');
   }
 }

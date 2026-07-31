@@ -111,7 +111,9 @@ export async function createCatalogProductFromStock(
     if (existing.rows.some((row) => row.deleted_at === null)) {
       throw new Error('catalog_variant_already_exists');
     }
-    if (existing.rows.length) throw new Error('catalog_variant_archived');
+    const archivedProductIds = existing.rows
+      .filter((row) => row.deleted_at !== null)
+      .map((row) => row.id);
 
     const duplicateCode = await client.query(
       `SELECT id FROM commerce.products
@@ -175,6 +177,7 @@ export async function createCatalogProductFromStock(
           tire_size: variant.measure,
           source: 'wholesale_stock',
           inherited_fitments: copiedFitments.rowCount ?? 0,
+          supersedes_archived_product_ids: archivedProductIds,
         }),
       ],
     );

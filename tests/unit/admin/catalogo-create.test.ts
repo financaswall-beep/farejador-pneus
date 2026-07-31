@@ -111,6 +111,49 @@ describe('cadastro de produto a partir do estoque', () => {
     expect(release).toHaveBeenCalledOnce();
   });
 
+  it('permite novo cadastro quando a variante anterior está arquivada', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('FROM commerce.wholesale_stock')) return {
+        rows: [{
+          measure: '90/90-18', brand: 'Technic', tire_condition: 'meia_vida',
+          tire_width_mm: 90, tire_aspect_ratio: 90, tire_rim_diameter: 18,
+        }],
+      };
+      if (sql.includes('JOIN commerce.tire_specs')) return {
+        rows: [{
+          id: 'produto-legado', product_code: 'TECH-LEGADO',
+          deleted_at: '2026-07-31T00:00:00.000Z',
+        }],
+      };
+      if (sql.includes('SELECT id FROM commerce.products')) return { rows: [] };
+      if (sql.includes('INSERT INTO commerce.products')) return { rows: [{ id: 'produto-novo' }] };
+      if (sql.includes('INSERT INTO commerce.tire_specs')) return { rows: [{ id: 'spec-nova' }] };
+      if (sql.includes('INSERT INTO commerce.vehicle_fitments')) return { rows: [], rowCount: 2 };
+      if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const { pool } = fakePool(query);
+
+    await expect(createCatalogProductFromStock({
+      measure: '90/90-18',
+      brand: 'Technic',
+      tireCondition: 'meia_vida',
+      productCode: 'TEC-909018-MV',
+      productName: 'Pneu Technic 90/90-18',
+      actorLabel: 'Admin',
+      environment: 'test',
+    }, pool)).resolves.toEqual(expect.objectContaining({
+      product_id: 'produto-novo',
+      tire_condition: 'meia_vida',
+    }));
+
+    const auditCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO audit.events'));
+    expect(String(auditCall?.[1]?.[3])).toContain('produto-legado');
+  });
+
   it('recusa codigo repetido e estoque ambiguo', async () => {
     const duplicateCodeQuery = vi.fn(async (sql: string) => {
       if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };

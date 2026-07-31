@@ -50,7 +50,7 @@ describe('0156 - migração segura das condições de pneu', () => {
           4,70,145,true,'in_stock','fixture'),
          ('test',$1,NULL,'Pneu novo legado','110/90-18','Pirelli','Novo',
           3,120,220,true,'in_stock','fixture'),
-         ('test',$1,NULL,'Pneu a revisar','120/90-18','Pirelli',NULL,
+         ('test',$1,$2,'Pneu a revisar','120/90-18','Pirelli',NULL,
           2,90,160,true,'in_stock','fixture')
        RETURNING id,item_name`,
       [unitId, oldProductId],
@@ -60,6 +60,7 @@ describe('0156 - migração segura das condições de pneu', () => {
     reviewId = rows.rows.find((row) => row.item_name === 'Pneu a revisar')!.id;
 
     await applyMigrationFile(db.pool, '0156_tire_condition_variants.sql');
+    await applyMigrationFile(db.pool, '0157_partner_condition_routing_guard.sql');
   }, 180_000);
 
   afterAll(async () => { if (db) await stopPostgres(db); });
@@ -112,5 +113,21 @@ describe('0156 - migração segura das condições de pneu', () => {
         `review-sale-${randomUUID()}`,
       ],
     )).rejects.toThrow(/partner_stock_condition_review_required/);
+  });
+
+  it('desvincula estoque pendente e impede que ele seja roteado pelo catálogo', async () => {
+    const row = await db.pool.query<{ product_id: string | null }>(
+      `SELECT product_id FROM commerce.partner_stock_levels WHERE id=$1`,
+      [reviewId],
+    );
+    expect(row.rows[0]?.product_id).toBeNull();
+
+    const audit = await db.pool.query<{ event_type: string }>(
+      `SELECT event_type FROM audit.events
+        WHERE entity_id=$1
+          AND event_type='partner_stock_pending_condition_unlinked'`,
+      [reviewId],
+    );
+    expect(audit.rows).toHaveLength(1);
   });
 });

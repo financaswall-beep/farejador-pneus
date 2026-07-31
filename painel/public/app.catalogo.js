@@ -187,9 +187,7 @@ window.PAINEL_MODULES.catalogo = function () {
             ? 'Esse código já está em uso. Informe outro código.'
             : code.includes('catalog_variant_already_exists')
               ? 'Essa medida e marca já possuem um produto no Catálogo.'
-              : code.includes('catalog_variant_archived')
-                ? 'Essa variante possui um produto arquivado. Reative-o antes de criar outro.'
-                : code.includes('catalog_stock_variant_ambiguous')
+              : code.includes('catalog_stock_variant_ambiguous')
                   ? 'Há mais de um estoque para essa medida e marca. Corrija a duplicidade antes de cadastrar.'
                 : code.includes('catalog_stock_variant_not_found')
                   ? 'A variante não existe mais no Estoque. Recarregue o Catálogo.'
