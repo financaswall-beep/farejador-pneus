@@ -36,7 +36,7 @@ button { -webkit-tap-highlight-color: transparent; }
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(255,255,255,0) 52%, rgba(255,255,255,.92) 89%, #fff 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0) 52%, rgba(255,255,255,.84) 89%, rgba(255,255,255,.96) 100%);
 }
 
 .visual-panel, .auth-region { position: relative; z-index: 1; }
