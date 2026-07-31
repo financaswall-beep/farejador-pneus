@@ -165,11 +165,14 @@ async function backfillWholesaleSales(
       );
     }
     if (row.status === 'cancelled' && row.cancelled_at) {
-      const returned = await client.query<{ measure: string; brand: string; quantity: number }>(
-        `SELECT measure,brand,sum(qty_delta)::int quantity
+      const returned = await client.query<{
+        measure: string; brand: string;
+        tire_condition: 'meia_vida' | 'novo' | 'remold'; quantity: number;
+      }>(
+        `SELECT measure,brand,tire_condition,sum(qty_delta)::int quantity
            FROM commerce.wholesale_stock_movements
           WHERE environment=$1 AND source='cancelamento_venda'
-            AND ref=$2 AND qty_delta>0 GROUP BY measure,brand`,
+            AND ref=$2 AND qty_delta>0 GROUP BY measure,brand,tire_condition`,
         [environment, row.id],
       );
       await postWholesaleSaleCancellation(

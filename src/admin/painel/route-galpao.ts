@@ -10,12 +10,14 @@ import {
   addWholesaleStockEntryComRotulo, applyGalpaoBaixaManual, applyMatrizPhysicalStockCount,
   deleteWholesaleStockComRotulo,
   getMatrizStockReconciliation, listGalpaoMovements, listWholesaleStock, setWholesaleStockComRotulo,
+  transferWholesaleStockCondition,
 } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import {
   baixaWholesaleStockSchema, entryWholesaleStockSchema, physicalStockCountSchema,
   removeWholesaleStockSchema, setWholesaleStockSchema,
-} from './route-schemas.js';
+  transferWholesaleStockConditionSchema,
+} from './route-schemas-stock.js';
 
 export async function registerPainelGalpao(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (_request, reply) => {
@@ -97,11 +99,45 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      await deleteWholesaleStockComRotulo(parsed.data.measure, parsed.data.brand);
+      await deleteWholesaleStockComRotulo(
+        parsed.data.measure, parsed.data.brand, parsed.data.tire_condition,
+      );
       return reply.status(200).send({ ok: true });
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale stock remove failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/wholesale/stock/condition-transfer', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = transferWholesaleStockConditionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: parsed.error.issues[0]?.message ?? 'invalid_body',
+      });
+    }
+    try {
+      return reply.status(200).send(await transferWholesaleStockCondition({
+        ...parsed.data,
+        actor_label: operatorLabel(request),
+      }));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'internal_server_error';
+      if (code.startsWith('condition_transfer_insufficient:')) {
+        return reply.status(409).send({ error: code });
+      }
+      if ([
+        'condition_transfer_same', 'condition_transfer_source_not_found',
+        'quantity_invalid', 'reason_required',
+      ].includes(code)) {
+        return reply.status(code === 'condition_transfer_source_not_found' ? 404 : 400)
+          .send({ error: code });
+      }
+      const mapped = mapWriteError(error);
+      logger.error({ error, status: mapped.status }, 'stock condition transfer failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });
@@ -126,11 +162,15 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
 
   // O FILME do galpão (0128): últimos movimentos, todos ou de uma medida (?measure=&limit=).
   fastify.get('/admin/api/wholesale/stock/movimentos', { preHandler: requireAdminAuth }, async (request, reply) => {
-    const q = request.query as { measure?: string; brand?: string; limit?: string };
+    const q = request.query as {
+      measure?: string; brand?: string;
+      tire_condition?: 'meia_vida' | 'novo' | 'remold'; limit?: string;
+    };
     const limit = Math.min(Math.max(1, Number(q.limit) || 50), 200);
     const rows = await listGalpaoMovements({
       measure: q.measure?.slice(0, 60) || null,
       brand: q.brand?.slice(0, 60) || null,
+      tire_condition: q.tire_condition ?? null,
       limit,
     });
     return reply.status(200).send(dashboardPayload(rows));

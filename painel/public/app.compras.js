@@ -1,11 +1,10 @@
-// Obra 300 (2026-07-05): fatia do painel da MATRIZ — compras/fornecedores + fiado (0115) + loads financeiro/despesas.
-// VERBATIM das linhas 1059-1232 do app.js pré-obra (commit dd64a35).
-// Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.compras = function () {
   return {
     compraAddItem() {
-      this.compraForm.items.push({ measure: '', brand: '', quantity: 1, unit_cost: '' });
+      this.compraForm.items.push({
+        measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '',
+      });
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     compraRemoveItem(i) {
@@ -47,7 +46,8 @@ window.PAINEL_MODULES.compras = function () {
       for (const row of this.fornecedorBreakdown) {
         const key = this.stockVariantKey(row);
         let g = byKey[key];
-        if (!g) { g = { variant_key: key, measure: row.measure, brand: row.brand, suppliers: [], qty: 0 }; byKey[key] = g; groups.push(g); }
+        if (!g) { g = { variant_key: key, measure: row.measure, brand: row.brand,
+          tire_condition: row.tire_condition, suppliers: [], qty: 0 }; byKey[key] = g; groups.push(g); }
         g.suppliers.push({ ...row, cheapest: g.suppliers.length === 0 });
         g.qty += Number(row.qty_total || 0);
       }
@@ -81,6 +81,7 @@ window.PAINEL_MODULES.compras = function () {
         .map((it) => ({
           measure: it.measure.trim(),
           brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
+          tire_condition: it.tire_condition || null,
           quantity: Number(it.quantity),
           unit_cost: Number(it.unit_cost) || 0,
         }));
@@ -92,6 +93,10 @@ window.PAINEL_MODULES.compras = function () {
         this.compraMsg = { ok: false, text: 'Informe a marca de cada pneu.' };
         return null;
       }
+      if (items.some((item) => !item.tire_condition)) {
+        this.compraMsg = { ok: false, text: 'Selecione a condição de cada pneu.' };
+        return null;
+      }
       // Auditoria 07-06: linha PREENCHIDA mas inválida (sem medida / sem quantidade) era
       // descartada em silêncio — a tela mostrava um total e registrava outro. Linha 100%
       // vazia (sobrou do "+ Adicionar pneu") segue ignorada sem pergunta.
@@ -99,6 +104,7 @@ window.PAINEL_MODULES.compras = function () {
         const valida = it.measure && it.measure.trim() && Number(it.quantity) > 0;
         if (valida) return false;
         return (it.measure && it.measure.trim()) || (it.brand && it.brand.trim())
+          || it.tire_condition
           || (it.unit_cost !== '' && it.unit_cost != null && Number(it.unit_cost) > 0)
           || Number(it.quantity) !== 1;
       });
@@ -154,7 +160,7 @@ window.PAINEL_MODULES.compras = function () {
           supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
           purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
           receipt_status: 'received', idempotency_key: '',
-          items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }],
+          items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }],
         };
         this.compraPendingSubmission = null;
         this.comprasTab = 'visao';
@@ -172,6 +178,7 @@ window.PAINEL_MODULES.compras = function () {
         items_required: 'Adicione ao menos um pneu.',
         measure_not_in_catalog: 'Essa medida não está no catálogo — confira o número.',
         quantidade_inteira: 'Quantidade tem que ser número inteiro (sem vírgula).',
+        tire_condition_required: 'Selecione a condição de cada pneu.',
         supplier_duplicate: 'Esse fornecedor já está cadastrado (nome, documento ou telefone equivalente). Escolha a ficha existente.',
         idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
       };

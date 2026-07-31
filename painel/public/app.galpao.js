@@ -1,4 +1,4 @@
-// Estoque do galpão por variante (medida + marca): busca, custo médio e entrada.
+// Estoque do galpão por variante (medida + marca + condição): busca, custo médio e entrada.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
@@ -17,6 +17,7 @@ window.PAINEL_MODULES.galpao = function () {
         reason_required: 'Informe o motivo da alteração de saldo ou custo.',
         catalog_product_not_found: 'A medida existe, mas o produto correspondente não foi encontrado no Catálogo.',
         brand_required: 'Informe a marca do pneu.',
+        tire_condition_required: 'Selecione a condição do pneu.',
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
     },
@@ -27,12 +28,14 @@ window.PAINEL_MODULES.galpao = function () {
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();
       const brand = (this.stockForm.brand || '').trim();
+      const tireCondition = this.stockForm.tire_condition || '';
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
       const reason = (this.stockForm.entry_reason || '').trim();
       const minRaw = String(this.stockForm.min_quantity ?? '').trim();
       const min = minRaw === '' ? null : Number(minRaw); // vazio = sem mínimo (limpa)
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
+      if (!tireCondition) { this.stockMsg = { ok: false, text: 'Selecione a condição do pneu.' }; return; }
       if (!Number.isInteger(qty) || qty < 0) { this.stockMsg = { ok: false, text: 'Quantidade inválida.' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
       if (min !== null && (!Number.isInteger(min) || min < 0)) { this.stockMsg = { ok: false, text: 'Mínimo inválido (número inteiro, 0 ou mais).' }; return; }
@@ -46,6 +49,7 @@ window.PAINEL_MODULES.galpao = function () {
         await this.apiPost('/admin/api/wholesale/stock', {
           measure,
           brand: brand || null,
+          tire_condition: tireCondition,
           quantity_on_hand: qty,
           unit_cost: cost,
           min_quantity: min,
@@ -53,7 +57,7 @@ window.PAINEL_MODULES.galpao = function () {
           reason: reason || undefined,
         });
         this.stockMsg = { ok: true, text: `${measure}${brand ? ` · ${brand}` : ''}: ${qty} un · custo R$ ${cost.toFixed(2)}${min !== null ? ` · mínimo ${min}` : ''}.` };
-        this.stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
+        this.stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // mínimo mudou → o aviso "repor" pode ter mudado
@@ -64,17 +68,24 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     stockEdit(row) {
-      this.stockForm = { measure: row.measure, brand: row.brand || '', quantity_on_hand: row.quantity_on_hand, unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand, original_unit_cost: row.unit_cost ?? 0 };
+      this.stockForm = { measure: row.measure, brand: row.brand || '',
+        tire_condition: row.tire_condition || '', quantity_on_hand: row.quantity_on_hand,
+        unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '',
+        notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '',
+        idempotency_key: '', original_quantity_on_hand: row.quantity_on_hand,
+        original_unit_cost: row.unit_cost ?? 0 };
       this.stockMsg = null;
     },
     // ENTRADA de compra: soma a qtd e recalcula o custo médio ponderado (a conta que "bate").
     async stockEntry() {
       const measure = (this.stockForm.measure || '').trim();
       const brand = (this.stockForm.brand || '').trim();
+      const tireCondition = this.stockForm.tire_condition || '';
       const qty = Number(this.stockForm.quantity_on_hand);
       const cost = Number(this.stockForm.unit_cost) || 0;
       const reason = (this.stockForm.entry_reason || '').trim();
       if (!measure) { this.stockMsg = { ok: false, text: 'Diga a medida (ex.: 90/90-18).' }; return; }
+      if (!tireCondition) { this.stockMsg = { ok: false, text: 'Selecione a condição do pneu.' }; return; }
       if (!Number.isInteger(qty) || qty <= 0) { this.stockMsg = { ok: false, text: 'Quantos pneus entraram?' }; return; }
       if (cost < 0) { this.stockMsg = { ok: false, text: 'Custo inválido.' }; return; }
       if (reason.length < 2) { this.stockMsg = { ok: false, text: 'Explique a origem dessa entrada.' }; return; }
@@ -82,10 +93,14 @@ window.PAINEL_MODULES.galpao = function () {
       this.stockMsg = null;
       try {
         this.stockForm.idempotency_key = this.stockForm.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-entry', 'form').key;
-        const row = await this.apiPost('/admin/api/wholesale/stock/entry', { measure, brand: brand || null, quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature, reason, idempotency_key: this.stockForm.idempotency_key });
+        const row = await this.apiPost('/admin/api/wholesale/stock/entry', {
+          measure, brand: brand || null, tire_condition: tireCondition,
+          quantity_in: qty, unit_cost: cost, entry_nature: this.stockForm.entry_nature,
+          reason, idempotency_key: this.stockForm.idempotency_key,
+        });
         window.PAINEL_INTEGRITY.complete('stock-entry', 'form');
         this.stockMsg = { ok: true, text: `Entrada de ${qty} × ${measure}${brand ? ` · ${brand}` : ''} a R$ ${cost.toFixed(2)} → estoque ${row.quantity_on_hand} un · custo médio R$ ${Number(row.unit_cost).toFixed(2)}.` };
-        this.stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
+        this.stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null };
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadSino(); // entrada pode ter tirado a medida do "repor"
@@ -101,7 +116,7 @@ window.PAINEL_MODULES.galpao = function () {
       if (!window.confirm(`Remover ${measure} · ${brand} do estoque do galpão?`)) return;
       try {
         await this.apiPost('/admin/api/wholesale/stock/remove', {
-          measure, brand,
+          measure, brand, tire_condition: row.tire_condition,
         });
         await this.loadAtacado();
         void this.loadStockReconciliation();
@@ -120,6 +135,7 @@ window.PAINEL_MODULES.galpao = function () {
       let rows = this.atacadoStock;
       if (q) rows = rows.filter((r) => r.measure.toLowerCase().includes(q)
         || String(r.brand || '').toLowerCase().includes(q)
+        || String(r.tire_condition || '').toLowerCase().includes(q)
         || (qd !== '' && digits(r.measure).includes(qd)));
       const peso = (r) => (Number(r.quantity_on_hand) === 0 ? 0 : (this.stockPrecisaRepor(r) ? 1 : 2));
       return [...rows].sort((a, b) => peso(a) - peso(b) || a.measure.localeCompare(b.measure));
@@ -140,12 +156,15 @@ window.PAINEL_MODULES.galpao = function () {
     },
     // ── BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo ──
     stockBaixaOpen(row) {
-      this.stockBaixaForm = { measure: row.measure, brand: row.brand, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
+      this.stockBaixaForm = { measure: row.measure, brand: row.brand,
+        tire_condition: row.tire_condition, quantity: '', tipo: 'breakage',
+        texto: '', idempotency_key: '' };
       this.stockMsg = null;
       this.$nextTick(() => { const el = document.getElementById('galpao-baixa-qtd'); if (el) el.focus(); });
     },
     stockBaixaFechar() {
-      this.stockBaixaForm = { measure: null, brand: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
+      this.stockBaixaForm = { measure: null, brand: null, tire_condition: null,
+        quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' };
     },
     async stockBaixaSubmit() {
       const f = this.stockBaixaForm;
@@ -157,7 +176,10 @@ window.PAINEL_MODULES.galpao = function () {
       this.stockMsg = null;
       try {
         f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('stock-manual-decrement', 'form').key;
-        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', { measure: f.measure, brand: f.brand, quantity: qty, nature: f.tipo, reason, idempotency_key: f.idempotency_key });
+        const row = await this.apiPost('/admin/api/wholesale/stock/baixa', {
+          measure: f.measure, brand: f.brand, tire_condition: f.tire_condition,
+          quantity: qty, nature: f.tipo, reason, idempotency_key: f.idempotency_key,
+        });
         window.PAINEL_INTEGRITY.complete('stock-manual-decrement', 'form');
         this.stockMsg = { ok: true, text: `Baixa de ${qty} × ${f.measure} (${labels[f.tipo]}) — sobraram ${row.quantity_on_hand} un.` };
         this.stockBaixaFechar();
@@ -185,17 +207,23 @@ window.PAINEL_MODULES.galpao = function () {
       return map[code] || `Não consegui dar a baixa (${code}).`;
     },
     // ── O FILME (0128): a movimentação do galpão — quem mexeu, quanto, quando ──
-    async loadGalpaoFilme(measure, brand) {
+    async loadGalpaoFilme(measure, brand, tireCondition) {
       if (measure !== undefined) this.galpaoFilme.measure = measure;
-      if (measure === null && brand === undefined) this.galpaoFilme.brand = null;
+      if (measure === null && brand === undefined) {
+        this.galpaoFilme.brand = null;
+        this.galpaoFilme.tire_condition = null;
+      }
       if (brand !== undefined) this.galpaoFilme.brand = brand;
+      if (tireCondition !== undefined) this.galpaoFilme.tire_condition = tireCondition;
       if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
         const selected = this.galpaoFilme.measure;
         const selectedBrand = this.galpaoFilme.brand;
+        const selectedCondition = this.galpaoFilme.tire_condition;
         this.galpaoFilme.loading = false;
         this.galpaoFilme.rows = window.PAINEL_STOCK_PREVIEW.movements
           .filter((row) => (!selected || row.measure === selected)
-            && (!selectedBrand || row.brand === selectedBrand))
+            && (!selectedBrand || row.brand === selectedBrand)
+            && (!selectedCondition || row.tire_condition === selectedCondition))
           .map((row) => ({ ...row }));
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
         return;
@@ -207,9 +235,11 @@ window.PAINEL_MODULES.galpao = function () {
       try {
         const m = this.galpaoFilme.measure;
         const b = this.galpaoFilme.brand;
+        const condition = this.galpaoFilme.tire_condition;
         const params = new URLSearchParams();
         if (m) params.set('measure', m);
         if (b) params.set('brand', b);
+        if (condition) params.set('tire_condition', condition);
         const r = await this.apiGet('/admin/api/wholesale/stock/movimentos' + (params.size ? '?' + params.toString() : ''));
         if (req !== this.galpaoFilme.req) return; // resposta velha: descarta
         this.galpaoFilme.rows = r.rows || [];
@@ -223,8 +253,8 @@ window.PAINEL_MODULES.galpao = function () {
       }
     },
     // Clicou "filme" numa medida: filtra a movimentação e desce até ela.
-    filmeDaMedida(measure, brand) {
-      void this.loadGalpaoFilme(measure, brand);
+    filmeDaMedida(measure, brand, tireCondition) {
+      void this.loadGalpaoFilme(measure, brand, tireCondition);
       this.$nextTick(() => { const el = document.getElementById('galpao-filme'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     },
     movRotulo(m) {
@@ -233,6 +263,7 @@ window.PAINEL_MODULES.galpao = function () {
         cancelamento_compra: 'Compra cancelada', venda_atacado: 'Venda de atacado',
         cancelamento_venda: 'Venda de atacado cancelada', varejo: 'Venda do varejo (bot/balcão)',
         cancelamento_varejo: 'Varejo cancelado (voltou)', baixa_manual: 'Baixa manual',
+        correcao_condicao: 'Correção de condição',
         remocao: 'Medida removida', sem_rotulo: 'mexida sem rótulo',
       };
       let t = m.source === 'definir' && String(m.reason || '').startsWith('Contagem física:')

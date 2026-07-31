@@ -1,10 +1,15 @@
 import type { PoolClient } from 'pg';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
+import {
+  requireTireCondition,
+  type TireCondition,
+} from '../../shared/tire-condition.js';
 
 export interface PurchaseItemInput {
   measure: string;
   brand?: string | null;
+  tire_condition: TireCondition | string;
   quantity: number;
   unit_cost: number;
 }
@@ -31,10 +36,12 @@ export async function canonicalPurchaseItems(
   void actorLabel;
   return items.map((item) => {
     const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
+    const tireCondition = requireTireCondition(item.tire_condition ?? 'meia_vida');
     return {
       ...item,
       measure: measures.get(item.measure.trim())!,
       brand,
+      tire_condition: tireCondition,
     };
   });
 }

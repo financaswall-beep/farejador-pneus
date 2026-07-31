@@ -48,9 +48,12 @@ window.PAINEL_MODULES.sino = function () {
         }
         const repor = s.galpao_repor || [];
         if (repor.length > 0) {
-          const nomes = repor.slice(0, 3).map((m) => m.measure + ' (' + m.quantity_on_hand + '/mín. ' + m.min_quantity + ')');
+          const nomes = repor.slice(0, 3).map((m) => m.measure + ' · '
+            + this.catalogoConditionLabel(m.tire_condition) + ' ('
+            + m.quantity_on_hand + '/mín. ' + m.min_quantity + ')');
           itens.push({
-            id: 'galpao:' + repor.map((m) => m.measure + m.quantity_on_hand).join(','),
+            id: 'galpao:' + repor.map((m) =>
+              m.measure + m.tire_condition + m.quantity_on_hand).join(','),
             icon: 'package', iconBg: 'bg-amber-50', iconColor: 'text-amber-600',
             title: 'Galpão pra repor (' + repor.length + (repor.length === 1 ? ' medida)' : ' medidas)'),
             desc: nomes.join(' · ') + (repor.length > 3 ? ' e mais ' + (repor.length - 3) : ''),

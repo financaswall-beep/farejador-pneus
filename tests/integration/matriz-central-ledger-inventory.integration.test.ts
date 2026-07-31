@@ -147,11 +147,12 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
   it('definicao e remocao manual tambem chegam ao livro central', async () => {
     const measure = await fixture();
     await setStock({
-      environment: 'test', measure, quantity_on_hand: 5, unit_cost: 12,
+      environment: 'test', measure, brand: 'Sem marca', tire_condition: 'meia_vida',
+      quantity_on_hand: 5, unit_cost: 12,
       reason: 'definicao inicial do teste',
       actor_label: 'owner:inventory',
     }, db.pool);
-    await removeStock(measure, 'Sem marca', 'test', db.pool);
+    await removeStock(measure, 'Sem marca', 'meia_vida', 'test', db.pool);
 
     const proof = await db.pool.query(
       `SELECT a.source,a.direction,t.transaction_kind,
@@ -185,14 +186,17 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
   it('contagem fisica ajusta saldo, livro e auditoria com replay idempotente', async () => {
     const measure = await fixture();
     await setStock({
-      environment: 'test', measure, quantity_on_hand: 5, unit_cost: 12,
+      environment: 'test', measure, brand: 'Sem marca', tire_condition: 'meia_vida',
+      quantity_on_hand: 5, unit_cost: 12,
       reason: 'saldo anterior a contagem',
       actor_label: 'owner:inventory',
     }, db.pool);
     const idempotencyKey = randomUUID();
     const input = {
       environment: 'test' as const,
-      rows: [{ measure, brand: 'Sem marca', counted_quantity: 3 }],
+      rows: [{
+        measure, brand: 'Sem marca', tire_condition: 'meia_vida', counted_quantity: 3,
+      }],
       reason: 'inventario mensal',
       idempotency_key: idempotencyKey,
       actor_label: 'owner:inventory',

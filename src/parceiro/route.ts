@@ -245,11 +245,19 @@ const stockSchema = z.object({
   average_cost: z.number().nonnegative().nullable().optional(),
   sale_price: z.number().nonnegative().nullable().optional(),
   // Campos do refit da tela de estoque (migration 0073).
-  tire_condition: z.string().max(40).nullable().optional(),
+  tire_condition: z.enum(['meia_vida', 'novo', 'remold']).nullable().optional(),
   shelf_location: z.string().max(60).nullable().optional(),
   // Posição do pneu em coluna própria (migration 0075) — antes vivia em supplier_name.
   tire_position: z.string().max(40).nullable().optional(),
   is_tracked: z.boolean().default(true),
+}).superRefine((value, ctx) => {
+  if (value.item_type === 'pneu' && !value.tire_condition) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['tire_condition'],
+      message: 'tire_condition_required',
+    });
+  }
 });
 
 const customerSchema = z.object({
@@ -398,6 +406,7 @@ const purchaseSchema = z.object({
     tire_aspect_ratio: z.number().int().min(1).max(999).nullable().optional(),
     tire_rim_diameter: z.number().int().min(1).max(30).nullable().optional(),
     brand: z.string().max(120).nullable().optional(),
+    tire_condition: z.enum(['meia_vida', 'novo', 'remold']),
     quantity: z.number().int().positive(),
     unit_cost: z.number().nonnegative(),
     sale_price: z.number().nonnegative().nullable().optional(),

@@ -73,8 +73,8 @@ describe('seguranca de inicializacao do painel', () => {
   it('invalida o cache dos modulos corrigidos', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
 
-    expect(html).toContain('app.atacado.js?v=20260731-multimarca3');
-    expect(html).toContain('app.compras.relatorios.js?v=20260731-multimarca3');
+    expect(html).toContain('app.atacado.js?v=20260731-condicao2');
+    expect(html).toContain('app.compras.relatorios.js?v=20260731-condicao2');
     expect(html).toContain('app.compras.acoes.js?v=20260723-compras2');
     expect(html).toContain('app.core.js?v=20260731-multimarca3');
     expect(html).toContain('app.clientes.js?v=20260718-etapa9');

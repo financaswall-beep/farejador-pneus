@@ -97,10 +97,12 @@ export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPoo
 export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
   const catalog = await dbPool.query<{
     product_id: string; product_code: string; product_name: string; product_type: string;
+    tire_condition: 'meia_vida' | 'novo' | 'remold' | null;
     brand: string | null; tire_size: string | null; tire_position: string | null;
     price_amount: number | string | null; currency: string | null;
   }>(
-    `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type, p.brand,
+    `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type,
+            p.tire_condition,p.brand,
             ts.tire_size, ts.position AS tire_position, cp.price_amount, cp.currency
        FROM commerce.products p
        LEFT JOIN commerce.tire_specs ts
@@ -111,17 +113,20 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
     [env.FAREJADOR_ENV],
   );
   const stock = await dbPool.query<{
-    measure: string; brand: string; quantity_on_hand: number | string;
+    measure: string; brand: string; tire_condition: string;
+    quantity_on_hand: number | string;
     unit_cost: number | string | null;
   }>(
-    `SELECT measure, brand, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [env.FAREJADOR_ENV],
   );
   const stockIndex = buildMatrizStockIndex(stock.rows);
   return catalog.rows.map((product) => {
-    const official = matrizStockForMeasure(stockIndex, product.tire_size, product.brand);
+    const official = matrizStockForMeasure(
+      stockIndex, product.tire_size, product.brand, product.tire_condition,
+    );
     return {
       ...product,
       total_stock_available: official.sellable ? official.quantity_on_hand : 0,

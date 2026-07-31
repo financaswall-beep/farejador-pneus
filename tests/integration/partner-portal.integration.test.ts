@@ -165,6 +165,7 @@ describe('Portal Parceiro — custo histórico da venda', () => {
         item_name: f.stockItemName,
         tire_size: '90/90-18',
         brand: 'Michelin',
+        tire_condition: 'meia_vida',
         quantity: 10,
         unit_cost: 120,
         sale_price: 150,
@@ -266,6 +267,81 @@ describe('Portal Parceiro — custo histórico da venda', () => {
       `UPDATE commerce.partner_order_items SET unit_cost_snapshot=999 WHERE order_id=$1`,
       [sale.order_id],
     )).rejects.toThrow(/partner_order_item_cost_snapshot_immutable/);
+  });
+});
+
+describe('Portal Parceiro - variantes por condicao', () => {
+  it('separa saldo e custo, congela a venda e devolve a condicao exata', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 3 });
+    const purchase = async (
+      condition: 'novo' | 'remold',
+      quantity: number,
+      unitCost: number,
+    ) => q.registerPartnerPurchase(f.ctx, {
+      supplier_name: null,
+      purchased_at: null,
+      payment_method: 'pix',
+      payment_status: 'paid_now' as const,
+      payable_due_date: null,
+      notes: null,
+      idempotency_key: `condition-purchase-${randomUUID()}`,
+      items: [{
+        product_id: null,
+        item_name: f.stockItemName,
+        tire_size: '90/90-18',
+        brand: 'Michelin',
+        tire_condition: condition,
+        quantity,
+        unit_cost: unitCost,
+        sale_price: condition === 'novo' ? 220 : 145,
+      }],
+    }, db.pool);
+
+    await purchase('novo', 10, 100);
+    await purchase('novo', 5, 120);
+    await purchase('remold', 4, 70);
+
+    const variants = await db.pool.query<{
+      id: string; tire_condition: string; quantity_on_hand: number; average_cost: string;
+    }>(
+      `SELECT id,tire_condition,quantity_on_hand,average_cost::text
+         FROM commerce.partner_stock_levels
+        WHERE environment='test' AND unit_id=$1
+          AND item_name=$2 AND tire_size='90/90-18' AND brand='Michelin'
+        ORDER BY tire_condition`,
+      [f.unitId, f.stockItemName],
+    );
+    expect(variants.rows.map(({ tire_condition, quantity_on_hand, average_cost }) => ({
+      tire_condition, quantity_on_hand, average_cost,
+    }))).toEqual([
+      { tire_condition: 'meia_vida', quantity_on_hand: 3, average_cost: '80.00' },
+      { tire_condition: 'novo', quantity_on_hand: 15, average_cost: '106.67' },
+      { tire_condition: 'remold', quantity_on_hand: 4, average_cost: '70.00' },
+    ]);
+
+    const newStock = variants.rows.find((row) => row.tire_condition === 'novo')!;
+    const sale = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Cliente condicao',
+      customer_phone: null,
+      items: [{ partner_stock_id: newStock.id, quantity: 2, unit_price: 220 }],
+      payment_method: 'pix',
+      fulfillment_mode: 'pickup',
+      delivery_address: null,
+      source_tag: 'porta',
+      idempotency_key: `condition-sale-${randomUUID()}`,
+    }, db.pool);
+    expect(await getStockQty(db.pool, newStock.id)).toBe(13);
+    expect(await getStockQty(db.pool, f.stockId)).toBe(3);
+    const snapshot = await db.pool.query<{ tire_condition: string }>(
+      `SELECT tire_condition FROM commerce.partner_order_items WHERE order_id=$1`,
+      [sale.order_id],
+    );
+    expect(snapshot.rows[0]?.tire_condition).toBe('novo');
+
+    expect((await q.cancelPartnerSale(f.ctx, sale.order_id)).cancelled).toBe(true);
+    expect(await getStockQty(db.pool, newStock.id)).toBe(15);
+    expect(await getStockQty(db.pool, f.stockId)).toBe(3);
   });
 });
 

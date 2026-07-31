@@ -14,8 +14,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
       ];
       const tasks = [
         this.loadComprasOverview(), this.loadComprasHistory(),
-        this.loadComprasSuppliers(), this.loadComprasPrices(),
-      ];
+        this.loadComprasSuppliers(), this.loadComprasPrices(),];
       const base = await Promise.allSettled(baseJobs.map(([, request]) => request));
       base.forEach((result, index) => {
         if (result.status === 'rejected') {
@@ -225,7 +224,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
           row.diff_pct = best > 0 ? ((Number(row.avg_cost) - best) / best) * 100 : 0;
         });
         return {
-          variant_key: variantKey, measure: rows[0]?.measure, brand: rows[0]?.brand,
+          variant_key: variantKey, measure: rows[0]?.measure, brand: rows[0]?.brand, tire_condition: rows[0]?.tire_condition,
           suppliers: rows, qty: rows.reduce((sum, row) => sum + Number(row.qty_total || 0), 0),
         };
       }).sort((a, b) => b.qty - a.qty || a.measure.localeCompare(b.measure));
@@ -262,6 +261,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
       }
       item.measure = row.measure;
       item.brand = row.brand || '';
+      item.tire_condition = row.tire_condition || '';
       this.compraMsg = {
         ok: true,
         text: row.supplier_archived

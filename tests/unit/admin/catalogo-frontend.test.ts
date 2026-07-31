@@ -46,7 +46,7 @@ describe('catalogo no painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     expect(html).toContain("currentPage === 'catalogo'");
     expect(html).toContain('/admin/painel/tailwind.css?v=20260729-catalog-layout1');
-    expect(html).toContain('app.catalogo.js?v=20260731-catalog-create2');
+    expect(html).toContain('app.catalogo.js?v=20260731-condicao2');
     expect(html).toContain('/admin/painel/assets/catalog-tire.webp?v=20260729-catalogo1');
     expect(html).toContain('catalogoBrandLogo(brand)');
     expect(html).toContain('catalogoBrandLogo(row.brand)');
@@ -111,6 +111,7 @@ describe('catalogo no painel', () => {
           catalogued: true,
           brand: 'Metzeler',
           tire_size: '90/90-18',
+          tire_condition: 'meia_vida',
           price_amount: null,
         }];
       }),
@@ -120,11 +121,12 @@ describe('catalogo no painel', () => {
 
     module.catalogoCreateOpen.call(context, {
       catalogued: false, brand: 'Metzeler', tire_size: '90/90-18',
+      tire_condition: 'meia_vida',
     });
     expect(context.catalogoCadastro).toMatchObject({
       open: true,
       form: {
-        product_code: 'MET-909018',
+        product_code: 'MET-909018-MV',
         product_name: 'Pneu Metzeler',
       },
     });
@@ -133,7 +135,8 @@ describe('catalogo no painel', () => {
     expect(context.apiPost).toHaveBeenCalledWith('/admin/api/catalog/products', {
       measure: '90/90-18',
       brand: 'Metzeler',
-      product_code: 'MET-909018',
+      tire_condition: 'meia_vida',
+      product_code: 'MET-909018-MV',
       product_name: 'Pneu Metzeler',
     });
     expect(context.catalogoSelecionado).toMatchObject({

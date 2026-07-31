@@ -260,6 +260,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           moto_modelo: { type: 'string', description: 'Modelo da moto. Ex: "Fan 150", "CG Titan 160"' },
           moto_ano: { type: 'integer', description: 'Ano do modelo (opcional)' },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'], description: 'Posição do pneu (opcional)' },
+          condicao_pneu: {
+            type: 'string',
+            enum: ['meia_vida', 'novo', 'remold'],
+            description: 'Condição pedida. Omitir se o cliente não especificou.',
+          },
           bairro: { type: 'string', description: 'Bairro do cliente, se já informado — pra mostrar o estoque da loja que vai atender.' },
           municipio: { type: 'string', description: 'Cidade (opcional, ajuda a localizar o bairro).' },
         },
@@ -272,12 +277,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'buscar_produto',
-      description: 'Busca pneus por medida, marca ou código. Use quando o cliente mencionar medida (ex: 90/90-18) ou marca.',
+      description: 'Busca pneus por medida, marca, condição ou código. Se o cliente pedir novo, meia-vida ou remold, passe condicao_pneu.',
       parameters: {
         type: 'object',
         properties: {
           medida_pneu: { type: 'string', description: 'Medida do pneu. Ex: "90/90-18"' },
           marca: { type: 'string', description: 'Marca. Ex: "Pirelli", "Levorin"' },
+          condicao_pneu: {
+            type: 'string',
+            enum: ['meia_vida', 'novo', 'remold'],
+            description: 'Condição pedida pelo cliente. Não inferir quando ele não disser.',
+          },
           posicao_pneu: { type: 'string', enum: ['front', 'rear', 'both'] },
           apenas_com_estoque: { type: 'boolean', description: 'Filtrar só com estoque disponível' },
           bairro: { type: 'string', description: 'Bairro do cliente, se já informado — pra mostrar o estoque da loja que vai atender.' },
@@ -519,6 +529,7 @@ export async function executeTool(
           moto_modelo: args.moto_modelo as string,
           moto_ano: args.moto_ano as number | undefined,
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
+          condicao_pneu: args.condicao_pneu as 'meia_vida' | 'novo' | 'remold' | undefined,
           limit: 10,
         };
         if (!env.WHOLESALE_UNIFIED_STOCK) recordMatrizLegacyStockRead('bot.buscar_compatibilidade', environment);
@@ -602,6 +613,7 @@ export async function executeTool(
           environment,
           medida_pneu: args.medida_pneu as string | undefined,
           marca: args.marca as string | undefined,
+          condicao_pneu: args.condicao_pneu as 'meia_vida' | 'novo' | 'remold' | undefined,
           posicao_pneu: args.posicao_pneu as 'front' | 'rear' | 'both' | undefined,
           apenas_com_estoque: (args.apenas_com_estoque as boolean | undefined) ?? false,
           limit: 10,

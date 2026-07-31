@@ -11,7 +11,7 @@
  *   3. 🔒 anti-duplo-cômputo: compra a prazo gera um payable, mas o SAIU NÃO o
  *      soma de novo (senão a compra entraria 2×).
  *   4. Período corta certo (fora da janela não entra) e cancelado nunca entra.
- *   5. Pneus: agrupa por medida/marca, soma unidades por created_at (não pelo
+ *   5. Pneus: agrupa por medida/marca/condição, soma unidades por created_at (não pelo
  *      realizado — é "o que está saindo"), ordena por quantidade, exclui cancelado.
  *
  * Roda em testcontainers (Postgres efêmero) — precisa Docker; `npm run test:integration`.
@@ -53,10 +53,11 @@ type Q = Awaited<ReturnType<typeof importQueries>>;
 async function insertStock(unitId: string, itemName: string, tireSize: string, brand: string): Promise<string> {
   const r = await db.pool.query<{ id: string }>(
     `INSERT INTO commerce.partner_stock_levels (
-       environment, unit_id, item_name, tire_size, brand,
+       environment, unit_id, item_name, tire_size, brand, tire_condition,
        quantity_on_hand, minimum_quantity, average_cost, sale_price,
        is_tracked, stock_status, updated_by
-     ) VALUES ('test', $1, $2, $3, $4, 20, 2, 80, 150, true, 'in_stock', 'fixture')
+     ) VALUES ('test', $1, $2, $3, $4, 'meia_vida',
+               20, 2, 80, 150, true, 'in_stock', 'fixture')
      RETURNING id`,
     [unitId, itemName, tireSize, brand],
   );
@@ -110,8 +111,8 @@ async function seedScenario(q: Q, f: PartnerFixture): Promise<string> {
   await q.registerPartnerExpense(f.ctx, { expense_date: '2026-03-05', category: 'other', description: 'dentro', amount: 50, payment_method: 'pix', idempotency_key: `e1-${randomUUID()}` });
   await q.registerPartnerExpense(f.ctx, { expense_date: '2026-04-02', category: 'other', description: 'fora', amount: 70, payment_method: 'pix', idempotency_key: `e2-${randomUUID()}` });
 
-  await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-03-08', items: [{ item_name: 'Pneu X', quantity: 2, unit_cost: 40 }], payment_method: 'pix', payment_status: 'payable', payable_due_date: '2026-04-08', idempotency_key: `p1-${randomUUID()}` });
-  await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-04-10', items: [{ item_name: 'Pneu Y', quantity: 1, unit_cost: 90 }], payment_method: 'pix', payment_status: 'paid_now', idempotency_key: `p2-${randomUUID()}` });
+  await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-03-08', items: [{ item_name: 'Pneu X', tire_condition: 'meia_vida', quantity: 2, unit_cost: 40 }], payment_method: 'pix', payment_status: 'payable', payable_due_date: '2026-04-08', idempotency_key: `p1-${randomUUID()}` });
+  await q.registerPartnerPurchase(f.ctx, { supplier_name: 'Fornecedor', purchased_at: '2026-04-10', items: [{ item_name: 'Pneu Y', tire_condition: 'meia_vida', quantity: 1, unit_cost: 90 }], payment_method: 'pix', payment_status: 'paid_now', idempotency_key: `p2-${randomUUID()}` });
 
   return P;
 }
@@ -147,20 +148,24 @@ describe('Relatório Caixa — "Vendi × gastei" (contrato de dinheiro)', () => 
   });
 });
 
-describe('Relatório Pneu mais vendido — ranking por medida/marca', () => {
+describe('Relatório Pneu mais vendido — ranking por medida/marca/condição', () => {
   it('agrupa e soma unidades por created_at, ordena por qtd, exclui cancelado e fora-da-janela', async () => {
     const q = await importQueries();
     const f = await createPartnerFixture(db.pool, { initialStockQty: 20, role: 'owner', slugSuffix: 'pn' + randomUUID().slice(0, 6) });
     await seedScenario(q, f);
 
-    const rows = await q.getPartnerRelatorioPneus(f.ctx, { from: FROM, to: TO }) as Array<{ medida: string; marca: string; qtd: number; faturamento: string }>;
+    const rows = await q.getPartnerRelatorioPneus(f.ctx, { from: FROM, to: TO }) as Array<{
+      medida: string; marca: string; condicao: string; qtd: number; faturamento: string;
+    }>;
 
     // 2 grupos: Michelin 90/90-18 (A=2 + C=1; B fora por created_at) e Pirelli (D=1).
     expect(rows).toHaveLength(2);
     expect(rows[0]!.marca).toBe('Michelin');
+    expect(rows[0]!.condicao).toBe('meia_vida');
     expect(rows[0]!.qtd).toBe(3);
     const pirelli = rows.find((r) => r.marca === 'Pirelli');
     expect(pirelli?.qtd).toBe(1);
+    expect(pirelli?.condicao).toBe('meia_vida');
     // Ordenação: maior quantidade primeiro.
     expect(rows[0]!.qtd).toBeGreaterThanOrEqual(rows[1]!.qtd);
   });

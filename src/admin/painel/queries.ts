@@ -1,5 +1,6 @@
 export * from './queries-stock-reconciliation.js';
 export * from './queries-stock-physical-count.js';
+export * from './queries-stock-condition-transfer.js';
 export * from './queries-rede-custos.js';
 export * from './queries-marketing.js';
 export * from './queries-marketing-campaigns.js';
@@ -25,6 +26,8 @@ export * from './queries-candidaturas.js'; // candidatura atômica/idempotente (
 export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo
 export * from './queries-galpao-movimentos.js'; // filme do galpão (0128): rótulo, baixa manual c/ motivo, leitura
+export * from './queries-galpao-filme.js';
+export * from './queries-galpao-medidas.js';
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)
 export * from './queries-fornecedores-cancel.js'; // cancelar compra (0127) + arquivar fornecedor
 export * from './queries-fiado-despesas.js'; // fiado do atacado (0115) + despesas da matriz (0120)

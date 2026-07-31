@@ -7,11 +7,16 @@ import {
 } from './stage5-integrity.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inventory.js';
+import {
+  requireTireCondition,
+  type TireCondition,
+} from '../../shared/tire-condition.js';
 
 interface StockCountRow {
   id: string;
   measure: string;
   brand: string;
+  tire_condition: TireCondition;
   quantity_on_hand: number;
   unit_cost: string | null;
 }
@@ -24,6 +29,7 @@ export interface MatrizPhysicalStockCountResult {
   differences: Array<{
     measure: string;
     brand: string;
+    tire_condition: TireCondition;
     previous_quantity: number;
     counted_quantity: number;
     difference: number;
@@ -32,7 +38,8 @@ export interface MatrizPhysicalStockCountResult {
 
 export async function applyMatrizPhysicalStockCount(
   input: {
-    rows: Array<{ measure: string; brand: string; counted_quantity: number }>;
+    rows: Array<{ measure: string; brand: string;
+      tire_condition: TireCondition | string; counted_quantity: number }>;
     reason: string;
     idempotency_key: string;
     actor_label?: string | null;
@@ -47,13 +54,16 @@ export async function applyMatrizPhysicalStockCount(
   const normalized = input.rows.map((row) => ({
     measure: row.measure.trim(),
     brand: row.brand?.trim() || 'Sem marca',
+    tire_condition: requireTireCondition(row.tire_condition),
     counted_quantity: row.counted_quantity,
-  })).sort((a, b) => `${a.measure}\u0000${a.brand}`.localeCompare(`${b.measure}\u0000${b.brand}`));
+  })).sort((a, b) => `${a.measure}\u0000${a.brand}\u0000${a.tire_condition}`
+    .localeCompare(`${b.measure}\u0000${b.brand}\u0000${b.tire_condition}`));
   if (normalized.some((row) => !row.measure || !row.brand
     || !Number.isInteger(row.counted_quantity) || row.counted_quantity < 0)) {
     throw new Error('physical_count_invalid');
   }
-  if (new Set(normalized.map((row) => `${row.measure}\u0000${row.brand}`)).size
+  if (new Set(normalized.map((row) =>
+    `${row.measure}\u0000${row.brand}\u0000${row.tire_condition}`)).size
     !== normalized.length) {
     throw new Error('physical_count_duplicate_measure');
   }
@@ -73,21 +83,24 @@ export async function applyMatrizPhysicalStockCount(
       return started.result;
     }
     const current = await client.query<StockCountRow>(
-      `SELECT id,measure,brand,quantity_on_hand,unit_cost::text
+      `SELECT id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text
          FROM commerce.wholesale_stock
         WHERE environment=$1
-          AND (measure,brand) IN (
-            SELECT x.measure,x.brand
-              FROM jsonb_to_recordset($2::jsonb) AS x(measure text,brand text)
+          AND (measure,brand,tire_condition) IN (
+            SELECT x.measure,x.brand,x.tire_condition
+              FROM jsonb_to_recordset($2::jsonb)
+                AS x(measure text,brand text,tire_condition text)
           )
-        ORDER BY measure,brand FOR UPDATE`,
-      [environment, JSON.stringify(normalized.map(({ measure, brand }) => ({ measure, brand })))],
+        ORDER BY measure,brand,tire_condition FOR UPDATE`,
+      [environment, JSON.stringify(normalized.map(
+        ({ measure, brand, tire_condition }) => ({ measure, brand, tire_condition }),
+      ))],
     );
     if (current.rows.length !== normalized.length) {
       throw new Error('physical_count_measure_not_found');
     }
     const byVariant = new Map(current.rows.map((row) => [
-      `${row.measure}\u0000${row.brand}`, row,
+      `${row.measure}\u0000${row.brand}\u0000${row.tire_condition}`, row,
     ]));
     // O trigger financeiro 0147 reconhece `definir` como contagem de inventário.
     // Mantemos esse contrato histórico para que código novo funcione antes e depois
@@ -98,7 +111,9 @@ export async function applyMatrizPhysicalStockCount(
     });
     const differences: MatrizPhysicalStockCountResult['differences'] = [];
     for (const counted of normalized) {
-      const before = byVariant.get(`${counted.measure}\u0000${counted.brand}`)!;
+      const before = byVariant.get(
+        `${counted.measure}\u0000${counted.brand}\u0000${counted.tire_condition}`,
+      )!;
       const difference = counted.counted_quantity - Number(before.quantity_on_hand);
       if (difference !== 0) {
         await client.query(
@@ -109,6 +124,7 @@ export async function applyMatrizPhysicalStockCount(
         differences.push({
           measure: counted.measure,
           brand: counted.brand,
+          tire_condition: counted.tire_condition,
           previous_quantity: Number(before.quantity_on_hand),
           counted_quantity: counted.counted_quantity,
           difference,
@@ -121,11 +137,13 @@ export async function applyMatrizPhysicalStockCount(
         idempotencyKey: operation.idempotencyKey,
         before: {
           measure: before.measure, brand: before.brand,
+          tire_condition: before.tire_condition,
           quantity_on_hand: Number(before.quantity_on_hand),
           unit_cost: before.unit_cost,
         },
         after: {
           measure: before.measure, brand: before.brand,
+          tire_condition: before.tire_condition,
           counted_quantity: counted.counted_quantity,
           difference, reason,
         },

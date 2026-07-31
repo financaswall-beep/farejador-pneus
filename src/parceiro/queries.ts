@@ -33,6 +33,10 @@ import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
 import { resolvePartnerPermissions, PARTNER_SCREENS, type PartnerContext, type PartnerPermissions } from './auth.js';
 import type { PartnerCommissionConfig } from './commission.js';
+import {
+  requireTireCondition,
+  type TireCondition,
+} from '../shared/tire-condition.js';
 export type { PartnerCommissionConfig } from './commission.js';
 export {
   getPartnerCommissionTeam,
@@ -105,7 +109,7 @@ export interface UpsertPartnerStockInput {
   minimum_quantity?: number | null;
   average_cost?: number | null;
   sale_price?: number | null;
-  tire_condition?: string | null;
+  tire_condition?: TireCondition | null;
   shelf_location?: string | null;
   tire_position?: string | null;
   is_tracked: boolean;
@@ -127,6 +131,7 @@ export interface RegisterPartnerPurchaseInput {
     tire_aspect_ratio?: number | null;
     tire_rim_diameter?: number | null;
     brand?: string | null;
+    tire_condition: TireCondition;
     quantity: number;
     unit_cost: number;
     sale_price?: number | null;
@@ -496,7 +501,7 @@ export interface RelatorioPeriodoOpts { from?: string | null; to?: string | null
 
 /**
  * Relatório PNEU MAIS VENDIDO (0108, só dono): ranking dos itens vendidos no
- * período, agrupado por medida (tire_size; fallback item_name) + marca. Conta
+ * período, agrupado por medida (tire_size; fallback item_name) + marca + condição. Conta
  * UNIDADES (SUM quantity) e faturamento (quantity*unit_price - desconto). Lê o
  * SNAPSHOT do item na venda (partner_order_items) ⨝ pedido (período + não
  * cancelado), datado por created_at (igual à aba Vendas). RLS isola por unidade;
@@ -505,9 +510,10 @@ export interface RelatorioPeriodoOpts { from?: string | null; to?: string | null
 export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: RelatorioPeriodoOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const res = await client.query(
-      `SELECT COALESCE(NULLIF(TRIM(poi.tire_size), ''), poi.item_name) AS medida,
-              COALESCE(NULLIF(TRIM(poi.brand), ''), '') AS marca,
-              SUM(poi.quantity)::int AS qtd,
+       `SELECT COALESCE(NULLIF(TRIM(poi.tire_size), ''), poi.item_name) AS medida,
+               COALESCE(NULLIF(TRIM(poi.brand), ''), '') AS marca,
+               poi.tire_condition AS condicao,
+               SUM(poi.quantity)::int AS qtd,
                SUM(poi.quantity * poi.unit_price - poi.discount_amount) AS faturamento,
                COALESCE(SUM(poi.quantity::numeric * poi.unit_cost_snapshot) FILTER (WHERE poi.cost_status='known'), 0) AS custo_conhecido,
                COUNT(*) FILTER (WHERE poi.cost_status='pending')::int AS itens_custo_pendente,
@@ -525,7 +531,7 @@ export async function getPartnerRelatorioPneus(ctx: PartnerContext, opts: Relato
                   THEN pof.delivered_at ELSE COALESCE(pof.retrieved_at,pof.created_at) END) >= $3::timestamptz)
           AND ($4::timestamptz IS NULL OR (CASE WHEN pof.fulfillment_mode='delivery'
                   THEN pof.delivered_at ELSE COALESCE(pof.retrieved_at,pof.created_at) END) < $4::timestamptz)
-        GROUP BY 1, 2
+        GROUP BY 1, 2, 3
         ORDER BY qtd DESC, faturamento DESC
         LIMIT 100`,
       [ctx.environment, ctx.unitId, opts.from ?? null, opts.to ?? null],
@@ -646,6 +652,7 @@ export interface CatalogSearchRow {
   product_name: string;
   brand: string | null;
   product_type: string | null;
+  tire_condition: TireCondition | null;
 }
 
 /**
@@ -664,7 +671,7 @@ export async function searchPartnerCatalog(ctx: PartnerContext, termo: string): 
   if (q.length < 2) return [];
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query<CatalogSearchRow>(
-      `SELECT id, product_code, product_name, brand, product_type
+      `SELECT id, product_code, product_name, brand, product_type, tire_condition
        FROM commerce.products
        WHERE environment = $1 AND deleted_at IS NULL
          AND (product_name ILIKE $2 OR product_code ILIKE $2 OR brand ILIKE $2)
@@ -779,6 +786,7 @@ export async function getPartnerCompras(ctx: PartnerContext, opts: PartnerListOp
                 'item_name', ppi.item_name,
                 'quantity', ppi.quantity,
                 'unit_cost', ppi.unit_cost,
+                'tire_condition', ppi.tire_condition,
                 'subtotal', (ppi.quantity * ppi.unit_cost)
               ) ORDER BY ppi.created_at) FILTER (WHERE ppi.id IS NOT NULL), '[]'::jsonb) AS items
        FROM commerce.partner_purchases pp
@@ -1651,6 +1659,9 @@ export async function upsertPartnerStock(
 ): Promise<{ stock_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const isCreate = !input.stock_id;
+    const tireCondition = (input.item_type ?? 'pneu') === 'pneu'
+      ? requireTireCondition(input.tire_condition)
+      : null;
     let result;
     try {
       result = await client.query<{ id: string }>(
@@ -1711,7 +1722,7 @@ export async function upsertPartnerStock(
         stockStatus(input),
         `partner:${ctx.slug}`,
         input.item_type ?? 'pneu',
-        input.tire_condition ?? null,
+        tireCondition,
         input.shelf_location ?? null,
         input.tire_position ?? null,
       ],
@@ -1761,6 +1772,7 @@ export async function upsertPartnerStock(
           average_cost: input.average_cost,
           sale_price: input.sale_price,
           is_tracked: input.is_tracked,
+          tire_condition: tireCondition,
         }),
       ],
     );
@@ -1886,15 +1898,19 @@ export async function registerPartnerPurchase(
     for (const item of input.items) {
       await client.query(
         `INSERT INTO commerce.partner_purchase_items (
-           environment, purchase_id, product_id, item_name, quantity, unit_cost
-         ) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [ctx.environment, purchaseId, item.product_id ?? null, item.item_name, item.quantity, item.unit_cost],
+           environment, purchase_id, product_id, item_name, quantity, unit_cost, tire_condition
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          ctx.environment, purchaseId, item.product_id ?? null, item.item_name,
+          item.quantity, item.unit_cost, requireTireCondition(item.tire_condition),
+        ],
       );
 
       const supplierName = normalizeText(input.supplier_name);
       const itemName = item.item_name.trim();
       const tireSize = normalizeText(item.tire_size);
       const brand = normalizeText(item.brand);
+      const tireCondition = requireTireCondition(item.tire_condition);
       const quantity = Number(item.quantity);
       const unitCost = Number(item.unit_cost);
 
@@ -1907,11 +1923,12 @@ export async function registerPartnerPurchase(
            AND lower(trim(COALESCE(tire_size,''))) = lower(trim(COALESCE($4::text,'')))
            AND lower(trim(COALESCE(brand,''))) = lower(trim(COALESCE($5::text,'')))
            AND lower(trim(COALESCE(supplier_name,''))) = lower(trim(COALESCE($6::text,'')))
+           AND tire_condition = $7
            AND deleted_at IS NULL
          ORDER BY updated_at DESC
          LIMIT 1
          FOR UPDATE`,
-        [ctx.environment, ctx.unitId, itemName, tireSize, brand, supplierName],
+        [ctx.environment, ctx.unitId, itemName, tireSize, brand, supplierName, tireCondition],
       );
 
       if (existingStock.rowCount && existingStock.rowCount > 0) {
@@ -1957,14 +1974,14 @@ export async function registerPartnerPurchase(
              environment, unit_id, product_id, item_name, tire_size,
              tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
              brand, supplier_name, quantity_on_hand, minimum_quantity,
-             average_cost, sale_price, is_tracked, stock_status, updated_by
+             average_cost, sale_price, tire_condition, is_tracked, stock_status, updated_by
            ) VALUES (
              $1, $2, $3, $4, $5,
              $6, $7, $8,
              $9, $10, $11, NULL,
-             $12, $13, true,
+             $12, $13, $14, true,
              commerce.partner_stock_status($11, 0, NULL, true),
-             $14
+             $15
            )
            RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
           [
@@ -1981,6 +1998,7 @@ export async function registerPartnerPurchase(
             quantity,
             unitCost,
             item.sale_price ?? null,
+            tireCondition,
             `partner:${ctx.slug}`,
           ],
         );
@@ -2095,8 +2113,11 @@ export async function deletePartnerPurchase(
     }
 
     const supplierName = normalizeText(purchaseRow.rows[0]!.supplier_name);
-    const items = await client.query<{ product_id: string | null; item_name: string; quantity: number }>(
-      `SELECT product_id, item_name, quantity
+    const items = await client.query<{
+      product_id: string | null; item_name: string; quantity: number;
+      tire_condition: TireCondition | null;
+    }>(
+      `SELECT product_id, item_name, quantity, tire_condition
        FROM commerce.partner_purchase_items
        WHERE purchase_id = $1 AND environment = $2`,
       [purchaseId, ctx.environment],
@@ -2113,25 +2134,29 @@ export async function deletePartnerPurchase(
              AND unit_id = $2
              AND lower(item_name) = lower($3)
              AND supplier_name IS NOT DISTINCT FROM $4
+             AND tire_condition IS NOT DISTINCT FROM $5
              AND deleted_at IS NULL
              AND is_tracked
-             AND quantity_on_hand >= $5
+             AND quantity_on_hand >= $6
            ORDER BY updated_at DESC
            LIMIT 1
            FOR UPDATE
          )
          UPDATE commerce.partner_stock_levels ps
-         SET quantity_on_hand = ps.quantity_on_hand - $5,
+         SET quantity_on_hand = ps.quantity_on_hand - $6,
              -- A5: estorno de compra recalcula status pelo helper. Se o disponível
              -- voltar a <= 0 com reserva aberta, o item volta corretamente a 'reserved'.
              stock_status = commerce.partner_stock_status(
-               ps.quantity_on_hand - $5, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
-             updated_by = $6,
+               ps.quantity_on_hand - $6, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
+             updated_by = $7,
              updated_at = now()
          FROM target
          WHERE ps.id = target.id
          RETURNING ps.id AS stock_id, ps.quantity_on_hand AS new_qty, ps.stock_status AS new_status`,
-        [ctx.environment, ctx.unitId, item.item_name, supplierName, Number(item.quantity), `partner:${ctx.slug}`],
+        [
+          ctx.environment, ctx.unitId, item.item_name, supplierName,
+          item.tire_condition, Number(item.quantity), `partner:${ctx.slug}`,
+        ],
       );
       if (moved.rowCount && moved.rowCount > 0) {
         moves.push(moved.rows[0]!);

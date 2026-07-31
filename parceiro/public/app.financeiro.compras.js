@@ -14,6 +14,7 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
     // â”€â”€â”€ FORMS: PURCHASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async savePurchase() {
       if (!this.purchaseForm.item_name.trim()) { this.flash('Informe o pneu comprado.'); return; }
+      if (!this.purchaseForm.tire_condition) { this.flash('Selecione a condição do pneu comprado.'); return; }
       const tireParts = [this.purchaseForm.tire_width, this.purchaseForm.tire_aspect, this.purchaseForm.tire_rim];
       const filledCount = tireParts.filter((v) => v !== null && v !== '' && Number(v) > 0).length;
       if (filledCount > 0 && filledCount < 3) {
@@ -42,6 +43,7 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
               tire_aspect_ratio: tireSize ? this.num(this.purchaseForm.tire_aspect) : null,
               tire_rim_diameter: tireSize ? this.num(this.purchaseForm.tire_rim) : null,
               brand: this.purchaseForm.brand.trim() || null,
+              tire_condition: this.purchaseForm.tire_condition,
               quantity: this.num(this.purchaseForm.quantity) || 1,
               unit_cost: this.num(this.purchaseForm.unit_cost) || 0,
               sale_price: this.purchaseForm.sale_price !== null && this.purchaseForm.sale_price !== '' ? this.num(this.purchaseForm.sale_price) : null,
@@ -49,7 +51,7 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
           }),
         });
         const wasPayable = this.purchaseForm.payment_status === 'payable';
-        this.purchaseForm = { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' };
+        this.purchaseForm = { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', tire_condition: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' };
         await this.loadData();
         this.flash(wasPayable
           ? 'Compra registrada (a prazo) — conta a pagar criada.'

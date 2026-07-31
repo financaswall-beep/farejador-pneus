@@ -482,7 +482,7 @@
           <h3>Buscar produtos</h3>
           <div class="pos-product-search">
             <i data-lucide="search"></i>
-            <input x-model="posSearch" :placeholder="isMobile ? 'Buscar medida ou marca' : 'Digite a medida, marca ou modelo...'" />
+            <input x-model="posSearch" :placeholder="isMobile ? 'Buscar medida, marca ou condição' : 'Digite a medida, marca, condição ou modelo...'" />
             <button disabled title="Em breve"><i data-lucide="barcode"></i></button>
           </div>
           <div class="pos-filter-row">
@@ -517,7 +517,7 @@
                 <span class="pos-product-info">
                   <strong x-text="itemPrimaryLabel(item)"></strong>
                   <em x-text="(item.item_type || 'pneu') === 'pneu' ? item.item_name : itemTypeLabel(item.item_type)"></em>
-                  <small x-text="(item.item_type || 'pneu') === 'pneu' ? (item.supplier_name || 'Traseiro • Sem câmara') : (item.brand || '-')"></small>
+                  <small x-text="(item.item_type || 'pneu') === 'pneu' ? `${tireConditionLabel(item.tire_condition)} · ${item.supplier_name || 'Sem fornecedor'}` : (item.brand || '-')"></small>
                 </span>
                 <span class="pos-product-price">
                   <strong x-text="money(item.sale_price)"></strong>
@@ -547,7 +547,7 @@
               <template x-for="item in posCart" :key="item.partner_stock_id">
                 <div class="pos-cart-row">
                   <span class="pos-tire-thumb small"></span>
-                  <span><strong x-text="item.tire_size"></strong><em x-text="item.item_name"></em><small x-text="item.brand || 'Sem marca'"></small></span>
+                  <span><strong x-text="item.tire_size"></strong><em x-text="item.item_name"></em><small x-text="`${item.brand || 'Sem marca'} · ${tireConditionLabel(item.tire_condition)}`"></small></span>
                   <span class="pos-qty"><button @click="posDecrementItem(item)">-</button><b x-text="item.quantity"></b><button @click="posIncrementItem(item)">+</button></span>
                   <span x-text="money(item.unit_price)"></span>
                   <span x-text="money(num(item.quantity) * num(item.unit_price))"></span>
@@ -1017,7 +1017,7 @@
                   <span class="pos-medida"><i class="pos-radio"></i><span x-text="item.tire_size || itemPrimaryLabel(item)"></span></span>
                   <span class="stock-col-brand" x-text="item.brand || '-'"></span>
                   <span class="stock-col-position" x-text="stockPositionLabel(item)"></span>
-                  <span class="pos-cond stock-col-condition" x-text="item.tire_condition || '—'"></span>
+                  <span class="pos-cond stock-col-condition" x-text="tireConditionLabel(item.tire_condition)"></span>
                   <span class="pos-green-text stock-col-qty" x-text="stockQtyDisplay(item)"></span>
                   <span class="stock-col-cost" x-text="money(item.average_cost)"></span>
                   <span class="stock-col-sale" x-text="money(item.sale_price)"></span>
@@ -1057,7 +1057,7 @@
                   <div><span><i data-lucide="tag"></i>Marca</span><b x-text="stockDetail.brand || '-'"></b></div>
                   <div><span><i data-lucide="compass"></i>Posição</span><b x-text="stockPositionLabel(stockDetail)"></b></div>
                   <div><span><i data-lucide="map-pin"></i>Localização</span><b x-text="stockDetail.shelf_location || '—'"></b></div>
-                  <div><span><i data-lucide="shield-check"></i>Condição</span><b x-text="stockDetail.tire_condition || '—'"></b></div>
+                  <div><span><i data-lucide="shield-check"></i>Condição</span><b x-text="tireConditionLabel(stockDetail.tire_condition)"></b></div>
                   <div><span><i data-lucide="layers"></i>Tipo</span><b x-text="itemTypeLabel(stockDetail.item_type)"></b></div>
                 </div>
                 <div class="pos-detail-figures">
@@ -1163,7 +1163,7 @@
                     <template x-for="p in catalogResults" :key="p.id">
                       <button type="button" class="pos-catalog-result" @click="selectCatalogProduct(p)">
                         <b x-text="p.product_name"></b>
-                        <small x-text="p.product_code"></small>
+                        <small x-text="`${p.product_code} · ${tireConditionLabel(p.tire_condition)}`"></small>
                       </button>
                     </template>
                   </div>
@@ -1204,9 +1204,10 @@
               <div class="pos-stock-form-grid" x-show="stockForm.item_type !== 'servico'">
                 <label x-show="stockForm.item_type === 'pneu'">Condição
                   <select x-model="stockForm.tire_condition">
-                    <option value="Novo">Novo</option>
-                    <option value="Usado">Usado</option>
-                    <option value="Recapado">Recapado</option>
+                    <option value="">Selecione</option>
+                    <option value="meia_vida">Meia-vida</option>
+                    <option value="novo">Novo</option>
+                    <option value="remold">Remold</option>
                   </select>
                 </label>
                 <label>Localização
@@ -2396,21 +2397,22 @@
               </div>
               <div class="rel-table-wrap">
                 <table class="rel-table">
-                  <thead><tr><th>#</th><th>Medida</th><th>Marca</th><th class="r">Qtd</th><th class="r">Faturamento</th><th class="r">Custo</th><th class="r">Resultado bruto</th></tr></thead>
+                  <thead><tr><th>#</th><th>Medida</th><th>Marca</th><th>Condição</th><th class="r">Qtd</th><th class="r">Faturamento</th><th class="r">Custo</th><th class="r">Resultado bruto</th></tr></thead>
                   <tbody>
-                    <template x-for="(p, i) in relPneusRows" :key="(p.medida || '') + '|' + (p.marca || '') + '|' + i">
+                    <template x-for="(p, i) in relPneusRows" :key="(p.medida || '') + '|' + (p.marca || '') + '|' + (p.condicao || '') + '|' + i">
                       <tr>
                         <td x-text="i + 1"></td>
                         <td x-text="p.medida || '—'"></td>
                         <td x-text="p.marca || '—'"></td>
+                        <td x-text="tireConditionLabel(p.condicao)"></td>
                         <td class="r" x-text="p.qtd"></td>
                         <td class="r" x-text="money(p.faturamento)"></td>
                         <td class="r" :class="num(p.itens_custo_pendente) > 0 && 'cost-pending'" x-text="num(p.itens_custo_pendente) > 0 ? num(p.itens_custo_pendente) + ' pendente(s)' : money(p.custo_conhecido)"></td>
                         <td class="r" :class="num(p.itens_custo_pendente) > 0 && 'cost-pending'" x-text="num(p.itens_custo_pendente) > 0 ? 'Pendente' : money(p.resultado_bruto)"></td>
                       </tr>
                     </template>
-                    <tr x-show="!relPneusRows.length && !relPneusLoading"><td colspan="7" class="rel-empty">Nenhuma venda nesse período.</td></tr>
-                    <tr x-show="relPneusLoading"><td colspan="7" class="rel-empty">Carregando…</td></tr>
+                    <tr x-show="!relPneusRows.length && !relPneusLoading"><td colspan="8" class="rel-empty">Nenhuma venda nesse período.</td></tr>
+                    <tr x-show="relPneusLoading"><td colspan="8" class="rel-empty">Carregando…</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2826,33 +2828,33 @@
   </div>
 
 <script src="./app.format.js?v=20260611-onda-c"></script>
-<script src="./app.labels.js?v=20260611-onda-c"></script>
+<script src="./app.labels.js?v=20260731-condicao2"></script>
 <script src="./app.charts.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.charts.pdv.js?v=20260611-onda-c"></script>
 <script src="./app.foto.js?v=20260614-foto-viva"></script>
 <script src="./app.chat.js?v=20260611-onda-c"></script>
-<script src="./app.chat.cliente.js?v=20260611-onda-c"></script>
+<script src="./app.chat.cliente.js?v=20260731-condicao2"></script>
 <script src="./app.config.js?v=20260612-bloco2"></script>
 <script src="./app.config.equipe.js?v=20260612-bloco2"></script>
 <script src="./app.comissao.js?v=20260612-bloco2b"></script>
-<script src="./app.estoque.kpis.js?v=20260611-onda-c"></script>
-<script src="./app.estoque.forms.js?v=20260611-onda-c"></script>
-<script src="./app.pdv.kpis.js?v=20260611-onda-c"></script>
-<script src="./app.pdv.js?v=20260611-onda-c"></script>
+<script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
+<script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
+<script src="./app.pdv.kpis.js?v=20260731-condicao2"></script>
+<script src="./app.pdv.js?v=20260731-condicao2"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>
-<script src="./app.financeiro.kpis.js?v=20260611-onda-c"></script>
+<script src="./app.financeiro.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.score.js?v=20260611-onda-c"></script>
-<script src="./app.financeiro.compras.js?v=20260611-onda-c"></script>
+<script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
 <script src="./app.core.js?v=20260612-bloco2b"></script>
 <script src="./app.auth.js?v=20260611-onda-c"></script>
 <script src="./app.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
-<script src="./app.entregas.js?v=20260611-onda-c"></script>
+<script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.push.js?v=20260619-pushfix"></script>
-<script src="./app.js?v=20260617-pwa-push"></script>
+<script src="./app.js?v=20260731-condicao2"></script>
 </body>
 </html>

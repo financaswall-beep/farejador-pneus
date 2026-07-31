@@ -188,6 +188,11 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
     purchaseItemsLabel(purchase) {
       const items = Array.isArray(purchase.items) ? purchase.items : [];
       if (!items.length) return 'Itens da compra';
-      return items.map((it) => `${it.quantity}x ${it.item_name}`).join(', ');
+      return items.map((it) => {
+        const condition = it.tire_condition
+          ? ` · ${this.tireConditionLabel(it.tire_condition)}`
+          : ' · Revisar condição';
+        return `${it.quantity}x ${it.item_name}${condition}`;
+      }).join(', ');
     },
 });

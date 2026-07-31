@@ -2,20 +2,25 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { logger } from '../../shared/logger.js';
 import type { Environment } from '../../shared/types/chatwoot.js';
+import type { TireCondition } from '../../shared/tire-condition.js';
 import { isKnownPolicyKey, parsePolicyValue } from '../policies/policy-schemas.js';
 
 const tirePositionSchema = z.enum(['front', 'rear', 'both']);
+const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
 
 export const buscarProdutoInputSchema = z.object({
   environment: z.enum(['prod', 'test']),
   medida_pneu: z.string().trim().min(1).optional(),
   marca: z.string().trim().min(1).optional(),
+  condicao_pneu: tireConditionSchema.optional(),
   posicao_pneu: tirePositionSchema.optional(),
   product_code: z.string().trim().min(1).optional(),
   apenas_com_estoque: z.boolean().default(false),
   limit: z.number().int().min(1).max(20).default(10),
-}).refine((data) => Boolean(data.medida_pneu || data.marca || data.product_code), {
-  message: 'buscarProduto exige medida_pneu, marca ou product_code',
+}).refine((data) => Boolean(
+  data.medida_pneu || data.marca || data.condicao_pneu || data.product_code,
+), {
+  message: 'buscarProduto exige medida_pneu, marca, condicao_pneu ou product_code',
 });
 
 export const verificarEstoqueInputSchema = z.object({
@@ -31,6 +36,7 @@ export const buscarCompatibilidadeInputSchema = z.object({
   moto_modelo: z.string().trim().min(1),
   moto_ano: z.number().int().min(1900).max(2100).optional(),
   posicao_pneu: tirePositionSchema.optional(),
+  condicao_pneu: tireConditionSchema.optional(),
   limit: z.number().int().min(1).max(20).default(10),
 });
 
@@ -56,6 +62,7 @@ export interface ProdutoOferta {
   product_code: string;
   product_name: string;
   product_type: string;
+  tire_condition: TireCondition | null;
   brand: string | null;
   short_description: string | null;
   tire_size: string | null;
@@ -92,6 +99,7 @@ export interface CompatibilidadeResultado {
     product_id: string;
     product_name: string;
     brand: string | null;
+    tire_condition: TireCondition | null;
     tire_size: string;
     position: 'front' | 'rear' | 'both';
     is_oem: boolean;
@@ -128,6 +136,7 @@ interface ProductFullRow {
   product_code: string;
   product_name: string;
   product_type: string;
+  tire_condition: TireCondition | null;
   brand: string | null;
   short_description: string | null;
   tire_size: string | null;
@@ -165,6 +174,7 @@ interface CompatibleTireRow {
   product_id: string;
   product_name: string;
   brand: string | null;
+  tire_condition?: TireCondition | null;
   tire_size: string;
   position?: 'front' | 'rear' | 'both';
   fitment_position?: 'front' | 'rear' | 'both';
@@ -215,6 +225,10 @@ export async function buscarProduto(
     values.push(parsed.marca);
     filters.push(`brand ILIKE '%' || $${values.length} || '%'`);
   }
+  if (parsed.condicao_pneu) {
+    values.push(parsed.condicao_pneu);
+    filters.push(`tire_condition = $${values.length}`);
+  }
   // 'both' = alias semântico de "qualquer posição" (MESMO fix do buscar_compatibilidade,
   // 2026-05-23): sem este guard, posicao_pneu='both' virava `tire_position='both'` e
   // excluía os pneus de posição ÚNICA (front/rear) — ex.: o 80/90-21 (dianteiro) sumia
@@ -234,6 +248,7 @@ export async function buscarProduto(
   values.push(parsed.limit);
   const result = await client.query<ProductFullRow>(
     `SELECT product_id, product_code, product_name, product_type, brand,
+            tire_condition,
             short_description, tire_size, tire_position, intended_use,
             price_amount, currency, price_type, total_stock_available
      FROM commerce.product_full
@@ -464,6 +479,7 @@ function mapCompatibleTire(row: CompatibleTireRow): CompatibilidadeResultado['pr
     product_id: row.product_id,
     product_name: row.product_name,
     brand: row.brand,
+    tire_condition: row.tire_condition ?? null,
     tire_size: row.tire_size,
     position,
     is_oem: row.is_oem,

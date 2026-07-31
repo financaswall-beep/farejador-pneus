@@ -11,13 +11,13 @@ function mockClient(
   stock: { measure: string; brand: string }[],
   onHand = 10, // qty antes da baixa (a devolvida no old_qty; new = clamp em 0)
 ) {
-  const updates: Array<[string, string, string, number]> = [];
+  const updates: Array<[string, string, string, string, number]> = [];
   const audits: Array<{ sql: string; params: unknown[] }> = [];
   const query = vi.fn(async (sql: string, params: unknown[]) => {
     if (sql.includes('commerce.tire_specs')) return { rows: specs };
     if (sql.includes('UPDATE commerce.wholesale_stock')) {
-      updates.push(params as [string, string, string, number]);
-      const req = Number((params as [string, string, string, number])[3]);
+      updates.push(params as [string, string, string, string, number]);
+      const req = Number((params as [string, string, string, string, number])[4]);
       return { rows: [{ old_qty: String(onHand), new_qty: String(Math.max(0, onHand - req)) }], rowCount: 1 };
     }
     if (sql.includes('INSERT INTO audit.events')) {
@@ -46,7 +46,7 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
        { measure: '100/90-18', brand: 'Pirelli' }],
     );
     await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 2 }], true);
-    expect(updates).toEqual([['prod', '90/90-12', 'Pirelli', 2]]);
+    expect(updates).toEqual([['prod', '90/90-12', 'Pirelli', 'meia_vida', 2]]);
   });
 
   it('casa por NÚMEROS mesmo se o formato do galpão diferir do catálogo', async () => {
@@ -55,7 +55,7 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
       [{ measure: '90/90 12', brand: 'Pirelli' }],
     );
     await applyMatrizGalpaoDecrement(client, 'prod', [{ productId: 'p1', quantity: 1 }], true);
-    expect(updates).toEqual([['prod', '90/90 12', 'Pirelli', 1]]);
+    expect(updates).toEqual([['prod', '90/90 12', 'Pirelli', 'meia_vida', 1]]);
   });
 
   it('agrega 2 itens da MESMA medida numa baixa só (2 + 1 = 3)', async () => {
@@ -72,7 +72,7 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
       [{ productId: 'p1', quantity: 2 }, { productId: 'p2', quantity: 1 }],
       true,
     );
-    expect(updates).toEqual([['prod', '90/90-12', 'Pirelli', 3]]);
+    expect(updates).toEqual([['prod', '90/90-12', 'Pirelli', 'meia_vida', 3]]);
   });
 
   it('produto sem medida no galpao falha fechado', async () => {
@@ -97,7 +97,7 @@ describe('applyMatrizGalpaoDecrement — baixa do galpão na venda da matriz (va
     expect(audits[0]!.sql).toContain('matriz_galpao_decrement');
     const payload = JSON.parse(audits[0]!.params[2] as string);
     expect(payload.movements).toEqual([{
-      measure: '90/90-12', brand: 'Pirelli', qty: 2,
+      measure: '90/90-12', brand: 'Pirelli', tire_condition: 'meia_vida', qty: 2,
     }]);
   });
 
@@ -129,7 +129,10 @@ describe('applyMatrizGalpaoReturn — devolução estrita no cancelamento', () =
       if (sql.includes("event_type = 'matriz_galpao_return'")) return { rows: [] };
       if (sql.includes("event_type = 'matriz_galpao_decrement'")) {
         return { rows: [{
-          payload_after: { movements: [{ measure: '90/90-12', brand: 'Pirelli', qty: 1 }] },
+          payload_after: { movements: [{
+            measure: '90/90-12', brand: 'Pirelli',
+            tire_condition: 'meia_vida', qty: 1,
+          }] },
         }] };
       }
       if (sql.includes('UPDATE commerce.wholesale_stock')) return { rows: [], rowCount: 0 };

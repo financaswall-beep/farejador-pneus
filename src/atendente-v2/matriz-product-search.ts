@@ -12,12 +12,14 @@ import {
 } from '../atendente/tools/commerce-tools.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../shared/tire-size.js';
+import type { TireCondition } from '../shared/tire-condition.js';
 
 interface CatalogRow {
   product_id: string;
   product_code: string;
   product_name: string;
   product_type: string;
+  tire_condition: TireCondition;
   brand: string | null;
   short_description: string | null;
   tire_size: string | null;
@@ -31,6 +33,7 @@ interface CatalogRow {
 interface OfficialStockRow {
   measure: string;
   brand: string;
+  tire_condition: TireCondition;
   quantity_on_hand: number | string;
   unit_cost: number | string | null;
 }
@@ -60,6 +63,10 @@ export async function buscarProdutoMatriz(
     values.push(parsed.posicao_pneu);
     filters.push(`(ts.position = $${values.length} OR ts.position = 'both')`);
   }
+  if (parsed.condicao_pneu) {
+    values.push(parsed.condicao_pneu);
+    filters.push(`p.tire_condition = $${values.length}`);
+  }
   const catalog = await client.query<CatalogRow>(catalogSql(filters), values);
   const stock = await loadOfficialStock(client, parsed.environment);
   const index = buildMatrizStockIndex(stock);
@@ -68,7 +75,9 @@ export async function buscarProdutoMatriz(
   return catalog.rows
     .filter((row) => !requestedKey || tireSizeKey(row.tire_size) === requestedKey)
     .map((row) => {
-      const state = matrizStockForMeasure(index, row.tire_size, row.brand);
+      const state = matrizStockForMeasure(
+        index, row.tire_size, row.brand, row.tire_condition,
+      );
       return {
         ...row,
         total_stock_available: state.sellable ? state.quantity_on_hand : 0,
@@ -102,7 +111,9 @@ export async function verificarEstoqueMatriz(
   const row = product.rows[0];
   if (!row) return null;
   const stock = await loadOfficialStock(client, parsed.environment);
-  const state = matrizStockForMeasure(buildMatrizStockIndex(stock), row.tire_size, row.brand);
+  const state = matrizStockForMeasure(
+    buildMatrizStockIndex(stock), row.tire_size, row.brand, row.tire_condition,
+  );
   const available = state.sellable ? state.quantity_on_hand : 0;
   return {
     product_id: row.product_id,
@@ -132,6 +143,7 @@ interface FitmentRow {
   product_id: string;
   product_name: string;
   brand: string | null;
+  tire_condition: TireCondition;
   tire_size: string;
   position: 'front' | 'rear' | 'both';
   is_oem: boolean;
@@ -154,6 +166,7 @@ export async function buscarCompatibilidadeMatriz(
   const position = parsed.posicao_pneu && parsed.posicao_pneu !== 'both' ? parsed.posicao_pneu : null;
   const fitments = await client.query<FitmentRow>(
     `SELECT vf.vehicle_model_id, p.id AS product_id, p.product_name, p.brand,
+            p.tire_condition,
             ts.tire_size, vf.position, vf.is_oem, vf.source,
             vf.confidence_level, cp.price_amount AS current_price
        FROM commerce.vehicle_fitments vf
@@ -164,8 +177,14 @@ export async function buscarCompatibilidadeMatriz(
        LEFT JOIN commerce.matriz_current_prices cp
          ON cp.product_id = p.id AND cp.environment = p.environment
       WHERE vf.environment = $1 AND vf.vehicle_model_id = ANY($2::uuid[])
-        AND ($3::text IS NULL OR vf.position = $3 OR vf.position = 'both')`,
-    [parsed.environment, vehicles.rows.map((row) => row.vehicle_model_id), position],
+        AND ($3::text IS NULL OR vf.position = $3 OR vf.position = 'both')
+        AND ($4::text IS NULL OR p.tire_condition = $4)`,
+    [
+      parsed.environment,
+      vehicles.rows.map((row) => row.vehicle_model_id),
+      position,
+      parsed.condicao_pneu ?? null,
+    ],
   );
   const stock = await loadOfficialStock(client, parsed.environment);
   const index = buildMatrizStockIndex(stock);
@@ -174,11 +193,14 @@ export async function buscarCompatibilidadeMatriz(
     produtos: fitments.rows
       .filter((row) => row.vehicle_model_id === vehicle.vehicle_model_id)
       .map((row) => {
-        const state = matrizStockForMeasure(index, row.tire_size, row.brand);
+        const state = matrizStockForMeasure(
+          index, row.tire_size, row.brand, row.tire_condition,
+        );
         return {
           product_id: row.product_id,
           product_name: row.product_name,
           brand: row.brand,
+          tire_condition: row.tire_condition,
           tire_size: row.tire_size,
           position: row.position,
           is_oem: row.is_oem,
@@ -196,7 +218,8 @@ export async function buscarCompatibilidadeMatriz(
 }
 
 function catalogSql(filters: string[]): string {
-  return `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type, p.brand,
+  return `SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type,
+                 p.tire_condition,p.brand,
                  p.short_description, ts.tire_size, ts.position AS tire_position, ts.intended_use,
                  cp.price_amount, cp.currency, cp.price_type
             FROM commerce.products p
@@ -209,7 +232,7 @@ function catalogSql(filters: string[]): string {
 
 async function loadOfficialStock(client: PoolClient, environment: 'prod' | 'test'): Promise<OfficialStockRow[]> {
   const result = await client.query<OfficialStockRow>(
-    `SELECT measure, brand, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [environment],

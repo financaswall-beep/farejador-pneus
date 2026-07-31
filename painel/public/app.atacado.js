@@ -1,6 +1,3 @@
-// Obra 300 (2026-07-05): fatia do painel da MATRIZ — venda de atacado: form, status, submit, ranking de recompra.
-// VERBATIM das linhas 915-1058 do app.js pré-obra (commit dd64a35).
-// Montado em app.js via getOwnPropertyDescriptors — NUNCA usar spread (congela getter).
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_STOCK_PREVIEW = {
   enabled() {
@@ -48,7 +45,6 @@ window.PAINEL_MODULES.atacado = function () {
     atacadoBuyerKey(b) {
       return b.customer_id ? `c:${b.customer_id}` : `p:${b.partner_id}`;
     },
-    // Compras e fornecedores ficam fora: uma falha neles não derruba o caixa do atacado.
     async loadAtacadoVendas() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
@@ -136,7 +132,9 @@ window.PAINEL_MODULES.atacado = function () {
       }
     },
     atacadoAddItem() {
-      this.atacadoForm.items.push({ measure: '', brand: '', quantity: 1, unit_price: '' });
+      this.atacadoForm.items.push({
+        measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: '',
+      });
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     atacadoRemoveItem(i) {
@@ -197,7 +195,6 @@ window.PAINEL_MODULES.atacado = function () {
         return { label: `sumiu (${b.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600', dot: 'bg-rose-400' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' };
     },
-    // Recibo via wa.me; sem telefone retorna null e a UI esconde o botão.
     reciboWhatsLink(v) {
       if (!v) return null;
       const digits = String(v.buyer_phone || '').replace(/\D/g, '');
@@ -242,13 +239,17 @@ window.PAINEL_MODULES.atacado = function () {
         .map((it) => ({
           measure: it.measure.trim(),
           brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
+          tire_condition: it.tire_condition || null,
           quantity: Number(it.quantity),
           unit_price: Number(it.unit_price) || 0,
         }));
       if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
       if (items.some((item) => !item.brand)) { this.atacadoMsg = { ok: false, text: 'Informe a marca de cada pneu.' }; return; }
+      if (items.some((item) => !item.tire_condition)) {
+        this.atacadoMsg = { ok: false, text: 'Selecione a condição de cada pneu.' };
+        return;
+      }
       body.items = items;
-      // FINANCEIRO (0115): fiado só quando o financeiro está ligado e com vencimento.
       if (this.atacadoFinance && f.payment_status === 'pending') {
         if (!f.due_date) {
           this.atacadoMsg = { ok: false, text: 'Informe o vencimento da venda fiada.' };
@@ -274,7 +275,7 @@ window.PAINEL_MODULES.atacado = function () {
         this.atacadoForm = {
           buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
           payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
-          items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }],
+          items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: '' }],
         };
         await this.loadAtacadoVendas();
       } catch (err) {
@@ -290,11 +291,10 @@ window.PAINEL_MODULES.atacado = function () {
         partner_not_found: 'Parceiro não encontrado.',
         buyer_not_found: 'Cliente não encontrado.',
         oversell: 'Estoque insuficiente. A venda não foi registrada; confira o galpão.',
+        tire_condition_required: 'Selecione a condição de cada pneu.',
         idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },
-
-    // ── ATACADO — FORNECEDORES (0114): compra/entrada com origem ──
   };
 };

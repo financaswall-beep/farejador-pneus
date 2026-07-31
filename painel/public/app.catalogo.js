@@ -34,7 +34,8 @@ window.PAINEL_MODULES.catalogo = function () {
         if (this.catalogoFiltro === 'estoque' && Number(row.official_quantity_on_hand || 0) <= 0) return false;
         if (this.catalogoFiltro === 'sem_preco' && row.price_amount != null) return false;
         if (!search) return true;
-        return [row.product_code, row.product_name, row.brand, row.tire_size]
+        return [row.product_code, row.product_name, row.brand, row.tire_size,
+          this.catalogoConditionLabel(row.tire_condition)]
           .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(search));
       });
     },
@@ -85,6 +86,13 @@ window.PAINEL_MODULES.catalogo = function () {
         : null;
     },
 
+    catalogoConditionLabel(value) {
+      if (value === 'meia_vida') return 'Meia-vida';
+      if (value === 'novo') return 'Novo';
+      if (value === 'remold') return 'Remold';
+      return 'Condição pendente';
+    },
+
     async catalogoOpen(row) {
       if (!row?.product_id || row.catalogued === false) {
         this.catalogoCreateOpen(row);
@@ -108,11 +116,13 @@ window.PAINEL_MODULES.catalogo = function () {
         .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '')
         .slice(0, 3).toUpperCase() || 'PNE';
       const measureCode = String(row.tire_size || '').replace(/\D/g, '') || 'MEDIDA';
+      const conditionCode = row.tire_condition === 'novo' ? 'NOV'
+        : row.tire_condition === 'remold' ? 'REM' : 'MV';
       this.catalogoCadastro = {
         open: true,
         row,
         form: {
-          product_code: `${brandCode}-${measureCode}`,
+          product_code: `${brandCode}-${measureCode}-${conditionCode}`,
           product_name: `Pneu ${row.brand}`,
         },
         saving: false,
@@ -155,6 +165,7 @@ window.PAINEL_MODULES.catalogo = function () {
         const created = await this.apiPost('/admin/api/catalog/products', {
           measure: row.tire_size,
           brand: row.brand,
+          tire_condition: row.tire_condition,
           product_code: String(form.product_code).trim().toUpperCase(),
           product_name: String(form.product_name).trim(),
         });

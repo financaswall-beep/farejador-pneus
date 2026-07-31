@@ -45,16 +45,17 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).not.toContain('pagination');
   });
 
-  it('reutiliza as cinco ações auditadas da medida selecionada', () => {
+  it('reutiliza as ações auditadas da medida selecionada', () => {
     expect(stockHtml).toContain('Registrar entrada');
     expect(stockHtml).toContain('Ajustar saldo e custo');
     expect(stockHtml).toContain('Baixa manual');
     expect(stockHtml).toContain('Ver histórico');
     expect(stockHtml).toContain('Remover variante');
+    expect(stockHtml).toContain('Corrigir condição');
     expect(stockHtml).toContain("stockOperacao = 'entrada'");
     expect(stockHtml).toContain("stockOperacao = 'ajuste'");
     expect(stockHtml).toContain('stockBaixaOpen(selectedRow)');
-    expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure, selectedRow.brand)');
+    expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure, selectedRow.brand, selectedRow.tire_condition)');
     expect(stockHtml).toContain('stockRemove(selectedRow)');
     expect(galpao).toContain('Remover ${measure} · ${brand} do estoque do galpão?');
     expect(stockHtml).toContain('Entrada recalcula o custo médio ponderado');
@@ -105,15 +106,15 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('id="capital-medida-heading"');
     expect(stockHtml).toContain('Capital por medida');
     expect(stockHtml).toContain('Leitura dos custos');
-    expect(stockHtml).toContain('Custo médio ponderado');
+    expect(stockHtml).toContain('Pneus com custo conhecido');
     expect(stockHtml).toContain('Concentração no Top 3');
     expect(stockHtml).toContain('id="custos-medida-heading"');
-    expect(stockHtml).toContain('Custos por medida');
+    expect(stockHtml).toContain('Custos por medida e condição');
     expect(stockHtml).toContain('Como este valor é calculado');
     expect(stockHtml).toContain('Mesma conta usada no Financeiro');
     expect(stockHtml).toContain('commerce.wholesale_stock');
     expect(stockHtml).toContain('custoCapital(row)');
-    expect(stockHtml).toContain('custoMediaPonderada()');
+    expect(stockHtml).toContain('custoPneusComCusto()');
     expect(stockHtml).toContain('custoTop3Percentual()');
     expect(stockHtml).toContain("custoOrdem: 'capital'");
     expect(stockHtml).toContain("stockTab = 'visao'; stockBusca = row.measure");

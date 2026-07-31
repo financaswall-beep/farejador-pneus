@@ -77,6 +77,7 @@ export async function getMatrizNotificacoes(
 
        (SELECT json_agg(json_build_object(
                  'measure', s.measure, 'brand', s.brand,
+                 'tire_condition', s.tire_condition,
                  'quantity_on_hand', s.quantity_on_hand,
                  'min_quantity', s.min_quantity)
                ORDER BY s.quantity_on_hand::numeric / NULLIF(s.min_quantity, 0))

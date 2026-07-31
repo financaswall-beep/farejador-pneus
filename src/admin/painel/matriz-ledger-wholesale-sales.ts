@@ -3,6 +3,7 @@ import { env } from '../../shared/config/env.js';
 import {
   matrizLedgerActor, matrizLedgerAmount, postMatrizLedgerTransaction,
 } from './matriz-ledger-posting.js';
+import type { TireCondition } from '../../shared/tire-condition.js';
 
 export interface WholesaleSaleLedgerState {
   environment: 'prod' | 'test';
@@ -182,22 +183,25 @@ async function reverseTransaction(
 async function returnedCogs(
   client: PoolClient,
   sale: WholesaleSaleLedgerState,
-  returned: Array<{ measure: string; brand: string; quantity: number }>,
+  returned: Array<{
+    measure: string; brand: string; tire_condition: TireCondition; quantity: number;
+  }>,
 ): Promise<number> {
   const result = await client.query<{ amount: string }>(
     `WITH returned AS (
-       SELECT measure,brand,quantity
-         FROM jsonb_to_recordset($3::jsonb) AS x(measure text,brand text,quantity int)
+       SELECT measure,brand,tire_condition,quantity
+         FROM jsonb_to_recordset($3::jsonb)
+           AS x(measure text,brand text,tire_condition text,quantity int)
      ), sold AS (
-       SELECT measure,brand,sum(quantity)::numeric quantity,
+       SELECT measure,brand,tire_condition,sum(quantity)::numeric quantity,
               sum(quantity*unit_cost)::numeric cost
          FROM commerce.wholesale_order_items
-        WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand
+        WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand,tire_condition
      )
      SELECT COALESCE(sum(
        LEAST(returned.quantity,sold.quantity)*sold.cost/NULLIF(sold.quantity,0)
      ),0)::numeric(14,2)::text amount
-       FROM returned JOIN sold USING (measure,brand)`,
+       FROM returned JOIN sold USING (measure,brand,tire_condition)`,
     [sale.environment, sale.orderId, JSON.stringify(returned)],
   );
   return matrizLedgerAmount(result.rows[0]!.amount, 'sale_ledger_cogs_invalid');
@@ -206,7 +210,9 @@ async function returnedCogs(
 export async function postWholesaleSaleCancellation(
   client: PoolClient,
   sale: WholesaleSaleLedgerState,
-  returned: Array<{ measure: string; brand: string; quantity: number }>,
+  returned: Array<{
+    measure: string; brand: string; tire_condition: TireCondition; quantity: number;
+  }>,
   cancelledAt: string,
   cancelledBy: string,
   reason: string,

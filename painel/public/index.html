@@ -24,13 +24,13 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
-<script src="/admin/painel/app.format.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.varejo.js?v=20260727-finance-refresh1"></script>
+<script src="/admin/painel/app.format.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.varejo.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.compras.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.compras.relatorios.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.atacado.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.compras.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.resultado.js?v=20260717-comprovantes1"></script>
@@ -38,7 +38,7 @@
 <script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260719-colab-dialog1"></script>
 <script src="/admin/painel/app.colaboradores.gestao.js?v=20260719-colab-dialog1"></script>
-<script src="/admin/painel/app.sino.js?v=20260717-etapa8"></script>
+<script src="/admin/painel/app.sino.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/mapa-rm-dados.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.bot.js?v=20260717-etapa8"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
@@ -53,19 +53,20 @@
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.galpao.contagem.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
-<script src="/admin/painel/app.galpao.multibrand.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.galpao.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260731-catalog-create2"></script>
+<script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.galpao.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260731-multimarca3"></script>
-<script src="/admin/painel/app.js?v=20260731-catalog-create1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.js?v=20260731-condicao2"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -2338,14 +2339,15 @@
               <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl"><label><span class="text-xs text-gray-500 mb-1 block">Nome</span><input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label><label><span class="text-xs text-gray-500 mb-1 block">Telefone</span><input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label></div>
 
               <div class="border border-gray-200 rounded-xl overflow-visible">
-                <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2 text-center">Estoque</div><div class="col-span-1 text-center">Qtd.</div><div class="col-span-2">Preço unitário</div><div class="col-span-2 text-right">Subtotal</div></div>
+                <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2">Condição</div><div class="col-span-1 text-center">Estoque</div><div class="col-span-1 text-center">Qtd.</div><div class="col-span-2">Preço unitário</div><div class="col-span-1 text-right">Subtotal</div></div>
                 <div class="divide-y divide-gray-100"><template x-for="(it, i) in atacadoForm.items" :key="i"><div class="grid grid-cols-1 lg:grid-cols-12 gap-2 p-3 items-center">
                   <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-400">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><div x-show="measureBox.key === 'v'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center justify-between gap-3"><span><strong x-text="m.measure"></strong><small class="ml-2 text-gray-500" x-text="m.brand"></small></span><span class="text-xs text-emerald-700" x-text="m.quantity_on_hand + ' un'"></span></button></template></div></div>
                   <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Marca</label><input x-model="it.brand" type="text" placeholder="Marca" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-                  <div class="lg:col-span-2 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="measureOnHand(it.measure, it.brand) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="!String(it.brand || '').trim() ? 'informe a marca' : (measureOnHand(it.measure, it.brand) === null ? 'não cadastrado' : measureOnHand(it.measure, it.brand) + ' un')"></span></div>
+                  <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-400">Condição</span><select x-model="it.tire_condition" class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white"><option value="">Selecione</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
+                  <div class="lg:col-span-1 text-center"><span class="inline-flex px-2 py-1 rounded-full text-xs" :class="measureOnHand(it.measure, it.brand, it.tire_condition) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="!String(it.brand || '').trim() || !it.tire_condition ? 'complete' : (measureOnHand(it.measure, it.brand, it.tire_condition) === null ? 'não cadastrado' : measureOnHand(it.measure, it.brand, it.tire_condition) + ' un')"></span></div>
                   <div class="lg:col-span-1"><label class="lg:hidden text-xs text-gray-400">Qtd.</label><input x-model.number="it.quantity" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"></div>
                   <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Preço unitário</label><input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-                  <div class="lg:col-span-2 flex items-center justify-end gap-2"><span class="font-semibold num" x-text="formatCurrency((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))"></span><button x-show="atacadoForm.items.length > 1" @click="atacadoRemoveItem(i)" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50" title="Remover"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
+                  <div class="lg:col-span-1 flex items-center justify-end gap-2"><span class="font-semibold num" x-text="formatCurrency((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))"></span><button x-show="atacadoForm.items.length > 1" @click="atacadoRemoveItem(i)" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50" title="Remover"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
                 </div></template></div>
                 <div class="px-4 py-3 border-t border-gray-100"><button @click="atacadoAddItem()" class="inline-flex items-center gap-1.5 text-sm text-emerald-700 font-medium hover:underline"><i data-lucide="plus" class="w-4 h-4"></i>Adicionar pneu</button></div>
               </div>
@@ -2373,7 +2375,7 @@
           <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm"><h3 class="text-base font-semibold">Medidas mais vendidas</h3><p class="text-xs text-gray-400 mt-1 mb-4">Nas vendas recentes do atacado</p><div class="space-y-3"><template x-for="row in atacadoMedidasMaisVendidas()" :key="row.medida"><div class="grid grid-cols-[100px_minmax(100px,1fr)_55px] gap-3 items-center"><span class="text-sm font-medium" x-text="row.medida"></span><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + row.pct + '%'"></div></div><span class="text-xs text-gray-500 text-right num" x-text="row.quantidade + ' un'"></span></div></template><p x-show="!atacadoMedidasMaisVendidas().length" class="py-8 text-center text-sm text-gray-400">As medidas aparecem depois das primeiras vendas.</p></div></div>
         </div>
 
-        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure + (item.brand ? ' · ' + item.brand : '')"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
+        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure + (item.brand ? ' · ' + item.brand : '') + ' · ' + catalogoConditionLabel(item.tire_condition)"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
       </div>
 
       <!-- HISTÓRICO COMERCIAL UNIFICADO -->
@@ -2603,9 +2605,9 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="mb-3"><h3 class="text-base font-semibold">Melhores preços recentes</h3><p class="text-xs text-gray-500 mt-1">Menor custo médio registrado por medida e marca</p></div>
+            <div class="mb-3"><h3 class="text-base font-semibold">Melhores preços recentes</h3><p class="text-xs text-gray-500 mt-1">Menor custo médio registrado por medida, marca e condição</p></div>
             <div class="divide-y divide-gray-100">
-              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.variant_key"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure + ' · ' + g.brand"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-emerald-700 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
+              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.variant_key"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure + ' · ' + g.brand + ' · ' + catalogoConditionLabel(g.tire_condition)"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-emerald-700 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
               <div x-show="fornecedorBreakdown.length === 0" class="py-8 text-center text-sm text-gray-500">Os melhores preços aparecem depois das primeiras compras.</div>
             </div>
             <button @click="comprasOpenTab('precos')" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-emerald-800 text-sm font-medium px-3 py-2.5 rounded-lg">Ver comparação completa</button>
@@ -2650,13 +2652,14 @@
 
             <section class="pt-5 border-t border-gray-100">
               <div class="flex items-center gap-3 mb-3"><span class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-sm font-semibold flex items-center justify-center">2</span><h4 class="font-semibold">Pneus da compra</h4></div>
-              <div class="hidden lg:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-t-lg text-[11px] font-medium text-gray-500 uppercase tracking-wide"><div class="col-span-3">Medida</div><div class="col-span-3">Marca</div><div class="col-span-2">Quantidade</div><div class="col-span-2">Custo unitário</div><div class="col-span-1 text-right">Subtotal</div><div class="col-span-1"></div></div>
+              <div class="hidden lg:grid grid-cols-12 gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-t-lg text-[11px] font-medium text-gray-500 uppercase tracking-wide"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2">Condição</div><div class="col-span-1">Quantidade</div><div class="col-span-2">Custo unitário</div><div class="col-span-1 text-right">Subtotal</div><div class="col-span-1"></div></div>
               <div class="border border-gray-200 lg:border-t-0 rounded-lg lg:rounded-t-none divide-y divide-gray-100">
                 <template x-for="(it, i) in compraForm.items" :key="i">
                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 items-center">
                     <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-500">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'compra'+i)" @focus="measureFind(it.measure, 'compra'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="Ex.: 90/90-18" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"><div x-show="measureBox.key === 'compra'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template></div></div>
-                    <label class="lg:col-span-3"><span class="lg:hidden text-xs text-gray-500">Marca</span><input x-model="it.brand" list="catalog-brand-options" maxlength="60" type="text" placeholder="Selecione ou digite" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
-                    <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Quantidade</span><input x-model="it.quantity" type="number" min="1" step="1" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                    <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Marca</span><input x-model="it.brand" list="catalog-brand-options" maxlength="60" type="text" placeholder="Selecione ou digite" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
+                    <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Condição</span><select x-model="it.tire_condition" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"><option value="">Selecione</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
+                    <label class="lg:col-span-1"><span class="lg:hidden text-xs text-gray-500">Quantidade</span><input x-model="it.quantity" type="number" min="1" step="1" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                     <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Custo unitário</span><input x-model="it.unit_cost" type="number" min="0" step="0.01" placeholder="0,00" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                     <div class="lg:col-span-1 text-right text-sm font-semibold num" x-text="formatCurrency((Number(it.quantity)||0)*(Number(it.unit_cost)||0))"></div>
                     <button type="button" @click="compraRemoveItem(i)" x-show="compraForm.items.length > 1" class="lg:col-span-1 text-gray-400 hover:text-rose-500 flex justify-end lg:justify-center" aria-label="Remover item"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -2697,6 +2700,15 @@
           <div class="mt-5 space-y-4">
             <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-dot-dashed" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-2xl font-semibold num" x-text="compraFormSummary().tires"></p><p class="text-xs text-gray-500">pneus</p></div></div>
             <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="ruler" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-2xl font-semibold num" x-text="compraFormSummary().measures"></p><p class="text-xs text-gray-500">medidas</p></div></div>
+            <div class="pt-4 border-t border-gray-100 space-y-2">
+              <p class="text-xs font-semibold text-gray-600">Confira as variantes</p>
+              <template x-for="(item, index) in compraForm.items.filter((row) => row.measure && Number(row.quantity) > 0)" :key="'resumo-compra-'+index">
+                <div class="rounded-lg bg-gray-50 px-3 py-2 text-xs">
+                  <p class="font-semibold text-gray-800" x-text="`${Number(item.quantity)}× ${item.measure}`"></p>
+                  <p class="mt-0.5 text-gray-500" x-text="`${item.brand || 'Marca pendente'} · ${item.tire_condition ? catalogoConditionLabel(item.tire_condition) : 'Condição pendente'}`"></p>
+                </div>
+              </template>
+            </div>
             <div class="pt-4 border-t border-gray-100"><p class="text-sm text-gray-500">Total</p><p class="text-3xl font-semibold mt-1 num" x-text="formatCurrency(compraFormSummary().total)"></p></div>
           </div>
           <div class="mt-5 p-4 rounded-xl border border-emerald-100 bg-emerald-50/60">
@@ -2802,10 +2814,10 @@
         <div x-show="comprasErrors.prices" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível atualizar os preços. Os dados anteriores foram mantidos.</span><button @click="loadComprasPrices()" class="font-semibold hover:underline">Tentar novamente</button></div>
         <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
           <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Custo médio por medida e marca</h3></div>
-            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida e marca</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Diferença</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead>
+            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Custo médio por medida, marca e condição</h3></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Variante</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Diferença</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead>
               <tbody class="divide-y divide-gray-100">
-                <template x-for="g in comprasPriceGroups()" :key="g.variant_key"><template x-for="(row, ri) in g.suppliers" :key="g.variant_key+':'+row.supplier_id"><tr @click="comprasPriceSelectedMeasure=g.variant_key" class="cursor-pointer hover:bg-gray-50" :class="comprasPriceSelectedMeasure === g.variant_key ? 'bg-emerald-50/50' : ''"><td class="px-5 py-3 font-semibold align-top" x-text="ri === 0 ? g.measure + ' · ' + g.brand : ''"></td><td class="px-4 py-3"><span x-show="row.cheapest" class="inline-flex mr-2 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">Menor média ★</span><span x-text="row.supplier_name"></span><span x-show="row.supplier_archived" class="ml-1 text-[10px] text-gray-400">arquivado</span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total+' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-emerald-800' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-4 py-3 text-right num" x-text="row.cheapest ? '—' : '+'+row.diff_pct.toFixed(1)+'%'"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template>
+                <template x-for="g in comprasPriceGroups()" :key="g.variant_key"><template x-for="(row, ri) in g.suppliers" :key="g.variant_key+':'+row.supplier_id"><tr @click="comprasPriceSelectedMeasure=g.variant_key" class="cursor-pointer hover:bg-gray-50" :class="comprasPriceSelectedMeasure === g.variant_key ? 'bg-emerald-50/50' : ''"><td class="px-5 py-3 font-semibold align-top" x-text="ri === 0 ? g.measure + ' · ' + g.brand + ' · ' + catalogoConditionLabel(g.tire_condition) : ''"></td><td class="px-4 py-3"><span x-show="row.cheapest" class="inline-flex mr-2 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">Menor média ★</span><span x-text="row.supplier_name"></span><span x-show="row.supplier_archived" class="ml-1 text-[10px] text-gray-400">arquivado</span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total+' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-emerald-800' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-4 py-3 text-right num" x-text="row.cheapest ? '—' : '+'+row.diff_pct.toFixed(1)+'%'"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template>
                 <tr x-show="comprasLoading.prices"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Carregando comparação…</td></tr>
                 <tr x-show="!comprasLoading.prices && comprasPriceGroups().length === 0"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Nenhum preço recebido nesse recorte.</td></tr>
               </tbody>
@@ -2814,7 +2826,7 @@
 
           <aside class="2xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5">
             <template x-if="comprasPriceSelected()"><div>
-              <h3 class="text-xl font-semibold" x-text="comprasPriceSelected().measure + ' · ' + comprasPriceSelected().brand"></h3>
+              <h3 class="text-xl font-semibold" x-text="comprasPriceSelected().measure + ' · ' + comprasPriceSelected().brand + ' · ' + catalogoConditionLabel(comprasPriceSelected().tire_condition)"></h3>
               <p class="text-xs text-gray-500 mt-1">Comparação da variante selecionada</p>
               <div class="mt-5"><p class="text-xs text-gray-500">Melhor média histórica</p><p class="text-2xl font-semibold text-emerald-800 num" x-text="formatCurrency(Number(comprasPriceSelected().suppliers[0]?.avg_cost || 0))"></p><p class="text-sm text-gray-600 mt-1" x-text="comprasPriceSelected().suppliers[0]?.supplier_name"></p></div>
               <div class="mt-5 space-y-3"><template x-for="row in comprasPriceSelected().suppliers" :key="'bar-'+row.supplier_id"><div><div class="flex items-center justify-between gap-3 text-xs mb-1"><span class="truncate" x-text="row.supplier_name"></span><span class="font-medium num" x-text="formatCurrency(Number(row.avg_cost))"></span></div><div class="h-2 rounded-full bg-gray-100 overflow-hidden"><div class="h-full rounded-full" :class="row.cheapest ? 'bg-emerald-700' : 'bg-gray-300'" :style="'width:'+Math.max(18,(Number(row.avg_cost)/Math.max(...comprasPriceSelected().suppliers.map(s=>Number(s.avg_cost))))*100)+'%'"></div></div></div></template></div>
@@ -2871,11 +2883,11 @@
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
           </nav>
           <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
-            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm">
               <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
             </button>
-            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+            <button @click="stockTab = 'visao'; stockOperacao = 'ajuste'; stockMsg = null; stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 border border-emerald-700 text-emerald-800 hover:bg-emerald-50 text-xs font-medium px-4 py-2 rounded-lg">
               <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Ajustar estoque
             </button>
@@ -2936,6 +2948,7 @@
                      placeholder="Ex.: Michelin" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
               <span class="mt-1 block text-[10px] text-emerald-700">Separa saldo e custo; também aparece no Catálogo</span>
             </label>
+            <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Condição</span><select x-model="stockForm.tire_condition" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="">Selecione</option><option value="meia_vida">Meia-vida</option><option value="novo">Novo</option><option value="remold">Remold</option></select></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Custo unitário</span><input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label x-show="stockOperacao === 'entrada'" class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Origem</span><select x-model="stockForm.entry_nature" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="inventory_found">Encontrado na contagem</option><option value="owner_contribution">Aporte do proprietário</option><option value="opening_balance">Saldo inicial/teste</option><option value="other">Outra origem</option></select></label>
@@ -3004,6 +3017,55 @@
           </div>
         </div>
 
+        <div x-show="stockConditionCorrection.open" x-cloak
+             class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
+            <div class="xl:w-64">
+              <p class="text-sm font-semibold text-emerald-950">Corrigir condição</p>
+              <p class="mt-1 text-xs text-emerald-800">
+                <span x-text="stockConditionCorrection.measure"></span>
+                <span> · </span>
+                <span x-text="stockConditionCorrection.brand"></span>
+                <span> · origem </span>
+                <b x-text="catalogoConditionLabel(stockConditionCorrection.from_condition)"></b>
+              </p>
+              <p class="mt-1 text-[11px] text-emerald-700">Transfere o saldo e preserva toda a trilha.</p>
+            </div>
+            <label class="block">
+              <span class="mb-1.5 block text-xs font-medium text-emerald-900">Quantidade</span>
+              <input x-model.number="stockConditionCorrection.quantity" type="number" min="1"
+                     :max="stockConditionCorrection.available"
+                     class="w-28 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm">
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-xs font-medium text-emerald-900">Condição correta</span>
+              <select x-model="stockConditionCorrection.to_condition"
+                      class="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm">
+                <option value="">Selecione</option>
+                <template x-for="option in stockConditionCorrectionOptions()" :key="option.value">
+                  <option :value="option.value" x-text="option.label"></option>
+                </template>
+              </select>
+            </label>
+            <label class="block flex-1">
+              <span class="mb-1.5 block text-xs font-medium text-emerald-900">Motivo obrigatório</span>
+              <input x-model="stockConditionCorrection.reason" maxlength="300" type="text"
+                     placeholder="Ex.: compra lançada como meia-vida por engano"
+                     class="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm">
+            </label>
+            <div class="flex gap-2">
+              <button @click="stockConditionCorrectionSubmit()"
+                      :disabled="stockConditionCorrection.saving"
+                      class="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-900 disabled:opacity-50">
+                <span x-show="!stockConditionCorrection.saving">Transferir</span>
+                <span x-show="stockConditionCorrection.saving">Salvando…</span>
+              </button>
+              <button @click="stockConditionCorrectionClose()"
+                      class="px-3 py-2 text-sm text-emerald-900">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
         <div
           x-data="{
             selectedVariant: '',
@@ -3017,11 +3079,11 @@
             },
             get selectedRow() {
               const rows = this.visibleRows();
-              return rows.find((row) => `${row.measure}\u0000${row.brand}` === this.selectedVariant) || rows[0] || null;
+              return rows.find((row) => `${row.measure}\u0000${row.brand}\u0000${row.tire_condition}` === this.selectedVariant) || rows[0] || null;
             },
             selectRow(row) {
-              this.selectedVariant = `${row.measure}\u0000${row.brand}`;
-              loadGalpaoFilme(row.measure, row.brand);
+              this.selectedVariant = `${row.measure}\u0000${row.brand}\u0000${row.tire_condition}`;
+              loadGalpaoFilme(row.measure, row.brand, row.tire_condition);
             }
           }"
           class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
@@ -3061,13 +3123,13 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <template x-for="row in visibleRows()" :key="row.measure + '\u0000' + row.brand">
+                  <template x-for="row in visibleRows()" :key="row.measure + '\u0000' + row.brand + '\u0000' + row.tire_condition">
                     <tr role="button" tabindex="0"
                         @click="selectRow(row)"
                         @keydown.enter.prevent="selectRow(row)"
                         @keydown.space.prevent="selectRow(row)"
-                        :aria-selected="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand"
-                        :class="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand ? 'bg-emerald-50/90 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/80'"
+                        :aria-selected="selectedRow && stockVariantKey(selectedRow) === stockVariantKey(row)"
+                        :class="selectedRow && stockVariantKey(selectedRow) === stockVariantKey(row) ? 'bg-emerald-50/90 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/80'"
                         class="cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
                       <td class="px-5 py-3.5">
                         <div class="flex items-center gap-3">
@@ -3082,7 +3144,7 @@
                           </div>
                           <div>
                             <span class="font-semibold" x-text="row.measure"></span>
-                            <p class="mt-0.5 text-[11px] text-gray-500" x-text="row.brand || 'Marca não informada'"></p>
+                            <p class="mt-0.5 text-[11px] text-gray-500" x-text="`${row.brand || 'Marca não informada'} · ${catalogoConditionLabel(row.tire_condition)}`"></p>
                           </div>
                         </div>
                       </td>
@@ -3095,7 +3157,7 @@
                           <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
                                 :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(row) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
                                 x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span>
-                          <i x-show="selectedRow && selectedRow.measure === row.measure && selectedRow.brand === row.brand" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
+                          <i x-show="selectedRow && stockVariantKey(selectedRow) === stockVariantKey(row)" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
                         </div>
                       </td>
                     </tr>
@@ -3118,7 +3180,7 @@
                         <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="circle-dot-dashed" class="h-7 w-7"></i></div>
                         <div>
                           <h3 id="painel-medida-heading" class="text-2xl font-semibold tracking-tight" x-text="selectedRow.measure"></h3>
-                          <p class="mt-0.5 text-xs font-medium text-emerald-700" x-text="selectedRow.brand || 'Marca não informada'"></p>
+                          <p class="mt-0.5 text-xs font-medium text-emerald-700" x-text="`${selectedRow.brand || 'Marca não informada'} · ${catalogoConditionLabel(selectedRow.tire_condition)}`"></p>
                           <p class="mt-1 text-xs text-gray-500"><span class="font-semibold text-emerald-800 num" x-text="selectedRow.quantity_on_hand"></span> em estoque <span class="mx-1">·</span> mínimo <span class="num" x-text="selectedRow.min_quantity == null ? '—' : selectedRow.min_quantity"></span></p>
                         </div>
                       </div>
@@ -3153,7 +3215,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 border-b border-gray-100 p-4 sm:grid-cols-2 2xl:grid-cols-1">
-                  <button @click="stockForm = { measure: selectedRow.measure, brand: selectedRow.brand || '', quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                  <button @click="stockForm = { measure: selectedRow.measure, brand: selectedRow.brand || '', tire_condition: selectedRow.tire_condition || '', quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                           class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-medium text-white hover:bg-emerald-800">
                     <i data-lucide="plus" class="h-4 w-4"></i> Registrar entrada
                   </button>
@@ -3165,7 +3227,11 @@
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/70 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="arrow-down-to-line" class="h-4 w-4"></i> Baixa manual
                   </button>
-                  <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure, selectedRow.brand)"
+                  <button @click="stockConditionCorrectionOpen(selectedRow)"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
+                    <i data-lucide="replace" class="h-4 w-4"></i> Corrigir condição
+                  </button>
+                  <button @click="stockTab = 'movimentacoes'; filmeDaMedida(selectedRow.measure, selectedRow.brand, selectedRow.tire_condition)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     <i data-lucide="history" class="h-4 w-4"></i> Ver histórico
                   </button>
@@ -3205,8 +3271,8 @@
                     <template x-for="row in stockRowsView().filter((item) => Number(item.quantity_on_hand) === 0 || stockPrecisaRepor(item)).filter((item) => stockVariantKey(item) !== stockVariantKey(selectedRow)).slice(0, 2)" :key="'prioridade-painel-' + stockVariantKey(row)">
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
-                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.brand"></span> · <span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
-                        <button @click="stockForm = { measure: row.measure, brand: row.brand || '', quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
+                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.brand"></span> · <span x-text="catalogoConditionLabel(row.tire_condition)"></span> · <span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
+                        <button @click="stockForm = { measure: row.measure, brand: row.brand || '', tire_condition: row.tire_condition || '', quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
                       </div>
                     </template>
                     <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-4 text-center text-xs text-emerald-700">Todas as medidas estão dentro do mínimo.</div>
@@ -3748,12 +3814,12 @@
             </div>
 
             <div class="mt-6 space-y-4">
-              <template x-for="(row, index) in custoTopRows()" :key="'capital-rank-' + row.measure">
+              <template x-for="(row, index) in custoTopRows()" :key="'capital-rank-' + row.measure + row.tire_condition">
                 <article class="grid grid-cols-[28px_minmax(115px,170px)_minmax(120px,1fr)_112px_58px] items-center gap-3">
                   <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-900 text-[11px] font-semibold text-white" x-text="index + 1"></span>
                   <div class="min-w-0">
                     <p class="truncate text-sm font-semibold text-slate-900" x-text="row.measure"></p>
-                    <p class="mt-0.5 truncate text-[10px] text-slate-400"><span x-text="row.quantity_on_hand"></span> pneus · <span x-text="row.brands.join(', ')"></span></p>
+                    <p class="mt-0.5 truncate text-[10px] text-slate-400"><span x-text="row.quantity_on_hand"></span> pneus · <span x-text="catalogoConditionLabel(row.tire_condition)"></span> · <span x-text="row.brands.join(', ')"></span></p>
                   </div>
                   <div class="h-3 overflow-hidden rounded-full bg-emerald-50">
                     <div class="h-full rounded-full bg-emerald-800" :style="{ width: Math.max(3, custoCapital(row) / custoMaxCapital() * 100) + '%', opacity: Math.max(.28, 1 - index * .15) }"></div>
@@ -3783,11 +3849,11 @@
 
             <div class="mt-5 grid grid-cols-1 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-slate-50/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Custo médio ponderado geral</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-emerald-800" x-text="formatCurrency(custoMediaPonderada())"></p>
+                <p class="text-[11px] text-slate-500">Pneus com custo conhecido</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-emerald-800"><span x-text="custoPneusComCusto()"></span> <span class="text-sm font-medium">pneus</span></p>
               </div>
               <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Medidas com custo</p>
+                <p class="text-[11px] text-slate-500">Medida + condição com custo</p>
                 <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900"><span x-text="custoComCusto()"></span> <span class="text-sm font-medium text-slate-500">de <span x-text="custoRowsBase().length"></span></span></p>
               </div>
               <div class="p-4 text-center">
@@ -3807,7 +3873,7 @@
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-700">Maior posição</p>
                 <p class="mt-2 text-xl font-semibold text-slate-950" x-text="custoLider()?.measure || '—'"></p>
-                <p class="mt-1 text-xs text-emerald-700" x-text="custoLider()?.brands?.join(' · ') || '—'"></p>
+                <p class="mt-1 text-xs text-emerald-700" x-text="custoLider() ? `${catalogoConditionLabel(custoLider().tire_condition)} · ${custoLider().brands.join(' · ')}` : '—'"></p>
                 <p class="mt-1 text-sm tabular-nums text-slate-600" x-text="custoLider() ? formatCurrency(custoCapital(custoLider())) : formatCurrency(0)"></p>
                 <p class="mt-3 text-xs leading-relaxed text-slate-500">A concentração mostra quanto do capital total depende de poucas medidas.</p>
               </div>
@@ -3821,7 +3887,7 @@
               <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div class="flex items-start gap-3">
                   <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i data-lucide="table-properties" class="h-5 w-5"></i></span>
-                  <div><h3 id="custos-medida-heading" class="text-lg font-semibold text-slate-950">Custos por medida</h3><p class="mt-1 text-xs text-slate-500">Saldo, custo médio oficial e participação no capital</p></div>
+                  <div><h3 id="custos-medida-heading" class="text-lg font-semibold text-slate-950">Custos por medida e condição</h3><p class="mt-1 text-xs text-slate-500">Novo, meia-vida e remold nunca entram na mesma média</p></div>
                 </div>
                 <label class="relative block">
                   <span class="sr-only">Buscar medida nos custos</span>
@@ -3840,7 +3906,7 @@
               <table class="w-full min-w-[900px] text-sm">
                 <thead class="border-b border-gray-200 bg-slate-50/80">
                   <tr class="text-left text-[11px] text-slate-500">
-                    <th class="px-5 py-3 font-medium">Medida</th>
+                    <th class="px-5 py-3 font-medium">Medida e condição</th>
                     <th class="px-4 py-3 text-center font-medium">Saldo</th>
                     <th class="px-4 py-3 text-right font-medium">Custo médio</th>
                     <th class="px-4 py-3 text-right font-medium">Capital</th>
@@ -3850,9 +3916,9 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <template x-for="row in custoRows()" :key="'custo-analitico-' + row.measure">
+                  <template x-for="row in custoRows()" :key="'custo-analitico-' + row.measure + row.tire_condition">
                     <tr class="hover:bg-emerald-50/30">
-                      <td class="px-5 py-3"><p class="font-semibold text-slate-900" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-emerald-700" x-text="row.brands.join(' · ')"></p></td>
+                      <td class="px-5 py-3"><p class="font-semibold text-slate-900" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-emerald-700" x-text="`${catalogoConditionLabel(row.tire_condition)} · ${row.brands.join(' · ')}`"></p></td>
                       <td class="px-4 py-3 text-center tabular-nums text-slate-700" x-text="row.quantity_on_hand + ' pneus'"></td>
                       <td class="px-4 py-3 text-right tabular-nums text-slate-700" x-text="custoValido(row) ? formatCurrency(Number(row.unit_cost)) : '—'"></td>
                       <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900" x-text="formatCurrency(custoCapital(row))"></td>
@@ -3930,7 +3996,7 @@
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in stockReconciliation.rows" :key="row.key">
                     <tr class="hover:bg-gray-50">
-                      <td class="px-5 py-3"><p class="font-medium" x-text="row.official_measures[0] || row.key"></p><p class="text-[11px] text-gray-500" x-text="row.official_brand || 'Sem marca'"></p></td>
+                      <td class="px-5 py-3"><p class="font-medium" x-text="row.official_measures[0] || row.key"></p><p class="text-[11px] text-gray-500" x-text="`${row.official_brand || 'Sem marca'} · ${catalogoConditionLabel(row.official_tire_condition)}`"></p></td>
                       <td class="px-4 py-3 text-center font-semibold num" x-text="row.official_quantity"></td>
                       <td class="px-4 py-3 text-center"><input type="number" min="0" step="1" x-model="row.counted_quantity" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-center text-sm font-semibold" placeholder="—"></td>
                       <td class="px-4 py-3 text-center font-semibold num" :class="stockCountDifference(row) > 0 ? 'text-emerald-700' : stockCountDifference(row) < 0 ? 'text-slate-700' : 'text-gray-500'" x-text="stockCountDifference(row) == null ? '—' : (stockCountDifference(row) > 0 ? '+' : '') + stockCountDifference(row)"></td>
@@ -8346,7 +8412,7 @@
             <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-gray-400"></i>
             <input x-model.debounce.250ms="catalogoBusca" @input="catalogoPagina=1"
                    class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-700"
-                   placeholder="Buscar por medida, marca, produto ou código">
+                   placeholder="Buscar por medida, marca, condição, produto ou código">
           </label>
           <div class="flex items-center gap-2">
             <button type="button" @click="catalogoSetFiltro('todos')" :class="catalogoFiltro==='todos' ? 'bg-emerald-800 text-white' : 'border border-gray-200 text-gray-600'" class="rounded-lg px-3.5 py-2 text-xs font-semibold">Todos</button>
@@ -8384,6 +8450,7 @@
                                 x-text="String(row.brand || 'SEM MARCA').toUpperCase()"></span>
                         </template>
                         <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="[row.product_name,row.tire_size].filter(Boolean).join(' · ')"></p>
+                        <p class="text-[10px] font-semibold text-emerald-700" x-text="catalogoConditionLabel(row.tire_condition)"></p>
                         <p class="text-[11px] text-gray-400" x-text="row.product_code || 'Ainda não cadastrado como produto'"></p>
                       </div>
                     </div>
@@ -8424,9 +8491,10 @@
           <button type="button" @click="catalogoCreateClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
         <div class="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div class="grid grid-cols-2 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60">
+          <div class="grid grid-cols-3 overflow-hidden rounded-xl border border-emerald-100 bg-emerald-50/60">
             <div class="border-r border-emerald-100 p-4"><p class="text-[10px] text-gray-500">Medida confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.tire_size"></p></div>
-            <div class="p-4"><p class="text-[10px] text-gray-500">Marca confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.brand"></p></div>
+            <div class="border-r border-emerald-100 p-4"><p class="text-[10px] text-gray-500">Marca confirmada</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoCadastro.row?.brand"></p></div>
+            <div class="p-4"><p class="text-[10px] text-gray-500">Condição</p><p class="mt-1 font-semibold text-emerald-900" x-text="catalogoConditionLabel(catalogoCadastro.row?.tire_condition)"></p></div>
           </div>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Código do produto *</span><input id="catalog-product-code" x-model="catalogoCadastro.form.product_code" @input="catalogoCadastro.form.product_code = String(catalogoCadastro.form.product_code || '').toUpperCase()" type="text" maxlength="80" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] text-gray-400">Único no sistema. Aceita letras, números, ponto, barra, hífen e sublinhado.</span></label>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-gray-700">Nome comercial *</span><input x-model="catalogoCadastro.form.product_name" type="text" maxlength="160" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"><span class="mt-1 block text-[10px] leading-4 text-gray-400">Use o modelo ou a linha quando souber, por exemplo: Metzeler ME Street. A medida e a marca já ficam salvas em campos separados.</span></label>
@@ -8457,7 +8525,7 @@
                     x-text="String(catalogoSelecionado?.brand || 'SEM MARCA').toUpperCase()"></span>
             </template>
             <h2 class="mt-3 truncate text-xl font-bold text-gray-950" x-text="[catalogoSelecionado?.product_name,catalogoSelecionado?.tire_size].filter(Boolean).join(' · ')"></h2>
-            <p class="mt-1 text-xs text-gray-400" x-text="catalogoSelecionado?.product_code"></p>
+            <p class="mt-1 text-xs text-gray-400" x-text="`${catalogoSelecionado?.product_code} · ${catalogoConditionLabel(catalogoSelecionado?.tire_condition)}`"></p>
           </div>
           <button type="button" @click="catalogoClose()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="Fechar"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
@@ -8974,7 +9042,7 @@
           <div><p class="text-xs text-gray-500">Pagamento</p><p class="font-semibold mt-1" x-text="compraPaymentLabel(compraDetalhe || {})"></p></div>
           <div><p class="text-xs text-gray-500">Recebimento</p><p class="font-semibold mt-1" x-text="compraReceiptLabel(compraDetalhe || {})"></p></div>
         </div>
-        <div><p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Itens</p><div class="border border-gray-200 rounded-xl overflow-hidden"><template x-for="item in (compraDetalhe?.items || [])" :key="item.id"><div class="px-4 py-3 border-b last:border-b-0 border-gray-100 flex items-center justify-between gap-4 text-sm"><div><span class="font-medium" x-text="item.quantity+'× '+item.measure"></span><span x-show="item.brand" class="text-gray-500" x-text="' · '+item.brand"></span></div><div class="text-right"><p class="font-semibold num" x-text="formatCurrency(Number(item.line_total))"></p><p class="text-[11px] text-gray-500 num" x-text="formatCurrency(Number(item.unit_cost))+' cada'"></p></div></div></template></div></div>
+        <div><p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Itens</p><div class="border border-gray-200 rounded-xl overflow-hidden"><template x-for="item in (compraDetalhe?.items || [])" :key="item.id"><div class="px-4 py-3 border-b last:border-b-0 border-gray-100 flex items-center justify-between gap-4 text-sm"><div><span class="font-medium" x-text="item.quantity+'× '+item.measure"></span><span x-show="item.brand" class="text-gray-500" x-text="' · '+item.brand"></span><span class="text-emerald-700" x-text="' · '+catalogoConditionLabel(item.tire_condition)"></span></div><div class="text-right"><p class="font-semibold num" x-text="formatCurrency(Number(item.line_total))"></p><p class="text-[11px] text-gray-500 num" x-text="formatCurrency(Number(item.unit_cost))+' cada'"></p></div></div></template></div></div>
         <div class="flex items-center justify-between pt-4 border-t border-gray-100"><span class="text-sm text-gray-500">Total da compra</span><span class="text-2xl font-semibold num" x-text="formatCurrency(Number(compraDetalhe?.total_amount || 0))"></span></div>
         <div x-show="compraDetalhe?.notes" class="p-4 rounded-xl bg-gray-50"><p class="text-xs font-medium text-gray-500">Observação</p><p class="text-sm mt-1 whitespace-pre-wrap" x-text="compraDetalhe?.notes"></p></div>
         <div x-show="compraDetalhe?.status === 'cancelled'" class="p-4 rounded-xl bg-rose-50 text-rose-800"><p class="text-xs font-semibold">Cancelamento</p><p class="text-sm mt-1" x-text="compraDetalhe?.cancel_reason || 'Motivo não informado'"></p><p class="text-[11px] mt-2 text-rose-600"><span x-text="compraDetalhe?.cancelled_by || 'operador'"></span> · <span x-text="compraDetalhe?.cancelled_at ? new Date(compraDetalhe.cancelled_at).toLocaleString('pt-BR') : ''"></span></p></div>

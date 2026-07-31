@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
+import type { TireCondition } from '../../shared/tire-condition.js';
 
 type ReconciliationStatus =
   | 'aligned'
@@ -16,12 +17,14 @@ interface LegacyRow {
   product_id: string;
   tire_size: string | null;
   brand: string | null;
+  tire_condition: TireCondition | null;
   legacy_quantity: number | string;
 }
 
 interface OfficialRow {
   measure: string;
   brand: string;
+  tire_condition: TireCondition;
   quantity_on_hand: number | string;
   unit_cost: number | string | null;
 }
@@ -34,6 +37,7 @@ export interface MatrizStockReconciliationRow {
   legacy_quantity: number | null;
   official_measures: string[];
   official_brand: string | null;
+  official_tire_condition: TireCondition | null;
   official_quantity: number | null;
   official_unit_cost: number | null;
   official_rows_count: number;
@@ -63,16 +67,17 @@ export async function getMatrizStockReconciliation(
   dbPool: Pool = defaultPool,
 ): Promise<MatrizStockReconciliation> {
   const legacy = await dbPool.query<LegacyRow>(
-    `SELECT product_id, tire_size, brand, total_stock_available AS legacy_quantity
+    `SELECT product_id, tire_size, brand, tire_condition,
+            total_stock_available AS legacy_quantity
        FROM commerce.product_full
       WHERE environment = $1 AND tire_size IS NOT NULL`,
     [environment],
   );
   const official = await dbPool.query<OfficialRow>(
-    `SELECT measure, brand, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1
-      ORDER BY measure, brand`,
+      ORDER BY measure, brand, tire_condition`,
     [environment],
   );
 
@@ -104,12 +109,14 @@ interface CatalogGroup {
   measures: Set<string>;
   brands: Set<string>;
   products: Set<string>;
+  tireCondition: TireCondition | null;
   quantity: number;
 }
 
 interface OfficialGroup {
   measureKey: string;
   brand: string;
+  tireCondition: TireCondition;
   rows: OfficialRow[];
 }
 
@@ -118,9 +125,10 @@ function groupCatalog(rows: LegacyRow[]): Map<string, CatalogGroup> {
   for (const row of rows) {
     const measureKey = tireSizeKey(row.tire_size);
     if (!measureKey) continue;
-    const key = variantKey(measureKey, row.brand);
+    const key = variantKey(measureKey, row.brand, row.tire_condition);
     const group = out.get(key) ?? {
-      measures: new Set<string>(), brands: new Set<string>(), products: new Set<string>(), quantity: 0,
+      measures: new Set<string>(), brands: new Set<string>(), products: new Set<string>(),
+      tireCondition: row.tire_condition, quantity: 0,
     };
     if (row.tire_size) group.measures.add(row.tire_size);
     if (row.brand) group.brands.add(row.brand);
@@ -136,8 +144,10 @@ function groupOfficial(rows: OfficialRow[]): Map<string, OfficialGroup> {
   for (const row of rows) {
     const measureKey = tireSizeKey(row.measure);
     if (!measureKey) continue;
-    const key = variantKey(measureKey, row.brand);
-    const group = out.get(key) ?? { measureKey, brand: row.brand, rows: [] };
+    const key = variantKey(measureKey, row.brand, row.tire_condition);
+    const group = out.get(key) ?? {
+      measureKey, brand: row.brand, tireCondition: row.tire_condition, rows: [],
+    };
     group.rows.push(row);
     out.set(key, group);
   }
@@ -153,9 +163,10 @@ function reconcileKey(
   const officialRows = official?.rows ?? [];
   const measureKey = official?.measureKey ?? key.split('\u0000')[0]!;
   const brand = official?.brand ?? first(catalog?.brands) ?? null;
+  const tireCondition = official?.tireCondition ?? catalog?.tireCondition ?? 'meia_vida';
   const state = officialRows.length
-    ? matrizStockForMeasure(officialIndex, measureKey, brand)
-    : matrizStockForMeasure(new Map(), measureKey, brand);
+    ? matrizStockForMeasure(officialIndex, measureKey, brand, tireCondition)
+    : matrizStockForMeasure(new Map(), measureKey, brand, tireCondition);
   const officialQuantity = officialRows.length === 0
     ? null
     : officialRows.reduce((sum, row) => sum + (Number(row.quantity_on_hand) || 0), 0);
@@ -177,6 +188,7 @@ function reconcileKey(
     legacy_quantity: legacyQuantity,
     official_measures: officialRows.map((row) => row.measure).sort(),
     official_brand: official?.brand ?? null,
+    official_tire_condition: tireCondition,
     official_quantity: officialQuantity,
     official_unit_cost: state.unit_cost,
     official_rows_count: officialRows.length,
@@ -186,8 +198,12 @@ function reconcileKey(
   };
 }
 
-function variantKey(measureKey: string, brand: string | null | undefined): string {
-  return `${measureKey}\u0000${brandKey(brand)}`;
+function variantKey(
+  measureKey: string,
+  brand: string | null | undefined,
+  tireCondition: TireCondition | null,
+): string {
+  return `${measureKey}\u0000${brandKey(brand)}\u0000${tireCondition ?? ''}`;
 }
 
 function brandKey(value: string | null | undefined): string {

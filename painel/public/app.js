@@ -86,12 +86,13 @@ function painelApp() {
     atacadoForm: {
       buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
       payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
-      items: [{ measure: '', brand: '', quantity: 1, unit_price: '' }],
+      items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: '' }],
     },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
     atacadoStock: [],
     atacadoMeasures: [],
-    stockForm: { measure: '', brand: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null },
+    stockForm: { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null },
+    stockConditionCorrection: { open: false, measure: '', brand: '', from_condition: '', to_condition: '', quantity: '', available: 0, reason: '', idempotency_key: '', saving: false },
     stockSaving: false,
     stockMsg: null,
     // ── ESTOQUE (0128): busca, baixa manual com motivo e o FILME da movimentação ──
@@ -99,9 +100,9 @@ function painelApp() {
     stockFiltro: 'todos',
     stockOperacao: null,
     stockBusca: '',
-    stockBaixaForm: { measure: null, brand: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' },
+    stockBaixaForm: { measure: null, brand: null, tire_condition: null, quantity: '', tipo: 'breakage', texto: '', idempotency_key: '' },
     stockBaixaSaving: false,
-    galpaoFilme: { rows: [], measure: null, brand: null, loading: false },
+    galpaoFilme: { rows: [], measure: null, brand: null, tire_condition: null, loading: false },
     stockReconciliation: { rows: [], summary: null, loading: false, error: null },
     stockCount: { reason: '', saving: false, message: null },
     atacadoResumo: null, // Fase 3: faturamento, custo, lucro do atacado
@@ -193,7 +194,7 @@ function painelApp() {
       supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
       purchased_at: '', payment_status: 'paid', payment_date: '', due_date: '',
       receipt_status: 'received', idempotency_key: '',
-      items: [{ measure: '', brand: '', quantity: 1, unit_cost: '' }],
+      items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '' }],
     },
     redePeriod: localStorage.getItem('farejador_rede_period') || 'month',
     redeSalesGoal: Number(localStorage.getItem('farejador_rede_sales_goal') || 5000),

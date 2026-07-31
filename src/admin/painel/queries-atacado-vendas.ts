@@ -13,6 +13,10 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, moneyCents,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+import {
+  requireTireCondition,
+  type TireCondition,
+} from '../../shared/tire-condition.js';
 
 export interface WholesaleBuyerRow {
   customer_id: string | null;
@@ -64,6 +68,7 @@ export async function getWholesaleRanking(
 interface SaleItemInput {
   measure: string;
   brand?: string | null;
+  tire_condition: TireCondition | string;
   quantity: number;
   unit_price: number;
 }
@@ -111,7 +116,11 @@ async function canonicalSaleItems(
   }
   return items.map((item) => {
     const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
-    return { ...item, measure: measures.get(item.measure.trim())!, brand };
+    const tireCondition = requireTireCondition(item.tire_condition ?? 'meia_vida');
+    return {
+      ...item, measure: measures.get(item.measure.trim())!,
+      brand, tire_condition: tireCondition,
+    };
   });
 }
 
@@ -200,6 +209,7 @@ export async function registerWholesaleSale(
       payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
       seller_collaborator_id: input.seller_collaborator_id ?? null,
       items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
+        tire_condition: item.tire_condition,
         quantity: item.quantity, unit_price_cents: moneyCents(item.unit_price) })),
     });
     const operation = { environment, domain: 'wholesale_sale.create',
@@ -213,24 +223,32 @@ export async function registerWholesaleSale(
     const items = await canonicalSaleItems(client, environment, rawItems);
     const buyer = await resolveBuyer(client, environment, input);
     const orderId = await insertSaleHeader(client, environment, buyer.id, input);
-    const requested = new Map<string, { measure: string; brand: string; quantity: number }>();
+    const requested = new Map<string, {
+      measure: string; brand: string; tire_condition: TireCondition; quantity: number;
+    }>();
     for (const item of items) {
       const brand = item.brand!;
-      const key = `${item.measure}\u0000${brand}`;
-      const current = requested.get(key) ?? { measure: item.measure, brand, quantity: 0 };
+      const tireCondition = requireTireCondition(item.tire_condition);
+      const key = `${item.measure}\u0000${brand}\u0000${tireCondition}`;
+      const current = requested.get(key) ?? {
+        measure: item.measure, brand, tire_condition: tireCondition, quantity: 0,
+      };
       current.quantity += item.quantity;
       requested.set(key, current);
     }
     const costs = new Map<string, number>();
-    const short: Array<{ measure: string; brand: string; available: number; requested: number }> = [];
+    const short: Array<{ measure: string; brand: string; tire_condition: TireCondition;
+      available: number; requested: number }> = [];
     for (const [key, variant] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
       const stock = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
         `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
-          WHERE environment=$1 AND measure=$2 AND brand=$3 FOR UPDATE`,
-        [environment, variant.measure, variant.brand]);
+          WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
+          FOR UPDATE`,
+        [environment, variant.measure, variant.brand, variant.tire_condition]);
       const available = Number(stock.rows[0]?.quantity_on_hand ?? 0);
       if (available < variant.quantity) short.push({
         measure: variant.measure, brand: variant.brand,
+        tire_condition: variant.tire_condition,
         available, requested: variant.quantity,
       });
       costs.set(key, Number(stock.rows[0]?.unit_cost ?? 0));
@@ -240,10 +258,11 @@ export async function registerWholesaleSale(
     for (const item of items) {
       await client.query(
         `INSERT INTO commerce.wholesale_order_items
-           (environment,order_id,measure,brand,quantity,unit_price,unit_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [environment, orderId, item.measure, item.brand ?? null, item.quantity,
-         item.unit_price, costs.get(`${item.measure}\u0000${item.brand}`) ?? 0],
+           (environment,order_id,measure,brand,tire_condition,quantity,unit_price,unit_cost)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [environment, orderId, item.measure, item.brand ?? null, item.tire_condition,
+         item.quantity, item.unit_price,
+         costs.get(`${item.measure}\u0000${item.brand}\u0000${item.tire_condition}`) ?? 0],
       );
     }
     await applyWholesaleStockDecrement(client, environment, items, true, orderId);

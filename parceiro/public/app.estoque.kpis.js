@@ -56,7 +56,13 @@ window.PARCEIRO_MODULES.estoqueKpis = () => ({
       const search = this.stockSearch.trim().toLowerCase();
       return this.estoque.filter((item) => {
         const origin = this.stockOriginKey(item);
-        const haystack = [item.item_name, item.tire_size, item.brand, item.supplier_name]
+        const haystack = [
+          item.item_name,
+          item.tire_size,
+          item.brand,
+          this.tireConditionLabel(item.tire_condition),
+          item.supplier_name,
+        ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();

@@ -39,6 +39,7 @@ window.PARCEIRO_MODULES.pdv = () => ({
         item_name: item.item_name || 'Produto',
         tire_size: item.tire_size || '',
         brand: item.brand || '',
+        tire_condition: item.tire_condition || null,
         quantity: 1,
         unit_price: this.num(item.sale_price),
         available,

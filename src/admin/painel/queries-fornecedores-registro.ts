@@ -74,19 +74,22 @@ async function applyPurchaseStock(
   await setGalpaoMovContext(client, { source: 'compra', reason: supplierName, ref: purchaseId });
   const consolidated = new Map<string, {
     measure: string; quantity: number; valueCents: number; brand: string;
+    tire_condition: PurchaseItemInput['tire_condition'];
   }>();
   for (const item of items) {
     const brand = canonicalCatalogBrand(item.brand) ?? 'Sem marca';
-    const key = `${item.measure}\u0000${brand}`;
+    const key = `${item.measure}\u0000${brand}\u0000${item.tire_condition}`;
     const current = consolidated.get(key) ?? {
       measure: item.measure, quantity: 0, valueCents: 0, brand,
+      tire_condition: item.tire_condition,
     };
     current.quantity += item.quantity;
     current.valueCents += moneyCents(item.unit_cost) * item.quantity;
     consolidated.set(key, current);
   }
   for (const [, item] of [...consolidated].sort(([a], [b]) => a.localeCompare(b))) {
-    await addWholesaleStockEntry({ measure: item.measure, brand: item.brand, quantity_in: item.quantity,
+    await addWholesaleStockEntry({ measure: item.measure, brand: item.brand,
+      tire_condition: item.tire_condition, quantity_in: item.quantity,
       unit_cost: item.valueCents / item.quantity / 100, environment,
       actor_label: `compra:${purchaseId}` }, client);
   }
@@ -114,6 +117,7 @@ export async function registerWholesalePurchase(
         receipt_status: receiptStatus,
         items: rawItems.map((item) => ({ measure: item.measure.trim(),
           brand: canonicalCatalogBrand(item.brand),
+          tire_condition: item.tire_condition,
           quantity: item.quantity, unit_cost_cents: moneyCents(item.unit_cost) })),
       }) };
     const started = await beginIntegrityOperation<RegisterWholesalePurchaseResult>(client, operation);
@@ -139,9 +143,12 @@ export async function registerWholesalePurchase(
     for (const item of items) {
       await client.query(
         `INSERT INTO commerce.wholesale_purchase_items
-          (environment,purchase_id,measure,brand,quantity,unit_cost)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [environment, purchaseId, item.measure, item.brand ?? null, item.quantity, item.unit_cost]);
+          (environment,purchase_id,measure,brand,tire_condition,quantity,unit_cost)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          environment, purchaseId, item.measure, item.brand ?? null,
+          item.tire_condition, item.quantity, item.unit_cost,
+        ]);
     }
     const total = await client.query<{ total_amount: string }>(
       `UPDATE commerce.wholesale_purchases SET total_amount=COALESCE(
@@ -224,7 +231,7 @@ export async function confirmWholesalePurchase(
         ? 'purchase_already_cancelled' : 'purchase_already_confirmed');
     }
     const items = await client.query<PurchaseItemInput>(
-      `SELECT measure,brand,quantity,unit_cost::float8 AS unit_cost
+      `SELECT measure,brand,tire_condition,quantity,unit_cost::float8 AS unit_cost
          FROM commerce.wholesale_purchase_items
         WHERE environment=$1 AND purchase_id=$2 ORDER BY measure,id`, [environment, input.purchase_id]);
     await applyPurchaseStock(client, environment, input.purchase_id,

@@ -14,6 +14,7 @@ const priceBody = z.object({
 const createProductBody = z.object({
   measure: z.string().trim().min(1).max(60),
   brand: z.string().trim().min(1).max(60),
+  tire_condition: z.enum(['meia_vida', 'novo', 'remold']),
   product_code: z.string().trim().min(2).max(80),
   product_name: z.string().trim().min(2).max(160),
 });
@@ -30,6 +31,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
       const product = await createCatalogProductFromStock({
         measure: body.data.measure,
         brand: body.data.brand,
+        tireCondition: body.data.tire_condition,
         productCode: body.data.product_code,
         productName: body.data.product_name,
         actorLabel: operatorLabel(request),

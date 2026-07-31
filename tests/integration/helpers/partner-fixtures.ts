@@ -122,10 +122,10 @@ export async function createPartnerFixture(
   const stockItemName = `Pneu Teste ${suffix}`;
   const stock = await pool.query<{ id: string }>(
     `INSERT INTO commerce.partner_stock_levels (
-       environment, unit_id, item_name, tire_size, brand,
+       environment, unit_id, item_name, tire_size, brand, tire_condition,
        quantity_on_hand, minimum_quantity, average_cost, sale_price,
        is_tracked, stock_status, updated_by
-     ) VALUES ('test', $1, $2, '90/90-18', 'Michelin',
+     ) VALUES ('test', $1, $2, '90/90-18', 'Michelin', 'meia_vida',
                $3, 2, 80, 150, true, $4, 'fixture')
      RETURNING id`,
     [unitId, stockItemName, initialQty, initialQty > 0 ? 'in_stock' : 'out_of_stock'],

@@ -9,7 +9,7 @@
  */
 
 import type { Environment } from './chatwoot.js';
-
+import type { TireCondition } from '../tire-condition.js';
 // ------------------------------------------------------------------
 // commerce.products
 // ------------------------------------------------------------------
@@ -22,6 +22,7 @@ export interface Product {
   product_code: string;
   product_name: string;
   product_type: ProductType;
+  tire_condition: TireCondition | null;
   brand: string | null;
   short_description: string | null;
   /** NEVER expose to customer. Say Validator must block. */
@@ -246,6 +247,7 @@ export interface OrderItem {
   environment: Environment;
   order_id: string;
   product_id: string;
+  tire_condition: TireCondition | null;
   quantity: number;
   unit_price: string; // NUMERIC
   line_total: string; // NUMERIC
@@ -267,13 +269,13 @@ export interface CurrentPrice {
   valid_until: Date | null;
 }
 
-/** View: commerce.product_full (product + active tire_spec + stock + retail price) */
 export interface ProductFull {
   id: string;
   environment: Environment;
   product_code: string;
   product_name: string;
   product_type: ProductType;
+  tire_condition: TireCondition | null;
   brand: string | null;
   short_description: string | null;
   tire_size: string | null;
@@ -286,7 +288,6 @@ export interface ProductFull {
   retail_price: string | null;
 }
 
-/** View: commerce.low_stock_alerts */
 export interface LowStockAlert {
   product_id: string;
   environment: Environment;

@@ -86,10 +86,12 @@ describe('fundação de integridade da Etapa 5', () => {
   it('a borda HTTP descarta ambiente injetado nas mutações da Matriz', () => {
     const sale = registerWholesaleSaleSchema.parse({ environment: 'prod',
       new_customer: { name: 'Cliente' }, idempotency_key: 'stage5-sale-key',
-      items: [{ measure: '90/90-18', brand: 'Pirelli', quantity: 1, unit_price: 10 }] });
+      items: [{ measure: '90/90-18', brand: 'Pirelli',
+        tire_condition: 'meia_vida', quantity: 1, unit_price: 10 }] });
     const purchase = registerPurchaseSchema.parse({ environment: 'prod',
       new_supplier: { name: 'Fornecedor' }, idempotency_key: 'stage5-purchase-key',
-      items: [{ measure: '90/90-18', brand: 'Pirelli', quantity: 1, unit_cost: 5 }] });
+      items: [{ measure: '90/90-18', brand: 'Pirelli',
+        tire_condition: 'meia_vida', quantity: 1, unit_cost: 5 }] });
     const expense = createMatrizExpenseSchema.parse({ environment: 'prod',
       category: 'outros', amount: 1, idempotency_key: 'stage5-expense-key' });
     expect(sale).not.toHaveProperty('environment');

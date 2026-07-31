@@ -13,11 +13,13 @@ function moduleState() {
   const methods = painelModule('app.galpao.multibrand.js', 'galpaoMultibrand');
   const stock = [
     {
-      measure: '90/90-18', brand: 'Pirelli', quantity_on_hand: 50,
+      measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
+      quantity_on_hand: 50,
       unit_cost: 17, min_quantity: 60,
     },
     {
-      measure: '90/90-18', brand: 'Metzeler', quantity_on_hand: 15,
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+      quantity_on_hand: 15,
       unit_cost: 12, min_quantity: 20,
     },
   ];
@@ -29,9 +31,12 @@ function moduleState() {
     galpaoFilme: {
       measure: null,
       brand: null,
+      tire_condition: null,
       rows: [
-        { measure: '90/90-18', brand: 'Pirelli', source: 'venda_atacado', qty_delta: -5 },
-        { measure: '90/90-18', brand: 'Metzeler', source: 'venda_atacado', qty_delta: -2 },
+        { measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
+          source: 'venda_atacado', qty_delta: -5 },
+        { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+          source: 'venda_atacado', qty_delta: -2 },
       ],
     },
     repoQuantidades: {},
@@ -55,14 +60,18 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     expect(new Set(state.measureBox.hits.map((row: { variant_key: string }) =>
       row.variant_key)).size).toBe(2);
 
-    const item = { measure: '', brand: '', quantity: 1, unit_price: 20 };
+    const item = {
+      measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: 20,
+    };
     const metzeler = state.measureBox.hits.find((row: { brand: string }) =>
       row.brand === 'Metzeler');
     state.measurePick(metzeler, item);
 
-    expect(item).toMatchObject({ measure: '90/90-18', brand: 'Metzeler' });
-    expect(state.measureOnHand(item.measure, item.brand)).toBe(15);
-    expect(state.measureCost(item.measure, item.brand)).toBe(12);
+    expect(item).toMatchObject({
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+    });
+    expect(state.measureOnHand(item.measure, item.brand, item.tire_condition)).toBe(15);
+    expect(state.measureCost(item.measure, item.brand, item.tire_condition)).toBe(12);
     expect(state.itemProfit(item)).toBe(8);
   });
 
@@ -81,13 +90,14 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       measure: '90/90-18',
+      tire_condition: 'meia_vida',
       brands: ['Metzeler', 'Pirelli'],
       quantity_on_hand: 65,
       capital: 1030,
       cost_complete: true,
     });
     expect(rows[0].unit_cost).toBeCloseTo(1030 / 65, 8);
-    expect(state.custoMediaPonderada()).toBeCloseTo(1030 / 65, 8);
+    expect(state.custoPneusComCusto()).toBe(65);
   });
 
   it('separa giro e quantidades de reposição e preserva a marca na compra', () => {
@@ -107,8 +117,10 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
       { ...metzeler, suggested_quantity: 7 },
     ]);
     expect(state.compraForm.items).toEqual([
-      { measure: '90/90-18', brand: 'Pirelli', quantity: 11, unit_cost: '' },
-      { measure: '90/90-18', brand: 'Metzeler', quantity: 7, unit_cost: '' },
+      { measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
+        quantity: 11, unit_cost: '' },
+      { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+        quantity: 7, unit_cost: '' },
     ]);
   });
 
@@ -116,6 +128,7 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     const state = moduleState();
     state.galpaoFilme.measure = '90/90-18';
     state.galpaoFilme.brand = 'Metzeler';
+    state.galpaoFilme.tire_condition = 'meia_vida';
     expect(state.filmeMatches(state.atacadoStock[1])).toBe(true);
     expect(state.filmeMatches(state.atacadoStock[0])).toBe(false);
   });
@@ -128,11 +141,13 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
       ...painelModule('app.compras.js', 'compras'),
       fornecedorBreakdown: [
         {
-          measure: '90/90-18', brand: 'Pirelli', supplier_id: 'a',
+          measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
+          supplier_id: 'a',
           supplier_name: 'Fornecedor A', avg_cost: 100, qty_total: 2,
         },
         {
-          measure: '90/90-18', brand: 'Metzeler', supplier_id: 'b',
+          measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+          supplier_id: 'b',
           supplier_name: 'Fornecedor B', avg_cost: 130, qty_total: 3,
         },
       ],
@@ -151,11 +166,13 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
       ...painelModule('app.compras.relatorios.js', 'comprasRelatorios'),
       comprasPriceRows: [
         {
-          measure: '90/90-18', brand: 'Pirelli', supplier_id: 'a',
+          measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
+          supplier_id: 'a',
           supplier_name: 'Fornecedor A', avg_cost: 100, qty_total: 2,
         },
         {
-          measure: '90/90-18', brand: 'Metzeler', supplier_id: 'a',
+          measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+          supplier_id: 'a',
           supplier_name: 'Fornecedor A', avg_cost: 130, qty_total: 3,
         },
       ],
@@ -182,7 +199,8 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
       comprasOpenTab: vi.fn(),
     };
     const row = {
-      measure: '90/90-18', brand: 'Metzeler', supplier_id: 'supplier-1',
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+      supplier_id: 'supplier-1',
       supplier_name: 'Fornecedor A', supplier_archived: false,
     };
 
@@ -190,7 +208,7 @@ describe('Relatórios de compra com duas marcas na mesma medida', () => {
 
     expect(state.compraForm.supplierKey).toBe('supplier-1');
     expect(state.compraForm.items[0]).toMatchObject({
-      measure: '90/90-18', brand: 'Metzeler',
+      measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
     });
     expect(state.comprasOpenTab).toHaveBeenCalledWith('nova');
   });

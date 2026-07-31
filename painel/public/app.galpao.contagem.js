@@ -60,6 +60,7 @@ window.PAINEL_MODULES.galpaoContagem = function () {
         .map((row) => ({
           measure: row.official_measures[0] || row.key,
           brand: row.official_brand,
+          tire_condition: row.official_tire_condition,
           counted_quantity: Number(row.counted_quantity),
         }));
       if (!rows.length || rows.some((row) =>
@@ -72,7 +73,7 @@ window.PAINEL_MODULES.galpaoContagem = function () {
         return;
       }
       const keyTarget = rows.map((row) =>
-        `${row.measure}:${row.brand}:${row.counted_quantity}`).join('|');
+        `${row.measure}:${row.brand}:${row.tire_condition}:${row.counted_quantity}`).join('|');
       const operation = window.PAINEL_INTEGRITY.operation('stock-physical-count', keyTarget);
       this.stockCount.saving = true;
       this.stockCount.message = null;

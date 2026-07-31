@@ -32,11 +32,11 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     expect(rotuloSql).toContain("set_config('app.galpao_source', 'venda_atacado', true)");
     expect(rotuloParams).toEqual(['order-x']);
     const [sql, params] = query.mock.calls[1];
-    expect(sql).toContain('quantity_on_hand = quantity_on_hand - $4');
-    expect(sql).toContain('quantity_on_hand >= $4');
+    expect(sql).toContain('quantity_on_hand = quantity_on_hand - $5');
+    expect(sql).toContain('quantity_on_hand >= $5');
     expect(sql).toContain('RETURNING quantity_on_hand');
     expect(sql).not.toContain('GREATEST');
-    expect(params).toEqual(['prod', '90/90-18', 'Pirelli', 3]);
+    expect(params).toEqual(['prod', '90/90-18', 'Pirelli', 'meia_vida', 3]);
   });
 
   it('recusa a baixa sem saldo em vez de zerar artificialmente', async () => {
@@ -52,7 +52,7 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     await expect(applyWholesaleStockDecrement(
       client, 'test', [{ measure: '90/90-18', brand: 'Pirelli', quantity: 3 }], true,
     )).rejects.toThrow(
-      'oversell:[{"measure":"90/90-18","brand":"Pirelli","available":2,"requested":3}]',
+      'oversell:[{"measure":"90/90-18","brand":"Pirelli","tire_condition":"meia_vida","available":2,"requested":3}]',
     );
 
     const updateSql = query.mock.calls.find(([sql]) => String(sql).includes('UPDATE commerce.wholesale_stock'))?.[0];
@@ -69,7 +69,9 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
       true,
     );
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 'Pirelli', 3]);
+    expect(query.mock.calls[1][1]).toEqual([
+      'test', '90/90-18', 'Pirelli', 'meia_vida', 3,
+    ]);
   });
 
   it('ordena medidas diferentes e faz uma baixa por medida', async () => {
@@ -82,8 +84,12 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
       true,
     );
     expect(query).toHaveBeenCalledTimes(3);
-    expect(query.mock.calls[1][1]).toEqual(['test', '100/90-18', 'Levorin', 1]);
-    expect(query.mock.calls[2][1]).toEqual(['test', '90/90-18', 'Pirelli', 2]);
+    expect(query.mock.calls[1][1]).toEqual([
+      'test', '100/90-18', 'Levorin', 'meia_vida', 1,
+    ]);
+    expect(query.mock.calls[2][1]).toEqual([
+      'test', '90/90-18', 'Pirelli', 'meia_vida', 2,
+    ]);
   });
 
   it('ignora medida vazia sem gerar baixa fantasma nem rótulo', async () => {
@@ -97,6 +103,8 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     await applyWholesaleStockDecrement(client, 'test', [{
       measure: '  90/90-18 ', brand: 'Pirelli', quantity: 1,
     }], true);
-    expect(query.mock.calls[1][1]).toEqual(['test', '90/90-18', 'Pirelli', 1]);
+    expect(query.mock.calls[1][1]).toEqual([
+      'test', '90/90-18', 'Pirelli', 'meia_vida', 1,
+    ]);
   });
 });

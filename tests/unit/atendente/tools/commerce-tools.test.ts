@@ -67,11 +67,11 @@ describe('commerce tools deterministicas da Atendente', () => {
     expect(client.calls[0]!.text).toContain('total_stock_available > 0');
   });
 
-  it('buscarProduto exige pelo menos medida, marca ou product_code', async () => {
+  it('buscarProduto exige pelo menos medida, marca, condição ou product_code', async () => {
     const client = clientWithRows([]);
 
     await expect(buscarProduto(client, { environment: 'test' })).rejects.toThrow(
-      'buscarProduto exige medida_pneu, marca ou product_code',
+      'buscarProduto exige medida_pneu, marca, condicao_pneu ou product_code',
     );
     expect(client.calls).toHaveLength(0);
   });

@@ -172,10 +172,10 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
     const result = await cancelSale({ order_id: sale.order_id, cancelled_by: 'etapa5-filme-parcial',
       reason: 'venda antiga parcial', environment: 'test', idempotency_key: randomUUID() }, db.pool);
     expect(result.stock_returned).toEqual([{
-      measure: filmed.measure, brand: 'Sem marca', quantity: 1,
+      measure: filmed.measure, brand: 'Sem marca', tire_condition: 'meia_vida', quantity: 1,
     }]);
     expect(result.stock_unverified).toEqual([{
-      measure: missing.measure, brand: 'Sem marca', quantity: 1,
+      measure: missing.measure, brand: 'Sem marca', tire_condition: 'meia_vida', quantity: 1,
     }]);
     const state = await db.pool.query(
       `SELECT measure,quantity_on_hand FROM commerce.wholesale_stock

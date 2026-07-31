@@ -227,10 +227,10 @@ describe('Etapa 3 — vendas de atacado no livro central', () => {
     }, db.pool);
 
     expect(cancelled.stock_returned).toEqual([
-      { measure, brand: 'Pirelli', quantity: 1 },
+      { measure, brand: 'Pirelli', tire_condition: 'meia_vida', quantity: 1 },
     ]);
     expect(cancelled.stock_unverified).toEqual([
-      { measure, brand: 'Metzeler', quantity: 1 },
+      { measure, brand: 'Metzeler', tire_condition: 'meia_vida', quantity: 1 },
     ]);
     const proof = await db.pool.query(
       `SELECT t.amount::text,

@@ -9,6 +9,7 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+import type { TireCondition } from '../../shared/tire-condition.js';
 
 export interface WholesaleSaleRow {
   id: string;
@@ -20,7 +21,8 @@ export interface WholesaleSaleRow {
   due_date: string | null;
   status: string;
   items_count: number;
-  items: Array<{ measure: string; brand: string | null; quantity: number; unit_price: string }>;
+  items: Array<{ measure: string; brand: string | null; tire_condition: TireCondition;
+    quantity: number; unit_price: string }>;
 }
 
 export async function listWholesaleSales(
@@ -33,8 +35,9 @@ export async function listWholesaleSales(
             o.payment_status,o.due_date,o.status,
             (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id=o.id)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'measure',i.measure,'brand',i.brand,'quantity',i.quantity,'unit_price',i.unit_price)
-              ORDER BY i.measure,i.brand)
+              'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'quantity',i.quantity,'unit_price',i.unit_price)
+              ORDER BY i.measure,i.brand,i.tire_condition)
               FROM commerce.wholesale_order_items i WHERE i.order_id=o.id),'[]'::json) AS items
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
@@ -55,6 +58,7 @@ export interface CancelWholesaleSaleInput {
 interface StockHistoryItem {
   measure: string;
   brand: string;
+  tire_condition: TireCondition;
   quantity: number;
 }
 
@@ -97,29 +101,37 @@ export async function cancelWholesaleSale(
       ? await getWholesaleSaleLedgerState(client, environment, input.order_id) : null;
 
     const history = await client.query<{
-      measure: string; brand: string; returned_quantity: number; unverified_quantity: number;
+      measure: string; brand: string; tire_condition: TireCondition;
+      returned_quantity: number; unverified_quantity: number;
     }>(
       `WITH nominal AS (
-         SELECT measure,brand,sum(quantity)::int AS quantity
+         SELECT measure,brand,tire_condition,sum(quantity)::int AS quantity
            FROM commerce.wholesale_order_items
-          WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand
+          WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand,tire_condition
        ), filmed AS (
-         SELECT measure,brand,(-sum(qty_delta))::int AS quantity
+         SELECT measure,brand,tire_condition,(-sum(qty_delta))::int AS quantity
            FROM commerce.wholesale_stock_movements
           WHERE environment=$1 AND source='venda_atacado' AND ref=$2::text AND qty_delta<0
-          GROUP BY measure,brand HAVING -sum(qty_delta)>0
+          GROUP BY measure,brand,tire_condition HAVING -sum(qty_delta)>0
        )
-       SELECT n.measure,n.brand,
+       SELECT n.measure,n.brand,n.tire_condition,
               LEAST(n.quantity,COALESCE(f.quantity,0))::int AS returned_quantity,
               GREATEST(n.quantity-COALESCE(f.quantity,0),0)::int AS unverified_quantity
-         FROM nominal n LEFT JOIN filmed f USING (measure,brand) ORDER BY n.measure,n.brand`,
+         FROM nominal n LEFT JOIN filmed f USING (measure,brand,tire_condition)
+        ORDER BY n.measure,n.brand,n.tire_condition`,
       [environment, input.order_id]);
     const stockReturned = history.rows
       .filter((row) => row.returned_quantity > 0)
-      .map((row) => ({ measure: row.measure, brand: row.brand, quantity: row.returned_quantity }));
+      .map((row) => ({
+        measure: row.measure, brand: row.brand, tire_condition: row.tire_condition,
+        quantity: row.returned_quantity,
+      }));
     const stockUnverified = history.rows
       .filter((row) => row.unverified_quantity > 0)
-      .map((row) => ({ measure: row.measure, brand: row.brand, quantity: row.unverified_quantity }));
+      .map((row) => ({
+        measure: row.measure, brand: row.brand, tire_condition: row.tire_condition,
+        quantity: row.unverified_quantity,
+      }));
     if (stockReturned.length === 0) {
       throw new Error(`sale_stock_history_missing:${JSON.stringify(stockUnverified)}`);
     }

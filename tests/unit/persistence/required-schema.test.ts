@@ -11,12 +11,12 @@ describe('schema mínimo exigido no boot', () => {
     expect(query).toHaveBeenCalledWith(REQUIRED_SCHEMA_SQL);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='wholesale_order_items'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='wholesale_purchase_items'`);
-    expect(REQUIRED_SCHEMA_SQL).toContain('wholesale_stock_movements_measure_brand_idx');
+    expect(REQUIRED_SCHEMA_SQL).toContain('wholesale_stock_movements_variant_idx');
   });
 
-  it('recusa iniciar antes da migration 0155', async () => {
+  it('recusa iniciar antes da migration 0156', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0155_wholesale_stock_multi_brand');
+      .rejects.toThrow('required_schema_missing:0156_tire_condition_variants');
   });
 });

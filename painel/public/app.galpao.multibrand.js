@@ -3,31 +3,34 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
   const clean = (value) => String(value || '').trim();
   const brandKey = (value) => clean(value).normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const variantKey = (measure, brand) => `${clean(measure)}\u0000${brandKey(brand)}`;
+  const variantKey = (measure, brand, condition) =>
+    `${clean(measure)}\u0000${brandKey(brand)}\u0000${clean(condition)}`;
 
   return {
-    stockVariantKey(rowOrMeasure, brand) {
+    stockVariantKey(rowOrMeasure, brand, condition) {
       return typeof rowOrMeasure === 'object' && rowOrMeasure
-        ? variantKey(rowOrMeasure.measure, rowOrMeasure.brand)
-        : variantKey(rowOrMeasure, brand);
+        ? variantKey(rowOrMeasure.measure, rowOrMeasure.brand, rowOrMeasure.tire_condition)
+        : variantKey(rowOrMeasure, brand, condition);
     },
-    stockVariant(measure, brand) {
+    stockVariant(measure, brand, condition) {
       const wantedMeasure = clean(measure);
       const wantedBrand = brandKey(brand);
-      if (!wantedMeasure || !wantedBrand) return null;
+      const wantedCondition = clean(condition);
+      if (!wantedMeasure || !wantedBrand || !wantedCondition) return null;
       return this.atacadoMeasures.find((row) =>
-        clean(row.measure) === wantedMeasure && brandKey(row.brand) === wantedBrand) || null;
+        clean(row.measure) === wantedMeasure && brandKey(row.brand) === wantedBrand
+        && clean(row.tire_condition) === wantedCondition) || null;
     },
-    measureOnHand(measure, brand) {
-      const row = this.stockVariant(measure, brand);
+    measureOnHand(measure, brand, condition) {
+      const row = this.stockVariant(measure, brand, condition);
       return row?.quantity_on_hand == null ? null : Number(row.quantity_on_hand);
     },
-    measureCost(measure, brand) {
-      const row = this.stockVariant(measure, brand);
+    measureCost(measure, brand, condition) {
+      const row = this.stockVariant(measure, brand, condition);
       return row?.unit_cost == null ? null : Number(row.unit_cost);
     },
     itemProfit(item) {
-      const cost = this.measureCost(item.measure, item.brand);
+      const cost = this.measureCost(item.measure, item.brand, item.tire_condition);
       return cost == null ? null
         : (Number(item.unit_price || 0) - cost) * (Number(item.quantity) || 0);
     },
@@ -60,7 +63,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       } else {
         candidates = candidates.map((row) => ({
           ...row,
-          variant_key: variantKey(row.measure, row.brand),
+          variant_key: variantKey(row.measure, row.brand, row.tire_condition),
         }));
       }
       if (!raw && key === 'estoque') candidates = [];
@@ -71,16 +74,20 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       if (Object.prototype.hasOwnProperty.call(item, 'brand') && row?.brand) {
         item.brand = clean(row.brand);
       }
+      if (Object.prototype.hasOwnProperty.call(item, 'tire_condition') && row?.tire_condition) {
+        item.tire_condition = clean(row.tire_condition);
+      }
       this.measureBox = { key: null, hits: [] };
     },
     filmeMatches(row) {
       return Boolean(row)
         && clean(this.galpaoFilme.measure) === clean(row.measure)
-        && brandKey(this.galpaoFilme.brand) === brandKey(row.brand);
+        && brandKey(this.galpaoFilme.brand) === brandKey(row.brand)
+        && clean(this.galpaoFilme.tire_condition) === clean(row.tire_condition);
     },
 
     repoKey(row) {
-      return variantKey(row?.measure, row?.brand);
+      return variantKey(row?.measure, row?.brand, row?.tire_condition);
     },
     repoGiro(row) {
       const sources = new Set(['venda_atacado', 'varejo']);
@@ -178,6 +185,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
         .map((row) => ({
           measure: row.measure,
           brand: row.brand,
+          tire_condition: row.tire_condition,
           quantity: Number(row.suggested_quantity || this.repoQuantidade(row)),
           unit_cost: '',
         }));
@@ -212,8 +220,10 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       const groups = new Map();
       for (const variant of this.atacadoStock) {
         const measure = clean(variant.measure);
-        const group = groups.get(measure) || {
-          measure, brands: [], variants: [], quantity_on_hand: 0,
+        const condition = clean(variant.tire_condition);
+        const groupKey = `${measure}\u0000${condition}`;
+        const group = groups.get(groupKey) || {
+          measure, tire_condition: condition, brands: [], variants: [], quantity_on_hand: 0,
           quantity_with_cost: 0, capital: 0, unit_cost: null, cost_complete: false,
         };
         const quantity = Math.max(0, Number(variant.quantity_on_hand) || 0);
@@ -225,7 +235,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
           group.quantity_with_cost += quantity;
           group.capital += quantity * Number(variant.unit_cost);
         }
-        groups.set(measure, group);
+        groups.set(groupKey, group);
       }
       return [...groups.values()].map((group) => ({
         ...group,
@@ -242,10 +252,6 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     custoPneusComCusto() {
       return this.custoRowsBase().reduce((total, row) => total + row.quantity_with_cost, 0);
     },
-    custoMediaPonderada() {
-      const tires = this.custoPneusComCusto();
-      return tires > 0 ? this.custoTotal() / tires : 0;
-    },
     custoPercentual(row) {
       const total = this.custoTotal();
       return total > 0 ? this.custoCapital(row) / total * 100 : 0;
@@ -257,6 +263,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       let rows = this.custoRowsBase();
       if (search) {
         rows = rows.filter((row) => row.measure.toLowerCase().includes(search)
+          || String(row.tire_condition || '').toLowerCase().includes(search)
           || row.brands.some((brand) => brand.toLowerCase().includes(search))
           || (searchDigits && digits(row.measure).includes(searchDigits)));
       }

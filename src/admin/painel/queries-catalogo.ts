@@ -4,19 +4,23 @@ import { env } from '../../shared/config/env.js';
 import { moneyCents } from '../../shared/catalog-pricing.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
 import { tireSizeKey } from '../../shared/tire-size.js';
+import type { TireCondition } from '../../shared/tire-condition.js';
 
 interface CatalogRow {
   product_id: string; product_code: string; product_name: string; product_type: string;
+  tire_condition: TireCondition | null;
   brand: string | null; tire_size: string | null; tire_position: string | null;
   price_amount: string | null; currency: string | null; price_type: string | null;
 }
 interface StockRow {
   measure: string; brand: string; quantity_on_hand: number | string;
+  tire_condition: TireCondition;
   unit_cost: number | string | null;
   updated_at: string | null;
 }
 interface PurchaseRow {
   measure: string; brand: string | null; unit_cost: number | string; purchased_at: string;
+  tire_condition: TireCondition;
 }
 export interface CatalogPriceInput {
   productId: string; priceAmount: number; reason: string; actorLabel: string;
@@ -29,8 +33,12 @@ function brandKey(value: string | null | undefined): string {
   return normalized === 'semmarca' ? '' : normalized;
 }
 
-function catalogVariantKey(measure: string | null | undefined, brand: string | null | undefined): string {
-  return `${tireSizeKey(measure)}\u0000${brandKey(brand)}`;
+function catalogVariantKey(
+  measure: string | null | undefined,
+  brand: string | null | undefined,
+  tireCondition: string | null | undefined,
+): string {
+  return `${tireSizeKey(measure)}\u0000${brandKey(brand)}\u0000${tireCondition ?? ''}`;
 }
 
 export async function getCatalogOverview(
@@ -39,7 +47,8 @@ export async function getCatalogOverview(
 ): Promise<{ summary: Record<string, number>; brands: string[]; rows: unknown[] }> {
   const [catalog, stock, purchases] = await Promise.all([
     dbPool.query<CatalogRow>(
-      `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,p.brand,
+      `SELECT p.id product_id,p.product_code,p.product_name,p.product_type,
+              p.tire_condition,p.brand,
               ts.tire_size,ts.position tire_position,
               cp.price_amount,cp.currency,cp.price_type
          FROM commerce.products p
@@ -52,12 +61,12 @@ export async function getCatalogOverview(
       [environment],
     ),
     dbPool.query<StockRow>(
-      `SELECT measure,brand,quantity_on_hand,unit_cost,updated_at
+      `SELECT measure,brand,tire_condition,quantity_on_hand,unit_cost,updated_at
          FROM commerce.wholesale_stock WHERE environment=$1`,
       [environment],
     ),
     dbPool.query<PurchaseRow>(
-      `SELECT i.measure,i.brand,i.unit_cost,p.purchased_at
+      `SELECT i.measure,i.brand,i.tire_condition,i.unit_cost,p.purchased_at
          FROM commerce.wholesale_purchase_items i
          JOIN commerce.wholesale_purchases p
            ON p.id=i.purchase_id AND p.environment=i.environment
@@ -68,18 +77,22 @@ export async function getCatalogOverview(
   ]);
   const stockIndex = buildMatrizStockIndex(stock.rows);
   const stockByKey = new Map(stock.rows.map((row) => [
-    catalogVariantKey(row.measure, row.brand), row,
+    catalogVariantKey(row.measure, row.brand, row.tire_condition), row,
   ]));
   const lastPurchase = new Map<string, PurchaseRow>();
   for (const row of purchases.rows) {
-    const key = catalogVariantKey(row.measure, row.brand);
+    const key = catalogVariantKey(row.measure, row.brand, row.tire_condition);
     if (tireSizeKey(row.measure) && !lastPurchase.has(key)) lastPurchase.set(key, row);
   }
   const catalogKeys = new Set(catalog.rows.map((product) =>
-    catalogVariantKey(product.tire_size, product.brand)));
+    catalogVariantKey(product.tire_size, product.brand, product.tire_condition)));
   const catalogRows = catalog.rows.map((product) => {
-    const state = matrizStockForMeasure(stockIndex, product.tire_size, product.brand);
-    const key = catalogVariantKey(product.tire_size, product.brand);
+    const state = matrizStockForMeasure(
+      stockIndex, product.tire_size, product.brand, product.tire_condition,
+    );
+    const key = catalogVariantKey(
+      product.tire_size, product.brand, product.tire_condition,
+    );
     const officialStock = tireSizeKey(product.tire_size) ? stockByKey.get(key) : undefined;
     const purchase = tireSizeKey(product.tire_size) ? lastPurchase.get(key) : undefined;
     const cost = state.unit_cost;
@@ -102,22 +115,25 @@ export async function getCatalogOverview(
     };
   });
   const stockOnlyRows = stock.rows
-    .filter((row) => !catalogKeys.has(catalogVariantKey(row.measure, row.brand)))
+    .filter((row) => !catalogKeys.has(
+      catalogVariantKey(row.measure, row.brand, row.tire_condition),
+    ))
     .map((row) => {
-      const key = catalogVariantKey(row.measure, row.brand);
+      const key = catalogVariantKey(row.measure, row.brand, row.tire_condition);
       const purchase = lastPurchase.get(key);
       return {
         product_id: null,
         product_code: null,
         product_name: row.brand,
         product_type: 'tire',
+        tire_condition: row.tire_condition,
         brand: row.brand,
         tire_size: row.measure,
         tire_position: null,
         price_amount: null,
         currency: null,
         price_type: null,
-        row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}`,
+        row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
         catalogued: false,
         official_quantity_on_hand: Number(row.quantity_on_hand),
         official_unit_cost: row.unit_cost === null ? null : Number(row.unit_cost),

@@ -1,4 +1,8 @@
 import { tireSizeKey } from './tire-size.js';
+import {
+  canonicalTireCondition,
+  type TireCondition,
+} from './tire-condition.js';
 
 export type MatrizStockBlockReason =
   | 'walkin_measure_not_found'
@@ -9,6 +13,7 @@ export type MatrizStockBlockReason =
 export interface MatrizStockRow {
   measure: string;
   brand?: string | null;
+  tire_condition?: TireCondition | string | null;
   quantity_on_hand: number | string;
   unit_cost?: number | string | null;
 }
@@ -17,6 +22,7 @@ export interface MatrizStockState {
   key: string;
   measure: string | null;
   brand: string | null;
+  tire_condition: TireCondition | null;
   quantity_on_hand: number;
   unit_cost: number | null;
   rows_count: number;
@@ -44,25 +50,33 @@ export function matrizStockForMeasure(
   index: MatrizStockIndex,
   measure: string | null | undefined,
   brand?: string | null,
+  tireCondition?: TireCondition | string | null,
 ): MatrizStockState {
   const key = tireSizeKey(measure);
   const candidates = key ? index.get(key) ?? [] : [];
   const wantedBrand = brandKey(brand);
+  const wantedCondition = canonicalTireCondition(tireCondition) ?? 'meia_vida';
   let rows = wantedBrand
     ? candidates.filter((row) => brandKey(row.brand) === wantedBrand)
     : candidates;
+  rows = rows.filter(
+    (row) => (canonicalTireCondition(row.tire_condition) ?? 'meia_vida') === wantedCondition,
+  );
   // Compatibilidade defensiva durante migrações/fixtures antigos: uma única
   // linha sem marca ainda é inequívoca. Com duas linhas, continua bloqueado.
   if (wantedBrand && rows.length === 0 && candidates.length === 1
+    && (canonicalTireCondition(candidates[0]?.tire_condition) ?? 'meia_vida') === wantedCondition
     && (!brandKey(candidates[0]?.brand)
       || brandKey(candidates[0]?.brand) === brandKey('Sem marca'))) {
     rows = candidates;
   }
   if (rows.length === 0) {
-    return blocked(key, null, brand ?? null, 0, null, 0, 'walkin_measure_not_found');
+    return blocked(key, null, brand ?? null, wantedCondition, 0, null, 0,
+      'walkin_measure_not_found');
   }
   if (rows.length !== 1) {
-    return blocked(key, rows[0]?.measure ?? null, brand ?? null, 0, null, rows.length,
+    return blocked(key, rows[0]?.measure ?? null, brand ?? null, wantedCondition,
+      0, null, rows.length,
       'walkin_stock_ambiguous');
   }
 
@@ -70,13 +84,15 @@ export function matrizStockForMeasure(
   const quantity = Number(row.quantity_on_hand);
   const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
   if (!Number.isFinite(quantity) || quantity <= 0) {
-    return blocked(key, row.measure, row.brand ?? null, safeQuantity, parseCost(row.unit_cost), 1,
+    return blocked(key, row.measure, row.brand ?? null, wantedCondition,
+      safeQuantity, parseCost(row.unit_cost), 1,
       'walkin_stock_insufficient');
   }
 
   const unitCost = parseCost(row.unit_cost);
   if (unitCost === null || unitCost <= 0) {
-    return blocked(key, row.measure, row.brand ?? null, safeQuantity, unitCost, 1,
+    return blocked(key, row.measure, row.brand ?? null, wantedCondition,
+      safeQuantity, unitCost, 1,
       'walkin_cost_missing');
   }
 
@@ -84,6 +100,7 @@ export function matrizStockForMeasure(
     key,
     measure: row.measure,
     brand: row.brand ?? null,
+    tire_condition: wantedCondition,
     quantity_on_hand: safeQuantity,
     unit_cost: unitCost,
     rows_count: 1,
@@ -102,6 +119,7 @@ function blocked(
   key: string,
   measure: string | null,
   brand: string | null,
+  tireCondition: TireCondition | null,
   quantity: number,
   unitCost: number | null,
   rowsCount: number,
@@ -111,6 +129,7 @@ function blocked(
     key,
     measure,
     brand,
+    tire_condition: tireCondition,
     quantity_on_hand: quantity,
     unit_cost: unitCost,
     rows_count: rowsCount,

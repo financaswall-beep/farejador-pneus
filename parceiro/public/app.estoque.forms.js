@@ -29,7 +29,7 @@ window.PARCEIRO_MODULES.estoqueForms = () => ({
         minimum_quantity: item.minimum_quantity ?? null,
         average_cost: item.average_cost ?? null,
         sale_price: item.sale_price ?? null,
-        tire_condition: item.tire_condition || 'Novo',
+        tire_condition: item.tire_condition || '',
         shelf_location: item.shelf_location || '',
         // Posição em coluna própria (migration 0075); fallback à heurística p/ legado.
         tire_position: item.tire_position || this.stockPositionValue(item.supplier_name) || this.stockPositionValue(item.item_name) || '',
@@ -44,7 +44,7 @@ window.PARCEIRO_MODULES.estoqueForms = () => ({
     },
 
     clearStockForm() {
-      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: 'Novo', shelf_location: '', tire_position: '', is_tracked: true, product_id: null, catalog_name: null };
+      this.stockForm = { stock_id: null, item_type: 'pneu', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', supplier_name: '', quantity_on_hand: null, minimum_quantity: null, average_cost: null, sale_price: null, tire_condition: '', shelf_location: '', tire_position: '', is_tracked: true, product_id: null, catalog_name: null };
       this.catalogQuery = '';
       this.catalogResults = [];
     },
@@ -68,6 +68,7 @@ window.PARCEIRO_MODULES.estoqueForms = () => ({
     selectCatalogProduct(p) {
       this.stockForm.product_id = p.id;
       this.stockForm.catalog_name = p.product_name;
+      if (p.tire_condition) this.stockForm.tire_condition = p.tire_condition;
       this.catalogResults = [];
       this.catalogQuery = '';
     },
@@ -82,6 +83,10 @@ window.PARCEIRO_MODULES.estoqueForms = () => ({
       if (!this.stockForm.item_name.trim()) { this.flash('Nome do item é obrigatório.'); return; }
 
       const itemType = this.stockForm.item_type || 'pneu';
+      if (itemType === 'pneu' && !this.stockForm.tire_condition) {
+        this.flash('Selecione a condição do pneu.');
+        return;
+      }
       const isService = itemType === 'servico';
       // Serviço não controla estoque; pneu/insumo controlam. O tipo dirige is_tracked.
       const isTracked = !isService;
@@ -203,6 +208,13 @@ window.PARCEIRO_MODULES.estoqueForms = () => ({
         }),
       });
       await this.loadData();
+    },
+
+    tireConditionLabel(value) {
+      if (value === 'meia_vida' || value === 'Usado') return 'Meia-vida';
+      if (value === 'novo' || value === 'Novo') return 'Novo';
+      if (value === 'remold' || value === 'Recapado') return 'Remold';
+      return 'Revisar condição';
     },
 
     openStockEntry(item) {

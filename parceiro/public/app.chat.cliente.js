@@ -44,7 +44,11 @@ window.PARCEIRO_MODULES.chatCliente = () => ({
     chatLastItemLabel(order) {
       const it = (order && Array.isArray(order.items) && order.items[0]) || null;
       if (!it) return 'Pedido';
-      const top = [it.brand, it.tire_size].filter(Boolean).join(' ');
+      const top = [
+        it.brand,
+        it.tire_size,
+        it.tire_condition ? this.tireConditionLabel(it.tire_condition) : null,
+      ].filter(Boolean).join(' ');
       return top || it.item_name || 'Pedido';
     },
     chatCustomerAddr() {

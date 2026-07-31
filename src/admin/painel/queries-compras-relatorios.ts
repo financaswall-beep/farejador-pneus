@@ -101,7 +101,8 @@ export async function getWholesalePurchaseReport(
             p.cancelled_at,p.cancelled_by,p.cancel_reason,
             COALESCE(sum(i.quantity),0)::int AS items_count,
             COALESCE(jsonb_agg(jsonb_build_object(
-              'id',i.id,'measure',i.measure,'brand',i.brand,'quantity',i.quantity,
+              'id',i.id,'measure',i.measure,'brand',i.brand,
+              'tire_condition',i.tire_condition,'quantity',i.quantity,
               'unit_cost',i.unit_cost,'line_total',i.line_total
             ) ORDER BY i.measure,i.id) FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
        FROM commerce.wholesale_purchases p
@@ -190,6 +191,7 @@ export async function getWholesalePriceReport(
   const result = await dbPool.query(
     `SELECT s.id AS supplier_id,s.name AS supplier_name,
             s.deleted_at IS NOT NULL AS supplier_archived,i.measure,i.brand,
+            i.tire_condition,
             sum(i.quantity)::int AS qty_total,
             round(sum(i.line_total)/NULLIF(sum(i.quantity),0),2) AS avg_cost,
             max(p.purchased_at) AS last_purchased_at,
@@ -200,8 +202,8 @@ export async function getWholesalePriceReport(
        JOIN commerce.wholesale_suppliers s
          ON s.id=p.supplier_id AND s.environment=p.environment
       WHERE ${where.join(' AND ')}
-      GROUP BY s.id,i.measure,i.brand
-      ORDER BY i.measure,i.brand,avg_cost,qty_total DESC
+      GROUP BY s.id,i.measure,i.brand,i.tire_condition
+      ORDER BY i.measure,i.brand,i.tire_condition,avg_cost,qty_total DESC
       LIMIT 1000`,
     params,
   );

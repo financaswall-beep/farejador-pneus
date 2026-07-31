@@ -98,7 +98,12 @@ window.PARCEIRO_MODULES.entregas = () => ({
       const items = Array.isArray(sale?.items) ? sale.items : [];
       if (!items.length) return 'Sem itens';
       return items
-        .map((item) => `${this.num(item.quantity)}× ${item.tire_size || item.item_name || 'item'}`)
+        .map((item) => {
+          const condition = item.tire_condition
+            ? ` · ${this.tireConditionLabel(item.tire_condition)}`
+            : '';
+          return `${this.num(item.quantity)}× ${item.tire_size || item.item_name || 'item'}${condition}`;
+        })
         .join(' · ');
     },
 

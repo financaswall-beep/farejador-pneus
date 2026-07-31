@@ -22,6 +22,7 @@ window.PARCEIRO_MODULES.pdvKpis = () => ({
           item.item_name,
           item.tire_size,
           item.brand,
+          this.tireConditionLabel(item.tire_condition),
           item.supplier_name,
         ].filter(Boolean).join(' ').toLowerCase();
         return !search || haystack.includes(search);
@@ -147,6 +148,9 @@ window.PARCEIRO_MODULES.pdvKpis = () => ({
       const parts = [item.item_name];
       if (item.tire_size) parts.push(item.tire_size);
       if (item.brand) parts.push(item.brand);
+      if ((item.item_type || 'pneu') === 'pneu') {
+        parts.push(this.tireConditionLabel(item.tire_condition));
+      }
       const qtyLabel = this.stockAvailabilityLabel(item);
       parts.push(qtyLabel);
       return parts.join(' - ');
@@ -157,7 +161,13 @@ window.PARCEIRO_MODULES.pdvKpis = () => ({
     },
 
     posProductSubtitle(item) {
-      return [item.brand, item.supplier_name].filter(Boolean).join(' - ') || 'Sem marca';
+      return [
+        item.brand,
+        (item.item_type || 'pneu') === 'pneu'
+          ? this.tireConditionLabel(item.tire_condition)
+          : null,
+        item.supplier_name,
+      ].filter(Boolean).join(' - ') || 'Sem marca';
     },
 
     posStockLabel(item) {

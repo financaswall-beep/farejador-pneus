@@ -120,7 +120,7 @@ window.PAINEL_MODULES.varejo = function () {
     varejoMedidasMaisVendidas() {
       const totais = new Map();
       this.vendasVarejoAtivas().forEach((p) => (p.rawItems || []).forEach((item) => {
-        const nome = item.product_name || item.product_code || 'Produto';
+        const nome = item.tire_size || item.product_name || item.product_code || 'Produto';
         totais.set(nome, (totais.get(nome) || 0) + Number(item.quantity || 0));
       }));
       const rows = [...totais].map(([nome, quantidade]) => ({ nome, quantidade })).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);

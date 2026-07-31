@@ -51,7 +51,11 @@ window.PAINEL_MODULES.format = function () {
       if (!Array.isArray(items) || items.length === 0) return 'Sem itens';
       return items.map((item) => {
         const name = item.product_name || item.product_code || item.product_id || 'Produto';
-        return `${item.quantity || 1}x ${name}`;
+        const condition = {
+          meia_vida: 'Meia-vida', novo: 'Novo', remold: 'Remold',
+        }[item.tire_condition] || (item.tire_condition ? 'Condição a confirmar' : null);
+        const details = [item.tire_size, item.brand, condition].filter(Boolean);
+        return `${item.quantity || 1}x ${name}${details.length ? ` · ${details.join(' · ')}` : ''}`;
       }).join(' + ');
     },
 

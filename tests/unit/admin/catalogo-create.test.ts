@@ -44,7 +44,12 @@ describe('cadastro de produto a partir do estoque', () => {
       if (sql.includes('JOIN commerce.tire_specs')) return { rows: [] };
       if (sql.includes('SELECT id FROM commerce.products')) return { rows: [] };
       if (sql.includes('INSERT INTO commerce.products')) return { rows: [{ id: 'produto-1' }] };
-      if (sql.includes('INSERT INTO commerce.tire_specs')) return { rows: [] };
+      if (sql.includes('INSERT INTO commerce.tire_specs')) {
+        return { rows: [{ id: 'spec-1' }] };
+      }
+      if (sql.includes('INSERT INTO commerce.vehicle_fitments')) {
+        return { rows: [], rowCount: 0 };
+      }
       if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
     });
@@ -62,6 +67,7 @@ describe('cadastro de produto a partir do estoque', () => {
       product_code: 'MET-909018',
       product_name: 'Pneu Metzeler 90/90-18',
       brand: 'Metzeler',
+      tire_condition: 'meia_vida',
       tire_size: '90/90-18',
     });
 

@@ -46,4 +46,21 @@ describe('fonte oficial do estoque da Matriz', () => {
     expect(matrizStockForMeasure(testIndex, '100/80-18').quantity_on_hand).toBe(2);
     expect(matrizStockForMeasure(prodIndex, '100/80-18').quantity_on_hand).toBe(99);
   });
+
+  it('não mistura novo, meia-vida e remold da mesma medida e marca', () => {
+    const index = buildMatrizStockIndex([
+      { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
+        quantity_on_hand: 2, unit_cost: 50 },
+      { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'novo',
+        quantity_on_hand: 4, unit_cost: 120 },
+      { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'remold',
+        quantity_on_hand: 3, unit_cost: 80 },
+    ]);
+    expect(matrizStockForMeasure(index, '90/90-18', 'Metzeler', 'novo'))
+      .toMatchObject({ quantity_on_hand: 4, unit_cost: 120, rows_count: 1 });
+    expect(matrizStockForMeasure(index, '90/90-18', 'Metzeler', 'meia_vida'))
+      .toMatchObject({ quantity_on_hand: 2, unit_cost: 50, rows_count: 1 });
+    expect(matrizStockForMeasure(index, '90/90-18', 'Metzeler', 'remold'))
+      .toMatchObject({ quantity_on_hand: 3, unit_cost: 80, rows_count: 1 });
+  });
 });

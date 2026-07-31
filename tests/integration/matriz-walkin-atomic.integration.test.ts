@@ -83,8 +83,8 @@ describe('venda walk-in atomica da Matriz', () => {
     const measure = `${110 + sequence}/${50 + sequence}-${12 + sequence}`;
     const product = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.products
-         (environment, product_code, product_name, product_type)
-       VALUES ('test', $1, $2, 'tire') RETURNING id`,
+         (environment, product_code, product_name, product_type, brand, tire_condition)
+       VALUES ('test', $1, $2, 'tire', 'Sem marca', 'meia_vida') RETURNING id`,
       [`WALKIN-${suffix}`, `Pneu ${suffix}`],
     );
     const productId = product.rows[0]!.id;
