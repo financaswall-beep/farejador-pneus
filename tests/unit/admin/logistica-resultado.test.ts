@@ -17,16 +17,19 @@ describe('getMatrizLogistica — resultado real por rota', () => {
   it('usa o fundo panorâmico no cabeçalho da Logística e o serve como WebP', () => {
     const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
     const staticRoutes = readFileSync(resolve('src/admin/painel/route-static.ts'), 'utf8');
-    const banner = statSync(resolve('painel/public/assets/logistica-hero.webp'));
+    const banner = statSync(resolve('painel/public/assets/logistica-hero-v2.webp'));
 
-    expect(html).toContain("url('/admin/painel/assets/logistica-hero.webp?v=20260718-logistica2')");
+    expect(html).toContain('/admin/painel/assets/logistica-hero-v2.webp');
     expect(html).toContain('aria-labelledby="logistica-heading"');
-    expect(html).toContain('relative -mx-8 -mt-8 mb-5 min-h-[260px]');
+    expect(html).toContain('class="relative mb-0 min-h-[148px] overflow-hidden rounded-t-xl');
+    expect(html).toContain('class="relative z-20 flex min-h-[148px] flex-col justify-center px-8 py-6 xl:px-10"');
+    expect(html).toContain('class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl');
     expect(html).toContain('id="logistica-heading"');
-    expect(html).toContain('absolute right-8 top-5 z-10');
-    expect(html).toContain('bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-600');
-    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/logistica-hero.webp'");
-    expect(staticRoutes).toContain("'assets/logistica-hero.webp', 'image/webp'");
+    expect(html).toContain('aria-label="Seções de Logística"');
+    expect(html).toContain('bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5');
+    expect(html).toContain('operação da matriz');
+    expect(staticRoutes).toContain("fastify.get('/admin/painel/assets/logistica-hero-v2.webp'");
+    expect(staticRoutes).toContain("'assets/logistica-hero-v2.webp'");
     expect(banner.size).toBeGreaterThan(0);
     expect(banner.size).toBeLessThan(100_000);
   });

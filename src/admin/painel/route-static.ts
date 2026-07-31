@@ -61,6 +61,12 @@ export async function registerPainelStatic(fastify: FastifyInstance): Promise<vo
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'tailwind.css', 'text/css; charset=utf-8'));
   fastify.get('/admin/painel/assets/logistica-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/logistica-hero.webp', 'image/webp'));
+  fastify.get('/admin/painel/assets/logistica-hero-v2.webp', async (_request, reply) =>
+    sendStatic(
+      reply.header('Cache-Control', 'public, max-age=31536000, immutable'),
+      'assets/logistica-hero-v2.webp',
+      'image/webp',
+    ));
   fastify.get('/admin/painel/assets/bot-hero.webp', async (_request, reply) =>
     sendStatic(reply.header('Cache-Control', 'public, max-age=86400'), 'assets/bot-hero.webp', 'image/webp'));
   fastify.get('/admin/painel/assets/compras-hero.webp', async (_request, reply) =>
