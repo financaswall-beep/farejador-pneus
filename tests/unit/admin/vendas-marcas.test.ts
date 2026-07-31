@@ -83,7 +83,10 @@ describe('ranking de marcas em Vendas', () => {
     const staticRoutes = readFileSync('src/admin/painel/route-static.ts', 'utf8');
     expect(html).toContain('data-testid="sales-brand-ranking"');
     expect(html).toContain('Marcas mais vendidas');
-    expect(html).toContain('Vendas confirmadas da Matriz · varejo + atacado');
+    expect(html).toContain('Matriz · varejo + atacado');
+    expect(html).toContain('xl:col-span-5 bg-white border border-gray-200 rounded-xl p-4 shadow-sm');
+    expect(html).toContain('xl:col-span-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm');
+    expect(html).toContain('data-testid="sales-brand-ranking" class="xl:col-span-4');
     expect(html).toContain('app.vendas.marcas.js?v=20260731-vendas-marcas1');
     expect(montagem).toContain('window.PAINEL_MODULES.vendasMarcas');
     expect(staticRoutes).toContain("'app.vendas.marcas.js'");
