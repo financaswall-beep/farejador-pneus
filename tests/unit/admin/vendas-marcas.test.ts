@@ -81,21 +81,24 @@ describe('ranking de marcas em Vendas', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     const montagem = readFileSync('painel/public/app.montagem.js', 'utf8');
     const staticRoutes = readFileSync('src/admin/painel/route-static.ts', 'utf8');
+    const commercialVisionStart = html.indexOf('data-testid="sales-commercial-vision"');
     const commercialVision = html.slice(
-      html.indexOf('data-testid="sales-commercial-vision"'),
-      html.indexOf('Vendas recentes'),
+      commercialVisionStart,
+      html.indexOf('</section>', commercialVisionStart) + '</section>'.length,
     );
     expect(html).toContain('data-testid="sales-commercial-vision" class="space-y-3"');
-    expect(html).toContain('data-testid="sales-channel-performance" class="overflow-hidden rounded-xl');
-    expect(html).toContain('data-testid="sales-commercial-focus" class="overflow-hidden rounded-xl');
+    expect(html).toContain('data-testid="sales-channel-performance" class="rounded-xl border border-gray-200 bg-white p-5 xl:col-span-7 xl:row-span-2"');
+    expect(html).toContain('data-testid="sales-commercial-focus" class="rounded-xl border border-amber-300');
     expect(html).toContain('data-testid="sales-brand-ranking" class="overflow-hidden rounded-xl');
     expect(html).toContain('Visão comercial');
-    expect(html).toContain('Foco de hoje');
-    expect(html).toContain('Marcas mais vendidas');
-    expect(html).toContain('bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800');
-    expect(html).toContain('xl:grid-cols-[1.08fr_0.86fr_1.06fr]');
+    expect(html).toContain('Resultado do período');
+    expect(html).toContain('Prioridade agora');
+    expect(html).toContain('Ranking de marcas');
+    expect(html).toContain('grid grid-cols-1 gap-4 xl:grid-cols-12');
     expect(commercialVision).toContain('vendasMarcas.rows.slice(0, 2)');
     expect(commercialVision).not.toContain('catalogoBrandLogo(marca.brand)');
+    expect(commercialVision).not.toContain('bg-gradient');
+    expect(commercialVision).not.toContain('shadow');
     expect(html).toContain('app.vendas.marcas.js?v=20260731-vendas-marcas1');
     expect(montagem).toContain('window.PAINEL_MODULES.vendasMarcas');
     expect(staticRoutes).toContain("'app.vendas.marcas.js'");
