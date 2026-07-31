@@ -2207,63 +2207,73 @@
           </button>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
-          <div class="xl:col-span-5 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <h3 class="text-base font-semibold">Desempenho por canal</h3>
-            <p class="text-xs text-gray-400 mt-1 mb-4">Participação no volume de vendas</p>
-            <div class="space-y-4">
-              <template x-for="canal in vendasCanais()" :key="canal.id">
-                <div class="grid grid-cols-[36px_minmax(0,1fr)] gap-3 items-center">
-                  <div class="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center"><i :data-lucide="canal.icon" class="w-4 h-4 text-emerald-700"></i></div>
-                  <div>
-                    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><span class="text-sm font-semibold" x-text="canal.label"></span><span class="text-xs"><b class="num" x-text="canal.vendas"></b> vendas</span><span class="text-xs num" x-text="formatCurrency(canal.valor)"></span></div>
-                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden mt-2"><div class="h-full bg-emerald-600 rounded-full" :style="'width:' + canal.barra + '%'"></div></div>
-                  </div>
-                </div>
-              </template>
+        <section data-testid="sales-commercial-vision" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <header class="flex flex-col gap-4 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-emerald-700 text-white shadow-sm"><i data-lucide="trending-up" class="h-5 w-5"></i></span>
+              <div><h2 class="text-lg font-bold text-gray-950">Visão comercial</h2><p class="text-sm text-gray-500">Resumo do período</p></div>
             </div>
-            <p class="text-[11px] text-gray-400 mt-4 pt-3 border-t border-gray-100">Caixa, custos e lucro ficam no <button @click="currentPage = 'financeiro'; finTab = 'visao'" class="text-brand-700 font-medium hover:underline">Financeiro</button>.</p>
-          </div>
-
-          <div class="xl:col-span-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-            <h3 class="text-base font-semibold mb-2">Atenção comercial</h3>
-            <div class="divide-y divide-gray-100">
-              <button @click="vendasTab = 'historico'" class="w-full py-2.5 flex items-center gap-2.5 text-left"><div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" :class="vendasAguardando() ? 'bg-amber-50' : 'bg-emerald-50'"><i data-lucide="clock-3" class="w-4 h-4" :class="vendasAguardando() ? 'text-amber-600' : 'text-emerald-700'"></i></div><div class="min-w-0 flex-1"><p class="text-xs font-semibold leading-4" x-text="vendasAguardando() ? vendasAguardando() + ' pedido(s) aguardando confirmação' : 'Nenhum pedido aguardando confirmação'"></p><p class="text-[11px] text-gray-400">acompanhar no histórico</p></div><i data-lucide="chevron-right" class="w-4 h-4 flex-shrink-0 text-brand-700"></i></button>
-              <button @click="vendasTab = 'recompra'" class="w-full py-2.5 flex items-center gap-2.5 text-left"><div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="user-plus" class="w-4 h-4 text-emerald-700"></i></div><div class="min-w-0 flex-1"><p class="text-xs font-semibold leading-4"><span x-text="vendasNuncaCompraram().length"></span> parceiro(s) ainda não compraram</p><p class="text-[11px] text-gray-400">primeira venda no atacado</p></div><i data-lucide="chevron-right" class="w-4 h-4 flex-shrink-0 text-brand-700"></i></button>
-              <button @click="vendasTab = 'recompra'" class="w-full py-2.5 flex items-center gap-2.5 text-left"><div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0"><i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-700"></i></div><div class="min-w-0 flex-1"><p class="text-xs font-semibold leading-4"><span x-text="vendasInativos().length"></span> cliente(s) sem comprar há 30 dias</p><p class="text-[11px] text-gray-400">oportunidades de recompra</p></div><i data-lucide="chevron-right" class="w-4 h-4 flex-shrink-0 text-brand-700"></i></button>
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700"><i data-lucide="calendar-days" class="h-4 w-4"></i><span x-text="vendasHistoricoPeriodoLabel()"></span></span>
+              <button @click="vendasTab = 'historico'" class="inline-flex items-center gap-2 px-2 py-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800">Ver relatório <i data-lucide="arrow-right" class="h-4 w-4"></i></button>
             </div>
-          </div>
+          </header>
 
-          <section data-testid="sales-brand-ranking" class="xl:col-span-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
-              <div class="flex min-w-0 items-center gap-2.5">
-                <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><i data-lucide="trophy" class="h-4 w-4"></i></span>
-                <div class="min-w-0"><h3 class="truncate text-base font-semibold text-gray-950">Marcas mais vendidas</h3><p class="mt-0.5 truncate text-[11px] text-gray-400">Matriz · varejo + atacado</p></div>
+          <div class="grid grid-cols-1 gap-4 bg-gray-50/50 p-4 xl:grid-cols-12">
+            <article data-testid="sales-channel-performance" class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 p-5 text-white shadow-sm xl:col-span-5">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div><h3 class="text-base font-semibold">Desempenho por canal</h3><p class="mt-3 text-3xl font-bold num sm:text-4xl" x-text="formatCurrency(vendasResumoGeral().valor)"></p><p class="mt-1 text-sm text-emerald-100">faturamento comercial</p></div>
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i> Ticket <span class="num" x-text="formatCurrency(vendasResumoGeral().ticket)"></span></span>
               </div>
-              <div class="flex-shrink-0 text-right"><p class="text-[11px] font-semibold text-emerald-800" x-text="vendasHistoricoPeriodoLabel()"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="Number(vendasMarcas?.summary?.units || 0)"></span> pneus</p></div>
-            </div>
 
-            <div x-show="vendasMarcasLoading" class="flex items-center justify-center gap-2 px-4 py-10 text-xs text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Calculando ranking...</div>
-            <div x-show="!vendasMarcasLoading && vendasMarcasError" class="m-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-800">Ranking temporariamente indisponível. Os demais dados continuam normais.</div>
-            <div x-show="!vendasMarcasLoading && !vendasMarcasError && !vendasMarcas?.rows?.length" class="px-4 py-10 text-center text-xs text-gray-400">Nenhuma venda confirmada com marca neste período.</div>
-
-            <div x-show="!vendasMarcasLoading && !vendasMarcasError && vendasMarcas?.rows?.length" class="divide-y divide-gray-100 px-4">
-              <template x-for="(marca, index) in vendasMarcas.rows.slice(0, 3)" :key="marca.brand">
-                <article class="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 py-3">
-                  <span class="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold" :class="index === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'" x-text="'#' + marca.rank"></span>
-                  <div class="min-w-0">
-                    <div class="flex h-5 items-center">
-                      <template x-if="catalogoBrandLogo(marca.brand)"><img :src="catalogoBrandLogo(marca.brand)" :alt="`Logo ${marca.brand}`" class="max-h-5 w-[84px] object-contain object-left"></template>
-                      <template x-if="!catalogoBrandLogo(marca.brand)"><span class="truncate text-xs font-bold uppercase tracking-wide text-gray-800" x-text="marca.brand"></span></template>
-                    </div>
-                    <p class="mt-1 truncate text-[10px] text-gray-400"><span x-text="marca.retail_units"></span> varejo · <span x-text="marca.wholesale_units"></span> atacado</p>
+              <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <template x-for="canal in vendasCanais()" :key="canal.id">
+                  <div class="rounded-xl border border-white/20 bg-white/5 p-4">
+                    <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-800"><i :data-lucide="canal.icon" class="h-5 w-5"></i></span><div><p class="font-semibold" x-text="canal.label"></p><p class="text-xs text-emerald-100"><span class="num" x-text="canal.vendas"></span> vendas</p></div></div>
+                    <div class="mt-4 border-t border-white/15 pt-3"><p class="text-lg font-semibold num" x-text="formatCurrency(canal.valor)"></p><p class="mt-1 text-2xl font-bold text-emerald-300 num" x-text="(vendasResumoGeral().valor > 0 ? (canal.valor / vendasResumoGeral().valor) * 100 : 0).toFixed(0) + '%'"></p></div>
                   </div>
-                  <div class="text-right"><p class="text-sm font-bold text-gray-950 num"><span x-text="marca.units"></span> <span class="text-[10px] font-medium text-gray-400">pneus</span></p><p class="mt-0.5 text-[10px] text-gray-500 num" x-text="formatCurrency(Number(marca.revenue || 0))"></p></div>
-                </article>
-              </template>
-            </div>
-          </section>
-        </div>
+                </template>
+              </div>
+
+              <div class="mt-4 flex h-9 overflow-hidden rounded-lg bg-white/10 text-xs font-bold">
+                <div class="flex min-w-0 items-center justify-center bg-emerald-100 text-emerald-950" :style="'width:' + (vendasResumoGeral().valor > 0 ? (vendasResumoGeral().varejoValor / vendasResumoGeral().valor) * 100 : 50) + '%'" x-text="(vendasResumoGeral().valor > 0 ? (vendasResumoGeral().varejoValor / vendasResumoGeral().valor) * 100 : 0).toFixed(0) + '%'"></div>
+                <div class="flex min-w-0 items-center justify-center bg-emerald-500 text-white" :style="'width:' + (vendasResumoGeral().valor > 0 ? (vendasResumoGeral().atacadoValor / vendasResumoGeral().valor) * 100 : 50) + '%'" x-text="(vendasResumoGeral().valor > 0 ? (vendasResumoGeral().atacadoValor / vendasResumoGeral().valor) * 100 : 0).toFixed(0) + '%'"></div>
+              </div>
+              <p class="mt-3 text-center text-sm text-emerald-100"><span class="font-semibold text-white num" x-text="vendasResumoGeral().vendas"></span> vendas no total</p>
+            </article>
+
+            <article data-testid="sales-commercial-focus" class="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/80 to-white shadow-sm xl:col-span-3">
+              <div class="p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2"><h3 class="text-lg font-bold text-gray-950">Foco de hoje</h3><span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700"><i data-lucide="star" class="h-4 w-4"></i><span x-text="vendasAguardando() + vendasNuncaCompraram().length + vendasInativos().length"></span> oportunidades</span></div>
+                <div class="mt-6 flex items-center gap-4"><span class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600"><i data-lucide="users-round" class="h-8 w-8"></i></span><div><p class="text-3xl font-bold text-gray-950 num" x-text="vendasNuncaCompraram().length"></p><p class="text-base font-semibold text-gray-900">parceiros ainda não compraram</p><p class="mt-1 text-xs text-gray-500">Primeira venda no atacado</p></div></div>
+                <button @click="vendasTab = 'recompra'" class="mt-6 w-full rounded-xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-900">Ver parceiros</button>
+              </div>
+              <div class="border-t border-amber-100 bg-white/60 px-5">
+                <button @click="vendasTab = 'historico'" class="flex w-full items-center gap-3 border-b border-amber-100 py-4 text-left"><span class="flex h-9 w-9 items-center justify-center rounded-full" :class="vendasAguardando() ? 'bg-amber-100 text-amber-700' : 'bg-emerald-600 text-white'"><i :data-lucide="vendasAguardando() ? 'clock-3' : 'check'" class="h-5 w-5"></i></span><div><p class="text-sm font-semibold text-gray-900">Pedidos</p><p class="text-xs text-gray-500" x-text="vendasAguardando() ? vendasAguardando() + ' aguardando confirmação' : 'Tudo confirmado'"></p></div></button>
+                <button @click="vendasTab = 'recompra'" class="flex w-full items-center gap-3 py-4 text-left"><span class="flex h-9 w-9 items-center justify-center rounded-full" :class="vendasInativos().length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-600 text-white'"><i :data-lucide="vendasInativos().length ? 'refresh-cw' : 'check'" class="h-5 w-5"></i></span><div><p class="text-sm font-semibold text-gray-900">Recompra</p><p class="text-xs text-gray-500" x-text="vendasInativos().length ? vendasInativos().length + ' cliente(s) para reativar' : 'Sem pendências'"></p></div></button>
+              </div>
+            </article>
+
+            <article data-testid="sales-brand-ranking" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm xl:col-span-4">
+              <div class="border-b border-gray-100 px-5 py-4"><h3 class="text-lg font-bold text-gray-950">Marcas mais vendidas</h3><p class="mt-1 text-sm text-gray-500"><span x-text="Number(vendasMarcas?.summary?.units || 0)"></span> pneus no período</p></div>
+              <div x-show="vendasMarcasLoading" class="flex items-center justify-center gap-2 px-5 py-14 text-sm text-gray-500"><i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>Calculando ranking...</div>
+              <div x-show="!vendasMarcasLoading && vendasMarcasError" class="m-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">Ranking temporariamente indisponível. Os demais dados continuam normais.</div>
+              <div x-show="!vendasMarcasLoading && !vendasMarcasError && !vendasMarcas?.rows?.length" class="px-5 py-14 text-center text-sm text-gray-400">Nenhuma venda confirmada com marca neste período.</div>
+              <div x-show="!vendasMarcasLoading && !vendasMarcasError && vendasMarcas?.rows?.length" class="divide-y divide-gray-100 px-5">
+                <template x-for="(marca, index) in vendasMarcas.rows.slice(0, 3)" :key="marca.brand">
+                  <div class="py-4">
+                    <div class="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3">
+                      <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-900 to-emerald-700 text-base font-bold text-white" x-text="'#' + marca.rank"></span>
+                      <div class="min-w-0"><div class="flex h-6 items-center"><template x-if="catalogoBrandLogo(marca.brand)"><img :src="catalogoBrandLogo(marca.brand)" :alt="`Logo ${marca.brand}`" class="max-h-6 w-[110px] object-contain object-left"></template><template x-if="!catalogoBrandLogo(marca.brand)"><span class="truncate text-lg font-bold text-gray-950" x-text="marca.brand"></span></template></div><p class="mt-1 text-xs text-gray-500" x-text="index === 0 ? 'Líder no período' : (index === 1 ? 'Segunda colocada' : 'Terceira colocada')"></p></div>
+                      <div class="text-right"><p class="text-sm font-bold text-gray-950"><span class="num" x-text="marca.units"></span> <span class="font-medium text-gray-500">pneus</span></p><p class="mt-1 text-xs text-gray-500 num" x-text="formatCurrency(Number(marca.revenue || 0))"></p><p class="mt-1 text-base font-bold text-emerald-700" x-text="Number(marca.share_percent || 0).toFixed(1).replace('.', ',') + '%'"></p></div>
+                    </div>
+                    <div class="mt-3 h-5 overflow-hidden rounded-md bg-gray-100"><div class="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-emerald-600 to-emerald-700 pr-2 text-[10px] font-semibold text-white" :style="'width:' + Math.max(0, Math.min(100, Number(marca.share_percent || 0))) + '%'" x-text="Number(marca.share_percent || 0).toFixed(1).replace('.', ',') + '%'"></div></div>
+                  </div>
+                </template>
+              </div>
+            </article>
+          </div>
+        </section>
 
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between"><h3 class="text-base font-semibold">Vendas recentes</h3><button @click="vendasTab = 'historico'" class="text-sm text-brand-700 font-medium hover:underline">Ver histórico completo</button></div>
