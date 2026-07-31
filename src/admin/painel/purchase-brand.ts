@@ -9,7 +9,7 @@ export interface PurchaseItemInput {
   unit_cost: number;
 }
 
-/** Canoniza medida/marca e impede que o estoque por medida esconda marcas misturadas. */
+/** Canoniza medida e marca antes de gravar cada variante independente no estoque. */
 export async function canonicalPurchaseItems(
   client: PoolClient,
   environment: 'prod' | 'test',

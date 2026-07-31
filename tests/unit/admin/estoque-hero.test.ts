@@ -21,7 +21,7 @@ describe('Estoque — cabeçalho panorâmico', () => {
     expect(html).toContain('class="absolute inset-0 min-h-[148px] overflow-hidden rounded-t-xl');
     expect(html).toContain('bg-gradient-to-r from-emerald-950 via-emerald-950/75 to-emerald-950/5');
     expect(html).toContain('galpão oficial');
-    expect(html).toContain("stockTab = 'movimentacoes'; loadGalpaoFilme()");
+    expect(html).toContain("stockTab = 'movimentacoes'; loadGalpaoFilme(null, null)");
     expect(html).toContain("stockTab = 'conciliacao'; loadStockReconciliation()");
     expect(html).toContain("stockOperacao = 'entrada'");
     expect(html).toContain("stockOperacao = 'ajuste'");

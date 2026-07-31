@@ -39,18 +39,19 @@ window.PAINEL_MODULES.compras = function () {
       }
       return { pct: Math.round((Number(topRow.total_spent || 0) / tot) * 100), name: topRow.name };
     },
-    // #1 + #2: agrupa o breakdown por MEDIDA; dentro de cada uma já vem do mais barato
+    // #1 + #2: agrupa por VARIANTE; dentro de cada uma já vem do mais barato
     // pro mais caro (o banco ordena), então o 1º fornecedor é o "mais barato".
     breakdownByMeasure() {
       const groups = [];
       const byKey = {};
       for (const row of this.fornecedorBreakdown) {
-        let g = byKey[row.measure];
-        if (!g) { g = { measure: row.measure, suppliers: [], qty: 0 }; byKey[row.measure] = g; groups.push(g); }
+        const key = this.stockVariantKey(row);
+        let g = byKey[key];
+        if (!g) { g = { variant_key: key, measure: row.measure, brand: row.brand, suppliers: [], qty: 0 }; byKey[key] = g; groups.push(g); }
         g.suppliers.push({ ...row, cheapest: g.suppliers.length === 0 });
         g.qty += Number(row.qty_total || 0);
       }
-      return groups.sort((a, b) => b.qty - a.qty); // a medida que mais compro primeiro
+      return groups.sort((a, b) => b.qty - a.qty);
     },
     fornecedorBreakdownDate(row) {
       if (!row.last_purchased_at) return '—';

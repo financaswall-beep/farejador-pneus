@@ -83,7 +83,7 @@ window.PAINEL_MODULES.galpaoContagem = function () {
         window.PAINEL_INTEGRITY.complete('stock-physical-count', keyTarget);
         this.stockCount.message = {
           ok: true,
-          text: `${result.checked} medida(s) conferida(s), ${result.changed} ajustada(s). Ganhos: ${result.gains}; perdas: ${result.losses}.`,
+          text: `${result.checked} variante(s) conferida(s), ${result.changed} ajustada(s). Ganhos: ${result.gains}; perdas: ${result.losses}.`,
         };
         await Promise.allSettled([
           this.loadAtacado(), this.loadStockReconciliation(), this.loadGalpaoFilme(),

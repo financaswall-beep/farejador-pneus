@@ -6,6 +6,7 @@ describe('Estoque — lista com painel da medida', () => {
   const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
   const galpao = [
     readFileSync(resolve('painel/public/app.galpao.contagem.js'), 'utf8'),
+    readFileSync(resolve('painel/public/app.galpao.multibrand.js'), 'utf8'),
     readFileSync(resolve('painel/public/app.galpao.js'), 'utf8'),
   ].join('\n');
   const atacado = readFileSync(resolve('painel/public/app.atacado.js'), 'utf8');
@@ -49,12 +50,13 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('Ajustar saldo e custo');
     expect(stockHtml).toContain('Baixa manual');
     expect(stockHtml).toContain('Ver histórico');
-    expect(stockHtml).toContain('Remover medida');
+    expect(stockHtml).toContain('Remover variante');
     expect(stockHtml).toContain("stockOperacao = 'entrada'");
     expect(stockHtml).toContain("stockOperacao = 'ajuste'");
     expect(stockHtml).toContain('stockBaixaOpen(selectedRow)');
     expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure, selectedRow.brand)');
     expect(stockHtml).toContain('stockRemove(selectedRow)');
+    expect(galpao).toContain('Remover ${measure} · ${brand} do estoque do galpão?');
     expect(stockHtml).toContain('Entrada recalcula o custo médio ponderado');
   });
 
@@ -70,8 +72,8 @@ describe('Estoque — lista com painel da medida', () => {
     expect(galpao).toContain("this.apiPost('/admin/api/wholesale/stock/remove'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/movimentos'");
     expect(galpao).toContain("this.apiGet('/admin/api/wholesale/stock/reconciliation'");
-    expect(stockHtml).toContain('Marca do produto');
-    expect(stockHtml).toContain('Alimenta o filtro do Catálogo');
+    expect(stockHtml).toContain('Marca da variante');
+    expect(stockHtml).toContain('Separa saldo e custo; também aparece no Catálogo');
     expect(galpao).toContain('brand: brand || null');
     expect(stockHtml).toContain("row.brand || 'Marca não informada'");
   });
@@ -88,12 +90,14 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('repoAbrirCompra(repoPlano())');
     expect(stockHtml).toContain('/admin/painel/assets/estoque-hero.webp?preview=tire');
     expect(stockHtml).toContain('loading="lazy"');
-    expect(stockHtml).toContain("stockTab = 'reposicao'; loadGalpaoFilme()");
-    expect(stockHtml).toContain("const fontesDeVenda = new Set(['venda_atacado', 'varejo'])");
+    expect(stockHtml).toContain("stockTab = 'reposicao'; loadGalpaoFilme(null, null)");
+    expect(galpao).toContain("const sources = new Set(['venda_atacado', 'varejo'])");
+    expect(galpao).toContain('this.repoKey(movement) !== key');
+    expect(galpao).toContain('brand: row.brand');
     expect(stockHtml).toContain('repoSugestao(row)');
-    expect(stockHtml).toContain("this.currentPage = 'compras'");
-    expect(stockHtml).toContain("this.comprasOpenTab('nova')");
-    expect(stockHtml).toContain("receipt_status: 'pending'");
+    expect(galpao).toContain("this.currentPage = 'compras'");
+    expect(galpao).toContain("this.comprasOpenTab('nova')");
+    expect(galpao).toContain("receipt_status: 'pending'");
     expect(galpao).not.toContain("this.apiPost('/admin/api/wholesale/replenishment'");
   });
 
@@ -112,7 +116,8 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('custoMediaPonderada()');
     expect(stockHtml).toContain('custoTop3Percentual()');
     expect(stockHtml).toContain("custoOrdem: 'capital'");
-    expect(stockHtml).toContain("stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'");
+    expect(stockHtml).toContain("stockTab = 'visao'; stockBusca = row.measure");
+    expect(galpao).toContain('group.capital / group.quantity_with_cost');
     expect(galpao).not.toContain("this.apiGet('/admin/api/wholesale/stock/costs'");
   });
 

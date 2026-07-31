@@ -9,6 +9,10 @@ describe('estoque do galpão por medida e marca', () => {
     typeof import('../../src/admin/painel/queries-fornecedores-registro.js').registerWholesalePurchase;
   let decrement:
     typeof import('../../src/admin/painel/wholesale-stock.js').applyWholesaleStockDecrement;
+  let priceReport:
+    typeof import('../../src/admin/painel/queries-compras-relatorios.js').getWholesalePriceReport;
+  let catalogOverview:
+    typeof import('../../src/admin/painel/queries-catalogo.js').getCatalogOverview;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -24,6 +28,10 @@ describe('estoque do galpão por medida e marca', () => {
       = await import('../../src/admin/painel/queries-fornecedores-registro.js'));
     ({ applyWholesaleStockDecrement: decrement }
       = await import('../../src/admin/painel/wholesale-stock.js'));
+    ({ getWholesalePriceReport: priceReport }
+      = await import('../../src/admin/painel/queries-compras-relatorios.js'));
+    ({ getCatalogOverview: catalogOverview }
+      = await import('../../src/admin/painel/queries-catalogo.js'));
 
     const product = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.products
@@ -69,6 +77,28 @@ describe('estoque do galpão por medida e marca', () => {
       { brand: 'Metzeler', quantity_on_hand: 3, unit_cost: '120.00' },
       { brand: 'Pirelli', quantity_on_hand: 2, unit_cost: '100.00' },
     ]);
+
+    const prices = await priceReport({ period: 'all' }, 'test', db.pool) as Array<{
+      measure: string; brand: string; avg_cost: string;
+    }>;
+    expect(prices.map((row) => ({
+      measure: row.measure, brand: row.brand, avg_cost: row.avg_cost,
+    }))).toEqual([
+      { measure: '90/90-18', brand: 'Metzeler', avg_cost: '120.00' },
+      { measure: '90/90-18', brand: 'Pirelli', avg_cost: '100.00' },
+    ]);
+
+    const catalog = await catalogOverview('test', db.pool);
+    expect(catalog.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        tire_size: '90/90-18', brand: 'Pirelli', catalogued: true,
+        official_quantity_on_hand: 2,
+      }),
+      expect.objectContaining({
+        tire_size: '90/90-18', brand: 'Metzeler', catalogued: false,
+        official_quantity_on_hand: 3, block_reason: 'catalog_product_missing',
+      }),
+    ]));
 
     const client = await db.pool.connect();
     try {

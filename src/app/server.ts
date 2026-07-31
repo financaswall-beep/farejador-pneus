@@ -18,6 +18,7 @@ import { createRequestId, registerRequestContext } from '../shared/request-conte
 import { startMarketingScheduler } from '../marketing/scheduler.js';
 import { startMarketingCapiWorker } from '../marketing/capi.js';
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
+import { assertRequiredSchema } from '../persistence/required-schema.js';
 
 const fastify = Fastify({
   logger: loggerOptions,
@@ -54,6 +55,7 @@ fastify.addContentTypeParser(
 );
 
 async function start(): Promise<void> {
+  await assertRequiredSchema(pool);
   await registerRoutes(fastify);
 
   stopWorker = startWorker();

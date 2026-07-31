@@ -185,7 +185,7 @@ function painelApp() {
     // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
     fornecedores: [],
     fornecedorRanking: [],
-    fornecedorBreakdown: [], // fornecedor × medida (quem vende mais barato / especialidade)
+    fornecedorBreakdown: [], // fornecedor × medida × marca
     compras: [],
     compraSaving: false,
     compraMsg: null,
@@ -282,7 +282,7 @@ function painelApp() {
     customerIdentityLoading: false, customerIdentityError: null, customerIdentityNotice: '', customerPrivacyPreview: null,
     kpis: [], leadsRecuperar: [], resumoSeries: [],
     pedidos: [], produtos: [],
-    catalogoRows: [], catalogoBrands: ['Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda'], catalogoSummary: { products: 0, brands: 0, without_price: 0, with_stock: 0 },
+    catalogoRows: [], catalogoBrands: ['Pirelli', 'Metzeler', 'Michelin', 'Bridgestone', 'Dunlop', 'Levorin', 'Rinaldi', 'Maggion', 'Technic', 'Vipal', 'Mitas', 'Kenda'], catalogoSummary: { products: 0, stock_only: 0, brands: 0, without_price: 0, with_stock: 0 },
     catalogoLoading: false, catalogoError: null, catalogoBusca: '', catalogoMarca: 'todas', catalogoFiltro: 'todos', catalogoPagina: 1, catalogoPorPagina: 7, catalogoSelecionado: null, catalogoHistory: [], catalogoPriceForm: { price: '', reason: '', marginPreset: null }, catalogoSaving: false, catalogoMessage: null,
     redeKpis: [],
     parceirosRede: [],

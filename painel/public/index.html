@@ -28,9 +28,9 @@
 <script src="/admin/painel/app.varejo.js?v=20260727-finance-refresh1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260730-multimarca1"></script>
-<script src="/admin/painel/app.compras.js?v=20260730-multimarca1"></script>
-<script src="/admin/painel/app.compras.relatorios.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.atacado.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.compras.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.compras.relatorios.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.resultado.js?v=20260717-comprovantes1"></script>
@@ -53,18 +53,19 @@
 <script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
 <script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
-<script src="/admin/painel/app.galpao.contagem.js?v=20260730-multimarca1"></script>
+<script src="/admin/painel/app.galpao.contagem.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
-<script src="/admin/painel/app.galpao.js?v=20260730-multimarca1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260729-catalog-brand3"></script>
+<script src="/admin/painel/app.galpao.multibrand.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.galpao.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.core.js?v=20260729-catalogo1"></script>
+<script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
-<script src="/admin/painel/app.montagem.js?v=20260729-catalogo1"></script>
-<script src="/admin/painel/app.js?v=20260730-multimarca1"></script>
+<script src="/admin/painel/app.montagem.js?v=20260731-multimarca3"></script>
+<script src="/admin/painel/app.js?v=20260731-multimarca3"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -2339,9 +2340,9 @@
               <div class="border border-gray-200 rounded-xl overflow-visible">
                 <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2 text-center">Estoque</div><div class="col-span-1 text-center">Qtd.</div><div class="col-span-2">Preço unitário</div><div class="col-span-2 text-right">Subtotal</div></div>
                 <div class="divide-y divide-gray-100"><template x-for="(it, i) in atacadoForm.items" :key="i"><div class="grid grid-cols-1 lg:grid-cols-12 gap-2 p-3 items-center">
-                  <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-400">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><div x-show="measureBox.key === 'v'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center justify-between"><span x-text="m.measure"></span><span class="text-xs text-emerald-700" x-text="m.quantity_on_hand + ' un'"></span></button></template></div></div>
+                  <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-400">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'v'+i)" @focus="measureFind(it.measure, 'v'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"><div x-show="measureBox.key === 'v'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center justify-between gap-3"><span><strong x-text="m.measure"></strong><small class="ml-2 text-gray-500" x-text="m.brand"></small></span><span class="text-xs text-emerald-700" x-text="m.quantity_on_hand + ' un'"></span></button></template></div></div>
                   <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Marca</label><input x-model="it.brand" type="text" placeholder="Marca" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
-                  <div class="lg:col-span-2 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="measureOnHand(it.measure) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="measureOnHand(it.measure) === null ? 'não cadastrado' : measureOnHand(it.measure) + ' un'"></span></div>
+                  <div class="lg:col-span-2 text-center"><span class="inline-flex px-2.5 py-1 rounded-full text-xs" :class="measureOnHand(it.measure, it.brand) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="!String(it.brand || '').trim() ? 'informe a marca' : (measureOnHand(it.measure, it.brand) === null ? 'não cadastrado' : measureOnHand(it.measure, it.brand) + ' un')"></span></div>
                   <div class="lg:col-span-1"><label class="lg:hidden text-xs text-gray-400">Qtd.</label><input x-model.number="it.quantity" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm text-center"></div>
                   <div class="lg:col-span-2"><label class="lg:hidden text-xs text-gray-400">Preço unitário</label><input x-model.number="it.unit_price" type="number" min="0" step="0.01" placeholder="0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
                   <div class="lg:col-span-2 flex items-center justify-end gap-2"><span class="font-semibold num" x-text="formatCurrency((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))"></span><button x-show="atacadoForm.items.length > 1" @click="atacadoRemoveItem(i)" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50" title="Remover"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>
@@ -2372,7 +2373,7 @@
           <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm"><h3 class="text-base font-semibold">Medidas mais vendidas</h3><p class="text-xs text-gray-400 mt-1 mb-4">Nas vendas recentes do atacado</p><div class="space-y-3"><template x-for="row in atacadoMedidasMaisVendidas()" :key="row.medida"><div class="grid grid-cols-[100px_minmax(100px,1fr)_55px] gap-3 items-center"><span class="text-sm font-medium" x-text="row.medida"></span><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + row.pct + '%'"></div></div><span class="text-xs text-gray-500 text-right num" x-text="row.quantidade + ' un'"></span></div></template><p x-show="!atacadoMedidasMaisVendidas().length" class="py-8 text-center text-sm text-gray-400">As medidas aparecem depois das primeiras vendas.</p></div></div>
         </div>
 
-        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
+        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure + (item.brand ? ' · ' + item.brand : '')"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
       </div>
 
       <!-- HISTÓRICO COMERCIAL UNIFICADO -->
@@ -2602,9 +2603,9 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <div class="bg-white border border-gray-200 rounded-xl p-5">
-            <div class="mb-3"><h3 class="text-base font-semibold">Melhores preços recentes</h3><p class="text-xs text-gray-500 mt-1">Menor custo médio registrado por medida</p></div>
+            <div class="mb-3"><h3 class="text-base font-semibold">Melhores preços recentes</h3><p class="text-xs text-gray-500 mt-1">Menor custo médio registrado por medida e marca</p></div>
             <div class="divide-y divide-gray-100">
-              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.measure"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-emerald-700 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
+              <template x-for="g in breakdownByMeasure().slice(0, 3)" :key="'melhor-' + g.variant_key"><div class="py-2.5 grid grid-cols-[minmax(100px,1fr)_minmax(130px,1.5fr)_auto_auto] gap-3 items-center text-sm"><span class="font-medium" x-text="g.measure + ' · ' + g.brand"></span><span class="text-gray-600 truncate" x-text="g.suppliers[0] ? g.suppliers[0].supplier_name : '—'"></span><i data-lucide="star" class="w-4 h-4 text-emerald-700 fill-current"></i><span class="font-semibold num" x-text="g.suppliers[0] ? formatCurrency(Number(g.suppliers[0].avg_cost || 0)) : '—'"></span></div></template>
               <div x-show="fornecedorBreakdown.length === 0" class="py-8 text-center text-sm text-gray-500">Os melhores preços aparecem depois das primeiras compras.</div>
             </div>
             <button @click="comprasOpenTab('precos')" class="w-full mt-3 border border-gray-200 hover:bg-gray-50 text-emerald-800 text-sm font-medium px-3 py-2.5 rounded-lg">Ver comparação completa</button>
@@ -2653,7 +2654,7 @@
               <div class="border border-gray-200 lg:border-t-0 rounded-lg lg:rounded-t-none divide-y divide-gray-100">
                 <template x-for="(it, i) in compraForm.items" :key="i">
                   <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 items-center">
-                    <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-500">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'compra'+i)" @focus="measureFind(it.measure, 'compra'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="Ex.: 90/90-18" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"><div x-show="measureBox.key === 'compra'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template></div></div>
+                    <div class="lg:col-span-3 relative"><label class="lg:hidden text-xs text-gray-500">Medida</label><input x-model="it.measure" @input="measureFind(it.measure, 'compra'+i)" @focus="measureFind(it.measure, 'compra'+i)" @blur="measureBlur()" type="text" autocomplete="off" placeholder="Ex.: 90/90-18" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"><div x-show="measureBox.key === 'compra'+i && measureBox.hits.length" class="absolute z-40 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto"><template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, it)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template></div></div>
                     <label class="lg:col-span-3"><span class="lg:hidden text-xs text-gray-500">Marca</span><input x-model="it.brand" list="catalog-brand-options" maxlength="60" type="text" placeholder="Selecione ou digite" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                     <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Quantidade</span><input x-model="it.quantity" type="number" min="1" step="1" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
                     <label class="lg:col-span-2"><span class="lg:hidden text-xs text-gray-500">Custo unitário</span><input x-model="it.unit_cost" type="number" min="0" step="0.01" placeholder="0,00" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></label>
@@ -2785,7 +2786,7 @@
         <div class="bg-white border border-gray-200 rounded-xl p-5">
           <div><h3 class="text-base font-semibold">Comparação histórica de preços</h3><p class="text-xs text-gray-500 mt-1">Baseada somente em compras recebidas. Não é cotação em tempo real.</p></div>
           <div class="mt-4 flex flex-col lg:flex-row gap-3">
-            <div class="relative flex-1"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasPriceFilters.search" @keyup.enter="loadComprasPrices()" type="search" placeholder="Buscar medida" class="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div>
+            <div class="relative flex-1"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i><input x-model="comprasPriceFilters.search" @keyup.enter="loadComprasPrices()" type="search" placeholder="Buscar medida ou marca" class="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-100"></div>
             <select x-model="comprasPriceFilters.supplierId" @change="loadComprasPrices()" class="lg:w-60 px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="">Todos os fornecedores</option><template x-for="s in comprasSuppliers" :key="'preco-f-'+s.supplier_id"><option :value="s.supplier_id" x-text="s.name"></option></template></select>
             <select x-model="comprasPriceFilters.period" @change="loadComprasPrices()" class="lg:w-48 px-3 py-2.5 border border-gray-200 rounded-lg text-sm"><option value="30d">Últimos 30 dias</option><option value="90d">Últimos 90 dias</option><option value="year">Este ano</option><option value="all">Todo o histórico</option></select>
             <button @click="loadComprasPrices()" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Comparar</button>
@@ -2793,18 +2794,18 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="ruler" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Medidas comparadas</p><p class="text-2xl font-semibold num" x-text="comprasPriceCards().measures"></p></div></div>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trophy" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Menor média histórica</p><p class="text-lg font-semibold truncate" x-text="comprasPriceCards().top?.name || '—'"></p><p class="text-[11px] text-gray-500" x-show="comprasPriceCards().top"><span x-text="comprasPriceCards().top?.count"></span> medida(s)</p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="ruler" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Variantes comparadas</p><p class="text-2xl font-semibold num" x-text="comprasPriceCards().variants"></p></div></div>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="trophy" class="w-5 h-5 text-emerald-800"></i></div><div class="min-w-0"><p class="text-xs text-gray-500">Menor média histórica</p><p class="text-lg font-semibold truncate" x-text="comprasPriceCards().top?.name || '—'"></p><p class="text-[11px] text-gray-500" x-show="comprasPriceCards().top"><span x-text="comprasPriceCards().top?.count"></span> variante(s)</p></div></div>
           <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center gap-4"><div class="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="percent" class="w-5 h-5 text-emerald-800"></i></div><div><p class="text-xs text-gray-500">Diferença média</p><p class="text-2xl font-semibold num" x-text="comprasPriceCards().spread.toFixed(1) + '%'"></p><p class="text-[11px] text-gray-500">entre menor e maior média</p></div></div>
         </div>
 
         <div x-show="comprasErrors.prices" class="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 text-sm text-rose-700"><span>Não foi possível atualizar os preços. Os dados anteriores foram mantidos.</span><button @click="loadComprasPrices()" class="font-semibold hover:underline">Tentar novamente</button></div>
         <div class="grid grid-cols-1 2xl:grid-cols-12 gap-5 items-start">
           <div class="2xl:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Custo médio por medida</h3></div>
-            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Diferença</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead>
+            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Custo médio por medida e marca</h3></div>
+            <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-gray-50 border-b border-gray-200"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida e marca</th><th class="px-4 py-3 font-medium">Fornecedor</th><th class="px-4 py-3 font-medium text-center">Quantidade</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-4 py-3 font-medium text-right">Diferença</th><th class="px-5 py-3 font-medium">Última compra</th></tr></thead>
               <tbody class="divide-y divide-gray-100">
-                <template x-for="g in comprasPriceGroups()" :key="g.measure"><template x-for="(row, ri) in g.suppliers" :key="g.measure+':'+row.supplier_id"><tr @click="comprasPriceSelectedMeasure=g.measure" class="cursor-pointer hover:bg-gray-50" :class="comprasPriceSelectedMeasure === g.measure ? 'bg-emerald-50/50' : ''"><td class="px-5 py-3 font-semibold align-top" x-text="ri === 0 ? g.measure : ''"></td><td class="px-4 py-3"><span x-show="row.cheapest" class="inline-flex mr-2 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">Menor média ★</span><span x-text="row.supplier_name"></span><span x-show="row.supplier_archived" class="ml-1 text-[10px] text-gray-400">arquivado</span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total+' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-emerald-800' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-4 py-3 text-right num" x-text="row.cheapest ? '—' : '+'+row.diff_pct.toFixed(1)+'%'"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template>
+                <template x-for="g in comprasPriceGroups()" :key="g.variant_key"><template x-for="(row, ri) in g.suppliers" :key="g.variant_key+':'+row.supplier_id"><tr @click="comprasPriceSelectedMeasure=g.variant_key" class="cursor-pointer hover:bg-gray-50" :class="comprasPriceSelectedMeasure === g.variant_key ? 'bg-emerald-50/50' : ''"><td class="px-5 py-3 font-semibold align-top" x-text="ri === 0 ? g.measure + ' · ' + g.brand : ''"></td><td class="px-4 py-3"><span x-show="row.cheapest" class="inline-flex mr-2 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold">Menor média ★</span><span x-text="row.supplier_name"></span><span x-show="row.supplier_archived" class="ml-1 text-[10px] text-gray-400">arquivado</span></td><td class="px-4 py-3 text-center num" x-text="row.qty_total+' un'"></td><td class="px-4 py-3 text-right font-semibold num" :class="row.cheapest ? 'text-emerald-800' : ''" x-text="formatCurrency(Number(row.avg_cost || 0))"></td><td class="px-4 py-3 text-right num" x-text="row.cheapest ? '—' : '+'+row.diff_pct.toFixed(1)+'%'"></td><td class="px-5 py-3 text-gray-500" x-text="fornecedorBreakdownDate(row)"></td></tr></template></template>
                 <tr x-show="comprasLoading.prices"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Carregando comparação…</td></tr>
                 <tr x-show="!comprasLoading.prices && comprasPriceGroups().length === 0"><td colspan="6" class="px-5 py-12 text-center text-gray-500">Nenhum preço recebido nesse recorte.</td></tr>
               </tbody>
@@ -2813,15 +2814,15 @@
 
           <aside class="2xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5">
             <template x-if="comprasPriceSelected()"><div>
-              <h3 class="text-xl font-semibold" x-text="comprasPriceSelected().measure"></h3>
-              <p class="text-xs text-gray-500 mt-1">Comparação da medida selecionada</p>
+              <h3 class="text-xl font-semibold" x-text="comprasPriceSelected().measure + ' · ' + comprasPriceSelected().brand"></h3>
+              <p class="text-xs text-gray-500 mt-1">Comparação da variante selecionada</p>
               <div class="mt-5"><p class="text-xs text-gray-500">Melhor média histórica</p><p class="text-2xl font-semibold text-emerald-800 num" x-text="formatCurrency(Number(comprasPriceSelected().suppliers[0]?.avg_cost || 0))"></p><p class="text-sm text-gray-600 mt-1" x-text="comprasPriceSelected().suppliers[0]?.supplier_name"></p></div>
               <div class="mt-5 space-y-3"><template x-for="row in comprasPriceSelected().suppliers" :key="'bar-'+row.supplier_id"><div><div class="flex items-center justify-between gap-3 text-xs mb-1"><span class="truncate" x-text="row.supplier_name"></span><span class="font-medium num" x-text="formatCurrency(Number(row.avg_cost))"></span></div><div class="h-2 rounded-full bg-gray-100 overflow-hidden"><div class="h-full rounded-full" :class="row.cheapest ? 'bg-emerald-700' : 'bg-gray-300'" :style="'width:'+Math.max(18,(Number(row.avg_cost)/Math.max(...comprasPriceSelected().suppliers.map(s=>Number(s.avg_cost))))*100)+'%'"></div></div></div></template></div>
               <div class="mt-5 pt-5 border-t border-gray-100 grid grid-cols-2 gap-4"><div><p class="text-lg font-semibold num" x-text="comprasPriceSelected().qty+' un'"></p><p class="text-[11px] text-gray-500">recebidas no recorte</p></div><div><p class="text-lg font-semibold num" x-text="comprasPriceSelected().suppliers.reduce((n,r)=>n+Number(r.purchases_count||0),0)"></p><p class="text-[11px] text-gray-500">compras observadas</p></div></div>
               <div class="mt-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-xs flex gap-2"><i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i><span>Preço histórico orienta a negociação, mas não substitui uma cotação atual.</span></div>
-              <button @click="comprasUsePrice(comprasPriceSelected().suppliers[0])" class="mt-5 w-full px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Usar medida em nova compra</button>
+              <button @click="comprasUsePrice(comprasPriceSelected().suppliers[0])" class="mt-5 w-full px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50">Usar variante em nova compra</button>
             </div></template>
-            <div x-show="!comprasPriceSelected()" class="py-12 text-center text-sm text-gray-500">Selecione uma medida para comparar.</div>
+            <div x-show="!comprasPriceSelected()" class="py-12 text-center text-sm text-gray-500">Selecione uma variante para comparar.</div>
           </aside>
         </div>
       </div>
@@ -2860,9 +2861,9 @@
           <nav aria-label="Seções de Estoque" class="flex items-center gap-1 overflow-x-auto">
             <button @click="stockTab = 'visao'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'visao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Visão geral</button>
-            <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            <button @click="stockTab = 'movimentacoes'; loadGalpaoFilme(null, null)" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'movimentacoes' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Movimentações</button>
-            <button @click="stockTab = 'reposicao'; loadGalpaoFilme()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            <button @click="stockTab = 'reposicao'; loadGalpaoFilme(null, null)" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'reposicao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Reposição</button>
             <button @click="stockTab = 'custos'" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                   :class="stockTab === 'custos' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Custos</button>
@@ -2896,11 +2897,11 @@
           </div>
           <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
             <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-emerald-200/40 bg-emerald-800/60"><i data-lucide="clipboard-list" class="h-6 w-6 text-emerald-100"></i></div>
-            <div><p class="text-xs text-emerald-100/80">Para repor</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().repor"></span> <span class="text-base font-medium text-emerald-100">medidas</span></p></div>
+            <div><p class="text-xs text-emerald-100/80">Para repor</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().repor"></span> <span class="text-base font-medium text-emerald-100">variantes</span></p></div>
           </div>
           <div class="flex min-h-[94px] items-center gap-4 px-5 py-4">
             <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-100/70 bg-emerald-950/50"><i data-lucide="triangle-alert" class="h-6 w-6 text-emerald-50"></i></div>
-            <div><p class="text-xs text-emerald-100/80">Zeradas</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().zeradas"></span> <span class="text-base font-medium text-emerald-100">medidas</span></p></div>
+            <div><p class="text-xs text-emerald-100/80">Zeradas</p><p class="mt-1 text-2xl font-semibold num"><span x-text="stockResumo().zeradas"></span> <span class="text-base font-medium text-emerald-100">variantes</span></p></div>
           </div>
         </div>
       </section>
@@ -2926,14 +2927,14 @@
               <input id="estoque-medida" x-model="stockForm.measure" @input="measureFind(stockForm.measure, 'estoque')" @blur="measureBlur()"
                      type="text" autocomplete="off" placeholder="Ex.: 185/65 R15" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
               <div x-show="measureBox.key === 'estoque' && measureBox.hits.length" class="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto">
-                <template x-for="m in measureBox.hits" :key="m.measure"><button type="button" @mousedown.prevent="measurePick(m.measure, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template>
+                <template x-for="m in measureBox.hits" :key="m.variant_key"><button type="button" @mousedown.prevent="measurePick(m, stockForm)" class="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50" x-text="m.measure"></button></template>
               </div>
             </label>
             <label class="xl:col-span-2 block">
-              <span class="block text-xs font-medium text-gray-600 mb-1.5">Marca do produto</span>
+              <span class="block text-xs font-medium text-gray-600 mb-1.5">Marca da variante</span>
               <input x-model="stockForm.brand" list="catalog-brand-options" type="text" maxlength="60"
                      placeholder="Ex.: Michelin" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm">
-              <span class="mt-1 block text-[10px] text-emerald-700">Alimenta o filtro do Catálogo</span>
+              <span class="mt-1 block text-[10px] text-emerald-700">Separa saldo e custo; também aparece no Catálogo</span>
             </label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5" x-text="stockOperacao === 'entrada' ? 'Quantidade que entrou' : 'Saldo correto'"></span><input x-model.number="stockForm.quantity_on_hand" type="number" min="0" placeholder="0" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
             <label class="xl:col-span-2 block"><span class="block text-xs font-medium text-gray-600 mb-1.5">Custo unitário</span><input x-model.number="stockForm.unit_cost" type="number" min="0" step="0.01" placeholder="R$ 0,00" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm"></label>
@@ -3029,7 +3030,7 @@
               <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                   <h3 id="estoque-lista-heading" class="text-lg font-semibold">Estoque por medida</h3>
-                  <p class="mt-1 text-xs text-gray-500"><span x-text="atacadoStock.length"></span> medida(s) cadastrada(s)</p>
+                  <p class="mt-1 text-xs text-gray-500"><span x-text="atacadoStock.length"></span> variante(s) cadastrada(s)</p>
                 </div>
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <label class="relative block">
@@ -3143,7 +3144,7 @@
                   </div>
                   <div class="border-r border-gray-100 p-4">
                     <p class="text-xs text-gray-500">Último movimento</p>
-                    <p class="mt-1 text-sm font-semibold" x-text="galpaoFilme.measure === selectedRow.measure && galpaoFilme.rows.length ? movQuando(galpaoFilme.rows[0]) : 'Selecione para carregar'"></p>
+                    <p class="mt-1 text-sm font-semibold" x-text="filmeMatches(selectedRow) && galpaoFilme.rows.length ? movQuando(galpaoFilme.rows[0]) : 'Selecione para carregar'"></p>
                   </div>
                   <div class="p-4">
                     <p class="text-xs text-gray-500">Observação</p>
@@ -3170,18 +3171,18 @@
                   </button>
                   <button @click="stockRemove(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 sm:col-span-2 2xl:col-span-1">
-                    <i data-lucide="trash-2" class="h-4 w-4"></i> Remover medida
+                    <i data-lucide="trash-2" class="h-4 w-4"></i> Remover variante
                   </button>
                   <p class="text-center text-[11px] text-gray-400 sm:col-span-2 2xl:col-span-1">Entrada recalcula o custo médio ponderado; ajuste também define o mínimo.</p>
                 </div>
 
                 <div class="border-b border-gray-100 p-4">
                   <div class="mb-3 flex items-center justify-between gap-3">
-                    <div><h4 class="text-sm font-semibold">Movimentos recentes</h4><p class="mt-0.5 text-[11px] text-gray-400">Da medida selecionada</p></div>
-                    <span x-show="galpaoFilme.loading && galpaoFilme.measure === selectedRow.measure" class="text-[11px] text-gray-400">Carregando…</span>
+                    <div><h4 class="text-sm font-semibold">Movimentos recentes</h4><p class="mt-0.5 text-[11px] text-gray-400">Da variante selecionada</p></div>
+                    <span x-show="galpaoFilme.loading && filmeMatches(selectedRow)" class="text-[11px] text-gray-400">Carregando…</span>
                   </div>
                   <div class="divide-y divide-gray-100">
-                    <template x-for="m in (galpaoFilme.measure === selectedRow.measure ? galpaoFilme.rows.slice(0, 3) : [])" :key="'painel-' + m.created_at + m.measure + m.qty_after">
+                    <template x-for="m in (filmeMatches(selectedRow) ? galpaoFilme.rows.slice(0, 3) : [])" :key="'painel-' + stockVariantKey(m) + m.created_at + m.op + m.qty_after">
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-800">
                           <i :data-lucide="m.qty_delta > 0 ? 'arrow-down-to-line' : (m.qty_delta < 0 ? 'arrow-up-from-line' : 'pencil')" class="h-4 w-4"></i>
@@ -3193,18 +3194,18 @@
                         <span class="text-xs font-semibold num" :class="m.qty_delta > 0 ? 'text-emerald-700' : 'text-slate-700'" x-text="m.qty_delta > 0 ? '+' + m.qty_delta + ' un' : (m.qty_delta < 0 ? m.qty_delta + ' un' : 'ajuste')"></span>
                       </div>
                     </template>
-                    <div x-show="galpaoFilme.measure !== selectedRow.measure" class="py-5 text-center text-xs text-gray-400">Selecione a linha para carregar o histórico.</div>
-                    <div x-show="galpaoFilme.measure === selectedRow.measure && !galpaoFilme.loading && galpaoFilme.rows.length === 0" class="py-5 text-center text-xs text-gray-400">Nenhum movimento gravado para esta medida.</div>
+                    <div x-show="!filmeMatches(selectedRow)" class="py-5 text-center text-xs text-gray-400">Selecione a linha para carregar o histórico.</div>
+                    <div x-show="filmeMatches(selectedRow) && !galpaoFilme.loading && galpaoFilme.rows.length === 0" class="py-5 text-center text-xs text-gray-400">Nenhum movimento gravado para esta variante.</div>
                   </div>
                 </div>
 
                 <div class="p-4">
                   <div class="mb-2 flex items-center justify-between gap-3"><h4 class="text-sm font-semibold">Prioridades</h4><button @click="stockTab = 'reposicao'" class="text-[11px] font-medium text-emerald-800 hover:underline">Ver todas na aba Reposição</button></div>
                   <div class="divide-y divide-gray-100">
-                    <template x-for="row in stockRowsView().filter((item) => Number(item.quantity_on_hand) === 0 || stockPrecisaRepor(item)).filter((item) => item.measure !== selectedRow.measure).slice(0, 2)" :key="'prioridade-painel-' + row.measure">
+                    <template x-for="row in stockRowsView().filter((item) => Number(item.quantity_on_hand) === 0 || stockPrecisaRepor(item)).filter((item) => stockVariantKey(item) !== stockVariantKey(selectedRow)).slice(0, 2)" :key="'prioridade-painel-' + stockVariantKey(row)">
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
-                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
+                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.brand"></span> · <span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
                         <button @click="stockForm = { measure: row.measure, brand: row.brand || '', quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
                       </div>
                     </template>
@@ -3362,7 +3363,8 @@
                 <h3 id="movimentos-heading" class="text-lg font-semibold">Movimentações do galpão</h3>
                 <span x-show="galpaoFilme.measure" class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
                   <span x-text="galpaoFilme.measure"></span>
-                  <button @click="movPage = 1; loadGalpaoFilme(null)" class="ml-1 hover:text-emerald-950">× ver todas</button>
+                  <span x-show="galpaoFilme.brand" x-text="' · ' + galpaoFilme.brand"></span>
+                  <button @click="movPage = 1; loadGalpaoFilme(null, null)" class="ml-1 hover:text-emerald-950">× ver todas</button>
                 </span>
               </div>
               <p class="mt-1 text-xs text-gray-500">Tudo que entrou, saiu ou foi ajustado · até 50 registros oficiais</p>
@@ -3403,7 +3405,7 @@
               <section class="pt-5">
                 <h4 class="mb-3 text-xs font-semibold text-slate-600" x-text="group.label"></h4>
                 <div class="relative ml-2 border-l border-slate-200">
-                  <template x-for="m in group.rows" :key="m.created_at + m.measure + m.op + m.qty_after">
+                  <template x-for="m in group.rows" :key="stockVariantKey(m) + m.created_at + m.op + m.qty_after">
                     <article class="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-gray-100 py-3 pl-7 last:border-b-0 md:grid-cols-[minmax(220px,1.2fr)_minmax(150px,.8fr)_70px_74px_82px] md:items-center">
                       <span class="absolute -left-[6px] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white shadow-sm"
                             :class="movKind(m) === 'entrada' ? 'bg-emerald-600' : 'bg-slate-500'"></span>
@@ -3414,7 +3416,7 @@
                         </span>
                         <div class="min-w-0">
                           <p class="truncate text-sm font-medium text-slate-900" x-text="movRotulo(m)"></p>
-                          <p class="mt-0.5 text-sm font-semibold text-slate-700" x-text="m.measure"></p>
+                          <p class="mt-0.5 text-sm font-semibold text-slate-700"><span x-text="m.measure"></span><span class="ml-2 text-xs font-medium text-emerald-700" x-text="m.brand"></span></p>
                         </div>
                       </div>
                       <p class="hidden truncate text-xs text-slate-500 md:block" x-text="movContexto(m)"></p>
@@ -3546,104 +3548,7 @@
            x-data="{
              repoFiltro: 'todos',
              repoBusca: '',
-             repoQuantidades: {},
-             repoGiro(row) {
-               const fontesDeVenda = new Set(['venda_atacado', 'varejo']);
-               return (this.galpaoFilme.rows || []).reduce((total, movimento) => {
-                 if (movimento.measure !== row.measure || !fontesDeVenda.has(movimento.source)) return total;
-                 const delta = Number(movimento.qty_delta || 0);
-                 return delta < 0 ? total + Math.abs(delta) : total;
-               }, 0);
-             },
-             repoSugestao(row) {
-               const saldo = Math.max(0, Number(row.quantity_on_hand) || 0);
-               const minimo = row.min_quantity == null ? 0 : Math.max(0, Number(row.min_quantity) || 0);
-               return Math.max(1, minimo - saldo);
-             },
-             repoQuantidade(row) {
-               const definida = Number(this.repoQuantidades[row.measure]);
-               return Number.isInteger(definida) && definida > 0 ? definida : this.repoSugestao(row);
-             },
-             repoDefinirQuantidade(row, quantidade) {
-               const proxima = Math.max(1, Math.round(Number(quantidade) || 1));
-               this.repoQuantidades = { ...this.repoQuantidades, [row.measure]: proxima };
-             },
-             repoRows() {
-               return [...this.atacadoStock]
-                 .filter((row) => Number(row.quantity_on_hand) === 0 || this.stockPrecisaRepor(row))
-                 .sort((a, b) => {
-                   const prioridadeA = Number(a.quantity_on_hand) === 0 ? 0 : 1;
-                   const prioridadeB = Number(b.quantity_on_hand) === 0 ? 0 : 1;
-                   return prioridadeA - prioridadeB || this.repoGiro(b) - this.repoGiro(a) || a.measure.localeCompare(b.measure);
-                 });
-             },
-             repoRowsView() {
-               const busca = (this.repoBusca || '').trim().toLowerCase();
-               const digitos = (valor) => String(valor || '').replace(/\D/g, '');
-               const buscaDigitos = digitos(busca);
-               let rows = this.repoRows();
-               if (busca) rows = rows.filter((row) => row.measure.toLowerCase().includes(busca) || (buscaDigitos && digitos(row.measure).includes(buscaDigitos)));
-               if (this.repoFiltro === 'zeradas') rows = rows.filter((row) => Number(row.quantity_on_hand) === 0);
-               else if (this.repoFiltro === 'abaixo') rows = rows.filter((row) => Number(row.quantity_on_hand) > 0 && this.stockPrecisaRepor(row));
-               else if (this.repoFiltro === 'giro') rows = [...rows].sort((a, b) => this.repoGiro(b) - this.repoGiro(a) || a.measure.localeCompare(b.measure));
-               return rows;
-             },
-             repoCobertura(row) {
-               const giro = this.repoGiro(row);
-               if (giro <= 0) return null;
-               const saldoDepois = Math.max(0, Number(row.quantity_on_hand) || 0) + this.repoQuantidade(row);
-               return Math.max(1, Math.round(saldoDepois / (giro / 30)));
-             },
-             repoPlano() {
-               return this.repoRows().map((row) => ({ ...row, suggested_quantity: this.repoQuantidade(row) }));
-             },
-             repoPlanoResumo() {
-               const rows = this.repoPlano();
-               return {
-                 medidas: rows.length,
-                 pneus: rows.reduce((total, row) => total + Number(row.suggested_quantity || 0), 0),
-                 investimento: rows.reduce((total, row) => total + Number(row.suggested_quantity || 0) * Number(row.unit_cost || 0), 0)
-               };
-             },
-             repoInsights() {
-               const rows = this.repoRows();
-               return {
-                 zeradas: rows.filter((row) => Number(row.quantity_on_hand) === 0).length,
-                 abaixo: rows.filter((row) => Number(row.quantity_on_hand) > 0).length,
-                 giro: rows.filter((row) => this.repoGiro(row) > 0).length
-               };
-             },
-             repoFornecedor() {
-               const medidas = new Set(this.repoRows().map((row) => row.measure));
-               const candidatos = this.fornecedorBreakdown
-                 .filter((row) => medidas.has(row.measure) && Number(row.avg_cost) > 0)
-                 .sort((a, b) => Number(a.avg_cost) - Number(b.avg_cost));
-               return candidatos[0] || null;
-             },
-             repoAbrirCompra(rows) {
-               const itens = (rows || [])
-                 .filter((row) => row && row.measure && Number(row.suggested_quantity || this.repoQuantidade(row)) > 0)
-                 .map((row) => ({
-                   measure: row.measure,
-                   brand: '',
-                   quantity: Number(row.suggested_quantity || this.repoQuantidade(row)),
-                   unit_cost: ''
-                 }));
-               if (!itens.length) {
-                 this.stockMsg = { ok: false, text: 'Não há medidas selecionadas para criar a compra.' };
-                 return;
-               }
-               this.compraForm = {
-                 supplierKey: '', newName: '', newPhone: '', newDocument: '',
-                 notes: 'Reposição planejada pelo estoque oficial. Confirmar fornecedor, cotação e recebimento.',
-                 payment_status: 'paid', due_date: '', receipt_status: 'pending', idempotency_key: '',
-                 items: itens
-               };
-               this.compraMsg = { ok: true, text: 'Plano de reposição enviado para a nova compra. Confirme fornecedor, custos e recebimento.' };
-               this.currentPage = 'compras';
-               this.comprasOpenTab('nova');
-               this.$nextTick(() => window.lucide && window.lucide.createIcons());
-             }
+             repoQuantidades: {}
            }"
            class="grid grid-cols-1 items-start gap-5 2xl:grid-cols-12">
         <section id="fila-reposicao" aria-labelledby="fila-reposicao-heading"
@@ -3662,7 +3567,7 @@
               <label class="relative block">
                 <span class="sr-only">Buscar medida na reposição</span>
                 <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-                <input x-model="repoBusca" type="search" placeholder="Buscar medida"
+                <input x-model="repoBusca" type="search" placeholder="Buscar medida ou marca"
                        class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
               </label>
             </div>
@@ -3688,7 +3593,7 @@
                 <span class="text-center">Sugerido</span><span>Cobertura após</span><span class="text-right">Último custo</span><span class="text-right">Ação</span>
               </div>
               <div class="divide-y divide-gray-100">
-                <template x-for="(row, index) in repoRowsView()" :key="'repor-' + row.measure">
+                <template x-for="(row, index) in repoRowsView()" :key="'repor-' + repoKey(row)">
                   <article class="grid grid-cols-[48px_minmax(160px,1.2fr)_70px_70px_84px_96px_92px_116px] items-center gap-3 px-4 py-4 transition-colors hover:bg-emerald-50/30">
                     <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900 text-xs font-semibold text-white" x-text="index + 1"></span>
                     <div class="flex min-w-0 items-center gap-3">
@@ -3703,6 +3608,7 @@
                       </span>
                       <div class="min-w-0">
                         <p class="truncate text-base font-semibold tracking-tight text-slate-950" x-text="row.measure"></p>
+                        <p class="mt-0.5 truncate text-xs font-medium text-emerald-700" x-text="row.brand"></p>
                         <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                               :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'"
                               x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado · crítico' : 'Abaixo do mínimo'"></span>
@@ -3751,7 +3657,7 @@
               <div><h3 class="text-lg font-semibold text-slate-950">Plano de compra</h3><p class="mt-0.5 text-xs text-slate-500">Quantidades editáveis antes de abrir Compras</p></div>
             </div>
             <div class="mt-5 grid grid-cols-3 divide-x divide-gray-100">
-              <div class="pr-3 text-center"><p class="text-2xl font-semibold tabular-nums text-slate-950" x-text="repoPlanoResumo().medidas"></p><p class="text-[11px] text-slate-500">medidas</p></div>
+              <div class="pr-3 text-center"><p class="text-2xl font-semibold tabular-nums text-slate-950" x-text="repoPlanoResumo().variantes"></p><p class="text-[11px] text-slate-500">variantes</p></div>
               <div class="px-3 text-center"><p class="text-2xl font-semibold tabular-nums text-slate-950" x-text="repoPlanoResumo().pneus"></p><p class="text-[11px] text-slate-500">pneus</p></div>
               <div class="pl-3 text-center"><p class="text-[11px] text-slate-500">Investimento estimado</p><p class="mt-1 text-lg font-semibold tabular-nums text-emerald-800" x-text="formatCurrency(repoPlanoResumo().investimento)"></p></div>
             </div>
@@ -3761,9 +3667,9 @@
                 <span>Medida</span><span class="text-center">Sugerido</span><span class="text-center">Quantidade</span>
               </div>
               <div class="divide-y divide-gray-100">
-                <template x-for="row in repoPlano()" :key="'plano-' + row.measure">
+                <template x-for="row in repoPlano()" :key="'plano-' + repoKey(row)">
                   <div class="grid grid-cols-[minmax(0,1fr)_80px_112px] items-center gap-3 py-3">
-                    <span class="truncate text-sm font-medium text-slate-800" x-text="row.measure"></span>
+                    <span class="truncate text-sm font-medium text-slate-800"><span x-text="row.measure"></span><small class="ml-1 text-emerald-700" x-text="'· ' + row.brand"></small></span>
                     <span class="text-center text-xs tabular-nums text-slate-500" x-text="repoSugestao(row) + ' pneus'"></span>
                     <div class="grid grid-cols-[32px_1fr_32px] overflow-hidden rounded-lg border border-gray-200 bg-white">
                       <button @click="repoDefinirQuantidade(row, repoQuantidade(row) - 1)" class="h-8 text-slate-500 hover:bg-emerald-50 hover:text-emerald-800" aria-label="Diminuir quantidade">−</button>
@@ -3807,15 +3713,15 @@
             <div class="mt-5 grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 2xl:grid-cols-1 2xl:divide-x-0 2xl:divide-y min-[1500px]:grid-cols-3 min-[1500px]:divide-x min-[1500px]:divide-y-0">
               <div class="py-3 sm:px-3 sm:py-0 sm:first:pl-0 2xl:px-0 2xl:py-3 min-[1500px]:px-3 min-[1500px]:py-0">
                 <p class="flex items-center gap-2 text-xs font-semibold text-slate-800"><i data-lucide="circle-minus" class="h-4 w-4 text-emerald-800"></i>Zerado</p>
-                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().zeradas"></span> medida(s) sem cobertura.</p>
+                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().zeradas"></span> variante(s) sem cobertura.</p>
               </div>
               <div class="py-3 sm:px-3 sm:py-0 2xl:px-0 2xl:py-3 min-[1500px]:px-3 min-[1500px]:py-0">
                 <p class="flex items-center gap-2 text-xs font-semibold text-slate-800"><i data-lucide="trending-down" class="h-4 w-4 text-emerald-800"></i>Abaixo do mínimo</p>
-                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().abaixo"></span> medida(s) pedem recomposição.</p>
+                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().abaixo"></span> variante(s) pedem recomposição.</p>
               </div>
               <div class="py-3 sm:px-3 sm:py-0 sm:last:pr-0 2xl:px-0 2xl:py-3 min-[1500px]:px-3 min-[1500px]:py-0">
                 <p class="flex items-center gap-2 text-xs font-semibold text-slate-800"><i data-lucide="refresh-cw" class="h-4 w-4 text-emerald-800"></i>Giro recente</p>
-                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().giro"></span> medida(s) tiveram saída de venda.</p>
+                <p class="mt-2 text-[11px] leading-relaxed text-slate-500"><span class="font-semibold text-slate-700" x-text="repoInsights().giro"></span> variante(s) tiveram saída de venda.</p>
               </div>
             </div>
           </section>
@@ -3826,59 +3732,7 @@
       <div x-show="stockTab === 'custos'" x-cloak
            x-data="{
              custoBusca: '',
-             custoOrdem: 'capital',
-             custoCapital(row) {
-               return Math.max(0, Number(row.quantity_on_hand) || 0) * Math.max(0, Number(row.unit_cost) || 0);
-             },
-             custoValido(row) {
-               return row.unit_cost != null && Number(row.unit_cost) > 0;
-             },
-             custoTotal() {
-               return this.atacadoStock.reduce((total, row) => total + this.custoCapital(row), 0);
-             },
-             custoPneusComCusto() {
-               return this.atacadoStock
-                 .filter((row) => this.custoValido(row))
-                 .reduce((total, row) => total + Math.max(0, Number(row.quantity_on_hand) || 0), 0);
-             },
-             custoMediaPonderada() {
-               const pneus = this.custoPneusComCusto();
-               return pneus > 0 ? this.custoTotal() / pneus : 0;
-             },
-             custoPercentual(row) {
-               const total = this.custoTotal();
-               return total > 0 ? this.custoCapital(row) / total * 100 : 0;
-             },
-             custoRowsBase() {
-               return [...this.atacadoStock].sort((a, b) => this.custoCapital(b) - this.custoCapital(a) || a.measure.localeCompare(b.measure));
-             },
-             custoRows() {
-               const busca = (this.custoBusca || '').trim().toLowerCase();
-               const digitos = (valor) => String(valor || '').replace(/\D/g, '');
-               const buscaDigitos = digitos(busca);
-               let rows = this.custoRowsBase();
-               if (busca) rows = rows.filter((row) => row.measure.toLowerCase().includes(busca) || (buscaDigitos && digitos(row.measure).includes(buscaDigitos)));
-               if (this.custoOrdem === 'maior_custo') rows = [...rows].sort((a, b) => Number(b.unit_cost || 0) - Number(a.unit_cost || 0) || a.measure.localeCompare(b.measure));
-               if (this.custoOrdem === 'menor_custo') rows = [...rows].sort((a, b) => Number(a.unit_cost || 0) - Number(b.unit_cost || 0) || a.measure.localeCompare(b.measure));
-               return rows;
-             },
-             custoTopRows() {
-               return this.custoRowsBase().filter((row) => this.custoCapital(row) > 0).slice(0, 5);
-             },
-             custoMaxCapital() {
-               return Math.max(1, ...this.custoTopRows().map((row) => this.custoCapital(row)));
-             },
-             custoTop3Percentual() {
-               const total = this.custoTotal();
-               if (total <= 0) return 0;
-               return this.custoRowsBase().slice(0, 3).reduce((soma, row) => soma + this.custoCapital(row), 0) / total * 100;
-             },
-             custoLider() {
-               return this.custoRowsBase()[0] || null;
-             },
-             custoComCusto() {
-               return this.atacadoStock.filter((row) => this.custoValido(row)).length;
-             }
+             custoOrdem: 'capital'
            }"
            class="space-y-5">
         <div class="grid grid-cols-1 items-stretch gap-5 2xl:grid-cols-12">
@@ -3899,7 +3753,7 @@
                   <span class="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-900 text-[11px] font-semibold text-white" x-text="index + 1"></span>
                   <div class="min-w-0">
                     <p class="truncate text-sm font-semibold text-slate-900" x-text="row.measure"></p>
-                    <p class="mt-0.5 text-[10px] text-slate-400"><span x-text="row.quantity_on_hand"></span> pneus</p>
+                    <p class="mt-0.5 truncate text-[10px] text-slate-400"><span x-text="row.quantity_on_hand"></span> pneus · <span x-text="row.brands.join(', ')"></span></p>
                   </div>
                   <div class="h-3 overflow-hidden rounded-full bg-emerald-50">
                     <div class="h-full rounded-full bg-emerald-800" :style="{ width: Math.max(3, custoCapital(row) / custoMaxCapital() * 100) + '%', opacity: Math.max(.28, 1 - index * .15) }"></div>
@@ -3929,12 +3783,12 @@
 
             <div class="mt-5 grid grid-cols-1 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-slate-50/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               <div class="p-4 text-center">
-                <p class="text-[11px] text-slate-500">Custo médio ponderado</p>
+                <p class="text-[11px] text-slate-500">Custo médio ponderado geral</p>
                 <p class="mt-2 text-xl font-semibold tabular-nums text-emerald-800" x-text="formatCurrency(custoMediaPonderada())"></p>
               </div>
               <div class="p-4 text-center">
                 <p class="text-[11px] text-slate-500">Medidas com custo</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900"><span x-text="custoComCusto()"></span> <span class="text-sm font-medium text-slate-500">de <span x-text="atacadoStock.length"></span></span></p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900"><span x-text="custoComCusto()"></span> <span class="text-sm font-medium text-slate-500">de <span x-text="custoRowsBase().length"></span></span></p>
               </div>
               <div class="p-4 text-center">
                 <p class="text-[11px] text-slate-500">Concentração no Top 3</p>
@@ -3953,6 +3807,7 @@
               <div>
                 <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-700">Maior posição</p>
                 <p class="mt-2 text-xl font-semibold text-slate-950" x-text="custoLider()?.measure || '—'"></p>
+                <p class="mt-1 text-xs text-emerald-700" x-text="custoLider()?.brands?.join(' · ') || '—'"></p>
                 <p class="mt-1 text-sm tabular-nums text-slate-600" x-text="custoLider() ? formatCurrency(custoCapital(custoLider())) : formatCurrency(0)"></p>
                 <p class="mt-3 text-xs leading-relaxed text-slate-500">A concentração mostra quanto do capital total depende de poucas medidas.</p>
               </div>
@@ -3971,7 +3826,7 @@
                 <label class="relative block">
                   <span class="sr-only">Buscar medida nos custos</span>
                   <i data-lucide="search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>
-                  <input x-model="custoBusca" type="search" placeholder="Buscar medida" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
+                  <input x-model="custoBusca" type="search" placeholder="Buscar medida ou marca" class="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
                 </label>
               </div>
               <div class="mt-4 flex flex-wrap gap-2" aria-label="Ordenar custos">
@@ -3997,22 +3852,22 @@
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in custoRows()" :key="'custo-analitico-' + row.measure">
                     <tr class="hover:bg-emerald-50/30">
-                      <td class="px-5 py-3 font-semibold text-slate-900" x-text="row.measure"></td>
+                      <td class="px-5 py-3"><p class="font-semibold text-slate-900" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-emerald-700" x-text="row.brands.join(' · ')"></p></td>
                       <td class="px-4 py-3 text-center tabular-nums text-slate-700" x-text="row.quantity_on_hand + ' pneus'"></td>
                       <td class="px-4 py-3 text-right tabular-nums text-slate-700" x-text="custoValido(row) ? formatCurrency(Number(row.unit_cost)) : '—'"></td>
                       <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900" x-text="formatCurrency(custoCapital(row))"></td>
                       <td class="px-4 py-3 text-right font-semibold tabular-nums text-emerald-800" x-text="custoPercentual(row).toFixed(1).replace('.', ',') + '%'"></td>
                       <td class="px-4 py-3">
                         <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
-                              :class="custoValido(row) ? 'bg-emerald-50 text-emerald-800' : 'border border-dashed border-emerald-800/50 bg-white text-emerald-950'">
-                          <span class="h-1.5 w-1.5 rounded-full" :class="custoValido(row) ? 'bg-emerald-600' : 'bg-emerald-950'"></span>
-                          <span x-text="custoValido(row) ? 'Custo cadastrado' : 'Sem custo'"></span>
+                              :class="custoValido(row) && row.cost_complete ? 'bg-emerald-50 text-emerald-800' : 'border border-dashed border-emerald-800/50 bg-white text-emerald-950'">
+                          <span class="h-1.5 w-1.5 rounded-full" :class="custoValido(row) && row.cost_complete ? 'bg-emerald-600' : 'bg-emerald-950'"></span>
+                          <span x-text="!custoValido(row) ? 'Sem custo' : (row.cost_complete ? 'Todas as marcas' : 'Custo parcial')"></span>
                         </span>
                       </td>
                       <td class="px-5 py-3 text-right">
-                        <button @click="stockTab = 'visao'; stockEdit(row); stockOperacao = 'ajuste'; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                        <button @click="stockTab = 'visao'; stockBusca = row.measure; stockOperacao = null"
                                 class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
-                          <i data-lucide="pencil" class="h-3.5 w-3.5"></i> Ajustar custo
+                          <i data-lucide="list" class="h-3.5 w-3.5"></i> Ver marcas
                         </button>
                       </td>
                     </tr>
@@ -4063,15 +3918,15 @@
         <template x-if="stockReconciliation.summary">
           <div>
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 p-5 bg-gray-50/70 border-b border-gray-100">
-              <div><p class="text-xs text-gray-500">Medidas no estoque</p><p class="text-xl font-semibold num" x-text="stockReconciliation.rows.length"></p></div>
+              <div><p class="text-xs text-gray-500">Variantes no estoque</p><p class="text-xl font-semibold num" x-text="stockReconciliation.rows.length"></p></div>
               <div><p class="text-xs text-gray-500">Já contadas</p><p class="text-xl font-semibold text-emerald-700 num" x-text="stockCountSummary().counted"></p></div>
               <div><p class="text-xs text-gray-500">Com diferença</p><p class="text-xl font-semibold text-slate-700 num" x-text="stockCountSummary().divergent"></p></div>
               <div><p class="text-xs text-gray-500">Saldo da contagem</p><p class="text-sm font-semibold text-slate-700"><span class="text-emerald-700" x-text="'+' + stockCountSummary().gains"></span> / <span class="text-slate-700" x-text="'−' + stockCountSummary().losses"></span></p></div>
             </div>
-            <p class="px-5 pt-4 text-xs text-gray-500">Conte cada medida. Saldo a mais vira ganho de inventário; saldo a menos vira perda pelo custo médio atual.</p>
+            <p class="px-5 pt-4 text-xs text-gray-500">Conte cada combinação de medida e marca. Saldo a mais vira ganho de inventário; saldo a menos vira perda pelo custo médio atual.</p>
             <div class="overflow-x-auto mt-3">
               <table class="w-full text-sm min-w-[920px]">
-                <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida</th><th class="px-4 py-3 font-medium text-center">Saldo no sistema</th><th class="px-4 py-3 font-medium text-center">Contagem física</th><th class="px-4 py-3 font-medium text-center">Diferença</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-5 py-3 font-medium text-right">Efeito estimado</th></tr></thead>
+                <thead class="bg-gray-50 border-y border-gray-100"><tr class="text-left text-xs text-gray-500"><th class="px-5 py-3 font-medium">Medida e marca</th><th class="px-4 py-3 font-medium text-center">Saldo no sistema</th><th class="px-4 py-3 font-medium text-center">Contagem física</th><th class="px-4 py-3 font-medium text-center">Diferença</th><th class="px-4 py-3 font-medium text-right">Custo médio</th><th class="px-5 py-3 font-medium text-right">Efeito estimado</th></tr></thead>
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="row in stockReconciliation.rows" :key="row.key">
                     <tr class="hover:bg-gray-50">
@@ -8453,6 +8308,10 @@
             <i data-lucide="warehouse" class="h-4 w-4"></i>Abrir Estoque
           </button>
         </div>
+        <div x-show="Number(catalogoSummary.stock_only || 0) > 0" class="mt-4 flex items-start gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-4 py-3 text-xs text-emerald-900">
+          <i data-lucide="circle-alert" class="mt-0.5 h-4 w-4 flex-shrink-0"></i>
+          <p><strong x-text="catalogoSummary.stock_only"></strong> variante(s) têm saldo no Estoque, mas ainda não possuem produto no Catálogo. Elas aparecem abaixo como “Não catalogado” e continuam bloqueadas para venda até o cadastro comercial.</p>
+        </div>
         <div class="mt-4 flex gap-3 overflow-x-auto pb-1">
           <button type="button" @click="catalogoSetMarca('todas')"
                   :class="catalogoMarca === 'todas' ? 'border-emerald-700 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-700' : 'border-gray-200 bg-white text-gray-600'"
@@ -8461,7 +8320,7 @@
           </button>
           <template x-for="brand in catalogoBrands" :key="brand">
             <button type="button" @click="catalogoSetMarca(brand)" :disabled="!catalogoRows.some((row) => row.brand === brand)"
-                    :title="catalogoRows.some((row) => row.brand === brand) ? `${catalogoRows.filter((row) => row.brand === brand).length} produto(s) ${brand}` : `${brand}: nenhum produto cadastrado`"
+                    :title="catalogoRows.some((row) => row.brand === brand) ? `${catalogoRows.filter((row) => row.brand === brand).length} item(ns) ${brand}` : `${brand}: nenhum item cadastrado`"
                     :class="catalogoMarca === brand ? 'border-emerald-700 ring-1 ring-emerald-700' : (catalogoRows.some((row) => row.brand === brand) ? 'border-gray-200' : 'border-dashed border-gray-200 bg-gray-50')"
                     class="relative flex h-[64px] min-w-[145px] items-center justify-center rounded-xl border bg-white px-3 py-2 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed">
               <span class="absolute right-2 top-1.5 text-[9px] font-semibold text-gray-400" x-text="catalogoRows.filter((row) => row.brand === brand).length"></span>
@@ -8505,7 +8364,7 @@
               <tr><th class="px-5 py-3">Produto</th><th class="px-4 py-3">Estoque</th><th class="px-4 py-3">Custo no estoque</th><th class="px-4 py-3">Preço varejo</th><th class="px-4 py-3">Lucro bruto</th><th class="px-4 py-3">Margem</th><th class="px-4 py-3">Status</th><th class="px-5 py-3 text-right">Ações</th></tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              <template x-for="row in catalogoPaginaRows()" :key="row.product_id">
+              <template x-for="row in catalogoPaginaRows()" :key="row.row_key || row.product_id">
                 <tr class="hover:bg-emerald-50/30">
                   <td class="px-5 py-3.5">
                     <div class="flex items-center gap-3">
@@ -8524,7 +8383,7 @@
                                 x-text="String(row.brand || 'SEM MARCA').toUpperCase()"></span>
                         </template>
                         <p class="mt-1 truncate text-sm font-semibold text-gray-950" x-text="[row.product_name,row.tire_size].filter(Boolean).join(' · ')"></p>
-                        <p class="text-[11px] text-gray-400" x-text="row.product_code"></p>
+                        <p class="text-[11px] text-gray-400" x-text="row.product_code || 'Ainda não cadastrado como produto'"></p>
                       </div>
                     </div>
                   </td>
@@ -8534,11 +8393,12 @@
                   <td class="px-4 py-3.5"><p :class="Number(row.gross_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-sm font-semibold" x-text="row.gross_profit == null ? '—' : formatCurrency(Number(row.gross_profit))"></p><p class="text-[10px] text-gray-400">por pneu</p></td>
                   <td class="px-4 py-3.5 text-sm font-medium" x-text="catalogoPercent(row.margin_percent)"></td>
                   <td class="px-4 py-3.5">
-                    <span x-show="row.sellable" class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Ativo</span>
-                    <span x-show="row.price_amount == null" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
-                    <span x-show="row.price_amount != null && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
+                    <span x-show="row.catalogued === false" class="rounded-full border border-dashed border-emerald-700 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-800">Não catalogado</span>
+                    <span x-show="row.catalogued !== false && row.sellable" class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Ativo</span>
+                    <span x-show="row.catalogued !== false && row.price_amount == null" class="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">Sem preço</span>
+                    <span x-show="row.catalogued !== false && row.price_amount != null && !row.sellable" class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">Estoque bloqueado</span>
                   </td>
-                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" class="rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" x-text="row.price_amount == null ? 'Definir preço' : 'Editar preço'"></button></td>
+                  <td class="px-5 py-3.5 text-right"><button type="button" @click="catalogoOpen(row)" class="rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50" x-text="row.catalogued === false ? 'Ver no Estoque' : (row.price_amount == null ? 'Definir preço' : 'Editar preço')"></button></td>
                 </tr>
               </template>
               <tr x-show="catalogoPaginaRows().length === 0"><td colspan="8" class="px-5 py-16 text-center text-sm text-gray-500">Nenhum produto encontrado com esses filtros.</td></tr>
@@ -8546,7 +8406,7 @@
           </table>
         </div>
         <div class="flex items-center justify-between border-t border-gray-100 px-5 py-4 text-xs text-gray-500">
-          <span x-text="catalogoFiltrados().length + ' produto(s) encontrado(s)'"></span>
+          <span x-text="catalogoFiltrados().length + ' item(ns) encontrado(s)'"></span>
           <div class="flex items-center gap-2"><button @click="catalogoPagina=Math.max(1,catalogoPagina-1)" :disabled="catalogoPagina<=1" class="rounded-lg border border-gray-200 p-2 disabled:opacity-30"><i data-lucide="chevron-left" class="h-3.5 w-3.5"></i></button><span class="font-semibold text-gray-700" x-text="catalogoPagina + ' / ' + catalogoTotalPaginas()"></span><button @click="catalogoPagina=Math.min(catalogoTotalPaginas(),catalogoPagina+1)" :disabled="catalogoPagina>=catalogoTotalPaginas()" class="rounded-lg border border-gray-200 p-2 disabled:opacity-30"><i data-lucide="chevron-right" class="h-3.5 w-3.5"></i></button></div>
         </div>
       </section>

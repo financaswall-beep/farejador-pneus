@@ -182,22 +182,22 @@ async function reverseTransaction(
 async function returnedCogs(
   client: PoolClient,
   sale: WholesaleSaleLedgerState,
-  returned: Array<{ measure: string; quantity: number }>,
+  returned: Array<{ measure: string; brand: string; quantity: number }>,
 ): Promise<number> {
   const result = await client.query<{ amount: string }>(
     `WITH returned AS (
-       SELECT measure,quantity
-         FROM jsonb_to_recordset($3::jsonb) AS x(measure text,quantity int)
+       SELECT measure,brand,quantity
+         FROM jsonb_to_recordset($3::jsonb) AS x(measure text,brand text,quantity int)
      ), sold AS (
-       SELECT measure,sum(quantity)::numeric quantity,
+       SELECT measure,brand,sum(quantity)::numeric quantity,
               sum(quantity*unit_cost)::numeric cost
          FROM commerce.wholesale_order_items
-        WHERE environment=$1 AND order_id=$2 GROUP BY measure
+        WHERE environment=$1 AND order_id=$2 GROUP BY measure,brand
      )
      SELECT COALESCE(sum(
        LEAST(returned.quantity,sold.quantity)*sold.cost/NULLIF(sold.quantity,0)
      ),0)::numeric(14,2)::text amount
-       FROM returned JOIN sold USING (measure)`,
+       FROM returned JOIN sold USING (measure,brand)`,
     [sale.environment, sale.orderId, JSON.stringify(returned)],
   );
   return matrizLedgerAmount(result.rows[0]!.amount, 'sale_ledger_cogs_invalid');
@@ -206,7 +206,7 @@ async function returnedCogs(
 export async function postWholesaleSaleCancellation(
   client: PoolClient,
   sale: WholesaleSaleLedgerState,
-  returned: Array<{ measure: string; quantity: number }>,
+  returned: Array<{ measure: string; brand: string; quantity: number }>,
   cancelledAt: string,
   cancelledBy: string,
   reason: string,

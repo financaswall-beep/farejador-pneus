@@ -3,9 +3,14 @@ import { pool } from '../persistence/db.js';
 import { partnerPool } from '../parceiro/db.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
+import { assertRequiredSchema } from '../persistence/required-schema.js';
 
 type CheckStatus = 'ok' | 'error';
-type Checks = { database: CheckStatus; partner_database: CheckStatus };
+type Checks = {
+  database: CheckStatus;
+  database_schema: CheckStatus;
+  partner_database: CheckStatus;
+};
 
 async function checkDatabase(query: () => Promise<unknown>): Promise<CheckStatus> {
   let timeout: NodeJS.Timeout | undefined;
@@ -40,12 +45,17 @@ export async function registerHealthRoute(fastify: FastifyInstance): Promise<voi
     reply.status(200).send({ status: 'ok', commit: env.APP_COMMIT_SHA }));
 
   const readinessHandler = async (_request: unknown, reply: FastifyReply): Promise<FastifyReply> => {
-    const [database, partnerDatabase] = await Promise.all([
+    const [database, databaseSchema, partnerDatabase] = await Promise.all([
       checkDatabase(() => pool.query('SELECT 1')),
+      checkDatabase(() => assertRequiredSchema(pool)),
       checkDatabase(() => partnerPool.query('SELECT 1')),
     ]);
-    const checks: Checks = { database, partner_database: partnerDatabase };
-    const ready = database === 'ok' && partnerDatabase === 'ok';
+    const checks: Checks = {
+      database,
+      database_schema: databaseSchema,
+      partner_database: partnerDatabase,
+    };
+    const ready = Object.values(checks).every((status) => status === 'ok');
 
     if (ready && previousReady === false) {
       logger.info({ operational_alert: 'readiness_recovered', checks }, 'service readiness recovered');

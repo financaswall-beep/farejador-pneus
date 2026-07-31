@@ -175,6 +175,78 @@ describe('Etapa 3 — vendas de atacado no livro central', () => {
     expect(proof.rows.every((row) => row.id === row.reversal_of_transaction_id)).toBe(true);
   });
 
+  it('devolucao parcial recupera o custo da marca exata na mesma medida', async () => {
+    sequence += 1;
+    const measure = `${240 + sequence}/${35 + sequence}-${13 + sequence}`;
+    const product = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.products
+         (environment,product_code,product_name,product_type,brand)
+       VALUES ('test',$1,$2,'tire','Pirelli') RETURNING id`,
+      [`LEDGER-MB-${sequence}`, `Pneu multimarca ${sequence}`],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.tire_specs
+         (environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter)
+       VALUES ('test',$1,$2,$3,$4,$5)`,
+      [product.rows[0]!.id, measure, 240 + sequence, 35 + sequence, 13 + sequence],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock
+         (environment,measure,brand,quantity_on_hand,unit_cost)
+       VALUES ('test',$1,'Pirelli',2,10),('test',$1,'Metzeler',2,30)`,
+      [measure],
+    );
+    const buyer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.wholesale_customers (environment,name)
+       VALUES ('test',$1) RETURNING id`,
+      [`Cliente multimarca ${sequence}`],
+    );
+    const created = await registerSale({
+      environment: 'test',
+      customer_id: buyer.rows[0]!.id,
+      items: [
+        { measure, brand: 'Pirelli', quantity: 1, unit_price: 50 },
+        { measure, brand: 'Metzeler', quantity: 1, unit_price: 50 },
+      ],
+      sold_at: '2026-07-10T14:00:00Z',
+      payment_status: 'pending',
+      due_date: '2026-08-10',
+      created_by: 'owner:wholesale-sale',
+      idempotency_key: randomUUID(),
+    }, db.pool);
+
+    await db.pool.query(
+      `DELETE FROM commerce.wholesale_stock_movements
+        WHERE environment='test' AND source='venda_atacado' AND ref=$1 AND brand='Metzeler'`,
+      [created.order_id],
+    );
+    const cancelled = await cancelSale({
+      environment: 'test', order_id: created.order_id,
+      cancelled_by: 'owner:cancel', reason: 'Devolucao parcial comprovada',
+      idempotency_key: randomUUID(),
+    }, db.pool);
+
+    expect(cancelled.stock_returned).toEqual([
+      { measure, brand: 'Pirelli', quantity: 1 },
+    ]);
+    expect(cancelled.stock_unverified).toEqual([
+      { measure, brand: 'Metzeler', quantity: 1 },
+    ]);
+    const proof = await db.pool.query(
+      `SELECT t.amount::text,
+              (SELECT jsonb_object_agg(e.account_code,e.side ORDER BY e.line_no)
+                 FROM finance.matriz_ledger_entries e WHERE e.transaction_id=t.id) entries
+         FROM finance.matriz_ledger_transactions t
+        WHERE t.environment='test'
+          AND t.source_type='commerce.wholesale_order.cogs_cancel' AND t.source_id=$1`,
+      [created.order_id],
+    );
+    expect(proof.rows).toEqual([{
+      amount: '10.00',
+      entries: { cost_of_goods_sold: 'credit', inventory: 'debit' },
+    }]);
+  });
+
   it('cancelamento recebido preserva caixa e cria devolucao ao cliente', async () => {
     const created = await sale({ paymentStatus: 'paid', quantity: 1, price: 90, cost: 35 });
     await cancelSale({

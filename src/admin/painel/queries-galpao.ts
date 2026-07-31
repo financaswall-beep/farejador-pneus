@@ -14,7 +14,7 @@ import { canonicalCatalogBrand } from './catalog-brand.js';
 
 export interface WholesaleStockRow {
   measure: string;
-  /** Marca do produto no Catálogo para esta medida. Não altera saldo nem custo. */
+  /** Marca que, junto da medida, identifica saldo e custo independentes. */
   brand: string;
   quantity_on_hand: number;
   unit_cost: number;
@@ -27,7 +27,7 @@ export interface WholesaleStockRow {
   tire_rim_diameter: number | null;
 }
 
-/** Lista o estoque do galpão (uma linha por medida), ordenado pela medida. */
+/** Lista o estoque do galpão (uma linha por medida e marca). */
 export async function listWholesaleStock(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
@@ -43,7 +43,7 @@ export async function listWholesaleStock(
   return r.rows;
 }
 
-/** Define quantidade + custo unitário + mínimo de uma medida (upsert por medida).
+/** Define quantidade + custo unitário + mínimo de uma variante (medida + marca).
  *  min_quantity: null LIMPA o mínimo (campo vazio no form = sem alerta); o form
  *  "Definir" sempre manda o valor completo — não há merge parcial. */
 export async function setWholesaleStock(
@@ -126,7 +126,7 @@ export async function addWholesaleStockEntry(
   return r.rows[0]!;
 }
 
-/** Remove uma medida do estoque do galpão (ex.: cadastrou errado). */
+/** Remove uma variante do estoque do galpão (ex.: cadastrou errado). */
 export async function deleteWholesaleStock(
   measure: string,
   brand: string,

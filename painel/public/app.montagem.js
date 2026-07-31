@@ -44,6 +44,7 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.financeiroDespesas, // app.financeiro.despesas.js (fatia 07-14): despesas (0120/0130) — form, modalidades, extrato
     window.PAINEL_MODULES.galpaoContagem, // contagem física auditável do estoque oficial
     window.PAINEL_MODULES.galpaoAjuste, // motivo e prévia financeira do ajuste manual
+    window.PAINEL_MODULES.galpaoMultibrand, // identidade medida+marca, custos consolidados e reposição
     window.PAINEL_MODULES.galpao, // app.galpao.js (linhas 1744-1859 pré-obra): estoque do galpão por medida: busca, custo médio, entrada
     window.PAINEL_MODULES.catalogo,
     window.PAINEL_MODULES.redeApply, // app.rede.apply.js (linhas 1860-2097 pré-obra): mapeadores do payload da Rede (applyRede/applyMatrizResumo)

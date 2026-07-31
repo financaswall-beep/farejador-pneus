@@ -23,6 +23,16 @@ export interface CatalogPriceInput {
   environment?: 'prod' | 'test';
 }
 
+function brandKey(value: string | null | undefined): string {
+  const normalized = (value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return normalized === 'semmarca' ? '' : normalized;
+}
+
+function catalogVariantKey(measure: string | null | undefined, brand: string | null | undefined): string {
+  return `${tireSizeKey(measure)}\u0000${brandKey(brand)}`;
+}
+
 export async function getCatalogOverview(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
@@ -58,23 +68,26 @@ export async function getCatalogOverview(
   ]);
   const stockIndex = buildMatrizStockIndex(stock.rows);
   const stockByKey = new Map(stock.rows.map((row) => [
-    `${tireSizeKey(row.measure)}\u0000${row.brand}`, row,
+    catalogVariantKey(row.measure, row.brand), row,
   ]));
   const lastPurchase = new Map<string, PurchaseRow>();
   for (const row of purchases.rows) {
-    const key = `${tireSizeKey(row.measure)}\u0000${row.brand ?? ''}`;
-    if (key && !lastPurchase.has(key)) lastPurchase.set(key, row);
+    const key = catalogVariantKey(row.measure, row.brand);
+    if (tireSizeKey(row.measure) && !lastPurchase.has(key)) lastPurchase.set(key, row);
   }
-  const rows = catalog.rows.map((product) => {
+  const catalogKeys = new Set(catalog.rows.map((product) =>
+    catalogVariantKey(product.tire_size, product.brand)));
+  const catalogRows = catalog.rows.map((product) => {
     const state = matrizStockForMeasure(stockIndex, product.tire_size, product.brand);
-    const key = tireSizeKey(product.tire_size);
-    const variantKey = `${key}\u0000${product.brand ?? ''}`;
-    const officialStock = key ? stockByKey.get(variantKey) : undefined;
-    const purchase = key ? lastPurchase.get(variantKey) : undefined;
+    const key = catalogVariantKey(product.tire_size, product.brand);
+    const officialStock = tireSizeKey(product.tire_size) ? stockByKey.get(key) : undefined;
+    const purchase = tireSizeKey(product.tire_size) ? lastPurchase.get(key) : undefined;
     const cost = state.unit_cost;
     const price = product.price_amount === null ? null : Number(product.price_amount);
     return {
       ...product,
+      row_key: `product:${product.product_id}`,
+      catalogued: true,
       price_amount: price,
       official_quantity_on_hand: state.quantity_on_hand,
       official_unit_cost: cost,
@@ -88,10 +101,45 @@ export async function getCatalogOverview(
       block_reason: price === null ? 'catalog_price_missing' : state.block_reason,
     };
   });
+  const stockOnlyRows = stock.rows
+    .filter((row) => !catalogKeys.has(catalogVariantKey(row.measure, row.brand)))
+    .map((row) => {
+      const key = catalogVariantKey(row.measure, row.brand);
+      const purchase = lastPurchase.get(key);
+      return {
+        product_id: null,
+        product_code: null,
+        product_name: row.brand,
+        product_type: 'tire',
+        brand: row.brand,
+        tire_size: row.measure,
+        tire_position: null,
+        price_amount: null,
+        currency: null,
+        price_type: null,
+        row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}`,
+        catalogued: false,
+        official_quantity_on_hand: Number(row.quantity_on_hand),
+        official_unit_cost: row.unit_cost === null ? null : Number(row.unit_cost),
+        stock_source: 'commerce.wholesale_stock',
+        stock_updated_at: row.updated_at,
+        last_purchase_cost: purchase ? Number(purchase.unit_cost) : null,
+        last_purchase_at: purchase?.purchased_at ?? null,
+        gross_profit: null,
+        margin_percent: null,
+        sellable: false,
+        block_reason: 'catalog_product_missing',
+      };
+    });
+  const rows = [...catalogRows, ...stockOnlyRows].sort((a, b) =>
+    String(a.brand ?? '').localeCompare(String(b.brand ?? ''), 'pt-BR')
+    || String(a.tire_size ?? '').localeCompare(String(b.tire_size ?? ''), 'pt-BR')
+    || String(a.product_name).localeCompare(String(b.product_name), 'pt-BR'));
   const brands = [...new Set(rows.map((row) => row.brand).filter((brand): brand is string => Boolean(brand)))];
   return {
     summary: {
-      products: rows.length,
+      products: catalogRows.length,
+      stock_only: stockOnlyRows.length,
       brands: brands.length,
       without_price: rows.filter((row) => row.price_amount === null).length,
       with_stock: rows.filter((row) => row.official_quantity_on_hand > 0).length,
