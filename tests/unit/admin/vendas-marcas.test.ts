@@ -81,6 +81,10 @@ describe('ranking de marcas em Vendas', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
     const montagem = readFileSync('painel/public/app.montagem.js', 'utf8');
     const staticRoutes = readFileSync('src/admin/painel/route-static.ts', 'utf8');
+    const commercialVision = html.slice(
+      html.indexOf('data-testid="sales-commercial-vision"'),
+      html.indexOf('Vendas recentes'),
+    );
     expect(html).toContain('data-testid="sales-commercial-vision" class="space-y-3"');
     expect(html).toContain('data-testid="sales-channel-performance" class="overflow-hidden rounded-xl');
     expect(html).toContain('data-testid="sales-commercial-focus" class="overflow-hidden rounded-xl');
@@ -89,7 +93,9 @@ describe('ranking de marcas em Vendas', () => {
     expect(html).toContain('Foco de hoje');
     expect(html).toContain('Marcas mais vendidas');
     expect(html).toContain('bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800');
-    expect(html).toContain('grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12');
+    expect(html).toContain('xl:grid-cols-[1.08fr_0.86fr_1.06fr]');
+    expect(commercialVision).toContain('vendasMarcas.rows.slice(0, 2)');
+    expect(commercialVision).not.toContain('catalogoBrandLogo(marca.brand)');
     expect(html).toContain('app.vendas.marcas.js?v=20260731-vendas-marcas1');
     expect(montagem).toContain('window.PAINEL_MODULES.vendasMarcas');
     expect(staticRoutes).toContain("'app.vendas.marcas.js'");
