@@ -201,7 +201,7 @@ async function matchPendingReferral(
        channel,referral_key,ctwa_clid,source_id,source_type,headline,captured_at,
        user_scoped_id,business_account_id,native_message_id,referral_payload
      ) VALUES ($1,$2,$3,$4,$5,$6,NULL,$7,$8,$9,$4,$10,$11,$12,
-       jsonb_build_object('provider_event_key',$13,'ref',$14))
+       jsonb_build_object('provider_event_key',$13::text,'ref',$14::text))
      ON CONFLICT DO NOTHING`,
     [
       environment,
@@ -242,11 +242,13 @@ export async function reconcilePendingMetaReferrals(
   const result = await client.query<PendingReferralRow>(
     `SELECT id,provider_event_key,channel,provider_message_id,user_scoped_id,
             business_account_id,ad_id,referral_ref,source_type,headline,occurred_at
-       FROM marketing.meta_messaging_referrals
+      FROM marketing.meta_messaging_referrals
       WHERE environment=$1 AND status='pending'
+        AND provider_message_id IS NOT NULL
         AND ($2::text IS NULL OR provider_message_id=$2)
         AND ($3::bigint IS NULL OR raw_event_id=$3)
-      ORDER BY occurred_at,id`,
+      ORDER BY occurred_at DESC,id
+      LIMIT 100`,
     [environment, options.providerMessageId ?? null, options.rawEventId ?? null],
   );
   let matched = 0;

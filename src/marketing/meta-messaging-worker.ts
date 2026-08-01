@@ -37,8 +37,12 @@ export async function pollMetaMessagingEvents(
     );
     row = result.rows[0];
     if (!row) {
+      // Fecha a corrida entre os dois webhooks: a Meta pode ser processada
+      // antes de o Chatwoot confirmar a mesma mensagem no core (ou vice-versa).
+      // Referrals com mid nativo ficam pendentes e são tentados novamente.
+      const matched = await reconcilePendingMetaReferrals(client, env.FAREJADOR_ENV);
       await client.query('COMMIT');
-      return false;
+      return matched > 0;
     }
     const referrals = extractMetaMessagingReferrals(row.payload, row.received_at);
     for (const referral of referrals) {

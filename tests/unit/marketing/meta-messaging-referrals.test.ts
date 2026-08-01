@@ -91,6 +91,13 @@ describe('referrals diretos da Meta', () => {
     expect(matched).toBe(1);
     expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO marketing.ad_referrals')))
       .toBe(true);
+    const insertSql = String(query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO marketing.ad_referrals'))?.[0]);
+    expect(insertSql).toContain('$13::text');
+    expect(insertSql).toContain('$14::text');
+    const pendingSql = String(query.mock.calls.find(([sql]) =>
+      String(sql).includes('FROM marketing.meta_messaging_referrals'))?.[0]);
+    expect(pendingSql).toContain('provider_message_id IS NOT NULL');
     expect(query.mock.calls.some(([sql]) => String(sql).includes("status='matched'")))
       .toBe(true);
   });
