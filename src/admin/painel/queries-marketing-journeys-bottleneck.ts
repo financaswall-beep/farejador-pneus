@@ -4,7 +4,7 @@ interface BottleneckInput {
   metaStatus: 'connected' | 'disabled' | 'not_configured' | 'error';
   conversations: number | null;
   operationalAvailable: boolean;
-  ctwa: number;
+  tracked: number;
   attributionEnabled: boolean;
   ledgerAvailable: boolean;
 }
@@ -30,12 +30,12 @@ export function marketingJourneyBottleneck(
       target: 'campanhas',
     };
   }
-  if (input.operationalAvailable && input.ctwa === 0) {
+  if (input.operationalAvailable && input.tracked === 0) {
     return {
       id: 'ctwa_missing',
       severity: 'high',
       title: 'Rastreio interrompido antes do Farejador',
-      detail: `${input.conversations ?? 0} conversa(s) e nenhum CTWA. Impulsionamento comum não envia o carimbo; use campanha de Mensagens Click-to-WhatsApp.`,
+      detail: `${input.conversations ?? 0} conversa(s) e nenhuma referência rastreável de WhatsApp, Messenger ou Instagram.`,
       target: 'integracoes',
     };
   }
@@ -45,7 +45,7 @@ export function marketingJourneyBottleneck(
       severity: 'attention',
       title: input.attributionEnabled
         ? 'Ledger de atribuição ainda indisponível'
-        : 'CTWA encontrado; validação da atribuição ainda está desligada',
+        : 'Referência encontrada; validação da atribuição ainda está desligada',
       detail: input.attributionEnabled
         ? 'Aplique a migration e execute a reconciliação explícita.'
         : 'Ative MARKETING_ATTRIBUTION somente depois de conferir o vínculo em produção.',
@@ -56,7 +56,7 @@ export function marketingJourneyBottleneck(
     id: 'journey_active',
     severity: 'ok',
     title: 'Jornada rastreável ativa',
-    detail: 'As vendas usam last-click CTWA em até 7 dias e cada clique é consumido uma única vez.',
+    detail: 'As vendas usam a última referência de mensagem em até 7 dias e cada clique é consumido uma única vez.',
     target: 'jornadas',
   };
 }

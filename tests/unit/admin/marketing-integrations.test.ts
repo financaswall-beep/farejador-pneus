@@ -38,7 +38,10 @@ function overview(meta: 'connected' | 'disabled', ctwa: number) {
       available: false, previous: null, spend_delta_percent: null,
       conversations_delta_percent: null, reason: 'historico_anterior_insuficiente',
     },
-    attribution: { available: true, referrals: ctwa, ctwa },
+    attribution: {
+      available: true, referrals: ctwa, tracked: ctwa,
+      ctwa, messenger: 0, instagram: 0,
+    },
     alerts: [],
     channels: [],
     quality: [],

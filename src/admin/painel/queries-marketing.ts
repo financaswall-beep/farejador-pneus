@@ -1,6 +1,6 @@
 /**
  * Marketing — visão executiva read-only da matriz.
- * Une Meta agregada + presença do carimbo CTWA já normalizado em core.messages.
+ * Une Meta agregada + referências de anúncio dos canais de mensagem.
  * Nunca lê telefone, nome ou conteúdo da conversa; sempre filtra environment.
  */
 import type { Pool } from 'pg';
@@ -22,7 +22,10 @@ type ConnectionStatus = 'connected' | 'disabled' | 'not_configured' | 'error';
 interface AttributionHealth {
   available: boolean;
   referrals: number;
+  tracked: number;
   ctwa: number;
+  messenger: number;
+  instagram: number;
 }
 
 export interface MarketingOverview {
@@ -95,27 +98,31 @@ async function attributionHealth(
   dbPool: Pool,
 ): Promise<AttributionHealth> {
   try {
-    const result = await dbPool.query<{ referrals: number; ctwa: number }>(
+    const result = await dbPool.query<{
+      referrals: number; tracked: number; ctwa: number; messenger: number; instagram: number;
+    }>(
       `SELECT
-         count(DISTINCT conversation_id)
-           FILTER (WHERE content_attributes ? 'referral')::int AS referrals,
-         count(DISTINCT conversation_id)
-           FILTER (WHERE COALESCE(content_attributes #>> '{referral,ctwa_clid}', '') <> '')::int AS ctwa
-       FROM core.messages
+         count(DISTINCT conversation_id)::int AS referrals,
+         count(DISTINCT conversation_id)::int AS tracked,
+         count(DISTINCT conversation_id) FILTER (WHERE channel='whatsapp')::int AS ctwa,
+         count(DISTINCT conversation_id) FILTER (WHERE channel='messenger')::int AS messenger,
+         count(DISTINCT conversation_id) FILTER (WHERE channel='instagram')::int AS instagram
+       FROM marketing.ad_referrals
        WHERE environment = $1
-         AND sender_type = 'contact'
-         AND is_private = false
-         AND sent_at >= $2::date
-         AND sent_at < ($3::date + 1)`,
+         AND captured_at >= $2::date
+         AND captured_at < ($3::date + 1)`,
       [environment, since, until],
     );
     return {
       available: true,
       referrals: Number(result.rows[0]?.referrals ?? 0),
+      tracked: Number(result.rows[0]?.tracked ?? result.rows[0]?.referrals ?? 0),
       ctwa: Number(result.rows[0]?.ctwa ?? 0),
+      messenger: Number(result.rows[0]?.messenger ?? 0),
+      instagram: Number(result.rows[0]?.instagram ?? 0),
     };
   } catch {
-    return { available: false, referrals: 0, ctwa: 0 };
+    return { available: false, referrals: 0, tracked: 0, ctwa: 0, messenger: 0, instagram: 0 };
   }
 }
 
@@ -170,10 +177,10 @@ export async function getMarketingOverview(
       target: 'integracoes',
     });
   }
-  if ((meta?.current.conversations ?? 0) > 0 && attribution.ctwa === 0) {
+  if ((meta?.current.conversations ?? 0) > 0 && attribution.tracked === 0) {
     alerts.push({
-      id: 'ctwa-missing', severity: 'high', title: 'Referência CTWA ausente',
-      detail: `${meta?.current.conversations ?? 0} conversas e nenhum CTWA; impulsionamento comum não substitui campanha de Mensagens`,
+      id: 'ctwa-missing', severity: 'high', title: 'Referência de anúncio ausente',
+      detail: `${meta?.current.conversations ?? 0} conversas e nenhuma referência rastreável de WhatsApp, Messenger ou Instagram`,
       target: 'jornadas',
     });
   }
@@ -269,7 +276,7 @@ export async function getMarketingOverview(
       { id: 'campaigns', label: 'Campanhas', status: meta ? 'ok' : 'pending' },
       { id: 'investment', label: 'Investimento', status: meta ? 'ok' : 'pending' },
       { id: 'conversations', label: 'Conversas', status: meta ? 'ok' : 'pending' },
-      { id: 'attribution', label: 'Atribuição', status: attribution.ctwa > 0 ? 'ok' : 'pending' },
+      { id: 'attribution', label: 'Atribuição', status: attribution.tracked > 0 ? 'ok' : 'pending' },
       {
         id: 'profit',
         label: 'Lucro',

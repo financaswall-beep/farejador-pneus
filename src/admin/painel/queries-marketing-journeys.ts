@@ -2,7 +2,7 @@
  * Marketing — jornada read-only da Meta até a venda.
  *
  * A entrada vem dos Insights agregados da Meta. O restante só é liberado
- * quando existe ctwa_clid persistido em core.messages e a atribuição foi
+ * quando existe referência de anúncio persistida e a atribuição foi
  * explicitamente habilitada. Nenhuma correlação por telefone ou coincidência.
  */
 import type { Pool } from 'pg';
@@ -56,6 +56,9 @@ export interface MarketingJourneysPayload {
   metrics: {
     conversations: number | null;
     ctwa: number | null;
+    tracked: number | null;
+    messenger: number | null;
+    instagram: number | null;
     tracking_coverage_percent: number | null;
     attributed_sales: number | null;
     attributed_revenue: number | null;
@@ -161,12 +164,13 @@ export async function getMarketingJourneys(
     dependencies.attributionProvider ?? getMarketingAttributionReport
   )(window.since, window.until, dbPool);
   const conversations = meta?.current.conversations ?? null;
+  const tracked = operational.available ? operational.tracked : null;
   const ctwa = operational.available ? operational.ctwa : null;
-  const coverage = trackingCoverage(conversations, ctwa);
+  const coverage = trackingCoverage(conversations, tracked);
   const attributionReliable = Boolean(
     config.attributionEnabled
       && operational.available
-      && operational.ctwa > 0
+      && operational.tracked > 0
       && attributionReport.available,
   );
   const downstreamStatus: JourneyStageStatus = attributionReliable ? 'ready' : 'blocked';
@@ -175,7 +179,7 @@ export async function getMarketingJourneys(
     metaStatus,
     conversations,
     operationalAvailable: operational.available,
-    ctwa: operational.ctwa,
+    tracked: operational.tracked,
     attributionEnabled: config.attributionEnabled,
     ledgerAvailable: attributionReport.available,
   });
@@ -185,7 +189,7 @@ export async function getMarketingJourneys(
   ));
   const campaigns = scopedCampaignRows.map((row) => {
     const noConversations = row.conversations === 0;
-    const noCtwaAnywhere = operational.available && operational.ctwa === 0;
+    const noCtwaAnywhere = operational.available && operational.tracked === 0;
     const campaignAttribution = attributionReport?.campaigns
       .find((item) => item.campaign_id === row.id);
     return {
@@ -218,6 +222,9 @@ export async function getMarketingJourneys(
     metrics: {
       conversations,
       ctwa,
+      tracked,
+      messenger: operational.available ? operational.messenger : null,
+      instagram: operational.available ? operational.instagram : null,
       tracking_coverage_percent: coverage,
       attributed_sales: attributionReliable ? attributionReport?.attributed_sales ?? 0 : null,
       attributed_revenue: attributionReliable ? attributionReport?.attributed_revenue ?? 0 : null,
@@ -244,11 +251,11 @@ export async function getMarketingJourneys(
       ),
       stage(
         'ctwa',
-        'CTWA identificado',
-        ctwa,
+        'Origem identificada',
+        tracked,
         'farejador',
-        ctwa == null ? 'pending' : ctwa > 0 ? 'ready' : 'attention',
-        'referral.ctwa_clid persistido no webhook.',
+        tracked == null ? 'pending' : tracked > 0 ? 'ready' : 'attention',
+        'Referência de WhatsApp, Messenger ou Instagram persistida no webhook.',
       ),
       stage(
         'qualified',
@@ -264,7 +271,7 @@ export async function getMarketingJourneys(
         attributionReliable ? operational.quotes : null,
         'analytics',
         downstreamStatus,
-        'Fato price_quoted posterior ao CTWA.',
+        'Fato price_quoted posterior à referência de anúncio.',
       ),
       stage(
         'order',
@@ -272,7 +279,7 @@ export async function getMarketingJourneys(
         attributionReliable ? operational.order_intents : null,
         'analytics',
         downstreamStatus,
-        'Fato pedido_criado posterior ao CTWA.',
+        'Fato pedido_criado posterior à referência de anúncio.',
       ),
       stage(
         'sale',

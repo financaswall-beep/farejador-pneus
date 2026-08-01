@@ -10,6 +10,9 @@ export const marketingEnvShape = {
   MARKETING_SCOPE_ENFORCEMENT_ENABLED: booleanStringSchema,
   MARKETING_ATTRIBUTION: booleanStringSchema,
   MARKETING_CAPI_ENABLED: booleanStringSchema,
+  MARKETING_CAPI_MESSENGER_ENABLED: booleanStringSchema,
+  MARKETING_CAPI_INSTAGRAM_ENABLED: booleanStringSchema,
+  META_MESSAGING_WEBHOOK_ENABLED: booleanStringSchema,
   CAPI_EXTENDED_MATCHING: booleanStringSchema,
   META_ADS_ACCOUNT_ID: z.string().regex(/^act_[0-9]+$/).optional(),
   META_ADS_ACCESS_TOKEN: z.string().min(1).optional(),
@@ -19,6 +22,8 @@ export const marketingEnvShape = {
   META_CAPI_PAGE_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_CAPI_TEST_EVENT_CODE: z.string().min(1).optional(),
+  META_MESSAGING_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  META_APP_SECRET: z.string().min(1).optional(),
   MARKETING_SYNC_INTERVAL_MS: z.string().transform(Number)
     .pipe(z.number().int().min(60_000)).default('86400000'),
   MARKETING_CAPI_POLL_MS: z.string().transform(Number)

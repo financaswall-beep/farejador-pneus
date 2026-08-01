@@ -12,6 +12,7 @@ export interface MappedMessage {
   content: string | null;
   contentType: string | null;
   contentAttributes: Record<string, unknown>;
+  nativeMessageId: string | null;
   isPrivate: boolean;
   status: string | null;
   externalSourceIds: Record<string, unknown> | null;
@@ -116,6 +117,7 @@ export function mapMessage(
     content: p.content ?? null,
     contentType: p.content_type ?? null,
     contentAttributes: (p.content_attributes ?? {}) as Record<string, unknown>,
+    nativeMessageId: p.source_id ?? null,
     isPrivate: p.private ?? false,
     status: p.status ?? null,
     externalSourceIds: p.external_source_ids

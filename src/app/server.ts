@@ -17,6 +17,7 @@ import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-cust
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 import { startMarketingScheduler } from '../marketing/scheduler.js';
 import { startMarketingCapiWorker } from '../marketing/capi.js';
+import { startMetaMessagingWorker } from '../marketing/meta-messaging-worker.js';
 import { startMonthlyContinuityScheduler } from '../monthly-continuity.js';
 import { assertRequiredSchema } from '../persistence/required-schema.js';
 
@@ -38,6 +39,7 @@ let stopSatisfactionSurvey: (() => void) | null = null;
 let stopPartnerPush: (() => void) | null = null;
 let stopMarketingScheduler: (() => void) | null = null;
 let stopMarketingCapi: (() => void) | null = null;
+let stopMetaMessaging: (() => void) | null = null;
 let stopMonthlyContinuity: (() => void) | null = null;
 
 fastify.addContentTypeParser(
@@ -75,6 +77,7 @@ async function start(): Promise<void> {
   stopPartnerPush = startPartnerPushFanout();
   stopMarketingScheduler = startMarketingScheduler();
   stopMarketingCapi = startMarketingCapiWorker();
+  stopMetaMessaging = startMetaMessagingWorker();
   stopMonthlyContinuity = startMonthlyContinuityScheduler();
 
   const port = env.PORT;
@@ -108,6 +111,7 @@ async function shutdown(signal: string): Promise<void> {
   stopPartnerPush?.();
   stopMarketingScheduler?.();
   stopMarketingCapi?.();
+  stopMetaMessaging?.();
   stopMonthlyContinuity?.();
   await fastify.close();
   await pool.end();

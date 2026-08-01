@@ -22,12 +22,18 @@ interface ProductionEnvConfig {
   MARKETING_SYNC_ENABLED?: boolean;
   MARKETING_SCOPE_ENFORCEMENT_ENABLED?: boolean;
   MARKETING_CAPI_ENABLED?: boolean;
+  MARKETING_CAPI_MESSENGER_ENABLED?: boolean;
+  MARKETING_CAPI_INSTAGRAM_ENABLED?: boolean;
+  META_MESSAGING_WEBHOOK_ENABLED?: boolean;
   MARKETING_ATTRIBUTION?: boolean;
   META_ADS_ACCOUNT_ID?: string;
   META_ADS_ACCESS_TOKEN?: string;
   META_CAPI_DATASET_ID?: string;
   META_CAPI_ACCESS_TOKEN?: string;
   META_WHATSAPP_BUSINESS_ACCOUNT_ID?: string;
+  META_CAPI_PAGE_ID?: string;
+  META_MESSAGING_WEBHOOK_VERIFY_TOKEN?: string;
+  META_APP_SECRET?: string;
 }
 
 function addIssue(ctx: RefinementCtx, path: string, message: string): void {
@@ -128,6 +134,17 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
         'META_WHATSAPP_BUSINESS_ACCOUNT_ID',
         'is required when MARKETING_CAPI_ENABLED=true',
       );
+    }
+    if (value.MARKETING_CAPI_MESSENGER_ENABLED && !value.META_CAPI_PAGE_ID) {
+      addIssue(ctx, 'META_CAPI_PAGE_ID', 'is required when Messenger CAPI is enabled');
+    }
+  }
+  if (value.META_MESSAGING_WEBHOOK_ENABLED) {
+    if (!value.META_MESSAGING_WEBHOOK_VERIFY_TOKEN) {
+      addIssue(ctx, 'META_MESSAGING_WEBHOOK_VERIFY_TOKEN', 'is required when Meta messaging webhook is enabled');
+    }
+    if (!value.META_APP_SECRET) {
+      addIssue(ctx, 'META_APP_SECRET', 'is required when Meta messaging webhook is enabled');
     }
   }
 }

@@ -1,4 +1,4 @@
-// Marketing — Jornadas: Meta Insights + CTWA + analytics/commerce.
+// Marketing — Jornadas: Meta Insights + referência de mensagem + analytics/commerce.
 // Somente leitura. Nenhuma etapa comercial aparece sem vínculo determinístico.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 
@@ -15,7 +15,10 @@ function marketingJourneysMockPayload() {
     },
     metrics: {
       conversations: 86,
-      ctwa: 61,
+      tracked: 61,
+      ctwa: 45,
+      messenger: 9,
+      instagram: 7,
       tracking_coverage_percent: 70.9,
       attributed_sales: 7,
       attributed_revenue: 5840,
@@ -25,17 +28,17 @@ function marketingJourneysMockPayload() {
     },
     stages: [
       { id: 'meta_conversations', label: 'Conversa Meta', value: 86, source: 'meta', status: 'ready', detail: 'Ação canônica registrada nos Insights.' },
-      { id: 'ctwa', label: 'CTWA identificado', value: 61, source: 'farejador', status: 'ready', detail: 'referral.ctwa_clid persistido no webhook.' },
+      { id: 'ctwa', label: 'Origem identificada', value: 61, source: 'farejador', status: 'ready', detail: 'Referência de WhatsApp, Messenger ou Instagram persistida.' },
       { id: 'qualified', label: 'Avançou após cotação', value: 24, source: 'analytics', status: 'ready', detail: 'Classificação real quote_sent ou purchase_intent.' },
-      { id: 'quote', label: 'Orçamento', value: 21, source: 'analytics', status: 'ready', detail: 'Fato price_quoted posterior ao CTWA.' },
-      { id: 'order', label: 'Pedido', value: 10, source: 'analytics', status: 'ready', detail: 'Fato pedido_criado posterior ao CTWA.' },
+      { id: 'quote', label: 'Orçamento', value: 21, source: 'analytics', status: 'ready', detail: 'Fato price_quoted posterior à referência.' },
+      { id: 'order', label: 'Pedido', value: 10, source: 'analytics', status: 'ready', detail: 'Fato pedido_criado posterior à referência.' },
       { id: 'sale', label: 'Venda realizada', value: 7, source: 'commerce', status: 'ready', detail: 'Entrega ou retirada realizada e ligada à conversa.' },
     ],
     bottleneck: {
       id: 'journey_active',
       severity: 'ok',
       title: 'Jornada rastreável ativa',
-      detail: 'As vendas usam last-click CTWA em até 7 dias e não reutilizam o clique.',
+      detail: 'As vendas usam last-click de mensagem em até 7 dias e não reutilizam o clique.',
       target: 'jornadas',
     },
     quality: {
@@ -85,9 +88,9 @@ window.PAINEL_MODULES.marketingJourneys = function () {
         },
         {
           id: 'ctwa',
-          label: 'Conversas com CTWA',
-          value: metrics.ctwa ?? '—',
-          detail: 'Farejador',
+          label: 'Origens identificadas',
+          value: metrics.tracked ?? metrics.ctwa ?? '—',
+          detail: 'WhatsApp + Messenger + Instagram',
           icon: 'mouse-pointer-click',
           source: 'farejador',
           blocked: false,
@@ -98,7 +101,7 @@ window.PAINEL_MODULES.marketingJourneys = function () {
           value: metrics.tracking_coverage_percent == null
             ? '—'
             : `${Number(metrics.tracking_coverage_percent).toLocaleString('pt-BR')}%`,
-          detail: 'CTWA ÷ conversas',
+          detail: 'origens ÷ conversas',
           icon: 'percent',
           source: 'calculated',
           blocked: false,
@@ -119,7 +122,7 @@ window.PAINEL_MODULES.marketingJourneys = function () {
         {
           id: 'sales',
           label: 'Vendas atribuídas',
-          value: metrics.attributed_sales ?? 'Aguardando CTWA',
+          value: metrics.attributed_sales ?? 'Aguardando origem',
           detail: metrics.attributed_sales == null ? 'atribuição bloqueada' : 'commerce.orders',
           icon: 'shopping-cart',
           source: metrics.attributed_sales == null ? 'blocked' : 'commerce',
@@ -191,7 +194,7 @@ window.PAINEL_MODULES.marketingJourneys = function () {
 
     marketingJourneyCampaignBottleneck(row) {
       if (row.bottleneck === 'no_conversations') return 'Sem conversa';
-      if (row.bottleneck === 'ctwa_missing') return 'CTWA ausente';
+      if (row.bottleneck === 'ctwa_missing') return 'Origem ausente';
       return 'Mapeamento por anúncio pendente';
     },
 

@@ -75,7 +75,7 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(marketingHtml).toContain('<title>TikTok</title>');
     expect(marketingHtml).toContain('grid grid-cols-1 gap-2 sm:grid-cols-3');
     expect(marketingHtml).toContain('background:conic-gradient(#047857');
-    expect(marketingHtml).toContain('<strong>Próximo passo:</strong> validar atribuição CTWA');
+    expect(marketingHtml).toContain('<strong>Próximo passo:</strong> validar atribuição multicanal');
     expect(marketingHtml).toContain('data-marketing-channel-filter-mock');
     expect(marketingHtml).toContain('Meta somente — Google e TikTok não têm conector neste módulo');
     expect(marketingHtml).toContain('disabled aria-pressed="false" title="Sem conector"');

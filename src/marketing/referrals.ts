@@ -10,7 +10,10 @@ interface ReferralCaptureInput {
   senderType: string;
   isPrivate: boolean;
   contentAttributes: Record<string, unknown>;
+  nativeMessageId?: string | null;
 }
+
+export type MarketingMessagingChannel = 'whatsapp' | 'messenger' | 'instagram';
 
 function text(value: unknown): string | null {
   if (value == null) return null;
@@ -18,11 +21,20 @@ function text(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
-function referralFrom(attributes: Record<string, unknown>): Record<string, unknown> | null {
-  const referral = attributes.referral;
-  return referral && typeof referral === 'object'
-    ? referral as Record<string, unknown>
+function object(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
     : null;
+}
+
+function referralFrom(attributes: Record<string, unknown>): Record<string, unknown> | null {
+  const direct = object(attributes.referral);
+  if (direct) return direct;
+  for (const wrapper of ['whatsapp', 'instagram', 'facebook', 'messenger']) {
+    const nested = object(object(attributes[wrapper])?.referral);
+    if (nested) return nested;
+  }
+  return null;
 }
 
 export function extractAdReferral(attributes: Record<string, unknown>) {
@@ -31,8 +43,10 @@ export function extractAdReferral(attributes: Record<string, unknown>) {
   const ctwaClid = text(referral.ctwa_clid ?? referral.ctwaClid);
   if (!ctwaClid) return null;
   return {
+    channel: 'whatsapp' as const,
+    referralKey: `whatsapp:${ctwaClid}`,
     ctwaClid,
-    sourceId: text(referral.source_id ?? referral.sourceId),
+    sourceId: text(referral.source_id ?? referral.sourceId ?? referral.ad_id ?? referral.adId),
     sourceUrl: text(referral.source_url ?? referral.sourceUrl),
     sourceType: text(referral.source_type ?? referral.sourceType),
     headline: text(referral.headline),
@@ -49,19 +63,24 @@ export async function captureAdReferral(
   const result = await client.query(
     `INSERT INTO marketing.ad_referrals (
        environment,conversation_id,source_message_id,source_message_sent_at,
-       ctwa_clid,source_id,source_url,source_type,headline,captured_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$4)
-     ON CONFLICT (environment,ctwa_clid) DO NOTHING`,
+       channel,referral_key,ctwa_clid,source_id,source_url,source_type,headline,
+       native_message_id,referral_payload,captured_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$4)
+     ON CONFLICT DO NOTHING`,
     [
       input.environment,
       input.conversationId,
       input.messageId,
       input.messageSentAt,
+      referral.channel,
+      referral.referralKey,
       referral.ctwaClid,
       referral.sourceId,
       referral.sourceUrl,
       referral.sourceType,
       referral.headline,
+      input.nativeMessageId ?? null,
+      JSON.stringify(input.contentAttributes),
     ],
   );
   return (result.rowCount ?? 0) > 0;
@@ -75,6 +94,7 @@ export async function captureAdReferralAfterMessageUpsert(
     senderType: string;
     isPrivate: boolean;
     contentAttributes: Record<string, unknown>;
+    nativeMessageId?: string | null;
     chatwootMessageId: number;
   },
   upserted: { conversationId: string; messageId: string },
@@ -90,6 +110,7 @@ export async function captureAdReferralAfterMessageUpsert(
       senderType: message.senderType,
       isPrivate: message.isPrivate,
       contentAttributes: message.contentAttributes,
+      nativeMessageId: message.nativeMessageId,
     });
     await client.query('RELEASE SAVEPOINT marketing_referral_capture');
   } catch (error) {

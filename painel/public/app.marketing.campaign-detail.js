@@ -206,7 +206,7 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
       const quality = this.marketingCampaignDetail?.quality || {};
       return [
         { id: 'conversations', label: 'Conversas Meta', value: quality.conversations_meta ?? '—', source: 'META', icon: 'messages-square' },
-        { id: 'ctwa', label: 'CTWAs identificados', value: quality.ctwa_referrals ?? '—', source: 'FAREJADOR', icon: 'map-pin-check' },
+        { id: 'ctwa', label: 'Origens identificadas', value: quality.ctwa_referrals ?? '—', source: 'FAREJADOR', icon: 'map-pin-check' },
         { id: 'sales', label: 'Vendas atribuídas', value: quality.attributed_sales ?? '—', source: 'FAREJADOR', icon: 'shopping-bag' },
         { id: 'costs', label: 'Pedidos com custo completo',
           value: quality.attributed_sales == null ? '—' : `${quality.complete_cost_orders || 0} de ${quality.attributed_sales}`,
@@ -224,8 +224,8 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
           : result >= 0 ? 'Campanha pagou a mídia e gerou resultado positivo'
             : 'Campanha ainda não pagou o investimento em mídia',
         conversion == null
-          ? 'Conversão CTWA → venda ainda não calculada'
-          : `Conversão CTWA → venda: ${Number(conversion).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`,
+          ? 'Conversão origem → venda ainda não calculada'
+          : `Conversão origem → venda: ${Number(conversion).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`,
         'Nenhuma verba será alterada automaticamente',
       ];
     },
@@ -238,9 +238,9 @@ window.PAINEL_MODULES.marketingCampaignDetail = function () {
 
     marketingCampaignAttributionLabel(status) {
       const labels = {
-        ready: 'Atribuição CTWA disponível',
+        ready: 'Atribuição multicanal disponível',
         pending: 'Aguardando primeira venda atribuída',
-        disabled: 'Atribuição CTWA desligada',
+        disabled: 'Atribuição multicanal desligada',
         unavailable: 'Atribuição temporariamente indisponível',
       };
       return labels[status] || 'Aguardando atribuição';

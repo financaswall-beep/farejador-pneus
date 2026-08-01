@@ -1,4 +1,4 @@
-/** Cruza o detalhe Meta com CTWA, pedidos e margem sem liberar números sem prova. */
+/** Cruza o detalhe Meta com referências de mensagem, pedidos e margem sem estimativas. */
 import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
 import type { CampaignAttribution } from '../../marketing/reporting.js';

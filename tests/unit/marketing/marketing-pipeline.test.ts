@@ -81,7 +81,10 @@ describe('pipeline determinístico de Marketing', () => {
       total_amount: '799.90',
       realized_at: '2026-07-26T12:00:00.000Z',
       phone_e164: '+55 (21) 99999-0000',
+      channel: 'whatsapp' as const,
       ctwa_clid: 'clid-real',
+      user_scoped_id: null,
+      business_account_id: null,
       ad_account_id: 'act_123',
       campaign_id: 'camp-1',
       campaign_scope_id: 'scope-1',
@@ -116,6 +119,30 @@ describe('pipeline determinístico de Marketing', () => {
       zp: [expect.stringMatching(/^[a-f0-9]{64}$/)],
       country: [expect.stringMatching(/^[a-f0-9]{64}$/)],
     });
+
+    const messenger = buildCapiPayload({
+      ...row,
+      channel: 'messenger',
+      ctwa_clid: null,
+      user_scoped_id: 'psid-123',
+      business_account_id: 'page-456',
+    }, {}) as { data: Array<{ messaging_channel: string; user_data: Record<string, unknown> }> };
+    expect(messenger.data[0]).toMatchObject({
+      messaging_channel: 'messenger',
+      user_data: { page_id: 'page-456', page_scoped_user_id: 'psid-123' },
+    });
+
+    const instagram = buildCapiPayload({
+      ...row,
+      channel: 'instagram',
+      ctwa_clid: null,
+      user_scoped_id: 'igsid-123',
+      business_account_id: 'ig-456',
+    }, {}) as { data: Array<{ messaging_channel: string; user_data: Record<string, unknown> }> };
+    expect(instagram.data[0]).toMatchObject({
+      messaging_channel: 'instagram',
+      user_data: { ig_account_id: 'ig-456', ig_sid: 'igsid-123' },
+    });
   });
 
   it('enfileira somente compras recentes e nunca leva o código de teste para produção', async () => {
@@ -125,7 +152,10 @@ describe('pipeline determinístico de Marketing', () => {
       total_amount: '799.90',
       realized_at: '2026-07-26T12:00:00.000Z',
       phone_e164: '+5521999990000',
+      channel: 'whatsapp',
       ctwa_clid: 'clid-real',
+      user_scoped_id: null,
+      business_account_id: null,
       city_name: null,
       state_code: null,
       postal_code_prefix: null,
@@ -155,7 +185,10 @@ describe('pipeline determinístico de Marketing', () => {
         total_amount: '450.00',
         realized_at: '2026-07-26T13:00:00.000Z',
         phone_e164: '+5521988880000',
+        channel: 'whatsapp',
         ctwa_clid: 'clid-test',
+        user_scoped_id: null,
+        business_account_id: null,
         ad_account_id: 'act_123',
         campaign_id: 'camp-1',
         campaign_scope_id: 'scope-1',

@@ -27,6 +27,7 @@ import type { Environment } from '../shared/types/chatwoot.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { reconcileAgentOutboundDelivery } from '../atendente-v2/outbound-reconcile.js';
 import { captureAdReferralAfterMessageUpsert } from '../marketing/referrals.js';
+import { reconcilePendingMetaReferralsForMessage } from '../marketing/meta-messaging-referrals.js';
 
 export interface RawEvent {
   id: number;
@@ -207,6 +208,18 @@ export async function dispatch(
       const upsertedMessage = await upsertMessage(client, message);
 
       await captureAdReferralAfterMessageUpsert(client, environment as Environment, message, upsertedMessage);
+
+      // Messenger/Instagram chegam por um webhook Meta separado porque o Chatwoot
+      // nao preserva hoje o referral do anuncio. O casamento usa somente o mid
+      // nativo da mesma mensagem e permanece isolado por SAVEPOINT.
+      if (env.META_MESSAGING_WEBHOOK_ENABLED) {
+        await reconcilePendingMetaReferralsForMessage(
+          client,
+          environment as Environment,
+          message,
+          upsertedMessage,
+        );
+      }
 
       // Prova forte da entrega do bot: casa o id devolvido pela API com o
       // core.messages criado pelo webhook. Defensivo para nunca quebrar raw/core.

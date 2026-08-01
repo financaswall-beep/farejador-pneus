@@ -8,7 +8,10 @@ export interface CapiSourceRow {
   total_amount: string;
   realized_at: string;
   phone_e164: string | null;
-  ctwa_clid: string;
+  channel: 'whatsapp' | 'messenger' | 'instagram';
+  ctwa_clid: string | null;
+  user_scoped_id: string | null;
+  business_account_id: string | null;
   ad_account_id: string | null;
   campaign_id: string | null;
   campaign_scope_id: string | null;
@@ -19,7 +22,8 @@ export interface CapiSourceRow {
 
 const CAPI_SOURCE_SQL = `
   SELECT a.id AS attribution_id,o.order_number,o.total_amount::text,
-         a.realized_at::text,c.phone_e164,r.ctwa_clid,
+         a.realized_at::text,c.phone_e164,r.channel,r.ctwa_clid,
+         r.user_scoped_id,r.business_account_id,
          map.ad_account_id,map.campaign_id,s.id AS campaign_scope_id,
          g.city_name,g.state_code,g.postal_code_prefix
     FROM marketing.order_attributions a

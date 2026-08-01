@@ -1,4 +1,4 @@
-/** Detalhe de uma campanha Meta: entrega real, eficiência e financeiro protegido por CTWA. */
+/** Detalhe de campanha Meta com financeiro protegido por atribuição determinística. */
 import type { Pool } from 'pg';
 import { env } from '../../shared/config/env.js';
 import { pool as defaultPool } from '../../persistence/db.js';
@@ -145,7 +145,7 @@ export async function getMarketingCampaignDetail(
     ads: enrichment.ads,
     attribution: {
       status: attributionStatus,
-      method: 'last_click_ctwa_7d' as const,
+      method: 'last_click_messaging_7d' as const,
       attributed_sales: attributionStatus === 'ready' ? sales : null,
       attributed_revenue: attributionStatus === 'ready' ? revenue : null,
       gross_margin: attributionStatus === 'ready' ? grossMargin : null,

@@ -134,8 +134,33 @@ describe('environment security validation', () => {
     expect(parsed.MARKETING_SCOPE_ENFORCEMENT_ENABLED).toBe(false);
     expect(parsed.MARKETING_ATTRIBUTION).toBe(false);
     expect(parsed.MARKETING_CAPI_ENABLED).toBe(false);
+    expect(parsed.MARKETING_CAPI_MESSENGER_ENABLED).toBe(false);
+    expect(parsed.MARKETING_CAPI_INSTAGRAM_ENABLED).toBe(false);
+    expect(parsed.META_MESSAGING_WEBHOOK_ENABLED).toBe(false);
     expect(parsed.CAPI_EXTENDED_MATCHING).toBe(false);
     expect(parsed.META_ADS_ACCESS_TOKEN).toBeUndefined();
+  });
+
+  it('só habilita o webhook de mensagens da Meta com verificação e assinatura', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      META_MESSAGING_WEBHOOK_ENABLED: 'true',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/META_MESSAGING_WEBHOOK_VERIFY_TOKEN[\s\S]*META_APP_SECRET/);
+
+    const parsed = parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      META_MESSAGING_WEBHOOK_ENABLED: 'true',
+      META_MESSAGING_WEBHOOK_VERIFY_TOKEN: 'verify-token-seguro',
+      META_APP_SECRET: 'app-secret-seguro',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    });
+
+    expect(parsed.META_MESSAGING_WEBHOOK_ENABLED).toBe(true);
   });
 
   it('fails closed when Meta is enabled in production without server credentials', () => {
@@ -182,6 +207,21 @@ describe('environment security validation', () => {
     });
     expect(parsed.MARKETING_CAPI_ENABLED).toBe(true);
     expect(parsed.META_CAPI_PAGE_ID).toBe('456789');
+  });
+
+  it('exige Page ID apenas quando o retorno CAPI do Messenger está ativo', () => {
+    expect(() => parseEnv({
+      ...baseEnv,
+      NODE_ENV: 'production',
+      MARKETING_CAPI_ENABLED: 'true',
+      MARKETING_CAPI_MESSENGER_ENABLED: 'true',
+      MARKETING_ATTRIBUTION: 'true',
+      META_CAPI_DATASET_ID: '123456',
+      META_CAPI_ACCESS_TOKEN: 'token-capi-seguro',
+      META_WHATSAPP_BUSINESS_ACCOUNT_ID: '987654',
+      ADMIN_AUTH_TOKEN: 'a'.repeat(24),
+      CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
+    })).toThrow(/META_CAPI_PAGE_ID.*Messenger CAPI/);
   });
 
   it('não agenda sync da Meta com o conector desligado', () => {

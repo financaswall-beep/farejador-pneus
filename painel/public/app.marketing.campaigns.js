@@ -54,7 +54,7 @@ function marketingCampaignMockPayload(channel, period = '30d') {
       ...(reviews ? [{ id: 'review', severity: 'attention', title: `${reviews} campanha(s) precisam de revisão`,
         detail: 'A recomendação usa somente entrega e custo por conversa.', target: 'campanhas' }] : []),
       { id: 'attribution', severity: 'info', title: 'Atribuição determinística ativa na amostra',
-        detail: 'Last-click CTWA em 7 dias, com uma venda por clique.', target: 'jornadas' },
+        detail: 'Last-click de mensagem em 7 dias, com uma venda por clique.', target: 'jornadas' },
     ],
   };
 }

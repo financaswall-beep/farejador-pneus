@@ -15,7 +15,9 @@ beforeAll(async () => {
 });
 
 function poolWithAttribution(referrals: number, ctwa: number) {
-  const query = vi.fn().mockResolvedValue({ rows: [{ referrals, ctwa }] });
+  const query = vi.fn().mockResolvedValue({
+    rows: [{ referrals, tracked: referrals, ctwa, messenger: 0, instagram: 0 }],
+  });
   return { pool: { query } as unknown as Pool, query };
 }
 
@@ -52,7 +54,14 @@ describe('Marketing overview da matriz', () => {
       net_after_media: null,
       profit: null,
     });
-    expect(overview.attribution).toEqual({ available: true, referrals: 3, ctwa: 1 });
+    expect(overview.attribution).toEqual({
+      available: true,
+      referrals: 3,
+      tracked: 3,
+      ctwa: 1,
+      messenger: 0,
+      instagram: 0,
+    });
     expect(query).toHaveBeenCalledOnce();
     expect(query.mock.calls[0]?.[1]?.[0]).toBe(overview.environment);
   });

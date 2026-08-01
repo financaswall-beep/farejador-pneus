@@ -51,6 +51,7 @@ export async function upsertMessage(
           content = $7,
           content_type = $8,
           content_attributes = $9,
+          native_message_id = $18,
           is_private = $10,
           status = $11,
           external_source_ids = $12,
@@ -68,12 +69,12 @@ export async function upsertMessage(
       INSERT INTO core.messages (
         environment, chatwoot_message_id, conversation_id, chatwoot_conversation_id,
         sender_type, sender_id, message_type, content, content_type, content_attributes,
-        is_private, status, external_source_ids, echo_id, sent_at, last_event_at
+        native_message_id, is_private, status, external_source_ids, echo_id, sent_at, last_event_at
       )
       SELECT
         $1, $2,
         (SELECT id FROM conversation_ref),
-        $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+        $3, $4, $5, $6, $7, $8, $9, $18, $10, $11, $12, $13, $14, $15
       WHERE NOT EXISTS (SELECT 1 FROM existing_message)
       ON CONFLICT (environment, chatwoot_message_id, sent_at) DO UPDATE
       SET sender_type = EXCLUDED.sender_type,
@@ -82,6 +83,7 @@ export async function upsertMessage(
           content = EXCLUDED.content,
           content_type = EXCLUDED.content_type,
           content_attributes = EXCLUDED.content_attributes,
+          native_message_id = EXCLUDED.native_message_id,
           is_private = EXCLUDED.is_private,
           status = EXCLUDED.status,
           external_source_ids = EXCLUDED.external_source_ids,
@@ -115,6 +117,7 @@ export async function upsertMessage(
       message.lastEventAt,
       message.chatwootAccountId,
       message.chatwootInboxId,
+      message.nativeMessageId,
     ],
   );
 

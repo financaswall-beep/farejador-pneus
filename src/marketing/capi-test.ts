@@ -31,7 +31,6 @@ export async function sendLatestCapiTestPurchase(options: {
   const whatsappBusinessAccountId = config.whatsappBusinessAccountId
     ?? env.META_WHATSAPP_BUSINESS_ACCOUNT_ID;
   const testEventCode = config.testEventCode ?? env.META_CAPI_TEST_EVENT_CODE;
-  if (!whatsappBusinessAccountId) throw new Error('marketing_capi_waba_not_configured');
   if (!testEventCode) throw new Error('capi_test_event_code_not_configured');
 
   const source = await loadLatestCapiTestSource(options.dbPool ?? defaultPool);

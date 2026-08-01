@@ -39,17 +39,35 @@ function hashed(value: string | null): string[] | undefined {
 }
 
 export function buildCapiPayload(row: CapiSourceRow, options: {
-  whatsappBusinessAccountId: string;
+  whatsappBusinessAccountId?: string;
   pageId?: string;
   testEventCode?: string;
   extendedMatching?: boolean;
 }): Record<string, unknown> {
   const phone = row.phone_e164?.replace(/\D/g, '') ?? '';
-  const userData: Record<string, unknown> = {
-    ctwa_clid: row.ctwa_clid,
-    whatsapp_business_account_id: options.whatsappBusinessAccountId,
-  };
-  if (options.pageId) userData.page_id = options.pageId;
+  const channel = row.channel ?? 'whatsapp';
+  const userData: Record<string, unknown> = {};
+  if (channel === 'whatsapp') {
+    if (!row.ctwa_clid || !options.whatsappBusinessAccountId) {
+      throw new Error('marketing_capi_whatsapp_identity_missing');
+    }
+    userData.ctwa_clid = row.ctwa_clid;
+    userData.whatsapp_business_account_id = options.whatsappBusinessAccountId;
+    if (options.pageId) userData.page_id = options.pageId;
+  } else if (channel === 'messenger') {
+    const pageId = row.business_account_id ?? options.pageId;
+    if (!pageId || !row.user_scoped_id) {
+      throw new Error('marketing_capi_messenger_identity_missing');
+    }
+    userData.page_id = pageId;
+    userData.page_scoped_user_id = row.user_scoped_id;
+  } else {
+    if (!row.business_account_id || !row.user_scoped_id) {
+      throw new Error('marketing_capi_instagram_identity_missing');
+    }
+    userData.ig_account_id = row.business_account_id;
+    userData.ig_sid = row.user_scoped_id;
+  }
   if (phone) userData.ph = [sha256(phone)];
   if (options.extendedMatching) {
     const city = hashed(row.city_name);
@@ -66,7 +84,7 @@ export function buildCapiPayload(row: CapiSourceRow, options: {
       event_time: Math.floor(new Date(row.realized_at).getTime() / 1000),
       event_id: row.order_number,
       action_source: 'business_messaging',
-      messaging_channel: 'whatsapp',
+      messaging_channel: channel,
       user_data: userData,
       custom_data: {
         value: Math.round(Number(row.total_amount) * 100) / 100,
@@ -85,13 +103,12 @@ export async function enqueueCapiPurchases(options: {
 } = {}): Promise<number> {
   const enabled = options.enabled ?? env.MARKETING_CAPI_ENABLED;
   if (!enabled) return 0;
-  if (!env.META_WHATSAPP_BUSINESS_ACCOUNT_ID) {
-    throw new Error('marketing_capi_waba_not_configured');
-  }
   const dbPool = options.dbPool ?? defaultPool;
   const source = await loadProductionCapiSources(dbPool);
   let enqueued = 0;
   for (const row of source) {
+    if (row.channel === 'messenger' && !env.MARKETING_CAPI_MESSENGER_ENABLED) continue;
+    if (row.channel === 'instagram' && !env.MARKETING_CAPI_INSTAGRAM_ENABLED) continue;
     const payload = buildCapiPayload(row, {
       whatsappBusinessAccountId: env.META_WHATSAPP_BUSINESS_ACCOUNT_ID,
       pageId: env.META_CAPI_PAGE_ID,

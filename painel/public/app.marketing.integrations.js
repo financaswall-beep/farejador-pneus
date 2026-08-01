@@ -29,14 +29,14 @@ function marketingIntegrationMockPayload() {
     collection: [
       { id: 'campaigns', label: 'Campanhas e investimento', status: 'ok', detail: 'recebendo' },
       { id: 'conversations', label: 'Conversas por anúncio', status: 'ok', detail: 'recebendo' },
-      { id: 'ctwa', label: 'ctwa_clid', status: 'ok', detail: '61 referência(s)' },
+      { id: 'ctwa', label: 'Referências de mensagem', status: 'ok', detail: '61 referência(s)' },
       { id: 'capi', label: 'CAPI', status: 'pending', detail: 'implementada e desligada até passar no Test Events' },
     ],
     quality: [
       { id: 'credential', label: 'Credencial protegida', status: 'ok' },
       { id: 'account', label: 'Conta de anúncios', status: 'ok' },
       { id: 'sync', label: 'Sincronização', status: 'ok' },
-      { id: 'ctwa', label: 'Atribuição CTWA', status: 'ok' },
+      { id: 'ctwa', label: 'Atribuição multicanal', status: 'ok' },
       { id: 'capi', label: 'Retorno CAPI', status: 'pending' },
     ],
     next_step: 'Validar Purchase no Test Events e ativar a CAPI',

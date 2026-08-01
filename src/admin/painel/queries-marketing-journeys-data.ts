@@ -3,7 +3,10 @@ import type { Pool } from 'pg';
 export interface OperationalJourney {
   available: boolean;
   referrals: number;
+  tracked: number;
   ctwa: number;
+  messenger: number;
+  instagram: number;
   qualified: number;
   quotes: number;
   order_intents: number;
@@ -11,7 +14,10 @@ export interface OperationalJourney {
 
 interface OperationalJourneyRow {
   referrals: unknown;
+  tracked: unknown;
   ctwa: unknown;
+  messenger: unknown;
+  instagram: unknown;
   qualified: unknown;
   quotes: unknown;
   order_intents: unknown;
@@ -31,29 +37,29 @@ export async function loadOperationalJourney(
   try {
     const result = await dbPool.query<OperationalJourneyRow>(
       `WITH tracked AS (
-         SELECT conversation_id, min(sent_at) AS attributed_at
-         FROM core.messages
+         SELECT conversation_id,min(captured_at) AS attributed_at,
+                bool_or(channel='whatsapp') AS has_whatsapp,
+                bool_or(channel='messenger') AS has_messenger,
+                bool_or(channel='instagram') AS has_instagram
+         FROM marketing.ad_referrals
          WHERE environment = $1
-           AND sender_type = 'contact'
-           AND is_private = false
-           AND sent_at >= $2::date
-           AND sent_at < ($3::date + 1)
-           AND COALESCE(content_attributes #>> '{referral,ctwa_clid}', '') <> ''
+           AND captured_at >= $2::date
+           AND captured_at < ($3::date + 1)
          GROUP BY conversation_id
        ),
        referrals AS (
          SELECT DISTINCT conversation_id
-         FROM core.messages
+         FROM marketing.ad_referrals
          WHERE environment = $1
-           AND sender_type = 'contact'
-           AND is_private = false
-           AND sent_at >= $2::date
-           AND sent_at < ($3::date + 1)
-           AND content_attributes ? 'referral'
+           AND captured_at >= $2::date
+           AND captured_at < ($3::date + 1)
        )
        SELECT
          (SELECT count(*) FROM referrals)::int AS referrals,
-         (SELECT count(*) FROM tracked)::int AS ctwa,
+         (SELECT count(*) FROM tracked)::int AS tracked,
+         (SELECT count(*) FROM tracked WHERE has_whatsapp)::int AS ctwa,
+         (SELECT count(*) FROM tracked WHERE has_messenger)::int AS messenger,
+         (SELECT count(*) FROM tracked WHERE has_instagram)::int AS instagram,
          (SELECT count(DISTINCT cc.conversation_id)
             FROM analytics.conversation_classifications cc
             JOIN tracked t ON t.conversation_id = cc.conversation_id
@@ -81,7 +87,10 @@ export async function loadOperationalJourney(
     return {
       available: true,
       referrals: numberValue(row?.referrals),
+      tracked: numberValue(row?.tracked ?? row?.referrals),
       ctwa: numberValue(row?.ctwa),
+      messenger: numberValue(row?.messenger),
+      instagram: numberValue(row?.instagram),
       qualified: numberValue(row?.qualified),
       quotes: numberValue(row?.quotes),
       order_intents: numberValue(row?.order_intents),
@@ -90,7 +99,10 @@ export async function loadOperationalJourney(
     return {
       available: false,
       referrals: 0,
+      tracked: 0,
       ctwa: 0,
+      messenger: 0,
+      instagram: 0,
       qualified: 0,
       quotes: 0,
       order_intents: 0,

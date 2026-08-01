@@ -54,6 +54,7 @@ describe('Marketing — Jornadas rastreáveis', () => {
     const secret = 'token-somente-no-servidor';
     const { pool, query } = poolWithJourney({
       referrals: 3,
+      tracked: 3,
       ctwa: 2,
       qualified: 2,
       quotes: 1,
@@ -77,7 +78,8 @@ describe('Marketing — Jornadas rastreáveis', () => {
     expect(payload.metrics).toMatchObject({
       conversations: 40,
       ctwa: 2,
-      tracking_coverage_percent: 5,
+      tracked: 3,
+      tracking_coverage_percent: 7.5,
       attributed_sales: null,
       attributed_revenue: null,
     });
@@ -100,6 +102,7 @@ describe('Marketing — Jornadas rastreáveis', () => {
   it('libera somente eventos posteriores ao CTWA quando a atribuição foi validada', async () => {
     const { pool } = poolWithJourney({
       referrals: 4,
+      tracked: 4,
       ctwa: 4,
       qualified: 3,
       quotes: 2,
@@ -146,6 +149,7 @@ describe('Marketing — Jornadas rastreáveis', () => {
   it('não distribui CTWA por campanha quando não existe chave de anúncio para conciliar', async () => {
     const { pool } = poolWithJourney({
       referrals: 0,
+      tracked: 0,
       ctwa: 0,
       qualified: 0,
       quotes: 0,

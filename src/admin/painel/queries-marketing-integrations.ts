@@ -107,8 +107,8 @@ export async function getMarketingIntegrations(
 
   const metaStatus = overview.connection.meta;
   const metaConnected = metaStatus === 'connected';
-  const hasCtwa = overview.attribution.available && overview.attribution.ctwa > 0;
-  const attributionReady = overview.connection.attribution === 'enabled' && hasCtwa;
+  const hasReferral = overview.attribution.available && overview.attribution.tracked > 0;
+  const attributionReady = overview.connection.attribution === 'enabled' && hasReferral;
   const syncedAt = health.last_sync_at ?? overview.connection.meta_synced_at;
   const capiEnabled = overview.connection.capi === 'enabled';
   const capiHealthy = capiEnabled && health.available && health.capi.dead_letter === 0;
@@ -117,12 +117,12 @@ export async function getMarketingIntegrations(
     check('credential', 'Credencial protegida', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
     check('account', 'Conta de anúncios', accountId ? 'ok' : 'pending'),
     check('sync', 'Sincronização', metaConnected ? 'ok' : metaStatus === 'error' ? 'error' : 'pending'),
-    check('ctwa', 'Atribuição CTWA', hasCtwa ? 'ok' : 'pending'),
+    check('ctwa', 'Atribuição por mensagem', hasReferral ? 'ok' : 'pending'),
     check('capi', 'Retorno CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
   ];
   const ready = quality.filter((row) => row.status === 'ok').length;
   const criticalPending = Number(!metaConnected)
-    + Number((overview.metrics.conversations ?? 0) > 0 && !hasCtwa);
+    + Number((overview.metrics.conversations ?? 0) > 0 && !hasReferral);
 
   return {
     environment: overview.environment,
@@ -172,10 +172,10 @@ export async function getMarketingIntegrations(
         detail: metaConnected ? 'recebendo' : 'sem coleta' },
       { ...check('conversations', 'Conversas por anúncio', metaConnected ? 'ok' : 'pending'),
         detail: metaConnected ? 'recebendo' : 'sem coleta' },
-      { ...check('ctwa', 'ctwa_clid', hasCtwa ? 'ok' : 'pending'),
-        detail: hasCtwa
-          ? `${overview.attribution.ctwa} referência(s)`
-          : 'ausente; exige campanha de Mensagens, não impulsionamento comum' },
+      { ...check('ctwa', 'Referências de anúncio', hasReferral ? 'ok' : 'pending'),
+        detail: hasReferral
+          ? `${overview.attribution.tracked} referência(s): ${overview.attribution.ctwa} WhatsApp, ${overview.attribution.messenger} Messenger, ${overview.attribution.instagram} Instagram`
+          : 'ausente; exige campanha de Mensagens com referral entregue ao Farejador' },
       {
         ...check('capi', 'CAPI', capiHealthy ? 'ok' : capiEnabled ? 'error' : 'pending'),
         detail: capiEnabled
@@ -186,7 +186,7 @@ export async function getMarketingIntegrations(
     quality,
     next_step: !metaConnected
       ? 'Conectar a Meta usando credenciais protegidas'
-      : !hasCtwa
+      : !hasReferral
         ? 'Validar o vínculo entre conversa e venda'
         : overview.connection.attribution !== 'enabled'
           ? 'Habilitar a atribuição depois da prova ponta a ponta'

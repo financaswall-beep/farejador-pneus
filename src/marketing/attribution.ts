@@ -3,8 +3,8 @@ import { pool as defaultPool } from '../persistence/db.js';
 import { env } from '../shared/config/env.js';
 
 const ATTRIBUTION_MODEL = 'last_click_7d_one_sale';
-const RULE_VERSION = 1;
-const EXTRACTOR_VERSION = 'marketing_attribution_sql_v1';
+const RULE_VERSION = 2;
+const EXTRACTOR_VERSION = 'marketing_attribution_sql_v2_multichannel';
 
 interface RealizedOrder {
   id: string;
@@ -15,6 +15,7 @@ interface RealizedOrder {
 interface ReferralCandidate {
   id: string;
   captured_at: string;
+  channel: 'whatsapp' | 'messenger' | 'instagram';
 }
 
 export interface AttributionReconcileResult {
@@ -30,15 +31,19 @@ export async function backfillAdReferrals(client: PoolClient): Promise<number> {
   const result = await client.query(
     `INSERT INTO marketing.ad_referrals (
        environment,conversation_id,source_message_id,source_message_sent_at,
-       ctwa_clid,source_id,source_url,source_type,headline,captured_at
+       channel,referral_key,ctwa_clid,source_id,source_url,source_type,headline,
+       referral_payload,captured_at
      )
      SELECT DISTINCT ON (m.environment,m.content_attributes #>> '{referral,ctwa_clid}')
        m.environment,m.conversation_id,m.id,m.sent_at,
+       'whatsapp',
+       'whatsapp:'||(m.content_attributes #>> '{referral,ctwa_clid}'),
        m.content_attributes #>> '{referral,ctwa_clid}',
        NULLIF(m.content_attributes #>> '{referral,source_id}',''),
        NULLIF(m.content_attributes #>> '{referral,source_url}',''),
        NULLIF(m.content_attributes #>> '{referral,source_type}',''),
        NULLIF(m.content_attributes #>> '{referral,headline}',''),
+       m.content_attributes,
        m.sent_at
      FROM core.messages m
      WHERE m.environment=$1 AND m.sender_type='contact' AND m.is_private=false
@@ -141,7 +146,7 @@ async function revokeInvalidAttributions(client: PoolClient): Promise<number> {
          rule_version,source_type,truth_type,confidence_level,source_reference,
          extractor_version,realized_at
        ) VALUES (
-         $1,$2,$3,$4,'revoked',$5,$6,'deterministic_ctwa','corrected',1.00,
+         $1,$2,$3,$4,'revoked',$5,$6,'deterministic_meta_messaging','corrected',1.00,
          jsonb_build_object('reason','sale_not_realized','previous_attribution_id',$7),
          $8,$9
        ) RETURNING id`,
@@ -165,7 +170,7 @@ async function findReferral(
   used: Set<string>,
 ): Promise<ReferralCandidate | null> {
   const result = await client.query<ReferralCandidate>(
-    `SELECT r.id,r.captured_at::text
+    `SELECT r.id,r.captured_at::text,r.channel
        FROM marketing.ad_referrals r
       WHERE r.environment=$1 AND r.conversation_id=$2
         AND r.captured_at<=$3::timestamptz
@@ -215,13 +220,14 @@ export async function reconcileMarketingAttributions(options: {
            rule_version,source_type,truth_type,confidence_level,source_reference,
            extractor_version,realized_at
          ) VALUES (
-           $1,$2,$3,$4,'active',$5,$6,'deterministic_ctwa','observed',1.00,
-           jsonb_build_object('ctwa_referral_id',$3,'order_id',$2,'window_days',7),
-           $7,$8
+           $1,$2,$3,$4,'active',$5,$6,'deterministic_meta_messaging','observed',1.00,
+           jsonb_build_object('ad_referral_id',$3,'order_id',$2,'window_days',7,
+             'channel',$7),$8,$9
          ) ON CONFLICT DO NOTHING`,
         [
           env.FAREJADOR_ENV, order.id, referral.id, order.conversation_id,
-          ATTRIBUTION_MODEL, RULE_VERSION, EXTRACTOR_VERSION, order.realized_at,
+          ATTRIBUTION_MODEL, RULE_VERSION, referral.channel,
+          EXTRACTOR_VERSION, order.realized_at,
         ],
       );
       if ((inserted.rowCount ?? 0) > 0) {
