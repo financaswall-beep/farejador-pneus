@@ -10,6 +10,7 @@ let enqueueCapiPurchases: typeof import('../../../src/marketing/capi.js').enqueu
 let pollCapiOutbox: typeof import('../../../src/marketing/capi.js').pollCapiOutbox;
 let sendLatestCapiTestPurchase:
   typeof import('../../../src/marketing/capi-test.js').sendLatestCapiTestPurchase;
+let sendCapiPayload: typeof import('../../../src/marketing/capi-transport.js').sendCapiPayload;
 let syncMetaInsights: typeof import('../../../src/marketing/meta-sync.js').syncMetaInsights;
 let reconcileMarketingAttributions:
   typeof import('../../../src/marketing/attribution.js').reconcileMarketingAttributions;
@@ -33,6 +34,7 @@ beforeAll(async () => {
     '../../../src/marketing/capi.js'
   ));
   ({ sendLatestCapiTestPurchase } = await import('../../../src/marketing/capi-test.js'));
+  ({ sendCapiPayload } = await import('../../../src/marketing/capi-transport.js'));
   ({ syncMetaInsights } = await import('../../../src/marketing/meta-sync.js'));
   ({ reconcileMarketingAttributions } = await import('../../../src/marketing/attribution.js'));
 });
@@ -230,6 +232,28 @@ describe('pipeline determinístico de Marketing', () => {
       test_event_code?: string;
     };
     expect(requestBody.test_event_code).toBe('TEST42');
+  });
+
+  it('preserva o diagnóstico sanitizado da Meta sem vazar dados sensíveis', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      error: {
+        code: 100,
+        message: 'Invalid parameter:\nuser_data access_token=segredo +5521988880000',
+        error_user_msg: 'Use a supported field',
+      },
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    await expect(sendCapiPayload({ data: [] }, {
+      fetcher: fetcher as typeof fetch,
+      datasetId: 'dataset-test',
+      accessToken: 'token-test',
+      apiVersion: 'v21.0',
+    })).rejects.toThrow(
+      'meta_capi_100:Invalid parameter: user_data access_token=[redacted] [redacted] - Use a supported field',
+    );
   });
 
   it('manda evento vencido para dead-letter sem chamar a Meta', async () => {

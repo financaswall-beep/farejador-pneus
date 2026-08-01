@@ -13,6 +13,18 @@ export interface CapiTransportOptions {
   apiVersion?: string;
 }
 
+function sanitizeMetaErrorDetail(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/access_token\s*[=:]\s*[^\s&,]+/gi, 'access_token=[redacted]')
+    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[redacted]')
+    .replace(/\+?\b\d{8,}\b/g, '[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300);
+}
+
 export async function sendCapiPayload(
   payload: Record<string, unknown>,
   options: CapiTransportOptions = {},
@@ -38,11 +50,23 @@ export async function sendCapiPayload(
   const body = await response.json().catch(() => ({})) as {
     events_received?: unknown;
     fbtrace_id?: unknown;
-    error?: { code?: unknown; message?: unknown };
+    error?: {
+      code?: unknown;
+      message?: unknown;
+      error_user_title?: unknown;
+      error_user_msg?: unknown;
+    };
   };
   if (!response.ok || body.error) {
     const code = body.error?.code ? String(body.error.code) : String(response.status);
-    throw new Error(`meta_capi_${code}`);
+    const detail = [
+      sanitizeMetaErrorDetail(body.error?.message),
+      sanitizeMetaErrorDetail(body.error?.error_user_title),
+      sanitizeMetaErrorDetail(body.error?.error_user_msg),
+    ].filter((item, index, items) => item && items.indexOf(item) === index)
+      .join(' - ')
+      .slice(0, 300);
+    throw new Error(detail ? `meta_capi_${code}:${detail}` : `meta_capi_${code}`);
   }
   return {
     eventsReceived: Number(body.events_received ?? 0),

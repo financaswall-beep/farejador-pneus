@@ -48,6 +48,13 @@ const syncBodySchema = z.object({
   lookback_days: z.union([z.literal(7), z.literal(60)]).default(60),
 }).strict();
 
+function capiFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return /^meta_capi_[0-9]+(?::.{1,300})?$/.test(message)
+    ? message
+    : 'marketing_capi_unknown_error';
+}
+
 export async function registerPainelMarketing(fastify: FastifyInstance): Promise<void> {
   fastify.get('/admin/api/marketing/overview', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = querySchema.safeParse(request.query ?? {});
@@ -228,15 +235,16 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
       });
       return reply.status(200).send(result);
     } catch (err) {
+      const reason = capiFailureReason(err);
       await recordMarketingAudit({
         eventType: 'marketing_capi_test',
         actorLabel: getAdminContext(request).displayName,
         entityTable: 'marketing.capi_test',
         idempotencyKey: String(request.id),
-        payload: { status: 'failed' },
+        payload: { status: 'failed', reason },
       });
       logger.error({ err }, 'painel marketing CAPI test failed');
-      return reply.status(503).send({ error: 'marketing_capi_test_failed' });
+      return reply.status(503).send({ error: 'marketing_capi_test_failed', reason });
     }
   });
 }

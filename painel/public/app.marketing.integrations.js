@@ -160,8 +160,13 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
         await this.loadMarketingIntegrations();
       } catch (error) {
         const code = error?.message || '';
+        const reason = typeof error?.payload?.reason === 'string'
+          ? error.payload.reason
+          : '';
         this.marketingIntegrationsMessage = code === 'capi_test_event_code_not_configured'
           ? 'Configure META_CAPI_TEST_EVENT_CODE antes de testar a CAPI.'
+          : action === 'capi_test' && reason.startsWith('meta_capi_')
+            ? `A Meta recusou o teste: ${reason}`
           : 'A ação não foi concluída. Confira a configuração e o diagnóstico do pipeline.';
       } finally {
         this.marketingIntegrationActionLoading = '';
