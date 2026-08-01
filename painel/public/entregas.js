@@ -7,6 +7,7 @@
  */
 function entregasApp() {
   return {
+    ...entregasCardActions(),
     token: localStorage.getItem('farejador_entregador_token') || '',
     displayName: localStorage.getItem('farejador_entregador_nome') || '',
     loginForm: { username: '', password: '' },
@@ -22,6 +23,8 @@ function entregasApp() {
     salvando: false,
     uploadando: false,
     comprovantesOk: 0,
+    fotoPneuUrls: {},
+    fotoPneuAberta: { open: false, url: null },
     msg: null,
     dialogo: { open: false, kind: null, delivery: null, reason: '' },
 
@@ -71,6 +74,9 @@ function entregasApp() {
     },
 
     forcarLogout() {
+      Object.values(this.fotoPneuUrls).forEach((url) => URL.revokeObjectURL(url));
+      this.fotoPneuUrls = {};
+      this.fotoPneuAberta = { open: false, url: null };
       this.token = ''; this.displayName = '';
       localStorage.removeItem('farejador_entregador_token');
       localStorage.removeItem('farejador_entregador_nome');
@@ -88,6 +94,7 @@ function entregasApp() {
         const data = await this.api('GET', '/api/entregas/minha-rota');
         this.displayName = data.display_name || this.displayName;
         this.rotaAberta = data.rota_aberta;
+        this.aplicarOrdemSalva();
         this.fila = data.fila || [];
         this.comprovantesOk = 0;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
@@ -110,18 +117,6 @@ function entregasApp() {
       } catch (err) {
         this.msg = { ok: false, text: err.message === 'trip_already_open'
           ? 'Você já tem uma rota aberta.' : 'Não consegui abrir a rota.' };
-      } finally { this.salvando = false; }
-    },
-
-    async entreguei(d, pm) {
-      this.salvando = true; this.msg = null;
-      try {
-        await this.api('POST', '/api/entregas/status', { order_id: d.order_id, status: 'delivered', payment_method: pm });
-        this.pagando = null;
-        this.msg = { ok: true, text: 'Entrega confirmada!' };
-        await this.carregar();
-      } catch (err) {
-        this.msg = { ok: false, text: 'Não consegui confirmar a entrega.' };
       } finally { this.salvando = false; }
     },
 
@@ -193,6 +188,7 @@ function entregasApp() {
 
     async fecharRota() {
       this.salvando = true; this.msg = null;
+      const ordemKey = this.ordemRotaKey();
       try {
         await this.api('POST', '/api/entregas/rota/fechar', {
           km_end: this.fecharForm.km_end === '' ? null : Number(this.fecharForm.km_end),
@@ -200,9 +196,12 @@ function entregasApp() {
         });
         this.msg = { ok: true, text: 'Rota fechada. A gasolina ficou anotada e o escritório confere o comprovante.' };
         this.fecharForm = { km_end: '', fuel_spent: '' };
+        if (ordemKey) localStorage.removeItem(ordemKey);
         await this.carregar();
       } catch (err) {
-        this.msg = { ok: false, text: 'Não consegui fechar a rota.' };
+        this.msg = { ok: false, text: err.message === 'trip_has_unresolved_deliveries'
+          ? 'Ainda há paradas pendentes. Finalize ou informe que não entregou.'
+          : 'Não consegui fechar a rota.' };
       } finally { this.salvando = false; }
     },
 

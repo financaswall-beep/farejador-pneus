@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(resolve('painel/public/entregas.html'), 'utf8');
 const script = readFileSync(resolve('painel/public/entregas.js'), 'utf8');
+const cardActions = readFileSync(resolve('painel/public/entregas.card-actions.js'), 'utf8');
 const route = readFileSync(resolve('src/admin/entregador/route.ts'), 'utf8');
+const staticRoutes = readFileSync(resolve('src/admin/entregador/route-static.ts'), 'utf8');
+const queries = readFileSync(resolve('src/admin/entregador/queries.ts'), 'utf8');
+const deliveryActions = readFileSync(resolve('src/admin/entregador/queries-delivery-actions.ts'), 'utf8');
 
 describe('portal mobile do entregador', () => {
   it('organiza rota, paradas e fechamento sem remover as ações operacionais', () => {
@@ -28,8 +32,8 @@ describe('portal mobile do entregador', () => {
     expect(html).toContain('x-model="fecharForm.km_end"');
     expect(html).toContain('x-model="fecharForm.fuel_spent"');
     expect(html).toContain('@change="subirComprovante($event)"');
-    expect(route).toContain("'/entregas/finalizar-rota-curva-v1.webp'");
-    expect(route).toContain("'assets/entregas-finalizar-rota-curva-v1.webp'");
+    expect(staticRoutes).toContain("'/entregas/finalizar-rota-curva-v1.webp'");
+    expect(staticRoutes).toContain("'entregas-finalizar-rota-curva-v1.webp'");
   });
 
   it('usa os botões ilustrados de navegação servidos localmente', () => {
@@ -41,7 +45,7 @@ describe('portal mobile do entregador', () => {
 
     for (const asset of assets) {
       expect(statSync(resolve('painel/public/assets', asset)).size).toBeGreaterThan(4_000);
-      expect(route).toContain(`'assets/${asset}'`);
+      expect(staticRoutes).toContain(`'${asset}'`);
     }
 
     expect(html).toContain('src="/entregas/button-whatsapp-v2.webp"');
@@ -57,5 +61,33 @@ describe('portal mobile do entregador', () => {
     expect(script).toContain('entregasPendentes()');
     expect(script).toContain('percentualRota()');
     expect(script).toContain("d.delivery_status === 'delivered'");
+  });
+
+  it('permite reordenar as paradas e preserva a ordem no próprio aparelho', () => {
+    expect(html).toContain('Reordenar parada');
+    expect(html).toContain('@click="moverParada(index, -1)"');
+    expect(html).toContain('@click="moverParada(index, 1)"');
+    expect(cardActions).toContain('moverParada(index, direcao)');
+    expect(cardActions).toContain('farejador_entregador_ordem_');
+    expect(script).toContain('aplicarOrdemSalva()');
+  });
+
+  it('expõe o fluxo pendente → saiu para entrega → entregue e permite desfazer a saída', () => {
+    expect(html).toContain('Saiu para entrega');
+    expect(html).toContain('Voltar para pendente');
+    expect(html).toContain("atualizarStatus(d, 'dispatched')");
+    expect(html).toContain("atualizarStatus(d, 'pending')");
+    expect(route).toContain("z.enum(['pending', 'dispatched', 'delivered'])");
+    expect(deliveryActions).toContain("($3 = 'delivered' AND o.delivery_status = 'dispatched')");
+    expect(queries).toContain("SET trip_id = $3, delivery_status = 'pending'");
+  });
+
+  it('serve a foto aprovada somente pela rota autenticada do entregador', () => {
+    expect(html).toContain('Foto do pneu aprovado');
+    expect(cardActions).toContain('/api/entregas/fotos/${photoRequestId}/imagem');
+    expect(route).toContain("'/api/entregas/fotos/:photoRequestId/imagem'");
+    expect(route).toContain('getEntregadorProductPhotoImage');
+    expect(deliveryActions).toContain('t.courier_collaborator_id = $3');
+    expect(deliveryActions).toContain('p_photo.product_name = pr.tire_size');
   });
 });

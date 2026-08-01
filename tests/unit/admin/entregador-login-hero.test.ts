@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 describe('login mobile do entregador', () => {
   it('usa a arte vertical da Fiorino 2W e mantém o formulário acessível', () => {
     const html = readFileSync(resolve('painel/public/entregas.html'), 'utf8');
-    const route = readFileSync(resolve('src/admin/entregador/route.ts'), 'utf8');
+    const route = readFileSync(resolve('src/admin/entregador/route-static.ts'), 'utf8');
     const asset = resolve('painel/public/assets/entregas-login-fiorino-galpao-v5.webp');
 
     expect(statSync(asset).size).toBeGreaterThan(50_000);
@@ -13,7 +13,7 @@ describe('login mobile do entregador', () => {
     expect(html).toContain('aria-labelledby="delivery-login-title"');
     expect(html).toContain('autocomplete="username"');
     expect(html).toContain('autocomplete="current-password"');
-    expect(route).toContain("fastify.get('/entregas/hero-fiorino-galpao-v5.webp'");
-    expect(route).toContain("'assets/entregas-login-fiorino-galpao-v5.webp'");
+    expect(route).toContain("asset('/entregas/hero-fiorino-galpao-v5.webp'");
+    expect(route).toContain("'entregas-login-fiorino-galpao-v5.webp'");
   });
 });

@@ -21,8 +21,8 @@ import { env } from '../../shared/config/env.js';
 import { hashPassword, verifyPassword, fakeVerify, hashSessionToken } from '../../parceiro/password.js';
 import { MAIN_DELIVERY_GUARD, closeMatrizTrip, addMatrizTripReceipt,
   type MatrizReceiptUploadResult } from '../painel/queries.js';
-import { postMatrizRetailPaymentIfRealized } from '../painel/matriz-ledger-retail-sales.js';
 export { reportEntregadorFail } from './queries-report-fail.js';
+export { setEntregadorDeliveryStatus, getEntregadorProductPhotoImage } from './queries-delivery-actions.js';
 
 void hashPassword; // reservado (troca de senha do próprio entregador — fatia futura)
 
@@ -147,6 +147,7 @@ export interface EntregadorDeliveryCard {
   delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
   scheduled_date: string;      // YYYY-MM-DD (D+1 padrão ou remarcada)
   scheduled_raw: string | null;
+  photo_request_id: string | null;
   items: Array<{ quantity: number; label: string }>;
 }
 
@@ -167,6 +168,7 @@ const CARD_SELECT = `
          o.delivery_address, o.total_amount::text AS cobrar, o.delivery_status,
          o.scheduled_delivery_date::text AS scheduled_raw,
          COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
+         approved_photo.photo_request_id,
          COALESCE((SELECT jsonb_agg(jsonb_build_object(
                      'quantity', oi.quantity,
                      'label', COALESCE(pr.product_name, 'item')) ORDER BY oi.created_at)
@@ -175,6 +177,29 @@ const CARD_SELECT = `
                     WHERE oi.order_id = o.id AND oi.environment = o.environment), '[]'::jsonb) AS items
     FROM commerce.orders o
     LEFT JOIN core.contacts c ON c.id = o.contact_id
+    LEFT JOIN LATERAL (
+      SELECT prq.id AS photo_request_id
+        FROM core.conversations cv
+        JOIN commerce.photo_requests prq
+          ON prq.environment = cv.environment
+         AND prq.conversation_id = cv.chatwoot_conversation_id
+       WHERE cv.id = o.source_conversation_id
+         AND cv.environment = o.environment
+         AND EXISTS (
+           SELECT 1 FROM commerce.photo_request_blobs b
+            WHERE b.environment = prq.environment AND b.photo_request_id = prq.id
+         )
+         AND EXISTS (
+           SELECT 1
+             FROM commerce.order_items oi_photo
+             JOIN commerce.products p_photo ON p_photo.id = oi_photo.product_id
+            WHERE oi_photo.order_id = o.id
+              AND oi_photo.environment = o.environment
+              AND p_photo.product_name = prq.tire_size
+         )
+       ORDER BY prq.created_at DESC
+       LIMIT 1
+    ) approved_photo ON true
    WHERE o.environment = $1 AND ${MAIN_DELIVERY_GUARD}`;
 
 /** A rota aberta do entregador (com as entregas dela) + a fila do dia fora de rota. */
@@ -196,7 +221,7 @@ export async function getEntregadorRota(
     openTrip
       ? dbPool.query<EntregadorDeliveryCard>(
           `${CARD_SELECT} AND o.trip_id = $2 AND o.status <> 'cancelled'
-             AND o.delivery_status IN ('dispatched','delivered')
+             AND o.delivery_status IN ('pending','dispatched','delivered')
            ORDER BY o.delivery_status ASC, o.created_at ASC`,
           [environment, openTrip.id])
       : Promise.resolve({ rows: [] as EntregadorDeliveryCard[] }),
@@ -245,8 +270,8 @@ export async function openEntregadorTrip(
     }
     const upd = await client.query(
       `UPDATE commerce.orders o
-          SET trip_id = $3, delivery_status = 'dispatched',
-              dispatched_at = COALESCE(o.dispatched_at, now()),
+          SET trip_id = $3, delivery_status = 'pending',
+              dispatched_at = NULL,
               delivery_courier = $4, updated_at = now()
         WHERE o.id = ANY($2::uuid[]) AND o.environment = $1
           AND o.status <> 'cancelled' AND o.delivery_status = 'pending' AND o.trip_id IS NULL
@@ -258,67 +283,6 @@ export async function openEntregadorTrip(
     if (count === 0) throw new Error('trip_needs_delivery'); // rollback desfaz a trip
     await client.query('COMMIT');
     return { trip_id: tripId, deliveries_count: count };
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-/** SAIU / ENTREGUE. Posse no WHERE: o pedido tem de estar numa trip ABERTA DELE.
- *  Entregue grava o NOME dele em delivery_courier/closed_by (trilha de quem fez). */
-export async function setEntregadorDeliveryStatus(
-  auth: EntregadorAuth,
-  input: { order_id: string; status: 'dispatched' | 'delivered'; payment_method?: string | null },
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<{ order_id: string; delivery_status: string }> {
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    const observed = await client.query<{ trip_id: string }>(
-      `SELECT o.trip_id FROM commerce.orders o
-        JOIN commerce.matriz_delivery_trips t
-          ON t.id=o.trip_id AND t.environment=o.environment
-       WHERE o.id=$2 AND o.environment=$1 AND t.courier_collaborator_id=$3`,
-      [environment, input.order_id, auth.collaboratorId],
-    );
-    const tripId = observed.rows[0]?.trip_id;
-    if (!tripId) throw new Error('delivery_not_found');
-    const trip = await client.query(
-      `SELECT id FROM commerce.matriz_delivery_trips
-        WHERE id=$2 AND environment=$1 AND courier_collaborator_id=$3
-          AND status='open' AND deleted_at IS NULL FOR UPDATE`,
-      [environment, tripId, auth.collaboratorId],
-    );
-    if (!trip.rows[0]) throw new Error('delivery_not_found');
-    const r = await client.query<{ order_id: string; delivery_status: string }>(
-    `UPDATE commerce.orders o
-        SET delivery_status = $3,
-            delivery_courier = $6,
-            dispatched_at = CASE WHEN $3 = 'dispatched' THEN COALESCE(o.dispatched_at, now()) ELSE o.dispatched_at END,
-            delivered_at  = CASE WHEN $3 = 'delivered'  THEN now() ELSE o.delivered_at END,
-            status        = CASE WHEN $3 = 'delivered'  THEN 'delivered' ELSE o.status END,
-            payment_method = CASE WHEN $3 = 'delivered' THEN COALESCE(NULLIF($5, ''), o.payment_method) ELSE o.payment_method END,
-            closed_at     = CASE WHEN $3 = 'delivered'  THEN COALESCE(o.closed_at, now()) ELSE o.closed_at END,
-            closed_by     = CASE WHEN $3 = 'delivered'  THEN COALESCE(o.closed_by, $6) ELSE o.closed_by END,
-            updated_at    = now()
-      WHERE o.id = $2 AND o.environment = $1
-        AND o.status <> 'cancelled' AND o.delivery_status <> 'delivered'
-        AND o.trip_id=$7
-        AND ${MAIN_DELIVERY_GUARD}
-        AND o.trip_id IN (SELECT t.id FROM commerce.matriz_delivery_trips t
-                           WHERE t.environment = $1 AND t.courier_collaborator_id = $4 AND t.status = 'open')
-      RETURNING o.id AS order_id, o.delivery_status`,
-      [environment, input.order_id, input.status, auth.collaboratorId,
-       input.payment_method ?? null, auth.displayName, tripId],
-    );
-    if (!r.rows[0]) throw new Error('delivery_not_found');
-    if (input.status === 'delivered') await postMatrizRetailPaymentIfRealized(
-      client, environment, input.order_id, auth.displayName);
-    await client.query('COMMIT');
-    return r.rows[0];
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;

@@ -7,7 +7,8 @@
 <meta name="theme-color" content="#047857" />
 <link rel="stylesheet" href="/tailwind.css?v=20260719-etapa11" />
 <script src="https://unpkg.com/lucide@1.17.0"></script>
-<script src="/entregas.js?v=20260717-comprovantes1"></script>
+<script src="/entregas.card-actions.js?v=20260801-card-actions1"></script>
+<script src="/entregas.js?v=20260801-card-actions1"></script>
 <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js"></script>
 <style>
   [x-cloak] { display: none !important; }
@@ -341,6 +342,10 @@
   .delivery-stop-customer { min-width: 0; flex: 1; }
   .delivery-stop-customer strong { display: block; overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
   .delivery-stop-customer small { display: block; margin-top: 3px; color: #72837b; font-size: 10px; }
+  .delivery-stop-order { display: flex; align-items: center; gap: 7px; margin-top: 12px; padding: 8px 9px 8px 12px; color: #607269; background: #f4f9f6; border: 1px solid #e3eee8; border-radius: 14px; }
+  .delivery-stop-order > span { display: flex; min-width: 0; flex: 1; align-items: center; gap: 6px; font-size: 10px; }
+  .delivery-stop-order button { display: grid; width: 38px; height: 36px; place-items: center; color: #047857; background: white; border: 1px solid #d5e7dd; border-radius: 10px; }
+  .delivery-stop-order button:disabled { color: #aebbb5; background: #f7faf8; opacity: .55; }
   .delivery-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 14px; }
   .delivery-quick-action {
     display: flex;
@@ -355,8 +360,15 @@
     filter: drop-shadow(0 4px 5px rgba(15, 42, 31, 0.12));
   }
   .delivery-navigation-button-art { display: block; width: 100%; height: 45px; object-fit: fill; }
+  .delivery-product-photo { display: flex; width: 100%; min-height: 70px; align-items: center; gap: 11px; margin-top: 12px; padding: 8px 11px 8px 8px; text-align: left; color: #183a2d; background: linear-gradient(135deg, #f0fbf5, #f8fcfa); border: 1px solid #cfeadd; border-radius: 16px; }
+  .delivery-product-photo-thumb { display: grid; width: 54px; height: 54px; overflow: hidden; place-items: center; flex: 0 0 54px; color: #059669; background: #dcfce7; border-radius: 12px; }
+  .delivery-product-photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .delivery-product-photo-copy { min-width: 0; flex: 1; }
+  .delivery-product-photo-copy strong { display: block; font-size: 12px; font-weight: 600; }
+  .delivery-product-photo-copy small { display: block; margin-top: 3px; color: #6b7d74; font-size: 10px; }
   .delivery-stop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }
   .delivery-danger-button { color: #e11d48; background: white; border: 1px solid #fecdd3; }
+  .delivery-return-button { display: flex; width: 100%; min-height: 43px; align-items: center; justify-content: center; gap: 7px; margin-top: 9px; color: #52675d; background: #f7faf8; border: 1px solid #d9e5df; border-radius: 13px; font-size: 11px; font-weight: 500; }
   .delivery-payment-box { margin-top: 12px; padding: 13px; background: #f1f7f4; border-radius: 16px; }
   .delivery-payment-box p { margin: 0 0 9px; color: #42574d; font-size: 11px; font-weight: 500; }
   .delivery-payment-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
@@ -603,11 +615,21 @@
                 <span class="delivery-stop-number" x-text="index + 1"></span>
                 <div class="delivery-stop-customer">
                   <strong x-text="d.customer_name || 'Cliente'"></strong>
-                  <small x-text="d.delivery_status === 'delivered' ? 'Parada finalizada' : 'Próxima ação disponível'"></small>
+                  <small x-text="statusEntregaSubtitulo(d)"></small>
                 </div>
                 <span class="delivery-status-pill"
-                      :class="d.delivery_status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                      x-text="d.delivery_status === 'delivered' ? 'entregue' : 'a caminho'"></span>
+                      :class="statusEntregaClasse(d)"
+                      x-text="statusEntregaTexto(d)"></span>
+              </div>
+
+              <div class="delivery-stop-order">
+                <span><i data-lucide="list-ordered" class="w-3.5 h-3.5"></i> Reordenar parada</span>
+                <button type="button" @click="moverParada(index, -1)" :disabled="index === 0" aria-label="Mover parada para cima">
+                  <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                </button>
+                <button type="button" @click="moverParada(index, 1)" :disabled="!rotaAberta || index === rotaAberta.entregas.length - 1" aria-label="Mover parada para baixo">
+                  <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                </button>
               </div>
 
               <div class="delivery-card-line">
@@ -629,7 +651,26 @@
                 </a>
               </div>
 
-              <div x-show="d.delivery_status !== 'delivered'">
+              <button type="button" x-show="d.photo_request_id" x-cloak
+                      x-init="d.photo_request_id && carregarFotoPneu(d.photo_request_id)"
+                      @click="abrirFotoPneu(d.photo_request_id)" class="delivery-product-photo">
+                <span class="delivery-product-photo-thumb">
+                  <img x-show="fotoPneuUrls[d.photo_request_id]" :src="fotoPneuUrls[d.photo_request_id]" alt="Foto do pneu aprovado" />
+                  <i x-show="!fotoPneuUrls[d.photo_request_id]" data-lucide="image" class="w-5 h-5"></i>
+                </span>
+                <span class="delivery-product-photo-copy">
+                  <strong>Foto do pneu aprovado</strong>
+                  <small>Toque para ampliar e conferir o produto.</small>
+                </span>
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+              </button>
+
+              <div x-show="d.delivery_status === 'pending'" class="delivery-stop-actions">
+                <button type="button" @click="atualizarStatus(d, 'dispatched')" :disabled="!!salvando" class="delivery-primary-button">Saiu para entrega</button>
+                <button type="button" @click="naoEntreguei(d)" :disabled="!!salvando" class="delivery-danger-button">Não entreguei</button>
+              </div>
+
+              <div x-show="d.delivery_status === 'dispatched'">
                 <div x-show="pagando !== d.order_id" class="delivery-stop-actions">
                   <button type="button" @click="pagando = d.order_id" class="delivery-primary-button">Confirmar entrega</button>
                   <button type="button" @click="naoEntreguei(d)" class="delivery-danger-button">Não entreguei</button>
@@ -643,6 +684,9 @@
                   </div>
                   <button type="button" @click="pagando = null" class="w-full mt-3 text-center text-xs text-slate-500">Voltar</button>
                 </div>
+                <button type="button" x-show="pagando !== d.order_id" @click="atualizarStatus(d, 'pending')" :disabled="!!salvando" class="delivery-return-button">
+                  <i data-lucide="undo-2" class="w-4 h-4"></i> Voltar para pendente
+                </button>
               </div>
             </div>
           </article>
@@ -705,6 +749,20 @@
                 class="delivery-primary-button disabled:opacity-40"
                 x-text="dialogo.kind === 'close-trip' ? 'Fechar rota' : 'Enviar relato'"></button>
       </div>
+    </div>
+  </div>
+
+  <div x-show="fotoPneuAberta.open" x-cloak
+       @keydown.escape.window="fecharFotoPneu()" @click.self="fecharFotoPneu()"
+       class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm"
+       role="dialog" aria-modal="true" aria-label="Foto do pneu aprovado" style="display:none;">
+    <div class="relative w-full max-w-lg">
+      <button type="button" @click="fecharFotoPneu()"
+              class="absolute -top-3 -right-1 z-10 grid w-10 h-10 place-items-center text-white bg-slate-900 rounded-full border border-white/30"
+              aria-label="Fechar foto">×</button>
+      <img :src="fotoPneuAberta.url" alt="Foto ampliada do pneu aprovado pelo cliente"
+           class="block w-full max-h-[82vh] object-contain bg-white rounded-2xl shadow-2xl" />
+      <p class="mt-3 text-center text-xs text-white/80">Foto aprovada pelo cliente</p>
     </div>
   </div>
 

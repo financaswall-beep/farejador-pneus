@@ -8,8 +8,6 @@
  * (FIX-ANTES) baked in: posse no WHERE das queries (queries.ts), 401 único no
  * login, sessão morre com o colaborador revogado, não-entregue só REPORTA.
  */
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
@@ -22,7 +20,8 @@ import {
 } from '../../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from '../../parceiro/photo-upload.js';
 import { extractReceiptSuggestion } from '../painel/receipt-ai-flow.js';
-import { ReceiptExactDuplicateError } from '../painel/queries.js';
+import { ReceiptExactDuplicateError, TripHasUnresolvedDeliveriesError } from '../painel/queries.js';
+import { registerEntregadorStaticRoutes } from './route-static.js';
 import {
   authenticateEntregador,
   validateEntregadorSession,
@@ -35,10 +34,9 @@ import {
   closeEntregadorTrip,
   addEntregadorReceipt,
   getEntregadorReceiptImage,
+  getEntregadorProductPhotoImage,
   type EntregadorAuth,
 } from './queries.js';
-
-const publicDir = path.join(process.cwd(), 'painel', 'public');
 
 // Espelho do login global (login-global.route.ts): 10 tentativas / 5 min por chave.
 const LOGIN_MAX_ATTEMPTS = 10;
@@ -55,7 +53,7 @@ const abrirRotaSchema = z.object({
 });
 const statusSchema = z.object({
   order_id: z.string().uuid(),
-  status: z.enum(['dispatched', 'delivered']),
+  status: z.enum(['pending', 'dispatched', 'delivered']),
   payment_method: z.string().max(40).optional().nullable(),
 });
 const naoEntregueSchema = z.object({
@@ -68,18 +66,9 @@ const fecharRotaSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 });
 const receiptIdSchema = z.object({ receiptId: z.string().uuid() });
+const photoRequestIdSchema = z.object({ photoRequestId: z.string().uuid() });
 
 type RequestWithAuth = FastifyRequest & { entregador?: EntregadorAuth };
-
-async function sendStatic(
-  reply: FastifyReply,
-  file: string,
-  type: string,
-  cacheControl = 'no-store',
-): Promise<FastifyReply> {
-  const content = await readFile(path.join(publicDir, file));
-  return reply.header('Content-Type', type).header('Cache-Control', cacheControl).send(content);
-}
 
 export async function registerEntregadorRoute(fastify: FastifyInstance): Promise<void> {
   // Parsers de imagem (idempotente — o painel pode já ter registrado).
@@ -95,6 +84,7 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
       await reply.status(404).send({ error: 'not_found' });
     }
   };
+  registerEntregadorStaticRoutes(fastify, flagGate);
 
   // AUTH do portal: bearer es_ (sem fallback) → sessão viva + colaborador ativo.
   const requireEntregadorAuth = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -117,42 +107,6 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
   };
 
   const authOf = (request: FastifyRequest): EntregadorAuth => (request as RequestWithAuth).entregador!;
-
-  // ── A página (mobile, standalone) — gated pela flag ──
-  fastify.get('/entregas', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'entregas.html', 'text/html; charset=utf-8'));
-  fastify.get('/entregas.js', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'entregas.js', 'text/javascript; charset=utf-8'));
-  fastify.get('/entregas/hero-fiorino-galpao-v5.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(
-      reply,
-      'assets/entregas-login-fiorino-galpao-v5.webp',
-      'image/webp',
-      'public, max-age=31536000, immutable',
-    ));
-  fastify.get('/entregas/finalizar-rota-curva-v1.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(
-      reply,
-      'assets/entregas-finalizar-rota-curva-v1.webp',
-      'image/webp',
-      'public, max-age=31536000, immutable',
-    ));
-  fastify.get('/entregas/icon-waze-v1.png', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-waze-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/icon-google-maps-v1.png', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-google-maps-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/icon-whatsapp-v1.png', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-whatsapp-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/button-whatsapp-v2.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-whatsapp-button-art-v2.webp', 'image/webp', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/button-waze-v2.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-waze-button-art-v2.webp', 'image/webp', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/button-google-maps-v4.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-google-maps-button-art-v4.webp', 'image/webp', 'public, max-age=31536000, immutable'));
-  fastify.get('/entregas/button-google-maps-v5.webp', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'assets/navigation-google-maps-button-art-v5.webp', 'image/webp', 'public, max-age=31536000, immutable'));
-  fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
-    sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
   // ── Login: usuário+senha → sessão es_. Resposta ÚNICA 401. ──
   fastify.post('/api/entregas/login', { preHandler: flagGate }, async (request, reply) => {
@@ -218,7 +172,7 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     }
   });
 
-  // ── Saiu / Entregue ──
+  // ── Pendente / Saiu / Entregue ──
   fastify.post('/api/entregas/status', { preHandler: [flagGate, requireEntregadorAuth] }, async (request, reply) => {
     const parsed = statusSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -263,6 +217,9 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
       }
       if (err instanceof ReceiptExactDuplicateError) {
         return reply.status(409).send({ error: 'receipt_exact_duplicate' });
+      }
+      if (err instanceof TripHasUnresolvedDeliveriesError) {
+        return reply.status(409).send({ error: 'trip_has_unresolved_deliveries', deliveries: err.deliveries });
       }
       logger.error({ err }, 'entregador fechar rota failed');
       return reply.status(500).send({ error: 'internal_error' });
@@ -315,6 +272,21 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     return reply
       .header('Content-Type', img.mime)
       .header('Cache-Control', 'private, max-age=3600')
+      .status(200)
+      .send(img.bytes);
+  });
+
+  // ── Foto do pneu aprovado — bytes autenticados e com posse da rota ──
+  fastify.get('/api/entregas/fotos/:photoRequestId/imagem', {
+    preHandler: [flagGate, requireEntregadorAuth],
+  }, async (request, reply) => {
+    const params = photoRequestIdSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'photo_not_found' });
+    const img = await getEntregadorProductPhotoImage(authOf(request), params.data.photoRequestId);
+    if (!img) return reply.status(404).send({ error: 'photo_not_found' });
+    return reply
+      .header('Content-Type', img.mime)
+      .header('Cache-Control', 'private, no-store')
       .status(200)
       .send(img.bytes);
   });
