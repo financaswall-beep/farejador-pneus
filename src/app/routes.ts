@@ -9,6 +9,7 @@ import { registerParceiroRoute } from '../parceiro/route.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
 import { registerEntregadorRoute } from '../admin/entregador/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
+import { registerPublicLegalRoutes } from '../public/legal.route.js';
 
 export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerChatwootWebhookRoutes(fastify);
@@ -17,6 +18,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerReplayRoute(fastify);
   await registerReconcileRoute(fastify);
   await registerAdminLoginRoute(fastify);
+  await registerPublicLegalRoutes(fastify);
   await registerPainelRoute(fastify);
   await registerParceiroRoute(fastify);
   // Porta única de login (/login) — 0095. Aditiva: o login por slug continua.
