@@ -147,7 +147,7 @@ async function revokeInvalidAttributions(client: PoolClient): Promise<number> {
          extractor_version,realized_at
        ) VALUES (
          $1,$2,$3,$4,'revoked',$5,$6,'deterministic_meta_messaging','corrected',1.00,
-         jsonb_build_object('reason','sale_not_realized','previous_attribution_id',$7),
+         jsonb_build_object('reason','sale_not_realized','previous_attribution_id',$7::uuid),
          $8,$9
        ) RETURNING id`,
       [
@@ -221,8 +221,8 @@ export async function reconcileMarketingAttributions(options: {
            extractor_version,realized_at
          ) VALUES (
            $1,$2,$3,$4,'active',$5,$6,'deterministic_meta_messaging','observed',1.00,
-           jsonb_build_object('ad_referral_id',$3,'order_id',$2,'window_days',7,
-             'channel',$7),$8,$9
+           jsonb_build_object('ad_referral_id',$3::uuid,'order_id',$2::uuid,'window_days',7,
+             'channel',$7::text),$8,$9
          ) ON CONFLICT DO NOTHING`,
         [
           env.FAREJADOR_ENV, order.id, referral.id, order.conversation_id,

@@ -4,9 +4,16 @@ import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postg
 
 describe('Marketing multicanal — migration aditiva', () => {
   let db: IntegrationDb;
+  let reconcileMarketingAttributions:
+    typeof import('../../src/marketing/attribution.js').reconcileMarketingAttributions;
 
   beforeAll(async () => {
+    Object.assign(process.env, {
+      NODE_ENV: 'test', FAREJADOR_ENV: 'test', DATABASE_URL: 'postgres://test',
+      CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
+    });
     db = await startPostgres({ throughMigration: '0161_marketing_multichannel_messaging.sql' });
+    ({ reconcileMarketingAttributions } = await import('../../src/marketing/attribution.js'));
   }, 180_000);
 
   afterAll(async () => { if (db) await stopPostgres(db); });
@@ -113,5 +120,63 @@ describe('Marketing multicanal — migration aditiva', () => {
         WHERE environment='test' AND native_message_id='mid.integration.1'`,
     );
     expect(referral.rows[0]).toEqual({ channel: 'messenger', source_id: 'ad.integration.1' });
+  });
+
+  it('atribui uma entrega do Messenger sem ambiguidade nos UUIDs do JSON', async () => {
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
+       VALUES ('test',93001,'Cliente Messenger') RETURNING id`,
+    );
+    const conversation = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.conversations (
+         environment,chatwoot_conversation_id,chatwoot_account_id,chatwoot_inbox_id,
+         channel_type,contact_id,current_status,started_at
+       ) VALUES ('test',93001,1,1,'facebook',$1,'open',now()-interval '10 minutes')
+       RETURNING id`,
+      [contact.rows[0]!.id],
+    );
+    const message = await db.pool.query<{ id: string; sent_at: string }>(
+      `INSERT INTO core.messages (
+         environment,chatwoot_message_id,conversation_id,chatwoot_conversation_id,
+         sender_type,message_type,content_attributes,native_message_id,is_private,sent_at
+       ) VALUES ('test',93001,$1,93001,'contact',0,'{}','mid.integration.attribution',false,
+                 now()-interval '9 minutes')
+       RETURNING id,sent_at::text`,
+      [conversation.rows[0]!.id],
+    );
+    await db.pool.query(
+      `INSERT INTO marketing.ad_referrals (
+         environment,conversation_id,source_message_id,source_message_sent_at,
+         channel,referral_key,user_scoped_id,business_account_id,native_message_id,
+         source_id,captured_at
+       ) VALUES ('test',$1,$2,$3,'messenger','messenger:integration-attribution',
+                 'psid.integration.attribution','page.integration.attribution',
+                 'mid.integration.attribution','ad.integration.attribution',$3)`,
+      [conversation.rows[0]!.id, message.rows[0]!.id, message.rows[0]!.sent_at],
+    );
+    const order = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders (
+         environment,contact_id,source_conversation_id,total_amount,status,
+         fulfillment_mode,payment_method,delivery_address,delivery_status,delivered_at
+       ) VALUES ('test',$1,$2,98.90,'delivered','delivery','pix','Rua Teste, 1',
+                 'delivered',now())
+       RETURNING id`,
+      [contact.rows[0]!.id, conversation.rows[0]!.id],
+    );
+
+    const result = await reconcileMarketingAttributions({ dbPool: db.pool, enabled: true });
+
+    expect(result.created).toBe(1);
+    const attribution = await db.pool.query<{ order_id: string; source_reference: Record<string, string> }>(
+      `SELECT order_id,source_reference
+         FROM marketing.order_attributions
+        WHERE environment='test' AND order_id=$1 AND status='active'`,
+      [order.rows[0]!.id],
+    );
+    expect(attribution.rows[0]?.order_id).toBe(order.rows[0]!.id);
+    expect(attribution.rows[0]?.source_reference).toMatchObject({
+      order_id: order.rows[0]!.id,
+      channel: 'messenger',
+    });
   });
 });

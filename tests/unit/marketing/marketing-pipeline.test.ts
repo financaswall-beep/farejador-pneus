@@ -466,5 +466,12 @@ describe('pipeline determinístico de Marketing', () => {
     expect(query.mock.calls.some(([sql]) => (
       String(sql).includes("interval '7 days'")
     ))).toBe(true);
+    const attributionInsert = query.mock.calls.find(([sql]) => (
+      String(sql).includes('INSERT INTO marketing.order_attributions')
+      && String(sql).includes("'active'")
+    ))?.[0];
+    expect(String(attributionInsert)).toContain("'ad_referral_id',$3::uuid");
+    expect(String(attributionInsert)).toContain("'order_id',$2::uuid");
+    expect(String(attributionInsert)).toContain("'channel',$7::text");
   });
 });
