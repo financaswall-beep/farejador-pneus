@@ -10,6 +10,7 @@ export const marketingEnvShape = {
   MARKETING_SCOPE_ENFORCEMENT_ENABLED: booleanStringSchema,
   MARKETING_ATTRIBUTION: booleanStringSchema,
   MARKETING_CAPI_ENABLED: booleanStringSchema,
+  MARKETING_CAPI_WHATSAPP_ENABLED: booleanStringSchema,
   MARKETING_CAPI_MESSENGER_ENABLED: booleanStringSchema,
   MARKETING_CAPI_INSTAGRAM_ENABLED: booleanStringSchema,
   META_MESSAGING_WEBHOOK_ENABLED: booleanStringSchema,

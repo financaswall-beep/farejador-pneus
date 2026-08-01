@@ -100,15 +100,22 @@ export function buildCapiPayload(row: CapiSourceRow, options: {
 export async function enqueueCapiPurchases(options: {
   dbPool?: Pool;
   enabled?: boolean;
+  whatsappEnabled?: boolean;
+  messengerEnabled?: boolean;
+  instagramEnabled?: boolean;
 } = {}): Promise<number> {
   const enabled = options.enabled ?? env.MARKETING_CAPI_ENABLED;
   if (!enabled) return 0;
+  const whatsappEnabled = options.whatsappEnabled ?? env.MARKETING_CAPI_WHATSAPP_ENABLED;
+  const messengerEnabled = options.messengerEnabled ?? env.MARKETING_CAPI_MESSENGER_ENABLED;
+  const instagramEnabled = options.instagramEnabled ?? env.MARKETING_CAPI_INSTAGRAM_ENABLED;
   const dbPool = options.dbPool ?? defaultPool;
   const source = await loadProductionCapiSources(dbPool);
   let enqueued = 0;
   for (const row of source) {
-    if (row.channel === 'messenger' && !env.MARKETING_CAPI_MESSENGER_ENABLED) continue;
-    if (row.channel === 'instagram' && !env.MARKETING_CAPI_INSTAGRAM_ENABLED) continue;
+    if (row.channel === 'whatsapp' && !whatsappEnabled) continue;
+    if (row.channel === 'messenger' && !messengerEnabled) continue;
+    if (row.channel === 'instagram' && !instagramEnabled) continue;
     const payload = buildCapiPayload(row, {
       whatsappBusinessAccountId: env.META_WHATSAPP_BUSINESS_ACCOUNT_ID,
       pageId: env.META_CAPI_PAGE_ID,

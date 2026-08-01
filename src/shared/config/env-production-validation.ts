@@ -22,6 +22,7 @@ interface ProductionEnvConfig {
   MARKETING_SYNC_ENABLED?: boolean;
   MARKETING_SCOPE_ENFORCEMENT_ENABLED?: boolean;
   MARKETING_CAPI_ENABLED?: boolean;
+  MARKETING_CAPI_WHATSAPP_ENABLED?: boolean;
   MARKETING_CAPI_MESSENGER_ENABLED?: boolean;
   MARKETING_CAPI_INSTAGRAM_ENABLED?: boolean;
   META_MESSAGING_WEBHOOK_ENABLED?: boolean;
@@ -128,11 +129,11 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
     if (!value.META_CAPI_ACCESS_TOKEN) {
       addIssue(ctx, 'META_CAPI_ACCESS_TOKEN', 'is required when MARKETING_CAPI_ENABLED=true');
     }
-    if (!value.META_WHATSAPP_BUSINESS_ACCOUNT_ID) {
+    if (value.MARKETING_CAPI_WHATSAPP_ENABLED && !value.META_WHATSAPP_BUSINESS_ACCOUNT_ID) {
       addIssue(
         ctx,
         'META_WHATSAPP_BUSINESS_ACCOUNT_ID',
-        'is required when MARKETING_CAPI_ENABLED=true',
+        'is required when WhatsApp CAPI is enabled',
       );
     }
     if (value.MARKETING_CAPI_MESSENGER_ENABLED && !value.META_CAPI_PAGE_ID) {

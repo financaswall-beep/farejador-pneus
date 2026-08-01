@@ -134,6 +134,7 @@ describe('environment security validation', () => {
     expect(parsed.MARKETING_SCOPE_ENFORCEMENT_ENABLED).toBe(false);
     expect(parsed.MARKETING_ATTRIBUTION).toBe(false);
     expect(parsed.MARKETING_CAPI_ENABLED).toBe(false);
+    expect(parsed.MARKETING_CAPI_WHATSAPP_ENABLED).toBe(false);
     expect(parsed.MARKETING_CAPI_MESSENGER_ENABLED).toBe(false);
     expect(parsed.MARKETING_CAPI_INSTAGRAM_ENABLED).toBe(false);
     expect(parsed.META_MESSAGING_WEBHOOK_ENABLED).toBe(false);
@@ -189,6 +190,7 @@ describe('environment security validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       MARKETING_CAPI_ENABLED: 'true',
+      MARKETING_CAPI_WHATSAPP_ENABLED: 'true',
       ADMIN_AUTH_TOKEN: 'a'.repeat(24),
       CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
     })).toThrow(/MARKETING_ATTRIBUTION.*MARKETING_CAPI_ENABLED[\s\S]*META_CAPI_DATASET_ID[\s\S]*META_CAPI_ACCESS_TOKEN[\s\S]*META_WHATSAPP_BUSINESS_ACCOUNT_ID/);
@@ -197,6 +199,7 @@ describe('environment security validation', () => {
       ...baseEnv,
       NODE_ENV: 'production',
       MARKETING_CAPI_ENABLED: 'true',
+      MARKETING_CAPI_WHATSAPP_ENABLED: 'true',
       MARKETING_ATTRIBUTION: 'true',
       META_CAPI_DATASET_ID: '123456',
       META_CAPI_ACCESS_TOKEN: 'token-capi-seguro',

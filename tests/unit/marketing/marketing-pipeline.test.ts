@@ -169,7 +169,11 @@ describe('pipeline determinístico de Marketing', () => {
     ));
     const dbPool = { query } as unknown as Pool;
 
-    await expect(enqueueCapiPurchases({ dbPool, enabled: true })).resolves.toBe(1);
+    await expect(enqueueCapiPurchases({
+      dbPool,
+      enabled: true,
+      whatsappEnabled: true,
+    })).resolves.toBe(1);
 
     expect(query.mock.calls[0]?.[0]).toContain("interval '6 days 23 hours'");
     expect(query.mock.calls[0]?.[0]).toContain('NOT EXISTS');
@@ -177,6 +181,38 @@ describe('pipeline determinístico de Marketing', () => {
       test_event_code?: string;
     };
     expect(persistedPayload.test_event_code).toBeUndefined();
+  });
+
+  it('não enfileira WhatsApp quando somente outro canal está habilitado', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{
+        attribution_id: 'attr-whatsapp-off',
+        order_number: 'PED-WHATSAPP-OFF',
+        total_amount: '100.00',
+        realized_at: '2026-07-26T12:00:00.000Z',
+        phone_e164: '+5521999990000',
+        channel: 'whatsapp',
+        ctwa_clid: 'clid-real',
+        user_scoped_id: null,
+        business_account_id: null,
+        ad_account_id: 'act_123',
+        campaign_id: 'camp-1',
+        campaign_scope_id: 'scope-1',
+        city_name: null,
+        state_code: null,
+        postal_code_prefix: null,
+      }],
+      rowCount: 1,
+    }));
+
+    await expect(enqueueCapiPurchases({
+      dbPool: { query } as unknown as Pool,
+      enabled: true,
+      whatsappEnabled: false,
+      messengerEnabled: true,
+      instagramEnabled: false,
+    })).resolves.toBe(0);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('envia Test Events diretamente sem inserir nem consumir a outbox', async () => {
