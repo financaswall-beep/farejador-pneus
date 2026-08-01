@@ -238,43 +238,46 @@ describe('pipeline determinístico de Marketing', () => {
     expect(client.release).toHaveBeenCalledOnce();
   });
 
-  it('suprime Purchase se a campanha sair do escopo antes do envio', async () => {
-    const clientQuery = vi.fn()
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({
-        rows: [{
-          id: 'outbox-external',
-          environment: 'test',
-          payload: { data: [{ event_time: 1785528000 }] },
-          attempts: 1,
-          attribution_id: 'attr-external',
-          campaign_scope_id: 'scope-external',
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ scope: 'external' }] })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [] });
-    const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
-    const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
-    const fetcher = vi.fn();
+  it.each(['external', 'pending'] as const)(
+    'suprime Purchase se a campanha sair para %s antes do envio',
+    async (scope) => {
+      const clientQuery = vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [{
+            id: `outbox-${scope}`,
+            environment: 'test',
+            payload: { data: [{ event_time: 1785528000 }] },
+            attempts: 1,
+            attribution_id: `attr-${scope}`,
+            campaign_scope_id: `scope-${scope}`,
+          }],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ scope }] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [] });
+      const client = { query: clientQuery, release: vi.fn() } as unknown as PoolClient;
+      const dbPool = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
+      const fetcher = vi.fn();
 
-    await expect(pollCapiOutbox({
-      dbPool,
-      fetcher: fetcher as typeof fetch,
-      now: new Date('2026-07-31T20:00:00Z'),
-      scopeEnforcement: true,
-    })).resolves.toBe(true);
+      await expect(pollCapiOutbox({
+        dbPool,
+        fetcher: fetcher as typeof fetch,
+        now: new Date('2026-07-31T20:00:00Z'),
+        scopeEnforcement: true,
+      })).resolves.toBe(true);
 
-    expect(fetcher).not.toHaveBeenCalled();
-    const suppression = clientQuery.mock.calls.find(([sql]) => (
-      String(sql).includes("status='suppressed'")
-    ));
-    expect(suppression?.[1]?.[2]).toBe('campaign_scope_external');
-    expect(client.release).toHaveBeenCalledOnce();
-  });
+      expect(fetcher).not.toHaveBeenCalled();
+      const suppression = clientQuery.mock.calls.find(([sql]) => (
+        String(sql).includes("status='suppressed'")
+      ));
+      expect(suppression?.[1]?.[2]).toBe(`campaign_scope_${scope}`);
+      expect(client.release).toHaveBeenCalledOnce();
+    },
+  );
 
   it('preserva o envio legado enquanto o enforcement de escopo está desligado', async () => {
     const eventTime = Math.floor(new Date('2026-07-31T19:00:00Z').getTime() / 1000);
