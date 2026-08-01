@@ -71,9 +71,14 @@ const receiptIdSchema = z.object({ receiptId: z.string().uuid() });
 
 type RequestWithAuth = FastifyRequest & { entregador?: EntregadorAuth };
 
-async function sendStatic(reply: FastifyReply, file: string, type: string): Promise<FastifyReply> {
+async function sendStatic(
+  reply: FastifyReply,
+  file: string,
+  type: string,
+  cacheControl = 'no-store',
+): Promise<FastifyReply> {
   const content = await readFile(path.join(publicDir, file));
-  return reply.header('Content-Type', type).header('Cache-Control', 'no-store').send(content);
+  return reply.header('Content-Type', type).header('Cache-Control', cacheControl).send(content);
 }
 
 export async function registerEntregadorRoute(fastify: FastifyInstance): Promise<void> {
@@ -118,6 +123,13 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     sendStatic(reply, 'entregas.html', 'text/html; charset=utf-8'));
   fastify.get('/entregas.js', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'entregas.js', 'text/javascript; charset=utf-8'));
+  fastify.get('/entregas/hero-fiorino-galpao-v5.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(
+      reply,
+      'assets/entregas-login-fiorino-galpao-v5.webp',
+      'image/webp',
+      'public, max-age=31536000, immutable',
+    ));
   fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
