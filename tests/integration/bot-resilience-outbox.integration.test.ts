@@ -6,6 +6,7 @@ let conversationId: string;
 let chatwootConversationId: number;
 let reconcileAgentOutboundDelivery: typeof import('../../src/atendente-v2/outbound-reconcile').reconcileAgentOutboundDelivery;
 let supersedeStaleAgentOutbound: typeof import('../../src/atendente-v2/outbound-worker').supersedeStaleAgentOutbound;
+let getBotVisao: typeof import('../../src/admin/painel/queries-bot-visao').getBotVisao;
 
 beforeAll(async () => {
   Object.assign(process.env, {
@@ -15,6 +16,7 @@ beforeAll(async () => {
   });
   ({ reconcileAgentOutboundDelivery } = await import('../../src/atendente-v2/outbound-reconcile'));
   ({ supersedeStaleAgentOutbound } = await import('../../src/atendente-v2/outbound-worker'));
+  ({ getBotVisao } = await import('../../src/admin/painel/queries-bot-visao'));
   db = await startPostgres();
 });
 afterAll(async () => { if (db) await stopPostgres(db); });
@@ -41,12 +43,12 @@ async function message(sender: 'contact' | 'user', secondsAgo: number, providerI
   return result.rows[0].id;
 }
 
-async function turn(triggerId: string): Promise<string> {
+async function turn(triggerId: string, actions: unknown[] = []): Promise<string> {
   const result = await db.pool.query<{ id: string }>(
     `INSERT INTO agent.turns
-       (environment,conversation_id,trigger_message_id,agent_version,context_hash,say_text,status)
-     VALUES ('test',$1,$2,'v2','hash','resposta','generated') RETURNING id`,
-    [conversationId, triggerId]);
+       (environment,conversation_id,trigger_message_id,agent_version,context_hash,say_text,status,actions)
+     VALUES ('test',$1,$2,'v2','hash','resposta','generated',$3::jsonb) RETURNING id`,
+    [conversationId, triggerId, JSON.stringify(actions)]);
   return result.rows[0].id;
 }
 
@@ -104,6 +106,88 @@ describe('Etapa 8 — outbox e DLQ no PostgreSQL real', () => {
       `SELECT count(*)::text AS count FROM ops.outbound_message_events
         WHERE outbound_id=$1 AND to_status='delivered'`, [outboundId]);
     expect(events.rows[0].count).toBe('1');
+  });
+
+  it('extracts analytics on the first outbox delivery transition without duplicating', async () => {
+    const triggerId = await message('contact', 20);
+    const actions = [
+      {
+        role: 'assistant',
+        tool_calls: [
+          {
+            id: 'call-product', type: 'function',
+            function: {
+              name: 'buscar_produto',
+              arguments: JSON.stringify({ medida_pneu: '90/90-18' }),
+            },
+          },
+          {
+            id: 'call-freight', type: 'function',
+            function: {
+              name: 'calcular_frete',
+              arguments: JSON.stringify({ bairro: 'Itaipuacu' }),
+            },
+          },
+        ],
+      },
+      {
+        role: 'tool', tool_call_id: 'call-product',
+        content: JSON.stringify({ encontrado: false }),
+      },
+      {
+        role: 'tool', tool_call_id: 'call-freight',
+        content: JSON.stringify({
+          encontrado: true, bairro_canonico: 'Itaipuacu', municipio: 'Marica',
+          valor: 20, prazo_dias: 1,
+        }),
+      },
+    ];
+    const turnId = await turn(triggerId, actions);
+
+    const before = await db.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM analytics.conversation_facts
+       WHERE conversation_id=$1`, [conversationId]);
+    expect(before.rows[0].count).toBe('0');
+
+    await db.pool.query(
+      `UPDATE agent.turns SET status='sent_api_ack', sent_at=now() WHERE id=$1`,
+      [turnId],
+    );
+
+    const afterAck = await db.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM analytics.conversation_facts
+       WHERE conversation_id=$1`, [conversationId]);
+    expect(afterAck.rows[0].count).toBe('0');
+
+    await db.pool.query(`UPDATE agent.turns SET status='delivered' WHERE id=$1`, [turnId]);
+
+    const facts = await db.pool.query<{ fact_key: string }>(
+      `SELECT fact_key FROM analytics.conversation_facts
+       WHERE conversation_id=$1 ORDER BY fact_key`, [conversationId]);
+    expect(facts.rows.map((row) => row.fact_key)).toEqual(expect.arrayContaining([
+      'bairro_canonico', 'bairro_consultado', 'faltou_estoque',
+      'medida_consultada', 'municipio_entrega',
+    ]));
+
+    const classifications = await db.pool.query<{ dimension: string }>(
+      `SELECT dimension FROM analytics.conversation_classifications
+       WHERE conversation_id=$1`, [conversationId]);
+    expect(classifications.rows.map((row) => row.dimension)).toContain('stage_reached');
+
+    const factCount = facts.rowCount;
+    await db.pool.query(`UPDATE agent.turns SET status='delivered' WHERE id=$1`, [turnId]);
+    const afterDelivered = await db.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM analytics.conversation_facts
+       WHERE conversation_id=$1`, [conversationId]);
+    expect(Number(afterDelivered.rows[0].count)).toBe(factCount);
+
+    const visao = await getBotVisao('today', 'test', db.pool);
+    expect(visao.mapa).toEqual(expect.arrayContaining([
+      expect.objectContaining({ municipio: 'Marica', chamou: 1 }),
+    ]));
+    expect(visao.radar).toEqual(expect.arrayContaining([
+      expect.objectContaining({ medida: '90/90-18', fora_catalogo: 1 }),
+    ]));
   });
 
   it('supersedes a stale queued draft after a newer customer message', async () => {

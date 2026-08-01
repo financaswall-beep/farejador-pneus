@@ -89,6 +89,12 @@ Ordem de execução:
 
 `0142_customer_identity_privacy.sql` cria a sobreposição canônica sem copiar PII, links e candidatos reversíveis, solicitações de privacidade e eventos append-only. É aditiva, não executa anonimização, não agenda retenção e mantém zero acesso para `farejador_partner_app`.
 
+### Reparo do Analytics do Bot
+
+`0160_bot_analytics_outbox_repair.sql` faz o gerador determinístico de `analytics.*`
+acompanhar a confirmação `delivered` do outbox, evita reprocessamento posterior e
+recupera os artefatos SQL ausentes.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

@@ -101,12 +101,18 @@ export async function getBotVisao(
   } catch { /* view ausente → cards null, tela avisa */ }
 
   try {
-    // Funil: stage_reached é a etapa MÁXIMA por conversa (o gerador reclassifica a
-    // cada turno — created_at acompanha a última atividade, mesma janela dos facts).
+    // Funil: stage_reached é a etapa MÁXIMA por conversa. A janela vem dos turnos
+    // realmente enviados pelo Bot V2, não do horário em que um backfill foi executado.
     const r = await dbPool.query<{ etapa: string; n: number }>(
-      `SELECT value AS etapa, count(DISTINCT conversation_id)::int AS n
-       FROM analytics.conversation_classifications
-       WHERE environment = $1 AND dimension = 'stage_reached' AND created_at >= ${sinceSql}
+      `SELECT cc.value AS etapa, count(DISTINCT cc.conversation_id)::int AS n
+       FROM analytics.conversation_classifications cc
+       WHERE cc.environment = $1 AND cc.dimension = 'stage_reached'
+         AND EXISTS (
+           SELECT 1 FROM agent.turns t
+           WHERE t.environment = $1 AND t.conversation_id = cc.conversation_id
+             AND t.agent_version = 'v2' AND t.status IN ('sent_api_ack', 'delivered')
+             AND t.created_at >= ${sinceSql}
+         )
        GROUP BY 1`,
       [environment],
     );
@@ -115,9 +121,15 @@ export async function getBotVisao(
 
   try {
     const r = await dbPool.query<{ motivo: string; n: number }>(
-      `SELECT value AS motivo, count(DISTINCT conversation_id)::int AS n
-       FROM analytics.conversation_classifications
-       WHERE environment = $1 AND dimension = 'loss_reason' AND created_at >= ${sinceSql}
+      `SELECT cc.value AS motivo, count(DISTINCT cc.conversation_id)::int AS n
+       FROM analytics.conversation_classifications cc
+       WHERE cc.environment = $1 AND cc.dimension = 'loss_reason'
+         AND EXISTS (
+           SELECT 1 FROM agent.turns t
+           WHERE t.environment = $1 AND t.conversation_id = cc.conversation_id
+             AND t.agent_version = 'v2' AND t.status IN ('sent_api_ack', 'delivered')
+             AND t.created_at >= ${sinceSql}
+         )
        GROUP BY 1 ORDER BY n DESC`,
       [environment],
     );
@@ -128,10 +140,15 @@ export async function getBotVisao(
     // Boca do cliente: conversas DISTINTAS (não matches crus — 3 "tá caro" na mesma
     // conversa é UMA conversa reclamando). Tipos de dinheiro só; tom (gíria etc.) fora.
     const r = await dbPool.query<{ tipo: string; convs: number }>(
-      `SELECT hint_type AS tipo, count(DISTINCT conversation_id)::int AS convs
-       FROM analytics.linguistic_hints
-       WHERE environment = $1 AND created_at >= ${sinceSql}
-         AND hint_type IN ('objecao_preco','mencao_concorrente','pergunta_parcelamento',
+      `SELECT h.hint_type AS tipo, count(DISTINCT h.conversation_id)::int AS convs
+       FROM analytics.linguistic_hints h
+       WHERE h.environment = $1
+         AND EXISTS (
+           SELECT 1 FROM core.messages m
+           WHERE m.environment = $1 AND m.id = h.message_id
+             AND m.deleted_at IS NULL AND m.sent_at >= ${sinceSql}
+         )
+         AND h.hint_type IN ('objecao_preco','mencao_concorrente','pergunta_parcelamento',
                            'pergunta_garantia','pediu_instalacao','urgencia')
        GROUP BY 1`,
       [environment],
@@ -148,7 +165,8 @@ export async function getBotVisao(
                 bool_or(cf.fact_key = 'faltou_estoque') AS faltou,
                 bool_or(cf.fact_key = 'pedido_criado') AS pediu_fact
          FROM analytics.conversation_facts cf
-         WHERE cf.environment = $1 AND cf.created_at >= ${sinceSql}
+         WHERE cf.environment = $1
+           AND COALESCE(cf.observed_at, cf.created_at) >= ${sinceSql}
          GROUP BY cf.conversation_id
        )
        SELECT c.municipio,
@@ -173,13 +191,20 @@ export async function getBotVisao(
 
   try {
     const r = await dbPool.query<{ sem_regiao: number }>(
-      `SELECT count(*)::int AS sem_regiao FROM (
-         SELECT cf.conversation_id
-         FROM analytics.conversation_facts cf
-         WHERE cf.environment = $1 AND cf.created_at >= ${sinceSql}
-         GROUP BY cf.conversation_id
-         HAVING max(cf.fact_value::text) FILTER (WHERE cf.fact_key = 'municipio_entrega') IS NULL
-       ) s`,
+      `WITH handled AS (
+         SELECT DISTINCT t.conversation_id
+         FROM agent.turns t
+         WHERE t.environment = $1 AND t.agent_version = 'v2'
+           AND t.status IN ('sent_api_ack', 'delivered')
+           AND t.created_at >= ${sinceSql}
+       )
+       SELECT count(*)::int AS sem_regiao
+       FROM handled h
+       WHERE NOT EXISTS (
+         SELECT 1 FROM analytics.conversation_facts cf
+         WHERE cf.environment = $1 AND cf.conversation_id = h.conversation_id
+           AND cf.fact_key = 'municipio_entrega'
+       )`,
       [environment],
     );
     out.sem_regiao = r.rows[0]?.sem_regiao ?? 0;
@@ -201,7 +226,7 @@ export async function getBotVisao(
             AND lower(ws.measure)=lower(cf.fact_value->>'medida')
        ) s ON true
        WHERE cf.environment = $1 AND cf.fact_key = 'faltou_estoque'
-         AND cf.created_at >= ${sinceSql}
+         AND COALESCE(cf.observed_at, cf.created_at) >= ${sinceSql}
          AND (cf.fact_value->>'medida') IS NOT NULL
        GROUP BY 1
        ORDER BY pedidos DESC
@@ -225,7 +250,7 @@ export async function getBotVisao(
             AND lower(ws.measure)=lower(replace(cf.fact_value::text, '"', ''))
        ) s ON true
        WHERE cf.environment = $1 AND cf.fact_key = 'medida_consultada'
-         AND cf.created_at >= ${sinceSql}
+         AND COALESCE(cf.observed_at, cf.created_at) >= ${sinceSql}
        GROUP BY 1
        ORDER BY consultas DESC
        LIMIT 10`,
