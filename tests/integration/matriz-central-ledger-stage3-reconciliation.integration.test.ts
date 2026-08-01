@@ -67,6 +67,17 @@ describe('Etapa 3 — backfill e paridade do livro central', () => {
        RETURNING id`,
       [legacyContact.rows[0]!.id, unit.rows[0]!.id],
     );
+    const zeroValueContact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
+       VALUES ('test',990002,'Pedido zerado cancelado') RETURNING id`,
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.orders
+         (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
+          payment_method,closed_by)
+       VALUES ('test',$1,$2,0,'cancelled','pickup','pix','legacy:test')`,
+      [zeroValueContact.rows[0]!.id, unit.rows[0]!.id],
+    );
     await db.pool.query(
       `INSERT INTO commerce.order_items
          (environment,order_id,product_id,quantity,unit_price,discount_amount,
