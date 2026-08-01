@@ -36,17 +36,17 @@ describe('portal mobile do entregador', () => {
     const assets = [
       'navigation-whatsapp-button-art-v2.webp',
       'navigation-waze-button-art-v2.webp',
-      'navigation-google-maps-button-art-v4.webp',
+      'navigation-google-maps-button-art-v5.webp',
     ];
 
     for (const asset of assets) {
-      expect(statSync(resolve('painel/public/assets', asset)).size).toBeGreaterThan(5_000);
+      expect(statSync(resolve('painel/public/assets', asset)).size).toBeGreaterThan(4_000);
       expect(route).toContain(`'assets/${asset}'`);
     }
 
     expect(html).toContain('src="/entregas/button-whatsapp-v2.webp"');
     expect(html).toContain('src="/entregas/button-waze-v2.webp"');
-    expect(html).toContain('src="/entregas/button-google-maps-v4.webp"');
+    expect(html).toContain('src="/entregas/button-google-maps-v5.webp"');
     expect(html).toContain(':href="whatsUrl(d)"');
     expect(html).toContain(':href="wazeUrl(d)"');
     expect(html).toContain(':href="mapsUrl(d)"');

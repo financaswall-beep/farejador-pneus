@@ -149,6 +149,8 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     sendStatic(reply, 'assets/navigation-waze-button-art-v2.webp', 'image/webp', 'public, max-age=31536000, immutable'));
   fastify.get('/entregas/button-google-maps-v4.webp', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'assets/navigation-google-maps-button-art-v4.webp', 'image/webp', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/button-google-maps-v5.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-google-maps-button-art-v5.webp', 'image/webp', 'public, max-age=31536000, immutable'));
   fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
