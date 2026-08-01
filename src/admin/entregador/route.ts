@@ -143,6 +143,12 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
     sendStatic(reply, 'assets/navigation-google-maps-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
   fastify.get('/entregas/icon-whatsapp-v1.png', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'assets/navigation-whatsapp-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/button-whatsapp-v2.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-whatsapp-button-art-v2.webp', 'image/webp', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/button-waze-v2.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-waze-button-art-v2.webp', 'image/webp', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/button-google-maps-v4.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-google-maps-button-art-v4.webp', 'image/webp', 'public, max-age=31536000, immutable'));
   fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 

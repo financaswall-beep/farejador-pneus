@@ -344,19 +344,17 @@
   .delivery-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 14px; }
   .delivery-quick-action {
     display: flex;
-    min-height: 45px;
+    height: 45px;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    color: #315045;
-    background: #f1f7f4;
-    border: 1px solid #e0ebe5;
+    overflow: hidden;
+    padding: 0;
+    background: transparent;
+    border: 0;
     border-radius: 13px;
-    font-size: 10.5px;
-    font-weight: 500;
+    filter: drop-shadow(0 4px 5px rgba(15, 42, 31, 0.12));
   }
-  .delivery-brand-icon { width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; border-radius: 5px; }
-  .delivery-quick-action--whatsapp { color: #047857; background: #e8f8f0; }
+  .delivery-navigation-button-art { display: block; width: 100%; height: 45px; object-fit: fill; }
   .delivery-stop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }
   .delivery-danger-button { color: #e11d48; background: white; border: 1px solid #fecdd3; }
   .delivery-payment-box { margin-top: 12px; padding: 13px; background: #f1f7f4; border-radius: 16px; }
@@ -620,17 +618,14 @@
               <p class="delivery-card-charge">Valor a receber <strong x-text="brl(d.cobrar)"></strong></p>
 
               <div class="delivery-quick-actions">
-                <a :href="whatsUrl(d)" x-show="d.customer_phone" target="_blank" rel="noopener" class="delivery-quick-action delivery-quick-action--whatsapp">
-                  <img src="/entregas/icon-whatsapp-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
-                  <span>WhatsApp</span>
+                <a :href="whatsUrl(d)" x-show="d.customer_phone" target="_blank" rel="noopener" class="delivery-quick-action" aria-label="Abrir WhatsApp">
+                  <img src="/entregas/button-whatsapp-v2.webp" alt="" aria-hidden="true" class="delivery-navigation-button-art" />
                 </a>
-                <a :href="wazeUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action">
-                  <img src="/entregas/icon-waze-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
-                  <span>Waze</span>
+                <a :href="wazeUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action" aria-label="Abrir no Waze">
+                  <img src="/entregas/button-waze-v2.webp" alt="" aria-hidden="true" class="delivery-navigation-button-art" />
                 </a>
-                <a :href="mapsUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action">
-                  <img src="/entregas/icon-google-maps-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
-                  <span translate="no">Google Maps</span>
+                <a :href="mapsUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action" aria-label="Abrir no Google Maps">
+                  <img src="/entregas/button-google-maps-v4.webp" alt="" aria-hidden="true" class="delivery-navigation-button-art" />
                 </a>
               </div>
 

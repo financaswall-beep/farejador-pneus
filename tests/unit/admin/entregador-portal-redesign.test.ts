@@ -32,22 +32,24 @@ describe('portal mobile do entregador', () => {
     expect(route).toContain("'assets/entregas-finalizar-rota-curva-v1.webp'");
   });
 
-  it('usa os ícones oficiais de navegação servidos localmente', () => {
+  it('usa os botões ilustrados de navegação servidos localmente', () => {
     const assets = [
-      'navigation-waze-official-v1.png',
-      'navigation-google-maps-official-v1.png',
-      'navigation-whatsapp-official-v1.png',
+      'navigation-whatsapp-button-art-v2.webp',
+      'navigation-waze-button-art-v2.webp',
+      'navigation-google-maps-button-art-v4.webp',
     ];
 
     for (const asset of assets) {
-      expect(statSync(resolve('painel/public/assets', asset)).size).toBeGreaterThan(3_000);
+      expect(statSync(resolve('painel/public/assets', asset)).size).toBeGreaterThan(5_000);
       expect(route).toContain(`'assets/${asset}'`);
     }
 
-    expect(html).toContain('src="/entregas/icon-waze-v1.png"');
-    expect(html).toContain('src="/entregas/icon-google-maps-v1.png"');
-    expect(html).toContain('src="/entregas/icon-whatsapp-v1.png"');
-    expect(html).toContain('<span translate="no">Google Maps</span>');
+    expect(html).toContain('src="/entregas/button-whatsapp-v2.webp"');
+    expect(html).toContain('src="/entregas/button-waze-v2.webp"');
+    expect(html).toContain('src="/entregas/button-google-maps-v4.webp"');
+    expect(html).toContain(':href="whatsUrl(d)"');
+    expect(html).toContain(':href="wazeUrl(d)"');
+    expect(html).toContain(':href="mapsUrl(d)"');
   });
 
   it('calcula o progresso apenas a partir das entregas da rota aberta', () => {
