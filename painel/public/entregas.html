@@ -174,6 +174,279 @@
     .delivery-login-heading { margin-bottom: 14px; }
     .delivery-login-brand { top: max(12px, env(safe-area-inset-top)); }
   }
+
+  /* Portal do entregador: interface mobile operacional */
+  .delivery-app-shell {
+    width: 100%;
+    max-width: 440px;
+    min-height: 100vh;
+    min-height: 100svh;
+    margin: 0 auto;
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+    color: #10231c;
+    background: #f1f7f4;
+  }
+  .delivery-app-header {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    padding: max(14px, env(safe-area-inset-top)) 18px 18px;
+    color: white;
+    background:
+      radial-gradient(circle at 90% 0%, rgba(110,231,183,.34), transparent 38%),
+      linear-gradient(145deg, #047857, #065f46 72%);
+    border-radius: 0 0 28px 28px;
+    box-shadow: 0 16px 35px rgba(6,78,59,.18);
+  }
+  .delivery-app-topbar,
+  .delivery-app-brand,
+  .delivery-app-user,
+  .delivery-route-row,
+  .delivery-section-heading,
+  .delivery-card-top,
+  .delivery-card-line,
+  .delivery-close-heading {
+    display: flex;
+    align-items: center;
+  }
+  .delivery-app-topbar { justify-content: space-between; gap: 14px; }
+  .delivery-app-brand { gap: 9px; min-width: 0; }
+  .delivery-app-brand-mark {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    flex: 0 0 38px;
+    color: #047857;
+    background: white;
+    border-radius: 12px;
+    font-weight: 700;
+    letter-spacing: -.04em;
+  }
+  .delivery-app-brand strong,
+  .delivery-app-brand small { display: block; line-height: 1.05; }
+  .delivery-app-brand strong { font-size: 13px; font-weight: 600; letter-spacing: .06em; }
+  .delivery-app-brand small { margin-top: 4px; color: #a7f3d0; font-size: 10px; }
+  .delivery-app-user { gap: 8px; min-width: 0; }
+  .delivery-app-user-copy { max-width: 118px; text-align: right; }
+  .delivery-app-user-copy small,
+  .delivery-app-user-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .delivery-app-user-copy small { color: #a7f3d0; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+  .delivery-app-user-copy strong { margin-top: 2px; font-size: 12px; font-weight: 500; }
+  .delivery-app-logout {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    flex: 0 0 38px;
+    color: white;
+    background: rgba(255,255,255,.13);
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 12px;
+  }
+  .delivery-route-summary {
+    margin-top: 16px;
+    padding: 15px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .delivery-route-row { justify-content: space-between; gap: 12px; }
+  .delivery-route-label { margin: 0 0 3px; color: #a7f3d0; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; }
+  .delivery-route-title { margin: 0; font-size: 18px; line-height: 1.1; font-weight: 600; }
+  .delivery-route-time { margin: 5px 0 0; color: #d1fae5; font-size: 11px; }
+  .delivery-route-count {
+    min-width: 70px;
+    padding: 8px 10px;
+    text-align: center;
+    color: #064e3b;
+    background: #d1fae5;
+    border-radius: 13px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .delivery-route-progress { height: 6px; margin-top: 13px; overflow: hidden; background: rgba(255,255,255,.18); border-radius: 999px; }
+  .delivery-route-progress > span { display: block; height: 100%; background: #6ee7b7; border-radius: inherit; transition: width .25s ease; }
+  .delivery-app-content { padding: 20px 14px 0; }
+  .delivery-flash {
+    margin: 16px 14px 0;
+    padding: 12px 14px;
+    border: 1px solid;
+    border-radius: 15px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .delivery-section-heading { justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .delivery-section-heading h2 { margin: 0; color: #10231c; font-size: 20px; line-height: 1.1; font-weight: 600; }
+  .delivery-section-heading p { margin: 5px 0 0; color: #64756d; font-size: 12px; line-height: 1.45; }
+  .delivery-section-badge { flex: 0 0 auto; padding: 7px 10px; color: #047857; background: #dff6eb; border-radius: 999px; font-size: 10px; font-weight: 500; }
+  .delivery-empty {
+    padding: 32px 20px;
+    text-align: center;
+    color: #64756d;
+    background: white;
+    border: 1px solid #e1ece6;
+    border-radius: 22px;
+  }
+  .delivery-empty-icon { display: grid; width: 54px; height: 54px; margin: 0 auto 12px; place-items: center; color: #059669; background: #e7f8ef; border-radius: 18px; }
+  .delivery-queue-card,
+  .delivery-stop-card,
+  .delivery-start-card {
+    background: white;
+    border: 1px solid #e1ece6;
+    border-radius: 22px;
+    box-shadow: 0 10px 28px rgba(15,67,48,.07);
+  }
+  .delivery-queue-card { display: block; margin-bottom: 12px; padding: 15px; cursor: pointer; }
+  .delivery-queue-layout { display: flex; align-items: flex-start; gap: 12px; }
+  .delivery-queue-check { width: 22px; height: 22px; margin-top: 1px; flex: 0 0 22px; accent-color: #059669; }
+  .delivery-card-main { min-width: 0; flex: 1; }
+  .delivery-card-top { justify-content: space-between; gap: 10px; }
+  .delivery-card-name { overflow: hidden; color: #10231c; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+  .delivery-status-pill { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+  .delivery-card-line { align-items: flex-start; gap: 7px; margin-top: 9px; color: #607269; font-size: 12px; line-height: 1.45; }
+  .delivery-card-line svg { margin-top: 1px; flex: 0 0 auto; }
+  .delivery-card-items { margin: 8px 0 0; color: #40534a; font-size: 12px; }
+  .delivery-card-charge { margin: 11px 0 0; color: #10231c; font-size: 12px; }
+  .delivery-card-charge strong { margin-left: 4px; color: #047857; font-size: 17px; font-weight: 500; }
+  .delivery-start-card { margin-top: 16px; padding: 17px; }
+  .delivery-field { display: block; margin-bottom: 13px; }
+  .delivery-field > span { display: block; margin-bottom: 6px; color: #42574d; font-size: 11px; font-weight: 500; }
+  .delivery-input {
+    width: 100%;
+    padding: 14px 15px;
+    color: #10231c;
+    background: #f8fbf9;
+    border: 1px solid #cfe0d7;
+    border-radius: 14px;
+    outline: none;
+    font-size: 16px;
+  }
+  .delivery-input:focus { background: white; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+  .delivery-primary-button,
+  .delivery-secondary-button,
+  .delivery-danger-button {
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .delivery-primary-button { color: white; background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 10px 22px rgba(5,150,105,.19); }
+  .delivery-primary-button:disabled { opacity: .45; box-shadow: none; }
+  .delivery-stop-card { margin-bottom: 14px; overflow: hidden; }
+  .delivery-stop-accent { height: 5px; background: linear-gradient(90deg, #059669, #6ee7b7); }
+  .delivery-stop-body { padding: 16px; }
+  .delivery-stop-number { display: grid; width: 32px; height: 32px; place-items: center; flex: 0 0 32px; color: #047857; background: #dcfce7; border-radius: 11px; font-size: 12px; font-weight: 500; }
+  .delivery-stop-customer { min-width: 0; flex: 1; }
+  .delivery-stop-customer strong { display: block; overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+  .delivery-stop-customer small { display: block; margin-top: 3px; color: #72837b; font-size: 10px; }
+  .delivery-quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 14px; }
+  .delivery-quick-action {
+    display: flex;
+    min-height: 45px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #315045;
+    background: #f1f7f4;
+    border: 1px solid #e0ebe5;
+    border-radius: 13px;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+  .delivery-brand-icon { width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; border-radius: 5px; }
+  .delivery-quick-action--whatsapp { color: #047857; background: #e8f8f0; }
+  .delivery-stop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }
+  .delivery-danger-button { color: #e11d48; background: white; border: 1px solid #fecdd3; }
+  .delivery-payment-box { margin-top: 12px; padding: 13px; background: #f1f7f4; border-radius: 16px; }
+  .delivery-payment-box p { margin: 0 0 9px; color: #42574d; font-size: 11px; font-weight: 500; }
+  .delivery-payment-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+  .delivery-payment-grid button { min-height: 42px; color: white; background: #059669; border-radius: 12px; font-size: 11px; font-weight: 500; text-transform: capitalize; }
+  .delivery-close-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1003 / 1568;
+    margin-top: 22px;
+    overflow: hidden;
+    background: #fff url('/entregas/finalizar-rota-curva-v1.webp') center / 100% 100% no-repeat;
+    border-radius: 22px;
+    box-shadow: 0 14px 34px rgba(15,67,48,.09);
+  }
+  .delivery-close-overlay-field {
+    position: absolute;
+    left: 7.5%;
+    right: 12%;
+    height: 9.2%;
+  }
+  .delivery-close-overlay-field--km { top: 40.4%; }
+  .delivery-close-overlay-field--fuel { top: 59.4%; }
+  .delivery-close-art-input {
+    width: 100%;
+    height: 100%;
+    padding: 0 15px;
+    color: #10231c;
+    background: rgba(248,251,249,.98);
+    border: 1px solid #c9ddd3;
+    border-radius: 14px;
+    outline: none;
+    font-size: 15px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(15,67,48,.05);
+  }
+  .delivery-close-art-input:focus {
+    background: #fff;
+    border-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16,185,129,.13);
+  }
+  .delivery-close-art-receipt {
+    position: absolute;
+    top: 72.2%;
+    left: 7.5%;
+    right: 12%;
+    display: flex;
+    height: 8.3%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #047857;
+    background: rgba(238,250,244,.97);
+    border: 1px dashed #84d5ad;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .delivery-close-art-receipt:focus-within { box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+  .delivery-close-art-receipt-ok {
+    position: absolute;
+    top: 81.2%;
+    left: 8%;
+    right: 12%;
+    color: #047857;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+  }
+  .delivery-close-art-button {
+    position: absolute;
+    right: 12%;
+    bottom: 5.2%;
+    left: 7.5%;
+    height: 8.4%;
+    color: #fff;
+    background: linear-gradient(135deg, #059669, #047857);
+    border-radius: 14px;
+    box-shadow: 0 10px 22px rgba(5,150,105,.22);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .delivery-close-art-button:disabled { opacity: .45; box-shadow: none; }
+  .delivery-dialog-panel { width: 100%; max-width: 440px; padding: 20px; background: white; border-radius: 24px; box-shadow: 0 24px 70px rgba(15,23,42,.25); }
+  @media (min-width: 640px) {
+    .delivery-app-shell { margin: 18px auto; overflow: hidden; border: 1px solid #dce9e2; border-radius: 32px; box-shadow: 0 28px 80px rgba(15,23,42,.16); }
+    .delivery-app-header { border-radius: 0 0 28px 28px; }
+  }
 </style>
 </head>
 <body class="bg-slate-100 text-slate-900 min-h-screen" x-data="entregasApp()" x-init="init()">
@@ -221,164 +494,220 @@
   </div>
 
   <!-- ═══ APP ═══ -->
-  <div x-show="token" x-cloak class="max-w-md mx-auto pb-24">
-    <!-- Cabeçalho -->
-    <header class="sticky top-0 z-10 bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
-      <div>
-        <div class="text-xs text-slate-400">Entregador</div>
-        <div class="font-semibold" x-text="displayName || 'você'"></div>
+  <div x-show="token" x-cloak class="delivery-app-shell">
+    <header class="delivery-app-header">
+      <div class="delivery-app-topbar">
+        <div class="delivery-app-brand">
+          <span class="delivery-app-brand-mark">2W</span>
+          <span>
+            <strong>2W PNEUS</strong>
+            <small>Logística da Matriz</small>
+          </span>
+        </div>
+        <div class="delivery-app-user">
+          <div class="delivery-app-user-copy">
+            <small>Entregador</small>
+            <strong x-text="displayName || 'você'"></strong>
+          </div>
+          <button type="button" @click="sair()" class="delivery-app-logout" aria-label="Sair do portal">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
-      <button @click="sair()" class="text-xs text-slate-300 border border-slate-700 rounded-lg px-3 py-1.5">Sair</button>
+
+      <section x-show="rotaAberta" class="delivery-route-summary" aria-label="Resumo da rota atual">
+        <div class="delivery-route-row">
+          <div>
+            <p class="delivery-route-label">Rota em andamento</p>
+            <h1 class="delivery-route-title" x-text="rotaAberta && rotaAberta.trip_number ? rotaAberta.trip_number : 'Minha rota'"></h1>
+            <p class="delivery-route-time"
+               x-text="'Saída às ' + (rotaAberta ? horaSaida(rotaAberta.started_at) : '') + (rotaAberta && rotaAberta.km_start ? ' · km ' + rotaAberta.km_start : '')"></p>
+          </div>
+          <div class="delivery-route-count">
+            <span x-text="entregasConcluidas()"></span>/<span x-text="rotaAberta ? rotaAberta.entregas.length : 0"></span><br />
+            concluídas
+          </div>
+        </div>
+        <div class="delivery-route-progress" aria-hidden="true">
+          <span :style="'width:' + percentualRota() + '%'" ></span>
+        </div>
+      </section>
     </header>
 
-    <div x-show="msg" x-cloak class="mx-5 mt-4 text-sm px-4 py-3 rounded-xl"
-         :class="msg && msg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+    <div x-show="msg" x-cloak class="delivery-flash"
+         :class="msg && msg.ok ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'"
          x-text="msg ? msg.text : ''"></div>
 
-    <!-- ── SEM ROTA ABERTA: fila do dia → abrir rota ── -->
-    <div x-show="!rotaAberta" class="px-5 mt-5">
-      <h2 class="text-lg font-bold mb-1">Entregas de hoje</h2>
-      <p class="text-sm text-slate-500 mb-4">Marca as que vão contigo e bate o km pra abrir a rota.</p>
-
-      <div x-show="fila.length === 0" class="bg-white rounded-2xl p-6 text-center text-slate-400 text-sm">
-        Nenhuma entrega na fila agora.
-      </div>
-
-      <template x-for="d in fila" :key="d.order_id">
-        <label class="block bg-white rounded-2xl p-4 mb-3 shadow-sm">
-          <div class="flex items-start gap-3">
-            <input type="checkbox" :value="d.order_id" x-model="selecionadas" class="mt-1 w-5 h-5 rounded" />
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between gap-2">
-                <span class="font-semibold truncate" x-text="d.customer_name || 'Cliente'"></span>
-                <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0" :class="badgeClass(d)" x-text="badgeText(d)"></span>
-              </div>
-              <div class="text-sm text-slate-500 mt-0.5" x-text="d.delivery_address || 'sem endereço'"></div>
-              <div class="text-sm mt-1" x-text="itensText(d)"></div>
-              <div class="text-base font-bold mt-1">Cobrar <span x-text="brl(d.cobrar)"></span></div>
-            </div>
+    <main class="delivery-app-content">
+      <!-- SEM ROTA ABERTA: fila do dia → abrir rota -->
+      <section x-show="!rotaAberta" aria-labelledby="delivery-queue-title">
+        <div class="delivery-section-heading">
+          <div>
+            <h2 id="delivery-queue-title">Entregas de hoje</h2>
+            <p>Selecione as paradas e informe o km para começar.</p>
           </div>
-        </label>
-      </template>
-
-      <div x-show="fila.length > 0" class="bg-white rounded-2xl p-4 mt-4 shadow-sm">
-        <label class="text-sm text-slate-500">Km inicial (do painel da moto)</label>
-        <input x-model="kmInicial" type="number" inputmode="decimal" placeholder="ex.: 45210"
-               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
-        <button @click="abrirRota()" :disabled="!!salvando || selecionadas.length === 0"
-                class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
-          <span x-text="selecionadas.length ? ('Abrir rota com ' + selecionadas.length + ' entrega(s)') : 'Marca as entregas'"></span>
-        </button>
-      </div>
-    </div>
-
-    <!-- ── ROTA ABERTA: entregas + fechar ── -->
-    <div x-show="rotaAberta" class="px-5 mt-5">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h2 class="text-lg font-bold" x-text="'Minha rota' + (rotaAberta && rotaAberta.trip_number ? ' — ' + rotaAberta.trip_number : '')"></h2>
-          <p class="text-sm text-slate-500" x-text="'Saída às ' + (rotaAberta ? horaSaida(rotaAberta.started_at) : '') + (rotaAberta && rotaAberta.km_start ? ' · km ' + rotaAberta.km_start : '')"></p>
+          <span class="delivery-section-badge" x-text="fila.length + ' na fila'"></span>
         </div>
-        <span class="text-xs bg-slate-200 text-slate-600 rounded-full px-3 py-1" x-text="(rotaAberta ? rotaAberta.entregas.length : 0) + ' entregas'"></span>
-      </div>
 
-      <template x-for="d in (rotaAberta ? rotaAberta.entregas : [])" :key="d.order_id">
-        <div class="bg-white rounded-2xl p-4 mb-3 shadow-sm">
-          <div class="flex items-center justify-between gap-2">
-            <span class="font-semibold truncate" x-text="d.customer_name || 'Cliente'"></span>
-            <span class="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                  :class="d.delivery_status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                  x-text="d.delivery_status === 'delivered' ? 'entregue' : 'a caminho'"></span>
-          </div>
-          <div class="text-sm text-slate-500 mt-0.5" x-text="d.delivery_address || 'sem endereço'"></div>
-          <div class="text-sm mt-1" x-text="itensText(d)"></div>
-          <div class="text-base font-bold mt-1">Cobrar <span x-text="brl(d.cobrar)"></span></div>
-
-          <!-- Deep-links -->
-          <div class="flex gap-2 mt-3">
-            <a :href="whatsUrl(d)" x-show="d.customer_phone" target="_blank" rel="noopener"
-               class="flex-1 text-center text-sm bg-emerald-50 text-emerald-700 rounded-xl py-2.5 font-medium">WhatsApp</a>
-            <a :href="wazeUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener"
-               class="flex-1 text-center text-sm bg-sky-50 text-sky-700 rounded-xl py-2.5 font-medium">Waze</a>
-            <a :href="mapsUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener"
-               class="flex-1 text-center text-sm bg-slate-100 text-slate-700 rounded-xl py-2.5 font-medium">Maps</a>
-          </div>
-
-          <!-- Ações (só enquanto a caminho) -->
-          <div x-show="d.delivery_status !== 'delivered'" class="mt-3">
-            <div x-show="pagando !== d.order_id" class="flex gap-2">
-              <button @click="pagando = d.order_id"
-                      class="flex-1 bg-emerald-600 text-white rounded-xl py-3 text-sm font-semibold active:bg-emerald-700">Entreguei</button>
-              <button @click="naoEntreguei(d)"
-                      class="flex-1 bg-white border border-rose-200 text-rose-600 rounded-xl py-3 text-sm font-semibold active:bg-rose-50">Não entreguei</button>
-            </div>
-            <!-- Escolha do pagamento -->
-            <div x-show="pagando === d.order_id" class="mt-1">
-              <div class="text-sm text-slate-500 mb-2">Recebeu como?</div>
-              <div class="grid grid-cols-3 gap-2">
-                <template x-for="pm in ['dinheiro','pix','cartao']" :key="pm">
-                  <button @click="entreguei(d, pm)" :disabled="!!salvando"
-                          class="bg-emerald-600 text-white rounded-xl py-3 text-sm font-semibold active:bg-emerald-700 disabled:opacity-50 capitalize" x-text="pm"></button>
-                </template>
-              </div>
-              <button @click="pagando = null" class="w-full text-center text-xs text-slate-400 mt-2">cancelar</button>
-            </div>
-          </div>
+        <div x-show="fila.length === 0" class="delivery-empty">
+          <span class="delivery-empty-icon"><i data-lucide="package-check" class="w-6 h-6"></i></span>
+          <strong class="block text-sm text-slate-700">Tudo tranquilo por aqui</strong>
+          <span class="block mt-1 text-xs">Nenhuma entrega aguardando agora.</span>
         </div>
-      </template>
 
-      <!-- FECHAR ROTA -->
-      <div class="bg-white rounded-2xl p-4 mt-5 shadow-sm">
-        <h3 class="font-bold mb-1">Fechar a rota</h3>
-        <p class="text-sm text-slate-500 mb-3">No fim do dia: km final, gasolina e foto do comprovante. A gasolina é uma anotação; o escritório confirma antes de entrar no Financeiro.</p>
-        <label class="text-sm text-slate-500">Km final</label>
-        <input x-model="fecharForm.km_end" type="number" inputmode="decimal" placeholder="ex.: 45340"
-               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
-        <label class="text-sm text-slate-500">Gasolina (R$)</label>
-        <input x-model="fecharForm.fuel_spent" type="number" inputmode="decimal" placeholder="ex.: 50,00"
-               class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base mt-1 mb-3 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        <template x-for="d in fila" :key="d.order_id">
+          <label class="delivery-queue-card">
+            <div class="delivery-queue-layout">
+              <input type="checkbox" :value="d.order_id" x-model="selecionadas" class="delivery-queue-check" />
+              <div class="delivery-card-main">
+                <div class="delivery-card-top">
+                  <span class="delivery-card-name" x-text="d.customer_name || 'Cliente'"></span>
+                  <span class="delivery-status-pill" :class="badgeClass(d)" x-text="badgeText(d)"></span>
+                </div>
+                <div class="delivery-card-line">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                  <span x-text="d.delivery_address || 'Endereço não informado'"></span>
+                </div>
+                <p x-show="itensText(d)" class="delivery-card-items" x-text="itensText(d)"></p>
+                <p class="delivery-card-charge">Cobrar <strong x-text="brl(d.cobrar)"></strong></p>
+              </div>
+            </div>
+          </label>
+        </template>
 
-        <label class="block w-full text-center bg-slate-100 text-slate-700 rounded-xl py-3 text-sm font-medium mb-3 cursor-pointer">
-          <span x-text="uploadando ? 'Enviando foto…' : '📷 Foto do comprovante'"></span>
-          <input type="file" accept="image/*" capture="environment" class="hidden" @change="subirComprovante($event)" :disabled="!!uploadando" />
-        </label>
-        <div x-show="comprovantesOk > 0" class="text-xs text-emerald-600 mb-3" x-text="comprovantesOk + ' comprovante(s) enviado(s)'"></div>
+        <div x-show="fila.length > 0" class="delivery-start-card">
+          <label class="delivery-field">
+            <span>Km inicial do veículo</span>
+            <input x-model="kmInicial" type="number" inputmode="decimal" placeholder="Ex.: 45.210" class="delivery-input" />
+          </label>
+          <button type="button" @click="abrirRota()" :disabled="!!salvando || selecionadas.length === 0"
+                  class="delivery-primary-button w-full">
+            <span x-text="selecionadas.length ? ('Começar rota · ' + selecionadas.length + ' parada(s)') : 'Selecione as entregas'"></span>
+          </button>
+        </div>
+      </section>
 
-        <button @click="pedirFechamentoRota()" :disabled="!!salvando"
-                class="w-full bg-slate-900 text-white rounded-xl py-4 text-base font-semibold active:bg-slate-800 disabled:opacity-50">
-          Fechar rota
-        </button>
-      </div>
-    </div>
+      <!-- ROTA ABERTA: entregas + fechar -->
+      <section x-show="rotaAberta" aria-labelledby="delivery-stops-title">
+        <div class="delivery-section-heading">
+          <div>
+            <h2 id="delivery-stops-title">Suas paradas</h2>
+            <p>Abra o mapa e confirme cada entrega.</p>
+          </div>
+          <span class="delivery-section-badge" x-text="entregasPendentes() + ' pendente(s)'"></span>
+        </div>
+
+        <template x-for="(d, index) in (rotaAberta ? rotaAberta.entregas : [])" :key="d.order_id">
+          <article class="delivery-stop-card">
+            <div class="delivery-stop-accent"></div>
+            <div class="delivery-stop-body">
+              <div class="delivery-card-top">
+                <span class="delivery-stop-number" x-text="index + 1"></span>
+                <div class="delivery-stop-customer">
+                  <strong x-text="d.customer_name || 'Cliente'"></strong>
+                  <small x-text="d.delivery_status === 'delivered' ? 'Parada finalizada' : 'Próxima ação disponível'"></small>
+                </div>
+                <span class="delivery-status-pill"
+                      :class="d.delivery_status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                      x-text="d.delivery_status === 'delivered' ? 'entregue' : 'a caminho'"></span>
+              </div>
+
+              <div class="delivery-card-line">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                <span x-text="d.delivery_address || 'Endereço não informado'"></span>
+              </div>
+              <p x-show="itensText(d)" class="delivery-card-items" x-text="itensText(d)"></p>
+              <p class="delivery-card-charge">Valor a receber <strong x-text="brl(d.cobrar)"></strong></p>
+
+              <div class="delivery-quick-actions">
+                <a :href="whatsUrl(d)" x-show="d.customer_phone" target="_blank" rel="noopener" class="delivery-quick-action delivery-quick-action--whatsapp">
+                  <img src="/entregas/icon-whatsapp-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
+                  <span>WhatsApp</span>
+                </a>
+                <a :href="wazeUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action">
+                  <img src="/entregas/icon-waze-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
+                  <span>Waze</span>
+                </a>
+                <a :href="mapsUrl(d)" x-show="d.delivery_address" target="_blank" rel="noopener" class="delivery-quick-action">
+                  <img src="/entregas/icon-google-maps-v1.png" alt="" aria-hidden="true" class="delivery-brand-icon" />
+                  <span translate="no">Google Maps</span>
+                </a>
+              </div>
+
+              <div x-show="d.delivery_status !== 'delivered'">
+                <div x-show="pagando !== d.order_id" class="delivery-stop-actions">
+                  <button type="button" @click="pagando = d.order_id" class="delivery-primary-button">Confirmar entrega</button>
+                  <button type="button" @click="naoEntreguei(d)" class="delivery-danger-button">Não entreguei</button>
+                </div>
+                <div x-show="pagando === d.order_id" class="delivery-payment-box">
+                  <p>Como o pagamento foi recebido?</p>
+                  <div class="delivery-payment-grid">
+                    <template x-for="pm in ['dinheiro','pix','cartao']" :key="pm">
+                      <button type="button" @click="entreguei(d, pm)" :disabled="!!salvando" x-text="pm"></button>
+                    </template>
+                  </div>
+                  <button type="button" @click="pagando = null" class="w-full mt-3 text-center text-xs text-slate-500">Voltar</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </template>
+
+        <section class="delivery-close-card" aria-labelledby="delivery-close-title" aria-describedby="delivery-close-description">
+          <h3 id="delivery-close-title" class="sr-only">Finalizar rota</h3>
+          <p id="delivery-close-description" class="sr-only">Registre os dados do retorno e encerre o dia.</p>
+
+          <label class="delivery-close-overlay-field delivery-close-overlay-field--km">
+            <span class="sr-only">Km final do veículo</span>
+            <input x-model="fecharForm.km_end" type="number" inputmode="decimal" placeholder="Ex.: 45.340" class="delivery-close-art-input" />
+          </label>
+          <label class="delivery-close-overlay-field delivery-close-overlay-field--fuel">
+            <span class="sr-only">Abastecimento (R$)</span>
+            <input x-model="fecharForm.fuel_spent" type="number" inputmode="decimal" placeholder="Ex.: 50,00" class="delivery-close-art-input" />
+          </label>
+
+          <label class="delivery-close-art-receipt">
+            <i data-lucide="camera" class="w-4 h-4"></i>
+            <span x-text="uploadando ? 'Enviando comprovante…' : 'Fotografar comprovante'"></span>
+            <input type="file" accept="image/*" capture="environment" class="hidden" @change="subirComprovante($event)" :disabled="!!uploadando" />
+          </label>
+          <div x-show="comprovantesOk > 0" class="delivery-close-art-receipt-ok" x-text="comprovantesOk + ' comprovante(s) enviado(s)'"></div>
+
+          <button type="button" @click="pedirFechamentoRota()" :disabled="!!salvando" class="delivery-close-art-button">
+            Finalizar rota do dia
+          </button>
+        </section>
+      </section>
+    </main>
   </div>
 
   <div x-show="dialogo.open" x-cloak
        @keydown.escape.window="fecharDialogo()" @click.self="fecharDialogo()"
-       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
+       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-emerald-950/50 backdrop-blur-sm"
        role="dialog" aria-modal="true" aria-labelledby="entregas-dialog-title"
        style="display:none;">
-    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl p-5">
+    <div class="delivery-dialog-panel">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 id="entregas-dialog-title" class="font-bold text-lg"
+          <h2 id="entregas-dialog-title" class="font-extrabold text-lg text-slate-900"
               x-text="dialogo.kind === 'close-trip' ? 'Fechar a rota do dia?' : 'O que aconteceu?'"></h2>
           <p class="text-sm text-slate-500 mt-1"
              x-text="dialogo.kind === 'close-trip' ? 'Entregas pendentes impedem o fechamento. Não-entregues reportadas voltam para a decisão do escritório.' : (dialogo.delivery?.customer_name || 'Entrega selecionada')"></p>
         </div>
-        <button @click="fecharDialogo()" class="p-2 rounded-lg bg-slate-100" aria-label="Fechar diálogo">×</button>
+        <button type="button" @click="fecharDialogo()" class="grid w-9 h-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700" aria-label="Fechar diálogo">×</button>
       </div>
       <div x-show="dialogo.kind === 'failure'" class="mt-4">
-        <label for="entregas-dialog-reason" class="block text-sm text-slate-600 mb-1">Motivo *</label>
+        <label for="entregas-dialog-reason" class="block text-xs font-bold text-slate-600 mb-2">Motivo *</label>
         <textarea id="entregas-dialog-reason" x-ref="entregasDialogReason"
                   x-model="dialogo.reason" maxlength="500" rows="4"
                   placeholder="Ex.: cliente não estava, endereço errado"
-                  class="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-400"></textarea>
+                  class="delivery-input resize-none"></textarea>
       </div>
       <div class="grid grid-cols-2 gap-2 mt-5">
-        <button @click="fecharDialogo()" class="border border-slate-300 rounded-xl py-3 text-sm font-semibold">Voltar</button>
-        <button @click="confirmarDialogo()"
+        <button type="button" @click="fecharDialogo()" class="delivery-secondary-button border border-slate-300 text-slate-600">Voltar</button>
+        <button type="button" @click="confirmarDialogo()"
                 :disabled="!!salvando || (dialogo.kind === 'failure' && !String(dialogo.reason || '').trim())"
-                class="bg-slate-900 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-40"
+                class="delivery-primary-button disabled:opacity-40"
                 x-text="dialogo.kind === 'close-trip' ? 'Fechar rota' : 'Enviar relato'"></button>
       </div>
     </div>

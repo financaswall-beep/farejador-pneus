@@ -130,6 +130,19 @@ export async function registerEntregadorRoute(fastify: FastifyInstance): Promise
       'image/webp',
       'public, max-age=31536000, immutable',
     ));
+  fastify.get('/entregas/finalizar-rota-curva-v1.webp', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(
+      reply,
+      'assets/entregas-finalizar-rota-curva-v1.webp',
+      'image/webp',
+      'public, max-age=31536000, immutable',
+    ));
+  fastify.get('/entregas/icon-waze-v1.png', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-waze-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/icon-google-maps-v1.png', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-google-maps-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
+  fastify.get('/entregas/icon-whatsapp-v1.png', { preHandler: flagGate }, async (_request, reply) =>
+    sendStatic(reply, 'assets/navigation-whatsapp-official-v1.png', 'image/png', 'public, max-age=31536000, immutable'));
   fastify.get('/tailwind.css', { preHandler: flagGate }, async (_request, reply) =>
     sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 

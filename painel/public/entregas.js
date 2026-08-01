@@ -211,6 +211,20 @@ function entregasApp() {
       const n = Number(v || 0);
       return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     },
+    entregasConcluidas() {
+      return this.rotaAberta
+        ? this.rotaAberta.entregas.filter((d) => d.delivery_status === 'delivered').length
+        : 0;
+    },
+    entregasPendentes() {
+      return this.rotaAberta
+        ? this.rotaAberta.entregas.filter((d) => d.delivery_status !== 'delivered').length
+        : 0;
+    },
+    percentualRota() {
+      const total = this.rotaAberta ? this.rotaAberta.entregas.length : 0;
+      return total ? Math.round((this.entregasConcluidas() / total) * 100) : 0;
+    },
     itensText(d) {
       if (!d.items || !d.items.length) return '';
       return d.items.map((i) => `${i.quantity}× ${i.label}`).join(', ');
