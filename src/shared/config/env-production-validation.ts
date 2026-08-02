@@ -31,6 +31,8 @@ interface ProductionEnvConfig {
   META_ADS_ACCESS_TOKEN?: string;
   META_CAPI_DATASET_ID?: string;
   META_CAPI_ACCESS_TOKEN?: string;
+  META_CAPI_WHATSAPP_DATASET_ID?: string;
+  META_CAPI_WHATSAPP_ACCESS_TOKEN?: string;
   META_WHATSAPP_BUSINESS_ACCOUNT_ID?: string;
   META_CAPI_PAGE_ID?: string;
   META_MESSAGING_WEBHOOK_VERIFY_TOKEN?: string;
@@ -123,18 +125,28 @@ export function validateProductionEnv(value: ProductionEnvConfig, ctx: Refinemen
     if (!value.MARKETING_ATTRIBUTION) {
       addIssue(ctx, 'MARKETING_ATTRIBUTION', 'must be true when MARKETING_CAPI_ENABLED=true');
     }
-    if (!value.META_CAPI_DATASET_ID) {
-      addIssue(ctx, 'META_CAPI_DATASET_ID', 'is required when MARKETING_CAPI_ENABLED=true');
+    if (value.MARKETING_CAPI_MESSENGER_ENABLED || value.MARKETING_CAPI_INSTAGRAM_ENABLED) {
+      if (!value.META_CAPI_DATASET_ID) {
+        addIssue(ctx, 'META_CAPI_DATASET_ID', 'is required when Messenger or Instagram CAPI is enabled');
+      }
+      if (!value.META_CAPI_ACCESS_TOKEN) {
+        addIssue(ctx, 'META_CAPI_ACCESS_TOKEN', 'is required when Messenger or Instagram CAPI is enabled');
+      }
     }
-    if (!value.META_CAPI_ACCESS_TOKEN) {
-      addIssue(ctx, 'META_CAPI_ACCESS_TOKEN', 'is required when MARKETING_CAPI_ENABLED=true');
-    }
-    if (value.MARKETING_CAPI_WHATSAPP_ENABLED && !value.META_WHATSAPP_BUSINESS_ACCOUNT_ID) {
-      addIssue(
-        ctx,
-        'META_WHATSAPP_BUSINESS_ACCOUNT_ID',
-        'is required when WhatsApp CAPI is enabled',
-      );
+    if (value.MARKETING_CAPI_WHATSAPP_ENABLED) {
+      if (!value.META_CAPI_WHATSAPP_DATASET_ID) {
+        addIssue(ctx, 'META_CAPI_WHATSAPP_DATASET_ID', 'is required when WhatsApp CAPI is enabled');
+      }
+      if (!value.META_CAPI_WHATSAPP_ACCESS_TOKEN) {
+        addIssue(ctx, 'META_CAPI_WHATSAPP_ACCESS_TOKEN', 'is required when WhatsApp CAPI is enabled');
+      }
+      if (!value.META_WHATSAPP_BUSINESS_ACCOUNT_ID) {
+        addIssue(
+          ctx,
+          'META_WHATSAPP_BUSINESS_ACCOUNT_ID',
+          'is required when WhatsApp CAPI is enabled',
+        );
+      }
     }
     if (value.MARKETING_CAPI_MESSENGER_ENABLED && !value.META_CAPI_PAGE_ID) {
       addIssue(ctx, 'META_CAPI_PAGE_ID', 'is required when Messenger CAPI is enabled');

@@ -27,6 +27,8 @@ beforeAll(async () => {
     META_WHATSAPP_BUSINESS_ACCOUNT_ID: '123456789',
     META_CAPI_DATASET_ID: '987654321',
     META_CAPI_ACCESS_TOKEN: 'capi-test-token',
+    META_CAPI_WHATSAPP_DATASET_ID: '246801357',
+    META_CAPI_WHATSAPP_ACCESS_TOKEN: 'whatsapp-capi-test-token',
     META_CAPI_TEST_EVENT_CODE: 'TEST42',
   });
   ({ extractAdReferral, captureAdReferralAfterMessageUpsert } = await import(
@@ -296,6 +298,29 @@ describe('pipeline determinístico de Marketing', () => {
     );
   });
 
+  it('roteia Messenger e WhatsApp para credenciais de datasets separados', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      events_received: 1,
+      fbtrace_id: 'trace-channel',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    await sendCapiPayload({ data: [{ messaging_channel: 'messenger' }] }, {
+      fetcher: fetcher as typeof fetch,
+      apiVersion: 'v26.0',
+    });
+    await sendCapiPayload({ data: [{ messaging_channel: 'whatsapp' }] }, {
+      fetcher: fetcher as typeof fetch,
+      apiVersion: 'v26.0',
+    });
+
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/987654321/events');
+    expect((fetcher.mock.calls[0]?.[1]?.headers as Record<string, string>).Authorization)
+      .toBe('Bearer capi-test-token');
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain('/246801357/events');
+    expect((fetcher.mock.calls[1]?.[1]?.headers as Record<string, string>).Authorization)
+      .toBe('Bearer whatsapp-capi-test-token');
+  });
+
   it('testa WhatsApp com referral real sem criar pedido nem tocar na outbox', async () => {
     const query = vi.fn(async () => ({
       rows: [{
@@ -320,8 +345,6 @@ describe('pipeline determinístico de Marketing', () => {
         whatsappBusinessAccountId: 'waba-test',
         pageId: 'page-test',
         testEventCode: 'TEST28055',
-        datasetId: 'dataset-test',
-        accessToken: 'token-test',
         apiVersion: 'v26.0',
       },
     })).resolves.toEqual({
@@ -332,6 +355,9 @@ describe('pipeline determinístico de Marketing', () => {
     expect(query).toHaveBeenCalledTimes(1);
     expect(query.mock.calls[0]?.[0]).not.toContain('commerce.orders');
     expect(query.mock.calls[0]?.[0]).not.toContain('capi_outbox');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/246801357/events');
+    expect((fetcher.mock.calls[0]?.[1]?.headers as Record<string, string>).Authorization)
+      .toBe('Bearer whatsapp-capi-test-token');
     const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
       test_event_code: string;
       data: Array<{

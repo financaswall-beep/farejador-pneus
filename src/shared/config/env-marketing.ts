@@ -20,6 +20,8 @@ export const marketingEnvShape = {
   META_GRAPH_API_VERSION: z.string().regex(/^v[0-9]+\.[0-9]+$/).default('v21.0'),
   META_CAPI_DATASET_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_CAPI_ACCESS_TOKEN: z.string().min(1).optional(),
+  META_CAPI_WHATSAPP_DATASET_ID: z.string().regex(/^[0-9]+$/).optional(),
+  META_CAPI_WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
   META_CAPI_PAGE_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().regex(/^[0-9]+$/).optional(),
   META_CAPI_TEST_EVENT_CODE: z.string().min(1).optional(),

@@ -13,6 +13,13 @@ export interface CapiTransportOptions {
   apiVersion?: string;
 }
 
+function payloadMessagingChannel(payload: Record<string, unknown>): string | null {
+  const firstEvent = Array.isArray(payload.data) ? payload.data[0] : null;
+  if (!firstEvent || typeof firstEvent !== 'object') return null;
+  const channel = (firstEvent as Record<string, unknown>).messaging_channel;
+  return typeof channel === 'string' ? channel : null;
+}
+
 function sanitizeMetaErrorDetail(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value
@@ -29,10 +36,19 @@ export async function sendCapiPayload(
   payload: Record<string, unknown>,
   options: CapiTransportOptions = {},
 ): Promise<CapiAck> {
-  const datasetId = options.datasetId ?? env.META_CAPI_DATASET_ID;
-  const accessToken = options.accessToken ?? env.META_CAPI_ACCESS_TOKEN;
+  const isWhatsapp = payloadMessagingChannel(payload) === 'whatsapp';
+  const datasetId = options.datasetId ?? (isWhatsapp
+    ? env.META_CAPI_WHATSAPP_DATASET_ID
+    : env.META_CAPI_DATASET_ID);
+  const accessToken = options.accessToken ?? (isWhatsapp
+    ? env.META_CAPI_WHATSAPP_ACCESS_TOKEN
+    : env.META_CAPI_ACCESS_TOKEN);
   const apiVersion = options.apiVersion ?? env.META_GRAPH_API_VERSION;
-  if (!datasetId || !accessToken) throw new Error('marketing_capi_not_configured');
+  if (!datasetId || !accessToken) {
+    throw new Error(isWhatsapp
+      ? 'marketing_capi_whatsapp_not_configured'
+      : 'marketing_capi_not_configured');
+  }
 
   const url = new URL(
     `https://graph.facebook.com/${encodeURIComponent(apiVersion)}/${encodeURIComponent(datasetId)}/events`,

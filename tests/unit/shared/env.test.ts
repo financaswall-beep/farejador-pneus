@@ -185,7 +185,7 @@ describe('environment security validation', () => {
     expect(parsed.MARKETING_META_ENABLED).toBe(true);
   });
 
-  it('só habilita CAPI em produção com atribuição e credenciais próprias', () => {
+  it('só habilita CAPI do WhatsApp com atribuição e credenciais do canal', () => {
     expect(() => parseEnv({
       ...baseEnv,
       NODE_ENV: 'production',
@@ -193,7 +193,7 @@ describe('environment security validation', () => {
       MARKETING_CAPI_WHATSAPP_ENABLED: 'true',
       ADMIN_AUTH_TOKEN: 'a'.repeat(24),
       CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
-    })).toThrow(/MARKETING_ATTRIBUTION.*MARKETING_CAPI_ENABLED[\s\S]*META_CAPI_DATASET_ID[\s\S]*META_CAPI_ACCESS_TOKEN[\s\S]*META_WHATSAPP_BUSINESS_ACCOUNT_ID/);
+    })).toThrow(/MARKETING_ATTRIBUTION.*MARKETING_CAPI_ENABLED[\s\S]*META_CAPI_WHATSAPP_DATASET_ID[\s\S]*META_CAPI_WHATSAPP_ACCESS_TOKEN[\s\S]*META_WHATSAPP_BUSINESS_ACCOUNT_ID/);
 
     const parsed = parseEnv({
       ...baseEnv,
@@ -201,14 +201,15 @@ describe('environment security validation', () => {
       MARKETING_CAPI_ENABLED: 'true',
       MARKETING_CAPI_WHATSAPP_ENABLED: 'true',
       MARKETING_ATTRIBUTION: 'true',
-      META_CAPI_DATASET_ID: '123456',
-      META_CAPI_ACCESS_TOKEN: 'token-capi-seguro',
+      META_CAPI_WHATSAPP_DATASET_ID: '123456',
+      META_CAPI_WHATSAPP_ACCESS_TOKEN: 'token-capi-whatsapp-seguro',
       META_CAPI_PAGE_ID: '456789',
       META_WHATSAPP_BUSINESS_ACCOUNT_ID: '987654',
       ADMIN_AUTH_TOKEN: 'a'.repeat(24),
       CHATWOOT_HMAC_SECRET: 'x'.repeat(24),
     });
     expect(parsed.MARKETING_CAPI_ENABLED).toBe(true);
+    expect(parsed.META_CAPI_WHATSAPP_DATASET_ID).toBe('123456');
     expect(parsed.META_CAPI_PAGE_ID).toBe('456789');
   });
 

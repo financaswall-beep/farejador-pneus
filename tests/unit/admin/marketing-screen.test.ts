@@ -199,6 +199,8 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/reconcile'");
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/capi/test'");
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/capi/test/whatsapp'");
+    expect(integrationsFront).toContain('META_CAPI_WHATSAPP_DATASET_ID');
+    expect(integrationsFront).toContain('META_CAPI_WHATSAPP_ACCESS_TOKEN');
     expect(integrationsFront).toContain('A Meta recusou o teste:');
     expect(integrationsFront).toContain('marketingIntegrationAuditLabel(eventType)');
     expect(route).toContain("fastify.get('/admin/api/marketing/integrations'");

@@ -170,6 +170,9 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
           : '';
         this.marketingIntegrationsMessage = code === 'capi_test_event_code_not_configured'
           ? 'Configure META_CAPI_TEST_EVENT_CODE antes de testar a CAPI.'
+          : action === 'capi_test_whatsapp'
+            && reason === 'marketing_capi_whatsapp_not_configured'
+            ? 'Configure META_CAPI_WHATSAPP_DATASET_ID e META_CAPI_WHATSAPP_ACCESS_TOKEN antes de testar o WhatsApp.'
           : action.startsWith('capi_test') && reason.startsWith('meta_capi_')
             ? `A Meta recusou o teste: ${reason}`
           : 'A ação não foi concluída. Confira a configuração e o diagnóstico do pipeline.';
