@@ -151,6 +151,11 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
         } else if (action === 'reconcile') {
           const result = await this.apiPost('/admin/api/marketing/reconcile', {});
           this.marketingIntegrationsMessage = `Reconciliação concluída: ${result.attribution?.created || 0} nova(s) atribuição(ões), ${result.capi_enqueued || 0} evento(s) enfileirado(s).`;
+        } else if (action === 'capi_test_whatsapp') {
+          const result = await this.apiPost('/admin/api/marketing/capi/test/whatsapp', {});
+          this.marketingIntegrationsMessage = result.processed
+            ? 'Um Purchase sintético do WhatsApp foi enviado somente ao Test Events da Meta.'
+            : 'Nenhum referral recente de WhatsApp foi encontrado para o Test Events.';
         } else {
           const result = await this.apiPost('/admin/api/marketing/capi/test', {});
           this.marketingIntegrationsMessage = result.processed
@@ -165,7 +170,7 @@ window.PAINEL_MODULES.marketingIntegrations = function () {
           : '';
         this.marketingIntegrationsMessage = code === 'capi_test_event_code_not_configured'
           ? 'Configure META_CAPI_TEST_EVENT_CODE antes de testar a CAPI.'
-          : action === 'capi_test' && reason.startsWith('meta_capi_')
+          : action.startsWith('capi_test') && reason.startsWith('meta_capi_')
             ? `A Meta recusou o teste: ${reason}`
           : 'A ação não foi concluída. Confira a configuração e o diagnóstico do pipeline.';
       } finally {

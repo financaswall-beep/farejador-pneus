@@ -16,7 +16,10 @@ import {
 import { syncMetaInsights } from '../../marketing/meta-sync.js';
 import { reconcileMarketingAttributions } from '../../marketing/attribution.js';
 import { enqueueCapiPurchases } from '../../marketing/capi.js';
-import { sendLatestCapiTestPurchase } from '../../marketing/capi-test.js';
+import {
+  sendLatestCapiTestPurchase,
+  sendLatestWhatsappReferralTestPurchase,
+} from '../../marketing/capi-test.js';
 import { env } from '../../shared/config/env.js';
 import { recordMarketingAudit } from './marketing-audit.js';
 import { setCampaignScope } from '../../marketing/campaign-scope.js';
@@ -244,6 +247,38 @@ export async function registerPainelMarketing(fastify: FastifyInstance): Promise
         payload: { status: 'failed', reason },
       });
       logger.error({ err }, 'painel marketing CAPI test failed');
+      return reply.status(503).send({ error: 'marketing_capi_test_failed', reason });
+    }
+  });
+
+  fastify.post('/admin/api/marketing/capi/test/whatsapp', { preHandler: requireAdminOwner }, async (request, reply) => {
+    if (!env.META_CAPI_TEST_EVENT_CODE) {
+      return reply.status(409).send({ error: 'capi_test_event_code_not_configured' });
+    }
+    try {
+      const result = await sendLatestWhatsappReferralTestPurchase();
+      await recordMarketingAudit({
+        eventType: 'marketing_capi_whatsapp_test',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.capi_test',
+        idempotencyKey: String(request.id),
+        payload: {
+          status: result.processed ? 'succeeded' : 'no_eligible_referral',
+          events_received: result.events_received,
+          synthetic: true,
+        },
+      });
+      return reply.status(200).send(result);
+    } catch (err) {
+      const reason = capiFailureReason(err);
+      await recordMarketingAudit({
+        eventType: 'marketing_capi_whatsapp_test',
+        actorLabel: getAdminContext(request).displayName,
+        entityTable: 'marketing.capi_test',
+        idempotencyKey: String(request.id),
+        payload: { status: 'failed', reason, synthetic: true },
+      });
+      logger.error({ err }, 'painel marketing WhatsApp CAPI test failed');
       return reply.status(503).send({ error: 'marketing_capi_test_failed', reason });
     }
   });

@@ -198,11 +198,13 @@ describe('Marketing — primeira tela da matriz', () => {
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/sync'");
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/reconcile'");
     expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/capi/test'");
+    expect(integrationsFront).toContain("this.apiPost('/admin/api/marketing/capi/test/whatsapp'");
     expect(integrationsFront).toContain('A Meta recusou o teste:');
     expect(integrationsFront).toContain('marketingIntegrationAuditLabel(eventType)');
     expect(route).toContain("fastify.get('/admin/api/marketing/integrations'");
     expect(route).toContain("fastify.post('/admin/api/marketing/sync'");
     expect(route).toContain('sendLatestCapiTestPurchase');
+    expect(route).toContain('sendLatestWhatsappReferralTestPurchase');
     expect(route).toContain("payload: { status: 'failed', reason }");
     expect(integrationsFront).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);
     expect(marketingHtml).not.toMatch(/META_ADS_ACCESS_TOKEN|access_token=/);

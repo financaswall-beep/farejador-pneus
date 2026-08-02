@@ -10,6 +10,8 @@ let enqueueCapiPurchases: typeof import('../../../src/marketing/capi.js').enqueu
 let pollCapiOutbox: typeof import('../../../src/marketing/capi.js').pollCapiOutbox;
 let sendLatestCapiTestPurchase:
   typeof import('../../../src/marketing/capi-test.js').sendLatestCapiTestPurchase;
+let sendLatestWhatsappReferralTestPurchase:
+  typeof import('../../../src/marketing/capi-test.js').sendLatestWhatsappReferralTestPurchase;
 let sendCapiPayload: typeof import('../../../src/marketing/capi-transport.js').sendCapiPayload;
 let syncMetaInsights: typeof import('../../../src/marketing/meta-sync.js').syncMetaInsights;
 let reconcileMarketingAttributions:
@@ -33,7 +35,9 @@ beforeAll(async () => {
   ({ buildCapiPayload, enqueueCapiPurchases, pollCapiOutbox } = await import(
     '../../../src/marketing/capi.js'
   ));
-  ({ sendLatestCapiTestPurchase } = await import('../../../src/marketing/capi-test.js'));
+  ({ sendLatestCapiTestPurchase, sendLatestWhatsappReferralTestPurchase } = await import(
+    '../../../src/marketing/capi-test.js'
+  ));
   ({ sendCapiPayload } = await import('../../../src/marketing/capi-transport.js'));
   ({ syncMetaInsights } = await import('../../../src/marketing/meta-sync.js'));
   ({ reconcileMarketingAttributions } = await import('../../../src/marketing/attribution.js'));
@@ -290,6 +294,62 @@ describe('pipeline determinístico de Marketing', () => {
     })).rejects.toThrow(
       'meta_capi_100:Invalid parameter: user_data access_token=[redacted] [redacted] - Use a supported field',
     );
+  });
+
+  it('testa WhatsApp com referral real sem criar pedido nem tocar na outbox', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{
+        referral_id: 'ref-whatsapp-1',
+        ctwa_clid: 'clid-whatsapp-real',
+        phone_e164: '+5521999990000',
+      }],
+      rowCount: 1,
+    }));
+    const fetcher = vi.fn(async (_input: URL | RequestInfo, _init?: RequestInit) => (
+      new Response(JSON.stringify({ events_received: 1, fbtrace_id: 'trace-whatsapp' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ));
+
+    await expect(sendLatestWhatsappReferralTestPurchase({
+      dbPool: { query } as unknown as Pool,
+      fetcher: fetcher as typeof fetch,
+      now: new Date('2026-08-02T12:00:00.000Z'),
+      config: {
+        whatsappBusinessAccountId: 'waba-test',
+        pageId: 'page-test',
+        testEventCode: 'TEST28055',
+        datasetId: 'dataset-test',
+        accessToken: 'token-test',
+        apiVersion: 'v26.0',
+      },
+    })).resolves.toEqual({
+      processed: true,
+      events_received: 1,
+      fbtrace_id: 'trace-whatsapp',
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).not.toContain('commerce.orders');
+    expect(query.mock.calls[0]?.[0]).not.toContain('capi_outbox');
+    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body)) as {
+      test_event_code: string;
+      data: Array<{
+        event_id: string;
+        messaging_channel: string;
+        user_data: Record<string, unknown>;
+      }>;
+    };
+    expect(body.test_event_code).toBe('TEST28055');
+    expect(body.data[0]).toMatchObject({
+      event_id: 'TEST-WHATSAPP-1785672000000',
+      messaging_channel: 'whatsapp',
+      user_data: {
+        ctwa_clid: 'clid-whatsapp-real',
+        whatsapp_business_account_id: 'waba-test',
+        page_id: 'page-test',
+      },
+    });
   });
 
   it('manda evento vencido para dead-letter sem chamar a Meta', async () => {
