@@ -156,18 +156,33 @@ window.PAINEL_MODULES.bot = function () {
     get botMapaRows() {
       return (this.botVisao && this.botVisao.mapa) || [];
     },
-    // Horário de pico: barrinhas proporcionais (madrugada/manhã/tarde/noite).
+    // Acessos por horário: uma conversa por started_at, já agregada no servidor
+    // no fuso de São Paulo. Normaliza defensivamente para sempre renderizar 00h–23h.
     get botHorarios() {
-      const c = this.botCards;
-      if (!c) return [];
-      const itens = [
-        { label: 'Madrugada', n: Number(c.conv_madrugada || 0) },
-        { label: 'Manhã', n: Number(c.conv_manha || 0) },
-        { label: 'Tarde', n: Number(c.conv_tarde || 0) },
-        { label: 'Noite', n: Number(c.conv_noite || 0) },
-      ];
-      const max = Math.max(1, ...itens.map((i) => i.n));
-      return itens.map((i) => ({ ...i, pct: Math.round((i.n / max) * 100) }));
+      const dados = (this.botVisao && this.botVisao.horarios) || [];
+      if (!dados.length) return [];
+      const porHora = Object.fromEntries(dados
+        .map((item) => [Number(item.hora), Number(item.conversas || 0)])
+        .filter(([hora]) => Number.isInteger(hora) && hora >= 0 && hora <= 23));
+      const itens = Array.from({ length: 24 }, (_, hora) => ({
+        hora,
+        label: String(hora).padStart(2, '0') + 'h',
+        n: porHora[hora] || 0,
+        mostraLabel: hora % 3 === 0 || hora === 23,
+      }));
+      const max = Math.max(0, ...itens.map((item) => item.n));
+      return itens.map((item) => ({
+        ...item,
+        pct: max > 0 ? Math.round((item.n / max) * 100) : 0,
+        pico: max > 0 && item.n === max,
+      }));
+    },
+    get botHorarioMax() {
+      return Math.max(0, ...this.botHorarios.map((item) => item.n));
+    },
+    get botHorarioPico() {
+      const pico = this.botHorarios.find((item) => item.pico);
+      return pico ? pico.label : '—';
     },
 
     // Funil ACUMULADO: o servidor manda onde cada conversa PAROU (stage_reached);

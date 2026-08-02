@@ -27,6 +27,11 @@ export interface BotVisaoRadarRow {
   galpao_qty: number | null;
 }
 
+export interface BotVisaoHorarioRow {
+  hora: number;
+  conversas: number;
+}
+
 export interface BotVisaoPayload {
   cards: Record<string, unknown> | null;
   mapa: BotVisaoMapaRow[];
@@ -40,6 +45,8 @@ export interface BotVisaoPayload {
   boca: Array<{ tipo: string; convs: number }>;
   /** Medidas mais CONSULTADAS (mesmo quando tinha) × galpão — reposição preventiva. */
   medidas_top: Array<{ medida: string; consultas: number; galpao_qty: number | null }>;
+  /** Conversas iniciadas por hora local; sempre 24 pontos quando a consulta está disponível. */
+  horarios: BotVisaoHorarioRow[];
 }
 
 /** Visão do bot (cards + funil/perdas + mapa + boca + radar) — carrega ao entrar na aba. */
@@ -58,7 +65,7 @@ export async function getBotVisao(
 
   const out: BotVisaoPayload = {
     cards: null, mapa: [], sem_regiao: 0, radar: [],
-    funil: [], perdas: [], boca: [], medidas_top: [],
+    funil: [], perdas: [], boca: [], medidas_top: [], horarios: [],
   };
 
   // Defensivo por bloco (padrão getMatrizResumo): um bloco quebrado não derruba a tela.
@@ -99,6 +106,30 @@ export async function getBotVisao(
       out.cards.respondidas_bot_48h = r48.rows[0]?.respondidas_bot_48h ?? 0;
     }
   } catch { /* view ausente → cards null, tela avisa */ }
+
+  try {
+    // Série horária da mesma população-base dos cards: uma conversa conta uma vez,
+    // pela hora em que começou. O limite usa timestamptz para aproveitar o BRIN de
+    // started_at; a extração usa o horário civil de São Paulo para os rótulos 00h–23h.
+    const r = await dbPool.query<BotVisaoHorarioRow>(
+      `WITH horas AS (
+         SELECT generate_series(0, 23)::int AS hora
+       ), contagem AS (
+         SELECT extract(hour FROM c.started_at AT TIME ZONE 'America/Sao_Paulo')::int AS hora,
+                count(*)::int AS conversas
+         FROM core.conversations c
+         WHERE c.environment = $1 AND c.deleted_at IS NULL
+           AND c.started_at >= (${sinceSql}::timestamp AT TIME ZONE 'America/Sao_Paulo')
+         GROUP BY 1
+       )
+       SELECT h.hora, COALESCE(c.conversas, 0)::int AS conversas
+       FROM horas h
+       LEFT JOIN contagem c USING (hora)
+       ORDER BY h.hora`,
+      [environment],
+    );
+    out.horarios = r.rows;
+  } catch { /* bloco vazio */ }
 
   try {
     // Funil: stage_reached é a etapa MÁXIMA por conversa. A janela vem dos turnos

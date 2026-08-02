@@ -188,6 +188,8 @@ describe('Etapa 8 — outbox e DLQ no PostgreSQL real', () => {
     expect(visao.radar).toEqual(expect.arrayContaining([
       expect.objectContaining({ medida: '90/90-18', fora_catalogo: 1 }),
     ]));
+    expect(visao.horarios).toHaveLength(24);
+    expect(visao.horarios.reduce((total, item) => total + item.conversas, 0)).toBeGreaterThan(0);
   });
 
   it('supersedes a stale queued draft after a newer customer message', async () => {
