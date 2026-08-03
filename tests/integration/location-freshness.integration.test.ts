@@ -16,6 +16,23 @@ describe('getLatestCustomerLocation — validade do pino no banco real', () => {
       CHATWOOT_HMAC_SECRET: 'test-secret', ADMIN_AUTH_TOKEN: 'emergency-token',
     });
     db = await startPostgres();
+    // O caso de 11 dias pode atravessar a virada do mes. A migration 0096 cria
+    // apenas o mes atual e os futuros, entao o banco efemero precisa preparar
+    // explicitamente a particao historica usada por este teste.
+    await db.pool.query(`
+      DO $partition$
+      DECLARE
+        v_month date := date_trunc('month', now() - interval '11 days')::date;
+        v_next date := (v_month + interval '1 month')::date;
+        v_name text := 'messages_' || to_char(v_month, 'YYYYMM');
+      BEGIN
+        EXECUTE format(
+          'CREATE TABLE IF NOT EXISTS core.%I PARTITION OF core.messages FOR VALUES FROM (%L) TO (%L)',
+          v_name, v_month, v_next
+        );
+      END
+      $partition$;
+    `);
     ({ getLatestCustomerLocation } = await import('../../src/atendente-v2/customer-location.js'));
   }, 120_000);
   afterAll(async () => { if (db) await stopPostgres(db); });

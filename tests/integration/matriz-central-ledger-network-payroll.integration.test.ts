@@ -173,11 +173,16 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
           SET commercial_model='monthly',monthly_fee=150 WHERE id=$1`,
       [fixture.partnerId],
     );
+    const currentCompetence = await db.pool.query<{ competence: string }>(
+      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text
+              AS competence`,
+    );
     await admin.sweepCommissionEntries('test', db.pool);
     const fees = await admin.listMatrizPartnerMonthlyFees('test', db.pool);
     const fee = fees.find((row) => row.partner_id === fixture.partnerId);
     expect(fee).toMatchObject({
-      competence: '2026-07-01', amount: '150.00', status: 'open',
+      competence: currentCompetence.rows[0]!.competence,
+      amount: '150.00', status: 'open',
     });
     const accrual = await db.pool.query(
       `SELECT t.amount::text,
