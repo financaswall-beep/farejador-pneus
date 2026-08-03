@@ -131,8 +131,13 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
       base_salary: 2100, payment_day: 5, payment_method: 'pix',
       starts_on: '2026-07-01', environment: 'test',
     }, db.pool);
+    const currentCompetence = await db.pool.query<{ competence: string }>(
+      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text
+              AS competence`,
+    );
     const closed = await payroll.closeMatrizPayroll({
-      competence: '2026-09-01', environment: 'test', actor_label: 'owner:payroll',
+      competence: currentCompetence.rows[0]!.competence,
+      environment: 'test', actor_label: 'owner:payroll',
     }, db.pool);
     const item = await db.pool.query<{ id: string; source_expense_id: string }>(
       `SELECT id,source_expense_id FROM finance.matriz_payroll_items
@@ -251,7 +256,7 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
     );
     expect(truth).toMatchObject({
       competencia: {
-        receita_total: '150.00', lucro_confirmado: '150.00',
+        receita_total: '150.00', lucro_confirmado: '-1950.00',
         status: 'confirmado',
       },
       caixa: {
