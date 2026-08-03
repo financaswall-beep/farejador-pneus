@@ -131,8 +131,13 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
       base_salary: 2100, payment_day: 5, payment_method: 'pix',
       starts_on: '2026-07-01', environment: 'test',
     }, db.pool);
+    const futureCompetence = await db.pool.query<{ competence: string }>(
+      `SELECT (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+                + interval '2 months')::date::text AS competence`,
+    );
     const closed = await payroll.closeMatrizPayroll({
-      competence: '2026-09-01', environment: 'test', actor_label: 'owner:payroll',
+      competence: futureCompetence.rows[0]!.competence,
+      environment: 'test', actor_label: 'owner:payroll',
     }, db.pool);
     const item = await db.pool.query<{ id: string; source_expense_id: string }>(
       `SELECT id,source_expense_id FROM finance.matriz_payroll_items
@@ -173,11 +178,16 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
           SET commercial_model='monthly',monthly_fee=150 WHERE id=$1`,
       [fixture.partnerId],
     );
+    const currentCompetence = await db.pool.query<{ competence: string }>(
+      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text
+              AS competence`,
+    );
     await admin.sweepCommissionEntries('test', db.pool);
     const fees = await admin.listMatrizPartnerMonthlyFees('test', db.pool);
     const fee = fees.find((row) => row.partner_id === fixture.partnerId);
     expect(fee).toMatchObject({
-      competence: '2026-07-01', amount: '150.00', status: 'open',
+      competence: currentCompetence.rows[0]!.competence,
+      amount: '150.00', status: 'open',
     });
     const accrual = await db.pool.query(
       `SELECT t.amount::text,

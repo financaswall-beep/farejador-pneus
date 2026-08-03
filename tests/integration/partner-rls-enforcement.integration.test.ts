@@ -12,6 +12,7 @@
  *   8. views do portal respeitam isolamento (security_invoker)
  *   9. venda funciona com role restrita
  *   10. pool admin (BYPASSRLS) continua vendo tudo
+ *   11. conta a receber nao aceita customer_id de outra unidade
  *
  * Pre-requisito: a migration 0044 ja foi aplicada no container de teste
  * (via helper applyMigrations) e a role 'farejador_partner_app' ja existe.
@@ -245,5 +246,47 @@ describe('Etapa 5 V2 — RLS enforcement com role farejador_partner_app', () => 
     const r = await db.pool.query('SELECT count(*)::int AS c FROM network.partner_units');
     // Pelo menos as 2 fixtures que acabamos de criar
     expect(r.rows[0].c).toBeGreaterThanOrEqual(2);
+  });
+
+  it('11. trigger bloqueia customer_id de outra unidade em conta a receber', async () => {
+    const a = await createPartnerFixture(db.pool, { slugSuffix: 'rls11a' + randomUUID().slice(0, 6) });
+    const b = await createPartnerFixture(db.pool, { slugSuffix: 'rls11b' + randomUUID().slice(0, 6) });
+
+    const ownCustomer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.partner_customers (environment, unit_id, name)
+       VALUES ('test', $1, 'Cliente RLS 11 A') RETURNING id`,
+      [a.unitId],
+    );
+    const foreignCustomer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.partner_customers (environment, unit_id, name)
+       VALUES ('test', $1, 'Cliente RLS 11 B') RETURNING id`,
+      [b.unitId],
+    );
+
+    await withRestrictedContext(a.partnerUnitId, async (client) => {
+      await client.query(
+        `INSERT INTO finance.partner_receivables
+           (environment, unit_id, customer_id, customer_name, description, amount, status)
+         VALUES ('test', $1, $2, 'Cliente A', 'Conta valida', 100, 'open')`,
+        [a.unitId, ownCustomer.rows[0]!.id],
+      );
+    });
+
+    await expect(withRestrictedContext(a.partnerUnitId, async (client) => {
+      await client.query(
+        `INSERT INTO finance.partner_receivables
+           (environment, unit_id, customer_id, customer_name, description, amount, status)
+         VALUES ('test', $1, $2, 'Cliente B', 'Tentativa cross-unit', 100, 'open')`,
+        [a.unitId, foreignCustomer.rows[0]!.id],
+      );
+    })).rejects.toThrow(/partner_receivable_customer_scope_mismatch/);
+
+    const crossLinked = await db.pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count
+         FROM finance.partner_receivables
+        WHERE environment = 'test' AND unit_id = $1 AND customer_id = $2`,
+      [a.unitId, foreignCustomer.rows[0]!.id],
+    );
+    expect(crossLinked.rows[0]?.count).toBe(0);
   });
 });

@@ -2662,11 +2662,38 @@ export async function cancelPartnerPayable(
   });
 }
 
+/**
+ * Autoriza o customer_id recebido nas contas a receber.
+ *
+ * O UUID sozinho nunca prova posse: ele precisa apontar para um cliente da mesma
+ * unidade e do mesmo ambiente derivados da sessao. Clientes arquivados continuam
+ * validos para preservar vinculos historicos; inexistente e outra unidade produzem
+ * o mesmo erro logico.
+ */
+async function assertPartnerReceivableCustomerScope(
+  client: PoolClient,
+  ctx: PartnerContext,
+  customerId: string | null,
+): Promise<void> {
+  if (!customerId) return;
+  const customer = await client.query(
+    `SELECT 1
+       FROM commerce.partner_customers
+      WHERE id = $1
+        AND environment = $2
+        AND unit_id = $3
+      LIMIT 1`,
+    [customerId, ctx.environment, ctx.unitId],
+  );
+  if (customer.rowCount !== 1) throw new Error('customer_not_found');
+}
+
 export async function registerPartnerReceivable(
   ctx: PartnerContext,
   input: RegisterPartnerReceivableInput,
 ): Promise<{ receivable_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await assertPartnerReceivableCustomerScope(client, ctx, input.customer_id ?? null);
     const status = input.status ?? 'open';
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_receivables (
@@ -2775,6 +2802,7 @@ export async function updatePartnerReceivable(
   input: UpdatePartnerReceivableInput,
 ): Promise<{ receivable_id: string; updated: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await assertPartnerReceivableCustomerScope(client, ctx, input.customer_id ?? null);
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_receivables
        SET customer_id = $4,
