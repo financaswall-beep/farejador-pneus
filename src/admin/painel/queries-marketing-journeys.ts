@@ -8,16 +8,9 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-import {
-  marketingDateWindow,
-  type MarketingPeriod,
-  type MetaMarketingSnapshot,
-} from './marketing-meta.js';
+import { marketingDateWindow, type MarketingPeriod, type MetaMarketingSnapshot } from './marketing-meta.js';
 import { getPersistedOrLiveMetaSnapshot } from '../../marketing/meta-sync.js';
-import {
-  getMarketingAttributionReport,
-  type MarketingAttributionReport,
-} from '../../marketing/reporting.js';
+import { getMarketingAttributionReport, type MarketingAttributionReport } from '../../marketing/reporting.js';
 import { loadOperationalJourney } from './queries-marketing-journeys-data.js';
 import { marketingJourneyBottleneck } from './queries-marketing-journeys-bottleneck.js';
 

@@ -4,13 +4,13 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
+import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
 // as constantes de throttle vêm de lá (o set-credentials reusa a mesma régua).
 import { registerParceiroLoginRoute, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } from './route-login.js';
-
 const SSE_TICKET_MAX_PER_MINUTE = 60;
 const SSE_TICKET_WINDOW_MS = 60 * 1000;
 
@@ -1597,7 +1597,14 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       const path = issue?.path?.join('.') || 'body';
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
-    return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
+    try {
+      return reply.status(200).send(await registerPartnerReceivable(getPartnerContext(request), parsed.data));
+    } catch (error) {
+      if (isReceivableCustomerScopeError(error)) {
+        return reply.status(404).send({ error: 'customer_not_found' });
+      }
+      throw error;
+    }
   });
 
   fastify.patch('/parceiro/:slug/api/contas-a-receber/:receivableId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
@@ -1611,9 +1618,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
 
-    const result = await updatePartnerReceivable(getPartnerContext(request), params.data.receivableId, parsed.data);
-    if (!result.updated) return reply.status(404).send({ error: 'receivable_not_found_or_closed' });
-    return reply.status(200).send(result);
+    try {
+      const result = await updatePartnerReceivable(getPartnerContext(request), params.data.receivableId, parsed.data);
+      if (!result.updated) return reply.status(404).send({ error: 'receivable_not_found_or_closed' });
+      return reply.status(200).send(result);
+    } catch (error) {
+      if (isReceivableCustomerScopeError(error)) {
+        return reply.status(404).send({ error: 'customer_not_found' });
+      }
+      throw error;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/contas-a-receber/:receivableId/receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {

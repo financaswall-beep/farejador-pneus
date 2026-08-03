@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { ChatwootEventType } from '../shared/types/chatwoot.js';
+import type { ChatwootEventType, Environment } from '../shared/types/chatwoot.js';
 import { env } from '../shared/config/env.js';
 import { logger } from '../shared/logger.js';
 import { mapContact } from './contact.mapper.js';
@@ -19,11 +19,7 @@ import { insertStatusEvent } from '../persistence/status-events.repository.js';
 import { insertAssignment } from '../persistence/assignments.repository.js';
 import { insertReaction } from '../persistence/reactions.repository.js';
 import { upsertTags } from '../persistence/tags.repository.js';
-import {
-  enqueueAtendenteJob,
-  ensureAtendenteSession,
-} from '../shared/repositories/ops-atendente.repository.js';
-import type { Environment } from '../shared/types/chatwoot.js';
+import { enqueueAtendenteJob, ensureAtendenteSession } from '../shared/repositories/ops-atendente.repository.js';
 import { notifyClientesKanban } from '../shared/clientes-kanban.notify.js';
 import { reconcileAgentOutboundDelivery } from '../atendente-v2/outbound-reconcile.js';
 import { captureAdReferralAfterMessageUpsert } from '../marketing/referrals.js';
@@ -74,12 +70,8 @@ function findNestedContactPayload(payload: Record<string, unknown>): Record<stri
   };
 }
 
-async function upsertNestedContactIfPresent(
-  client: PoolClient,
-  payload: Record<string, unknown>,
-  environment: string,
-  lastEventAt: Date,
-): Promise<void> {
+async function upsertNestedContactIfPresent(client: PoolClient, payload: Record<string, unknown>,
+  environment: string, lastEventAt: Date): Promise<void> {
   const contactPayload = findNestedContactPayload(payload);
   if (!contactPayload) {
     return;
@@ -179,13 +171,9 @@ export async function dispatch(
       const conversation = mapConversation(payload, environment, lastEventAt);
       const conversationId = await upsertConversation(client, conversation);
 
-      const changedAttrs = payload.changed_attributes as
-        | Array<{
-            attribute: string;
-            previous_value?: string;
-            current_value?: string;
-          }>
-        | undefined;
+      const changedAttrs = payload.changed_attributes as Array<{
+        attribute: string; previous_value?: string; current_value?: string;
+      }> | undefined;
       const statusChange = changedAttrs?.find((a) => a.attribute === 'status');
 
       const statusEvent = mapStatusEvent(
@@ -296,9 +284,7 @@ export async function dispatch(
         }
       }
 
-      const attachments = (payload.attachments ?? []) as Array<
-        Record<string, unknown>
-      >;
+      const attachments = (payload.attachments ?? []) as Array<Record<string, unknown>>;
       for (const attPayload of attachments) {
         const attachment = mapAttachment(attPayload, environment);
         await upsertAttachment(
@@ -309,9 +295,7 @@ export async function dispatch(
         );
       }
 
-      const reactions = (payload.reactions ?? []) as Array<
-        Record<string, unknown>
-      >;
+      const reactions = (payload.reactions ?? []) as Array<Record<string, unknown>>;
       for (const reactionPayload of reactions) {
         const reaction = mapReaction(reactionPayload, environment, lastEventAt);
         if (reaction) {

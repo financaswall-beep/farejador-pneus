@@ -708,6 +708,76 @@ describe('Portal Parceiro — isolamento entre parceiros', () => {
 });
 
 // --------------------------------------------------------------
+// 5d. IDOR/BOLA em customer_id de contas a receber
+// --------------------------------------------------------------
+describe('Portal Parceiro - escopo do cliente em contas a receber', () => {
+  it('aceita cliente proprio e bloqueia cliente de outra unidade no create e update', async () => {
+    const q = await importQueries();
+    const a = await createPartnerFixture(db.pool, { slugSuffix: 'recv-a' + randomUUID().slice(0, 6) });
+    const b = await createPartnerFixture(db.pool, { slugSuffix: 'recv-b' + randomUUID().slice(0, 6) });
+
+    const ownCustomer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.partner_customers (environment, unit_id, name)
+       VALUES ('test', $1, 'Cliente A') RETURNING id`,
+      [a.unitId],
+    );
+    const foreignCustomer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.partner_customers (environment, unit_id, name)
+       VALUES ('test', $1, 'Cliente B') RETURNING id`,
+      [b.unitId],
+    );
+    const ownCustomerId = ownCustomer.rows[0]!.id;
+    const foreignCustomerId = foreignCustomer.rows[0]!.id;
+
+    const created = await q.registerPartnerReceivable(a.ctx, {
+      customer_id: ownCustomerId,
+      customer_name: 'Cliente A',
+      description: 'Conta valida da unidade A',
+      amount: 150,
+      due_date: '2026-08-15',
+      status: 'open',
+      idempotency_key: `recv-own-${randomUUID()}`,
+    });
+
+    await expect(q.registerPartnerReceivable(a.ctx, {
+      customer_id: foreignCustomerId,
+      customer_name: 'Cliente B',
+      description: 'Tentativa cross-unit no create',
+      amount: 200,
+      due_date: '2026-08-16',
+      status: 'open',
+      idempotency_key: `recv-cross-create-${randomUUID()}`,
+    })).rejects.toThrow('customer_not_found');
+
+    await expect(q.updatePartnerReceivable(a.ctx, created.receivable_id, {
+      customer_id: foreignCustomerId,
+      customer_name: 'Cliente B',
+      description: 'Tentativa cross-unit no update',
+      amount: 250,
+      due_date: '2026-08-17',
+    })).rejects.toThrow('customer_not_found');
+
+    const persisted = await db.pool.query<{ customer_id: string }>(
+      `SELECT customer_id
+         FROM finance.partner_receivables
+        WHERE id = $1 AND environment = 'test' AND unit_id = $2`,
+      [created.receivable_id, a.unitId],
+    );
+    expect(persisted.rows[0]?.customer_id).toBe(ownCustomerId);
+
+    await expect(q.registerPartnerReceivable(a.ctx, {
+      customer_id: null,
+      customer_name: 'Lancamento avulso',
+      description: 'Conta sem cadastro de cliente',
+      amount: 50,
+      due_date: '2026-08-18',
+      status: 'open',
+      idempotency_key: `recv-null-${randomUUID()}`,
+    })).resolves.toHaveProperty('receivable_id');
+  });
+});
+
+// --------------------------------------------------------------
 // 6. Raio de entrega (proximidade-primeiro, Fase 2) — round-trip
 // --------------------------------------------------------------
 describe('Portal Parceiro — raio de entrega (Fase 2)', () => {
