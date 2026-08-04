@@ -189,13 +189,11 @@ const envSchema = z.object({
   // for contornada. O default conserva o teto debatido para comprovante de rota.
   MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT: z.string().transform(Number)
     .pipe(z.number().positive().max(1_000_000)).default('10000'),
-  // PORTAL DO ENTREGADOR (0125, requer MATRIZ_LOGISTICS): /entregas no celular do
-  // colaborador job='entregador' (0124) — fila do dia, abrir/fechar a rota DELE,
-  // entregue com pagamento, NÃO-ENTREGUE só REPORTA (o dono confirma no painel; o
-  // portal nunca cancela nem devolve galpão — regra da revisão de segurança 07-04).
-  // Sessão própria es_ (7 dias; revogar o colaborador mata na hora). Default OFF =
-  // portal INVISÍVEL (404 em tudo, nem 401 — não denuncia que existe).
+  // Portais mobile ficam invisíveis (404) por padrão e usam sessões próprias.
+  // /entregas atende somente o colaborador entregador e nunca cancela pedidos.
   MATRIZ_ENTREGADOR_PORTAL: booleanStringSchema,
+  // /caixa aceita somente vendedor ativo da área de vendas da Matriz.
+  MATRIZ_CAIXA_PORTAL: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel
