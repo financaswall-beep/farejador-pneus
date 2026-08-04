@@ -100,6 +100,7 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     'walkin_stock_insufficient',
     'walkin_stock_ambiguous',
     'walkin_idempotency_conflict',
+    'walkin_product_not_sellable',
     'catalog_price_missing',
     'catalog_price_changed',
   ].includes(err.message)) {

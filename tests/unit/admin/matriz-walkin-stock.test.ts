@@ -15,14 +15,13 @@ function preparationClient(options: {
   const query = vi.fn(async (sql: string) => {
     if (sql.includes('commerce.tire_specs')) {
       return {
-        rows: options.tireSize === undefined
-          ? []
-          : [{
-            product_id: items[0]!.productId,
-            tire_size: options.tireSize,
-            brand: 'Pirelli',
-            tire_condition: 'meia_vida',
-          }],
+        rows: [{
+          product_id: items[0]!.productId,
+          product_type: 'tire',
+          tire_size: options.tireSize ?? null,
+          brand: 'Pirelli',
+          tire_condition: 'meia_vida',
+        }],
       };
     }
     if (sql.includes('commerce.wholesale_stock') && sql.includes('FOR UPDATE')) {
@@ -59,6 +58,28 @@ describe('estoque atomico da venda walk-in da matriz', () => {
     const { client } = preparationClient({});
     await expect(prepareMatrizWalkinStock(client, 'test', items))
       .rejects.toThrow('walkin_measure_not_found');
+  });
+
+  it('aceita serviço sem movimentar estoque e congela custo zero', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('commerce.products p')) return {
+        rows: [{
+          product_id: items[0]!.productId,
+          product_type: 'service',
+          tire_size: null,
+          brand: null,
+          tire_condition: null,
+        }],
+      };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const client = { query } as unknown as PoolClient;
+
+    const plan = await prepareMatrizWalkinStock(client, 'test', items);
+
+    expect(plan.lines).toEqual([]);
+    expect(plan.costByProduct.get(items[0]!.productId)).toBe(0);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('wholesale_stock'))).toBe(false);
   });
 
   it('rejeita medida sem custo', async () => {

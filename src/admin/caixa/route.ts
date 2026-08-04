@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { env } from '../../shared/config/env.js';
+import { logger } from '../../shared/logger.js';
 import {
   rateLimitBlocked,
   rateLimitClear,
@@ -17,6 +18,7 @@ import {
   type CaixaAuth,
 } from './queries.js';
 import { getCaixaSaleReceipt, getCaixaSales } from './sales.js';
+import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_PER_USER = 10;
@@ -30,6 +32,25 @@ const loginSchema = z.object({
 const salesQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d']).default('today'),
   search: z.string().trim().max(80).default(''),
+});
+
+const catalogQuerySchema = z.object({
+  search: z.string().trim().max(80).default(''),
+  type: z.enum(['all', 'tire', 'service']).default('all'),
+});
+
+const createSaleSchema = z.object({
+  customer_name: z.string().trim().min(1).max(200).nullable().optional(),
+  customer_phone: z.string().trim().min(1).max(40).nullable().optional(),
+  payment_method: z.enum(['pix', 'cartao', 'dinheiro']),
+  idempotency_key: z.string().trim().min(8).max(120),
+  items: z.array(z.object({
+    product_id: z.string().uuid(),
+    quantity: z.number().int().positive().max(50),
+  })).min(1).max(30),
+}).refine((data) => data.items.reduce((sum, item) => sum + item.quantity, 0) <= 100, {
+  message: 'sale_quantity_limit',
+  path: ['items'],
 });
 
 const receiptParamsSchema = z.object({ orderId: z.string().uuid() });
@@ -54,6 +75,28 @@ function bearerOf(request: FastifyRequest): string | null {
 function tooMany(reply: FastifyReply, key: string) {
   return reply.header('Retry-After', String(rateLimitRetryAfterSeconds(key)))
     .status(429).send({ error: 'too_many_attempts' });
+}
+
+function checkoutError(error: unknown): { status: number; error: string } {
+  if (!(error instanceof Error)) return { status: 500, error: 'internal_server_error' };
+  if (error.message === 'caixa_finance_not_ready') {
+    return { status: 503, error: error.message };
+  }
+  if ([
+    'walkin_measure_not_found', 'walkin_cost_missing', 'walkin_stock_insufficient',
+    'walkin_stock_ambiguous', 'walkin_idempotency_conflict',
+    'walkin_product_not_sellable', 'catalog_price_missing', 'catalog_price_changed',
+    'seller_collaborator_not_found', 'walkin_unit_not_found',
+  ].includes(error.message)) {
+    return { status: 409, error: error.message };
+  }
+  if ([
+    'walkin_items_required', 'walkin_idempotency_required', 'walkin_item_invalid',
+    'walkin_total_invalid', 'sale_quantity_limit',
+  ].includes(error.message)) {
+    return { status: 400, error: error.message };
+  }
+  return { status: 500, error: 'internal_server_error' };
 }
 
 export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void> {
@@ -124,6 +167,41 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
       parsed.data.search,
     );
     return reply.status(200).send({ ...payload, operator_name: auth.displayName });
+  });
+
+  fastify.get('/api/caixa/catalogo', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = catalogQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    return reply.status(200).send(await getCaixaCatalog(
+      env.FAREJADOR_ENV,
+      parsed.data.search,
+      parsed.data.type,
+    ));
+  });
+
+  fastify.post('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = createSaleSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    const auth = (request as CaixaRequest).caixa!;
+    try {
+      const result = await createCaixaSale(env.FAREJADOR_ENV, auth, parsed.data);
+      const receipt = await getCaixaSaleReceipt(env.FAREJADOR_ENV, result.order_id)
+        .catch((error: unknown) => {
+          // A venda já foi confirmada atomicamente. Uma falha de leitura do
+          // recibo não pode induzir o operador a repetir a cobrança.
+          logger.warn({ err: error, orderId: result.order_id }, 'caixa receipt unavailable after sale');
+          return null;
+        });
+      return reply.status(200).send({ ...result, receipt });
+    } catch (error) {
+      const mapped = checkoutError(error);
+      logger.error({ err: error, status: mapped.status }, 'caixa sale registration failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
   });
 
   fastify.get('/api/caixa/vendas/:orderId/recibo', {

@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Frente de Caixa — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260804-hero1" />
-  <script defer src="/caixa/caixa-core.js?v=20260804-ci1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260804-checkout1" />
+  <script defer src="/caixa/caixa-core.js?v=20260804-checkout1"></script>
+  <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout1"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
@@ -118,7 +119,69 @@
           </div>
         </header>
 
-        <div id="sales-panel" class="app-panel">
+        <div id="cash-panel" class="app-panel checkout-panel">
+          <div class="checkout-search">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <label class="sr-only" for="checkout-search-input">Buscar produto, medida ou marca</label>
+            <input id="checkout-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar produto, medida ou marca" />
+            <button id="checkout-search-clear" class="search-clear hidden" type="button" aria-label="Limpar busca">×</button>
+          </div>
+
+          <nav class="catalog-type-tabs" aria-label="Tipo de item">
+            <button class="active" type="button" data-catalog-type="tire" aria-pressed="true">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="6" ry="10"/><ellipse cx="12" cy="12" rx="2.5" ry="6"/><path d="m8 5 3 3m5-3-3 3M8 19l3-3m5 3-3-3"/></svg>
+              Pneus
+            </button>
+            <button type="button" data-catalog-type="service" aria-pressed="false">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z"/></svg>
+              Serviços
+            </button>
+          </nav>
+
+          <div id="catalog-loading" class="catalog-message" role="status">Carregando catálogo…</div>
+          <div id="catalog-error" class="catalog-message catalog-message--error hidden" role="alert">
+            <strong>Não foi possível carregar o catálogo.</strong>
+            <button id="catalog-retry" type="button">Tentar novamente</button>
+          </div>
+          <div id="catalog-empty" class="catalog-message hidden">
+            <strong>Nenhum item encontrado</strong>
+            <span>Altere a busca ou escolha outra categoria.</span>
+          </div>
+          <div id="catalog-list" class="catalog-list hidden" aria-live="polite"></div>
+
+          <section class="checkout-cart" aria-labelledby="checkout-cart-title">
+            <div class="checkout-cart-summary">
+              <button id="checkout-customer-button" class="checkout-customer" type="button">
+                <span class="checkout-cart-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
+                  <b id="checkout-cart-count">0</b>
+                </span>
+                <span><strong id="checkout-cart-title">Cliente: Balcão</strong><small id="checkout-items-label">Carrinho vazio</small></span>
+                <em>Alterar</em>
+              </button>
+              <div class="checkout-total"><small>Subtotal</small><strong id="checkout-total">R$ 0,00</strong></div>
+            </div>
+
+            <div class="payment-methods" role="radiogroup" aria-label="Forma de pagamento">
+              <button class="active" type="button" data-payment="pix" role="radio" aria-checked="true">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 4 4-4 4-4-4 4-4Zm0 10 4 4-4 4-4-4 4-4ZM3 12l4-4 4 4-4 4-4-4Zm10 0 4-4 4 4-4 4-4-4Z"/></svg>Pix
+              </button>
+              <button type="button" data-payment="cartao" role="radio" aria-checked="false">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Cartão
+              </button>
+              <button type="button" data-payment="dinheiro" role="radio" aria-checked="false">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 9a3 3 0 0 0 3-3m12 0a3 3 0 0 0 3 3m0 6a3 3 0 0 0-3 3M6 18a3 3 0 0 0-3-3"/><circle cx="12" cy="12" r="2.5"/></svg>Dinheiro
+              </button>
+            </div>
+
+            <button id="checkout-review-button" class="checkout-finish" type="button" disabled>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
+              REVISAR E FINALIZAR
+            </button>
+          </section>
+        </div>
+
+        <div id="sales-panel" class="app-panel hidden">
           <nav class="period-tabs" aria-label="Período das vendas">
             <button class="period-button active" type="button" data-period="today" aria-pressed="true">
               <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16"/><path d="m9 15 2 2 4-5"/></svg>
@@ -258,11 +321,11 @@
         </div>
 
         <nav class="bottom-nav" aria-label="Navegação do Frente de Caixa">
-          <button id="nav-cash" type="button" data-tab="cash">
+          <button id="nav-cash" class="active" type="button" data-tab="cash" aria-current="page">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 4h12v5H6zM4 9h16v11H4zM7 13h3m2 0h2m2 0h1m-10 3h3m2 0h2m2 0h1"/></svg>
             <span>Caixa</span>
           </button>
-          <button id="nav-sales" class="active" type="button" data-tab="sales" aria-current="page">
+          <button id="nav-sales" type="button" data-tab="sales">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z"/><path d="M9 8h6m-6 4h6m-6 4h4"/></svg>
             <span>Vendas</span>
           </button>
@@ -310,6 +373,37 @@
             <p id="password-change-error" class="account-modal-error" role="alert"></p>
             <button id="password-change-submit" class="account-modal-primary" type="submit">Salvar nova senha</button>
           </form>
+        </article>
+      </div>
+
+      <div id="checkout-customer-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="checkout-customer-title">
+        <button class="account-modal-backdrop" type="button" data-close-customer aria-label="Fechar cliente"></button>
+        <article class="account-modal-sheet">
+          <header>
+            <div><p>Dados da venda</p><h2 id="checkout-customer-title">Identificar cliente</h2></div>
+            <button type="button" data-close-customer aria-label="Fechar">×</button>
+          </header>
+          <form id="checkout-customer-form" novalidate>
+            <label>Nome<input id="checkout-customer-name" type="text" maxlength="200" autocomplete="name" placeholder="Cliente Balcão" /></label>
+            <label>Telefone (opcional)<input id="checkout-customer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="(21) 99999-9999" /></label>
+            <button class="account-modal-primary" type="submit">Salvar cliente</button>
+          </form>
+        </article>
+      </div>
+
+      <div id="checkout-review-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="checkout-review-title">
+        <button class="account-modal-backdrop" type="button" data-close-checkout aria-label="Voltar para a venda"></button>
+        <article class="account-modal-sheet checkout-review-sheet">
+          <header>
+            <div><p>Conferência obrigatória</p><h2 id="checkout-review-title">Revisar venda</h2></div>
+            <button type="button" data-close-checkout aria-label="Fechar">×</button>
+          </header>
+          <div id="checkout-review-content" class="checkout-review-content"></div>
+          <p id="checkout-submit-error" class="checkout-submit-error" role="alert"></p>
+          <footer class="checkout-review-actions">
+            <button type="button" data-close-checkout>Voltar</button>
+            <button id="checkout-confirm-button" type="button">CONFIRMAR VENDA</button>
+          </footer>
         </article>
       </div>
 

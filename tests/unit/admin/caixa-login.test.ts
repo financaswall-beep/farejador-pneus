@@ -6,6 +6,7 @@ const html = readFileSync(resolve('painel/public/caixa.html'), 'utf8');
 const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
 const scriptFiles = [
   'caixa-core.js',
+  'caixa-checkout.js',
   'caixa-sales-view.js',
   'caixa-sales.js',
   'caixa-profile.js',
@@ -79,6 +80,18 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
     expect(script).not.toContain('/admin/api/');
     expect(salesQueries).toContain("u.slug='main'");
     expect(salesQueries).toContain("o.status<>'cancelled'");
+  });
+
+  it('entrega nova venda com catálogo, carrinho e fechamento pela API própria', () => {
+    expect(html).toContain('Buscar produto, medida ou marca');
+    expect(html).toContain('REVISAR E FINALIZAR');
+    expect(html).toContain('data-payment="pix"');
+    expect(script).toContain("authenticatedFetch('/api/caixa/catalogo?'");
+    expect(script).toContain("authenticatedFetch('/api/caixa/vendas'");
+    expect(script).toContain('Venda registrada, estoque baixado e Financeiro atualizado.');
+    expect(route).toContain("'/api/caixa/catalogo'");
+    expect(route).toContain("fastify.post('/api/caixa/vendas'");
+    expect(script).not.toContain('/admin/api/');
   });
 
   it('reproduz o perfil completo sem conceder acesso de administrador', () => {
