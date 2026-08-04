@@ -54,6 +54,9 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
 
   it('serve a porta e a API separadas do admin e da logística', () => {
     expect(staticRoute).toContain("text('/caixa', 'caixa.html'");
+    expect(staticRoute).toContain("['/vendas', '/caixa/vendas']");
+    expect(staticRoute).toContain("redirect('/caixa#vendas')");
+    expect(script).toContain("window.location.hash === '#vendas'");
     scriptFiles.forEach((file) => {
       expect(html).toContain(`/caixa/${file}`);
       expect(staticRoute).toContain(`'/caixa/${file}'`);
