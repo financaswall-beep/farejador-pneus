@@ -4,7 +4,16 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(resolve('painel/public/caixa.html'), 'utf8');
 const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
-const script = readFileSync(resolve('painel/public/caixa.js'), 'utf8');
+const scriptFiles = [
+  'caixa-core.js',
+  'caixa-sales-view.js',
+  'caixa-sales.js',
+  'caixa-profile.js',
+  'caixa.js',
+];
+const script = scriptFiles
+  .map((file) => readFileSync(resolve('painel/public', file), 'utf8'))
+  .join('\n');
 const route = readFileSync(resolve('src/admin/caixa/route.ts'), 'utf8');
 const staticRoute = readFileSync(resolve('src/admin/caixa/route-static.ts'), 'utf8');
 const queries = readFileSync(resolve('src/admin/caixa/queries.ts'), 'utf8');
@@ -43,6 +52,10 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
 
   it('serve a porta e a API separadas do admin e da logística', () => {
     expect(staticRoute).toContain("text('/caixa', 'caixa.html'");
+    scriptFiles.forEach((file) => {
+      expect(html).toContain(`/caixa/${file}`);
+      expect(staticRoute).toContain(`'/caixa/${file}'`);
+    });
     expect(route).toContain("'/api/caixa/login'");
     expect(route).toContain("'/api/caixa/me'");
     expect(route).toContain("'/api/caixa/logout'");
