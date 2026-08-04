@@ -68,14 +68,20 @@
   }
 
   function showTab(tab) {
+    const cash = tab === 'cash';
     const profile = tab === 'profile';
-    elements.salesPanel.classList.toggle('hidden', profile);
+    const sales = tab === 'sales';
+    elements.cashPanel.classList.toggle('hidden', !cash);
+    elements.salesPanel.classList.toggle('hidden', !sales);
     elements.profilePanel.classList.toggle('hidden', !profile);
     elements.sessionView.classList.toggle('is-profile', profile);
-    elements.appHeadingTitle.textContent = profile ? 'Perfil' : 'Vendas';
-    document.getElementById('nav-sales').classList.toggle('active', !profile);
+    elements.sessionView.classList.toggle('is-cash', cash);
+    elements.appHeadingTitle.textContent = profile ? 'Perfil' : cash ? 'Nova venda' : 'Vendas';
+    document.getElementById('nav-cash').classList.toggle('active', cash);
+    document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-profile').classList.toggle('active', profile);
-    document.getElementById('nav-sales').toggleAttribute('aria-current', !profile);
+    document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
+    document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     if (profile) void loadProfileSummary();
   }
@@ -114,9 +120,13 @@
   document.getElementById('sales-retry').addEventListener('click', function () { void loadSales(); });
   document.getElementById('operator-button').addEventListener('click', function () { showTab('profile'); });
   document.getElementById('nav-profile').addEventListener('click', function () { showTab('profile'); });
-  document.getElementById('nav-sales').addEventListener('click', function () { showTab('sales'); });
+  document.getElementById('nav-sales').addEventListener('click', function () {
+    showTab('sales');
+    void loadSales();
+  });
   document.getElementById('nav-cash').addEventListener('click', function () {
-    Caixa.showToast('A tela de nova venda será a próxima etapa do Frente de Caixa.');
+    showTab('cash');
+    void Caixa.loadCatalog();
   });
   document.querySelectorAll('[data-close-receipt]').forEach(function (button) {
     button.addEventListener('click', closeReceipt);

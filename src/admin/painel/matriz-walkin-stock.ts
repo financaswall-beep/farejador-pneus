@@ -45,14 +45,17 @@ export async function prepareMatrizWalkinStock(
   if (qtyByProduct.size === 0) throw new Error('walkin_items_required');
 
   const productIds = [...qtyByProduct.keys()];
-  const specs = await client.query<{ product_id: string; tire_size: string | null;
-    brand: string | null; tire_condition: TireCondition }>(
-    `SELECT ts.product_id,ts.tire_size,p.brand,p.tire_condition
-       FROM commerce.tire_specs ts
-       JOIN commerce.products p ON p.id=ts.product_id AND p.environment=ts.environment
-      WHERE ts.environment = $1 AND ts.product_id = ANY($2::uuid[])`,
+  const specs = await client.query<{ product_id: string; product_type: string;
+    tire_size: string | null; brand: string | null; tire_condition: TireCondition | null }>(
+    `SELECT p.id AS product_id,p.product_type,ts.tire_size,p.brand,p.tire_condition
+       FROM commerce.products p
+       LEFT JOIN commerce.tire_specs ts
+         ON ts.product_id=p.id AND ts.environment=p.environment
+      WHERE p.environment = $1 AND p.id = ANY($2::uuid[]) AND p.deleted_at IS NULL`,
     [environment, productIds],
   );
+  if (specs.rows.length !== productIds.length) throw new Error('walkin_product_not_sellable');
+  const typeByProduct = new Map(specs.rows.map((row) => [row.product_id, row.product_type]));
   const sizeByProduct = new Map(specs.rows.map((row) => [row.product_id, row.tire_size]));
   const brandByProduct = new Map(specs.rows.map((row) => [row.product_id, row.brand]));
   const conditionByProduct = new Map(
@@ -62,7 +65,14 @@ export async function prepareMatrizWalkinStock(
     key: string; brand: string | null; tire_condition: TireCondition; quantity: number;
   }>();
   const productsByKey = new Map<string, string[]>();
+  const costByProduct = new Map<string, number>();
   for (const [productId, quantity] of qtyByProduct) {
+    const productType = typeByProduct.get(productId);
+    if (productType === 'service') {
+      costByProduct.set(productId, 0);
+      continue;
+    }
+    if (productType !== 'tire') throw new Error('walkin_product_not_sellable');
     const key = tireSizeKey(sizeByProduct.get(productId));
     if (!key) throw new Error('walkin_measure_not_found');
     const brand = brandByProduct.get(productId) ?? null;
@@ -76,6 +86,8 @@ export async function prepareMatrizWalkinStock(
     productsByKey.set(variantKey, [...(productsByKey.get(variantKey) ?? []), productId]);
   }
 
+  const lines: MatrizWalkinStockPlan['lines'] = [];
+  if (requestedByKey.size === 0) return { lines, costByProduct };
   const stock = await client.query<StockRow>(
     `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
        FROM commerce.wholesale_stock
@@ -85,9 +97,6 @@ export async function prepareMatrizWalkinStock(
     [environment],
   );
   const stockIndex = buildMatrizStockIndex(stock.rows);
-
-  const lines: MatrizWalkinStockPlan['lines'] = [];
-  const costByProduct = new Map<string, number>();
   for (const [variantKey, variant] of requestedByKey) {
     const state = matrizStockForMeasure(
       stockIndex, variant.key, variant.brand, variant.tire_condition,

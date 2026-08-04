@@ -39,6 +39,7 @@
     logout: byId('caixa-logout'),
     passwordToggle: byId('password-toggle'),
     app: document.querySelector('.caixa-app'),
+    cashPanel: byId('cash-panel'),
     salesPanel: byId('sales-panel'),
     profilePanel: byId('profile-panel'),
     periodButtons: Array.from(document.querySelectorAll('[data-period]')),
@@ -53,6 +54,8 @@
     metricRevenue: byId('metric-revenue'),
     metricTicket: byId('metric-ticket'),
     receiptModal: byId('receipt-modal'),
+    customerModal: byId('checkout-customer-modal'),
+    checkoutReviewModal: byId('checkout-review-modal'),
     receiptContent: byId('receipt-content'),
     toast: byId('app-toast'),
   };
@@ -114,14 +117,16 @@
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
-    Caixa.showTab('sales');
-    void Caixa.loadSales();
+    Caixa.showTab('cash');
+    void Caixa.loadCatalog();
   }
 
   function showLogin(message) {
     elements.sessionView.classList.add('hidden');
     elements.loginView.classList.remove('hidden');
     elements.receiptModal.classList.add('hidden');
+    elements.customerModal.classList.add('hidden');
+    elements.checkoutReviewModal.classList.add('hidden');
     elements.passwordModal.classList.add('hidden');
     elements.helpModal.classList.add('hidden');
     elements.app.classList.remove('is-authenticated');

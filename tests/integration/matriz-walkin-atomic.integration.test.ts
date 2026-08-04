@@ -17,6 +17,8 @@ describe('venda walk-in atomica da Matriz', () => {
   let applyManualStockDecrement: typeof import('../../src/admin/painel/queries-galpao-movimentos.js').applyGalpaoBaixaManual;
   let getMatrizFinanceiroVisao: typeof import('../../src/admin/painel/queries-financeiro-visao.js').getMatrizFinanceiroVisao;
   let getMatrizStockReconciliation: typeof import('../../src/admin/painel/queries-stock-reconciliation.js').getMatrizStockReconciliation;
+  let createCaixaSale: typeof import('../../src/admin/caixa/checkout.js').createCaixaSale;
+  let getCaixaCatalog: typeof import('../../src/admin/caixa/checkout.js').getCaixaCatalog;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -36,6 +38,7 @@ describe('venda walk-in atomica da Matriz', () => {
       = await import('../../src/admin/painel/queries-galpao-movimentos.js'));
     ({ getMatrizFinanceiroVisao } = await import('../../src/admin/painel/queries-financeiro-visao.js'));
     ({ getMatrizStockReconciliation } = await import('../../src/admin/painel/queries-stock-reconciliation.js'));
+    ({ createCaixaSale, getCaixaCatalog } = await import('../../src/admin/caixa/checkout.js'));
 
     await db.pool.query(
       `INSERT INTO core.units (environment, slug, name, is_active)
@@ -211,6 +214,60 @@ describe('venda walk-in atomica da Matriz', () => {
     expect(Number(after.lucro_total) - Number(before.lucro_total)).toBe(150);
     expect(after.vendas_count - before.vendas_count).toBe(1);
     expect(after.itens_sem_custo - before.itens_sem_custo).toBe(0);
+  });
+
+  it('fecha venda pelo Caixa e grava pedido, baixa, receita e custo na mesma verdade', async () => {
+    const fixture = await createProduct({ quantity: 3, cost: 40 });
+    const idempotencyKey = key('caixa-integrado');
+    const catalog = await getCaixaCatalog('test', '', 'tire', db.pool);
+    expect(catalog.products.find((item) => item.product_id === fixture.productId))
+      .toMatchObject({ price_amount: 120, stock_quantity: 3, sellable: true });
+
+    const sale = await createCaixaSale('test', {
+      personId: 'caixa-person', collaboratorId: sellerId,
+      displayName: 'Vendedor Integracao', username: 'caixa.integracao',
+    }, {
+      customer_name: 'Cliente Caixa', customer_phone: null,
+      payment_method: 'pix', idempotency_key: idempotencyKey,
+      items: [{ product_id: fixture.productId, quantity: 2 }],
+    }, db.pool);
+
+    const state = await db.pool.query<{
+      status: string; payment_method: string; total_amount: string;
+      quantity_on_hand: number; revenue_rows: number; cogs_rows: number;
+    }>(
+      `SELECT o.status,o.payment_method,o.total_amount,
+              s.quantity_on_hand,
+              count(*) FILTER (WHERE t.source_type='commerce.order.revenue')::int revenue_rows,
+              count(*) FILTER (WHERE t.source_type='commerce.order.cogs')::int cogs_rows
+         FROM commerce.orders o
+         JOIN commerce.wholesale_stock s
+           ON s.environment=o.environment AND s.measure=$2
+         LEFT JOIN finance.matriz_ledger_transactions t
+           ON t.environment=o.environment AND t.source_id=o.id::text
+        WHERE o.environment='test' AND o.id=$1
+        GROUP BY o.id,o.status,o.payment_method,o.total_amount,s.quantity_on_hand`,
+      [sale.order_id, fixture.measure],
+    );
+    expect(state.rows[0]).toEqual({
+      status: 'confirmed', payment_method: 'pix', total_amount: '240.00',
+      quantity_on_hand: 1, revenue_rows: 1, cogs_rows: 1,
+    });
+
+    const lines = await db.pool.query<{ account_code: string; side: string; amount: string }>(
+      `SELECT e.account_code,e.side,e.amount::text
+         FROM finance.matriz_ledger_transactions t
+         JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+        WHERE t.environment='test' AND t.source_id=$1
+        ORDER BY t.source_type,e.line_no`,
+      [sale.order_id],
+    );
+    expect(lines.rows).toEqual([
+      { account_code: 'cost_of_goods_sold', side: 'debit', amount: '80.00' },
+      { account_code: 'inventory', side: 'credit', amount: '80.00' },
+      { account_code: 'cash', side: 'debit', amount: '240.00' },
+      { account_code: 'sales_revenue', side: 'credit', amount: '240.00' },
+    ]);
   });
 
   it('rejeita produto sem medida e nao cria pedido nem cliente', async () => {
