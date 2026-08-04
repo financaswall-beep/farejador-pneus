@@ -22,6 +22,10 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
 
   text('/caixa', 'caixa.html', 'text/html; charset=utf-8');
   text('/caixa/', 'caixa.html', 'text/html; charset=utf-8');
+  for (const url of ['/vendas', '/caixa/vendas']) {
+    fastify.get(url, { preHandler: flagGate }, async (_request, reply) =>
+      reply.header('Cache-Control', 'no-store').redirect('/caixa#vendas'));
+  }
   text('/caixa/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
   text('/caixa/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-checkout-catalog.js', 'caixa-checkout-catalog.js', 'text/javascript; charset=utf-8');

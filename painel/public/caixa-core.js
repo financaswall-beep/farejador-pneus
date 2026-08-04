@@ -117,8 +117,10 @@
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
-    Caixa.showTab('cash');
-    void Caixa.loadCatalog();
+    const initialTab = window.location.hash === '#vendas' ? 'sales' : 'cash';
+    Caixa.showTab(initialTab);
+    if (initialTab === 'sales') void Caixa.loadSales();
+    else void Caixa.loadCatalog();
   }
 
   function showLogin(message) {
