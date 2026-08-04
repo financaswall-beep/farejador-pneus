@@ -196,6 +196,11 @@ const envSchema = z.object({
   // Sessão própria es_ (7 dias; revogar o colaborador mata na hora). Default OFF =
   // portal INVISÍVEL (404 em tudo, nem 401 — não denuncia que existe).
   MATRIZ_ENTREGADOR_PORTAL: booleanStringSchema,
+  // FRENTE DE CAIXA DA MATRIZ: porta mobile separada em /caixa para colaborador
+  // ativo job='vendedor' e work_area='sales'. A primeira entrega cobre somente
+  // login/sessao; abrir a sessao nao cria movimento financeiro. Default OFF =
+  // portal invisivel (404) ate o rollout ser autorizado no ambiente.
+  MATRIZ_CAIXA_PORTAL: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

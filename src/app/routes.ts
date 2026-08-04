@@ -8,6 +8,7 @@ import { registerPainelRoute } from '../admin/painel/route.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
 import { registerEntregadorRoute } from '../admin/entregador/route.js';
+import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
 import { registerPublicLegalRoutes } from '../public/legal.route.js';
 
@@ -25,4 +26,6 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   await registerLoginGlobalRoute(fastify);
   // Portal do entregador (/entregas) — 0125. Dormente atrás de MATRIZ_ENTREGADOR_PORTAL.
   await registerEntregadorRoute(fastify);
+  // Frente de Caixa da Matriz (/caixa) — login móvel isolado do admin e da logística.
+  await registerCaixaRoute(fastify);
 }
