@@ -244,7 +244,7 @@ describe('venda walk-in atomica da Matriz', () => {
          JOIN commerce.wholesale_stock s
            ON s.environment=o.environment AND s.measure=$2
          LEFT JOIN finance.matriz_ledger_transactions t
-           ON t.environment=o.environment AND t.source_id=o.id
+           ON t.environment=o.environment AND t.source_id=o.id::text
         WHERE o.environment='test' AND o.id=$1
         GROUP BY o.id,o.status,o.payment_method,o.total_amount,s.quantity_on_hand`,
       [sale.order_id, fixture.measure],
