@@ -994,8 +994,15 @@ export async function executeTool(
           clientNeighborhoodCanonical,
         });
         // partner = atende perto; only_far = TEM o pneu (longe, mas a foto ajuda
-        // a fechar por entrega). matriz = ninguém da rede tem → sem foto.
-        const unitId = geo.kind === 'partner' ? geo.routing.unitId : geo.kind === 'only_far' ? geo.unitId : null;
+        // a fechar por entrega). Matriz só recebe quando o motor provou estoque;
+        // o `matriz` de mero fallback continua sem foto.
+        const unitId = geo.kind === 'partner'
+          ? geo.routing.unitId
+          : geo.kind === 'only_far'
+            ? geo.unitId
+            : geo.canFulfill
+              ? await resolveMatrizUnitId(client, environment)
+              : null;
         if (!unitId) {
           return JSON.stringify({ status: 'sem_loja' });
         }

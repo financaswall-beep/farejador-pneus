@@ -19,6 +19,7 @@ import {
 } from './queries.js';
 import { getCaixaSaleReceipt, getCaixaSales } from './sales.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
+import { registerCaixaPhotoRoutes } from './route-photo.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_MAX_PER_USER = 10;
@@ -118,6 +119,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     }
     (request as CaixaRequest).caixa = auth;
   };
+  registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth);
 
   fastify.post('/api/caixa/login', { preHandler: flagGate }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

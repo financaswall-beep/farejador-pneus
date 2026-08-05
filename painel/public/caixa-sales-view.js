@@ -113,11 +113,63 @@
     elements.profileMetricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
   }
 
+  function weeklyDate(value) {
+    return new Date(String(value) + 'T12:00:00-03:00');
+  }
+
+  function weeklyRangeLabel(series) {
+    if (!series.length) return 'Últimos 7 dias';
+    const format = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' });
+    return format.format(weeklyDate(series[0].date)) + ' – '
+      + format.format(weeklyDate(series[series.length - 1].date));
+  }
+
+  function renderWeeklySummary(payload, summary) {
+    const weekly = payload.period === '7d';
+    elements.salesMetrics.classList.toggle('hidden', weekly);
+    elements.weeklySummary.classList.toggle('hidden', !weekly);
+    if (!weekly) return;
+
+    const series = Array.isArray(payload.daily_series) ? payload.daily_series : [];
+    const values = series.map(function (day) { return Number(day.revenue || 0); });
+    const max = Math.max(1, ...values);
+    const total = Number(summary.revenue || 0);
+    const average = series.length ? total / series.length : 0;
+    elements.weeklyRange.textContent = weeklyRangeLabel(series);
+    elements.weeklyTotal.textContent = Caixa.currency.format(total);
+    elements.weeklySalesCount.textContent = String(summary.sales_count || 0);
+    elements.weeklyTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
+    elements.weeklyReference.style.bottom = Math.min(96, (average / max) * 100) + '%';
+    elements.weeklyReferenceValue.textContent = 'média ' + Caixa.currency.format(average);
+    elements.weeklyBars.replaceChildren();
+
+    const dayFormat = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
+    series.forEach(function (day) {
+      const item = document.createElement('div');
+      item.className = 'weekly-bar-item' + (Number(day.revenue || 0) === max ? ' is-best' : '');
+      item.title = Caixa.currency.format(Number(day.revenue || 0)) + ' · '
+        + day.sales_count + (day.sales_count === 1 ? ' venda' : ' vendas');
+      const value = document.createElement('span');
+      value.className = 'weekly-bar-value';
+      value.textContent = Number(day.revenue || 0) > 0 ? Caixa.currency.format(Number(day.revenue)) : 'R$ 0';
+      const bar = document.createElement('i');
+      bar.style.height = Math.max(3, (Number(day.revenue || 0) / max) * 100) + '%';
+      const date = weeklyDate(day.date);
+      const dateLabel = document.createElement('b');
+      dateLabel.textContent = String(date.getDate()).padStart(2, '0');
+      const dayLabel = document.createElement('small');
+      dayLabel.textContent = dayFormat.format(date).replace('.', '');
+      item.append(value, bar, dateLabel, dayLabel);
+      elements.weeklyBars.appendChild(item);
+    });
+  }
+
   function renderSales(payload) {
     const summary = payload.summary || {};
     elements.metricSales.textContent = String(summary.sales_count || 0);
     elements.metricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
     elements.metricTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
+    renderWeeklySummary(payload, summary);
     if (payload.period === 'today') renderProfileSummary(summary);
     elements.salesList.replaceChildren();
     const sales = Array.isArray(payload.sales) ? payload.sales : [];

@@ -53,6 +53,15 @@
     metricSales: byId('metric-sales'),
     metricRevenue: byId('metric-revenue'),
     metricTicket: byId('metric-ticket'),
+    salesMetrics: document.querySelector('.sales-metrics'),
+    weeklySummary: byId('weekly-summary'),
+    weeklyRange: byId('weekly-range'),
+    weeklyTotal: byId('weekly-total'),
+    weeklyReference: byId('weekly-reference'),
+    weeklyReferenceValue: byId('weekly-reference-value'),
+    weeklyBars: byId('weekly-bars'),
+    weeklySalesCount: byId('weekly-sales-count'),
+    weeklyTicket: byId('weekly-ticket'),
     receiptModal: byId('receipt-modal'),
     customerModal: byId('checkout-customer-modal'),
     checkoutReviewModal: byId('checkout-review-modal'),
@@ -117,6 +126,7 @@
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
+    if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
     const initialTab = window.location.hash === '#vendas' ? 'sales' : 'cash';
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
@@ -132,6 +142,7 @@
     elements.passwordModal.classList.add('hidden');
     elements.helpModal.classList.add('hidden');
     elements.app.classList.remove('is-authenticated');
+    if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
     elements.error.textContent = message || '';
   }
 

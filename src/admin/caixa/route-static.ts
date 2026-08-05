@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 type FlagGate = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 const publicDir = path.join(process.cwd(), 'painel', 'public');
+const partnerAssetsDir = path.join(process.cwd(), 'parceiro', 'public', 'assets');
 
 async function sendStatic(
   reply: FastifyReply,
@@ -33,7 +34,13 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/caixa/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-profile.js', 'caixa-profile.js', 'text/javascript; charset=utf-8');
+  text('/caixa/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa.js', 'caixa.js', 'text/javascript; charset=utf-8');
+  fastify.get('/caixa/som-pedido-novo.mp3', { preHandler: flagGate }, async (_request, reply) => {
+    const content = await readFile(path.join(partnerAssetsDir, 'som-pedido-novo.mp3'));
+    return reply.header('Content-Type', 'audio/mpeg')
+      .header('Cache-Control', 'public, max-age=31536000, immutable').send(content);
+  });
   text(
     '/caixa/logo-2w.svg',
     'assets/2w-app-icon-1024.svg',

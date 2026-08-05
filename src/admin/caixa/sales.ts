@@ -24,7 +24,14 @@ export interface CaixaSaleListItem {
 export interface CaixaSalesPayload {
   period: CaixaSalesPeriod;
   summary: CaixaSalesSummary;
+  daily_series: CaixaSalesDay[];
   sales: CaixaSaleListItem[];
+}
+
+export interface CaixaSalesDay {
+  date: string;
+  sales_count: number;
+  revenue: number;
 }
 
 export interface CaixaSaleReceipt {
@@ -78,7 +85,7 @@ export async function getCaixaSales(
     LEFT JOIN commerce.customers cu
       ON cu.id=o.customer_id AND cu.environment=o.environment`;
 
-  const [summaryResult, salesResult] = await Promise.all([
+  const [summaryResult, salesResult, dailySeriesResult] = await Promise.all([
     dbPool.query<{
       sales_count: number;
       revenue: string;
@@ -127,6 +134,33 @@ export async function getCaixaSales(
         LIMIT 40`,
       [environment, searchPattern],
     ),
+    period === '7d'
+      ? dbPool.query<{ date: string; sales_count: number; revenue: string }>(
+          `WITH days AS (
+             SELECT generate_series(
+               (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '6 days')::date,
+               (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo'))::date,
+               INTERVAL '1 day'
+             )::date AS day
+           ), matriz_sales AS (
+             SELECT (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS sale_day,
+                    o.total_amount
+               FROM commerce.orders o
+               JOIN core.units u
+                 ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
+              WHERE o.environment=$1 AND o.status<>'cancelled'
+                AND o.created_at>=${PERIOD_START['7d']}
+           )
+           SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
+                  COUNT(matriz_sales.sale_day)::int AS sales_count,
+                  COALESCE(SUM(matriz_sales.total_amount),0)::text AS revenue
+             FROM days
+             LEFT JOIN matriz_sales ON matriz_sales.sale_day=days.day
+            GROUP BY days.day
+            ORDER BY days.day`,
+          [environment],
+        )
+      : Promise.resolve({ rows: [] as Array<{ date: string; sales_count: number; revenue: string }> }),
   ]);
 
   const summaryRow = summaryResult.rows[0];
@@ -137,6 +171,11 @@ export async function getCaixaSales(
       revenue: Number(summaryRow?.revenue ?? 0),
       average_ticket: Number(summaryRow?.average_ticket ?? 0),
     },
+    daily_series: dailySeriesResult.rows.map((row) => ({
+      date: row.date,
+      sales_count: row.sales_count,
+      revenue: Number(row.revenue),
+    })),
     sales: salesResult.rows.map((row) => ({
       ...row,
       order_number: row.order_number ?? `#${row.order_id.slice(0, 8)}`,

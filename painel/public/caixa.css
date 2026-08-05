@@ -314,6 +314,36 @@ form { display: grid; gap: 16px; }
 .metric-card small { margin-top: 4px; color: #424b47; font-family: "Arial Narrow", Arial, sans-serif; font-size: 12px; }
 .metric-prefix { margin: -2px 0 2px; color: #4e5652; font-size: 11px; line-height: 1; }
 
+.photo-alert { position: relative; z-index: 35; display: grid; width: min(calc(100% - 30px),428px); min-height: 66px; grid-template-columns: 43px minmax(0,1fr) 20px; align-items: center; gap: 10px; margin: -54px auto 41px; padding: 9px 12px; border: 1px solid #ffb45f; border-radius: 17px; color: #fff; background: linear-gradient(135deg,#e76a18,#bc3f0c); box-shadow: 0 13px 32px rgba(115,42,5,.32); text-align: left; cursor: pointer; animation: photo-alert-pulse 1.7s ease-in-out infinite; }
+.photo-alert-icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 13px; color: #d9550f; background: #fff; }
+.photo-alert-icon svg,.photo-alert-chevron { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
+.photo-alert > span:nth-child(2) { min-width: 0; }
+.photo-alert strong,.photo-alert small { display: block; }
+.photo-alert strong { font-size: 14px; }
+.photo-alert small { margin-top: 4px; color: #fff4eb; font-size: 10px; }
+.photo-alert-chevron { width: 20px; }
+@keyframes photo-alert-pulse { 50% { box-shadow: 0 13px 36px rgba(157,52,3,.48),0 0 0 4px rgba(251,146,60,.14); } }
+
+.weekly-summary { margin-top: 16px; padding: 18px 15px 14px; border: 1px solid #dfe6e2; border-radius: 20px; background: #fff; box-shadow: 0 6px 18px rgba(16,37,28,.06); }
+.weekly-summary-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.weekly-summary-head span { display: block; margin-bottom: 4px; color: #6f7974; font-size: 11px; font-weight: 620; text-transform: uppercase; letter-spacing: .035em; }
+.weekly-summary-head h3 { margin: 0; color: #1a2923; font-size: 17px; font-weight: 680; letter-spacing: -.02em; }
+.weekly-summary-head > strong { color: #075132; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(25px,7vw,32px); font-weight: 680; letter-spacing: -.045em; white-space: nowrap; }
+.weekly-chart { margin-top: 16px; padding-top: 25px; }
+.weekly-chart-plot { position: relative; height: 176px; border-bottom: 1px solid #ccd5d0; }
+.weekly-reference { position: absolute; z-index: 3; right: 0; left: 0; border-top: 1px dashed #96a39d; pointer-events: none; }
+.weekly-reference span { position: absolute; bottom: 4px; left: 0; padding-right: 5px; color: #7b8580; background: rgba(255,255,255,.94); font-size: 9px; }
+.weekly-bars { position: absolute; z-index: 2; inset: 0 0 -35px; display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; align-items: end; }
+.weekly-bar-item { display: grid; height: 100%; min-width: 0; grid-template-rows: 17px minmax(0,1fr) 18px 17px; justify-items: center; align-items: end; }
+.weekly-bar-value { max-width: 46px; overflow: hidden; color: #6e7873; font-size: 8px; line-height: 1; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity .15s ease; }
+.weekly-bar-item:hover .weekly-bar-value,.weekly-bar-item:focus-within .weekly-bar-value { opacity: 1; }
+.weekly-bar-item i { display: block; width: min(100%,34px); min-height: 3px; border-radius: 7px 7px 2px 2px; background: #cfe0d7; box-shadow: inset 0 1px 0 rgba(255,255,255,.5); }
+.weekly-bar-item.is-best i { background: linear-gradient(180deg,#31a870,#087448); }
+.weekly-bar-item b { align-self: center; color: #36443e; font-size: 11px; }
+.weekly-bar-item small { align-self: start; color: #737d78; font-size: 10px; text-transform: capitalize; }
+.weekly-summary-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 40px; padding-top: 12px; border-top: 1px solid #edf0ee; color: #68736d; font-size: 11px; }
+.weekly-summary-foot strong { color: #0a6544; font-size: 12px; }
+
 .sales-search { position: relative; margin-top: 15px; }
 .sales-search > svg { position: absolute; top: 50%; left: 17px; width: 25px; height: 25px; transform: translateY(-50%); fill: none; stroke: #646a67; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; pointer-events: none; }
 .sales-search input {
@@ -582,6 +612,19 @@ form { display: grid; gap: 16px; }
 .account-modal-sheet form input { width: 100%; height: 51px; padding: 0 13px; border: 1px solid #cfd8d3; border-radius: 12px; outline: 0; color: #17251f; background: #fff; }
 .account-modal-sheet form input:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
 .account-modal-sheet form small { color: #7b837f; font-size: 10px; font-weight: 400; }
+.photo-modal-sheet { max-height: min(90svh,790px); }
+.photo-request-list { display: grid; gap: 13px; padding: 18px 18px max(22px,env(safe-area-inset-bottom)); }
+.caixa-photo-card { display: grid; gap: 8px; padding: 16px; border: 1px solid #f1c7a9; border-radius: 17px; background: #fffaf6; box-shadow: 0 5px 14px rgba(93,45,14,.06); }
+.caixa-photo-card > small { color: #d15311; font-size: 10px; font-weight: 760; letter-spacing: .045em; }
+.caixa-photo-card > strong { color: #153d2d; font-size: 24px; letter-spacing: -.03em; }
+.caixa-photo-card > p { margin: 0; color: #69746f; font-size: 11px; }
+.caixa-photo-card > img { width: 100%; max-height: 310px; margin-top: 3px; border-radius: 13px; object-fit: cover; background: #e8ecea; }
+.photo-shoot-button,.caixa-photo-actions button { display: flex; min-height: 50px; align-items: center; justify-content: center; border-radius: 13px; font-size: 12px; font-weight: 730; cursor: pointer; }
+.photo-shoot-button { margin-top: 5px; border: 1px solid #0a714c; color: #096343; background: #fff; }
+.caixa-photo-actions { display: grid; grid-template-columns: .8fr 1.2fr; gap: 8px; }
+.caixa-photo-actions .photo-shoot-button { margin: 0; }
+.caixa-photo-actions button { border: 0; color: #fff; background: linear-gradient(135deg,#087d51,#005e3e); }
+.caixa-photo-actions button:disabled { opacity: .6; cursor: wait; }
 .account-modal-error { min-height: 17px; margin: -2px 0; color: #be123c; font-size: 11px; line-height: 1.4; }
 .account-modal-primary { height: 50px; border: 0; border-radius: 12px; color: #fff; background: linear-gradient(135deg,#07804f,#005f3e); font-size: 13px; font-weight: 680; cursor: pointer; }
 .account-modal-primary:disabled { opacity: .6; cursor: wait; }

@@ -26,6 +26,15 @@ services:
       CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:?CHATWOOT_ACCOUNT_ID is required}
       ADMIN_AUTH_TOKEN: ${ADMIN_AUTH_TOKEN:?ADMIN_AUTH_TOKEN is required}
       ADMIN_BEARER_FALLBACK_ENABLED: ${ADMIN_BEARER_FALLBACK_ENABLED:-false}
+      # Frente de Caixa e foto sob demanda. Defaults OFF preservam rollout/rollback;
+      # o Coolify deve definir ambas como true para publicar esta entrega.
+      MATRIZ_CAIXA_PORTAL: ${MATRIZ_CAIXA_PORTAL:-false}
+      PHOTO_REQUESTS: ${PHOTO_REQUESTS:-false}
+      # A foto toca no Caixa somente quando o motor comprova estoque da Matriz.
+      # Estas flags já governam o roteamento em produção e precisam atravessar o Compose.
+      ROUTING_GEO: ${ROUTING_GEO:-false}
+      ROUTING_MATRIZ_AS_STORE: ${ROUTING_MATRIZ_AS_STORE:-false}
+      WHOLESALE_UNIFIED_STOCK: ${WHOLESALE_UNIFIED_STOCK:-false}
       # Etapa 9: rollout em gates separados; ambos permanecem false no deploy inicial.
       MATRIZ_CUSTOMER_IDENTITY: ${MATRIZ_CUSTOMER_IDENTITY:-false}
       MATRIZ_CUSTOMER_PRIVACY: ${MATRIZ_CUSTOMER_PRIVACY:-false}
