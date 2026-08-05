@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Portal Parceiro - Farejador</title>
 
+  <!-- Porta unica: a URL da loja e destino, nao uma segunda tela de login. -->
+  <script>
+    (() => {
+      const slug = location.pathname.split('/').filter(Boolean)[1] || '';
+      if (!slug) return;
+      let token = '';
+      try { token = localStorage.getItem(`farejador_partner_token_${slug}`) || ''; }
+      catch (e) { /* armazenamento bloqueado: segue para o login central */ }
+      if (!token) location.replace(`/login?loja=${encodeURIComponent(slug)}`);
+    })();
+  </script>
+
   <link rel="stylesheet" href="./tailwind.css?v=20260719-etapa11" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,13 +27,13 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260805-matriz-light1" />
+  <link rel="stylesheet" href="./style.css?v=20260805-entrada-simples1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
   <!-- PWA (0109): vira "app" na tela inicial + base da notificação nativa. -->
   <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#ea580c" />
+  <meta name="theme-color" content="#047857" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="2W Pneus" />
@@ -33,7 +45,8 @@
 <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      LOGIN
      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-<div x-show="!authed" class="min-h-screen flex items-center justify-center px-4">
+<!-- Login por slug desativado: toda autenticação visível acontece em /login. -->
+<div x-show="false" style="display:none" aria-hidden="true" class="min-h-screen flex items-center justify-center px-4">
   <div class="bg-white border border-gray-200 rounded-2xl shadow-sm w-full max-w-md p-8">
     <div class="flex items-center gap-3 mb-6">
       <div class="w-10 h-10 rounded-lg bg-gray-900 text-white flex items-center justify-center font-bold">F</div>
@@ -202,7 +215,7 @@
       </div>
     </aside>
 
-    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
+    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'onboarding-mode': currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0), 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-company">
           <div class="font-bold" x-text="unitName || partnerName || 'Minha loja'">Minha loja</div>
@@ -404,13 +417,35 @@
         </article>
       </section>
 
+      <section x-show="currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
+               class="pos-onboarding" aria-label="Primeiros passos da loja">
+        <div class="pos-onboarding-head">
+          <div>
+            <span class="pos-onboarding-kicker">Comece por aqui</span>
+            <h3>Deixe a loja pronta para operar</h3>
+            <p>Faça na ordem. O painel marca sozinho o que já foi concluído.</p>
+          </div>
+          <strong x-text="(num(resumo?.stock_items) > 0 ? 1 : 0) + (num(resumo?.orders_month) > 0 ? 1 : 0) + '/2'"></strong>
+        </div>
+        <div class="pos-onboarding-steps">
+          <button type="button" :class="num(resumo?.stock_items) > 0 && 'done'" @click="goToSection('estoque')">
+            <i :data-lucide="num(resumo?.stock_items) > 0 ? 'check' : 'package-plus'"></i>
+            <span><b>1. Cadastre o estoque</b><small x-text="num(resumo?.stock_items) > 0 ? 'Pronto — seus produtos já aparecem no sistema.' : 'Informe os pneus disponíveis e o preço de venda.'"></small></span>
+          </button>
+          <button type="button" :class="num(resumo?.orders_month) > 0 && 'done'" @click="goToSection('vendas')">
+            <i :data-lucide="num(resumo?.orders_month) > 0 ? 'check' : 'shopping-cart'"></i>
+            <span><b>2. Registre a primeira venda</b><small x-text="num(resumo?.orders_month) > 0 ? 'Pronto — o caixa já começou a acompanhar a operação.' : 'Use a Frente de caixa; o estoque e o financeiro atualizam juntos.'"></small></span>
+          </button>
+        </div>
+      </section>
+
       <section x-show="currentSection === 'resumo'" class="pos-workspace">
         <div class="pos-page-grid finance">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
-                <h3>Resumo da unidade</h3>
-                <p>Visão rápida para decidir onde mexer primeiro</p>
+                <h3>O que aconteceu</h3>
+                <p>Movimento registrado na loja neste mês</p>
               </div>
               <span class="pos-live-badge">online</span>
             </div>
@@ -445,7 +480,7 @@
             </div>
           </section>
           <aside class="pos-panel pos-side-panel">
-            <h3>Próxima melhor ação</h3>
+            <h3>O que fazer agora</h3>
             <div class="pos-tip-list">
               <template x-for="tip in financialScoreTips.slice(0, 5)" :key="tip">
                 <div><i data-lucide="arrow-up-right"></i><span x-text="tip"></span></div>
@@ -2847,9 +2882,9 @@
 <script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
-<script src="./app.core.js?v=20260612-bloco2b"></script>
-<script src="./app.auth.js?v=20260611-onda-c"></script>
-<script src="./app.resumo.js?v=20260611-onda-c"></script>
+<script src="./app.core.js?v=20260805-entrada-simples1"></script>
+<script src="./app.auth.js?v=20260805-entrada-simples1"></script>
+<script src="./app.resumo.js?v=20260805-entrada-simples1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>

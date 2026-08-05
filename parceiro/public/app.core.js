@@ -51,6 +51,7 @@ window.PARCEIRO_MODULES.core = () => ({
               this.apiToken = '';
               localStorage.removeItem(this.tokenKey);
               this.authed = false;
+              location.replace(`/login?loja=${encodeURIComponent(this.slug)}&sessao=expirada`);
             }
           }
         });

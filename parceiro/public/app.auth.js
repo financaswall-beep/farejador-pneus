@@ -119,5 +119,6 @@ window.PARCEIRO_MODULES.auth = () => ({
       this.produtos = [];
       this.payables = [];
       this.receivables = [];
+      location.replace('/login');
     },
 });
