@@ -5,17 +5,25 @@
  *            (farejador_partner_token_<slug>) e vai pra /parceiro/<slug>/.
  *   choose → mostra as lojas DA PESSOA; o clique troca o ticket (uso único,
  *            2 min) pela sessão da loja em POST /api/login/escolher.
+ *   primeiro acesso → código cru + slug definem usuário/senha aqui; a resposta
+ *                     já vira sessão e abre a loja correta.
  * REGRA: teto 300 (mesmo espírito do painel); dado dinâmico só via textContent.
  */
 (function () {
   'use strict';
 
   var form = document.getElementById('form-login');
+  var formPrimeiro = document.getElementById('form-primeiro');
   var btnEntrar = document.getElementById('btn-entrar');
+  var btnCriar = document.getElementById('btn-criar');
+  var btnPrimeiro = document.getElementById('btn-primeiro');
+  var btnJaTenho = document.getElementById('btn-ja-tenho');
   var btnVoltar = document.getElementById('btn-voltar');
   var elEscolha = document.getElementById('escolha');
   var elLojas = document.getElementById('lojas');
   var elErro = document.getElementById('erro');
+  var tituloAcesso = document.getElementById('titulo-acesso');
+  var subtituloAcesso = document.getElementById('subtitulo-acesso');
   var ticket = null;
 
   function setErro(msg) { elErro.textContent = msg || ''; }
@@ -27,6 +35,15 @@
     }
     if (status === 401) return 'Usuário ou senha incorretos.';
     return 'Não foi possível entrar agora. Tente de novo.';
+  }
+
+  function msgPrimeiroAcesso(status, payload) {
+    if (status === 429) return 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+    if (status === 401) return 'Código de acesso ou endereço da loja incorreto.';
+    if (status === 409 && payload && payload.error === 'username_taken') return 'Esse usuário já existe. Escolha outro.';
+    if (status === 409 && payload && payload.error === 'credentials_already_set') return 'Esse acesso já foi configurado. Entre com usuário e senha.';
+    if (status === 400) return 'Confira o endereço da loja, o usuário e a senha.';
+    return 'Não foi possível criar o acesso agora. Tente de novo.';
   }
 
   // Mesma chave do painel (app.js): o painel abre já logado depois do redirect.
@@ -66,9 +83,23 @@
   function voltarPraSenha() {
     ticket = null;
     elEscolha.style.display = 'none';
+    formPrimeiro.style.display = 'none';
     form.style.display = 'block';
+    tituloAcesso.textContent = 'Bem-vindo de volta';
+    subtituloAcesso.textContent = 'Entre com seu usuário. A gente encontra sua loja.';
     setErro('');
     document.getElementById('password').value = '';
+  }
+
+  function mostrarPrimeiroAcesso() {
+    ticket = null;
+    form.style.display = 'none';
+    elEscolha.style.display = 'none';
+    formPrimeiro.style.display = 'block';
+    tituloAcesso.textContent = 'Crie seu acesso';
+    subtituloAcesso.textContent = 'Configure uma vez. Depois é só entrar com usuário e senha.';
+    setErro('');
+    document.getElementById('first-code').focus();
   }
 
   async function postJson(url, body) {
@@ -125,6 +156,43 @@
     }
   }
 
+  async function criarPrimeiroAcesso(ev) {
+    ev.preventDefault();
+    setErro('');
+    var slug = (document.getElementById('first-slug').value || '').trim().toLowerCase();
+    var code = (document.getElementById('first-code').value || '').trim();
+    var username = (document.getElementById('first-username').value || '').trim();
+    var password = document.getElementById('first-password').value || '';
+    if (!/^[a-z0-9-]{2,80}$/.test(slug)) { setErro('Informe o endereço da loja, como borracharia-rio-do-ouro.'); return; }
+    if (!code || !username || password.length < 6) { setErro('Preencha o código, o usuário e uma senha de pelo menos 6 caracteres.'); return; }
+
+    btnCriar.disabled = true;
+    try {
+      var res = await fetch('/parceiro/' + encodeURIComponent(slug) + '/api/set-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + code },
+        body: JSON.stringify({ username: username, password: password }),
+      });
+      var payload = null;
+      try { payload = await res.json(); } catch (e) { /* corpo vazio */ }
+      if (!res.ok) { setErro(msgPrimeiroAcesso(res.status, payload)); return; }
+      entrarNaLoja(slug, payload.session_token);
+    } catch (e) {
+      setErro('Sem conexão. Verifique a internet e tente de novo.');
+    } finally {
+      btnCriar.disabled = false;
+    }
+  }
+
   form.addEventListener('submit', entrar);
+  formPrimeiro.addEventListener('submit', criarPrimeiroAcesso);
   btnVoltar.addEventListener('click', voltarPraSenha);
+  btnPrimeiro.addEventListener('click', mostrarPrimeiroAcesso);
+  btnJaTenho.addEventListener('click', voltarPraSenha);
+
+  var params = new URLSearchParams(window.location.search);
+  var slugInicial = (params.get('loja') || '').trim().toLowerCase();
+  if (/^[a-z0-9-]{2,80}$/.test(slugInicial)) document.getElementById('first-slug').value = slugInicial;
+  if (params.get('primeiro') === '1') mostrarPrimeiroAcesso();
+  if (params.get('sessao') === 'expirada') setErro('Sua sessão terminou. Entre novamente.');
 })();

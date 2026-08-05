@@ -227,6 +227,39 @@ html, body {
   overflow: hidden;
 }
 
+.pos-main.onboarding-mode { grid-template-rows: 80px 88px auto 1fr 46px; }
+
+.pos-onboarding {
+  margin: 10px 18px 0;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 208, 0, .28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 208, 0, .10), rgba(255, 255, 255, .025));
+}
+.pos-onboarding-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.pos-onboarding-head h3 { margin: 2px 0 3px; color: #f8fafc; font-size: 17px; font-weight: 850; }
+.pos-onboarding-head p { margin: 0; color: #9ca3af; font-size: 12px; }
+.pos-onboarding-head > strong {
+  min-width: 48px; padding: 6px 10px; border-radius: 999px; text-align: center;
+  color: #0b0f12; background: var(--pos-yellow); font-size: 13px; font-weight: 900;
+}
+.pos-onboarding-kicker { color: var(--pos-yellow); font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.pos-onboarding-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
+.pos-onboarding-steps button {
+  min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 11px; border: 1px solid rgba(255, 255, 255, .10); border-radius: 10px;
+  color: #e5e7eb; background: rgba(5, 8, 11, .30); text-align: left;
+}
+.pos-onboarding-steps button:hover { border-color: rgba(255, 208, 0, .42); }
+.pos-onboarding-steps button > svg {
+  width: 34px; height: 34px; padding: 8px; border-radius: 9px;
+  color: var(--pos-yellow); background: rgba(255, 208, 0, .12);
+}
+.pos-onboarding-steps b { display: block; font-size: 13px; }
+.pos-onboarding-steps small { display: block; margin-top: 3px; color: #9ca3af; font-size: 11px; line-height: 1.35; }
+.pos-onboarding-steps button.done { border-color: rgba(16, 185, 129, .25); opacity: .78; }
+.pos-onboarding-steps button.done > svg { color: #34d399; background: rgba(16, 185, 129, .12); }
+
 .pos-workspace {
   min-height: 0;
   overflow: auto;
@@ -2288,6 +2321,8 @@ html, body {
     overflow-y: auto; overflow-x: hidden;
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
+  .pos-onboarding { margin: 10px 10px 0; padding: 14px; }
+  .pos-onboarding-steps { grid-template-columns: 1fr; }
 
   /* Topbar compacto: nome + status, esconde busca/icones */
   .pos-topbar {
@@ -2591,6 +2626,18 @@ html, body {
   background: linear-gradient(180deg, #ffffff, #f5f8fc);
   border-right-color: rgba(15, 23, 42, .10);
 }
+.pos-shell[data-theme="light"] .pos-onboarding {
+  border-color: rgba(var(--pos-brand-rgb), .22);
+  background: linear-gradient(135deg, rgba(var(--pos-brand-rgb), .10), rgba(255, 255, 255, .9));
+}
+.pos-shell[data-theme="light"] .pos-onboarding-head h3,
+.pos-shell[data-theme="light"] .pos-onboarding-steps b { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-onboarding-head p,
+.pos-shell[data-theme="light"] .pos-onboarding-steps small { color: #64748b; }
+.pos-shell[data-theme="light"] .pos-onboarding-head > strong { color: #fff; background: var(--pos-brand); }
+.pos-shell[data-theme="light"] .pos-onboarding-steps button { color: #334155; border-color: rgba(15, 23, 42, .10); background: rgba(255, 255, 255, .82); }
+.pos-shell[data-theme="light"] .pos-onboarding-steps button:hover { border-color: rgba(var(--pos-brand-rgb), .4); }
+.pos-shell[data-theme="light"] .pos-onboarding-steps button > svg { color: var(--pos-brand); background: rgba(var(--pos-brand-rgb), .10); }
 .pos-shell[data-theme="light"] .pos-logo-main { color: #0f172a; }
 .pos-shell[data-theme="light"] .pos-logo-sub { color: #64748b; }
 .pos-shell[data-theme="light"] .pos-nav-item { color: #334155; }

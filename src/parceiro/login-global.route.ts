@@ -6,9 +6,9 @@
  * direto; N lojas devolve um ticket de 2 min e o front mostra "escolhe a loja"
  * (só as lojas DELA — papel de cada vínculo decide o que vê lá dentro).
  *
- * O login por slug (/parceiro/:slug/ + api/login) CONTINUA funcionando — esta
- * rota é aditiva; a sessão emitida aqui é a MESMA do caminho antigo
- * (mintPartnerSession), então o painel não muda nada.
+ * A tela de acesso da rede vive somente em /login. Os endpoints antigos por slug
+ * continuam compatíveis para clientes instalados e primeiro acesso, mas a URL da
+ * loja é apenas destino autenticado. A sessão emitida aqui é a MESMA do painel.
  *
  * Segurança (espelha o login por slug + endurece o global):
  *   - resposta ÚNICA 401 invalid_credentials (usuário inexistente, senha errada
