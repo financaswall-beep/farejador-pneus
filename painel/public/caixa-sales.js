@@ -25,6 +25,7 @@
     state.salesRequest = controller;
     Caixa.setSalesState('loading');
     const params = new URLSearchParams({ period: state.currentPeriod });
+    if (state.currentPeriod === '7d') params.set('week', String(state.weekOffset));
     const search = elements.salesSearch.value.trim();
     if (search) params.set('search', search);
     try {
@@ -96,7 +97,12 @@
 
   elements.periodButtons.forEach(function (button) {
     button.addEventListener('click', function () {
-      state.currentPeriod = button.dataset.period;
+      const nextPeriod = button.dataset.period;
+      if (nextPeriod !== state.currentPeriod) {
+        state.selectedSalesDay = null;
+        if (nextPeriod === '7d') state.weekOffset = 0;
+      }
+      state.currentPeriod = nextPeriod;
       elements.periodButtons.forEach(function (item) {
         const selected = item === button;
         item.classList.toggle('active', selected);
@@ -104,6 +110,22 @@
       });
       void loadSales();
     });
+  });
+
+  elements.weeklyPrev.addEventListener('click', function () {
+    if (state.weekOffset <= -52) return;
+    state.weekOffset -= 1;
+    state.selectedSalesDay = null;
+    void loadSales();
+  });
+  elements.weeklyNext.addEventListener('click', function () {
+    if (state.weekOffset >= 0) return;
+    state.weekOffset += 1;
+    state.selectedSalesDay = null;
+    void loadSales();
+  });
+  elements.weeklyClearDay.addEventListener('click', function () {
+    Caixa.selectWeeklyDay(null);
   });
 
   elements.salesSearch.addEventListener('input', function () {

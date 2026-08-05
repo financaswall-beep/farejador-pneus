@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
+import { getCaixaWeeklySeries } from './sales-weekly.js';
 
 export type CaixaSalesPeriod = 'today' | '7d' | '30d';
 
@@ -7,6 +8,11 @@ export interface CaixaSalesSummary {
   sales_count: number;
   revenue: number;
   average_ticket: number;
+  items_quantity: number;
+  pix_revenue: number;
+  card_revenue: number;
+  cash_revenue: number;
+  other_revenue: number;
 }
 
 export interface CaixaSaleListItem {
@@ -23,15 +29,14 @@ export interface CaixaSaleListItem {
 
 export interface CaixaSalesPayload {
   period: CaixaSalesPeriod;
+  week_offset: number;
   summary: CaixaSalesSummary;
   daily_series: CaixaSalesDay[];
   sales: CaixaSaleListItem[];
 }
 
-export interface CaixaSalesDay {
+export interface CaixaSalesDay extends CaixaSalesSummary {
   date: string;
-  sales_count: number;
-  revenue: number;
 }
 
 export interface CaixaSaleReceipt {
@@ -58,6 +63,48 @@ const PERIOD_START: Record<CaixaSalesPeriod, string> = {
   '30d': `((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '29 days') AT TIME ZONE 'America/Sao_Paulo')`,
 };
 
+const paymentRevenueSql = `
+  COALESCE(SUM(o.total_amount) FILTER (
+    WHERE o.status<>'cancelled' AND lower(COALESCE(o.payment_method,''))='pix'
+  ),0)::text AS pix_revenue,
+  COALESCE(SUM(o.total_amount) FILTER (
+    WHERE o.status<>'cancelled' AND (
+      lower(COALESCE(o.payment_method,'')) LIKE '%cart%'
+      OR lower(COALESCE(o.payment_method,'')) IN ('credito','crédito','debito','débito')
+    )
+  ),0)::text AS card_revenue,
+  COALESCE(SUM(o.total_amount) FILTER (
+    WHERE o.status<>'cancelled' AND lower(COALESCE(o.payment_method,'')) LIKE '%dinheiro%'
+  ),0)::text AS cash_revenue,
+  COALESCE(SUM(o.total_amount) FILTER (
+    WHERE o.status<>'cancelled'
+      AND lower(COALESCE(o.payment_method,''))<>'pix'
+      AND lower(COALESCE(o.payment_method,'')) NOT LIKE '%cart%'
+      AND lower(COALESCE(o.payment_method,'')) NOT IN ('credito','crédito','debito','débito')
+      AND lower(COALESCE(o.payment_method,'')) NOT LIKE '%dinheiro%'
+  ),0)::text AS other_revenue`;
+
+function weekStart(placeholder: string): string {
+  return `((date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo')
+    + (${placeholder}::int * INTERVAL '7 days')) AT TIME ZONE 'America/Sao_Paulo')`;
+}
+
+function weekEnd(placeholder: string): string {
+  return `((date_trunc('week', now() AT TIME ZONE 'America/Sao_Paulo')
+    + ((${placeholder}::int + 1) * INTERVAL '7 days')) AT TIME ZONE 'America/Sao_Paulo')`;
+}
+
+function timeScope(period: CaixaSalesPeriod, weekPlaceholder: string): string {
+  if (period === '7d') {
+    return `o.created_at>=${weekStart(weekPlaceholder)} AND o.created_at<${weekEnd(weekPlaceholder)}`;
+  }
+  return `o.created_at>=${PERIOD_START[period]}`;
+}
+
+function numberOf(value: string | number | null | undefined): number {
+  return Number(value ?? 0);
+}
+
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
 }
@@ -71,9 +118,9 @@ export async function getCaixaSales(
   environment: 'prod' | 'test',
   period: CaixaSalesPeriod,
   search = '',
+  weekOffset = 0,
   dbPool: Pool = defaultPool,
 ): Promise<CaixaSalesPayload> {
-  const periodStart = PERIOD_START[period];
   const normalizedSearch = search.trim().slice(0, 80);
   const searchPattern = normalizedSearch ? `%${escapeLike(normalizedSearch)}%` : null;
   const fromScope = `
@@ -85,18 +132,35 @@ export async function getCaixaSales(
     LEFT JOIN commerce.customers cu
       ON cu.id=o.customer_id AND cu.environment=o.environment`;
 
+  const summaryArgs = period === '7d' ? [environment, weekOffset] : [environment];
+  const salesArgs = period === '7d'
+    ? [environment, searchPattern, weekOffset]
+    : [environment, searchPattern];
+
   const [summaryResult, salesResult, dailySeriesResult] = await Promise.all([
     dbPool.query<{
       sales_count: number;
       revenue: string;
       average_ticket: string;
+      items_quantity: string;
+      pix_revenue: string;
+      card_revenue: string;
+      cash_revenue: string;
+      other_revenue: string;
     }>(
       `SELECT COUNT(*) FILTER (WHERE o.status<>'cancelled')::int AS sales_count,
               COALESCE(SUM(o.total_amount) FILTER (WHERE o.status<>'cancelled'),0)::text AS revenue,
-              COALESCE(AVG(o.total_amount) FILTER (WHERE o.status<>'cancelled'),0)::text AS average_ticket
+              COALESCE(AVG(o.total_amount) FILTER (WHERE o.status<>'cancelled'),0)::text AS average_ticket,
+              COALESCE(SUM(summary_items.items_quantity) FILTER (WHERE o.status<>'cancelled'),0)::text AS items_quantity,
+              ${paymentRevenueSql}
          ${fromScope}
-        WHERE o.environment=$1 AND o.created_at>=${periodStart}`,
-      [environment],
+         LEFT JOIN LATERAL (
+           SELECT COALESCE(SUM(oi.quantity),0)::int AS items_quantity
+             FROM commerce.order_items oi
+            WHERE oi.order_id=o.id AND oi.environment=o.environment
+         ) summary_items ON true
+        WHERE o.environment=$1 AND ${timeScope(period, '$2')}`,
+      summaryArgs,
     ),
     dbPool.query<{
       order_id: string;
@@ -125,57 +189,35 @@ export async function getCaixaSales(
                ON p.id=oi.product_id AND p.environment=oi.environment
             WHERE oi.order_id=o.id AND oi.environment=o.environment
          ) items ON true
-        WHERE o.environment=$1 AND o.created_at>=${periodStart}
+        WHERE o.environment=$1 AND ${timeScope(period, '$3')}
           AND ($2::text IS NULL
            OR o.order_number ILIKE $2 ESCAPE '\\'
            OR COALESCE(ct.name,'') ILIKE $2 ESCAPE '\\'
            OR COALESCE(cu.name,'') ILIKE $2 ESCAPE '\\')
         ORDER BY o.created_at DESC,o.id DESC
         LIMIT 40`,
-      [environment, searchPattern],
+      salesArgs,
     ),
     period === '7d'
-      ? dbPool.query<{ date: string; sales_count: number; revenue: string }>(
-          `WITH days AS (
-             SELECT generate_series(
-               (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '6 days')::date,
-               (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo'))::date,
-               INTERVAL '1 day'
-             )::date AS day
-           ), matriz_sales AS (
-             SELECT (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS sale_day,
-                    o.total_amount
-               FROM commerce.orders o
-               JOIN core.units u
-                 ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
-              WHERE o.environment=$1 AND o.status<>'cancelled'
-                AND o.created_at>=${PERIOD_START['7d']}
-           )
-           SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
-                  COUNT(matriz_sales.sale_day)::int AS sales_count,
-                  COALESCE(SUM(matriz_sales.total_amount),0)::text AS revenue
-             FROM days
-             LEFT JOIN matriz_sales ON matriz_sales.sale_day=days.day
-            GROUP BY days.day
-            ORDER BY days.day`,
-          [environment],
-        )
-      : Promise.resolve({ rows: [] as Array<{ date: string; sales_count: number; revenue: string }> }),
+      ? getCaixaWeeklySeries(environment, weekOffset, dbPool)
+      : Promise.resolve([]),
   ]);
 
   const summaryRow = summaryResult.rows[0];
   return {
     period,
+    week_offset: period === '7d' ? weekOffset : 0,
     summary: {
       sales_count: summaryRow?.sales_count ?? 0,
-      revenue: Number(summaryRow?.revenue ?? 0),
-      average_ticket: Number(summaryRow?.average_ticket ?? 0),
+      revenue: numberOf(summaryRow?.revenue),
+      average_ticket: numberOf(summaryRow?.average_ticket),
+      items_quantity: numberOf(summaryRow?.items_quantity),
+      pix_revenue: numberOf(summaryRow?.pix_revenue),
+      card_revenue: numberOf(summaryRow?.card_revenue),
+      cash_revenue: numberOf(summaryRow?.cash_revenue),
+      other_revenue: numberOf(summaryRow?.other_revenue),
     },
-    daily_series: dailySeriesResult.rows.map((row) => ({
-      date: row.date,
-      sales_count: row.sales_count,
-      revenue: Number(row.revenue),
-    })),
+    daily_series: dailySeriesResult,
     sales: salesResult.rows.map((row) => ({
       ...row,
       order_number: row.order_number ?? `#${row.order_id.slice(0, 8)}`,

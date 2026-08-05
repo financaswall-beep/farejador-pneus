@@ -88,10 +88,19 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
     expect(salesQueries).toContain("o.status<>'cancelled'");
     expect(html).toContain('id="weekly-summary"');
     expect(html).toContain('id="weekly-bars"');
+    expect(html).toContain('id="weekly-prev"');
+    expect(html).toContain('id="weekly-next"');
+    expect(html).toContain('id="weekly-detail-period"');
+    expect(html).toContain('Itens vendidos');
+    expect(html).toContain('Faturamento total');
     expect(script).toContain('payload.daily_series');
     expect(script).toContain("payload.period === '7d'");
+    expect(script).toContain("params.set('week', String(state.weekOffset))");
+    expect(script).toContain("item.setAttribute('aria-pressed'");
+    expect(script).toContain('selectWeeklyDay');
     expect(css).toContain('.weekly-reference');
-    expect(css).toContain('.weekly-bar-item.is-best');
+    expect(css).toContain('.weekly-bar-item.is-selected');
+    expect(route).toContain('week: z.coerce.number().int().min(-52).max(0)');
   });
 
   it('toca e abre a fila de fotos da Matriz em tempo real', () => {
