@@ -42,7 +42,6 @@
     cashPanel: byId('cash-panel'),
     salesPanel: byId('sales-panel'),
     profilePanel: byId('profile-panel'),
-    periodButtons: Array.from(document.querySelectorAll('[data-period]')),
     salesSearch: byId('sales-search-input'),
     searchClear: byId('sales-search-clear'),
     salesList: byId('sales-list'),
@@ -50,10 +49,6 @@
     salesError: byId('sales-error'),
     salesEmpty: byId('sales-empty'),
     salesResultCount: byId('sales-result-count'),
-    metricSales: byId('metric-sales'),
-    metricRevenue: byId('metric-revenue'),
-    metricTicket: byId('metric-ticket'),
-    salesMetrics: document.querySelector('.sales-metrics'),
     weeklySummary: byId('weekly-summary'),
     weeklyPrev: byId('weekly-prev'),
     weeklyNext: byId('weekly-next'),
@@ -81,7 +76,6 @@
     toast: byId('app-toast'),
   };
   const state = {
-    currentPeriod: 'today',
     weekOffset: 0,
     selectedSalesDay: null,
     salesPayload: null,
