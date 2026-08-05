@@ -33,6 +33,7 @@ const loginSchema = z.object({
 const salesQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d']).default('today'),
   search: z.string().trim().max(80).default(''),
+  week: z.coerce.number().int().min(-52).max(0).default(0),
 });
 
 const catalogQuerySchema = z.object({
@@ -167,6 +168,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
       env.FAREJADOR_ENV,
       parsed.data.period,
       parsed.data.search,
+      parsed.data.week,
     );
     return reply.status(200).send({ ...payload, operator_name: auth.displayName });
   });

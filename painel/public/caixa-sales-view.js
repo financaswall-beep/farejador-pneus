@@ -3,6 +3,7 @@
 
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
+  const state = Caixa.state;
 
   function statusInfo(status) {
     if (status === 'cancelled') return { label: 'Cancelada', className: 'cancelled' };
@@ -118,10 +119,46 @@
   }
 
   function weeklyRangeLabel(series) {
-    if (!series.length) return 'Últimos 7 dias';
-    const format = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' });
+    if (!series.length) return 'Semana atual';
+    const format = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
     return format.format(weeklyDate(series[0].date)) + ' – '
       + format.format(weeklyDate(series[series.length - 1].date));
+  }
+
+  function weeklyDayLabel(value, long) {
+    const format = new Intl.DateTimeFormat('pt-BR', long ? {
+      weekday: 'long', day: 'numeric', month: 'long',
+    } : { weekday: 'short', day: 'numeric', month: 'short' });
+    const label = format.format(weeklyDate(value)).replace('.', '');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  function detailValue(summary, key) {
+    return Number(summary && summary[key] || 0);
+  }
+
+  function renderWeeklyDetails(summary, selectedDay) {
+    const detail = selectedDay || summary;
+    const selected = Boolean(selectedDay);
+    const periodLabel = selected ? weeklyDayLabel(selectedDay.date, true) : 'Semana completa';
+    elements.weeklyTotalLabel.textContent = selected ? 'Faturamento do dia' : 'Faturamento da semana';
+    elements.weeklyTotal.textContent = Caixa.currency.format(detailValue(detail, 'revenue'));
+    elements.weeklySalesCount.textContent = String(detailValue(detail, 'sales_count'));
+    elements.weeklyItemsCount.textContent = String(detailValue(detail, 'items_quantity'));
+    elements.weeklyTicket.textContent = Caixa.currency.format(detailValue(detail, 'average_ticket'));
+    elements.weeklyDetailPeriod.textContent = periodLabel;
+    elements.weeklyPix.textContent = Caixa.currency.format(detailValue(detail, 'pix_revenue'));
+    elements.weeklyCard.textContent = Caixa.currency.format(detailValue(detail, 'card_revenue'));
+    elements.weeklyCash.textContent = Caixa.currency.format(detailValue(detail, 'cash_revenue'));
+    elements.weeklyOther.textContent = Caixa.currency.format(detailValue(detail, 'other_revenue'));
+    elements.weeklyDetailTotal.textContent = Caixa.currency.format(detailValue(detail, 'revenue'));
+    elements.weeklyClearDay.classList.toggle('hidden', !selected);
+  }
+
+  function selectWeeklyDay(date) {
+    if (!state.salesPayload || state.salesPayload.period !== '7d') return;
+    state.selectedSalesDay = date || null;
+    renderWeeklySummary(state.salesPayload, state.salesPayload.summary || {});
   }
 
   function renderWeeklySummary(payload, summary) {
@@ -135,20 +172,31 @@
     const max = Math.max(1, ...values);
     const total = Number(summary.revenue || 0);
     const average = series.length ? total / series.length : 0;
+    const weekOffset = Number(payload.week_offset || 0);
+    const selectedDay = series.find(function (day) { return day.date === state.selectedSalesDay; }) || null;
+    if (state.selectedSalesDay && !selectedDay) state.selectedSalesDay = null;
     elements.weeklyRange.textContent = weeklyRangeLabel(series);
-    elements.weeklyTotal.textContent = Caixa.currency.format(total);
-    elements.weeklySalesCount.textContent = String(summary.sales_count || 0);
-    elements.weeklyTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
+    elements.weeklyWeekState.textContent = weekOffset === 0
+      ? 'Semana atual'
+      : (weekOffset === -1 ? 'Semana anterior' : Math.abs(weekOffset) + ' semanas atrás');
+    elements.weeklyPrev.disabled = weekOffset <= -52;
+    elements.weeklyNext.disabled = weekOffset >= 0;
     elements.weeklyReference.style.bottom = Math.min(96, (average / max) * 100) + '%';
     elements.weeklyReferenceValue.textContent = 'média ' + Caixa.currency.format(average);
     elements.weeklyBars.replaceChildren();
 
     const dayFormat = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
     series.forEach(function (day) {
-      const item = document.createElement('div');
-      item.className = 'weekly-bar-item' + (Number(day.revenue || 0) === max ? ' is-best' : '');
-      item.title = Caixa.currency.format(Number(day.revenue || 0)) + ' · '
-        + day.sales_count + (day.sales_count === 1 ? ' venda' : ' vendas');
+      const item = document.createElement('button');
+      const selected = state.selectedSalesDay === day.date;
+      item.type = 'button';
+      item.className = 'weekly-bar-item'
+        + (Number(day.revenue || 0) === max ? ' is-best' : '')
+        + (selected ? ' is-selected' : '');
+      item.setAttribute('aria-pressed', String(selected));
+      item.setAttribute('aria-label', weeklyDayLabel(day.date, true) + ': '
+        + Caixa.currency.format(Number(day.revenue || 0)) + ', '
+        + day.sales_count + (day.sales_count === 1 ? ' venda' : ' vendas'));
       const value = document.createElement('span');
       value.className = 'weekly-bar-value';
       value.textContent = Number(day.revenue || 0) > 0 ? Caixa.currency.format(Number(day.revenue)) : 'R$ 0';
@@ -160,11 +208,14 @@
       const dayLabel = document.createElement('small');
       dayLabel.textContent = dayFormat.format(date).replace('.', '');
       item.append(value, bar, dateLabel, dayLabel);
+      item.addEventListener('click', function () { selectWeeklyDay(day.date); });
       elements.weeklyBars.appendChild(item);
     });
+    renderWeeklyDetails(summary, selectedDay);
   }
 
   function renderSales(payload) {
+    state.salesPayload = payload;
     const summary = payload.summary || {};
     elements.metricSales.textContent = String(summary.sales_count || 0);
     elements.metricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
@@ -241,5 +292,6 @@
     renderProfileSummary: renderProfileSummary,
     renderSales: renderSales,
     renderReceipt: renderReceipt,
+    selectWeeklyDay: selectWeeklyDay,
   });
 }());

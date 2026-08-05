@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Frente de Caixa — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260804-weekly-photo1" />
-  <script defer src="/caixa/caixa-core.js?v=20260804-checkout1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260805-weeknav1" />
+  <script defer src="/caixa/caixa-core.js?v=20260805-weeknav1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout2"></script>
-  <script defer src="/caixa/caixa-sales-view.js?v=20260804-ci1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260804-ci1"></script>
+  <script defer src="/caixa/caixa-sales-view.js?v=20260805-weeknav1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260805-weeknav1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260804-ci1"></script>
@@ -231,23 +231,60 @@
           </section>
 
           <section id="weekly-summary" class="weekly-summary hidden" aria-labelledby="weekly-summary-title">
-            <header class="weekly-summary-head">
+            <header class="weekly-week-nav">
+              <button id="weekly-prev" type="button" aria-label="Ver semana anterior">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
               <div>
-                <span id="weekly-range">Últimos 7 dias</span>
+                <span id="weekly-range">Semana atual</span>
+                <small id="weekly-week-state">Semana atual</small>
+              </div>
+              <button id="weekly-next" type="button" aria-label="Ver semana seguinte" disabled>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </header>
+
+            <div class="weekly-summary-head">
+              <div>
+                <span id="weekly-total-label">Faturamento da semana</span>
                 <h3 id="weekly-summary-title">Resumo semanal</h3>
               </div>
               <strong id="weekly-total">—</strong>
-            </header>
-            <div class="weekly-chart" role="img" aria-label="Faturamento diário dos últimos sete dias">
+            </div>
+
+            <div class="weekly-chart" role="group" aria-label="Faturamento diário da semana; toque em um dia para detalhar">
               <div class="weekly-chart-plot">
                 <div id="weekly-reference" class="weekly-reference"><span id="weekly-reference-value"></span></div>
                 <div id="weekly-bars" class="weekly-bars"></div>
               </div>
             </div>
-            <footer class="weekly-summary-foot">
-              <span><strong id="weekly-sales-count">0</strong> vendas</span>
-              <span>Ticket médio <strong id="weekly-ticket">—</strong></span>
-            </footer>
+
+            <button id="weekly-clear-day" class="weekly-clear-day hidden" type="button">
+              Ver a semana completa
+            </button>
+
+            <section class="weekly-stats" aria-labelledby="weekly-stats-title">
+              <h4 id="weekly-stats-title">Estatísticas</h4>
+              <div class="weekly-stats-grid">
+                <div><small>Vendas</small><strong id="weekly-sales-count">0</strong></div>
+                <div><small>Itens vendidos</small><strong id="weekly-items-count">0</strong></div>
+                <div><small>Ticket médio</small><strong id="weekly-ticket">—</strong></div>
+              </div>
+            </section>
+
+            <section class="weekly-detail" aria-labelledby="weekly-detail-title">
+              <header>
+                <h4 id="weekly-detail-title">Detalhamento</h4>
+                <span id="weekly-detail-period">Semana completa</span>
+              </header>
+              <dl>
+                <div><dt>Pix</dt><dd id="weekly-pix">—</dd></div>
+                <div><dt>Cartão</dt><dd id="weekly-card">—</dd></div>
+                <div><dt>Dinheiro</dt><dd id="weekly-cash">—</dd></div>
+                <div><dt>Outros / a receber</dt><dd id="weekly-other">—</dd></div>
+                <div class="weekly-detail-total"><dt>Faturamento total</dt><dd id="weekly-detail-total">—</dd></div>
+              </dl>
+            </section>
           </section>
 
           <div class="sales-search">

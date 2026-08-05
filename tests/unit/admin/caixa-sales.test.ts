@@ -7,7 +7,16 @@ vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 describe('consultas da aba Vendas do caixa', () => {
   it('resume e lista somente o varejo da Matriz no período selecionado', async () => {
     const query = vi.fn()
-      .mockResolvedValueOnce({ rows: [{ sales_count: 2, revenue: '528.90', average_ticket: '264.45' }] })
+      .mockResolvedValueOnce({ rows: [{
+        sales_count: 2,
+        revenue: '528.90',
+        average_ticket: '264.45',
+        items_quantity: '3',
+        pix_revenue: '308.90',
+        card_revenue: '220.00',
+        cash_revenue: '0',
+        other_revenue: '0',
+      }] })
       .mockResolvedValueOnce({ rows: [{
         order_id: '11111111-1111-4111-8111-111111111111',
         order_number: 'PED-1048',
@@ -20,29 +29,61 @@ describe('consultas da aba Vendas do caixa', () => {
         item_kind: 'pneu',
       }] })
       .mockResolvedValueOnce({ rows: [
+        { date: '2026-07-27', sales_count: 0, revenue: '0' },
+        { date: '2026-07-28', sales_count: 1, revenue: '220.00' },
         { date: '2026-07-29', sales_count: 0, revenue: '0' },
-        { date: '2026-07-30', sales_count: 1, revenue: '220.00' },
+        { date: '2026-07-30', sales_count: 0, revenue: '0' },
         { date: '2026-07-31', sales_count: 0, revenue: '0' },
         { date: '2026-08-01', sales_count: 0, revenue: '0' },
-        { date: '2026-08-02', sales_count: 0, revenue: '0' },
-        { date: '2026-08-03', sales_count: 0, revenue: '0' },
-        { date: '2026-08-04', sales_count: 1, revenue: '308.90' },
+        {
+          date: '2026-08-02',
+          sales_count: 1,
+          revenue: '308.90',
+          average_ticket: '308.90',
+          items_quantity: '2',
+          pix_revenue: '308.90',
+          card_revenue: '0',
+          cash_revenue: '0',
+          other_revenue: '0',
+        },
       ] });
     const dbPool = { query } as unknown as Pool;
 
-    const payload = await getCaixaSales('prod', '7d', 'Cliente', dbPool);
+    const payload = await getCaixaSales('prod', '7d', 'Cliente', -1, dbPool);
 
-    expect(payload.summary).toEqual({ sales_count: 2, revenue: 528.9, average_ticket: 264.45 });
+    expect(payload.week_offset).toBe(-1);
+    expect(payload.summary).toEqual({
+      sales_count: 2,
+      revenue: 528.9,
+      average_ticket: 264.45,
+      items_quantity: 3,
+      pix_revenue: 308.9,
+      card_revenue: 220,
+      cash_revenue: 0,
+      other_revenue: 0,
+    });
     expect(payload.daily_series).toHaveLength(7);
-    expect(payload.daily_series[6]).toEqual({ date: '2026-08-04', sales_count: 1, revenue: 308.9 });
+    expect(payload.daily_series[6]).toEqual({
+      date: '2026-08-02',
+      sales_count: 1,
+      revenue: 308.9,
+      average_ticket: 308.9,
+      items_quantity: 2,
+      pix_revenue: 308.9,
+      card_revenue: 0,
+      cash_revenue: 0,
+      other_revenue: 0,
+    });
     expect(payload.sales[0]).toMatchObject({ order_number: 'PED-1048', total_amount: 308.9 });
     expect(query).toHaveBeenCalledTimes(3);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain("u.slug='main'");
-    expect(sql).toContain("INTERVAL '6 days'");
+    expect(sql).toContain("date_trunc('week'");
+    expect(sql).toContain("INTERVAL '7 days'");
     expect(sql).toContain("o.status<>'cancelled'");
-    expect(query.mock.calls[1]?.[1]).toEqual(['prod', '%Cliente%']);
-    expect(query.mock.calls[2]?.[1]).toEqual(['prod']);
+    expect(query.mock.calls[0]?.[1]).toEqual(['prod', -1]);
+    expect(query.mock.calls[1]?.[1]).toEqual(['prod', '%Cliente%', -1]);
+    expect(query.mock.calls[2]?.[1]).toEqual(['prod', -1]);
   });
 
   it('protege curingas da busca e limita o texto recebido', async () => {
@@ -51,7 +92,7 @@ describe('consultas da aba Vendas do caixa', () => {
       .mockResolvedValueOnce({ rows: [] });
     const dbPool = { query } as unknown as Pool;
 
-    await getCaixaSales('test', 'today', '  10%_off  ', dbPool);
+    await getCaixaSales('test', 'today', '  10%_off  ', 0, dbPool);
 
     expect(query.mock.calls[1]?.[1]).toEqual(['test', '%10\\%\\_off%']);
   });
