@@ -71,6 +71,7 @@
   elements.notificationsToggle.addEventListener('click', function () {
     const enabled = elements.notificationsToggle.getAttribute('aria-checked') !== 'true';
     setPreference(elements.notificationsToggle, Caixa.keys.notifications, enabled);
+    if (Caixa.setPhotoSoundEnabled) Caixa.setPhotoSoundEnabled(enabled);
     Caixa.showToast(enabled
       ? 'Notificações ativadas neste aparelho.'
       : 'Notificações desativadas neste aparelho.');

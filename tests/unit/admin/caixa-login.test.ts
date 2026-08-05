@@ -11,12 +11,14 @@ const scriptFiles = [
   'caixa-sales-view.js',
   'caixa-sales.js',
   'caixa-profile.js',
+  'caixa-photo.js',
   'caixa.js',
 ];
 const script = scriptFiles
   .map((file) => readFileSync(resolve('painel/public', file), 'utf8'))
   .join('\n');
 const route = readFileSync(resolve('src/admin/caixa/route.ts'), 'utf8');
+const photoRoute = readFileSync(resolve('src/admin/caixa/route-photo.ts'), 'utf8');
 const staticRoute = readFileSync(resolve('src/admin/caixa/route-static.ts'), 'utf8');
 const queries = readFileSync(resolve('src/admin/caixa/queries.ts'), 'utf8');
 const salesQueries = readFileSync(resolve('src/admin/caixa/sales.ts'), 'utf8');
@@ -84,6 +86,27 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
     expect(script).not.toContain('/admin/api/');
     expect(salesQueries).toContain("u.slug='main'");
     expect(salesQueries).toContain("o.status<>'cancelled'");
+    expect(html).toContain('id="weekly-summary"');
+    expect(html).toContain('id="weekly-bars"');
+    expect(script).toContain('payload.daily_series');
+    expect(script).toContain("payload.period === '7d'");
+    expect(css).toContain('.weekly-reference');
+    expect(css).toContain('.weekly-bar-item.is-best');
+  });
+
+  it('toca e abre a fila de fotos da Matriz em tempo real', () => {
+    expect(html).toContain('id="photo-alert"');
+    expect(html).toContain('id="photo-modal"');
+    expect(script).toContain("new Audio('/caixa/som-pedido-novo.mp3')");
+    expect(script).toContain("new EventSource('/api/caixa/photo-stream?ticket='");
+    expect(script).toContain("data.kind === 'photo_request'");
+    expect(script).toContain("capture = 'environment'");
+    expect(script).toContain("'/photo'");
+    expect(photoRoute).toContain("'/api/caixa/photo-requests'");
+    expect(photoRoute).toContain("'/api/caixa/photo-stream-ticket'");
+    expect(photoRoute).toContain("'/api/caixa/photo-stream'");
+    expect(staticRoute).toContain("'/caixa/som-pedido-novo.mp3'");
+    expect(staticRoute).toContain("'som-pedido-novo.mp3'");
   });
 
   it('entrega nova venda com catálogo, carrinho e fechamento pela API própria', () => {

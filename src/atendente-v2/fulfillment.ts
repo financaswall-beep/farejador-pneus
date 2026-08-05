@@ -873,7 +873,7 @@ export type GeoStoreDecision =
   // com consentimento explícito do cliente ("vou buscar mesmo assim", decisão Wallace
   // 2026-06-08). A rota fica pronta pra esse caso, sem reabrir a busca.
   | { kind: 'only_far'; unitId: string; unitName: string; distanceKm: number; routing: PartnerOrderRouting }
-  | { kind: 'matriz' };
+  | { kind: 'matriz'; canFulfill: boolean };
 
 function toGeoRoutingCandidate(c: UnitCandidate): GeoRoutingCandidate {
   return {
@@ -974,14 +974,23 @@ export async function matrizRoadInfo(
  *  - partner   → loja escolhida dentro do anel (com o pedido completo);
  *  - only_far  → ninguém no anel, mas EXISTE loja com o pedido completo além do maior
  *                anel (caso E, honestidade D3) — a mais perto dos longes;
- *  - matriz    → ninguém cobre / ninguém tem o pedido completo (backstop).
+ *  - matriz    → Matriz venceu com estoque (`canFulfill`) ou é mero backstop.
  */
 export async function decideStoreForItemsGeo(
   client: PoolClient,
   environment: Environment,
   input: GeoDecisionInput,
 ): Promise<GeoStoreDecision> {
-  if (input.items.length === 0) return { kind: 'matriz' };
+  if (input.items.length === 0) return { kind: 'matriz', canFulfill: false };
+
+  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
+  const matrizCanFulfill = async (): Promise<boolean> => {
+    if (!env.ROUTING_MATRIZ_AS_STORE || !env.WHOLESALE_UNIFIED_STOCK) return false;
+    if (haversineKm(input.customerLocation, MATRIZ_COORD) > Math.max(...rings)) return false;
+    return (await Promise.all(input.items.map((item) =>
+      getMatrizWholesaleStockQty(client, environment, item.product_id)
+        .then((quantity) => quantity >= item.quantity)))).every(Boolean);
+  };
 
   // PROXIMIDADE-PRIMEIRO (Fase 1 retirada + Fase 3 entrega): com a flag on, os candidatos
   // passam a ser TODAS as lojas ativas com coordenada (sem o "muro de cidade") — o
@@ -993,7 +1002,7 @@ export async function decideStoreForItemsGeo(
   const candidates = useProximity
     ? await resolveUnitCandidatesByProximity(client, environment)
     : await resolveUnitCandidates(client, environment, input.municipio);
-  if (candidates.length === 0) return { kind: 'matriz' };
+  if (candidates.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
   // ② modo + ④a (puro, de graça) — reduz as checagens de estoque. Proximidade: na
   // entrega, o "④a" vira presença de raio (a cobertura de bairro não se aplica);
@@ -1012,11 +1021,10 @@ export async function decideStoreForItemsGeo(
   // ③ estoque: só entra no anel quem tem TODOS os itens disponíveis E tem coordenada.
   const fulfillable: { cand: UnitCandidate; mappings: PartnerStockMapping[]; distanceKm: number }[] = [];
   const eligible = candidates.filter((c) => servableIds.has(c.ctx.unitId) && c.location != null);
-  if (eligible.length === 0) return { kind: 'matriz' };
+  if (eligible.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
   // Anéis da modalidade (④b/④c) computados aqui pra também travar o custo do Google:
   // mede a distância de RUA só de quem cabe no maior anel (resolveDistances capKm).
-  const rings = ringsForModalidade(input.modalidade, GEO_RING_KM, GEO_PICKUP_RING_KM);
   const distanceByUnit = await resolveDistances(
     client,
     input.customerLocation,
@@ -1032,7 +1040,7 @@ export async function decideStoreForItemsGeo(
     useProximity && input.modalidade === 'delivery'
       ? eligible.filter((c) => passesDeliveryRadius(c.deliveryRadiusKm, distanceByUnit.get(c.ctx.unitId)!))
       : eligible;
-  if (inRadius.length === 0) return { kind: 'matriz' };
+  if (inRadius.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
   for (const cand of inRadius) {
     const mappings = await Promise.all(
@@ -1046,7 +1054,7 @@ export async function decideStoreForItemsGeo(
       });
     }
   }
-  if (fulfillable.length === 0) return { kind: 'matriz' };
+  if (fulfillable.length === 0) return { kind: 'matriz', canFulfill: await matrizCanFulfill() };
 
   // ④b/④c anel que cresce (D1/D2) sobre os que têm o pedido completo (rings já calculado).
   const selection = selectWithinExpandingRing(fulfillable, (f) => f.distanceKm, rings);
@@ -1082,7 +1090,7 @@ export async function decideStoreForItemsGeo(
             { environment, matrizDistKm: Math.round(matrizDist), nearestPartnerKm: Math.round(nearestPartnerDist), modalidade: input.modalidade },
             'decideStoreForItemsGeo: matriz concorre e VENCE (mais perto que todo parceiro do pool)',
           );
-          return { kind: 'matriz' };
+          return { kind: 'matriz', canFulfill: true };
         }
       }
     }
@@ -1114,21 +1122,12 @@ export async function decideStoreForItemsGeo(
   // Requer WHOLESALE_UNIFIED_STOCK on (garante que o galpão é a fonte de estoque da matriz).
   if (env.ROUTING_MATRIZ_AS_STORE && env.WHOLESALE_UNIFIED_STOCK) {
     const matrizDist = haversineKm(input.customerLocation, MATRIZ_COORD);
-    if (matrizDist <= Math.max(...rings)) {
-      const allInStock = (
-        await Promise.all(
-          input.items.map((i) =>
-            getMatrizWholesaleStockQty(client, environment, i.product_id).then((q) => q >= i.quantity),
-          ),
-        )
-      ).every(Boolean);
-      if (allInStock) {
-        logger.info(
-          { environment, matrizDistKm: Math.round(matrizDist), modalidade: input.modalidade },
-          'decideStoreForItemsGeo: matriz no anel, vence (nenhum parceiro no pool)',
-        );
-        return { kind: 'matriz' };
-      }
+    if (await matrizCanFulfill()) {
+      logger.info(
+        { environment, matrizDistKm: Math.round(matrizDist), modalidade: input.modalidade },
+        'decideStoreForItemsGeo: matriz no anel, vence (nenhum parceiro no pool)',
+      );
+      return { kind: 'matriz', canFulfill: true };
     }
   }
 
@@ -1160,7 +1159,7 @@ export async function decideStoreForItemsGeo(
     };
   }
 
-  return { kind: 'matriz' };
+  return { kind: 'matriz', canFulfill: false };
 }
 
 /** Loja que vai atender um produto + quanto ela tem disponível. */

@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Frente de Caixa — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260804-checkout1" />
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260804-weekly-photo1" />
   <script defer src="/caixa/caixa-core.js?v=20260804-checkout1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
+  <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260804-ci1"></script>
 </head>
 <body>
@@ -120,6 +121,14 @@
           </div>
         </header>
 
+        <button id="photo-alert" class="photo-alert hidden" type="button">
+          <span class="photo-alert-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M14.5 5 16 8h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h3l1.5-3h5Z"/><circle cx="12" cy="14" r="3"/></svg>
+          </span>
+          <span><strong><b id="photo-alert-count">1</b> pedido de foto</strong><small>Cliente esperando · toque para atender</small></span>
+          <svg class="photo-alert-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+
         <div id="cash-panel" class="app-panel checkout-panel">
           <div class="checkout-search">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -219,6 +228,26 @@
               <strong id="metric-ticket">—</strong>
               <small>médio</small>
             </article>
+          </section>
+
+          <section id="weekly-summary" class="weekly-summary hidden" aria-labelledby="weekly-summary-title">
+            <header class="weekly-summary-head">
+              <div>
+                <span id="weekly-range">Últimos 7 dias</span>
+                <h3 id="weekly-summary-title">Resumo semanal</h3>
+              </div>
+              <strong id="weekly-total">—</strong>
+            </header>
+            <div class="weekly-chart" role="img" aria-label="Faturamento diário dos últimos sete dias">
+              <div class="weekly-chart-plot">
+                <div id="weekly-reference" class="weekly-reference"><span id="weekly-reference-value"></span></div>
+                <div id="weekly-bars" class="weekly-bars"></div>
+              </div>
+            </div>
+            <footer class="weekly-summary-foot">
+              <span><strong id="weekly-sales-count">0</strong> vendas</span>
+              <span>Ticket médio <strong id="weekly-ticket">—</strong></span>
+            </footer>
           </section>
 
           <div class="sales-search">
@@ -405,6 +434,17 @@
             <button type="button" data-close-checkout>Voltar</button>
             <button id="checkout-confirm-button" type="button">CONFIRMAR VENDA</button>
           </footer>
+        </article>
+      </div>
+
+      <div id="photo-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title">
+        <button class="account-modal-backdrop" type="button" data-close-photo aria-label="Fechar pedidos de foto"></button>
+        <article class="account-modal-sheet photo-modal-sheet">
+          <header>
+            <div><p>Atendimento da Matriz</p><h2 id="photo-modal-title">Foto solicitada</h2></div>
+            <button type="button" data-close-photo aria-label="Fechar">×</button>
+          </header>
+          <div id="photo-request-list" class="photo-request-list"></div>
         </article>
       </div>
 

@@ -18,19 +18,31 @@ describe('consultas da aba Vendas do caixa', () => {
         created_at: '2026-08-04T13:00:00.000Z',
         items_quantity: 2,
         item_kind: 'pneu',
-      }] });
+      }] })
+      .mockResolvedValueOnce({ rows: [
+        { date: '2026-07-29', sales_count: 0, revenue: '0' },
+        { date: '2026-07-30', sales_count: 1, revenue: '220.00' },
+        { date: '2026-07-31', sales_count: 0, revenue: '0' },
+        { date: '2026-08-01', sales_count: 0, revenue: '0' },
+        { date: '2026-08-02', sales_count: 0, revenue: '0' },
+        { date: '2026-08-03', sales_count: 0, revenue: '0' },
+        { date: '2026-08-04', sales_count: 1, revenue: '308.90' },
+      ] });
     const dbPool = { query } as unknown as Pool;
 
     const payload = await getCaixaSales('prod', '7d', 'Cliente', dbPool);
 
     expect(payload.summary).toEqual({ sales_count: 2, revenue: 528.9, average_ticket: 264.45 });
+    expect(payload.daily_series).toHaveLength(7);
+    expect(payload.daily_series[6]).toEqual({ date: '2026-08-04', sales_count: 1, revenue: 308.9 });
     expect(payload.sales[0]).toMatchObject({ order_number: 'PED-1048', total_amount: 308.9 });
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(3);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain("u.slug='main'");
     expect(sql).toContain("INTERVAL '6 days'");
     expect(sql).toContain("o.status<>'cancelled'");
     expect(query.mock.calls[1]?.[1]).toEqual(['prod', '%Cliente%']);
+    expect(query.mock.calls[2]?.[1]).toEqual(['prod']);
   });
 
   it('protege curingas da busca e limita o texto recebido', async () => {
