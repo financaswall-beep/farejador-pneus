@@ -162,10 +162,7 @@
   }
 
   function renderWeeklySummary(payload, summary) {
-    const weekly = payload.period === '7d';
-    elements.salesMetrics.classList.toggle('hidden', weekly);
-    elements.weeklySummary.classList.toggle('hidden', !weekly);
-    if (!weekly) return;
+    elements.weeklySummary.classList.remove('hidden');
 
     const series = Array.isArray(payload.daily_series) ? payload.daily_series : [];
     const values = series.map(function (day) { return Number(day.revenue || 0); });
@@ -217,11 +214,7 @@
   function renderSales(payload) {
     state.salesPayload = payload;
     const summary = payload.summary || {};
-    elements.metricSales.textContent = String(summary.sales_count || 0);
-    elements.metricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
-    elements.metricTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
     renderWeeklySummary(payload, summary);
-    if (payload.period === 'today') renderProfileSummary(summary);
     elements.salesList.replaceChildren();
     const sales = Array.isArray(payload.sales) ? payload.sales : [];
     sales.forEach(function (sale) { elements.salesList.appendChild(saleCard(sale)); });

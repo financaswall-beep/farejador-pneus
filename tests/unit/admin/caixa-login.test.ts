@@ -75,9 +75,8 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
 
   it('entrega uma aba de vendas funcional sem usar a API administrativa', () => {
     expect(html).toContain('Vendas recentes');
-    expect(html).toContain('data-period="today"');
-    expect(html).toContain('data-period="7d"');
-    expect(html).toContain('data-period="30d"');
+    expect(html).not.toContain('data-period=');
+    expect(html).not.toContain('class="sales-metrics"');
     expect(html).toContain('Buscar venda ou cliente');
     expect(script).toContain("document.createTextNode('Ver recibo')");
     expect(script).toContain("tireImage.src = '/caixa/catalog-tire.webp'");
@@ -94,8 +93,8 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
     expect(html).toContain('Itens vendidos');
     expect(html).toContain('Faturamento total');
     expect(script).toContain('payload.daily_series');
-    expect(script).toContain("payload.period === '7d'");
-    expect(script).toContain("params.set('week', String(state.weekOffset))");
+    expect(script).toContain("new URLSearchParams({ period: '7d', week: String(state.weekOffset) })");
+    expect(script).not.toContain('periodButtons');
     expect(script).toContain("item.setAttribute('aria-pressed'");
     expect(script).toContain('selectWeeklyDay');
     expect(css).toContain('.weekly-reference');

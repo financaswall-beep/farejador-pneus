@@ -269,51 +269,6 @@ form { display: grid; gap: 16px; }
   background: #fdfdfb;
   box-shadow: 0 -9px 28px rgba(0,42,30,.08);
 }
-.period-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.period-button {
-  display: flex;
-  min-width: 0;
-  height: 51px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 9px;
-  border: 1px solid #cbd8d0;
-  border-radius: 17px;
-  color: #173e30;
-  background: #fff;
-  box-shadow: 0 2px 7px rgba(13,53,39,.025);
-  font-size: 14px;
-  font-weight: 540;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.period-button svg { width: 20px; height: 20px; flex: 0 0 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
-.period-button.active { border-color: #087b50; color: #fff; background: linear-gradient(135deg, #087b50, #005c3d); box-shadow: 0 8px 18px rgba(4,105,70,.18); }
-.period-button:focus-visible { outline: 3px solid rgba(16,185,129,.22); outline-offset: 2px; }
-
-.sales-metrics { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; margin-top: 16px; }
-.metric-card {
-  display: flex;
-  min-height: 118px;
-  min-width: 0;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  padding: 11px 5px 10px;
-  border: 1px solid #e0e4e1;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 4px 11px rgba(16,37,28,.045);
-  text-align: center;
-}
-.metric-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; margin-bottom: 7px; place-items: center; border-radius: 50%; color: #087246; background: #e4f4e5; font-size: 19px; font-weight: 700; }
-.metric-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.75; }
-.metric-card strong { display: block; max-width: 100%; overflow: hidden; color: #075132; font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif; font-size: clamp(17px,4.4vw,20px); font-stretch: condensed; font-weight: 650; line-height: 1.08; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
-.metric-card--wide strong { font-size: clamp(15px,4vw,18px); }
-.metric-card small { margin-top: 4px; color: #424b47; font-family: "Arial Narrow", Arial, sans-serif; font-size: 12px; }
-.metric-prefix { margin: -2px 0 2px; color: #4e5652; font-size: 11px; line-height: 1; }
-
 .photo-alert { position: relative; z-index: 35; display: grid; width: min(calc(100% - 30px),428px); min-height: 66px; grid-template-columns: 43px minmax(0,1fr) 20px; align-items: center; gap: 10px; margin: -54px auto 41px; padding: 9px 12px; border: 1px solid #ffb45f; border-radius: 17px; color: #fff; background: linear-gradient(135deg,#e76a18,#bc3f0c); box-shadow: 0 13px 32px rgba(115,42,5,.32); text-align: left; cursor: pointer; animation: photo-alert-pulse 1.7s ease-in-out infinite; }
 .photo-alert-icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 13px; color: #d9550f; background: #fff; }
 .photo-alert-icon svg,.photo-alert-chevron { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.9; }
@@ -678,9 +633,6 @@ form { display: grid; gap: 16px; }
   .sales-heading h2 { font-size: 24px; }
   .operator-button { max-width: 113px; padding-inline: 9px; }
   .app-panel { padding-inline: 11px; }
-  .period-tabs,.sales-metrics { gap: 6px; }
-  .period-button { gap: 5px; padding-inline: 5px; font-size: 12px; }
-  .period-button svg { width: 17px; height: 17px; flex-basis: 17px; }
   .sale-card { grid-template-columns: 44px minmax(0,1fr); gap: 9px; padding-inline: 10px; }
   .sale-icon { width: 42px; height: 42px; }
   .sale-card-heading > strong { font-size: 13px; }

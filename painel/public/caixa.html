@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Frente de Caixa — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260805-weeknav1" />
-  <script defer src="/caixa/caixa-core.js?v=20260805-weeknav1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260805-weekonly1" />
+  <script defer src="/caixa/caixa-core.js?v=20260805-weekonly1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout2"></script>
-  <script defer src="/caixa/caixa-sales-view.js?v=20260805-weeknav1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260805-weeknav1"></script>
+  <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260805-weekonly1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260804-ci1"></script>
@@ -192,44 +192,6 @@
         </div>
 
         <div id="sales-panel" class="app-panel hidden">
-          <nav class="period-tabs" aria-label="Período das vendas">
-            <button class="period-button active" type="button" data-period="today" aria-pressed="true">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16"/><path d="m9 15 2 2 4-5"/></svg>
-              Hoje
-            </button>
-            <button class="period-button" type="button" data-period="7d" aria-pressed="false">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16"/></svg>
-              7 dias
-            </button>
-            <button class="period-button" type="button" data-period="30d" aria-pressed="false">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4m8-4v4M4 10h16"/></svg>
-              30 dias
-            </button>
-          </nav>
-
-          <section class="sales-metrics" aria-label="Resumo das vendas">
-            <article class="metric-card">
-              <span class="metric-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
-              </span>
-              <strong id="metric-sales">—</strong>
-              <small>vendas</small>
-            </article>
-            <article class="metric-card metric-card--wide">
-              <span class="metric-icon" aria-hidden="true">$</span>
-              <strong id="metric-revenue">—</strong>
-              <small>faturamento</small>
-            </article>
-            <article class="metric-card">
-              <span class="metric-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M4 7h16v10H4zM4 10a3 3 0 0 0 3-3m10 0a3 3 0 0 0 3 3m0 4a3 3 0 0 0-3 3M7 17a3 3 0 0 0-3-3"/><circle cx="12" cy="12" r="2"/></svg>
-              </span>
-              <span class="metric-prefix">Ticket</span>
-              <strong id="metric-ticket">—</strong>
-              <small>médio</small>
-            </article>
-          </section>
-
           <section id="weekly-summary" class="weekly-summary hidden" aria-labelledby="weekly-summary-title">
             <header class="weekly-week-nav">
               <button id="weekly-prev" type="button" aria-label="Ver semana anterior">
@@ -309,7 +271,7 @@
           <div id="sales-empty" class="sales-empty hidden">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
             <strong>Nenhuma venda encontrada</strong>
-            <span>Ajuste o período ou limpe a busca.</span>
+            <span>Limpe a busca para ver todas as vendas da semana.</span>
           </div>
           <div id="sales-list" class="sales-list" aria-live="polite"></div>
         </div>
