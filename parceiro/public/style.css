@@ -5158,3 +5158,88 @@ html, body {
     box-shadow: none;
   }
 }
+
+/* ========================================================================
+   FRENTE DE CAIXA 2026-08-06 — detalhes operacionais e leitura dos produtos
+   ======================================================================== */
+.checkout-screen .pos-product-list {
+  grid-auto-rows: max-content;
+  align-content: start;
+}
+.checkout-screen .pos-product-card {
+  min-height: 88px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  padding: 8px;
+}
+.checkout-screen .pos-product-card .pos-tire-thumb {
+  width: 46px;
+  height: 68px;
+}
+.pos-tire-thumb.with-image {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .22);
+  border-radius: 8px;
+  background: #fff;
+  filter: none;
+}
+.pos-tire-thumb.with-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.checkout-screen .pos-sale-details-visible {
+  flex: 0 0 auto;
+  margin-top: 8px;
+}
+.checkout-screen .pos-sale-details-visible .pos-sale-options {
+  margin: 0;
+}
+.checkout-screen .pos-sale-details-visible .pos-sale-options span {
+  font-weight: 700;
+}
+.checkout-screen .pos-inline-save {
+  background: linear-gradient(180deg, #059669, #047857);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(4, 120, 87, .2);
+}
+.checkout-screen .pos-inline-save:disabled {
+  background: linear-gradient(180deg, #34d399, #10b981);
+  opacity: .62;
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-product-info .pos-product-stock {
+  color: var(--pos-brand);
+  font-weight: 750;
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-product-price strong {
+  color: var(--pos-brand);
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-customer-inline-form {
+  border-color: var(--matrix-border-strong);
+  background: #fff;
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-customer-inline-form .pos-inline-row input {
+  border-color: var(--matrix-border-strong);
+  background: #fff;
+  color: var(--matrix-text);
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-customer-inline-form .pos-inline-row input:focus {
+  border-color: rgba(var(--pos-brand-rgb), .55);
+  box-shadow: 0 0 0 3px rgba(var(--pos-brand-rgb), .1);
+}
+.pos-shell.checkout-screen[data-theme="light"] .pos-inline-cancel {
+  border-color: var(--matrix-border-strong);
+  background: #fff;
+  color: var(--matrix-text-body);
+}
+
+@media (max-width: 1400px) and (min-width: 769px) {
+  .checkout-screen .pos-product-card { min-height: 82px; }
+  .checkout-screen .pos-product-card .pos-tire-thumb { width: 42px; height: 62px; }
+}
+
+@media (max-width: 768px) {
+  .checkout-screen .pos-product-card { min-height: 86px; }
+  .checkout-screen .pos-product-card .pos-tire-thumb { width: 42px; height: 64px; }
+  .checkout-screen .pos-sale-details-visible .pos-sale-options { grid-template-columns: 1fr; }
+}
