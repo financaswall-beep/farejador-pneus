@@ -77,6 +77,7 @@
       elLojas.appendChild(btn);
     });
     form.style.display = 'none';
+    document.body.classList.remove('first-access-active');
     tituloAcesso.textContent = 'Escolha sua loja';
     subtituloAcesso.textContent = 'Seu acesso está ligado a mais de uma unidade.';
     elEscolha.style.display = 'block';
@@ -87,6 +88,7 @@
     elEscolha.style.display = 'none';
     formPrimeiro.style.display = 'none';
     form.style.display = 'grid';
+    document.body.classList.remove('first-access-active');
     tituloAcesso.textContent = 'Bem-vindo de volta!';
     subtituloAcesso.textContent = 'Entre com seu usuário. A gente encontra sua loja.';
     setErro('');
@@ -98,6 +100,7 @@
     form.style.display = 'none';
     elEscolha.style.display = 'none';
     formPrimeiro.style.display = 'grid';
+    document.body.classList.add('first-access-active');
     tituloAcesso.textContent = 'Crie seu acesso';
     subtituloAcesso.textContent = 'Configure uma vez. Depois é só entrar com usuário e senha.';
     setErro('');
