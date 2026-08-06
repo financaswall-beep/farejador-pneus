@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260806-checkout-detalhes1" />
+  <link rel="stylesheet" href="./style.css?v=20260806-mobile-checkout1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -128,7 +128,7 @@
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
   <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="[sidebarCollapsed && 'sidebar-collapsed', currentSection === 'vendas' && 'checkout-screen']" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
-    <aside class="pos-sidebar">
+    <aside class="pos-sidebar" :class="isMobile && mobileMenuOpen && 'mobile-open'" :aria-hidden="isMobile && !mobileMenuOpen ? 'true' : 'false'">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
         <div>
@@ -136,6 +136,9 @@
           <div class="pos-logo-sub">PNEUS</div>
         </div>
       </div>
+      <button type="button" class="pos-mobile-menu-close" @click="mobileMenuOpen = false" aria-label="Fechar menu">
+        <i data-lucide="x"></i>
+      </button>
 
       <nav class="pos-nav">
         <button x-show="canSee('resumo')" @click="goToSection('resumo')" class="pos-nav-item" :class="currentSection === 'resumo' && 'active'">
@@ -215,10 +218,13 @@
       </div>
     </aside>
 
+    <button type="button" class="pos-mobile-menu-backdrop" x-show="isMobile && mobileMenuOpen" x-cloak
+            @click="mobileMenuOpen = false" aria-label="Fechar menu"></button>
+
     <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'onboarding-mode': currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0), 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-topbar-leading">
-          <button type="button" class="pos-topbar-menu" @click="toggleSidebar()"
+          <button type="button" class="pos-topbar-menu" @click="isMobile ? (mobileMenuOpen = !mobileMenuOpen) : toggleSidebar()"
                   :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'" aria-label="Alternar menu lateral">
             <i data-lucide="menu"></i>
           </button>
@@ -505,6 +511,18 @@
 
       <section x-show="currentSection === 'vendas'" class="pos-grid pos-checkout">
         <section class="pos-panel pos-products" x-show="!isMobile || posMobileStep === 'select'">
+          <div class="pos-mobile-checkout-intro">
+            <h2>Frente de caixa</h2>
+            <div class="pos-mobile-mode-tabs" aria-label="Áreas do atendimento">
+              <button type="button" class="active" aria-pressed="true">
+                <i data-lucide="store"></i><span>Balcão</span>
+              </button>
+              <button type="button" @click="goToSection('entrega')" :disabled="!canSee('entrega')">
+                <i data-lucide="truck"></i><span>Entrega</span>
+                <b x-show="deliveryOpenCount > 0" x-text="deliveryOpenCount"></b>
+              </button>
+            </div>
+          </div>
           <div class="pos-checkout-heading">
             <h3>Produtos</h3>
             <span x-text="posDisplayProducts.length + ' disponíveis'"></span>
@@ -530,8 +548,19 @@
               <option value="best_sellers">Mais vendidos</option>
             </select>
           </div>
+          <div class="pos-mobile-category-tabs" aria-label="Categorias de produtos">
+            <button type="button" :class="posMobileCategory === 'pneu' && 'active'" @click="posMobileCategory = 'pneu'">
+              <i data-lucide="circle-dot-dashed"></i><span>Pneus</span>
+            </button>
+            <button type="button" :class="posMobileCategory === 'servico' && 'active'" @click="posMobileCategory = 'servico'">
+              <i data-lucide="wrench"></i><span>Serviços</span>
+            </button>
+            <button type="button" :class="posMobileCategory === 'outro' && 'active'" @click="posMobileCategory = 'outro'">
+              <i data-lucide="circle-ellipsis"></i><span>Outros</span>
+            </button>
+          </div>
           <div class="pos-product-list">
-            <template x-for="item in posDisplayProducts.slice(0, 5)" :key="item.stock_id">
+            <template x-for="item in posDisplayProducts.slice(0, isMobile ? 2 : 5)" :key="item.stock_id">
               <button type="button" @click="posAddProduct(item)" class="pos-product-card">
                 <span class="pos-tire-thumb" :class="[(item.item_type && item.item_type !== 'pneu') && item.item_type, (!item.item_type || item.item_type === 'pneu') && 'with-image']">
                   <img x-show="!item.item_type || item.item_type === 'pneu'" src="/admin/painel/assets/catalog-tire.webp" alt="" loading="lazy" decoding="async" />
@@ -552,9 +581,34 @@
           <button type="button" class="pos-more" @click="goToSection('estoque')">
             Ver mais produtos <i data-lucide="chevron-down"></i>
           </button>
+
+          <div class="pos-mobile-sale-dock">
+            <button type="button" class="pos-mobile-current-sale" @click="posGoCheckout()" :disabled="!posCart.length">
+              <span class="pos-mobile-cart-icon"><i data-lucide="shopping-cart"></i></span>
+              <span class="pos-mobile-sale-copy"><strong>Venda atual</strong><small x-text="posCartUnits + (posCartUnits === 1 ? ' item' : ' itens')"></small></span>
+              <strong class="pos-mobile-sale-total" x-text="money(posCartTotal)"></strong>
+              <i data-lucide="chevron-down" class="pos-mobile-sale-chevron"></i>
+            </button>
+
+            <div class="pos-mobile-payments" aria-label="Forma de pagamento">
+              <button type="button" @click="posSelectPayment('Pix', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Pix' && 'active'">
+                <svg class="pix-icon" viewBox="0 0 512 512" aria-hidden="true"><path d="M242.4 47.6c7.6-7.6 19.8-7.6 27.4 0l92.6 92.6c13.1 13.1 30.8 20.4 49.3 20.4h31.2c17.3 0 25.9 20.9 13.7 33.1l-91.7 91.7c-30.2 30.2-79.2 30.2-109.4 0l-28.8-28.8c-8.4-8.4-22-8.4-30.4 0l-28.8 28.8c-30.2 30.2-79.2 30.2-109.4 0l-91.7-91.7c-12.2-12.2-3.6-33.1 13.7-33.1h31.2c18.5 0 36.2-7.3 49.3-20.4l181.8-92.6Z"/><path d="M58.1 226.6c30.2-30.2 79.2-30.2 109.4 0l28.8 28.8c8.4 8.4 22 8.4 30.4 0l28.8-28.8c30.2-30.2 79.2-30.2 109.4 0l91.7 91.7c12.2 12.2 3.6 33.1-13.7 33.1h-31.2c-18.5 0-36.2 7.3-49.3 20.4l-92.6 92.6c-7.6 7.6-19.8 7.6-27.4 0L60.6 371.8c-13.1-13.1-30.8-20.4-49.3-20.4H-19.9c-17.3 0-25.9-20.9-13.7-33.1l91.7-91.7Z"/></svg>
+                <span>PIX</span>
+              </button>
+              <button type="button" @click="posSelectPayment('Dinheiro', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Dinheiro' && 'active'">
+                <i data-lucide="banknote"></i><span>Dinheiro</span>
+              </button>
+              <button type="button" @click="posSelectPayment('Cartão crédito', 'received')" :class="saleForm.payment_status === 'received' && saleForm.payment_method === 'Cartão crédito' && 'active'">
+                <i data-lucide="credit-card"></i><span>Cartão</span>
+              </button>
+            </div>
+          </div>
         </section>
 
-        <section class="pos-center" x-show="!isMobile || posMobileStep === 'select'">
+        <section class="pos-center" x-show="!isMobile || posMobileStep === 'checkout'">
+          <button type="button" class="pos-mobile-details-back" x-show="isMobile && posMobileStep === 'checkout'" @click="posMobileStep = 'select'">
+            <i data-lucide="arrow-left"></i> Voltar à venda
+          </button>
           <div class="pos-panel pos-cart-panel">
             <h3>Venda atual</h3>
 
@@ -725,6 +779,13 @@
         <button class="pos-fab-finalize" x-show="posCart.length && posMobileStep === 'select'" @click="posGoCheckout()" title="Avançar para finalizar a venda">
           <span x-text="'Avançar • ' + money(posCartTotal)"></span><i data-lucide="arrow-right"></i>
         </button>
+
+        <div class="pos-mobile-checkout-bar" x-show="isMobile && posMobileStep === 'select'">
+          <div><span>Total</span><strong x-text="money(posCartTotal)"></strong></div>
+          <button type="button" @click="posFinalizeSale()" :disabled="saving || !posCart.length">
+            <span x-text="isSaving('sale') ? 'Finalizando...' : 'Finalizar venda'"></span>
+          </button>
+        </div>
       </section>
 
       <!-- KPIs da aba Pedidos (ocupa a linha do grid; sem isso o workspace colapsa) -->
@@ -2868,15 +2929,15 @@
 <script src="./app.comissao.js?v=20260612-bloco2b"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
-<script src="./app.pdv.kpis.js?v=20260731-condicao2"></script>
-<script src="./app.pdv.js?v=20260731-condicao2"></script>
+<script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
+<script src="./app.pdv.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.score.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
-<script src="./app.core.js?v=20260805-entrada-simples1"></script>
+<script src="./app.core.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
 <script src="./app.resumo.js?v=20260805-entrada-simples1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
@@ -2884,6 +2945,6 @@
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.push.js?v=20260619-pushfix"></script>
-<script src="./app.js?v=20260731-condicao2"></script>
+<script src="./app.js?v=20260806-mobile-checkout1"></script>
 </body>
 </html>

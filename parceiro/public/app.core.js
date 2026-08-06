@@ -271,6 +271,7 @@ window.PARCEIRO_MODULES.core = () => ({
         catch (e) { /* localStorage indisponível */ }
       }
       this.currentSection = id;
+      this.mobileMenuOpen = false;
       if (id === 'vendas') this.currentTab = 'sale';
       if (id === 'estoque') this.currentTab = 'stock';
       if (id === 'financeiro') this.currentTab = 'purchase';

@@ -58,7 +58,12 @@ window.PARCEIRO_MODULES.pdvKpis = () => ({
         const brandOk = this.posBrandFilter === 'all' || item.brand === this.posBrandFilter;
         const rim = item.tire_rim_diameter || this.parseTireSize(item.tire_size).rim;
         const rimOk = this.posRimFilter === 'all' || String(rim || '') === String(this.posRimFilter);
-        return brandOk && rimOk;
+        const itemType = item.item_type || 'pneu';
+        const mobileCategoryOk = !this.isMobile
+          || (this.posMobileCategory === 'pneu' && itemType === 'pneu')
+          || (this.posMobileCategory === 'servico' && itemType === 'servico')
+          || (this.posMobileCategory === 'outro' && itemType === 'insumo');
+        return brandOk && rimOk && mobileCategoryOk;
       });
       return [...filtered].sort((a, b) => {
         if (this.posSort === 'price_asc') return this.num(a.sale_price) - this.num(b.sale_price);
