@@ -15,6 +15,569 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ========================================================================
+   ENTREGA MOBILE 2026-08-06 — operacao de rota do Portal Parceiro
+   Desktop preservado. No celular, a aba ganha casco proprio, busca, filtros,
+   cards de toque e identificacao inequivoca da foto aprovada pelo cliente.
+   ======================================================================== */
+.pos-delivery-mobile-intro,
+.pos-delivery-mobile-kpis,
+.pos-delivery-mobile-tools,
+.pos-delivery-mobile-nav,
+.pos-route-mobile-card-top,
+.pos-route-mobile-icon,
+.pos-route-mobile-payment,
+.pos-route-photo-empty,
+.pos-contact-mobile-label { display: none; }
+
+.pos-contact-btn.call {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, .1);
+  border-color: rgba(16, 185, 129, .3);
+}
+.pos-shell[data-theme="light"] .pos-contact-btn.call {
+  color: #047857;
+  background: rgba(4, 120, 87, .07);
+  border-color: rgba(4, 120, 87, .24);
+}
+
+/* Foto vinculada: tambem melhora a leitura no desktop, sem mudar o fluxo. */
+.pos-route-photo-thumb {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, .12);
+}
+.pos-route-photo-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+.pos-route-photo-thumb > svg { width: 22px; height: 22px; }
+.pos-route-photo-thumb b {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #fff;
+  background: #047857;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.pos-route-photo-copy { min-width: 0; flex: 1; }
+.pos-route-photo-copy small,
+.pos-route-photo-copy strong,
+.pos-route-photo-copy em { display: block; }
+.pos-route-photo-copy small { color: #34d399; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.pos-route-photo-copy strong { margin-top: 2px; color: #f8fafc; font-size: 12px; }
+.pos-route-photo-copy em { margin-top: 2px; color: #94a3b8; font-size: 10px; font-style: normal; }
+.pos-route-photo-expand { width: 17px; height: 17px; flex: 0 0 auto; color: #34d399; }
+.pos-shell[data-theme="light"] .pos-route-photo-copy small,
+.pos-shell[data-theme="light"] .pos-route-photo-expand { color: #047857; }
+.pos-shell[data-theme="light"] .pos-route-photo-copy strong { color: #0f172a; }
+.pos-shell[data-theme="light"] .pos-route-photo-copy em { color: #64748b; }
+
+@media (max-width: 768px) {
+  .pos-shell.delivery-screen {
+    --delivery-green: #047857;
+    --delivery-green-dark: #065f46;
+    grid-template-columns: 1fr;
+  }
+
+  /* O menu completo vira gaveta; a barra inferior fica com quatro destinos. */
+  .pos-shell.delivery-screen .pos-sidebar {
+    display: flex;
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(320px, 86vw);
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 20px 14px calc(20px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+    border: 0;
+    border-left: 1px solid rgba(148, 163, 184, .18);
+    transform: translateX(105%);
+    transition: transform .22s ease;
+    z-index: 92;
+    overflow: hidden;
+  }
+  .pos-shell.delivery-screen .pos-sidebar.mobile-open { transform: translateX(0); }
+  .pos-shell.delivery-screen .pos-sidebar::after { display: none; }
+  .pos-shell.delivery-screen .pos-sidebar .pos-logo {
+    display: flex;
+    height: 62px;
+    margin: 0 46px 12px 4px;
+  }
+  .pos-shell.delivery-screen .pos-sidebar .pos-nav {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .pos-shell.delivery-screen .pos-sidebar .pos-nav-item {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    min-height: 46px;
+    flex: 0 0 46px;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 13px;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .pos-shell.delivery-screen .pos-sidebar .pos-nav-item span {
+    display: block;
+    max-width: none;
+    min-height: 0;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .pos-shell.delivery-screen .pos-sidebar .pos-nav-item svg { width: 20px; height: 20px; }
+  .pos-shell.delivery-screen .pos-sidebar .pos-theme-toggle,
+  .pos-shell.delivery-screen .pos-sidebar .pos-logout,
+  .pos-shell.delivery-screen .pos-sidebar .pos-settings { display: flex; flex-direction: row; }
+  .pos-shell.delivery-screen .pos-sidebar .pos-sidebar-toggle { display: none; }
+  .pos-shell.delivery-screen .pos-mobile-menu-close {
+    display: grid;
+    position: absolute;
+    top: 22px;
+    right: 18px;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 10px;
+  }
+  .pos-shell.delivery-screen .pos-mobile-menu-close svg { width: 20px; height: 20px; }
+  .pos-shell.delivery-screen .pos-mobile-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    border: 0;
+    background: rgba(2, 6, 23, .48);
+    backdrop-filter: blur(2px);
+    z-index: 91;
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar {
+    color: #fff;
+    background: linear-gradient(160deg, #064e3b, #047857);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar .pos-logo-main,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar .pos-logo-main span,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar .pos-logo-sub,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar .pos-nav-item { color: #fff; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-sidebar .pos-nav-item.active {
+    color: #fff;
+    background: rgba(255, 255, 255, .16);
+  }
+
+  /* Cabecalho alto: marca, loja, menu e estado online como no modelo aprovado. */
+  .pos-shell.delivery-screen .pos-main {
+    display: block;
+    height: 100%;
+    padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .pos-shell.delivery-screen .pos-topbar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    min-height: 104px;
+    padding: 18px 92px 17px 18px;
+    align-items: center;
+    border: 0;
+    color: #fff;
+    background: linear-gradient(145deg, #064e3b, #065f46);
+  }
+  .pos-shell.delivery-screen .pos-topbar-leading { width: 100%; min-width: 0; flex: 1; gap: 14px; }
+  .pos-shell.delivery-screen .pos-topbar-menu {
+    display: grid !important;
+    position: absolute;
+    top: 17px;
+    right: 18px;
+    width: 46px;
+    height: 42px;
+    place-items: center;
+    color: #fff;
+    border: 0;
+    border-radius: 10px;
+  }
+  .pos-shell.delivery-screen .pos-topbar-menu svg { width: 33px; height: 33px; stroke-width: 2; }
+  .pos-shell.delivery-screen .pos-mobile-brand {
+    display: flex;
+    flex: 0 0 60px;
+    width: 60px;
+    flex-direction: column;
+    align-items: flex-start;
+    color: #fff;
+    line-height: .84;
+  }
+  .pos-shell.delivery-screen .pos-mobile-brand b { font-size: 34px; font-weight: 950; letter-spacing: -2px; }
+  .pos-shell.delivery-screen .pos-mobile-brand small { margin-top: 6px; font-size: 11px; font-weight: 900; letter-spacing: .03em; }
+  .pos-shell.delivery-screen .pos-company {
+    min-width: 0;
+    max-width: 170px;
+    padding-left: 14px;
+    border-left: 1px solid rgba(255, 255, 255, .38);
+    color: #fff;
+  }
+  .pos-shell.delivery-screen .pos-company .font-bold {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 17px;
+    line-height: 1.35;
+    white-space: normal;
+    text-overflow: clip;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .pos-shell.delivery-screen .pos-company .text-xs { display: none; }
+  .pos-shell.delivery-screen .pos-topbar-actions { display: block; position: absolute; top: 66px; right: 19px; }
+  .pos-shell.delivery-screen .pos-topbar-actions > :not(.pos-online) { display: none !important; }
+  .pos-shell.delivery-screen .pos-online {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pos-shell.delivery-screen .pos-online > span { width: 9px; height: 9px; background: #34d399; }
+  .pos-shell.delivery-screen .pos-online > div { display: none; }
+  .pos-shell.delivery-screen .pos-online::after { content: 'Online'; }
+
+  /* Titulo e tres indicadores operacionais. */
+  .pos-delivery-mobile-intro {
+    display: block;
+    padding: 24px 18px 14px;
+  }
+  .pos-delivery-mobile-intro h1 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 31px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -.035em;
+  }
+  .pos-delivery-mobile-intro p { margin: 8px 0 0; color: #94a3b8; font-size: 16px; }
+  .pos-delivery-mobile-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 18px 16px;
+  }
+  .pos-delivery-mobile-kpis button {
+    min-width: 0;
+    min-height: 88px;
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: start;
+    gap: 5px;
+    padding: 14px 10px;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 12px;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, .035);
+    text-align: left;
+  }
+  .pos-delivery-mobile-kpis button > svg { width: 23px; height: 23px; }
+  .pos-delivery-mobile-kpis button > span { min-width: 0; font-size: 11px; line-height: 1.2; }
+  .pos-delivery-mobile-kpis button strong { display: block; margin-top: 7px; color: #f8fafc; font-size: 24px; line-height: 1; }
+  .pos-delivery-mobile-kpis button.active {
+    color: #fff;
+    border-color: #047857;
+    background: linear-gradient(145deg, #065f46, #047857);
+    box-shadow: 0 8px 22px rgba(4, 120, 87, .18);
+  }
+  .pos-delivery-mobile-kpis button.active strong { color: #fff; }
+  .pos-delivery-desktop-kpis { display: none !important; }
+
+  /* Busca e filtro usam os dados reais ja carregados pelo parceiro. */
+  .pos-shell.delivery-screen .pos-workspace { padding: 0 16px 24px; overflow: visible; }
+  .pos-shell.delivery-screen .pos-page-grid { display: block; min-height: 0; }
+  .pos-shell.delivery-screen .pos-panel {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .pos-shell.delivery-screen .pos-panel-head,
+  .pos-shell.delivery-screen .pos-route-hint { display: none; }
+  .pos-delivery-mobile-tools {
+    display: grid;
+    grid-template-columns: minmax(132px, .82fr) minmax(0, 1.25fr);
+    gap: 9px;
+    margin-bottom: 14px;
+  }
+  .pos-delivery-mobile-filter,
+  .pos-delivery-mobile-search {
+    min-width: 0;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 11px;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, .035);
+  }
+  .pos-delivery-mobile-filter > svg,
+  .pos-delivery-mobile-search > svg { width: 20px; height: 20px; flex: 0 0 auto; }
+  .pos-delivery-mobile-filter > svg:last-child { width: 16px; height: 16px; }
+  .pos-delivery-mobile-filter select,
+  .pos-delivery-mobile-search input {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    color: #e2e8f0;
+    background: transparent;
+    appearance: none;
+  }
+  .pos-delivery-mobile-filter select { font-size: 14px !important; font-weight: 750; }
+  .pos-delivery-mobile-filter { gap: 6px; padding-inline: 9px; }
+  .pos-delivery-mobile-search input { font-size: 14px !important; }
+  .pos-delivery-mobile-search input::placeholder { color: #94a3b8; opacity: 1; }
+
+  /* Cards grandes, claros e com alvos de toque confortaveis. */
+  .pos-shell.delivery-screen .pos-route-list { grid-template-columns: 1fr; gap: 13px; }
+  .pos-shell.delivery-screen .pos-route-card {
+    display: flex;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .035);
+    box-shadow: 0 8px 24px rgba(2, 6, 23, .12);
+  }
+  .pos-shell.delivery-screen .pos-route-card::before { display: none; }
+  .pos-shell.delivery-screen .pos-route-card.delivered,
+  .pos-shell.delivery-screen .pos-route-card.failed { opacity: 1; }
+  .pos-route-mobile-card-top {
+    order: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .pos-route-mobile-card-top > strong { min-width: 0; color: #f8fafc; font-size: 19px; font-weight: 900; }
+  .pos-route-mobile-card-top .pos-delivery-pill { flex: 0 0 auto; }
+  .pos-shell.delivery-screen .pos-route-desktop-head { display: none; }
+  .pos-shell.delivery-screen .pos-route-who {
+    order: 2;
+    display: grid;
+    grid-template-columns: 23px minmax(0, 1fr);
+    gap: 2px 8px;
+    align-items: center;
+  }
+  .pos-route-mobile-icon {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / 3;
+    width: 19px;
+    height: 19px;
+    color: #94a3b8;
+  }
+  .pos-shell.delivery-screen .pos-route-who strong,
+  .pos-shell.delivery-screen .pos-route-who a { grid-column: 2; }
+  .pos-shell.delivery-screen .pos-route-who strong { font-size: 16px; }
+  .pos-shell.delivery-screen .pos-route-who a { font-size: 12px; }
+  .pos-shell.delivery-screen .pos-route-addr { order: 3; color: #cbd5e1; font-size: 14px; }
+  .pos-shell.delivery-screen .pos-route-items { order: 4; color: #94a3b8; font-size: 13px; }
+  .pos-shell.delivery-screen .pos-route-addr svg,
+  .pos-shell.delivery-screen .pos-route-items svg,
+  .pos-route-mobile-payment svg { width: 19px; height: 19px; margin-top: 0; }
+  .pos-route-mobile-payment {
+    order: 5;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: #6ee7b7;
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  /* A foto recebe area propria, selo e instrucao de conferencia. */
+  .pos-shell.delivery-screen .pos-route-photo {
+    order: 6;
+    min-height: 82px;
+    margin: 2px 0 0;
+    padding: 8px;
+    gap: 11px;
+    border: 1px solid rgba(16, 185, 129, .35);
+    border-radius: 12px;
+    color: #d1fae5;
+    background: linear-gradient(135deg, rgba(6, 95, 70, .34), rgba(4, 120, 87, .1));
+  }
+  .pos-shell.delivery-screen .pos-route-photo-thumb { width: 66px; height: 66px; flex-basis: 66px; }
+  .pos-shell.delivery-screen .pos-route-photo-copy small { font-size: 9px; }
+  .pos-shell.delivery-screen .pos-route-photo-copy strong { font-size: 13px; }
+  .pos-shell.delivery-screen .pos-route-photo-copy em { margin-top: 4px; font-size: 11px; line-height: 1.25; }
+  .pos-route-photo-empty {
+    order: 6;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px dashed rgba(148, 163, 184, .28);
+    border-radius: 9px;
+    color: #94a3b8;
+    font-size: 11px;
+  }
+  .pos-route-photo-empty svg { width: 17px; height: 17px; }
+
+  .pos-shell.delivery-screen .pos-route-money { order: 7; padding-top: 10px; }
+  .pos-shell.delivery-screen .pos-route-courier input { height: 42px; }
+  .pos-shell.delivery-screen .pos-route-total strong { font-size: 19px; }
+  .pos-shell.delivery-screen .pos-route-pay { order: 8; align-items: flex-start; flex-direction: column; gap: 6px; }
+  .pos-shell.delivery-screen .pos-seg { width: 100%; }
+  .pos-shell.delivery-screen .pos-seg button { height: 38px; }
+
+  /* Rota ocupa a largura; telefone e WhatsApp ficam como botoes quadrados. */
+  .pos-shell.delivery-screen .pos-route-contact {
+    order: 9;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 50px 50px;
+    gap: 8px;
+  }
+  .pos-shell.delivery-screen .pos-contact-btn {
+    min-width: 0;
+    height: 48px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .pos-shell.delivery-screen .pos-contact-btn svg { width: 22px; height: 22px; }
+  .pos-shell.delivery-screen .pos-contact-btn.waze {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 8px;
+    color: #fff;
+    border-color: #047857;
+    background: linear-gradient(145deg, #059669, #047857);
+  }
+  .pos-shell.delivery-screen .pos-contact-btn.call { grid-column: 2; grid-row: 1; }
+  .pos-shell.delivery-screen .pos-contact-btn.wa { grid-column: 3; grid-row: 1; }
+  .pos-shell.delivery-screen .pos-contact-btn.call span,
+  .pos-shell.delivery-screen .pos-contact-btn.wa span,
+  .pos-shell.delivery-screen .pos-contact-desktop-label,
+  .pos-shell.delivery-screen .pos-contact-btn.maps { display: none; }
+  .pos-shell.delivery-screen .pos-contact-mobile-label { display: inline; }
+
+  .pos-shell.delivery-screen .pos-route-actions { order: 10; }
+  .pos-shell.delivery-screen .pos-route-actions .act-primary { height: 48px; background: linear-gradient(145deg, #059669, #047857); color: #fff; }
+  .pos-shell.delivery-screen .pos-route-actions .act-icon { width: 48px; height: 48px; }
+
+  /* Barra inferior fixa do modelo: Inicio, Caixa, Entregas e Mais. */
+  .pos-delivery-mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    min-height: calc(72px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid rgba(148, 163, 184, .18);
+    background: rgba(15, 23, 42, .96);
+    box-shadow: 0 -10px 28px rgba(2, 6, 23, .18);
+    backdrop-filter: blur(14px);
+  }
+  .pos-delivery-mobile-nav button {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .pos-delivery-mobile-nav button svg { width: 24px; height: 24px; }
+  .pos-delivery-mobile-nav button.active { color: #10b981; }
+
+  /* Tema claro: fundo branco, tipografia escura e verde da Matriz. */
+  .pos-shell.delivery-screen[data-theme="light"] { background: #f8fafc !important; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-topbar {
+    color: #fff;
+    background: linear-gradient(145deg, #064e3b, #065f46);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-intro h1,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-mobile-card-top > strong { color: #111827; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-intro p { color: #64748b; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-kpis button,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-filter,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-search,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-card {
+    border-color: #e2e8f0;
+    background: #fff;
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-kpis button {
+    color: #64748b;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, .035);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-kpis button strong { color: #111827; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-kpis button.active {
+    color: #fff;
+    border-color: #047857;
+    background: linear-gradient(145deg, #065f46, #047857);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-kpis button.active strong { color: #fff; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-filter select,
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-search input { color: #334155; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-card { box-shadow: 0 6px 20px rgba(15, 23, 42, .05); }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-mobile-payment { color: #047857; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-photo {
+    color: #065f46;
+    border-color: rgba(4, 120, 87, .26);
+    background: linear-gradient(135deg, #ecfdf5, #f7fdf9);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-route-photo-empty {
+    color: #64748b;
+    border-color: #cbd5e1;
+    background: #f8fafc;
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-nav {
+    border-top-color: #e2e8f0;
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 -10px 28px rgba(15, 23, 42, .08);
+  }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-nav button { color: #64748b; }
+  .pos-shell.delivery-screen[data-theme="light"] .pos-delivery-mobile-nav button.active { color: #047857; }
+
+  @media (max-width: 370px) {
+    .pos-delivery-mobile-intro { padding-inline: 14px; }
+    .pos-delivery-mobile-kpis { gap: 6px; padding-inline: 14px; }
+    .pos-delivery-mobile-kpis button { padding-inline: 8px; grid-template-columns: 22px minmax(0, 1fr); }
+    .pos-delivery-mobile-kpis button > svg { width: 20px; height: 20px; }
+    .pos-shell.delivery-screen .pos-workspace { padding-inline: 12px; }
+    .pos-delivery-mobile-tools { grid-template-columns: 1fr; }
+  }
+}
+
 /* Alpine x-cloak: esconde elementos até Alpine montar (evita FOUC) */
 [x-cloak] { display: none !important; }
 
