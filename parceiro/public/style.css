@@ -5044,24 +5044,14 @@ html, body {
   .pos-shell.checkout-screen .pos-user > i { display: inline-block; }
 }
 
-/* Marca esmeralda global: vale para claro e escuro, sem alterar as superficies
-   internas de cada tema. */
-.pos-shell .pos-sidebar,
-.pos-shell .pos-topbar,
+/* Marca esmeralda do tema claro. O tema escuro preserva a casca grafite e o
+   destaque amarelo originais; apenas a geometria do menu e do topo e comum. */
 .pos-shell[data-theme="light"] .pos-sidebar,
 .pos-shell[data-theme="light"] .pos-topbar {
   color: #fff;
   background: linear-gradient(145deg, #064e3b 0%, #065f46 58%, #064e3b 100%);
   border-color: rgba(255, 255, 255, .12);
 }
-.pos-shell .pos-logo-main,
-.pos-shell .pos-logo-main span,
-.pos-shell .pos-logo-sub,
-.pos-shell .pos-company,
-.pos-shell .pos-nav-item,
-.pos-shell .pos-top-icons button,
-.pos-shell .pos-user strong,
-.pos-shell .pos-topbar-menu,
 .pos-shell[data-theme="light"] .pos-logo-main,
 .pos-shell[data-theme="light"] .pos-logo-main span,
 .pos-shell[data-theme="light"] .pos-logo-sub,
@@ -5070,61 +5060,41 @@ html, body {
 .pos-shell[data-theme="light"] .pos-top-icons button,
 .pos-shell[data-theme="light"] .pos-user strong,
 .pos-shell[data-theme="light"] .pos-topbar-menu { color: #fff; }
-.pos-shell .pos-logo-main,
 .pos-shell[data-theme="light"] .pos-logo-main { font-size: 34px; font-style: normal; letter-spacing: -2px; }
-.pos-shell .pos-logo-sub,
 .pos-shell[data-theme="light"] .pos-logo-sub { color: rgba(255, 255, 255, .82); text-align: left; font-size: 12px; }
 .pos-shell.checkout-screen[data-theme="light"] .pos-tire-mark { display: inline-block; }
 .pos-shell.checkout-screen[data-theme="light"] .pos-logo-main { font-size: 34px; font-style: normal; letter-spacing: -2px; }
 .pos-shell.checkout-screen[data-theme="light"] .pos-logo-sub { color: rgba(255, 255, 255, .82); text-align: left; font-size: 12px; }
-.pos-shell .pos-nav-item:not(.active):hover,
 .pos-shell[data-theme="light"] .pos-nav-item:not(.active):hover { background: rgba(255, 255, 255, .08); }
-.pos-shell .pos-nav-item.active,
 .pos-shell[data-theme="light"] .pos-nav-item.active {
   color: #fff;
   background: linear-gradient(135deg, #0d9488, #059669);
   border-color: transparent;
   box-shadow: 0 8px 20px rgba(0, 0, 0, .16);
 }
-.pos-shell .pos-nav-item kbd,
 .pos-shell[data-theme="light"] .pos-nav-item kbd {
   color: rgba(255, 255, 255, .72);
   border-color: rgba(255, 255, 255, .18);
   background: rgba(255, 255, 255, .08);
 }
-.pos-shell .pos-nav-item.active kbd,
 .pos-shell[data-theme="light"] .pos-nav-item.active kbd { color: #fff; border-color: rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .14); }
-.pos-shell .pos-theme-toggle,
 .pos-shell[data-theme="light"] .pos-theme-toggle { border-top-color: rgba(255, 255, 255, .12); }
-.pos-shell .pos-global-search,
 .pos-shell[data-theme="light"] .pos-global-search {
   color: #fff;
   border-color: rgba(255, 255, 255, .34);
   background: rgba(0, 0, 0, .08);
 }
-.pos-shell .pos-global-search svg,
-.pos-shell .pos-global-search input,
-.pos-shell .pos-global-search input::placeholder,
-.pos-shell .pos-global-search kbd,
-.pos-shell .pos-user > div,
 .pos-shell[data-theme="light"] .pos-global-search svg,
 .pos-shell[data-theme="light"] .pos-global-search input,
 .pos-shell[data-theme="light"] .pos-global-search input::placeholder,
 .pos-shell[data-theme="light"] .pos-global-search kbd,
 .pos-shell[data-theme="light"] .pos-user > div { color: rgba(255, 255, 255, .9); }
-.pos-shell .pos-global-search kbd,
-.pos-shell .pos-user > div,
 .pos-shell[data-theme="light"] .pos-global-search kbd,
 .pos-shell[data-theme="light"] .pos-user > div { border-color: rgba(255, 255, 255, .26); background: rgba(255, 255, 255, .06); }
-.pos-shell .pos-top-icons,
 .pos-shell[data-theme="light"] .pos-top-icons { border-color: rgba(255, 255, 255, .22); }
-.pos-shell .pos-online,
 .pos-shell[data-theme="light"] .pos-online { color: #fff; }
-.pos-shell .pos-online > span,
 .pos-shell[data-theme="light"] .pos-online > span { background: #4ade80; }
-.pos-shell .pos-online small,
 .pos-shell[data-theme="light"] .pos-online small { color: #86efac; }
-.pos-shell .pos-user small,
 .pos-shell[data-theme="light"] .pos-user small { color: rgba(255, 255, 255, .68); }
 
 @media (max-width: 1400px) and (min-width: 769px) {
@@ -5155,9 +5125,8 @@ html, body {
 
 @media (max-width: 768px) {
   .pos-shell .pos-topbar,
-  .pos-shell.checkout-screen .pos-topbar,
+  .pos-shell.checkout-screen .pos-topbar { display: flex; }
   .pos-shell[data-theme="light"] .pos-topbar {
-    display: flex;
     color: #fff;
     background: linear-gradient(145deg, #064e3b, #065f46);
     border-color: rgba(255, 255, 255, .12);
@@ -5175,9 +5144,7 @@ html, body {
   }
   .pos-shell .pos-mobile-brand b { font-size: 21px; font-weight: 900; letter-spacing: -1px; }
   .pos-shell .pos-mobile-brand small { margin-top: 3px; font-size: 7px; font-weight: 850; letter-spacing: .06em; }
-  .pos-shell .pos-theme-toggle-mobile,
   .pos-shell[data-theme="light"] .pos-theme-toggle-mobile,
-  .pos-shell .pos-user > div,
   .pos-shell[data-theme="light"] .pos-user > div { color: #fff; border-color: rgba(255, 255, 255, .26); }
   .pos-shell[data-theme="light"] .pos-sidebar {
     color: var(--matrix-text-body);

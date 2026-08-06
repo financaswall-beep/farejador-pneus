@@ -32,9 +32,20 @@ describe('partner global navigation shell', () => {
   it('keeps the same green topbar and mobile navigation treatment', async () => {
     const css = await partnerFile('style.css');
 
+    expect(css).toContain('Marca esmeralda do tema claro');
+    expect(css).toContain('.pos-shell[data-theme="light"] .pos-sidebar');
     expect(css).toContain('background: linear-gradient(145deg, #064e3b 0%, #065f46 58%, #064e3b 100%);');
     expect(css).toContain('@media (max-width: 768px)');
     expect(css).toContain('.pos-shell .pos-mobile-brand');
     expect(css).toContain('.pos-shell[data-theme="light"] .pos-sidebar');
+  });
+
+  it('does not apply the emerald palette to the dark theme', async () => {
+    const css = await partnerFile('style.css');
+
+    expect(css).toContain('background: linear-gradient(180deg, rgba(18, 24, 29, .96), rgba(11, 15, 18, .98));');
+    expect(css).toContain('background: linear-gradient(180deg, #ffe100, #ffc400);');
+    expect(css).not.toContain('Marca esmeralda global: vale para claro e escuro');
+    expect(css).not.toMatch(/\.pos-shell \.pos-sidebar,\s*\.pos-shell \.pos-topbar,\s*\.pos-shell\[data-theme="light"\]/);
   });
 });
