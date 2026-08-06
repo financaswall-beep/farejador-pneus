@@ -19,6 +19,9 @@ describe('partner checkout layout', () => {
     expect(html).toContain('@click="posFinalizeSale()"');
     expect(html).toContain('x-model="posNotes"');
     expect(html).toContain('x-model="saleForm.source_tag"');
+    expect(html).toContain('<span>Origem da compra</span>');
+    expect(html).toContain('/admin/painel/assets/catalog-tire.webp');
+    expect(html).not.toContain('<summary>Detalhes da venda</summary>');
     expect(html).toContain('value="Retirada (paga agora)"');
   });
 
@@ -38,8 +41,12 @@ describe('partner checkout layout', () => {
     expect(css).toContain('FRENTE DE CAIXA 2026-08-06');
     expect(css).toContain('.checkout-screen .pos-checkout');
     expect(css).toContain('CASCO GLOBAL 2026-08-06');
+    expect(css).toContain('FRENTE DE CAIXA 2026-08-06 — detalhes operacionais e leitura dos produtos');
     expect(css).toContain('.pos-shell .pos-sidebar');
     expect(css).toContain('.pos-shell .pos-topbar');
+    expect(css).toContain('.pos-tire-thumb.with-image');
+    expect(css).toContain('.pos-shell.checkout-screen[data-theme="light"] .pos-customer-inline-form');
+    expect(css).toContain('.checkout-screen .pos-inline-save');
     expect(css).toContain('@media (max-width: 768px)');
   });
 });

@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260806-menu-global-dark-fix1" />
+  <link rel="stylesheet" href="./style.css?v=20260806-checkout-detalhes1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -533,7 +533,9 @@
           <div class="pos-product-list">
             <template x-for="item in posDisplayProducts.slice(0, 5)" :key="item.stock_id">
               <button type="button" @click="posAddProduct(item)" class="pos-product-card">
-                <span class="pos-tire-thumb" :class="(item.item_type && item.item_type !== 'pneu') && item.item_type"></span>
+                <span class="pos-tire-thumb" :class="[(item.item_type && item.item_type !== 'pneu') && item.item_type, (!item.item_type || item.item_type === 'pneu') && 'with-image']">
+                  <img x-show="!item.item_type || item.item_type === 'pneu'" src="/admin/painel/assets/catalog-tire.webp" alt="" loading="lazy" decoding="async" />
+                </span>
                 <span class="pos-product-info">
                   <small class="pos-product-brand" x-text="item.brand || itemTypeLabel(item.item_type)"></small>
                   <strong x-text="itemPrimaryLabel(item)"></strong>
@@ -621,7 +623,9 @@
               </template>
               <template x-for="item in posCart" :key="item.partner_stock_id">
                 <div class="pos-cart-row">
-                  <span class="pos-tire-thumb small" :class="(item.item_type && item.item_type !== 'pneu') && item.item_type"></span>
+                  <span class="pos-tire-thumb small" :class="[(item.item_type && item.item_type !== 'pneu') && item.item_type, (!item.item_type || item.item_type === 'pneu') && 'with-image']">
+                    <img x-show="!item.item_type || item.item_type === 'pneu'" src="/admin/painel/assets/catalog-tire.webp" alt="" loading="lazy" decoding="async" />
+                  </span>
                   <span>
                     <small x-text="item.brand || itemTypeLabel(item.item_type)"></small>
                     <strong x-text="item.tire_size || item.item_name"></strong>
@@ -644,11 +648,10 @@
               <input class="pos-notes-input" x-model="posNotes" placeholder="Observação (opcional)" />
             </label>
 
-            <details class="pos-sale-details">
-              <summary>Detalhes da venda</summary>
+            <div class="pos-sale-details pos-sale-details-visible">
               <div class="pos-sale-options">
                 <label>
-                  <span>Origem</span>
+                  <span>Origem da compra</span>
                   <select x-model="saleForm.source_tag">
                     <option value="porta">Porta</option>
                     <option value="2w">2W</option>
@@ -662,7 +665,7 @@
                   <input class="pos-static-field" value="Retirada (paga agora)" readonly />
                 </label>
               </div>
-            </details>
+            </div>
 
             <div class="pos-cart-totals">
               <div><span>Subtotal</span><strong x-text="money(posCartSubtotal)"></strong></div>
