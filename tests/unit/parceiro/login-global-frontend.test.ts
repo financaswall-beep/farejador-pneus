@@ -31,7 +31,7 @@ describe('partner global login frontend', () => {
 
     expect(html).toContain('Portal do Parceiro');
     expect(html).toContain('Sua loja conectada à');
-    expect(css).toContain("url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-matriz1')");
+    expect(css).toContain("url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-mobile2')");
     expect(css).toContain('--green-700: #047857');
     expect(css).toContain('@media (max-width: 850px)');
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
@@ -52,6 +52,7 @@ describe('partner global login frontend', () => {
     expect(html).toContain('data-password-toggle="password"');
     expect(script).toContain("document.querySelectorAll('[data-password-toggle]')");
     expect(script).toContain("formPrimeiro.style.display = 'grid'");
+    expect(script).toContain("document.body.classList.add('first-access-active')");
     expect(script).toContain("tituloAcesso.textContent = 'Escolha sua loja'");
   });
 });

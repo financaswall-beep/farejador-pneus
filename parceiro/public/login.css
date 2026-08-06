@@ -26,7 +26,7 @@ button { -webkit-tap-highlight-color: transparent; }
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,0) 55%, rgba(244,247,245,.24) 100%),
-    url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-matriz1') center / cover no-repeat;
+    url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-mobile2') center / cover no-repeat;
 }
 
 .login-shell::after {
@@ -156,30 +156,44 @@ input:focus { border-color: var(--green-700); box-shadow: 0 0 0 4px rgba(16,185,
   body { background: #f3f6f4; }
   .login-shell { display: block; overflow: visible; background: #f3f6f4; }
   .login-shell::after { display: none; }
-  .visual-panel { min-height: 285px; background: linear-gradient(180deg,rgba(255,255,255,.02) 40%,rgba(243,246,244,.97) 100%), url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-matriz1') 42% 59% / cover no-repeat; }
-  .brand { top: 20px; left: 20px; }
-  .brand-mark { width: 46px; height: 46px; border-radius: 14px; font-size: 19px; }
-  .brand-copy strong { font-size: 15px; }
-  .hero-copy { right: 20px; bottom: 41px; left: 20px; }
+  .visual-panel { min-height: 260px; background: linear-gradient(180deg,rgba(255,255,255,.02) 36%,rgba(243,246,244,.97) 100%), url('/assets/login-partner-hero-v1.webp?v=20260806-parceiro-mobile2') 44% 58% / cover no-repeat; transition: min-height .2s ease; }
+  .brand { top: 16px; left: 16px; gap: 10px; padding: 7px 11px 7px 7px; border: 1px solid rgba(255,255,255,.75); border-radius: 17px; background: rgba(255,255,255,.88); box-shadow: 0 10px 24px rgba(2,44,34,.1); backdrop-filter: blur(10px); }
+  .brand-mark { width: 43px; height: 43px; border-radius: 13px; font-size: 18px; }
+  .brand-copy strong { font-size: 14px; }
+  .brand-copy small { margin-top: 5px; font-size: 8px; }
+  .hero-copy { right: 18px; bottom: 36px; left: 18px; }
   .hero-kicker, .hero-subtitle, .benefits { display: none; }
-  .hero-copy h2 { max-width: 390px; font-size: clamp(31px,8vw,44px); text-shadow: 0 2px 15px rgba(255,255,255,.85); }
-  .auth-region { min-height: auto; margin-top: -30px; padding: 0 18px 30px; overflow: visible; }
-  .card { width: min(100%,560px); padding: 32px; border-radius: 24px; backdrop-filter: none; }
+  .hero-copy h2 { max-width: 360px; font-size: clamp(30px,7.5vw,41px); text-shadow: 0 2px 15px rgba(255,255,255,.9); }
+  .auth-region { min-height: auto; margin-top: -26px; padding: 0 14px 28px; overflow: visible; }
+  .card { width: min(100%,560px); padding: 29px 27px; border-radius: 25px; box-shadow: 0 20px 54px rgba(28,45,38,.12), 0 5px 18px rgba(28,45,38,.06); backdrop-filter: none; }
 }
 
 @media (max-width: 500px) {
-  .visual-panel { min-height: 235px; }
-  .brand-copy small { font-size: 8px; }
-  .hero-copy { bottom: 34px; }
-  .hero-copy h2 { max-width: 300px; font-size: 33px; }
-  .auth-region { margin-top: -22px; padding-right: 12px; padding-left: 12px; }
-  .card { padding: 27px 21px; border-radius: 21px; }
-  .card-head { margin-bottom: 25px; }
-  h1 { font-size: 31px; }
-  .sub { font-size: 13px; }
-  .auth-form { gap: 15px; }
-  input { height: 52px; }
+  .visual-panel { min-height: 218px; }
+  .hero-copy { bottom: 29px; }
+  .hero-copy h2 { max-width: 285px; font-size: 29px; line-height: 1; }
+  .auth-region { margin-top: -20px; padding-right: 10px; padding-bottom: 20px; padding-left: 10px; }
+  .card { padding: 24px 20px; border-radius: 23px; }
+  .card-head { margin-bottom: 21px; }
+  .card-kicker { margin-bottom: 10px; }
+  h1 { font-size: 29px; }
+  .sub { margin-top: 10px; font-size: 13px; line-height: 1.55; }
+  .auth-form { gap: 14px; }
+  .field { gap: 7px; }
+  input { height: 54px; font-size: 16px; }
   .primary-button { min-height: 54px; }
+  .card-footer { margin-top: 18px; }
+  .legal { margin-top: 15px; }
+  body.first-access-active .visual-panel { min-height: 132px; }
+  body.first-access-active .hero-copy { display: none; }
+  body.first-access-active .auth-region { margin-top: -16px; }
+  body.first-access-active .card { padding-top: 22px; }
+}
+
+@media (max-width: 500px) and (max-height: 700px) {
+  .visual-panel { min-height: 195px; }
+  .hero-copy { bottom: 26px; }
+  .hero-copy h2 { font-size: 27px; }
 }
 
 @media (max-height: 760px) and (min-width: 851px) {
