@@ -68,19 +68,19 @@ window.PARCEIRO_MODULES.chartsPdv = () => ({
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: light ? '#0f172a' : '#05080b',
-              borderColor: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.12)',
+              backgroundColor: light ? '#111827' : '#05080b',
+              borderColor: light ? 'rgba(17,24,39,.12)' : 'rgba(255,255,255,.12)',
               borderWidth: 1,
               padding: 10,
               callbacks: { label: (item) => this.money(item.parsed.y) },
             },
           },
           scales: {
-            x: { grid: { display: false }, ticks: { color: light ? '#64748b' : '#8b949e', maxTicksLimit: 7, font: { size: 11 } }, border: { color: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.1)' } },
+            x: { grid: { display: false }, ticks: { color: light ? '#6b7280' : '#8b949e', maxTicksLimit: 7, font: { size: 11 } }, border: { color: light ? 'rgba(17,24,39,.12)' : 'rgba(255,255,255,.1)' } },
             y: {
               beginAtZero: true,
-              grid: { color: light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.07)' },
-              ticks: { color: light ? '#64748b' : '#8b949e', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') },
+              grid: { color: light ? 'rgba(17,24,39,.08)' : 'rgba(255,255,255,.07)' },
+              ticks: { color: light ? '#6b7280' : '#8b949e', callback: (v) => 'R$ ' + Number(v).toLocaleString('pt-BR') },
               border: { display: false },
             },
           },
@@ -113,10 +113,10 @@ window.PARCEIRO_MODULES.chartsPdv = () => ({
           cutout: '68%',
           layout: { padding: { bottom: 8 } },
           plugins: {
-            legend: { position: 'bottom', labels: { color: light ? '#475569' : '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
+            legend: { position: 'bottom', labels: { color: light ? '#4b5563' : '#d1d5db', boxWidth: 10, padding: 14, font: { size: 11 } } },
             tooltip: {
-              backgroundColor: light ? '#0f172a' : '#05080b',
-              borderColor: light ? 'rgba(15,23,42,.12)' : 'rgba(255,255,255,.12)',
+              backgroundColor: light ? '#111827' : '#05080b',
+              borderColor: light ? 'rgba(17,24,39,.12)' : 'rgba(255,255,255,.12)',
               borderWidth: 1,
               padding: 10,
               callbacks: { label: (item) => `${item.label}: ${this.money(item.parsed)}` },
@@ -144,10 +144,10 @@ window.PARCEIRO_MODULES.chartsPdv = () => ({
             canvasCtx.textBaseline = 'middle';
             // Offsets simétricos em torno de cy para o bloco (valor + rótulo)
             // ficar visualmente centralizado no buraco do donut.
-            canvasCtx.fillStyle = light ? '#0f172a' : '#f8fafc';
+            canvasCtx.fillStyle = light ? '#111827' : '#f8fafc';
             canvasCtx.font = '700 15px Inter, system-ui, sans-serif';
             canvasCtx.fillText(totalCostsLabel, cx, cy - 9);
-            canvasCtx.fillStyle = light ? '#64748b' : '#9ca3af';
+            canvasCtx.fillStyle = light ? '#6b7280' : '#9ca3af';
             canvasCtx.font = '400 10px Inter, system-ui, sans-serif';
             canvasCtx.fillText('Custos', cx, cy + 9);
             canvasCtx.restore();

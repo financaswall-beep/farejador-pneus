@@ -4139,3 +4139,242 @@ html, body {
   .pos-shell .stock-table .stock-col-sale::before { content: 'Venda'; }
   .pos-shell .stock-table .stock-col-sale { font-size: 13px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   AUDITORIA VISUAL 2026-08-06 — TEMA CLARO ALINHADO À MATRIZ
+   ------------------------------------------------------------------------
+   A matriz usa a escala neutra gray do Tailwind; o tema claro antigo usava
+   slate (azulado). Este acabamento final centraliza a paleta, melhora o
+   contraste de textos pequenos e não altera nenhuma regra do tema escuro.
+   ════════════════════════════════════════════════════════════════════════ */
+.pos-shell[data-theme="light"] {
+  --matrix-canvas: #f9fafb;
+  --matrix-surface: #ffffff;
+  --matrix-surface-soft: #f3f4f6;
+  --matrix-border: #e5e7eb;
+  --matrix-border-strong: #d1d5db;
+  --matrix-text: #111827;
+  --matrix-text-body: #374151;
+  --matrix-text-muted: #6b7280;
+  --matrix-text-subtle: #9ca3af;
+  --pos-bg: var(--matrix-canvas);
+  --pos-panel: var(--matrix-surface);
+  --pos-panel-2: var(--matrix-surface-soft);
+  --pos-line: var(--matrix-border);
+  color: var(--matrix-text-body);
+  background: var(--matrix-canvas) !important;
+}
+
+/* Superfícies: mesmo branco limpo, borda e sombra discreta da matriz. */
+.pos-shell[data-theme="light"] .pos-sidebar,
+.pos-shell[data-theme="light"] .pos-topbar,
+.pos-shell[data-theme="light"] .pos-kpis article,
+.pos-shell[data-theme="light"] .pos-panel,
+.pos-shell[data-theme="light"] .pos-finance-cards article,
+.pos-shell[data-theme="light"] .pos-chart-card,
+.pos-shell[data-theme="light"] .pos-form-card,
+.pos-shell[data-theme="light"] .pos-money-row,
+.pos-shell[data-theme="light"] .pos-form-total,
+.pos-shell[data-theme="light"] .pos-recent-sale,
+.pos-shell[data-theme="light"] .pos-delivery-card,
+.pos-shell[data-theme="light"] .pos-order-card,
+.pos-shell[data-theme="light"] .pos-route-card,
+.pos-shell[data-theme="light"] .photo-card {
+  border-color: var(--matrix-border);
+  background: var(--matrix-surface);
+}
+.pos-shell[data-theme="light"] .pos-sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+  box-shadow: 1px 0 0 rgba(17, 24, 39, .02);
+}
+.pos-shell[data-theme="light"] .pos-topbar {
+  box-shadow: 0 1px 0 rgba(17, 24, 39, .03);
+}
+.pos-shell[data-theme="light"] .pos-kpis article,
+.pos-shell[data-theme="light"] .pos-panel {
+  box-shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 6px 18px rgba(17, 24, 39, .045);
+}
+
+/* Hierarquia tipográfica: preto neutro, corpo cinza e auxiliar legível. */
+.pos-shell[data-theme="light"] .pos-logo-main,
+.pos-shell[data-theme="light"] .pos-user strong,
+.pos-shell[data-theme="light"] .pos-kpis strong,
+.pos-shell[data-theme="light"] .pos-panel h3,
+.pos-shell[data-theme="light"] .pos-panel-head h3,
+.pos-shell[data-theme="light"] .pos-side-panel h3,
+.pos-shell[data-theme="light"] .pos-customer-name b,
+.pos-shell[data-theme="light"] .pos-product-cell b,
+.pos-shell[data-theme="light"] .pos-side-list strong,
+.pos-shell[data-theme="light"] .pos-finance-cards strong,
+.pos-shell[data-theme="light"] .pos-chart-card h4,
+.pos-shell[data-theme="light"] .pos-form-head h4,
+.pos-shell[data-theme="light"] .pos-form-head strong,
+.pos-shell[data-theme="light"] .pos-form-total b,
+.pos-shell[data-theme="light"] .pos-money-row b,
+.pos-shell[data-theme="light"] .pos-recent-head strong,
+.pos-shell[data-theme="light"] .pos-recent-sale strong,
+.pos-shell[data-theme="light"] .pos-two-columns h4,
+.pos-shell[data-theme="light"] .pos-product-info strong,
+.pos-shell[data-theme="light"] .pos-product-price strong,
+.pos-shell[data-theme="light"] .pos-cart-row strong,
+.pos-shell[data-theme="light"] .pos-qty b,
+.pos-shell[data-theme="light"] .pos-total span,
+.pos-shell[data-theme="light"] .avisos-head h2,
+.pos-shell[data-theme="light"] .avisos-empty h3,
+.pos-shell[data-theme="light"] .rel-head h2,
+.pos-shell[data-theme="light"] .rel-kpi strong,
+.pos-shell[data-theme="light"] .rel-cash-card strong,
+.pos-shell[data-theme="light"] .rel-cash-detail b,
+.pos-shell[data-theme="light"] .photo-card-size,
+.pos-shell[data-theme="light"] .photo-who-cell b {
+  color: var(--matrix-text);
+}
+
+.pos-shell[data-theme="light"] .pos-nav-item,
+.pos-shell[data-theme="light"] .pos-dark-table-row,
+.pos-shell[data-theme="light"] .pos-customer-table-row,
+.pos-shell[data-theme="light"] .pos-side-list div,
+.pos-shell[data-theme="light"] .pos-alert-list div,
+.pos-shell[data-theme="light"] .pos-tip-list div,
+.pos-shell[data-theme="light"] .pos-summary-line,
+.pos-shell[data-theme="light"] .pos-client-data,
+.pos-shell[data-theme="light"] .pos-product-card,
+.pos-shell[data-theme="light"] .pos-cart-row,
+.pos-shell[data-theme="light"] .pos-product-info em,
+.pos-shell[data-theme="light"] .pos-cart-row em,
+.pos-shell[data-theme="light"] .pos-static-field,
+.pos-shell[data-theme="light"] .pos-payments button,
+.pos-shell[data-theme="light"] .pos-budget,
+.pos-shell[data-theme="light"] .pos-delivery-address,
+.pos-shell[data-theme="light"] .pos-order-addr,
+.pos-shell[data-theme="light"] .pos-route-addr,
+.pos-shell[data-theme="light"] .pos-order-items li,
+.pos-shell[data-theme="light"] .pos-order-cart-line,
+.pos-shell[data-theme="light"] .rel-table td,
+.pos-shell[data-theme="light"] .rel-chip,
+.pos-shell[data-theme="light"] .rel-tab,
+.pos-shell[data-theme="light"] .photo-who-cell,
+.pos-shell[data-theme="light"] .pos-route-photo {
+  color: var(--matrix-text-body);
+}
+
+.pos-shell[data-theme="light"] .pos-logo-sub,
+.pos-shell[data-theme="light"] .pos-user small,
+.pos-shell[data-theme="light"] .pos-kpis small,
+.pos-shell[data-theme="light"] .pos-panel-head p,
+.pos-shell[data-theme="light"] .pos-empty,
+.pos-shell[data-theme="light"] .pos-dark-table-head,
+.pos-shell[data-theme="light"] .pos-customer-table-head,
+.pos-shell[data-theme="light"] .pos-customer-name small,
+.pos-shell[data-theme="light"] .pos-finance-cards small,
+.pos-shell[data-theme="light"] .pos-finance-cards span,
+.pos-shell[data-theme="light"] .pos-chart-card p,
+.pos-shell[data-theme="light"] .pos-form-grid label,
+.pos-shell[data-theme="light"] .pos-stock-side-form label,
+.pos-shell[data-theme="light"] .pos-form-total span,
+.pos-shell[data-theme="light"] .pos-form-head p,
+.pos-shell[data-theme="light"] .pos-money-row small,
+.pos-shell[data-theme="light"] .pos-count-row,
+.pos-shell[data-theme="light"] .pos-recent-head span,
+.pos-shell[data-theme="light"] .pos-recent-sale small,
+.pos-shell[data-theme="light"] .pos-field span,
+.pos-shell[data-theme="light"] .pos-field-label,
+.pos-shell[data-theme="light"] .pos-form-hint,
+.pos-shell[data-theme="light"] .pos-client-data small,
+.pos-shell[data-theme="light"] .pos-sale-options span,
+.pos-shell[data-theme="light"] .pos-product-info small,
+.pos-shell[data-theme="light"] .pos-cart-row small,
+.pos-shell[data-theme="light"] .pos-cart-head,
+.pos-shell[data-theme="light"] .pos-summary label,
+.pos-shell[data-theme="light"] .pos-summary-input,
+.pos-shell[data-theme="light"] .pos-change,
+.pos-shell[data-theme="light"] .pos-secure,
+.pos-shell[data-theme="light"] .pos-footer,
+.pos-shell[data-theme="light"] .avisos-head p,
+.pos-shell[data-theme="light"] .avisos-empty,
+.pos-shell[data-theme="light"] .rel-head p,
+.pos-shell[data-theme="light"] .rel-kpi small,
+.pos-shell[data-theme="light"] .rel-table th,
+.pos-shell[data-theme="light"] .rel-cash-card span,
+.pos-shell[data-theme="light"] .rel-cash-detail span,
+.pos-shell[data-theme="light"] .rel-cash-note,
+.pos-shell[data-theme="light"] .photo-card-tag,
+.pos-shell[data-theme="light"] .photo-card-done small,
+.pos-shell[data-theme="light"] .photo-gone-note {
+  color: var(--matrix-text-muted);
+}
+
+/* Controles: branco, borda gray-300 e texto/placeholder com contraste AA. */
+.pos-shell[data-theme="light"] .pos-global-search,
+.pos-shell[data-theme="light"] .pos-dark-search,
+.pos-shell[data-theme="light"] .pos-dark-select,
+.pos-shell[data-theme="light"] .pos-form-grid input,
+.pos-shell[data-theme="light"] .pos-form-grid select,
+.pos-shell[data-theme="light"] .pos-stock-side-form input,
+.pos-shell[data-theme="light"] .pos-stock-side-form select,
+.pos-shell[data-theme="light"] .pos-product-search,
+.pos-shell[data-theme="light"] .pos-client-search,
+.pos-shell[data-theme="light"] .pos-client-inline-fields input,
+.pos-shell[data-theme="light"] .pos-sale-options select,
+.pos-shell[data-theme="light"] .pos-delivery-input,
+.pos-shell[data-theme="light"] .pos-summary-input input,
+.pos-shell[data-theme="light"] .pos-received,
+.pos-shell[data-theme="light"] .pos-adjust-row input,
+.pos-shell[data-theme="light"] .pos-notes-input,
+.pos-shell[data-theme="light"] .pos-field input,
+.pos-shell[data-theme="light"] .pos-order-add select,
+.pos-shell[data-theme="light"] .pos-order-add-row input,
+.pos-shell[data-theme="light"] .pos-delivery-courier,
+.pos-shell[data-theme="light"] .pos-route-courier input,
+.pos-shell[data-theme="light"] .rel-input {
+  border-color: var(--matrix-border-strong);
+  background: var(--matrix-surface);
+  color: var(--matrix-text);
+}
+.pos-shell[data-theme="light"] input::placeholder,
+.pos-shell[data-theme="light"] textarea::placeholder {
+  color: var(--matrix-text-muted);
+  opacity: 1;
+}
+
+/* Neutros de apoio e linhas deixam de puxar para azul. */
+.pos-shell[data-theme="light"] .pos-dark-table-head,
+.pos-shell[data-theme="light"] .pos-customer-table-head,
+.pos-shell[data-theme="light"] .pos-cart-head,
+.pos-shell[data-theme="light"] .pos-stock-type-tabs,
+.pos-shell[data-theme="light"] .pos-type-badge,
+.pos-shell[data-theme="light"] .pos-qty button,
+.pos-shell[data-theme="light"] .team-commission-person div span,
+.pos-shell[data-theme="light"] .team-commission-stats > div {
+  background: var(--matrix-surface-soft);
+}
+.pos-shell[data-theme="light"] .pos-dark-table,
+.pos-shell[data-theme="light"] .pos-customer-table,
+.pos-shell[data-theme="light"] .pos-dark-table-row,
+.pos-shell[data-theme="light"] .pos-customer-table-row,
+.pos-shell[data-theme="light"] .pos-footer,
+.pos-shell[data-theme="light"] .pos-settings,
+.pos-shell[data-theme="light"] .pos-top-icons {
+  border-color: var(--matrix-border);
+}
+
+/* Ações e estados preservam significado com tons escuros legíveis no branco. */
+.pos-shell[data-theme="light"] .pos-kpis span,
+.pos-shell[data-theme="light"] .pos-online small,
+.pos-shell[data-theme="light"] .pos-status-pill,
+.pos-shell[data-theme="light"] .pos-live-badge,
+.pos-shell[data-theme="light"] .photo-card-done strong {
+  color: #047857;
+}
+.pos-shell[data-theme="light"] .pos-nav-item.active,
+.pos-shell[data-theme="light"] .pos-finalize,
+.pos-shell[data-theme="light"] .pos-stock-type-tabs button.active,
+.pos-shell[data-theme="light"] .rel-tab.on {
+  color: #ffffff;
+  background: linear-gradient(180deg, #047857, #065f46);
+  border-color: #047857;
+}
+
+@media (max-width: 768px) {
+  .pos-shell[data-theme="light"] .pos-topbar { background: var(--matrix-surface); }
+}
