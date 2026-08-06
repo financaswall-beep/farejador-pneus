@@ -77,6 +77,8 @@
       elLojas.appendChild(btn);
     });
     form.style.display = 'none';
+    tituloAcesso.textContent = 'Escolha sua loja';
+    subtituloAcesso.textContent = 'Seu acesso está ligado a mais de uma unidade.';
     elEscolha.style.display = 'block';
   }
 
@@ -84,8 +86,8 @@
     ticket = null;
     elEscolha.style.display = 'none';
     formPrimeiro.style.display = 'none';
-    form.style.display = 'block';
-    tituloAcesso.textContent = 'Bem-vindo de volta';
+    form.style.display = 'grid';
+    tituloAcesso.textContent = 'Bem-vindo de volta!';
     subtituloAcesso.textContent = 'Entre com seu usuário. A gente encontra sua loja.';
     setErro('');
     document.getElementById('password').value = '';
@@ -95,7 +97,7 @@
     ticket = null;
     form.style.display = 'none';
     elEscolha.style.display = 'none';
-    formPrimeiro.style.display = 'block';
+    formPrimeiro.style.display = 'grid';
     tituloAcesso.textContent = 'Crie seu acesso';
     subtituloAcesso.textContent = 'Configure uma vez. Depois é só entrar com usuário e senha.';
     setErro('');
@@ -189,6 +191,17 @@
   btnVoltar.addEventListener('click', voltarPraSenha);
   btnPrimeiro.addEventListener('click', mostrarPrimeiroAcesso);
   btnJaTenho.addEventListener('click', voltarPraSenha);
+
+  document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var input = document.getElementById(button.getAttribute('data-password-toggle'));
+      if (!input) return;
+      var mostrar = input.type === 'password';
+      input.type = mostrar ? 'text' : 'password';
+      button.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
+      button.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+    });
+  });
 
   var params = new URLSearchParams(window.location.search);
   var slugInicial = (params.get('loja') || '').trim().toLowerCase();
