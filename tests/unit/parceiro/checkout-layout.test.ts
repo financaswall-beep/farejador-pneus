@@ -32,12 +32,14 @@ describe('partner checkout layout', () => {
     expect(checkout).toContain('Retirada (paga agora)');
   });
 
-  it('isolates the new desktop and mobile rules to checkout-screen', async () => {
+  it('keeps the checkout content specific while sharing the shell with every tab', async () => {
     const css = await partnerFile('style.css');
 
     expect(css).toContain('FRENTE DE CAIXA 2026-08-06');
     expect(css).toContain('.checkout-screen .pos-checkout');
-    expect(css).toContain('.pos-shell.checkout-screen[data-theme="light"] .pos-sidebar');
+    expect(css).toContain('CASCO GLOBAL 2026-08-06');
+    expect(css).toContain('.pos-shell .pos-sidebar');
+    expect(css).toContain('.pos-shell .pos-topbar');
     expect(css).toContain('@media (max-width: 768px)');
   });
 });
