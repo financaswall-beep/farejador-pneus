@@ -36,6 +36,7 @@ window.PARCEIRO_MODULES.pdv = () => ({
       }
       this.posCart.push({
         partner_stock_id: item.stock_id,
+        item_type: item.item_type || 'pneu',
         item_name: item.item_name || 'Produto',
         tire_size: item.tire_size || '',
         brand: item.brand || '',

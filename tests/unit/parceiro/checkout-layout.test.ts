@@ -49,4 +49,31 @@ describe('partner checkout layout', () => {
     expect(css).toContain('.checkout-screen .pos-inline-save');
     expect(css).toContain('@media (max-width: 768px)');
   });
+
+  it('provides the dedicated employee mobile checkout without changing delivery semantics', async () => {
+    const [html, css, app, kpis, pdv] = await Promise.all([
+      partnerFile('index.html'),
+      partnerFile('style.css'),
+      partnerFile('app.js'),
+      partnerFile('app.pdv.kpis.js'),
+      partnerFile('app.pdv.js'),
+    ]);
+
+    expect(html).toContain('class="pos-mobile-checkout-intro"');
+    expect(html).toContain('class="pos-mobile-mode-tabs"');
+    expect(html).toContain('@click="goToSection(\'entrega\')"');
+    expect(html).toContain('class="pos-mobile-category-tabs"');
+    expect(html).toContain('class="pos-mobile-current-sale"');
+    expect(html).toContain('class="pos-mobile-payments"');
+    expect(html).toContain('class="pos-mobile-checkout-bar"');
+    expect(html).toContain('x-show="!isMobile || posMobileStep === \'checkout\'"');
+    expect(app).toContain("posMobileCategory: 'pneu'");
+    expect(app).toContain('mobileMenuOpen: false');
+    expect(kpis).toContain("this.posMobileCategory === 'servico'");
+    expect(kpis).toContain("this.posMobileCategory === 'outro'");
+    expect(pdv).toContain("item_type: item.item_type || 'pneu'");
+    expect(css).toContain('FRENTE DE CAIXA MOBILE 2026-08-06');
+    expect(css).toContain('.pos-shell.checkout-screen .pos-sidebar.mobile-open');
+    expect(css).toContain('.checkout-screen .pos-mobile-checkout-bar');
+  });
 });

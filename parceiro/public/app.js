@@ -105,7 +105,7 @@ function parceiroApp() {
     posSearch: '',
     posBrandFilter: 'all',
     posRimFilter: 'all',
-    posSort: 'relevance',
+    posSort: 'relevance', posMobileCategory: 'pneu',
     posCart: [],
     // Wizard mobile do PDV: no celular a venda vira 2 etapas pra evitar rolagem infinita.
     // 'select' = produtos + carrinho; 'checkout' = resumo/pagamento/finalizar.
@@ -113,7 +113,7 @@ function parceiroApp() {
     posMobileStep: 'select',
     // Mesma ideia na aba Pedidos (celular): 'list' = KPIs+lista; 'form' = novo pedido.
     orderMobileStep: 'list',
-    isMobile: false,
+    isMobile: false, mobileMenuOpen: false,
 
     // â”€â”€â”€ BATE-PAPO (F7) â”€ Fatia 1.4: dados reais via API (fan-out Chatwoot->banco).
     //     Leitura + polling 5s. Responder pelo portal e Fatia 2 (ainda nao envia).
