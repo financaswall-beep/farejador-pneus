@@ -127,7 +127,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="[sidebarCollapsed && 'sidebar-collapsed', currentSection === 'vendas' && 'checkout-screen']" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="[sidebarCollapsed && 'sidebar-collapsed', currentSection === 'vendas' && 'checkout-screen', currentSection === 'entrega' && 'delivery-screen']" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar" :class="isMobile && mobileMenuOpen && 'mobile-open'" :aria-hidden="isMobile && !mobileMenuOpen ? 'true' : 'false'">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -1377,7 +1377,27 @@
         </div>
       </section>
 
-      <section x-show="currentSection === 'entrega'" class="pos-kpis">
+      <section x-show="currentSection === 'entrega'" class="pos-delivery-mobile-intro">
+        <h1>Entregas</h1>
+        <p>Acompanhe os pedidos em rota</p>
+      </section>
+
+      <section x-show="currentSection === 'entrega'" class="pos-delivery-mobile-kpis" aria-label="Resumo das entregas">
+        <button type="button" :class="deliveryMobileFilter === 'pending' && 'active'" @click="setDeliveryListFilter('pending')">
+          <i data-lucide="package"></i>
+          <span>A preparar<strong x-text="deliveriesAll.filter(d => d.delivery_status === 'pending').length"></strong></span>
+        </button>
+        <button type="button" :class="deliveryMobileFilter === 'dispatched' && 'active'" @click="setDeliveryListFilter('dispatched')">
+          <i data-lucide="bike"></i>
+          <span>Em rota<strong x-text="deliveriesAll.filter(d => d.delivery_status === 'dispatched').length"></strong></span>
+        </button>
+        <button type="button" :class="deliveryMobileFilter === 'delivered' && 'active'" @click="setDeliveryListFilter('delivered')">
+          <i data-lucide="circle-check-big"></i>
+          <span>Entregues<strong x-text="deliveriesAll.filter(d => d.delivery_status === 'delivered').length"></strong></span>
+        </button>
+      </section>
+
+      <section x-show="currentSection === 'entrega'" class="pos-kpis pos-delivery-desktop-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
           <div><small>Entregas em aberto</small><strong x-text="deliveryOpenCount"></strong><span>pendentes + a caminho</span></div>
@@ -1405,16 +1425,33 @@
                 <p>Vendas marcadas como entrega — acompanhe o status e quem leva</p>
               </div>
               <div class="pos-delivery-toolbar">
-                <button :class="!deliveryShowDone && 'active'" @click="deliveryShowDone = false">
+                <button :class="!deliveryShowDone && 'active'" @click="setDeliveryListFilter('open')">
                   Em aberto <em x-text="deliveryOpenCount"></em>
                 </button>
-                <button :class="deliveryShowDone && 'active'" @click="deliveryShowDone = true">Finalizadas</button>
+                <button :class="deliveryShowDone && 'active'" @click="setDeliveryListFilter('delivered')">Finalizadas</button>
               </div>
             </div>
 
             <datalist id="courier-suggestions">
               <template x-for="name in recentCouriers" :key="name"><option :value="name"></option></template>
             </datalist>
+
+            <div class="pos-delivery-mobile-tools">
+              <label class="pos-delivery-mobile-filter">
+                <i data-lucide="list-filter"></i>
+                <select x-model="deliveryMobileFilter" @change="setDeliveryListFilter(deliveryMobileFilter)" aria-label="Filtrar entregas">
+                  <option value="open">Em aberto</option>
+                  <option value="pending">A preparar</option>
+                  <option value="dispatched">Em rota</option>
+                  <option value="delivered">Entregues</option>
+                </select>
+                <i data-lucide="chevron-down"></i>
+              </label>
+              <label class="pos-delivery-mobile-search">
+                <i data-lucide="search"></i>
+                <input x-model="deliverySearch" type="search" placeholder="Buscar cliente ou pedido" aria-label="Buscar cliente ou pedido" />
+              </label>
+            </div>
 
             <p class="pos-route-hint" x-show="!deliveryShowDone && routeList.length">
               <i data-lucide="route"></i> <span>Ordem da rota — use <b>↑ ↓</b> pra ajustar como você vai entregar. Fica salvo neste aparelho.</span>
@@ -1423,7 +1460,12 @@
             <div class="pos-route-list">
               <template x-for="(d, i) in routeList" :key="d.order_id">
                 <article class="pos-route-card" :class="d.delivery_status">
-                  <header class="pos-route-card-top">
+                  <header class="pos-route-mobile-card-top">
+                    <strong>Pedido #<span x-text="deliveryOrderLabel(d)"></span></strong>
+                    <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
+                  </header>
+
+                  <header class="pos-route-card-top pos-route-desktop-head">
                     <span class="pos-route-num" x-show="!deliveryShowDone" x-text="i + 1"></span>
                     <span class="pos-route-bairro"><i data-lucide="map-pin"></i> <span x-text="deliveryZone(d)"></span></span>
                     <span class="pos-delivery-pill" :class="d.delivery_status" x-text="deliveryStatusLabel(d.delivery_status)"></span>
@@ -1435,26 +1477,42 @@
                   </header>
 
                   <div class="pos-route-who">
+                    <i data-lucide="user" class="pos-route-mobile-icon"></i>
                     <strong x-text="d.customer_name || 'Cliente'"></strong>
                     <a x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')"><i data-lucide="phone"></i> <span x-text="formatPhoneDisplay(d.customer_phone)"></span></a>
                   </div>
                   <p class="pos-route-addr"><i data-lucide="map-pin"></i> <span x-text="d.delivery_address || 'Sem endereço informado'"></span></p>
                   <!-- Contato direto do entregador: WhatsApp dele + navegacao no endereco (custo zero, fora da API Meta) -->
                   <div class="pos-route-contact" x-show="d.customer_phone || d.delivery_address">
-                    <a class="pos-contact-btn wa" x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido. 🛵')" target="_blank" rel="noopener"><i data-lucide="message-circle"></i> WhatsApp</a>
-                    <a class="pos-contact-btn waze" x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="navigation"></i> Waze</a>
+                    <a class="pos-contact-btn call" x-show="d.customer_phone" :href="'tel:' + (d.customer_phone || '')" aria-label="Ligar para o cliente"><i data-lucide="phone"></i><span>Ligar</span></a>
+                    <a class="pos-contact-btn wa" x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido. 🛵')" target="_blank" rel="noopener"><i data-lucide="message-circle"></i><span>WhatsApp</span></a>
+                    <a class="pos-contact-btn waze" x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="navigation"></i><span class="pos-contact-desktop-label">Waze</span><span class="pos-contact-mobile-label">Ver rota</span></a>
                     <a class="pos-contact-btn maps" x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"><i data-lucide="map"></i> Maps</a>
                   </div>
                   <p class="pos-route-items"><i data-lucide="package"></i> <span x-text="deliveryItemsLabel(d)"></span></p>
+                  <p class="pos-route-mobile-payment"><i data-lucide="credit-card"></i> <span x-text="deliveryPaymentLabel(d)"></span></p>
                   <!-- FOTO SOB DEMANDA: o pneu que o cliente APROVOU na conversa.
                        O separador confere e pega ESTA peça (não qualquer uma da medida). -->
                   <button type="button" class="pos-route-photo" x-show="d.photo_request_id" x-cloak
                           x-init="d.photo_request_id && photoLoadThumb(d.photo_request_id)"
                           @click="openPhotoLightbox(d.photo_request_id)"
                           title="Foto do pneu que o cliente aprovou — toca pra ampliar">
-                    <img x-show="photoThumbUrls[d.photo_request_id]" :src="photoThumbUrls[d.photo_request_id]" alt="Foto do pneu aprovado" />
-                    <span>📸 pneu da foto — <u>conferir</u></span>
+                    <span class="pos-route-photo-thumb">
+                      <img x-show="photoThumbUrls[d.photo_request_id]" :src="photoThumbUrls[d.photo_request_id]" alt="Foto do pneu aprovado pelo cliente" />
+                      <i x-show="!photoThumbUrls[d.photo_request_id]" data-lucide="image"></i>
+                      <b>FOTO</b>
+                    </span>
+                    <span class="pos-route-photo-copy">
+                      <small>FOTO DO PRODUTO</small>
+                      <strong>Pneu aprovado pelo cliente</strong>
+                      <em>Toque para ampliar e conferir a peça</em>
+                    </span>
+                    <i data-lucide="maximize-2" class="pos-route-photo-expand"></i>
                   </button>
+                  <div class="pos-route-photo-empty" x-show="!d.photo_request_id">
+                    <i data-lucide="image-off"></i>
+                    <span>Este pedido não possui foto vinculada</span>
+                  </div>
 
                   <div class="pos-route-money">
                     <div class="pos-route-courier">
@@ -1503,6 +1561,21 @@
           </section>
         </div>
       </section>
+
+      <nav x-show="currentSection === 'entrega'" class="pos-delivery-mobile-nav" aria-label="Navegação principal">
+        <button type="button" x-show="canSee('resumo')" @click="goToSection('resumo')">
+          <i data-lucide="house"></i><span>Início</span>
+        </button>
+        <button type="button" x-show="canSee('vendas')" @click="goToSection('vendas')">
+          <i data-lucide="calculator"></i><span>Caixa</span>
+        </button>
+        <button type="button" class="active" aria-current="page">
+          <i data-lucide="bike"></i><span>Entregas</span>
+        </button>
+        <button type="button" @click="mobileMenuOpen = true">
+          <i data-lucide="ellipsis"></i><span>Mais</span>
+        </button>
+      </nav>
 
       <!-- Tela Retiradas (balcão): pedidos do bot pra o cliente retirar na loja (pneu reservado) -->
       <section x-show="currentSection === 'retiradas'" class="pos-workspace">

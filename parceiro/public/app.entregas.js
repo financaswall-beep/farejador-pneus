@@ -10,6 +10,9 @@
  */
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.entregas = () => ({
+    deliveryMobileFilter: 'open',
+    deliverySearch: '',
+
     // ─── ENTREGA ──────────────────────────────────────────────
     // Toda venda marcada como entrega (deriva das vendas ja carregadas).
     get deliveriesAll() {
@@ -18,9 +21,12 @@ window.PARCEIRO_MODULES.entregas = () => ({
 
     // Em aberto = pendente + saiu; "entregues" quando o filtro pede.
     get deliveries() {
-      return this.deliveriesAll.filter((d) => this.deliveryShowDone
-        ? d.delivery_status === 'delivered'
-        : d.delivery_status !== 'delivered');
+      const filter = this.isMobile ? this.deliveryMobileFilter : (this.deliveryShowDone ? 'delivered' : 'open');
+      return this.deliveriesAll.filter((d) => {
+        if (filter === 'delivered') return d.delivery_status === 'delivered';
+        if (filter === 'pending' || filter === 'dispatched') return d.delivery_status === filter;
+        return d.delivery_status !== 'delivered';
+      });
     },
 
     get deliveryOpenCount() {
@@ -59,7 +65,21 @@ window.PARCEIRO_MODULES.entregas = () => ({
     // Lista da aba Entrega. Em aberto = ordem da rota (ajustável pelo entregador, salva no aparelho);
     // novos pedidos entram no fim. Finalizadas = mais recentes primeiro.
     get routeList() {
-      const base = this.deliveries;
+      const query = String(this.deliverySearch || '').trim().toLocaleLowerCase('pt-BR');
+      const base = query
+        ? this.deliveries.filter((delivery) => {
+          const items = this.deliveryItemsLabel(delivery);
+          const haystack = [
+            delivery.order_id,
+            delivery.customer_name,
+            delivery.customer_phone,
+            delivery.delivery_address,
+            delivery.delivery_courier,
+            items,
+          ].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+          return haystack.includes(query);
+        })
+        : this.deliveries;
       if (this.deliveryShowDone) {
         return [...base].sort((a, b) => new Date(b.delivered_at || 0) - new Date(a.delivered_at || 0));
       }
@@ -70,6 +90,25 @@ window.PARCEIRO_MODULES.entregas = () => ({
         if (r !== 0) return r;
         return new Date(a.created_at || 0) - new Date(b.created_at || 0);
       });
+    },
+
+    setDeliveryListFilter(filter) {
+      const allowed = ['open', 'pending', 'dispatched', 'delivered'];
+      this.deliveryMobileFilter = allowed.includes(filter) ? filter : 'open';
+      this.deliveryShowDone = this.deliveryMobileFilter === 'delivered';
+    },
+
+    deliveryOrderLabel(sale) {
+      const id = String(sale?.order_id || '').replace(/-/g, '');
+      return (id.slice(0, 6) || '------').toUpperCase();
+    },
+
+    deliveryPaymentLabel(sale) {
+      if (sale?.delivery_status === 'delivered') {
+        const method = String(sale?.payment_method || '').trim();
+        return method && method !== 'A receber' ? `${method} · pago` : 'Pagamento recebido';
+      }
+      return 'A receber na entrega';
     },
 
     moveRoute(sale, dir) {
