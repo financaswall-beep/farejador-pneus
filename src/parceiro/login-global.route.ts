@@ -65,6 +65,9 @@ export async function registerLoginGlobalRoute(fastify: FastifyInstance): Promis
   // A página (pública, standalone — CSS embutido, sem tocar no painel).
   fastify.get('/login', async (_request, reply) => sendStatic(reply, 'login.html', 'text/html; charset=utf-8'));
   fastify.get('/login.js', async (_request, reply) => sendStatic(reply, 'login.js', 'text/javascript; charset=utf-8'));
+  fastify.get('/login.css', async (_request, reply) => sendStatic(reply, 'login.css', 'text/css; charset=utf-8'));
+  fastify.get('/assets/login-partner-hero-v1.webp', async (_request, reply) =>
+    sendStatic(reply, 'assets/login-partner-hero-v1.webp', 'image/webp'));
   fastify.get('/assets/login-2w-desktop.webp', async (_request, reply) =>
     sendStatic(reply, 'assets/login-2w-desktop.webp', 'image/webp'));
   fastify.get('/assets/login-2w-mobile.webp', async (_request, reply) =>
