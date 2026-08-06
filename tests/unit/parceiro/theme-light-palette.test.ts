@@ -26,7 +26,7 @@ describe('partner light theme Matriz palette', () => {
       partnerFile('app.charts.pdv.js'),
     ]);
 
-    expect(html).toContain('style.css?v=20260806-tema-claro-matriz1');
+    expect(html).toContain('style.css?v=20260806-checkout-parceiro1');
     expect(css).toContain('AUDITORIA VISUAL 2026-08-06 — TEMA CLARO ALINHADO À MATRIZ');
     expect(css).toContain('--matrix-canvas: #f9fafb');
     expect(css).toContain('--matrix-surface: #ffffff');
