@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260806-checkout-parceiro1" />
+  <link rel="stylesheet" href="./style.css?v=20260806-menu-global1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -217,48 +217,52 @@
 
     <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'onboarding-mode': currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0), 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
-        <button type="button" class="pos-topbar-menu" @click="toggleSidebar()"
-                :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'" aria-label="Alternar menu lateral">
-          <i data-lucide="menu"></i>
-        </button>
-        <div class="pos-mobile-brand" aria-label="2W Pneus"><b>2W</b><small>PNEUS</small></div>
-        <div class="pos-company">
-          <div class="font-bold" x-text="unitName || partnerName || 'Minha loja'">Minha loja</div>
-          <div class="text-xs text-slate-400" x-show="partnerName && partnerName !== unitName" x-text="partnerName"></div>
+        <div class="pos-topbar-leading">
+          <button type="button" class="pos-topbar-menu" @click="toggleSidebar()"
+                  :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'" aria-label="Alternar menu lateral">
+            <i data-lucide="menu"></i>
+          </button>
+          <div class="pos-mobile-brand" aria-label="2W Pneus"><b>2W</b><small>PNEUS</small></div>
+          <div class="pos-company">
+            <div class="font-bold" x-text="unitName || partnerName || 'Minha loja'">Minha loja</div>
+            <div class="text-xs text-slate-400" x-show="partnerName && partnerName !== unitName" x-text="partnerName"></div>
+          </div>
         </div>
         <div class="pos-global-search">
           <i data-lucide="search"></i>
           <input x-model="posSearch" placeholder="Buscar produtos, clientes, pedidos..." />
           <kbd>Ctrl + K</kbd>
         </div>
-        <div class="pos-online">
-          <span></span>
-          <div>
-            <div>Sistema online</div>
-            <small>Sincronizado</small>
+        <div class="pos-topbar-actions">
+          <div class="pos-online">
+            <span></span>
+            <div>
+              <div>Sistema online</div>
+              <small>Sincronizado</small>
+            </div>
           </div>
-        </div>
-        <div class="pos-top-icons">
-          <!-- Sino REAL: pedidos de foto pendentes (antes era número fake hardcoded). -->
-          <button @click="goToSection('batepapo')" :title="photoPendingCount > 0 ? 'Pedidos de foto esperando' : 'Sem alertas'">
-            <i data-lucide="bell"></i><b x-show="photoPendingCount > 0" x-text="photoPendingCount"></b>
+          <div class="pos-top-icons">
+            <!-- Sino REAL: pedidos de foto pendentes (antes era número fake hardcoded). -->
+            <button @click="goToSection('batepapo')" :title="photoPendingCount > 0 ? 'Pedidos de foto esperando' : 'Sem alertas'">
+              <i data-lucide="bell"></i><b x-show="photoPendingCount > 0" x-text="photoPendingCount"></b>
+            </button>
+          </div>
+          <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
+                  :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
+            <i data-lucide="sun-moon"></i>
           </button>
-        </div>
-        <button class="pos-theme-toggle-mobile" @click="toggleTheme()"
-                :title="theme === 'light' ? 'Tema escuro' : 'Tema claro'">
-          <i data-lucide="sun-moon"></i>
-        </button>
-        <button x-show="isOwner" class="pos-theme-toggle-mobile"
-                @click="goToSection('config')" title="Configurações">
-          <i data-lucide="settings"></i>
-        </button>
-        <button class="pos-theme-toggle-mobile" @click="logout()" title="Sair da conta">
-          <i data-lucide="log-out"></i>
-        </button>
-        <div class="pos-user" @click="openMeuDesempenho()" style="cursor:pointer;" title="Ver meu desempenho">
-          <div><i data-lucide="user"></i></div>
-          <span><strong x-text="selfName || (isOwner ? 'Dono' : 'Operador')"></strong><small x-text="isOwner ? 'Dono' : 'Funcionário'"></small></span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+          <button x-show="isOwner" class="pos-theme-toggle-mobile"
+                  @click="goToSection('config')" title="Configurações">
+            <i data-lucide="settings"></i>
+          </button>
+          <button class="pos-theme-toggle-mobile" @click="logout()" title="Sair da conta">
+            <i data-lucide="log-out"></i>
+          </button>
+          <div class="pos-user" @click="openMeuDesempenho()" style="cursor:pointer;" title="Ver meu desempenho">
+            <div><i data-lucide="user"></i></div>
+            <span><strong x-text="selfName || (isOwner ? 'Dono' : 'Operador')"></strong><small x-text="isOwner ? 'Dono' : 'Funcionário'"></small></span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+          </div>
         </div>
       </header>
 

@@ -4960,3 +4960,234 @@ html, body {
   .pos-shell.checkout-screen[data-theme="light"] .pos-theme-toggle-mobile,
   .pos-shell.checkout-screen[data-theme="light"] .pos-user > div { color: #fff; border-color: rgba(255, 255, 255, .26); }
 }
+
+/* ========================================================================
+   CASCO GLOBAL 2026-08-06 — menu da Frente de Caixa em todas as abas
+   O menu e o topo deixam de mudar ao navegar. A coluna central da busca usa
+   laterais simetricas, portanto permanece geometricamente centralizada.
+   ======================================================================== */
+.pos-topbar-leading,
+.pos-topbar-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.pos-topbar-leading { justify-content: flex-start; gap: 12px; }
+.pos-topbar-actions { justify-content: flex-end; gap: 14px; }
+
+@media (min-width: 769px) {
+  .pos-shell,
+  .pos-shell.checkout-screen { grid-template-columns: 248px minmax(0, 1fr); }
+  .pos-shell.sidebar-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
+
+  .pos-shell .pos-sidebar,
+  .pos-shell.checkout-screen .pos-sidebar {
+    padding: 18px 14px 54px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .pos-shell .pos-sidebar::-webkit-scrollbar { display: none; }
+  .pos-shell .pos-logo,
+  .pos-shell.checkout-screen .pos-logo { height: 70px; margin-bottom: 8px; }
+  .pos-shell .pos-nav,
+  .pos-shell.checkout-screen .pos-nav { gap: 3px; padding-block: 6px 10px; }
+  .pos-shell .pos-nav-item,
+  .pos-shell.checkout-screen .pos-nav-item { height: 44px; font-size: 13px; }
+  .pos-shell .pos-nav-item svg,
+  .pos-shell.checkout-screen .pos-nav-item svg { width: 19px; height: 19px; }
+  .pos-shell .pos-theme-toggle,
+  .pos-shell.checkout-screen .pos-theme-toggle { padding-top: 6px; }
+  .pos-shell.checkout-screen .pos-version { display: flex; }
+
+  .pos-shell .pos-topbar,
+  .pos-shell.checkout-screen .pos-topbar {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(280px, 520px) minmax(160px, 1fr);
+    align-items: center;
+    gap: 18px;
+    min-height: 80px;
+    padding: 14px 18px;
+  }
+  .pos-shell.checkout-screen .pos-topbar { flex: 0 0 80px; }
+  .pos-shell .pos-topbar-menu,
+  .pos-shell.checkout-screen .pos-topbar-menu {
+    display: inline-flex;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: inherit;
+  }
+  .pos-shell .pos-topbar-menu svg { width: 22px; height: 22px; }
+  .pos-shell .pos-global-search,
+  .pos-shell.checkout-screen .pos-global-search {
+    width: 100%;
+    height: 44px;
+    border-radius: 8px;
+  }
+  .pos-shell .pos-online,
+  .pos-shell.checkout-screen .pos-online { justify-content: center; }
+  .pos-shell .pos-online > span { width: 9px; height: 9px; }
+  .pos-shell .pos-top-icons,
+  .pos-shell.checkout-screen .pos-top-icons {
+    justify-content: center;
+    border-right: 0;
+    padding: 0 12px;
+  }
+  .pos-shell .pos-user,
+  .pos-shell.checkout-screen .pos-user { justify-content: flex-end; }
+  .pos-shell .pos-user > div,
+  .pos-shell.checkout-screen .pos-user > div { width: 38px; height: 38px; }
+  .pos-shell.checkout-screen .pos-user > span { display: block; }
+  .pos-shell.checkout-screen .pos-user > i { display: inline-block; }
+}
+
+/* Marca esmeralda global: vale para claro e escuro, sem alterar as superficies
+   internas de cada tema. */
+.pos-shell .pos-sidebar,
+.pos-shell .pos-topbar,
+.pos-shell[data-theme="light"] .pos-sidebar,
+.pos-shell[data-theme="light"] .pos-topbar {
+  color: #fff;
+  background: linear-gradient(145deg, #064e3b 0%, #065f46 58%, #064e3b 100%);
+  border-color: rgba(255, 255, 255, .12);
+}
+.pos-shell .pos-logo-main,
+.pos-shell .pos-logo-main span,
+.pos-shell .pos-logo-sub,
+.pos-shell .pos-company,
+.pos-shell .pos-nav-item,
+.pos-shell .pos-top-icons button,
+.pos-shell .pos-user strong,
+.pos-shell .pos-topbar-menu,
+.pos-shell[data-theme="light"] .pos-logo-main,
+.pos-shell[data-theme="light"] .pos-logo-main span,
+.pos-shell[data-theme="light"] .pos-logo-sub,
+.pos-shell[data-theme="light"] .pos-company,
+.pos-shell[data-theme="light"] .pos-nav-item,
+.pos-shell[data-theme="light"] .pos-top-icons button,
+.pos-shell[data-theme="light"] .pos-user strong,
+.pos-shell[data-theme="light"] .pos-topbar-menu { color: #fff; }
+.pos-shell .pos-logo-main,
+.pos-shell[data-theme="light"] .pos-logo-main { font-size: 34px; font-style: normal; letter-spacing: -2px; }
+.pos-shell .pos-logo-sub,
+.pos-shell[data-theme="light"] .pos-logo-sub { color: rgba(255, 255, 255, .82); text-align: left; font-size: 12px; }
+.pos-shell.checkout-screen[data-theme="light"] .pos-tire-mark { display: inline-block; }
+.pos-shell.checkout-screen[data-theme="light"] .pos-logo-main { font-size: 34px; font-style: normal; letter-spacing: -2px; }
+.pos-shell.checkout-screen[data-theme="light"] .pos-logo-sub { color: rgba(255, 255, 255, .82); text-align: left; font-size: 12px; }
+.pos-shell .pos-nav-item:not(.active):hover,
+.pos-shell[data-theme="light"] .pos-nav-item:not(.active):hover { background: rgba(255, 255, 255, .08); }
+.pos-shell .pos-nav-item.active,
+.pos-shell[data-theme="light"] .pos-nav-item.active {
+  color: #fff;
+  background: linear-gradient(135deg, #0d9488, #059669);
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .16);
+}
+.pos-shell .pos-nav-item kbd,
+.pos-shell[data-theme="light"] .pos-nav-item kbd {
+  color: rgba(255, 255, 255, .72);
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .08);
+}
+.pos-shell .pos-nav-item.active kbd,
+.pos-shell[data-theme="light"] .pos-nav-item.active kbd { color: #fff; border-color: rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .14); }
+.pos-shell .pos-theme-toggle,
+.pos-shell[data-theme="light"] .pos-theme-toggle { border-top-color: rgba(255, 255, 255, .12); }
+.pos-shell .pos-global-search,
+.pos-shell[data-theme="light"] .pos-global-search {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .34);
+  background: rgba(0, 0, 0, .08);
+}
+.pos-shell .pos-global-search svg,
+.pos-shell .pos-global-search input,
+.pos-shell .pos-global-search input::placeholder,
+.pos-shell .pos-global-search kbd,
+.pos-shell .pos-user > div,
+.pos-shell[data-theme="light"] .pos-global-search svg,
+.pos-shell[data-theme="light"] .pos-global-search input,
+.pos-shell[data-theme="light"] .pos-global-search input::placeholder,
+.pos-shell[data-theme="light"] .pos-global-search kbd,
+.pos-shell[data-theme="light"] .pos-user > div { color: rgba(255, 255, 255, .9); }
+.pos-shell .pos-global-search kbd,
+.pos-shell .pos-user > div,
+.pos-shell[data-theme="light"] .pos-global-search kbd,
+.pos-shell[data-theme="light"] .pos-user > div { border-color: rgba(255, 255, 255, .26); background: rgba(255, 255, 255, .06); }
+.pos-shell .pos-top-icons,
+.pos-shell[data-theme="light"] .pos-top-icons { border-color: rgba(255, 255, 255, .22); }
+.pos-shell .pos-online,
+.pos-shell[data-theme="light"] .pos-online { color: #fff; }
+.pos-shell .pos-online > span,
+.pos-shell[data-theme="light"] .pos-online > span { background: #4ade80; }
+.pos-shell .pos-online small,
+.pos-shell[data-theme="light"] .pos-online small { color: #86efac; }
+.pos-shell .pos-user small,
+.pos-shell[data-theme="light"] .pos-user small { color: rgba(255, 255, 255, .68); }
+
+@media (max-width: 1400px) and (min-width: 769px) {
+  .pos-shell,
+  .pos-shell.checkout-screen { grid-template-columns: 208px minmax(0, 1fr); }
+  .pos-shell.sidebar-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
+  .pos-shell .pos-topbar,
+  .pos-shell.checkout-screen .pos-topbar {
+    grid-template-columns: minmax(145px, 1fr) minmax(270px, 480px) minmax(145px, 1fr);
+    gap: 12px;
+    padding-inline: 12px;
+  }
+  .pos-shell .pos-topbar-actions { gap: 9px; }
+  .pos-shell .pos-online { font-size: 12px; }
+  .pos-shell .pos-user > span,
+  .pos-shell .pos-user > i { display: none; }
+}
+
+@media (max-width: 980px) and (min-width: 769px) {
+  .pos-shell .pos-topbar,
+  .pos-shell.checkout-screen .pos-topbar {
+    grid-template-columns: minmax(120px, 1fr) minmax(250px, 390px) minmax(120px, 1fr);
+    gap: 8px;
+  }
+  .pos-shell .pos-online > div { display: none; }
+  .pos-shell .pos-top-icons { padding-inline: 6px; }
+}
+
+@media (max-width: 768px) {
+  .pos-shell .pos-topbar,
+  .pos-shell.checkout-screen .pos-topbar,
+  .pos-shell[data-theme="light"] .pos-topbar {
+    display: flex;
+    color: #fff;
+    background: linear-gradient(145deg, #064e3b, #065f46);
+    border-color: rgba(255, 255, 255, .12);
+  }
+  .pos-shell .pos-topbar-leading { flex: 1; gap: 8px; }
+  .pos-shell .pos-topbar-actions { flex: 0 0 auto; gap: 5px; }
+  .pos-shell .pos-topbar-menu { display: none; }
+  .pos-shell .pos-mobile-brand {
+    display: flex;
+    flex: 0 0 38px;
+    flex-direction: column;
+    align-items: flex-start;
+    color: #fff;
+    line-height: .88;
+  }
+  .pos-shell .pos-mobile-brand b { font-size: 21px; font-weight: 900; letter-spacing: -1px; }
+  .pos-shell .pos-mobile-brand small { margin-top: 3px; font-size: 7px; font-weight: 850; letter-spacing: .06em; }
+  .pos-shell .pos-theme-toggle-mobile,
+  .pos-shell[data-theme="light"] .pos-theme-toggle-mobile,
+  .pos-shell .pos-user > div,
+  .pos-shell[data-theme="light"] .pos-user > div { color: #fff; border-color: rgba(255, 255, 255, .26); }
+  .pos-shell[data-theme="light"] .pos-sidebar {
+    color: var(--matrix-text-body);
+    background: #fff;
+    border-color: var(--matrix-border);
+  }
+  .pos-shell[data-theme="light"] .pos-nav-item { color: var(--matrix-text-muted); }
+  .pos-shell[data-theme="light"] .pos-nav-item.active {
+    color: var(--pos-brand);
+    background: var(--pos-brand-soft);
+    box-shadow: none;
+  }
+}
