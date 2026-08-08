@@ -9,12 +9,18 @@ import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './whole
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import {
+  consumeMatrizGalpaoReservation, releaseMatrizGalpaoReservation,
+} from '../../atendente-v2/matriz-stock-reservation.js';
+import {
   applyMatrizWalkinStockSale, prepareMatrizWalkinStock,
 } from './matriz-walkin-stock.js';
 import { hashPassword } from '../../parceiro/password.js';
 import type { RegisterManualOrderInput, CancelManualOrderInput } from './queries-pedidos.js';
 import { hasMatrizSellerColumn } from './payroll-schema.js';
-import { postMatrizRetailCancellation, postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
+import {
+  postMatrizRetailCancellation, postMatrizRetailPaymentIfRealized,
+  postMatrizRetailSaleFacts,
+} from './matriz-ledger-retail-sales.js';
 import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 
 async function resolveContactId(
@@ -170,6 +176,7 @@ export async function cancelManualOrder(
       input.actor_label,
       input.reason,
     ]);
+    await releaseMatrizGalpaoReservation(client, environment, input.order_id);
     await applyMatrizGalpaoReturn(client, environment, input.order_id);
     const cancelled = await client.query<{ updated_at: string }>(
       `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,
@@ -186,6 +193,45 @@ export async function cancelManualOrder(
   }
 
   return { cancelled: true };
+}
+
+/** Conclui retirada aberta do bot: reserva vira baixa fisica e o pagamento realiza. */
+export async function completeMatrizPickup(
+  input: { order_id: string; actor_label: string; environment?: 'prod' | 'test' },
+  dbPool: Pool = defaultPool,
+): Promise<{ order_id: string; status: 'paid'; retrieved_at: string }> {
+  const environment = input.environment ?? env.FAREJADOR_ENV;
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const updated = await client.query<{ order_id: string; status: 'paid'; retrieved_at: string }>(
+      `UPDATE commerce.orders o
+          SET status='paid',retrieved_at=now(),closed_at=COALESCE(closed_at,now()),
+              closed_by=COALESCE(closed_by,$3),updated_at=now()
+        WHERE o.environment=$1 AND o.id=$2 AND o.partner_order_id IS NULL
+          AND o.fulfillment_mode='pickup' AND o.status='open'
+          AND EXISTS (SELECT 1 FROM core.units u
+                       WHERE u.environment=o.environment AND u.id=o.unit_id AND u.slug='main')
+          AND EXISTS (SELECT 1 FROM audit.events a
+                       WHERE a.environment=o.environment AND a.entity_id=o.id
+                         AND a.event_type='matriz_galpao_reserved')
+        RETURNING o.id order_id,o.status,o.retrieved_at`,
+      [environment, input.order_id, input.actor_label],
+    );
+    if (!updated.rows[0]) throw new Error('pickup_not_found');
+    await consumeMatrizGalpaoReservation(client, environment, input.order_id);
+    await postMatrizRetailSaleFacts(client, environment, input.order_id);
+    await postMatrizRetailPaymentIfRealized(
+      client, environment, input.order_id, input.actor_label,
+    );
+    await client.query('COMMIT');
+    return updated.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ─── Onboarding de parceiro (Etapa 1) ────────────────────────────────────────

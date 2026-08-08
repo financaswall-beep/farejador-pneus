@@ -28,7 +28,7 @@ export async function getMatrizWholesaleStockQty(
   const state = matrizStockForMeasure(
     buildMatrizStockIndex(stock), key, spec?.brand, spec?.tire_condition,
   );
-  return state.sellable ? state.quantity_on_hand : 0;
+  return state.sellable ? state.quantity_available : 0;
 }
 
 /**
@@ -51,7 +51,7 @@ export async function getMatrizWholesaleStockMap(
     const state = matrizStockForMeasure(
       stockIndex, s.tire_size, s.brand, s.tire_condition,
     );
-    out.set(s.product_id, state.sellable ? state.quantity_on_hand : 0);
+    out.set(s.product_id, state.sellable ? state.quantity_available : 0);
   }
   return out;
 }
@@ -138,7 +138,7 @@ export async function checkMatrizGalpaoShortfall(
     const brand = brandByKey.get(variantKey) ?? null;
     const tireCondition = conditionByKey.get(variantKey) ?? 'meia_vida';
     const state = matrizStockForMeasure(stockIndex, key, brand, tireCondition);
-    const available = state.sellable ? state.quantity_on_hand : 0;
+    const available = state.sellable ? state.quantity_available : 0;
     if (available < requested) {
       shortfalls.push({
         measure: labelByKey.get(variantKey) ?? key, brand,
@@ -209,7 +209,7 @@ export async function applyMatrizGalpaoDecrement(
   for (const { key, brand, tire_condition: condition, quantity: qty } of qtyByKey.values()) {
     const state = matrizStockForMeasure(stockIndex, key, brand, condition);
     if (state.block_reason) throw new Error(state.block_reason);
-    if (state.quantity_on_hand < qty) throw new Error('walkin_stock_insufficient');
+    if (state.quantity_available < qty) throw new Error('walkin_stock_insufficient');
     plan.push({
       measure: state.measure!, brand: state.brand!, tire_condition: condition, qty,
     });
@@ -229,7 +229,7 @@ export async function applyMatrizGalpaoDecrement(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand - $5
         WHERE environment = $1 AND measure = $2 AND brand = $3
-          AND tire_condition=$4 AND quantity_on_hand >= $5
+          AND tire_condition=$4 AND quantity_on_hand-quantity_reserved >= $5
         RETURNING quantity_on_hand`,
       [environment, line.measure, line.brand, line.tire_condition, line.qty],
     );

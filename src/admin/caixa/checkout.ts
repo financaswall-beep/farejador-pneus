@@ -93,9 +93,10 @@ export async function getCaixaCatalog(
 
   const stock = await dbPool.query<{
     measure: string; brand: string; tire_condition: TireCondition;
-    quantity_on_hand: number | string; unit_cost: number | string | null;
+    quantity_on_hand: number | string; quantity_reserved: number | string;
+    unit_cost: number | string | null;
   }>(
-    `SELECT measure,brand,tire_condition,quantity_on_hand,unit_cost
+    `SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost
        FROM commerce.wholesale_stock
       WHERE environment=$1`,
     [environment],
@@ -124,7 +125,7 @@ export async function getCaixaCatalog(
       ...row,
       price_amount: price,
       currency: row.currency ?? 'BRL',
-      stock_quantity: official.quantity_on_hand,
+      stock_quantity: official.quantity_available,
       sellable: official.sellable && price !== null,
       block_reason: price === null ? 'catalog_price_missing' : official.block_reason,
     };

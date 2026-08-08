@@ -21,6 +21,8 @@ describe('erros publicos da venda walk-in atomica', () => {
     'walkin_stock_ambiguous',
     'walkin_idempotency_conflict',
     'walkin_product_not_sellable',
+    'pickup_not_found',
+    'stock_reservation_already_released',
   ])('mapeia conflito comercial %s para 409', (message) => {
     expect(mapWriteError(new Error(message))).toEqual({ status: 409, error: message });
   });

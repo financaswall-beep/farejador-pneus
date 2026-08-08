@@ -30,7 +30,8 @@ import {
   type PartnerOrderRouting,
 } from './fulfillment.js';
 import { env } from '../shared/config/env.js';
-import { getMatrizWholesaleStockQty, applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { getMatrizWholesaleStockQty, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot, checkMatrizGalpaoShortfall } from './wholesale-stock-read.js';
+import { releaseMatrizGalpaoReservation, reserveMatrizGalpaoStock } from './matriz-stock-reservation.js';
 import { buscarCompatibilidadeMatriz, buscarProdutoMatriz, verificarEstoqueMatriz } from './matriz-product-search.js';
 import { recordMatrizLegacyStockRead } from '../shared/matriz-stock-telemetry.js';
 import { getLatestCustomerLocation, resolveCustomerLocation } from './customer-location.js';
@@ -1162,12 +1163,12 @@ async function insertCommerceOrderMirror(
     // NUNCA entra aqui (tem partner_order_id + reserva o próprio partner_stock_levels). Só na
     // inserção REAL — o caminho de colisão de idempotência (retry) abaixo NÃO baixa de novo.
     if (!input.partnerOrderId) {
-      await applyMatrizGalpaoDecrement(
+      await reserveMatrizGalpaoStock(
         client,
         environment,
+        order.id,
         input.items.map((i) => ({ productId: i.product_id, quantity: i.quantity })),
         env.WHOLESALE_MATRIZ_DECREMENT,
-        order.id,
       );
       // Fatia 2 (0117): CONGELA o custo médio do galpão nos itens da venda da matriz —
       // o lucro desta venda não muda quando o custo médio mudar depois. Mesma transação
@@ -1831,6 +1832,7 @@ async function cancelarPedido(
       'agent_v2_bot',
       reason,
     ]);
+    await releaseMatrizGalpaoReservation(client, environment, order.id);
     await applyMatrizGalpaoReturn(client, environment, order.id);
     const cancelled = await client.query<{ updated_at: string }>(
       `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,

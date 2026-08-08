@@ -15,6 +15,7 @@ interface CatalogRow {
 }
 interface StockRow {
   measure: string; brand: string; quantity_on_hand: number | string;
+  quantity_reserved: number | string;
   tire_condition: TireCondition;
   unit_cost: number | string | null;
   updated_at: string | null;
@@ -68,7 +69,7 @@ export async function getCatalogOverview(
       [environment],
     ),
     dbPool.query<StockRow>(
-      `SELECT measure,brand,tire_condition,quantity_on_hand,unit_cost,updated_at
+      `SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost,updated_at
          FROM commerce.wholesale_stock WHERE environment=$1`,
       [environment],
     ),
@@ -111,6 +112,8 @@ export async function getCatalogOverview(
       catalogued: true,
       price_amount: price,
       official_quantity_on_hand: state.quantity_on_hand,
+      official_quantity_reserved: state.quantity_reserved,
+      total_stock_available: state.quantity_available,
       official_unit_cost: cost,
       stock_source: 'commerce.wholesale_stock',
       stock_updated_at: officialStock?.updated_at ?? null,
@@ -145,6 +148,8 @@ export async function getCatalogOverview(
         row_key: `stock:${tireSizeKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
         catalogued: false,
         official_quantity_on_hand: Number(row.quantity_on_hand),
+        official_quantity_reserved: Number(row.quantity_reserved ?? 0),
+        total_stock_available: Math.max(Number(row.quantity_on_hand) - Number(row.quantity_reserved ?? 0), 0),
         official_unit_cost: row.unit_cost === null ? null : Number(row.unit_cost),
         stock_source: 'commerce.wholesale_stock',
         stock_updated_at: row.updated_at,
@@ -167,7 +172,7 @@ export async function getCatalogOverview(
       stock_only: stockOnlyRows.length,
       brands: brands.length,
       without_price: rows.filter((row) => row.price_amount === null).length,
-      with_stock: rows.filter((row) => row.official_quantity_on_hand > 0).length,
+      with_stock: rows.filter((row) => row.total_stock_available > 0).length,
     },
     brands,
     rows,

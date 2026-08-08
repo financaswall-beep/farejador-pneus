@@ -61,7 +61,7 @@ export async function applyWholesaleStockDecrement(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand - $5
         WHERE environment = $1 AND measure = $2 AND brand = $3
-          AND tire_condition = $4 AND quantity_on_hand >= $5
+          AND tire_condition = $4 AND quantity_on_hand-quantity_reserved >= $5
         RETURNING quantity_on_hand`,
       [environment, measure, brand, condition, qty],
     );

@@ -75,12 +75,17 @@ function clampLimit(limit?: number): number {
 
 export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPool): Promise<unknown[]> {
   const result = await dbPool.query(
-    `SELECT pr.*,
+    `SELECT pr.*, live.delivery_status AS matriz_delivery_status, live.retrieved_at,
+            EXISTS (SELECT 1 FROM audit.events a
+                     WHERE a.environment=live.environment AND a.entity_id=live.id
+                       AND a.event_type='matriz_galpao_reserved') AS has_stock_reservation,
             COALESCE(amounts.items_amount,0) AS items_amount,
             CASE WHEN pr.fulfillment_mode='delivery'
                  THEN GREATEST(pr.total_amount-COALESCE(amounts.items_amount,0),0)
                  ELSE 0 END AS freight_amount
      FROM dashboard.pedidos_recentes pr
+     JOIN commerce.orders live
+       ON live.id=pr.order_id AND live.environment=pr.environment
      LEFT JOIN LATERAL (
        SELECT SUM(oi.quantity*oi.unit_price-oi.discount_amount) AS items_amount
          FROM commerce.order_items oi
@@ -115,9 +120,10 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
   const stock = await dbPool.query<{
     measure: string; brand: string; tire_condition: string;
     quantity_on_hand: number | string;
+    quantity_reserved: number | string;
     unit_cost: number | string | null;
   }>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [env.FAREJADOR_ENV],
@@ -129,8 +135,9 @@ export async function getPainelProdutos(limit?: number, dbPool: Pool = defaultPo
     );
     return {
       ...product,
-      total_stock_available: official.sellable ? official.quantity_on_hand : 0,
+      total_stock_available: official.sellable ? official.quantity_available : 0,
       official_quantity_on_hand: official.quantity_on_hand,
+      official_quantity_reserved: official.quantity_reserved,
       official_unit_cost: official.unit_cost,
       stock_source: 'commerce.wholesale_stock',
       walkin_sellable: official.sellable && product.price_amount !== null,

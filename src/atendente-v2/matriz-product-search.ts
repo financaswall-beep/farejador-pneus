@@ -35,6 +35,7 @@ interface OfficialStockRow {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number | string;
+  quantity_reserved: number | string;
   unit_cost: number | string | null;
 }
 
@@ -80,7 +81,7 @@ export async function buscarProdutoMatriz(
       );
       return {
         ...row,
-        total_stock_available: state.sellable ? state.quantity_on_hand : 0,
+        total_stock_available: state.sellable ? state.quantity_available : 0,
         stock_source: 'commerce.wholesale_stock' as const,
         stock_block_reason: state.block_reason,
       };
@@ -95,7 +96,9 @@ export async function buscarProdutoMatriz(
 export async function verificarEstoqueMatriz(
   client: PoolClient,
   input: VerificarEstoqueInput,
-): Promise<(EstoqueProduto & StockProvenance & { quantidade_fisica_oficial: number }) | null> {
+): Promise<(EstoqueProduto & StockProvenance & {
+  quantidade_fisica_oficial: number; quantidade_reservada: number;
+}) | null> {
   const parsed = verificarEstoqueInputSchema.parse(input);
   const values: unknown[] = [parsed.environment];
   const filters = ['p.environment = $1', 'p.deleted_at IS NULL'];
@@ -114,7 +117,7 @@ export async function verificarEstoqueMatriz(
   const state = matrizStockForMeasure(
     buildMatrizStockIndex(stock), row.tire_size, row.brand, row.tire_condition,
   );
-  const available = state.sellable ? state.quantity_on_hand : 0;
+  const available = state.sellable ? state.quantity_available : 0;
   return {
     product_id: row.product_id,
     product_code: row.product_code,
@@ -122,7 +125,9 @@ export async function verificarEstoqueMatriz(
     disponivel: state.sellable,
     quantidade_total: available,
     quantidade_fisica_oficial: state.quantity_on_hand,
-    locations: [{ location: 'matriz_galpao', quantity_available: available, quantity_reserved: 0 }],
+    quantidade_reservada: state.quantity_reserved,
+    locations: [{ location: 'matriz_galpao', quantity_available: available,
+      quantity_reserved: state.quantity_reserved }],
     stock_source: 'commerce.wholesale_stock',
     stock_block_reason: state.block_reason,
   };
@@ -207,7 +212,7 @@ export async function buscarCompatibilidadeMatriz(
           source: row.source,
           confidence_level: row.confidence_level,
           current_price: row.current_price,
-          total_stock: state.sellable ? state.quantity_on_hand : 0,
+          total_stock: state.sellable ? state.quantity_available : 0,
           stock_source: 'commerce.wholesale_stock',
           stock_block_reason: state.block_reason,
         };
@@ -232,7 +237,7 @@ function catalogSql(filters: string[]): string {
 
 async function loadOfficialStock(client: PoolClient, environment: 'prod' | 'test'): Promise<OfficialStockRow[]> {
   const result = await client.query<OfficialStockRow>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1`,
     [environment],

@@ -137,7 +137,7 @@ describe('estoque atomico da venda walk-in da matriz', () => {
 
     const decrement = queries.find((entry) => entry.sql.includes('UPDATE commerce.wholesale_stock'))!;
     expect(decrement.sql).toContain('quantity_on_hand - $5');
-    expect(decrement.sql).toContain('quantity_on_hand >= $5');
+    expect(decrement.sql).toContain('quantity_on_hand-quantity_reserved >= $5');
     expect(decrement.sql).not.toContain('GREATEST');
     expect(queries.some((entry) => entry.sql.includes("'matriz_galpao_decrement'"))).toBe(true);
   });

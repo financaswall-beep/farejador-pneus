@@ -37,6 +37,10 @@ window.PAINEL_MODULES.varejo = function () {
           itensCount: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           pagto,
           fulfillmentMode: row.fulfillment_mode || null,
+          matrizDeliveryStatus: row.matriz_delivery_status || null,
+          retrievedAt: row.retrieved_at || null,
+          canCompletePickup: !isPartner && row.fulfillment_mode === 'pickup'
+            && row.status === 'open' && !!row.has_stock_reservation,
           operador: row.registered_by || '-',
           total: this.formatCurrency(row.total_amount),
           totalAmount: Number(row.total_amount || 0),
@@ -277,6 +281,17 @@ window.PAINEL_MODULES.varejo = function () {
         ]);
       } catch (err) {
         window.alert(`Não consegui cancelar: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    async retirarVarejo(row) {
+      if (!row?.canCompletePickup || !window.confirm('Confirmar que o cliente retirou e recebeu este pedido?')) return;
+      try {
+        await this.apiPost(`/admin/api/orders/${row.id}/retrieve`, {});
+        await Promise.allSettled([
+          this.loadRealData(), this.loadVendasData(), this.loadFinanceiro(),
+        ]);
+      } catch (err) {
+        window.alert(`NÃ£o consegui concluir a retirada: ${err instanceof Error ? err.message : String(err)}`);
       }
     },
   };

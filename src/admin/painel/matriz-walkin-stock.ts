@@ -24,6 +24,7 @@ interface StockRow {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number | string;
+  quantity_reserved: number | string;
   unit_cost: number | string | null;
 }
 
@@ -89,7 +90,7 @@ export async function prepareMatrizWalkinStock(
   const lines: MatrizWalkinStockPlan['lines'] = [];
   if (requestedByKey.size === 0) return { lines, costByProduct };
   const stock = await client.query<StockRow>(
-    `SELECT measure, brand, tire_condition, quantity_on_hand, unit_cost
+    `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
        FROM commerce.wholesale_stock
       WHERE environment = $1
       ORDER BY measure
@@ -102,7 +103,7 @@ export async function prepareMatrizWalkinStock(
       stockIndex, variant.key, variant.brand, variant.tire_condition,
     );
     if (state.block_reason) throw new Error(state.block_reason);
-    if (state.quantity_on_hand < variant.quantity) throw new Error('walkin_stock_insufficient');
+    if (state.quantity_available < variant.quantity) throw new Error('walkin_stock_insufficient');
     lines.push({
       measure: state.measure!, brand: state.brand!,
       tire_condition: variant.tire_condition, quantity: variant.quantity,
@@ -133,7 +134,7 @@ export async function applyMatrizWalkinStockSale(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand - $5
         WHERE environment = $1 AND measure = $2 AND brand = $3
-          AND tire_condition=$4 AND quantity_on_hand >= $5
+          AND tire_condition=$4 AND quantity_on_hand-quantity_reserved >= $5
         RETURNING quantity_on_hand`,
       [environment, line.measure, line.brand, line.tire_condition, line.quantity],
     );

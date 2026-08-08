@@ -31,7 +31,7 @@ window.PAINEL_MODULES.catalogo = function () {
       const search = String(this.catalogoBusca || '').trim().toLocaleLowerCase('pt-BR');
       return this.catalogoRows.filter((row) => {
         if (this.catalogoMarca !== 'todas' && row.brand !== this.catalogoMarca) return false;
-        if (this.catalogoFiltro === 'estoque' && Number(row.official_quantity_on_hand || 0) <= 0) return false;
+        if (this.catalogoFiltro === 'estoque' && Number(row.total_stock_available ?? row.official_quantity_on_hand ?? 0) <= 0) return false;
         if (this.catalogoFiltro === 'sem_preco' && row.price_amount != null) return false;
         if (!search) return true;
         return [row.product_code, row.product_name, row.brand, row.tire_size,

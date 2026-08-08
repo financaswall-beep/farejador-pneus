@@ -234,7 +234,7 @@ export async function applyGalpaoBaixaManual(
       `UPDATE commerce.wholesale_stock
           SET quantity_on_hand = quantity_on_hand - $5
         WHERE environment = $1 AND measure = $2 AND brand = $3
-          AND tire_condition=$4 AND quantity_on_hand >= $5
+          AND tire_condition=$4 AND quantity_on_hand-quantity_reserved >= $5
         RETURNING id, measure, brand, tire_condition, quantity_on_hand,
                   unit_cost, min_quantity, notes, updated_at,
                   tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,

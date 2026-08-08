@@ -13,6 +13,7 @@ export interface MatrizOfficialStockRow {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number | string;
+  quantity_reserved?: number | string | null;
   unit_cost: number | string | null;
 }
 
@@ -43,7 +44,7 @@ export async function loadMatrizOfficialStock(
   lock = false,
 ): Promise<MatrizOfficialStockRow[]> {
   const result = await client.query<MatrizOfficialStockRow>(
-    `SELECT measure,brand,tire_condition,quantity_on_hand,unit_cost
+    `SELECT measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost
        FROM commerce.wholesale_stock
       WHERE environment=$1
       ${lock ? 'ORDER BY measure,brand,tire_condition FOR UPDATE' : ''}`,

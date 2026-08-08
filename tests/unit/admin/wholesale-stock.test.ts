@@ -33,7 +33,7 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
     expect(rotuloParams).toEqual(['order-x']);
     const [sql, params] = query.mock.calls[1];
     expect(sql).toContain('quantity_on_hand = quantity_on_hand - $5');
-    expect(sql).toContain('quantity_on_hand >= $5');
+    expect(sql).toContain('quantity_on_hand-quantity_reserved >= $5');
     expect(sql).toContain('RETURNING quantity_on_hand');
     expect(sql).not.toContain('GREATEST');
     expect(params).toEqual(['prod', '90/90-18', 'Pirelli', 'meia_vida', 3]);

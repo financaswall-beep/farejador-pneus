@@ -22,6 +22,8 @@ export interface WholesaleStockRow {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number;
+  quantity_reserved: number;
+  quantity_available: number;
   unit_cost: number;
   /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
   min_quantity: number | null;
@@ -39,6 +41,8 @@ export async function listWholesaleStock(
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
     `SELECT ws.measure, ws.brand, ws.tire_condition, ws.quantity_on_hand,
+            ws.quantity_reserved,
+            (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,
             ws.unit_cost, ws.min_quantity, ws.notes,
             ws.updated_at, ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter
        FROM commerce.wholesale_stock ws
@@ -89,7 +93,8 @@ export async function setWholesaleStock(
                    tire_width_mm     = EXCLUDED.tire_width_mm,
                    tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
                    tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, brand, tire_condition, quantity_on_hand, unit_cost,
+       RETURNING measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
+                 (quantity_on_hand-quantity_reserved)::int AS quantity_available, unit_cost,
                  min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, brand, tireCondition, input.quantity_on_hand,
@@ -133,7 +138,8 @@ export async function addWholesaleStockEntry(
        tire_width_mm     = EXCLUDED.tire_width_mm,
        tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
        tire_rim_diameter = EXCLUDED.tire_rim_diameter
-       RETURNING measure, brand, tire_condition, quantity_on_hand, unit_cost,
+       RETURNING measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
+                 (quantity_on_hand-quantity_reserved)::int AS quantity_available, unit_cost,
                  min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, brand, tireCondition, input.quantity_in, input.unit_cost,

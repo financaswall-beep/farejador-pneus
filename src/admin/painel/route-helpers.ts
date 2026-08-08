@@ -103,6 +103,8 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
     'walkin_product_not_sellable',
     'catalog_price_missing',
     'catalog_price_changed',
+    'pickup_not_found',
+    'stock_reservation_already_released',
   ].includes(err.message)) {
     return { status: 409, error: err.message };
   }

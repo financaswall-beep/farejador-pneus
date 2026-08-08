@@ -1,7 +1,10 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-import { postMatrizRetailPaymentIfRealized } from '../painel/matriz-ledger-retail-sales.js';
+import {
+  postMatrizRetailPaymentIfRealized, postMatrizRetailSaleFacts,
+} from '../painel/matriz-ledger-retail-sales.js';
+import { consumeMatrizGalpaoReservation } from '../../atendente-v2/matriz-stock-reservation.js';
 import { MAIN_DELIVERY_GUARD } from '../painel/queries.js';
 import type { EntregadorAuth } from './queries.js';
 
@@ -60,8 +63,12 @@ export async function setEntregadorDeliveryStatus(
        input.payment_method ?? null, auth.displayName, tripId],
     );
     if (!r.rows[0]) throw new Error('delivery_not_found');
-    if (input.status === 'delivered') await postMatrizRetailPaymentIfRealized(
-      client, environment, input.order_id, auth.displayName);
+    if (input.status === 'delivered') {
+      await consumeMatrizGalpaoReservation(client, environment, input.order_id);
+      await postMatrizRetailSaleFacts(client, environment, input.order_id);
+      await postMatrizRetailPaymentIfRealized(
+        client, environment, input.order_id, auth.displayName);
+    }
     await client.query('COMMIT');
     return r.rows[0];
   } catch (err) {

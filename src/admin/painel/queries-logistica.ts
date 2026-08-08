@@ -7,10 +7,14 @@ import { normalizeBrazilianPhone } from '../../shared/phone.js';
 import { applyWholesaleStockDecrement, applyWholesaleStockReturn } from './wholesale-stock.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
+import {
+  consumeMatrizGalpaoReservation, releaseMatrizGalpaoReservation,
+} from '../../atendente-v2/matriz-stock-reservation.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { MAIN_DELIVERY_GUARD } from './queries-logistica-read.js';
 import {
   postMatrizRetailCancellation, postMatrizRetailPaymentIfRealized,
+  postMatrizRetailSaleFacts,
 } from './matriz-ledger-retail-sales.js';
 export * from './queries-logistica-read.js';
 
@@ -65,8 +69,12 @@ export async function setMatrizDeliveryStatus(
        input.payment_method ?? null, tripId],
     );
     if (!r.rows[0]) throw new Error('delivery_not_found');
-    if (input.status === 'delivered') await postMatrizRetailPaymentIfRealized(
-      client, environment, input.order_id, input.courier ?? 'logistica-matriz');
+    if (input.status === 'delivered') {
+      await consumeMatrizGalpaoReservation(client, environment, input.order_id);
+      await postMatrizRetailSaleFacts(client, environment, input.order_id);
+      await postMatrizRetailPaymentIfRealized(
+        client, environment, input.order_id, input.courier ?? 'logistica-matriz');
+    }
     await client.query('COMMIT');
     return r.rows[0];
   } catch (err) {
@@ -115,6 +123,7 @@ export async function failMatrizDelivery(
       input.actor_label ?? 'logistica-matriz',
       input.reason ?? 'entrega falhou',
     ]);
+    await releaseMatrizGalpaoReservation(client, environment, input.order_id);
     await applyMatrizGalpaoReturn(client, environment, input.order_id);
     const cancelled = await client.query<{ updated_at: string }>(
       `SELECT updated_at FROM commerce.orders WHERE id=$1 AND environment=$2`,

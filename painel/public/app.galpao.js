@@ -23,7 +23,8 @@ window.PAINEL_MODULES.galpao = function () {
     },
     // 0126: badge "repor" da tabela — mínimo definido e qtd chegou nele (zero tem cor própria).
     stockPrecisaRepor(row) {
-      return row.min_quantity != null && Number(row.quantity_on_hand) <= Number(row.min_quantity);
+      return row.min_quantity != null
+        && Number(row.quantity_available ?? row.quantity_on_hand) <= Number(row.min_quantity);
     },
     async stockSubmit() {
       const measure = (this.stockForm.measure || '').trim();

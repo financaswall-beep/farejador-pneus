@@ -16,6 +16,21 @@ export const REQUIRED_SCHEMA_SQL = `
       SELECT 1
         FROM information_schema.columns
        WHERE table_schema='commerce'
+         AND table_name='wholesale_stock'
+         AND column_name='quantity_reserved'
+         AND is_nullable='NO'
+    )
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
+         AND table_name='orders'
+         AND column_name='retrieved_at'
+    )
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
          AND table_name='wholesale_stock_movements'
          AND column_name='tire_condition'
          AND is_nullable='NO'
@@ -54,6 +69,6 @@ export const REQUIRED_SCHEMA_SQL = `
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0161_marketing_multichannel_messaging');
+    throw new Error('required_schema_missing:0164_matriz_stock_reservations');
   }
 }

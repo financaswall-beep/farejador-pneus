@@ -83,7 +83,7 @@ export async function getMatrizNotificacoes(
                ORDER BY s.quantity_on_hand::numeric / NULLIF(s.min_quantity, 0))
           FROM commerce.wholesale_stock s
          WHERE s.environment = $1 AND s.min_quantity IS NOT NULL
-           AND s.quantity_on_hand <= s.min_quantity) AS galpao_repor`,
+           AND (s.quantity_on_hand-s.quantity_reserved) <= s.min_quantity) AS galpao_repor`,
     [environment],
   );
   const row = r.rows[0]!;

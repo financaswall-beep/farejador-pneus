@@ -77,7 +77,7 @@ window.PAINEL_MODULES.format = function () {
         return messages[product.walkin_block_reason] || 'Esse produto nÃ£o pode ser vendido agora.';
       }
       const requested = Number(this.saleForm.quantity || 0);
-      const available = Number(product.official_quantity_on_hand || 0);
+      const available = Number(product.total_stock_available ?? product.official_quantity_on_hand ?? 0);
       if (!Number.isInteger(requested) || requested <= 0) return 'Informe uma quantidade vÃ¡lida.';
       if (requested > available) return `SÃ³ tem ${available} dessa medida no galpÃ£o.`;
       return null;

@@ -22,6 +22,7 @@ interface StockVariant {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number;
+  quantity_reserved: number;
   unit_cost: string;
   min_quantity: number | null;
   notes: string | null;
@@ -89,7 +90,7 @@ export async function transferWholesaleStockCondition(
     }
 
     const locked = await client.query<StockVariant>(
-      `SELECT id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text,
+      `SELECT id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost::text,
               min_quantity,notes,tire_width_mm,tire_aspect_ratio,tire_rim_diameter
          FROM commerce.wholesale_stock
         WHERE environment=$1 AND measure=$2 AND brand=$3
@@ -101,8 +102,9 @@ export async function transferWholesaleStockCondition(
     const source = locked.rows.find((row) => row.tire_condition === fromCondition);
     const targetBefore = locked.rows.find((row) => row.tire_condition === toCondition);
     if (!source) throw new Error('condition_transfer_source_not_found');
-    if (Number(source.quantity_on_hand) < input.quantity) {
-      throw new Error(`condition_transfer_insufficient:${source.quantity_on_hand}`);
+    const available = Number(source.quantity_on_hand) - Number(source.quantity_reserved ?? 0);
+    if (available < input.quantity) {
+      throw new Error(`condition_transfer_insufficient:${available}`);
     }
 
     await setGalpaoMovContext(client, {

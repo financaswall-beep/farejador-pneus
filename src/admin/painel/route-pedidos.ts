@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { getAdminContext, requireAdminAuth } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { cancelManualOrder, registerManualOrder, registerWalkinOrder } from './queries.js';
+import {
+  cancelManualOrder, completeMatrizPickup, registerManualOrder, registerWalkinOrder,
+} from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { cancelBodySchema, cancelParamsSchema, registerManualOrderSchema, registerWalkinOrderSchema } from './route-schemas.js';
 
@@ -67,6 +69,21 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel manual order cancellation failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  fastify.post('/admin/api/orders/:order_id/retrieve', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const params = cancelParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      return reply.status(200).send(await completeMatrizPickup({
+        order_id: params.data.order_id,
+        actor_label: operatorLabel(request),
+      }));
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel matriz pickup completion failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

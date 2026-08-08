@@ -24,8 +24,8 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
-<script src="/admin/painel/app.format.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.varejo.js?v=20260731-vendas-marcas1"></script>
+<script src="/admin/painel/app.format.js?v=20260807-reserva-matriz1"></script>
+<script src="/admin/painel/app.varejo.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260731-vendas-marcas1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260716-etapa4"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
@@ -58,10 +58,10 @@
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.correcao.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.galpao.js?v=20260731-brand1"></script>
-<script src="/admin/painel/app.catalogo.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.galpao.js?v=20260807-reserva-matriz1"></script>
+<script src="/admin/painel/app.catalogo.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260731-compat1"></script>
-<script src="/admin/painel/app.catalogo.marca.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.catalogo.marca.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
@@ -2371,7 +2371,7 @@
           <div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden">
             <div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaVarejoSelecionada?.data"></p></div><button @click="vendaVarejoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div>
             <div class="p-6 space-y-4"><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Cliente</p><p class="font-semibold mt-1" x-text="vendaVarejoSelecionada?.cliente"></p></div><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaVarejoSelecionada?.pagto"></p></div></div><div><p class="text-xs text-gray-400">Itens</p><p class="text-sm mt-1" x-text="vendaVarejoSelecionada?.itens"></p></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Operador</p><p class="text-sm mt-1" x-text="vendaVarejoSelecionada?.operador"></p></div><div><p class="text-xs text-gray-400">Status</p><span class="inline-flex mt-1 text-xs px-2 py-1 rounded-full" :class="vendaVarejoSelecionada?.statusClass" x-text="vendaVarejoSelecionada?.status"></span></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="vendaVarejoSelecionada?.total"></span></div></div>
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between"><button x-show="vendaVarejoSelecionada?.status !== 'Cancelado'" @click="cancelarVarejo(vendaVarejoSelecionada); vendaVarejoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><button @click="vendaVarejoSelecionada = null" class="ml-auto px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Fechar</button></div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="vendaVarejoSelecionada?.status !== 'Cancelado'" @click="cancelarVarejo(vendaVarejoSelecionada); vendaVarejoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><button x-show="vendaVarejoSelecionada?.canCompletePickup" @click="retirarVarejo(vendaVarejoSelecionada); vendaVarejoSelecionada = null" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Marcar retirado</button><button @click="vendaVarejoSelecionada = null" :class="vendaVarejoSelecionada?.canCompletePickup ? '' : 'ml-auto'" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800">Fechar</button></div>
           </div>
         </div>
       </div><!-- /varejo -->
@@ -2534,6 +2534,7 @@
             </div>
             <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3">
               <button x-show="vendaHistoricoSelecionada?.cancelavel" @click="if (vendaHistoricoSelecionada.canalId === 'varejo') { cancelarVarejo(vendaHistoricoSelecionada.varejo) } else { atacadoCancelSale(vendaHistoricoSelecionada.atacado) }; vendaHistoricoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button>
+              <button x-show="vendaHistoricoSelecionada?.varejo?.canCompletePickup" @click="retirarVarejo(vendaHistoricoSelecionada.varejo); vendaHistoricoSelecionada = null" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Marcar retirado</button>
               <a x-show="vendaHistoricoSelecionada?.recibo" :href="vendaHistoricoSelecionada?.recibo" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a>
               <button @click="vendaHistoricoSelecionada = null" :class="vendaHistoricoSelecionada?.recibo ? '' : 'ml-auto'" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button>
             </div>
@@ -8777,7 +8778,7 @@
             <div class="flex items-center gap-2 border-b border-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-900"><i data-lucide="warehouse" class="h-4 w-4"></i>Dados trazidos do Estoque</div>
             <div class="grid grid-cols-3 divide-x divide-emerald-100 px-2 py-4 text-center">
               <div class="px-2"><p class="text-[10px] text-gray-500">Custo médio atual</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="catalogoSelecionado?.official_unit_cost == null ? '—' : formatCurrency(Number(catalogoSelecionado.official_unit_cost))"></p></div>
-              <div class="px-2"><p class="text-[10px] text-gray-500">Estoque disponível</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="Number(catalogoSelecionado?.official_quantity_on_hand || 0) + ' un.'"></p></div>
+              <div class="px-2"><p class="text-[10px] text-gray-500">Estoque disponível</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="Number(catalogoSelecionado?.total_stock_available ?? catalogoSelecionado?.official_quantity_on_hand ?? 0) + ' un.'"></p></div>
               <div class="px-2"><p class="text-[10px] text-gray-500">Última compra</p><p class="mt-1 text-base font-bold text-emerald-800" x-text="catalogoSelecionado?.last_purchase_cost == null ? '—' : formatCurrency(Number(catalogoSelecionado.last_purchase_cost))"></p></div>
             </div>
             <div class="flex items-center justify-between border-t border-emerald-100 px-4 py-2.5 text-[10px] text-emerald-800">
@@ -9189,7 +9190,7 @@
           </div>
           <p x-show="saleForm.product_id" class="mt-2 text-xs"
              :class="saleStockError() ? 'text-rose-600' : 'text-emerald-700'"
-             x-text="saleStockError() || ('DisponÃ­vel no galpÃ£o: ' + selectedProduct()?.official_quantity_on_hand + ' un')"></p>
+             x-text="saleStockError() || ('DisponÃ­vel no galpÃ£o: ' + (selectedProduct()?.total_stock_available ?? selectedProduct()?.official_quantity_on_hand) + ' un')"></p>
           <div x-show="saleForm.product_id && selectedProduct()?.walkin_sellable"
                class="mt-3 grid grid-cols-3 gap-2 border-t border-gray-200 pt-3 text-xs">
             <div><p class="text-gray-400">Custo do estoque</p><p class="mt-1 font-semibold" x-text="formatCurrency(Number(selectedProduct()?.official_unit_cost || 0))"></p></div>

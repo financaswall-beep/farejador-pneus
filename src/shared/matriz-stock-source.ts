@@ -15,6 +15,7 @@ export interface MatrizStockRow {
   brand?: string | null;
   tire_condition?: TireCondition | string | null;
   quantity_on_hand: number | string;
+  quantity_reserved?: number | string | null;
   unit_cost?: number | string | null;
 }
 
@@ -24,6 +25,8 @@ export interface MatrizStockState {
   brand: string | null;
   tire_condition: TireCondition | null;
   quantity_on_hand: number;
+  quantity_reserved: number;
+  quantity_available: number;
   unit_cost: number | null;
   rows_count: number;
   sellable: boolean;
@@ -71,28 +74,31 @@ export function matrizStockForMeasure(
     rows = candidates;
   }
   if (rows.length === 0) {
-    return blocked(key, null, brand ?? null, wantedCondition, 0, null, 0,
+    return blocked(key, null, brand ?? null, wantedCondition, 0, 0, null, 0,
       'walkin_measure_not_found');
   }
   if (rows.length !== 1) {
     return blocked(key, rows[0]?.measure ?? null, brand ?? null, wantedCondition,
-      0, null, rows.length,
+      0, 0, null, rows.length,
       'walkin_stock_ambiguous');
   }
 
   const row = rows[0]!;
   const quantity = Number(row.quantity_on_hand);
+  const reserved = Number(row.quantity_reserved ?? 0);
   const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  const safeReserved = Number.isFinite(reserved) ? reserved : 0;
+  const available = Math.max(safeQuantity - safeReserved, 0);
+  if (!Number.isFinite(quantity) || !Number.isFinite(reserved) || available <= 0) {
     return blocked(key, row.measure, row.brand ?? null, wantedCondition,
-      safeQuantity, parseCost(row.unit_cost), 1,
+      safeQuantity, safeReserved, parseCost(row.unit_cost), 1,
       'walkin_stock_insufficient');
   }
 
   const unitCost = parseCost(row.unit_cost);
   if (unitCost === null || unitCost <= 0) {
     return blocked(key, row.measure, row.brand ?? null, wantedCondition,
-      safeQuantity, unitCost, 1,
+      safeQuantity, safeReserved, unitCost, 1,
       'walkin_cost_missing');
   }
 
@@ -102,6 +108,8 @@ export function matrizStockForMeasure(
     brand: row.brand ?? null,
     tire_condition: wantedCondition,
     quantity_on_hand: safeQuantity,
+    quantity_reserved: safeReserved,
+    quantity_available: available,
     unit_cost: unitCost,
     rows_count: 1,
     sellable: true,
@@ -121,6 +129,7 @@ function blocked(
   brand: string | null,
   tireCondition: TireCondition | null,
   quantity: number,
+  reserved: number,
   unitCost: number | null,
   rowsCount: number,
   reason: MatrizStockBlockReason,
@@ -131,6 +140,8 @@ function blocked(
     brand,
     tire_condition: tireCondition,
     quantity_on_hand: quantity,
+    quantity_reserved: reserved,
+    quantity_available: Math.max(quantity - reserved, 0),
     unit_cost: unitCost,
     rows_count: rowsCount,
     sellable: false,

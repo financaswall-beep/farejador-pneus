@@ -21,6 +21,6 @@ describe('schema mínimo exigido no boot', () => {
   it('recusa iniciar antes da migration 0161', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0161_marketing_multichannel_messaging');
+      .rejects.toThrow('required_schema_missing:0164_matriz_stock_reservations');
   });
 });

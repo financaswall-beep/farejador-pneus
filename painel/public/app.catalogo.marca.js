@@ -40,6 +40,8 @@ window.PAINEL_MODULES.catalogoMarca = function () {
         ...row,
         tire_size: row.measure,
         official_quantity_on_hand: row.quantity_on_hand,
+        official_quantity_reserved: row.quantity_reserved || 0,
+        total_stock_available: row.quantity_available ?? row.quantity_on_hand,
         official_unit_cost: row.unit_cost,
         row_key: `stock:${measureKey(row.measure)}:${brandKey(row.brand)}:${row.tire_condition}`,
       });
