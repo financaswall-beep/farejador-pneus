@@ -3,6 +3,93 @@
 
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
+  let pendingTicket = '';
+
+  function resetWorkplaceChooser() {
+    pendingTicket = '';
+    elements.workplaceList.replaceChildren();
+    elements.workplaceError.textContent = '';
+    elements.workplaceChooser.classList.add('hidden');
+    elements.form.classList.remove('hidden');
+  }
+
+  function storePartnerSession(payload) {
+    const key = 'farejador_partner_token_' + payload.slug;
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+    const storage = elements.remember.checked ? localStorage : sessionStorage;
+    storage.setItem(key, payload.session_token);
+  }
+
+  function completeLogin(payload) {
+    if (payload.scope === 'partner') {
+      storePartnerSession(payload);
+      window.location.assign(payload.redirect_path || ('/parceiro/' + payload.slug + '/'));
+      return;
+    }
+    Caixa.saveSession(payload);
+    Caixa.showSession(payload.display_name, payload.username);
+  }
+
+  function workplaceIcon(kind) {
+    if (kind === 'matrix') {
+      return Caixa.createSvg([
+        { d: 'M5 21V4h14v17M9 8h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1M3 21h18' },
+      ]);
+    }
+    return Caixa.createSvg([
+      { d: 'M4 10h16M5 10v10h14V10M3 6h18l-1 4H4L3 6Z' },
+      { d: 'M9 20v-6h6v6' },
+    ]);
+  }
+
+  function showWorkplaceChooser(payload) {
+    pendingTicket = payload.ticket;
+    elements.password.value = '';
+    elements.form.classList.add('hidden');
+    elements.workplaceChooser.classList.remove('hidden');
+    elements.workplaceList.replaceChildren();
+    (payload.workplaces || []).forEach(function (workplace) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'workplace-option';
+      button.dataset.workplaceId = workplace.id;
+      button.appendChild(workplaceIcon(workplace.kind));
+
+      const copy = document.createElement('span');
+      const title = document.createElement('strong');
+      title.textContent = workplace.name;
+      const subtitle = document.createElement('small');
+      subtitle.textContent = workplace.kind === 'matrix' ? 'Matriz · Vendas' : 'Unidade parceira · ' + (workplace.role === 'owner' ? 'Proprietário' : 'Funcionário');
+      copy.append(title, subtitle);
+      button.appendChild(copy);
+      button.appendChild(Caixa.createSvg([{ d: 'm9 18 6-6-6-6' }]));
+      elements.workplaceList.appendChild(button);
+    });
+    const first = elements.workplaceList.querySelector('button');
+    if (first) first.focus({ preventScroll: true });
+  }
+
+  async function chooseWorkplace(workplaceId) {
+    const buttons = Array.from(elements.workplaceList.querySelectorAll('button'));
+    buttons.forEach(function (button) { button.disabled = true; });
+    elements.workplaceError.textContent = '';
+    try {
+      const response = await fetch('/api/caixa/login/escolher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: pendingTicket, workplace_id: workplaceId }),
+      });
+      const payload = await Caixa.json(response);
+      if (!response.ok) throw new Error(payload.error || 'request_failed');
+      completeLogin(payload);
+    } catch (failure) {
+      elements.workplaceError.textContent = Caixa.errorMessage(
+        failure instanceof Error ? failure.message : 'request_failed',
+      );
+      buttons.forEach(function (button) { button.disabled = false; });
+    }
+  }
 
   elements.passwordToggle.addEventListener('click', function () {
     const visible = elements.password.type === 'text';
@@ -31,9 +118,12 @@
       });
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
-      Caixa.saveSession(payload);
       elements.password.value = '';
-      Caixa.showSession(payload.display_name, payload.username);
+      if (payload.mode === 'choose') {
+        showWorkplaceChooser(payload);
+        return;
+      }
+      completeLogin(payload);
     } catch (failure) {
       elements.error.textContent = Caixa.errorMessage(
         failure instanceof Error ? failure.message : 'request_failed',
@@ -43,9 +133,23 @@
     }
   });
 
+  elements.workplaceList.addEventListener('click', function (event) {
+    const button = event.target.closest('.workplace-option');
+    if (!button || button.disabled) return;
+    void chooseWorkplace(button.dataset.workplaceId || '');
+  });
+
+  elements.workplaceBack.addEventListener('click', function () {
+    resetWorkplaceChooser();
+    elements.username.focus({ preventScroll: true });
+  });
+
   document.addEventListener('keydown', function (event) {
     if (event.key !== 'Escape') return;
-    if (!elements.receiptModal.classList.contains('hidden')) Caixa.closeReceipt();
+    if (!elements.workplaceChooser.classList.contains('hidden')) {
+      resetWorkplaceChooser();
+      elements.username.focus({ preventScroll: true });
+    } else if (!elements.receiptModal.classList.contains('hidden')) Caixa.closeReceipt();
     else if (!elements.passwordModal.classList.contains('hidden')) Caixa.closePasswordModal();
     else if (!elements.helpModal.classList.contains('hidden')) Caixa.closeHelpModal();
   });

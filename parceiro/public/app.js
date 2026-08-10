@@ -32,7 +32,7 @@ function parceiroApp() {
     // â”€â”€â”€ ESTADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     slug,
     tokenKey,
-    apiToken: localStorage.getItem(tokenKey) || '',
+    apiToken: sessionStorage.getItem(tokenKey) || localStorage.getItem(tokenKey) || '',
     tokenInput: '',              // P1: código de acesso (só no primeiro acesso do dono)
     loginMode: 'login',          // 'login' (usuário+senha) | 'firstAccess' (dono cola código)
     loginUsername: '',

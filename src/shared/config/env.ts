@@ -194,6 +194,8 @@ const envSchema = z.object({
   MATRIZ_ENTREGADOR_PORTAL: booleanStringSchema,
   // /caixa aceita somente vendedor ativo da área de vendas da Matriz.
   MATRIZ_CAIXA_PORTAL: booleanStringSchema,
+  // Login unificado de Matriz + parceiros; OFF preserva a porta atual da Matriz.
+  OPERACAO_LOJA_PORTAL: booleanStringSchema,
   // MATRIZ COMO LOJA — a matriz entra no anel de proximidade igual a qualquer parceiro,
   // com a coordenada do galpão (Petiti/SG) e o estoque do GALPÃO (commerce.wholesale_stock,
   // mesma régua do WHOLESALE_UNIFIED_STOCK). Ela NUNCA bate um parceiro no mesmo anel

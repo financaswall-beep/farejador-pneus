@@ -110,6 +110,7 @@ window.PARCEIRO_MODULES.auth = () => ({
       this.loginPassword = '';
       this.loginMode = 'login';
       localStorage.removeItem(this.tokenKey);
+      sessionStorage.removeItem(this.tokenKey);
       this.authed = false;
       this.resumo = null;
       this.vendas = [];

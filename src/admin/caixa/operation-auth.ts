@@ -1,0 +1,144 @@
+import type { Pool } from 'pg';
+import { pool as defaultPool } from '../../persistence/db.js';
+import { authenticatePersonCredentials } from '../../parceiro/people.js';
+
+export type OperationWorkplace =
+  | {
+      id: 'matrix';
+      kind: 'matrix';
+      name: 'Matriz';
+      role: 'vendedor';
+      collaboratorId: string;
+    }
+  | {
+      id: string;
+      kind: 'partner';
+      name: string;
+      role: string;
+      slug: string;
+      tokenId: string;
+    };
+
+export interface OperationAuthResult {
+  personId: string;
+  username: string;
+  workplaces: OperationWorkplace[];
+}
+
+type MatrixRow = {
+  collaborator_id: string;
+};
+
+type PartnerRow = {
+  token_id: string;
+  slug: string;
+  store_name: string;
+  role: string;
+  allow_vendas: boolean;
+  allow_estoque: boolean;
+  allow_entregas: boolean;
+};
+
+/**
+ * Lista exclusivamente os locais de trabalho ativos da pessoa autenticada.
+ *
+ * O identificador técnico do vínculo nunca sai no JSON. Para parceiros, a
+ * permissão por pessoa prevalece sobre a permissão da loja e os defaults atuais
+ * são mantidos. Um funcionário sem Vendas, Estoque e Entregas não recebe a porta
+ * operacional, mesmo que ainda possua acesso a outras telas administrativas.
+ */
+export async function listOperationWorkplaces(
+  environment: string,
+  personId: string,
+  dbPool: Pool = defaultPool,
+): Promise<OperationWorkplace[]> {
+  const [matrix, partners] = await Promise.all([
+    dbPool.query<MatrixRow>(
+      `SELECT mc.id AS collaborator_id
+         FROM network.matriz_collaborators mc
+        WHERE mc.environment = $1
+          AND mc.person_id = $2
+          AND mc.revoked_at IS NULL
+          AND mc.job = 'vendedor'
+          AND mc.work_area = 'sales'
+        LIMIT 1`,
+      [environment, personId],
+    ),
+    dbPool.query<PartnerRow>(
+      `SELECT pat.id AS token_id,
+              pu.slug,
+              COALESCE(pu.display_name, u.name) AS store_name,
+              pat.role,
+              CASE WHEN pat.role = 'owner' THEN true
+                   ELSE COALESCE(ptp.allow_vendas, pup.allow_vendas, true) END AS allow_vendas,
+              CASE WHEN pat.role = 'owner' THEN true
+                   ELSE COALESCE(ptp.allow_estoque, pup.allow_estoque, true) END AS allow_estoque,
+              CASE WHEN pat.role = 'owner' THEN true
+                   ELSE COALESCE(ptp.allow_entregas, pup.allow_entregas, true) END AS allow_entregas
+         FROM network.partner_access_tokens pat
+         JOIN network.partner_units pu
+           ON pu.id = pat.partner_unit_id AND pu.environment = pat.environment
+         JOIN network.partners p
+           ON p.id = pu.partner_id AND p.environment = pu.environment
+         JOIN core.units u ON u.id = pu.unit_id
+         LEFT JOIN network.partner_token_permissions ptp
+           ON ptp.token_id = pat.id AND ptp.environment = pat.environment
+         LEFT JOIN network.partner_unit_permissions pup
+           ON pup.partner_unit_id = pu.id AND pup.environment = pu.environment
+        WHERE pat.environment = $1
+          AND pat.person_id = $2
+          AND pat.revoked_at IS NULL
+          AND pu.status = 'active' AND p.status = 'active'
+          AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        ORDER BY store_name ASC`,
+      [environment, personId],
+    ),
+  ]);
+
+  const workplaces: OperationWorkplace[] = [];
+  const matrixRow = matrix.rows[0];
+  if (matrixRow) {
+    workplaces.push({
+      id: 'matrix',
+      kind: 'matrix',
+      name: 'Matriz',
+      role: 'vendedor',
+      collaboratorId: matrixRow.collaborator_id,
+    });
+  }
+
+  for (const row of partners.rows) {
+    if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas) continue;
+    workplaces.push({
+      id: `partner:${row.slug}`,
+      kind: 'partner',
+      name: row.store_name,
+      role: row.role,
+      slug: row.slug,
+      tokenId: row.token_id,
+    });
+  }
+  return workplaces;
+}
+
+export async function authenticateOperation(
+  environment: string,
+  username: string,
+  password: string,
+  dbPool: Pool = defaultPool,
+): Promise<OperationAuthResult | null> {
+  const person = await authenticatePersonCredentials(environment, username, password);
+  if (!person) return null;
+  const workplaces = await listOperationWorkplaces(environment, person.personId, dbPool);
+  if (workplaces.length === 0) return null;
+  return { personId: person.personId, username: person.username, workplaces };
+}
+
+export function publicOperationWorkplace(workplace: OperationWorkplace) {
+  return {
+    id: workplace.id,
+    kind: workplace.kind,
+    name: workplace.name,
+    role: workplace.role,
+  };
+}

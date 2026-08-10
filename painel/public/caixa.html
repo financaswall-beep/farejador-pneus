@@ -4,16 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
-  <title>Frente de Caixa — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260805-weekonly1" />
-  <script defer src="/caixa/caixa-core.js?v=20260805-weekonly1"></script>
+  <title>Operação da Loja — 2W Pneus</title>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260810-operacao-login1" />
+  <script defer src="/caixa/caixa-core.js?v=20260810-operacao-login1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout2"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260805-weekonly1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
-  <script defer src="/caixa/caixa.js?v=20260804-ci1"></script>
+  <script defer src="/caixa/caixa.js?v=20260810-operacao-login1"></script>
 </head>
 <body>
   <main class="caixa-shell">
@@ -23,30 +23,40 @@
       <header class="brand-header">
         <img src="/caixa/logo-2w.svg" width="92" height="92" alt="2W Pneus" class="brand-logo" />
         <h1 id="caixa-title">2W PNEUS</h1>
-        <p class="brand-product">Frente de Caixa</p>
-        <p class="brand-unit">Matriz</p>
+        <p class="brand-product">Operação da Loja</p>
+        <p class="brand-unit">Venda, estoque e entregas em um só lugar</p>
       </header>
 
-      <div class="terminal-strip" aria-label="Identificação do terminal">
-        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V4h10v4M5 8h14v11H5zM8 13h8M8 16h5"/></svg>
-        <span>PDV MATRIZ</span>
+      <div class="operation-modules" aria-label="Módulos da Operação da Loja">
+        <span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
+          <strong>Vendas</strong>
+        </span>
         <i aria-hidden="true"></i>
-        <strong>TERMINAL 01</strong>
+        <span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>
+          <strong>Estoque</strong>
+        </span>
+        <i aria-hidden="true"></i>
+        <span>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 18H3v-5h8l2-5h4l2 5h2v5h-1M9 18h7M8 13l2-5H7M15 8l-1-3"/></svg>
+          <strong>Entregas</strong>
+        </span>
       </div>
 
       <section id="login-view">
-        <div class="cash-status" aria-label="Situação do caixa">
+        <div class="cash-status" aria-label="Acesso pronto">
           <span class="cash-status-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M7 8V4h10v4M5 9h14v10H5zM8 14h8M9 19v2m6-2v2"/><path d="M9 5h6"/></svg>
+            <svg viewBox="0 0 24 24"><circle cx="10" cy="7" r="4"/><path d="M3 20a7 7 0 0 1 11-5.7"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="m15.5 17.5 1.3 1.3 2.7-3"/></svg>
           </span>
           <span class="cash-status-copy">
-            <strong>Caixa fechado</strong>
-            <small>Entre para iniciar seu atendimento</small>
+            <strong>Pronto para começar</strong>
+            <small>Seu acesso e sua unidade serão identificados pelo login</small>
           </span>
         </div>
 
         <article class="login-card" aria-labelledby="login-heading">
-          <h2 id="login-heading" class="sr-only">Entrar no Frente de Caixa</h2>
+          <h2 id="login-heading" class="sr-only">Entrar na Operação da Loja</h2>
           <form id="caixa-login-form" novalidate>
             <div class="field">
               <label for="caixa-username">Usuário</label>
@@ -81,25 +91,27 @@
             <p id="caixa-login-error" class="login-error" role="alert" aria-live="assertive"></p>
 
             <button id="caixa-submit" class="primary-button" type="submit">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 8V4h10v4M5 9h14v10H5zM8 14h8M9 19v2m6-2v2"/></svg>
-              <span>ABRIR FRENTE DE CAIXA</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/></svg>
+              <span>ENTRAR NA OPERAÇÃO</span>
             </button>
           </form>
+
+          <section id="workplace-chooser" class="workplace-chooser hidden" aria-labelledby="workplace-heading">
+            <p class="chooser-kicker">Acesso identificado</p>
+            <h2 id="workplace-heading">Onde você vai trabalhar agora?</h2>
+            <p>Escolha um dos locais vinculados à sua conta.</p>
+            <div id="workplace-list" class="workplace-list"></div>
+            <p id="workplace-error" class="login-error" role="alert" aria-live="assertive"></p>
+            <button id="workplace-back" class="chooser-back" type="button">Voltar para o login</button>
+          </section>
 
           <div class="secure-row">
             <span aria-hidden="true"></span>
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-            <p>Acesso seguro da Matriz</p>
+            <p>Acesso seguro 2W Pneus</p>
             <span aria-hidden="true"></span>
           </div>
-
-          <div class="pos-tools" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 7h14v5H4zM7 12v8m8-8v8M9 15h4M18 9h2v8h-2"/></svg>
-            <i></i>
-            <svg viewBox="0 0 24 24"><path d="M4 9h16l-1 11H5L4 9Z"/><path d="m8 9 4-5 4 5M8 13v3m4-3v3m4-3v3"/></svg>
-            <i></i>
-            <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z"/><path d="M9 8h6m-6 4h6m-6 4h4"/></svg>
-          </div>
+          <p class="individual-access">Cada funcionário entra com sua própria conta.</p>
         </article>
       </section>
 

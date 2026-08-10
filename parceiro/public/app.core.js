@@ -50,6 +50,7 @@ window.PARCEIRO_MODULES.core = () => ({
             if (err && err.status === 401) {
               this.apiToken = '';
               localStorage.removeItem(this.tokenKey);
+              sessionStorage.removeItem(this.tokenKey);
               this.authed = false;
               location.replace(`/login?loja=${encodeURIComponent(this.slug)}&sessao=expirada`);
             }

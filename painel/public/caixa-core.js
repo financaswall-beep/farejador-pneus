@@ -12,6 +12,10 @@
   const byId = function (id) { return document.getElementById(id); };
   const elements = {
     form: byId('caixa-login-form'),
+    workplaceChooser: byId('workplace-chooser'),
+    workplaceList: byId('workplace-list'),
+    workplaceError: byId('workplace-error'),
+    workplaceBack: byId('workplace-back'),
     username: byId('caixa-username'),
     password: byId('caixa-password'),
     remember: byId('caixa-remember'),
@@ -157,7 +161,8 @@
 
   function errorMessage(code) {
     if (code === 'too_many_attempts') return 'Muitas tentativas. Aguarde alguns minutos.';
-    if (code === 'invalid_credentials') return 'Usuário ou senha inválidos para o Frente de Caixa.';
+    if (code === 'invalid_credentials') return 'Usuário ou senha inválidos para a Operação da Loja.';
+    if (code === 'ticket_invalid') return 'A escolha expirou. Entre novamente para continuar.';
     return 'Não foi possível entrar agora. Tente novamente.';
   }
 
@@ -181,7 +186,7 @@
 
   function setBusy(busy) {
     elements.submit.disabled = busy;
-    elements.submit.querySelector('span').textContent = busy ? 'ENTRANDO…' : 'ABRIR FRENTE DE CAIXA';
+    elements.submit.querySelector('span').textContent = busy ? 'ENTRANDO…' : 'ENTRAR NA OPERAÇÃO';
   }
 
   function createSvg(paths, className) {

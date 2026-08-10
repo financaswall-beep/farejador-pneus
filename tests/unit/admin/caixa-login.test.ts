@@ -17,24 +17,31 @@ const scriptFiles = [
 const script = scriptFiles
   .map((file) => readFileSync(resolve('painel/public', file), 'utf8'))
   .join('\n');
-const route = readFileSync(resolve('src/admin/caixa/route.ts'), 'utf8');
+const route = [
+  'src/admin/caixa/route.ts',
+  'src/admin/caixa/route-operation-login.ts',
+].map((file) => readFileSync(resolve(file), 'utf8')).join('\n');
 const photoRoute = readFileSync(resolve('src/admin/caixa/route-photo.ts'), 'utf8');
 const staticRoute = readFileSync(resolve('src/admin/caixa/route-static.ts'), 'utf8');
 const queries = readFileSync(resolve('src/admin/caixa/queries.ts'), 'utf8');
 const salesQueries = readFileSync(resolve('src/admin/caixa/sales.ts'), 'utf8');
 const appRoutes = readFileSync(resolve('src/app/routes.ts'), 'utf8');
 
-describe('login mobile do Frente de Caixa da Matriz', () => {
-  it('usa a identidade 2W e reproduz os elementos aprovados do PDV', () => {
+describe('login mobile da Operação da Loja', () => {
+  it('preserva a identidade 2W e apresenta os três módulos operacionais', () => {
     expect(html).toContain('2W PNEUS');
-    expect(html).toContain('Frente de Caixa');
-    expect(html).toContain('PDV MATRIZ');
-    expect(html).toContain('TERMINAL 01');
-    expect(html).toContain('Caixa fechado');
-    expect(html).toContain('ABRIR FRENTE DE CAIXA');
+    expect(html).toContain('Operação da Loja');
+    expect(html).toContain('Venda, estoque e entregas em um só lugar');
+    expect(html).toContain('Pronto para começar');
+    expect(html).toContain('Seu acesso e sua unidade serão identificados pelo login');
+    expect(html).toContain('ENTRAR NA OPERAÇÃO');
+    expect(html).toContain('Cada funcionário entra com sua própria conta.');
+    expect(html).toContain('Vendas');
+    expect(html).toContain('Estoque');
+    expect(html).toContain('Entregas');
     expect(html).not.toContain('Farejador');
     expect(css).toContain('.cash-status');
-    expect(css).toContain('.pos-tools');
+    expect(css).toContain('.operation-modules');
     expect(css).toContain("url('/caixa/hero-atendente-v1.webp')");
     expect(staticRoute).toContain("'/caixa/hero-atendente-v1.webp'");
     expect(staticRoute).toContain("'assets/caixa-login-atendente-v1.webp'");
@@ -64,13 +71,28 @@ describe('login mobile do Frente de Caixa da Matriz', () => {
       expect(staticRoute).toContain(`'/caixa/${file}'`);
     });
     expect(route).toContain("'/api/caixa/login'");
+    expect(route).toContain("'/api/caixa/login/escolher'");
     expect(route).toContain("'/api/caixa/me'");
     expect(route).toContain("'/api/caixa/logout'");
     expect(route).toContain("'/api/caixa/vendas'");
     expect(route).toContain("'/api/caixa/vendas/:orderId/recibo'");
     expect(route).toContain("'/api/caixa/password'");
     expect(route).toContain('MATRIZ_CAIXA_PORTAL');
+    expect(route).toContain('OPERACAO_LOJA_PORTAL');
     expect(appRoutes).toContain('registerCaixaRoute');
+  });
+
+  it('resolve Matriz ou parceira no servidor e mostra escolha só para vários vínculos', () => {
+    expect(html).toContain('id="workplace-chooser"');
+    expect(html).toContain('Onde você vai trabalhar agora?');
+    expect(script).toContain("payload.mode === 'choose'");
+    expect(script).toContain("payload.scope === 'partner'");
+    expect(script).toContain("fetch('/api/caixa/login/escolher'");
+    expect(script).toContain("'farejador_partner_token_' + payload.slug");
+    expect(route).toContain('authenticateOperation');
+    expect(route).toContain('newOperationLoginTicket');
+    expect(route).toContain('publicOperationWorkplace');
+    expect(queries).toContain('mintCaixaSessionForPerson');
   });
 
   it('entrega uma aba de vendas funcional sem usar a API administrativa', () => {

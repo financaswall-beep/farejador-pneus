@@ -30,6 +30,51 @@ export function isCaixaSessionToken(value: string): boolean {
 }
 
 /**
+ * Emite a sessão da Matriz depois que a identidade global já foi conferida.
+ * Revalida o vínculo no mesmo instante da emissão para uma revogação concorrente
+ * nunca transformar um ticket ainda vivo em acesso válido.
+ */
+export async function mintCaixaSessionForPerson(
+  environment: 'prod' | 'test',
+  personId: string,
+  dbPool: Pool = defaultPool,
+): Promise<CaixaLoginResult | null> {
+  const result = await dbPool.query<{
+    display_name: string;
+    username: string;
+  }>(
+    `SELECT mc.display_name, pp.username
+       FROM network.matriz_collaborators mc
+       JOIN network.partner_people pp
+         ON pp.id = mc.person_id AND pp.environment = mc.environment
+      WHERE mc.environment = $1
+        AND mc.person_id = $2
+        AND mc.revoked_at IS NULL
+        AND mc.job = 'vendedor' AND mc.work_area = 'sales'
+        AND pp.revoked_at IS NULL
+      LIMIT 1`,
+    [environment, personId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  const { token, hash } = newCaixaSessionToken();
+  const expiresAt = new Date(Date.now() + CAIXA_SESSION_TTL_HOURS * 60 * 60 * 1000).toISOString();
+  await dbPool.query(
+    `INSERT INTO network.matriz_staff_sessions
+       (environment, person_id, session_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [environment, personId, hash, expiresAt],
+  );
+  return {
+    session_token: token,
+    expires_at: expiresAt,
+    display_name: row.display_name,
+    username: row.username,
+  };
+}
+
+/**
  * Autentica somente vendedor ativo da Matriz. A consulta resolve pessoa e
  * colaborador antes da decisão e mantém a mesma resposta para todos os erros.
  */

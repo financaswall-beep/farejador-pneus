@@ -10,7 +10,6 @@ import {
 } from '../../shared/rate-limit.js';
 import { registerCaixaStaticRoutes } from './route-static.js';
 import {
-  authenticateCaixa,
   changeCaixaPassword,
   isCaixaSessionToken,
   revokeCaixaSession,
@@ -20,15 +19,9 @@ import {
 import { getCaixaSaleReceipt, getCaixaSales } from './sales.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
+import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
-const LOGIN_MAX_PER_USER = 10;
-const LOGIN_MAX_PER_IP = 20;
-
-const loginSchema = z.object({
-  username: z.string().trim().min(3).max(60).regex(/^[a-zA-Z0-9._-]+$/),
-  password: z.string().min(1).max(200),
-});
 
 const salesQuerySchema = z.object({
   period: z.enum(['today', '7d', '30d']).default('today'),
@@ -121,37 +114,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     (request as CaixaRequest).caixa = auth;
   };
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth);
-
-  fastify.post('/api/caixa/login', { preHandler: flagGate }, async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const ipKey = `caixa-login:ip:${request.ip}`;
-    if (rateLimitBlocked(ipKey, LOGIN_MAX_PER_IP)) return tooMany(reply, ipKey);
-
-    const parsed = loginSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
-      const exceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
-      if (exceeded) return tooMany(reply, ipKey);
-      return reply.status(401).send({ error: 'invalid_credentials' });
-    }
-
-    const userKey = `caixa-login:user:${parsed.data.username.toLowerCase()}`;
-    if (rateLimitBlocked(userKey, LOGIN_MAX_PER_USER)) return tooMany(reply, userKey);
-    const result = await authenticateCaixa(
-      env.FAREJADOR_ENV,
-      parsed.data.username,
-      parsed.data.password,
-    );
-    if (!result) {
-      const ipExceeded = rateLimitHit(ipKey, LOGIN_MAX_PER_IP, LOGIN_WINDOW_MS);
-      const userExceeded = rateLimitHit(userKey, LOGIN_MAX_PER_USER, LOGIN_WINDOW_MS);
-      if (ipExceeded || userExceeded) return tooMany(reply, userExceeded ? userKey : ipKey);
-      return reply.status(401).send({ error: 'invalid_credentials' });
-    }
-
-    rateLimitClear(ipKey);
-    rateLimitClear(userKey);
-    return reply.status(200).send(result);
-  });
+  registerCaixaOperationLoginRoutes(fastify, flagGate);
 
   fastify.get('/api/caixa/me', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

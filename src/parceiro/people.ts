@@ -26,19 +26,23 @@ export interface PersonAuthResult {
   stores: PersonStore[];
 }
 
+export interface PersonCredentialsResult {
+  personId: string;
+  username: string;
+}
+
 /**
- * Autentica a pessoa (username global + senha). null em: pessoa inexistente,
- * senha errada OU pessoa sem loja ativa — sempre a MESMA resposta lá fora
- * (não revela o que falhou). Pessoa inexistente queima o tempo de um verify
- * real (anti-enumeração por timing, igual ao login por slug).
+ * Confere a identidade global sem presumir onde a pessoa trabalha.
+ * A porta do parceiro lista lojas depois desta etapa; a Operação da Loja também
+ * pode acrescentar o vínculo ativo com a Matriz sem conferir a senha duas vezes.
  */
-export async function authenticatePersonGlobal(
+export async function authenticatePersonCredentials(
   environment: string,
   username: string,
   password: string,
-): Promise<PersonAuthResult | null> {
-  const res = await pool.query<{ id: string; password_hash: string | null }>(
-    `SELECT id, password_hash
+): Promise<PersonCredentialsResult | null> {
+  const res = await pool.query<{ id: string; username: string; password_hash: string | null }>(
+    `SELECT id, username, password_hash
        FROM network.partner_people
       WHERE environment = $1
         AND lower(username) = lower($2)
@@ -53,12 +57,26 @@ export async function authenticatePersonGlobal(
     await fakeVerify(password);
     return null;
   }
-  const ok = await verifyPassword(password, person.password_hash);
-  if (!ok) return null;
+  if (!await verifyPassword(password, person.password_hash)) return null;
+  return { personId: person.id, username: person.username };
+}
 
-  const stores = await listPersonStores(environment, person.id);
+/**
+ * Autentica a pessoa (username global + senha). null em: pessoa inexistente,
+ * senha errada OU pessoa sem loja ativa — sempre a MESMA resposta lá fora
+ * (não revela o que falhou). Pessoa inexistente queima o tempo de um verify
+ * real (anti-enumeração por timing, igual ao login por slug).
+ */
+export async function authenticatePersonGlobal(
+  environment: string,
+  username: string,
+  password: string,
+): Promise<PersonAuthResult | null> {
+  const person = await authenticatePersonCredentials(environment, username, password);
+  if (!person) return null;
+  const stores = await listPersonStores(environment, person.personId);
   if (stores.length === 0) return null; // sem loja ativa = mesma cara de credencial inválida
-  return { personId: person.id, stores };
+  return { personId: person.personId, stores };
 }
 
 /** Lojas ATIVAS da pessoa (vínculos não-revogados em unidade/parceiro ativos). */

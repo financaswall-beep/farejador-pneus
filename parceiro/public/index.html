@@ -11,7 +11,7 @@
       const slug = location.pathname.split('/').filter(Boolean)[1] || '';
       if (!slug) return;
       let token = '';
-      try { token = localStorage.getItem(`farejador_partner_token_${slug}`) || ''; }
+      try { token = sessionStorage.getItem(`farejador_partner_token_${slug}`) || localStorage.getItem(`farejador_partner_token_${slug}`) || ''; }
       catch (e) { /* armazenamento bloqueado: segue para o login central */ }
       if (!token) location.replace(`/login?loja=${encodeURIComponent(slug)}`);
     })();
