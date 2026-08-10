@@ -193,5 +193,37 @@ window.PAINEL_MODULES.api = function () {
       }
     },
 
+    // 0165 "Recebe pedidos da Rede?": estado da chave na ficha da unidade. Mora no
+    // módulo (e não na raiz do app.js) porque o app.js está colado no teto de 300.
+    savingChaveRede: false,
+    chaveRedeMsg: '',
+
+    // 0165 — "Recebe pedidos da Rede?" do parceiro selecionado. Desligar tira a loja
+    // do roteamento do bot; o sistema dela continua inteiro. Só o DONO da matriz
+    // grava (a rota é owner-only); admin comum leva 403 e cai no alert.
+    async salvarChaveRede(ligar) {
+      const p = this.selectedParceiro();
+      if (!p) return;
+      const alvo = !!ligar;
+      if (alvo === !!p.aceitaRede) return;                       // clique sem mudança: não bate na API
+      if (!alvo && !confirm(`Desligar "${p.nome || 'esta loja'}" da Rede?\n\nO bot para de mandar cliente novo pra ela. O sistema dela (caixa, estoque, financeiro) continua funcionando, e os pedidos que já existem seguem normais.`)) return;
+      this.savingChaveRede = true;
+      const anterior = p.aceitaRede;
+      p.aceitaRede = alvo;                                       // otimista: a chave vira na hora
+      try {
+        await this.apiPut(`/admin/api/partners/${encodeURIComponent(p.id)}/network-orders`, { accepts_network_orders: alvo });
+        this.chaveRedeMsg = alvo ? 'Voltou a receber pedidos da Rede.' : 'Agora é só sistema — sem pedidos da Rede.';
+        setTimeout(() => { this.chaveRedeMsg = ''; }, 3000);
+      } catch (err) {
+        p.aceitaRede = anterior;                                 // falhou: devolve a chave pro estado anterior
+        const msg = String(err && err.message || err);
+        alert(msg === 'admin_owner_required'
+          ? 'Só o dono da matriz pode mudar essa chave.'
+          : 'Não consegui salvar: ' + msg);
+      } finally {
+        this.savingChaveRede = false;
+      }
+    },
+
   };
 };

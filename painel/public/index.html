@@ -23,7 +23,7 @@
 <script src="/admin/painel/app.rede.operacao.js?v=20260723-rede-operacao-prod1"></script>
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
-<script src="/admin/painel/app.api.js?v=20260716-etapa5b"></script>
+<script src="/admin/painel/app.api.js?v=20260810-chaverede1"></script>
 <script src="/admin/painel/app.format.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260731-vendas-marcas1"></script>
@@ -62,14 +62,14 @@
 <script src="/admin/painel/app.catalogo.js?v=20260807-reserva-matriz1"></script>
 <script src="/admin/painel/app.catalogo.compatibilidade.js?v=20260731-compat1"></script>
 <script src="/admin/painel/app.catalogo.marca.js?v=20260807-reserva-matriz1"></script>
-<script src="/admin/painel/app.rede.apply.js?v=20260723-rede-visao2"></script>
+<script src="/admin/painel/app.rede.apply.js?v=20260810-chaverede1"></script>
 <script src="/admin/painel/app.pedidos.parceiros.js?v=20260729-catalogo1"></script>
 <script src="/admin/painel/app.core.js?v=20260731-multimarca3"></script>
 <script src="/admin/painel/app.charts.rede.js?v=20260723-rede-visao2"></script>
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260731-vendas-marcas1"></script>
-<script src="/admin/painel/app.js?v=20260731-brand1"></script>
+<script src="/admin/painel/app.js?v=20260810-chaverede1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -1429,7 +1429,13 @@
                             <i data-lucide="store" class="h-4 w-4"></i>
                           </span>
                           <div class="min-w-0">
-                            <p class="truncate text-base font-semibold text-slate-900" x-text="parceiro.nome"></p>
+                            <div class="flex min-w-0 items-center gap-2">
+                              <p class="truncate text-base font-semibold text-slate-900" x-text="parceiro.nome"></p>
+                              <!-- 0165: loja fora do roteamento do bot (usa só o sistema). -->
+                              <span x-show="!parceiro.aceitaRede"
+                                    class="inline-flex flex-shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600"
+                                    title="Não recebe pedidos da Rede — usa só o sistema">só sistema</span>
+                            </div>
                             <p class="mt-1 truncate text-sm text-slate-500">
                               <span x-text="parceiro.responsavel || 'Responsável não informado'"></span>
                               <span aria-hidden="true"> · </span>
@@ -1705,6 +1711,32 @@
       </header>
 
       <div x-show="unidadeTab === 'visao'" class="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <!-- 0165 "Recebe pedidos da Rede?": desligada, a loja vira SÓ SISTEMA — painel
+           inteiro, zero lead do bot. Escrita owner-only; pedido antigo não é afetado. -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <div class="text-sm font-semibold text-gray-700">Pedidos da Rede</div>
+          <span class="text-[11px] px-2 py-0.5 rounded-full"
+                :class="selectedParceiro()?.aceitaRede ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'"
+                x-text="selectedParceiro()?.aceitaRede ? 'recebendo pedidos' : 'só sistema'"></span>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Deixa o bot mandar cliente novo pra esta loja. Desligado, ela continua usando o sistema inteiro — só não entra na distribuição da Rede.</p>
+        <div class="mt-3 flex items-center gap-3 flex-wrap">
+          <button type="button" @click="salvarChaveRede(!selectedParceiro()?.aceitaRede)" :disabled="savingChaveRede"
+                  class="relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full disabled:opacity-50"
+                  :class="selectedParceiro()?.aceitaRede ? 'bg-emerald-600' : 'bg-gray-300'"
+                  :aria-pressed="selectedParceiro()?.aceitaRede ? 'true' : 'false'"
+                  aria-label="Recebe pedidos da Rede">
+            <span class="inline-block h-5 w-5 rounded-full bg-white shadow"
+                  :style="'transition: transform .15s; transform: translateX(' + (selectedParceiro()?.aceitaRede ? 24 : 4) + 'px)'"></span>
+          </button>
+          <span class="text-sm text-gray-700"
+                x-text="savingChaveRede ? 'Salvando...' : (selectedParceiro()?.aceitaRede ? 'Recebe pedidos da Rede' : 'Não recebe pedidos da Rede')"></span>
+          <span x-show="chaveRedeMsg" class="text-xs text-emerald-600" x-text="chaveRedeMsg"></span>
+        </div>
+        <p class="mt-2 text-[11px] text-gray-400">Pedidos que já existem não são afetados, e você continua podendo mandar pedido manual pra esta loja.</p>
+      </div>
+
       <!-- Entrega na Rede: raio de entrega (proximidade-primeiro Fase 2) -->
       <div class="bg-white border border-gray-200 rounded-xl p-5">
         <div class="flex items-center justify-between gap-2 mb-1">
