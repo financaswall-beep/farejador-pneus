@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-10T16:49:40.261Z",
+  "geradoEm": "2026-08-10T17:52:02.532Z",
   "commitBase": "c0d7913",
-  "total": 542,
+  "total": 547,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -143,6 +143,11 @@
     "deliveryStatusLabel": "function",
     "deliveryZone": "function",
     "desarquivarVenda": "function",
+    "desktopSummaryChartArea": "getter",
+    "desktopSummaryChartCoordinates": "getter",
+    "desktopSummaryChartPoints": "getter",
+    "desktopSummaryMonthWeeks": "getter",
+    "desktopSummarySaleLabel": "function",
     "despesas": "value:array",
     "dismissPushBanner": "function",
     "doRevoke": "function",

@@ -51,6 +51,34 @@ describe('partner mobile summary', () => {
     expect(route).toContain("/parceiro/:slug/api/comissao/equipe', { preHandler: [requirePartnerAuth, requireScreen('resumo')] }");
   });
 
+  it('keeps the web summary consistent with the mobile information hierarchy', async () => {
+    const [html, css, resumo] = await Promise.all([
+      partnerFile('index.html'),
+      partnerFile('style.css'),
+      partnerFile('app.resumo.js'),
+    ]);
+    const desktop = html.split('<!-- RESUMO WEB:')[1]
+      ?.split("<section x-show=\"currentSection === 'vendas'\"")[0] ?? '';
+
+    expect(desktop).toContain('class="desktop-summary"');
+    expect(desktop).toContain('Vendas do mês');
+    expect(desktop).toContain('Comissões');
+    expect(desktop).toContain('Estoque atual');
+    expect(desktop).toContain('A receber');
+    expect(desktop).toContain('Dinheiro da loja');
+    expect(desktop).toContain('Atenção hoje');
+    expect(desktop).toContain('Desempenho da equipe');
+    expect(desktop).toContain('desktopSummarySaleLabel(sale)');
+    expect(desktop).toContain('mobileSummaryPayablesDueTodayCount');
+    expect(desktop).not.toContain('Saúde da loja');
+    expect(resumo).toContain('get desktopSummaryMonthWeeks()');
+    expect(resumo).toContain('get desktopSummaryChartPoints()');
+    expect(resumo).toContain('desktopSummarySaleLabel(sale)');
+    expect(css).toContain('RESUMO WEB 2026-08-10');
+    expect(css).toContain('--summary-web-surface');
+    expect(css).toContain('.pos-shell.summary-screen[data-theme="light"] .pos-sidebar');
+  });
+
   it('ranks up to three employees by finalized monthly gross sales', async () => {
     const resumo = await partnerFile('app.resumo.js');
 

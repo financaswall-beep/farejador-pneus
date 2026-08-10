@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260810-resumo-dark-padrao1" />
+  <link rel="stylesheet" href="./style.css?v=20260810-resumo-web1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -221,7 +221,7 @@
     <button type="button" class="pos-mobile-menu-backdrop" x-show="isMobile && mobileMenuOpen" x-cloak
             @click="mobileMenuOpen = false" aria-label="Fechar menu"></button>
 
-    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'onboarding-mode': currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0), 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
+    <main class="pos-main" :class="{ 'chat-mode': currentSection === 'batepapo', 'config-mode': currentSection === 'config', 'retiradas-mode': currentSection === 'retiradas', 'relatorios-mode': currentSection === 'relatorios', 'photo-alert-on': photoPendingCount > 0 && currentSection !== 'batepapo' }">
       <header class="pos-topbar">
         <div class="pos-topbar-leading">
           <button type="button" class="pos-topbar-menu" @click="isMobile ? (mobileMenuOpen = !mobileMenuOpen) : toggleSidebar()"
@@ -459,25 +459,6 @@
         </button>
       </nav>
 
-      <section x-show="currentSection === 'resumo' && !isMobile" class="pos-kpis">
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
-          <div><small>Vendas do mês</small><strong x-text="money(resumo?.sales_month)"></strong><span x-text="num(resumo?.orders_month) + ' vendas'"></span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
-          <div><small>Estoque</small><strong x-text="stockTotalUnits + ' un.'"></strong><span x-text="stockLowItems.length + ' alertas'"></span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="wallet"></i></div>
-          <div><small>Caixa do mês</small><strong x-text="money(resumo?.cash_net_month)"></strong><span>entrada menos saída</span></div>
-        </article>
-        <article>
-          <div class="pos-kpi-icon"><i data-lucide="activity"></i></div>
-          <div><small>Saúde da loja</small><strong x-text="financialScore"></strong><span x-text="financialScoreLevel.label"></span></div>
-        </article>
-      </section>
-
       <section x-show="currentSection === 'estoque'" class="pos-kpis stock-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package"></i></div>
@@ -543,81 +524,123 @@
         </article>
       </section>
 
-      <section x-show="currentSection === 'resumo' && !isMobile && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
-               class="pos-onboarding" aria-label="Primeiros passos da loja">
-        <div class="pos-onboarding-head">
+      <!-- RESUMO WEB: mesma linguagem simples e os mesmos números do mobile. -->
+      <section x-show="currentSection === 'resumo' && !isMobile" x-cloak class="desktop-summary" aria-label="Resumo da loja">
+        <div class="desktop-summary-head">
           <div>
-            <span class="pos-onboarding-kicker">Comece por aqui</span>
-            <h3>Deixe a loja pronta para operar</h3>
-            <p>Faça na ordem. O painel marca sozinho o que já foi concluído.</p>
+            <h1>Resumo da loja</h1>
+            <p>Acompanhe o que importa sem complicação</p>
           </div>
-          <strong x-text="(num(resumo?.stock_items) > 0 ? 1 : 0) + (num(resumo?.orders_month) > 0 ? 1 : 0) + '/2'"></strong>
+          <div class="desktop-summary-head-actions">
+            <span><i data-lucide="calendar-days"></i> Este mês</span>
+            <button type="button" x-show="canSee('vendas')" @click="goToSection('vendas')">
+              <i data-lucide="circle-plus"></i> Nova venda
+            </button>
+          </div>
         </div>
-        <div class="pos-onboarding-steps">
-          <button type="button" :class="num(resumo?.stock_items) > 0 && 'done'" @click="goToSection('estoque')">
-            <i :data-lucide="num(resumo?.stock_items) > 0 ? 'check' : 'package-plus'"></i>
-            <span><b>1. Cadastre o estoque</b><small x-text="num(resumo?.stock_items) > 0 ? 'Pronto — seus produtos já aparecem no sistema.' : 'Informe os pneus disponíveis e o preço de venda.'"></small></span>
-          </button>
-          <button type="button" :class="num(resumo?.orders_month) > 0 && 'done'" @click="goToSection('vendas')">
-            <i :data-lucide="num(resumo?.orders_month) > 0 ? 'check' : 'shopping-cart'"></i>
-            <span><b>2. Registre a primeira venda</b><small x-text="num(resumo?.orders_month) > 0 ? 'Pronto — o caixa já começou a acompanhar a operação.' : 'Use a Frente de caixa; o estoque e o financeiro atualizam juntos.'"></small></span>
-          </button>
-        </div>
-      </section>
 
-      <section x-show="currentSection === 'resumo' && !isMobile" class="pos-workspace">
-        <div class="pos-page-grid finance">
-          <section class="pos-panel pos-data-panel">
-            <div class="pos-panel-head">
-              <div>
-                <h3>O que aconteceu</h3>
-                <p>Movimento registrado na loja neste mês</p>
-              </div>
-              <span class="pos-live-badge">online</span>
-            </div>
-            <div class="pos-finance-cards">
-              <article><small>Vendas registradas</small><strong x-text="num(resumo?.orders_month)"></strong><span>mês atual</span></article>
-              <article><small>Itens vendidos</small><strong x-text="soldUnitsMonth + ' un.'"></strong><span>saída por venda</span></article>
-              <article><small>A receber</small><strong x-text="money(receivablesOpenTotal)"></strong><span>em aberto</span></article>
-              <article><small>A pagar</small><strong x-text="money(payablesOpenTotal)"></strong><span>em aberto</span></article>
-              <article x-show="num(resumo?.satisfaction_count) > 0"><small>Satisfação ⭐</small><strong x-text="num(resumo?.satisfaction_avg).toFixed(1).replace('.', ',')"></strong><span x-text="num(resumo?.satisfaction_count) + (num(resumo?.satisfaction_count) === 1 ? ' avaliação' : ' avaliações')"></span></article>
-            </div>
-            <div class="pos-two-columns">
-              <div>
-                <h4>Últimas vendas</h4>
-                <template x-for="sale in completedSales.slice(0, 5)" :key="sale.id">
-                  <div class="pos-money-row positive">
-                    <span><b x-text="sale.customer_name || 'Consumidor final'"></b><small x-text="formatDate(saleRealizedAt(sale))"></small></span>
-                    <strong x-text="money(sale.total_amount)"></strong>
-                  </div>
-                </template>
-                <div x-show="!completedSales.length" class="pos-empty small">Nenhuma venda registrada.</div>
-              </div>
-              <div class="pos-resumo-alertas">
-                <h4>Alertas principais</h4>
-                <template x-for="item in stockLowItems.slice(0, 5)" :key="item.id">
-                  <div class="pos-money-row negative">
-                    <span><b x-text="item.tire_size || item.item_name"></b><small>estoque baixo</small></span>
-                    <strong x-text="(item.quantity_on_hand ?? 0) + ' un.'"></strong>
-                  </div>
-                </template>
-                <div x-show="!stockLowItems.length" class="pos-empty small">Nenhum alerta no momento.</div>
-              </div>
-            </div>
-          </section>
-          <aside class="pos-panel pos-side-panel">
-            <h3>O que fazer agora</h3>
-            <div class="pos-tip-list">
-              <template x-for="tip in financialScoreTips.slice(0, 5)" :key="tip">
-                <div><i data-lucide="arrow-up-right"></i><span x-text="tip"></span></div>
-              </template>
-            </div>
-            <div class="pos-divider"></div>
-            <button @click="goToSection('vendas')" class="pos-outline-action"><i data-lucide="shopping-cart"></i> Abrir frente de caixa</button>
-            <button @click="goToSection('estoque')" class="pos-outline-action"><i data-lucide="package"></i> Ver estoque</button>
-            <button @click="goToSection('financeiro')" class="pos-outline-action"><i data-lucide="wallet"></i> Ver financeiro</button>
-          </aside>
+        <div class="desktop-summary-kpis">
+          <article>
+            <span><i data-lucide="shopping-cart"></i></span>
+            <div><small>Vendas do mês</small><strong x-text="money(resumo?.sales_month)"></strong><em x-text="num(resumo?.orders_month) + (num(resumo?.orders_month) === 1 ? ' venda' : ' vendas')"></em></div>
+          </article>
+          <article>
+            <span><i data-lucide="hand-coins"></i></span>
+            <div><small>Comissões</small><strong x-text="money(commissionTeam?.total_commission)"></strong><em>geradas no mês</em></div>
+          </article>
+          <article>
+            <span><i data-lucide="package"></i></span>
+            <div><small>Estoque atual</small><strong x-text="canSee('estoque') ? stockTotalUnits + ' unidades' : num(resumo?.stock_items) + ' itens'"></strong><em x-text="canSee('estoque') ? stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos') : 'cadastrados'"></em></div>
+          </article>
+          <article>
+            <span><i data-lucide="file-dollar-sign"></i></span>
+            <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><em x-text="canSee('financeiro') ? mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências') : 'em aberto'"></em></div>
+          </article>
         </div>
+
+        <section x-show="(canSee('estoque') || canSee('vendas')) && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
+                 class="pos-onboarding desktop-summary-onboarding" aria-label="Primeiros passos da loja">
+          <div class="pos-onboarding-head">
+            <div><span class="pos-onboarding-kicker">Comece por aqui</span><h3>Deixe a loja pronta para operar</h3><p>Faça na ordem. O painel marca sozinho o que já foi concluído.</p></div>
+            <strong x-text="(num(resumo?.stock_items) > 0 ? 1 : 0) + (num(resumo?.orders_month) > 0 ? 1 : 0) + '/2'"></strong>
+          </div>
+          <div class="pos-onboarding-steps">
+            <button type="button" x-show="canSee('estoque')" :class="num(resumo?.stock_items) > 0 && 'done'" @click="goToSection('estoque')">
+              <i :data-lucide="num(resumo?.stock_items) > 0 ? 'check' : 'package-plus'"></i><span><b>1. Cadastre o estoque</b><small x-text="num(resumo?.stock_items) > 0 ? 'Pronto — seus produtos já aparecem no sistema.' : 'Informe os pneus disponíveis e o preço de venda.'"></small></span>
+            </button>
+            <button type="button" x-show="canSee('vendas')" :class="num(resumo?.orders_month) > 0 && 'done'" @click="goToSection('vendas')">
+              <i :data-lucide="num(resumo?.orders_month) > 0 ? 'check' : 'shopping-cart'"></i><span><b>2. Registre a primeira venda</b><small x-text="num(resumo?.orders_month) > 0 ? 'Pronto — o caixa já começou a acompanhar a operação.' : 'Use a Frente de caixa; o estoque e o financeiro atualizam juntos.'"></small></span>
+            </button>
+          </div>
+        </section>
+
+        <div class="desktop-summary-primary" :class="!canSee('vendas') && 'single'">
+          <article x-show="canSee('vendas')" class="desktop-summary-card desktop-summary-chart">
+            <header><h2>Como foi o mês</h2><span x-text="num(resumo?.orders_month) + (num(resumo?.orders_month) === 1 ? ' venda' : ' vendas')"></span></header>
+            <div class="desktop-summary-chart-plot">
+              <svg viewBox="0 0 640 180" role="img" aria-label="Vendas por semana no mês atual" preserveAspectRatio="none">
+                <defs><linearGradient id="desktopSummaryArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".24"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+                <line x1="20" y1="42" x2="620" y2="42"></line><line x1="20" y1="82" x2="620" y2="82"></line><line x1="20" y1="122" x2="620" y2="122"></line><line x1="20" y1="160" x2="620" y2="160"></line>
+                <path :d="desktopSummaryChartArea" fill="url(#desktopSummaryArea)"></path>
+                <polyline :points="desktopSummaryChartPoints" fill="none"></polyline>
+              </svg>
+              <div><template x-for="week in desktopSummaryMonthWeeks" :key="week.label"><span><b x-text="week.label"></b><small x-text="money(week.value)"></small></span></template></div>
+            </div>
+          </article>
+
+          <article class="desktop-summary-card desktop-summary-money">
+            <h2>Dinheiro da loja</h2>
+            <div><span><i data-lucide="arrow-down"></i></span><b>Entrou</b><strong x-text="money(resumo?.cash_in_month)"></strong></div>
+            <div class="muted"><span><i data-lucide="arrow-up"></i></span><b>Saiu</b><strong x-text="money(resumo?.cash_out_month)"></strong></div>
+            <div class="total" :class="num(resumo?.cash_net_month) < 0 && 'negative'"><span><i data-lucide="equal"></i></span><b>Sobrou</b><strong x-text="money(resumo?.cash_net_month)"></strong></div>
+            <button type="button" x-show="canSee('financeiro')" @click="goToSection('financeiro')">Ver financeiro completo <i data-lucide="chevron-right"></i></button>
+          </article>
+        </div>
+
+        <div class="desktop-summary-secondary" :class="!canSee('vendas') && 'single'">
+          <article x-show="canSee('vendas')" class="desktop-summary-card desktop-summary-sales">
+            <header><h2>Últimas vendas</h2><button type="button" @click="goToSection('vendas')">Ver todas <i data-lucide="chevron-right"></i></button></header>
+            <template x-for="sale in completedSales.slice(0, 5)" :key="sale.order_id">
+              <div class="desktop-summary-sale-row">
+                <span><i data-lucide="shopping-bag"></i></span>
+                <b x-text="desktopSummarySaleLabel(sale)"></b>
+                <small x-text="sale.fulfillment_mode === 'delivery' ? 'Entrega' : 'Balcão'"></small>
+                <time x-text="formatDateTime(saleRealizedAt(sale))"></time>
+                <strong x-text="money(sale.total_amount)"></strong>
+              </div>
+            </template>
+            <div x-show="!completedSales.length" class="desktop-summary-empty">Nenhuma venda registrada neste mês.</div>
+          </article>
+
+          <article class="desktop-summary-card desktop-summary-attention">
+            <h2>Atenção hoje</h2>
+            <button type="button" x-show="canSee('estoque')" @click="goToSection('estoque')">
+              <span><i data-lucide="triangle-alert"></i></span><b x-text="stockLowItems.length ? stockLowItems.length + (stockLowItems.length === 1 ? ' produto com estoque baixo' : ' produtos com estoque baixo') : 'Estoque sem alertas'"></b><em>Ver produtos</em><i data-lucide="chevron-right"></i>
+            </button>
+            <button type="button" x-show="canSee('entrega')" @click="goToSection('entrega')">
+              <span><i data-lucide="truck"></i></span><b x-text="deliveryOpenCount ? deliveryOpenCount + (deliveryOpenCount === 1 ? ' entrega em andamento' : ' entregas em andamento') : 'Nenhuma entrega em andamento'"></b><em>Ver entregas</em><i data-lucide="chevron-right"></i>
+            </button>
+            <button type="button" x-show="canSee('financeiro')" @click="goToSection('financeiro')">
+              <span><i data-lucide="calendar-clock"></i></span><b x-text="mobileSummaryPayablesDueTodayCount ? mobileSummaryPayablesDueTodayCount + (mobileSummaryPayablesDueTodayCount === 1 ? ' conta vence hoje' : ' contas vencem hoje') : 'Nenhuma conta vence hoje'"></b><em>Ver contas</em><i data-lucide="chevron-right"></i>
+            </button>
+            <div x-show="!canSee('estoque') && !canSee('entrega') && !canSee('financeiro')" class="desktop-summary-empty">Nenhum módulo de alerta foi liberado para este acesso.</div>
+          </article>
+        </div>
+
+        <article class="desktop-summary-card desktop-summary-team">
+          <header><div><h2>Desempenho da equipe</h2><p>Ranking por vendas finalizadas no mês</p></div><button type="button" x-show="isOwner" @click="openMobileSummaryTeam()">Ver equipe <i data-lucide="chevron-right"></i></button></header>
+          <div class="desktop-summary-team-grid" x-show="mobileSummaryTeam.length">
+            <template x-for="(member, index) in mobileSummaryTeam" :key="member.token_id || member.username">
+              <div>
+                <strong x-text="index + 1"></strong>
+                <span class="desktop-summary-avatar"><img x-show="member.avatar_url" :src="member.avatar_url" :alt="'Foto de ' + (member.label || member.username)" @error="member.avatar_url = ''"/><i x-show="!member.avatar_url" data-lucide="user-round"></i></span>
+                <span><b x-text="member.label || member.username"></b><small x-text="num(member.finalized_sales) + (num(member.finalized_sales) === 1 ? ' venda finalizada' : ' vendas finalizadas')"></small><i><em :style="'width:' + mobileSummaryTeamProgress(member) + '%'"></em></i></span>
+                <b x-text="money(member.gross_sales)"></b>
+              </div>
+            </template>
+          </div>
+          <div class="desktop-summary-empty" x-show="!mobileSummaryTeam.length">Nenhum colaborador com venda finalizada neste mês.</div>
+        </article>
       </section>
 
       <section x-show="currentSection === 'vendas'" class="pos-grid pos-checkout">
@@ -3123,7 +3146,7 @@
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
 <script src="./app.core.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
-<script src="./app.resumo.js?v=20260810-resumo-mobile1"></script>
+<script src="./app.resumo.js?v=20260810-resumo-web1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>

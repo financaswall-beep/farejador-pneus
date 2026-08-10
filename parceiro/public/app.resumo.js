@@ -2,8 +2,8 @@
  * app.resumo.js - fabrica `resumo` do painel do parceiro (obra <=300, passo 10/11).
  * MORA AQUI: as DERIVADAS da tela Resumo - avgTicket, filtros/contadores de cliente,
  * vendas concluidas (completedSales = regra 0077 de venda REALIZADA via helpers do
- * financeiro.kpis), recortes porta/2w, salesTodayCount, serie de 7 dias
- * (salesSeries7d) e labels de tendencia/atualizacao.
+ * financeiro.kpis), recortes porta/2w, séries do resumo mobile/web e labels de
+ * tendência/atualização.
  * NAO MORA AQUI: KPIs financeiros (app.financeiro.kpis.js); graficos
  * (app.charts.resumo.js); pedidos/entregas (app.pedidos.js / app.entregas.js).
  * VEIO DE: app.js commit 29e9817 (ranges 549-621, 932-961), VERBATIM.
@@ -118,6 +118,50 @@ window.PARCEIRO_MODULES.resumo = () => ({
       const rows = Array.isArray(this.payables) ? this.payables : [];
       return rows.filter((item) => item?.status === 'open'
         && String(item?.due_date || '').slice(0, 10) === today).length;
+    },
+
+    // Resumo web: distribui as vendas realizadas do mês em cinco faixas de 7 dias.
+    // Usa a mesma regra de realização do restante do painel (delivery só ao entregar).
+    get desktopSummaryMonthWeeks() {
+      const month = this.dateKeySaoPaulo(new Date()).slice(0, 7);
+      const weeks = Array.from({ length: 5 }, (_, index) => ({
+        label: `Semana ${index + 1}`,
+        value: 0,
+      }));
+      for (const sale of this.completedSales) {
+        const key = this.dateKeySaoPaulo(this.saleRealizedAt(sale));
+        if (!key.startsWith(month)) continue;
+        const day = Number(key.slice(8, 10));
+        const index = Math.min(4, Math.max(0, Math.floor((day - 1) / 7)));
+        weeks[index].value += this.num(sale.total_amount);
+      }
+      return weeks;
+    },
+
+    get desktopSummaryChartCoordinates() {
+      const max = Math.max(1, ...this.desktopSummaryMonthWeeks.map((week) => week.value));
+      return this.desktopSummaryMonthWeeks.map((week, index) => ({
+        ...week,
+        x: 28 + (index * 146),
+        y: Math.round(152 - ((week.value / max) * 110)),
+      }));
+    },
+
+    get desktopSummaryChartPoints() {
+      return this.desktopSummaryChartCoordinates.map((point) => `${point.x},${point.y}`).join(' ');
+    },
+
+    get desktopSummaryChartArea() {
+      const points = this.desktopSummaryChartCoordinates;
+      if (!points.length) return '';
+      return `M ${points[0].x} 160 L ${points.map((point) => `${point.x} ${point.y}`).join(' L ')} L ${points[points.length - 1].x} 160 Z`;
+    },
+
+    desktopSummarySaleLabel(sale) {
+      const items = Array.isArray(sale?.items) ? sale.items : [];
+      const first = items[0] || {};
+      const label = first.tire_size || first.item_name || 'Venda registrada';
+      return items.length > 1 ? `${label} + ${items.length - 1} item(ns)` : label;
     },
 
     openMobileSummaryTeam() {
