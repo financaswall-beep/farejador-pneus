@@ -743,8 +743,8 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  // Card "Comissão da equipe" do dono (no Financeiro): soma do mês por funcionário.
-  fastify.get('/parceiro/:slug/api/comissao/equipe', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+  // Ranking/comissão da equipe: dono ou funcionário com a tela Resumo liberada.
+  fastify.get('/parceiro/:slug/api/comissao/equipe', { preHandler: [requirePartnerAuth, requireScreen('resumo')] }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send(await getPartnerCommissionTeam(getPartnerContext(request)));
   });
 

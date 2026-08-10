@@ -1,15 +1,15 @@
 /**
  * app.comissao.js — Bloco 2, telas #2 e #3 (2026-06-12):
- *   #2 "Comissão da equipe" (card do DONO no Financeiro) — GET comissao/equipe.
+ *   #2 "Comissão da equipe" (Resumo liberado pelo dono) — GET comissao/equipe.
  *   #3 "Meu desempenho" (modal pelo chip do topo) — GET meu-desempenho (self, ctx.tokenId).
  * Backend já no ar (commit 0474e03). O ESTADO (selfName/commissionTeam/perfOpen/perf)
  * mora na raiz (app.js). REGRA: teto 300 (npm run checar-tamanho); `this` é o app.js.
  */
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.comissao = () => ({
-  // ─── #2: Comissão da equipe (dono) ───
+  // ─── #2: Comissão da equipe (permissão Resumo) ───
   async loadCommissionTeam() {
-    if (!this.isOwner) return; // endpoint é owner-only (funcionário levaria 403)
+    if (!this.canSee('resumo')) return;
     try {
       const res = await this.api('comissao/equipe');
       this.commissionTeam = { rows: res.rows || [], total_commission: res.total_commission || 0 };

@@ -197,6 +197,9 @@ window.PARCEIRO_MODULES.core = () => ({
         if (this.canSee('resumo') || this.canSee('financeiro')) {
           this.resumo = await safeRow('resumo');
         }
+        if (this.canSee('resumo')) {
+          await this.loadCommissionTeam(); // ranking/comissões liberados junto com o Resumo
+        }
         if (this.canSee('financeiro')) {
           const [compras, despesas, payables, receivables, fluxo] = await Promise.all([
             safeRows('compras'),
@@ -210,7 +213,6 @@ window.PARCEIRO_MODULES.core = () => ({
           this.payables = payables;
           this.receivables = receivables;
           this.fluxoCaixa = fluxo;
-          await this.loadCommissionTeam(); // #2 card Comissão da equipe (owner-only por dentro)
         }
         this.lastUpdatedAt = new Date();
         this.$nextTick(() => {

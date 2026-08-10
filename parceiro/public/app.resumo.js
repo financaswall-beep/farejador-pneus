@@ -79,7 +79,7 @@ window.PARCEIRO_MODULES.resumo = () => ({
       return this.completedDoorSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
     },
 
-    // Resumo mobile do dono: o ranking usa faturamento bruto FINALIZADO no mês.
+    // Resumo mobile liberado pelo dono: o ranking usa faturamento bruto FINALIZADO no mês.
     // A API já devolve apenas vendas consolidadas no ledger de comissão; aqui só
     // ordenamos de forma explícita para a posição não depender do valor da comissão.
     get mobileSummaryTeam() {

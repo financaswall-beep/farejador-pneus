@@ -6,17 +6,18 @@ async function partnerFile(name: string): Promise<string> {
   return readFile(path.join(process.cwd(), 'parceiro', 'public', name), 'utf8');
 }
 
-describe('partner owner mobile summary', () => {
-  it('activates the new composition only for the owner on mobile', async () => {
+describe('partner mobile summary', () => {
+  it('activates the new composition on mobile for whoever has Resumo permission', async () => {
     const html = await partnerFile('index.html');
-    const mobileSummary = html.split('<!-- RESUMO MOBILE DO DONO')[1]
+    const mobileSummary = html.split('<!-- RESUMO MOBILE:')[1]
       ?.split('<nav x-show="currentSection === \'resumo\'"')[0] ?? '';
 
     expect(html).toContain("currentSection === 'resumo' && 'summary-screen'");
-    expect(mobileSummary).toContain("currentSection === 'resumo' && isMobile && isOwner");
+    expect(mobileSummary).toContain("currentSection === 'resumo' && isMobile && canSee('resumo')");
     expect(mobileSummary).toContain('class="mobile-summary-owner"');
     expect(mobileSummary).not.toContain('Nova venda');
-    expect(html).toContain("currentSection === 'resumo' && (!isMobile || !isOwner)");
+    expect(html).toContain("currentSection === 'resumo' && !isMobile");
+    expect(html).not.toContain("currentSection === 'resumo' && (!isMobile || !isOwner)");
   });
 
   it('binds the cards to existing real operational data', async () => {
@@ -31,6 +32,23 @@ describe('partner owner mobile summary', () => {
     expect(html).toContain('money(resumo?.cash_net_month)');
     expect(html).toContain('deliveryOpenCount');
     expect(html).toContain('mobileSummaryPayablesDueTodayCount');
+    expect(html).toContain('x-show="canSee(\'estoque\')" @click="goToSection(\'estoque\')"');
+    expect(html).toContain('x-show="canSee(\'entrega\')" @click="goToSection(\'entrega\')"');
+    expect(html).toContain('x-show="canSee(\'financeiro\')" @click="goToSection(\'financeiro\')"');
+    expect(html).toContain('x-show="isOwner" @click="openMobileSummaryTeam()"');
+  });
+
+  it('loads team ranking through the same Resumo permission on UI and backend', async () => {
+    const [core, commission, route] = await Promise.all([
+      partnerFile('app.core.js'),
+      partnerFile('app.comissao.js'),
+      readFile(path.join(process.cwd(), 'src', 'parceiro', 'route.ts'), 'utf8'),
+    ]);
+
+    expect(core).toContain("if (this.canSee('resumo')) {");
+    expect(core).toContain('await this.loadCommissionTeam()');
+    expect(commission).toContain("if (!this.canSee('resumo')) return;");
+    expect(route).toContain("/parceiro/:slug/api/comissao/equipe', { preHandler: [requirePartnerAuth, requireScreen('resumo')] }");
   });
 
   it('ranks up to three employees by finalized monthly gross sales', async () => {
@@ -53,7 +71,7 @@ describe('partner owner mobile summary', () => {
     expect(html).toContain('x-show="member.avatar_url"');
     expect(html).toContain('data-lucide="user-round"');
     expect(html).toContain('class="pos-summary-mobile-nav"');
-    expect(css).toContain('RESUMO MOBILE DO DONO 2026-08-10');
+    expect(css).toContain('RESUMO MOBILE POR PERMISSÃO 2026-08-10');
     expect(css).toContain('@media (max-width: 768px)');
     expect(css).toContain('.pos-shell.summary-screen .pos-sidebar');
     expect(css).toContain('.mobile-summary-rank { color: #059669;');

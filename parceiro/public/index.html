@@ -348,8 +348,8 @@
         <span>toca pra fechar</span>
       </div>
 
-      <!-- RESUMO MOBILE DO DONO: leitura simples, sem alterar a composição desktop. -->
-      <section x-show="currentSection === 'resumo' && isMobile && isOwner"
+      <!-- RESUMO MOBILE: o dono libera para o funcionário pela permissão Resumo. -->
+      <section x-show="currentSection === 'resumo' && isMobile && canSee('resumo')"
                x-cloak class="mobile-summary-owner" aria-label="Resumo da loja">
         <header class="mobile-summary-heading">
           <div>
@@ -370,11 +370,11 @@
           </article>
           <article>
             <span class="mobile-summary-kpi-icon"><i data-lucide="package"></i></span>
-            <div><small>Estoque atual</small><strong x-text="stockTotalUnits + ' un.'"></strong><span x-text="stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos')"></span></div>
+            <div><small>Estoque atual</small><strong x-text="canSee('estoque') ? stockTotalUnits + ' un.' : num(resumo?.stock_items) + ' itens'"></strong><span x-text="canSee('estoque') ? stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos') : 'cadastrados'"></span></div>
           </article>
           <article>
             <span class="mobile-summary-kpi-icon"><i data-lucide="file-dollar-sign"></i></span>
-            <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><span x-text="mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências')"></span></div>
+            <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><span x-text="canSee('financeiro') ? mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências') : 'em aberto'"></span></div>
           </article>
         </div>
 
@@ -399,17 +399,17 @@
 
         <article class="mobile-summary-card mobile-summary-attention">
           <h2>Atenção hoje</h2>
-          <button type="button" @click="goToSection('estoque')">
+          <button type="button" x-show="canSee('estoque')" @click="goToSection('estoque')">
             <span class="mobile-summary-attention-icon"><i data-lucide="triangle-alert"></i></span>
             <span x-text="stockLowItems.length ? stockLowItems.length + (stockLowItems.length === 1 ? ' produto com estoque baixo' : ' produtos com estoque baixo') : 'Estoque sem alertas'"></span>
             <i data-lucide="chevron-right"></i>
           </button>
-          <button type="button" @click="goToSection('entrega')">
+          <button type="button" x-show="canSee('entrega')" @click="goToSection('entrega')">
             <span class="mobile-summary-attention-icon"><i data-lucide="truck"></i></span>
             <span x-text="deliveryOpenCount ? deliveryOpenCount + (deliveryOpenCount === 1 ? ' entrega em andamento' : ' entregas em andamento') : 'Nenhuma entrega em andamento'"></span>
             <i data-lucide="chevron-right"></i>
           </button>
-          <button type="button" @click="goToSection('financeiro')">
+          <button type="button" x-show="canSee('financeiro')" @click="goToSection('financeiro')">
             <span class="mobile-summary-attention-icon"><i data-lucide="calendar-clock"></i></span>
             <span x-text="mobileSummaryPayablesDueTodayCount ? mobileSummaryPayablesDueTodayCount + (mobileSummaryPayablesDueTodayCount === 1 ? ' conta vence hoje' : ' contas vencem hoje') : 'Nenhuma conta vence hoje'"></span>
             <i data-lucide="chevron-right"></i>
@@ -419,7 +419,7 @@
         <article class="mobile-summary-card mobile-summary-team">
           <header>
             <div><h2>Desempenho da equipe</h2><p>Ranking por vendas finalizadas no mês</p></div>
-            <button type="button" @click="openMobileSummaryTeam()">Ver equipe <i data-lucide="chevron-right"></i></button>
+            <button type="button" x-show="isOwner" @click="openMobileSummaryTeam()">Ver equipe <i data-lucide="chevron-right"></i></button>
           </header>
           <div class="mobile-summary-team-list" x-show="mobileSummaryTeam.length">
             <template x-for="(member, index) in mobileSummaryTeam" :key="member.token_id || member.username">
@@ -459,7 +459,7 @@
         </button>
       </nav>
 
-      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner)" class="pos-kpis">
+      <section x-show="currentSection === 'resumo' && !isMobile" class="pos-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
           <div><small>Vendas do mês</small><strong x-text="money(resumo?.sales_month)"></strong><span x-text="num(resumo?.orders_month) + ' vendas'"></span></div>
@@ -543,7 +543,7 @@
         </article>
       </section>
 
-      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner) && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
+      <section x-show="currentSection === 'resumo' && !isMobile && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
                class="pos-onboarding" aria-label="Primeiros passos da loja">
         <div class="pos-onboarding-head">
           <div>
@@ -565,7 +565,7 @@
         </div>
       </section>
 
-      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner)" class="pos-workspace">
+      <section x-show="currentSection === 'resumo' && !isMobile" class="pos-workspace">
         <div class="pos-page-grid finance">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
@@ -3110,7 +3110,7 @@
 <script src="./app.chat.cliente.js?v=20260731-condicao2"></script>
 <script src="./app.config.js?v=20260612-bloco2"></script>
 <script src="./app.config.equipe.js?v=20260612-bloco2"></script>
-<script src="./app.comissao.js?v=20260612-bloco2b"></script>
+<script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
 <script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
@@ -3121,7 +3121,7 @@
 <script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
-<script src="./app.core.js?v=20260806-mobile-checkout1"></script>
+<script src="./app.core.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
 <script src="./app.resumo.js?v=20260810-resumo-mobile1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
