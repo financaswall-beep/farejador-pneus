@@ -111,7 +111,14 @@
     return sessionStorage.getItem(key) || localStorage.getItem(key) || '';
   }
 
+  function sessionFingerprint() {
+    const currentToken = token();
+    if (!currentToken) return '';
+    return [currentToken, scope(), slug(), stored(keys.user)].join('|');
+  }
+
   function clearSession() {
+    if (Caixa.resetCheckout) Caixa.resetCheckout();
     const partnerSlug = stored(keys.slug);
     if (partnerSlug) {
       sessionStorage.removeItem('farejador_partner_token_' + partnerSlug);
@@ -169,6 +176,7 @@
     elements.profileUsername.textContent = data.username || stored(keys.user) || '—';
     elements.operationUnitLabel.textContent = unitName;
     elements.sessionView.dataset.scope = scope();
+    if (Caixa.bindCheckoutSession) Caixa.bindCheckoutSession(sessionFingerprint());
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
@@ -258,6 +266,7 @@
     slug: slug,
     isPartner: isPartner,
     operationPath: operationPath,
+    sessionFingerprint: sessionFingerprint,
     clearSession: clearSession,
     saveSession: saveSession,
     showSession: showSession,
@@ -268,5 +277,16 @@
     setBusy: setBusy,
     createSvg: createSvg,
     showToast: showToast,
+  });
+
+  let storageReloadTimer = 0;
+  window.addEventListener('storage', function (event) {
+    if (![keys.token, keys.user, keys.scope, keys.slug].includes(event.key)) return;
+    window.clearTimeout(storageReloadTimer);
+    storageReloadTimer = window.setTimeout(function () {
+      if (Caixa.checkoutSessionChanged && Caixa.checkoutSessionChanged(sessionFingerprint())) {
+        window.location.reload();
+      }
+    }, 80);
   });
 }());

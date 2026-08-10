@@ -12,6 +12,7 @@ describe('Etapa 2 - Vender na Operação da Loja', () => {
   const login = source('painel/public/caixa.js');
   const catalog = source('painel/public/caixa-checkout-catalog.js');
   const checkout = source('painel/public/caixa-checkout.js');
+  const checkoutSession = source('painel/public/caixa-checkout-session.js');
   const partnerRoute = source('src/parceiro/route.ts');
   const partnerQueries = source('src/parceiro/queries.ts');
   const operationLogin = source('src/admin/caixa/route-operation-login.ts');
@@ -43,5 +44,16 @@ describe('Etapa 2 - Vender na Operação da Loja', () => {
     expect(partnerRoute).toContain("requireScreen('vendas')");
     expect(partnerQueries).toContain('SET operator_token_id = $4');
     expect(partnerQueries).toContain('[orderId, ctx.environment, ctx.unitId, ctx.tokenId]');
+  });
+
+  it('zera o carrinho ao trocar conta ou unidade e ignora respostas da sessão anterior', () => {
+    expect(core).toContain('if (Caixa.resetCheckout) Caixa.resetCheckout()');
+    expect(core).toContain('Caixa.bindCheckoutSession(sessionFingerprint())');
+    expect(core).toContain("window.addEventListener('storage'");
+    expect(checkoutSession).toContain('checkout.cart.clear()');
+    expect(checkoutSession).toContain("checkout.customerName = 'Cliente Balcão'");
+    expect(checkout).toContain('requestSession !== Caixa.sessionFingerprint()');
+    expect(checkout).toContain('Caixa.checkoutSessionChanged(saleSession)');
+    expect(checkout).toContain("Caixa.showToast('A conta mudou. O carrinho anterior foi limpo.')");
   });
 });

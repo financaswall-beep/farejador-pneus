@@ -39,14 +39,12 @@
     idempotencyKey: null,
     busy: false,
   };
-
   const catalogView = Caixa.createCheckoutCatalogView(checkout, ui, changeQuantity);
-  const productTitle = catalogView.productTitle;
-  const renderCatalog = catalogView.renderCatalog;
-  const setCatalogState = catalogView.setCatalogState;
+  const productTitle = catalogView.productTitle, renderCatalog = catalogView.renderCatalog, setCatalogState = catalogView.setCatalogState;
 
   async function loadCatalog() {
     if (!Caixa.token()) return;
+    const requestSession = Caixa.sessionFingerprint();
     if (checkout.request) checkout.request.abort();
     const controller = new AbortController();
     checkout.request = controller;
@@ -55,16 +53,14 @@
     const search = ui.search.value.trim();
     if (search) params.set('search', search);
     try {
-      if (!Caixa.isPartner() && checkout.type === 'other') {
-        renderCatalog([]);
-        return;
-      }
+      if (!Caixa.isPartner() && checkout.type === 'other') { renderCatalog([]); return; }
       const catalogUrl = Caixa.isPartner()
         ? Caixa.operationPath('produtos')
         : '/api/caixa/catalogo?' + params.toString();
       const response = await Caixa.authenticatedFetch(catalogUrl, { signal: controller.signal });
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
+      if (requestSession !== Caixa.sessionFingerprint()) return;
       const products = Caixa.isPartner()
         ? Caixa.normalizePartnerCatalog(Array.isArray(payload.rows) ? payload.rows : [], checkout.type, search)
         : Array.isArray(payload.products) ? payload.products : [];
@@ -185,9 +181,7 @@
   }
 
   function newIdempotencyKey() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return 'caixa-' + window.crypto.randomUUID();
-    }
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'caixa-' + window.crypto.randomUUID();
     return 'caixa-' + Date.now() + '-' + Math.random().toString(16).slice(2);
   }
 
@@ -204,6 +198,10 @@
 
   async function confirmSale() {
     if (checkout.busy || checkout.cart.size === 0) return;
+    const saleSession = Caixa.sessionFingerprint();
+    if (Caixa.checkoutSessionChanged(saleSession)) {
+      Caixa.resetCheckout(); Caixa.showToast('A conta mudou. O carrinho anterior foi limpo.'); return;
+    }
     checkout.busy = true;
     checkout.idempotencyKey = checkout.idempotencyKey || newIdempotencyKey();
     ui.submitError.textContent = '';
@@ -219,6 +217,7 @@
       });
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
+      if (saleSession !== Caixa.sessionFingerprint()) { Caixa.resetCheckout(); return; }
       checkout.cart.clear();
       checkout.idempotencyKey = null;
       elements.checkoutReviewModal.classList.add('hidden');
@@ -243,7 +242,8 @@
     }
   }
 
-  Object.assign(Caixa, { loadCatalog: loadCatalog });
+  Caixa.checkoutRuntime = { state: checkout, ui: ui, renderCatalog: renderCatalog, renderCart: renderCart };
+  Caixa.loadCatalog = loadCatalog;
 
   ui.search.addEventListener('input', function () {
     ui.searchClear.classList.toggle('hidden', !ui.search.value);
