@@ -17,6 +17,14 @@
  *
  * Nada aqui escreve. A materialização do partner_order (com reserva de estoque)
  * é feita no criar_pedido reusando commerce.register_partner_local_order.
+ *
+ * §CHAVE DA REDE (0165, `pu.accepts_network_orders`) — "Recebe pedidos da Rede?".
+ * Loja com a chave OFF é "só sistema": usa o painel inteiro mas NUNCA é ESCOLHIDA
+ * pelo bot. Regra de ouro: o filtro entra nas consultas que ESCOLHEM loja nova
+ * (as daqui + nearestStoreKm no agent.ts) e NUNCA nas que EXIBEM/CONCLUEM algo já
+ * escolhido (getUnitDisplayById, satisfação, histórico) — senão pedido antigo vira
+ * órfão. Filtrar na FONTE (o SQL) e não nas camadas de decisão é de propósito:
+ * nenhuma camada acima consegue furar, mesmo as sem chamador hoje.
  */
 
 import type { PoolClient } from 'pg';
@@ -83,6 +91,7 @@ export async function resolveUnitForOrder(
        AND p.status = 'active'
        AND pu.deleted_at IS NULL
        AND p.deleted_at IS NULL
+       AND pu.accepts_network_orders          -- 0165 (ver §CHAVE DA REDE no topo)
      ORDER BY pu.created_at ASC
      LIMIT 2`,
     [environment],
@@ -147,6 +156,7 @@ export async function resolveUnitForMunicipio(
        AND p.status = 'active'
        AND pu.deleted_at IS NULL
        AND p.deleted_at IS NULL
+       AND pu.accepts_network_orders          -- 0165 (ver §CHAVE DA REDE no topo)
      ORDER BY length(uc.municipio) DESC, pu.created_at ASC
      LIMIT 1`,
     [environment, m],
@@ -266,6 +276,7 @@ export async function resolveUnitCandidates(
        AND p.status = 'active'
        AND pu.deleted_at IS NULL
        AND p.deleted_at IS NULL
+       AND pu.accepts_network_orders          -- 0165 (ver §CHAVE DA REDE no topo)
      GROUP BY pu.id, p.id, u.id
      ORDER BY pu.id`,
     [environment, m],
@@ -317,6 +328,7 @@ export async function resolveUnitCandidatesByProximity(
        AND p.status = 'active'
        AND pu.deleted_at IS NULL
        AND p.deleted_at IS NULL
+       AND pu.accepts_network_orders          -- 0165 (ver §CHAVE DA REDE no topo)
        AND pu.latitude IS NOT NULL
        AND pu.longitude IS NOT NULL
      GROUP BY pu.id, p.id, u.id
@@ -526,6 +538,7 @@ export async function getUnitMapsUrl(
           AND $2 LIKE '%' || uc.municipio || '%'
           AND pu.status = 'active' AND p.status = 'active'
           AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+          AND pu.accepts_network_orders       -- 0165 (ver §CHAVE DA REDE no topo)
         ORDER BY length(uc.municipio) DESC, pu.created_at ASC`,
       [environment, m],
     );
@@ -584,6 +597,7 @@ export async function getUnitMapsUrl(
       WHERE pu.environment = $1
         AND pu.status = 'active' AND p.status = 'active'
         AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        AND pu.accepts_network_orders         -- 0165 (ver §CHAVE DA REDE no topo)
       ORDER BY pu.created_at ASC
       LIMIT 2`,
     [environment],

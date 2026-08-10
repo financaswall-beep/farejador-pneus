@@ -87,7 +87,8 @@ async function loadCustomerContext(
  * Distância em LINHA RETA (haversine) do cliente até a loja ATIVA mais perto, em km.
  * Produto-agnóstico, barato e OFFLINE (não chama o Google) — é só pro gancho de calor
  * "você tá a ~X km". O roteamento real continua usando distância de RUA; aqui aproxima.
- * null se não há loja com coordenada.
+ * null se não há loja com coordenada. Loja "só sistema" (0165) fica FORA: o gancho
+ * de calor não pode medir distância de uma loja que o bot nunca vai escolher.
  */
 async function nearestStoreKm(
   client: PoolClient,
@@ -100,6 +101,7 @@ async function nearestStoreKm(
        JOIN network.partners p ON p.id = pu.partner_id AND p.environment = pu.environment
       WHERE pu.environment = $1 AND pu.status = 'active' AND p.status = 'active'
         AND pu.deleted_at IS NULL AND p.deleted_at IS NULL
+        AND pu.accepts_network_orders
         AND pu.latitude IS NOT NULL AND pu.longitude IS NOT NULL`,
     [environment],
   );

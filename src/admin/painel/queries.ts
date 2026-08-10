@@ -24,6 +24,7 @@ export * from './queries-rede.js'; // getPainelRede — o agregado por parceiro 
 export * from './queries-rede-resumo.js'; // funil da Rede + resumo da matriz (getMatrizResumo)
 export * from './queries-pedidos-acoes.js'; // registrar pedido manual/walk-in + cancelar + raio de entrega
 export * from './queries-parceiros.js'; // criação transacional de parceiro
+export * from './queries-parceiros-rede.js'; // 0165: chave "recebe pedidos da Rede" (só sistema)
 export * from './queries-candidaturas.js'; // candidatura atômica/idempotente (Etapa 6)
 export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo

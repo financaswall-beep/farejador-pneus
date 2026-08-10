@@ -60,6 +60,7 @@ export async function getPainelRede(
        p.whatsapp_phone,
        p.address,
        pu.service_mode,
+       COALESCE(pu.accepts_network_orders, true) AS accepts_network_orders, -- 0165: null (join vazio) = ligada
        pu.delivery_radius_km,
        p.commercial_model,
        p.commission_percent,

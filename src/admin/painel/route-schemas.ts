@@ -73,6 +73,14 @@ export const setDeliveryRadiusBodySchema = z.object({
   delivery_radius_km: z.number().positive().max(9999.99).nullable(),
 });
 
+// 0165 — "Recebe pedidos da Rede?": a Matriz liga/desliga a participação da loja
+// no roteamento do bot. Reusa o params schema do raio (mesma :partnerUnitId).
+// Sem `environment` no corpo DE PROPÓSITO: quem manda é o servidor (chave de
+// contrato comercial não se escolhe ambiente pelo navegador).
+export const setNetworkOrdersBodySchema = z.object({
+  accepts_network_orders: z.boolean(),
+});
+
 // ATACADO (Fase 1): venda de atacado da Matriz. Comprador = ficha existente
 // (customer_id), parceiro da rede (partner_id) OU só-atacado novo (new_customer).
 // Preço DIGITADO por item. Admin-only (dado só da matriz).

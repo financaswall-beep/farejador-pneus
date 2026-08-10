@@ -3,12 +3,15 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { createPartnerUnit, setPartnerUnitDeliveryRadius } from './queries.js';
+import { createPartnerUnit, setPartnerUnitDeliveryRadius, setPartnerUnitNetworkOrders } from './queries.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
-import { createPartnerSchema, setDeliveryRadiusBodySchema, setDeliveryRadiusParamsSchema } from './route-schemas.js';
+import {
+  createPartnerSchema, setDeliveryRadiusBodySchema, setDeliveryRadiusParamsSchema,
+  setNetworkOrdersBodySchema,
+} from './route-schemas.js';
 
 export async function registerPainelParceiros(fastify: FastifyInstance): Promise<void> {
   fastify.post('/admin/api/partners', { preHandler: requireAdminAuth }, async (request, reply) => {
@@ -50,6 +53,37 @@ export async function registerPainelParceiros(fastify: FastifyInstance): Promise
     } catch (err) {
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel set delivery radius failed');
+      return reply.status(mapped.status).send({ error: mapped.error });
+    }
+  });
+
+  // ADMIN OWNER-ONLY: "Recebe pedidos da Rede?" (0165). Desligada, a loja vira
+  // "só sistema" — painel inteiro, zero lead do bot.
+  //
+  // Mais apertado que a rota irmã do raio (requireAdminAuth) DE PROPÓSITO: raio é
+  // ajuste operacional; esta chave é CONTRATO comercial (define se a loja entra na
+  // distribuição e, portanto, se gera comissão). Admin não-dono leva 403.
+  fastify.put('/admin/api/partners/:partnerUnitId/network-orders', { preHandler: requireAdminOwner }, async (request, reply) => {
+    const params = setDeliveryRadiusParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: 'invalid_partner_unit_id' });
+    const body = setNetworkOrdersBodySchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.issues[0]?.message ?? 'invalid_body' });
+    }
+    // Ambiente vem do SERVIDOR, nunca do corpo — o navegador não escolhe onde grava.
+    try {
+      const result = await setPartnerUnitNetworkOrders(
+        env.FAREJADOR_ENV, params.data.partnerUnitId, body.data.accepts_network_orders, operatorLabel(request),
+      );
+      if (!result.updated) return reply.status(404).send({ error: 'partner_not_found' });
+      return reply.status(200).send({
+        updated: true,
+        changed: Boolean(result.changed),
+        accepts_network_orders: body.data.accepts_network_orders,
+      });
+    } catch (err) {
+      const mapped = mapWriteError(err);
+      logger.error({ err, status: mapped.status }, 'painel set network orders failed');
       return reply.status(mapped.status).send({ error: mapped.error });
     }
   });

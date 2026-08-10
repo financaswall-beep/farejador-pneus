@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-08T07:05:41.099Z",
-  "total": 228,
+  "geradoEm": "2026-08-10T04:47:40.744Z",
+  "total": 229,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -229,6 +229,7 @@
     "POST /admin/api/wholesale/suppliers/archive AUTH(1)",
     "POST /api/seja-parceiro PUBLICA",
     "PUT /admin/api/marketing/ad-accounts/:adAccountId/campaigns/:campaignId/scope AUTH(1)",
-    "PUT /admin/api/partners/:partnerUnitId/delivery-radius AUTH(1)"
+    "PUT /admin/api/partners/:partnerUnitId/delivery-radius AUTH(1)",
+    "PUT /admin/api/partners/:partnerUnitId/network-orders AUTH(1)"
   ]
 }
