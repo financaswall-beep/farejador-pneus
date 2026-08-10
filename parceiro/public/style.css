@@ -454,6 +454,75 @@ html, body {
     font-weight: 850;
   }
 
+  /* Tema escuro do Resumo mobile: mantém o verde da marca e superfícies profundas. */
+  .pos-shell.summary-screen[data-theme="dark"] {
+    color: #e2e8f0;
+    background: #06100d !important;
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .pos-main {
+    background:
+      radial-gradient(circle at 12% 0%, rgba(16, 185, 129, .09), transparent 34%),
+      linear-gradient(180deg, #081410 0%, #06100d 100%);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .pos-topbar {
+    border-bottom: 1px solid rgba(110, 231, 183, .12);
+    background: linear-gradient(145deg, #032e24, #064e3b);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-owner { color: #e2e8f0; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-heading h1,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-card h2,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-kpis strong,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-person b,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row.total > span:not(.mobile-summary-row-icon) { color: #f8fafc; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-heading p,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-kpis article > div > span,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-team header p,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-person small,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-empty-team { color: #94a3b8; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-period,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-kpis article,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-card {
+    border-color: rgba(110, 231, 183, .14);
+    background: rgba(12, 28, 23, .94);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-period { color: #d1fae5; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-period svg,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-link,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-team header button,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-rank,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-team-value,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-empty-team svg { color: #34d399; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-kpis small,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-attention > button { color: #cbd5e1; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-kpi-icon,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-row-icon,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-attention-icon {
+    color: #34d399;
+    background: rgba(16, 185, 129, .12);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row strong { color: #34d399; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row.muted strong { color: #94a3b8; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row.total,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-attention > button,
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-team-row { border-color: rgba(148, 163, 184, .16); }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-money-row.total.negative strong { color: #fb7185; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-attention > button > svg { color: #34d399; }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-avatar {
+    color: #34d399;
+    border-color: rgba(52, 211, 153, .34);
+    background: rgba(16, 185, 129, .12);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .mobile-summary-person > span { background: #24352f; }
+  .pos-shell.summary-screen[data-theme="dark"] .pos-summary-mobile-nav {
+    border-color: rgba(110, 231, 183, .14);
+    background: rgba(5, 15, 12, .96);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .28);
+  }
+  .pos-shell.summary-screen[data-theme="dark"] .pos-summary-mobile-nav button { color: #94a3b8; }
+  .pos-shell.summary-screen[data-theme="dark"] .pos-summary-mobile-nav button.active { color: #34d399; }
+
   @media (max-width: 370px) {
     .mobile-summary-owner { padding-inline: 10px; }
     .mobile-summary-heading h1 { font-size: 25px; }
