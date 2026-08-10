@@ -79,6 +79,52 @@ window.PARCEIRO_MODULES.resumo = () => ({
       return this.completedDoorSales.reduce((sum, sale) => sum + this.num(sale.total_amount), 0);
     },
 
+    // Resumo mobile do dono: o ranking usa faturamento bruto FINALIZADO no mês.
+    // A API já devolve apenas vendas consolidadas no ledger de comissão; aqui só
+    // ordenamos de forma explícita para a posição não depender do valor da comissão.
+    get mobileSummaryTeam() {
+      const rows = Array.isArray(this.commissionTeam?.rows) ? this.commissionTeam.rows : [];
+      return [...rows]
+        .sort((a, b) => {
+          const byGross = this.num(b?.gross_sales) - this.num(a?.gross_sales);
+          if (byGross) return byGross;
+          const bySales = this.num(b?.finalized_sales) - this.num(a?.finalized_sales);
+          if (bySales) return bySales;
+          return String(a?.label || a?.username || '').localeCompare(
+            String(b?.label || b?.username || ''),
+            'pt-BR',
+          );
+        })
+        .slice(0, 3);
+    },
+
+    get mobileSummaryTeamMaxGross() {
+      return Math.max(0, ...this.mobileSummaryTeam.map((member) => this.num(member?.gross_sales)));
+    },
+
+    mobileSummaryTeamProgress(member) {
+      const max = this.mobileSummaryTeamMaxGross;
+      if (max <= 0) return 0;
+      return Math.max(4, Math.round((this.num(member?.gross_sales) / max) * 100));
+    },
+
+    get mobileSummaryReceivablesOpenCount() {
+      const rows = Array.isArray(this.receivables) ? this.receivables : [];
+      return rows.filter((item) => item?.status === 'open').length;
+    },
+
+    get mobileSummaryPayablesDueTodayCount() {
+      const today = this.dateKeySaoPaulo(new Date());
+      const rows = Array.isArray(this.payables) ? this.payables : [];
+      return rows.filter((item) => item?.status === 'open'
+        && String(item?.due_date || '').slice(0, 10) === today).length;
+    },
+
+    openMobileSummaryTeam() {
+      this.configTab = 'equipe';
+      this.goToSection('config');
+    },
+
     get partnerSalesShareLabel() {
       const total = this.completedSales.length;
       if (!total) return 'sem vendas ainda';

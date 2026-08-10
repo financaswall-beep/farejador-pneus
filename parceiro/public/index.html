@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260806-mobile-checkout1" />
+  <link rel="stylesheet" href="./style.css?v=20260810-resumo-mobile1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -127,7 +127,7 @@
 <div x-show="authed" class="min-h-screen flex">
 
   <!-- FRENTE DE CAIXA FULLSCREEN -->
-  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="[sidebarCollapsed && 'sidebar-collapsed', currentSection === 'vendas' && 'checkout-screen', currentSection === 'entrega' && 'delivery-screen']" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
+  <div x-show="['resumo', 'vendas', 'pedidos', 'entrega', 'retiradas', 'clientes', 'estoque', 'financeiro', 'batepapo', 'relatorios', 'config'].includes(currentSection)" :data-theme="theme" :class="[sidebarCollapsed && 'sidebar-collapsed', currentSection === 'resumo' && 'summary-screen', currentSection === 'vendas' && 'checkout-screen', currentSection === 'entrega' && 'delivery-screen']" class="pos-shell fixed inset-0 z-50 bg-[#0b0f12] text-slate-100 overflow-hidden">
     <aside class="pos-sidebar" :class="isMobile && mobileMenuOpen && 'mobile-open'" :aria-hidden="isMobile && !mobileMenuOpen ? 'true' : 'false'">
       <div class="pos-logo">
         <div class="pos-tire-mark"></div>
@@ -348,7 +348,118 @@
         <span>toca pra fechar</span>
       </div>
 
-      <section x-show="currentSection === 'resumo'" class="pos-kpis">
+      <!-- RESUMO MOBILE DO DONO: leitura simples, sem alterar a composição desktop. -->
+      <section x-show="currentSection === 'resumo' && isMobile && isOwner"
+               x-cloak class="mobile-summary-owner" aria-label="Resumo da loja">
+        <header class="mobile-summary-heading">
+          <div>
+            <h1>Resumo da loja</h1>
+            <p>Acompanhe o que importa sem complicação</p>
+          </div>
+          <span class="mobile-summary-period"><i data-lucide="calendar-days"></i> Este mês</span>
+        </header>
+
+        <div class="mobile-summary-kpis">
+          <article>
+            <span class="mobile-summary-kpi-icon"><i data-lucide="shopping-cart"></i></span>
+            <div><small>Vendas do mês</small><strong x-text="money(resumo?.sales_month)"></strong><span x-text="num(resumo?.orders_month) + (num(resumo?.orders_month) === 1 ? ' venda' : ' vendas')"></span></div>
+          </article>
+          <article>
+            <span class="mobile-summary-kpi-icon"><i data-lucide="hand-coins"></i></span>
+            <div><small>Comissões</small><strong x-text="money(commissionTeam?.total_commission)"></strong><span>geradas no mês</span></div>
+          </article>
+          <article>
+            <span class="mobile-summary-kpi-icon"><i data-lucide="package"></i></span>
+            <div><small>Estoque atual</small><strong x-text="stockTotalUnits + ' un.'"></strong><span x-text="stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos')"></span></div>
+          </article>
+          <article>
+            <span class="mobile-summary-kpi-icon"><i data-lucide="file-dollar-sign"></i></span>
+            <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><span x-text="mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências')"></span></div>
+          </article>
+        </div>
+
+        <article class="mobile-summary-card mobile-summary-money">
+          <h2>Dinheiro da loja</h2>
+          <div class="mobile-summary-money-row">
+            <span class="mobile-summary-row-icon"><i data-lucide="arrow-down"></i></span>
+            <span>Entrou</span><strong x-text="money(resumo?.cash_in_month)"></strong>
+          </div>
+          <div class="mobile-summary-money-row muted">
+            <span class="mobile-summary-row-icon"><i data-lucide="arrow-up"></i></span>
+            <span>Saiu</span><strong x-text="money(resumo?.cash_out_month)"></strong>
+          </div>
+          <div class="mobile-summary-money-row total" :class="num(resumo?.cash_net_month) < 0 && 'negative'">
+            <span class="mobile-summary-row-icon"><i data-lucide="equal"></i></span>
+            <span>Sobrou</span><strong x-text="money(resumo?.cash_net_month)"></strong>
+          </div>
+          <button type="button" x-show="canSee('financeiro')" @click="goToSection('financeiro')" class="mobile-summary-link">
+            Ver financeiro <i data-lucide="chevron-right"></i>
+          </button>
+        </article>
+
+        <article class="mobile-summary-card mobile-summary-attention">
+          <h2>Atenção hoje</h2>
+          <button type="button" @click="goToSection('estoque')">
+            <span class="mobile-summary-attention-icon"><i data-lucide="triangle-alert"></i></span>
+            <span x-text="stockLowItems.length ? stockLowItems.length + (stockLowItems.length === 1 ? ' produto com estoque baixo' : ' produtos com estoque baixo') : 'Estoque sem alertas'"></span>
+            <i data-lucide="chevron-right"></i>
+          </button>
+          <button type="button" @click="goToSection('entrega')">
+            <span class="mobile-summary-attention-icon"><i data-lucide="truck"></i></span>
+            <span x-text="deliveryOpenCount ? deliveryOpenCount + (deliveryOpenCount === 1 ? ' entrega em andamento' : ' entregas em andamento') : 'Nenhuma entrega em andamento'"></span>
+            <i data-lucide="chevron-right"></i>
+          </button>
+          <button type="button" @click="goToSection('financeiro')">
+            <span class="mobile-summary-attention-icon"><i data-lucide="calendar-clock"></i></span>
+            <span x-text="mobileSummaryPayablesDueTodayCount ? mobileSummaryPayablesDueTodayCount + (mobileSummaryPayablesDueTodayCount === 1 ? ' conta vence hoje' : ' contas vencem hoje') : 'Nenhuma conta vence hoje'"></span>
+            <i data-lucide="chevron-right"></i>
+          </button>
+        </article>
+
+        <article class="mobile-summary-card mobile-summary-team">
+          <header>
+            <div><h2>Desempenho da equipe</h2><p>Ranking por vendas finalizadas no mês</p></div>
+            <button type="button" @click="openMobileSummaryTeam()">Ver equipe <i data-lucide="chevron-right"></i></button>
+          </header>
+          <div class="mobile-summary-team-list" x-show="mobileSummaryTeam.length">
+            <template x-for="(member, index) in mobileSummaryTeam" :key="member.token_id || member.username">
+              <div class="mobile-summary-team-row">
+                <strong class="mobile-summary-rank" x-text="index + 1"></strong>
+                <span class="mobile-summary-avatar">
+                  <img x-show="member.avatar_url" :src="member.avatar_url" :alt="'Foto de ' + (member.label || member.username)" @error="member.avatar_url = ''" />
+                  <i x-show="!member.avatar_url" data-lucide="user-round"></i>
+                </span>
+                <span class="mobile-summary-person">
+                  <b x-text="member.label || member.username"></b>
+                  <small x-text="num(member.finalized_sales) + (num(member.finalized_sales) === 1 ? ' venda finalizada' : ' vendas finalizadas')"></small>
+                  <span><i :style="'width:' + mobileSummaryTeamProgress(member) + '%'" ></i></span>
+                </span>
+                <strong class="mobile-summary-team-value" x-text="money(member.gross_sales)"></strong>
+              </div>
+            </template>
+          </div>
+          <div class="mobile-summary-empty-team" x-show="!mobileSummaryTeam.length">
+            <i data-lucide="users"></i><span>Nenhum colaborador com venda finalizada neste mês.</span>
+          </div>
+        </article>
+      </section>
+
+      <nav x-show="currentSection === 'resumo'" class="pos-summary-mobile-nav" aria-label="Navegação principal">
+        <button type="button" class="active" aria-current="page">
+          <i data-lucide="house"></i><span>Início</span>
+        </button>
+        <button type="button" x-show="canSee('vendas')" @click="goToSection('vendas')">
+          <i data-lucide="calculator"></i><span>Caixa</span>
+        </button>
+        <button type="button" x-show="canSee('entrega')" @click="goToSection('entrega')">
+          <i data-lucide="bike"></i><span>Entregas</span><b x-show="deliveryOpenCount > 0" x-text="deliveryOpenCount"></b>
+        </button>
+        <button type="button" @click="mobileMenuOpen = true">
+          <i data-lucide="ellipsis"></i><span>Mais</span>
+        </button>
+      </nav>
+
+      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner)" class="pos-kpis">
         <article>
           <div class="pos-kpi-icon"><i data-lucide="trending-up"></i></div>
           <div><small>Vendas do mês</small><strong x-text="money(resumo?.sales_month)"></strong><span x-text="num(resumo?.orders_month) + ' vendas'"></span></div>
@@ -432,7 +543,7 @@
         </article>
       </section>
 
-      <section x-show="currentSection === 'resumo' && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
+      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner) && (num(resumo?.stock_items) === 0 || num(resumo?.orders_month) === 0)"
                class="pos-onboarding" aria-label="Primeiros passos da loja">
         <div class="pos-onboarding-head">
           <div>
@@ -454,7 +565,7 @@
         </div>
       </section>
 
-      <section x-show="currentSection === 'resumo'" class="pos-workspace">
+      <section x-show="currentSection === 'resumo' && (!isMobile || !isOwner)" class="pos-workspace">
         <div class="pos-page-grid finance">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
@@ -3012,7 +3123,7 @@
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
 <script src="./app.core.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
-<script src="./app.resumo.js?v=20260805-entrada-simples1"></script>
+<script src="./app.resumo.js?v=20260810-resumo-mobile1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
 <script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
