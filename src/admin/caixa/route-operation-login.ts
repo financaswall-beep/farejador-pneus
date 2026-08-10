@@ -41,6 +41,7 @@ function tooMany(reply: FastifyReply, key: string) {
 async function issueOperationSession(
   environment: 'prod' | 'test',
   personId: string,
+  username: string,
   workplace: OperationWorkplace,
 ) {
   if (workplace.kind === 'matrix') {
@@ -51,6 +52,7 @@ async function issueOperationSession(
       scope: 'matrix' as const,
       workplace_id: workplace.id,
       store_name: workplace.name,
+      modules: workplace.modules,
       ...session,
     };
   }
@@ -62,7 +64,9 @@ async function issueOperationSession(
     slug: workplace.slug,
     store_name: workplace.name,
     role: workplace.role,
-    redirect_path: `/parceiro/${workplace.slug}/`,
+    display_name: workplace.displayName,
+    username,
+    modules: workplace.modules,
     ...session,
   };
 }
@@ -103,6 +107,7 @@ export function registerCaixaOperationLoginRoutes(
         const result = await issueOperationSession(
           env.FAREJADOR_ENV,
           operation.personId,
+          operation.username,
           operation.workplaces[0]!,
         );
         if (!result) return reply.status(401).send({ error: 'invalid_credentials' });
@@ -156,7 +161,12 @@ export function registerCaixaOperationLoginRoutes(
     }
     const workplace = ticket.workplaces.find((item) => item.id === parsed.data.workplace_id);
     if (!workplace) return reply.status(401).send({ error: 'ticket_invalid' });
-    const result = await issueOperationSession(env.FAREJADOR_ENV, ticket.personId, workplace);
+    const result = await issueOperationSession(
+      env.FAREJADOR_ENV,
+      ticket.personId,
+      ticket.username,
+      workplace,
+    );
     if (!result) return reply.status(401).send({ error: 'ticket_invalid' });
     rateLimitClear(ipKey);
     return reply.status(200).send(result);

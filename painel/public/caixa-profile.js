@@ -50,7 +50,7 @@
   async function logoutCaixa() {
     const current = Caixa.token();
     try {
-      if (current) await Caixa.authenticatedFetch('/api/caixa/logout', { method: 'POST' });
+      if (current) await Caixa.authenticatedFetch(Caixa.operationPath('logout', '/api/caixa/logout'), { method: 'POST' });
     } catch (_) {
       // O logout local continua mesmo se a rede estiver indisponível.
     }
@@ -82,6 +82,10 @@
     Caixa.showToast(enabled ? 'Modo compacto ativado.' : 'Modo compacto desativado.');
   });
   document.getElementById('change-password-button').addEventListener('click', function () {
+    if (Caixa.isPartner()) {
+      Caixa.showToast('A troca de senha entrará na etapa Perfil.');
+      return;
+    }
     elements.passwordModal.classList.remove('hidden');
     elements.currentPassword.focus({ preventScroll: true });
   });

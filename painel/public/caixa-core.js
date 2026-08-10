@@ -6,6 +6,11 @@
     token: '2w_caixa_token',
     name: '2w_caixa_nome',
     user: '2w_caixa_usuario',
+    scope: '2w_caixa_escopo',
+    slug: '2w_caixa_unidade_slug',
+    store: '2w_caixa_unidade_nome',
+    role: '2w_caixa_papel',
+    modules: '2w_caixa_modulos',
     notifications: '2w_caixa_notificacoes',
     compact: '2w_caixa_compacto',
   };
@@ -27,6 +32,7 @@
     profileUsername: byId('profile-username'),
     operatorLabel: byId('operator-label'),
     appHeadingTitle: byId('app-heading-title'),
+    operationUnitLabel: byId('operation-unit-label'),
     profileInitials: byId('profile-initials'),
     profileMetricSales: byId('profile-metric-sales'),
     profileMetricRevenue: byId('profile-metric-revenue'),
@@ -106,7 +112,12 @@
   }
 
   function clearSession() {
-    [keys.token, keys.name, keys.user].forEach(function (key) {
+    const partnerSlug = stored(keys.slug);
+    if (partnerSlug) {
+      sessionStorage.removeItem('farejador_partner_token_' + partnerSlug);
+      localStorage.removeItem('farejador_partner_token_' + partnerSlug);
+    }
+    [keys.token, keys.name, keys.user, keys.scope, keys.slug, keys.store, keys.role, keys.modules].forEach(function (key) {
       sessionStorage.removeItem(key);
       localStorage.removeItem(key);
     });
@@ -118,6 +129,23 @@
     storage.setItem(keys.token, payload.session_token);
     storage.setItem(keys.name, payload.display_name || 'Operador');
     storage.setItem(keys.user, payload.username || elements.username.value.trim());
+    storage.setItem(keys.scope, payload.scope || 'matrix');
+    storage.setItem(keys.store, payload.store_name || (payload.scope === 'partner' ? 'Unidade parceira' : 'Matriz'));
+    storage.setItem(keys.role, payload.role || 'vendedor');
+    storage.setItem(keys.modules, JSON.stringify(payload.modules || { vendas: true }));
+    if (payload.slug) storage.setItem(keys.slug, payload.slug);
+    if (payload.scope === 'partner' && payload.slug) {
+      storage.setItem('farejador_partner_token_' + payload.slug, payload.session_token);
+    }
+  }
+
+  function scope() { return stored(keys.scope) || 'matrix'; }
+  function slug() { return stored(keys.slug); }
+  function isPartner() { return scope() === 'partner' && Boolean(slug()); }
+
+  function operationPath(resource, matrixPath) {
+    if (isPartner()) return '/parceiro/' + encodeURIComponent(slug()) + '/api/' + resource;
+    return matrixPath || '/api/caixa/' + resource;
   }
 
   function firstName(value) {
@@ -130,17 +158,24 @@
     return (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : (words[0][1] || ''))).toUpperCase();
   }
 
-  function showSession(displayName, userName) {
-    const name = displayName || 'Operador';
+  function showSession(payload, legacyUserName) {
+    const data = typeof payload === 'object' && payload !== null
+      ? payload : { display_name: payload, username: legacyUserName };
+    const name = data.display_name || stored(keys.name) || 'Operador';
+    const unitName = data.store_name || data.unit_name || stored(keys.store) || 'Matriz';
     elements.sessionName.textContent = name;
     elements.operatorLabel.textContent = firstName(name);
     elements.profileInitials.textContent = initials(name);
-    elements.profileUsername.textContent = userName || '—';
+    elements.profileUsername.textContent = data.username || stored(keys.user) || '—';
+    elements.operationUnitLabel.textContent = unitName;
+    elements.sessionView.dataset.scope = scope();
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
-    if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
-    const initialTab = window.location.hash === '#vendas' ? 'sales' : 'cash';
+    if (isPartner()) {
+      if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
+    } else if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
+    const initialTab = !isPartner() && window.location.hash === '#vendas' ? 'sales' : 'cash';
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
     else void Caixa.loadCatalog();
@@ -219,6 +254,10 @@
     dateTime: dateTime,
     token: token,
     stored: stored,
+    scope: scope,
+    slug: slug,
+    isPartner: isPartner,
+    operationPath: operationPath,
     clearSession: clearSession,
     saveSession: saveSession,
     showSession: showSession,

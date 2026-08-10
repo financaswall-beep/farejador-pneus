@@ -6,6 +6,11 @@
   const state = Caixa.state;
 
   async function loadProfileSummary() {
+    if (Caixa.isPartner()) {
+      elements.profileMetricSales.textContent = '—';
+      elements.profileMetricRevenue.textContent = '—';
+      return;
+    }
     try {
       const response = await Caixa.authenticatedFetch('/api/caixa/vendas?period=today');
       const payload = await Caixa.json(response);
@@ -20,6 +25,7 @@
 
   async function loadSales() {
     if (!Caixa.token()) return;
+    if (Caixa.isPartner()) return;
     if (state.salesRequest) state.salesRequest.abort();
     const controller = new AbortController();
     state.salesRequest = controller;
@@ -44,6 +50,7 @@
   }
 
   async function openReceipt(orderId) {
+    if (Caixa.isPartner()) return;
     elements.receiptModal.classList.remove('hidden');
     elements.receiptContent.replaceChildren();
     const loading = document.createElement('p');
@@ -76,7 +83,7 @@
     elements.profilePanel.classList.toggle('hidden', !profile);
     elements.sessionView.classList.toggle('is-profile', profile);
     elements.sessionView.classList.toggle('is-cash', cash);
-    elements.appHeadingTitle.textContent = profile ? 'Perfil' : cash ? 'Nova venda' : 'Vendas';
+    elements.appHeadingTitle.textContent = profile ? 'Perfil' : cash ? 'Vender' : 'Vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-profile').classList.toggle('active', profile);
@@ -125,8 +132,18 @@
   document.getElementById('operator-button').addEventListener('click', function () { showTab('profile'); });
   document.getElementById('nav-profile').addEventListener('click', function () { showTab('profile'); });
   document.getElementById('nav-sales').addEventListener('click', function () {
+    if (Caixa.isPartner()) {
+      Caixa.showToast('Minhas vendas será liberada na etapa própria.');
+      return;
+    }
     showTab('sales');
     void loadSales();
+  });
+  document.getElementById('nav-stock').addEventListener('click', function () {
+    Caixa.showToast('A tela Estoque será a próxima etapa.');
+  });
+  document.getElementById('nav-deliveries').addEventListener('click', function () {
+    Caixa.showToast('A tela Entregas será implementada depois do Estoque.');
   });
   document.getElementById('nav-cash').addEventListener('click', function () {
     showTab('cash');

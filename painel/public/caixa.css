@@ -424,9 +424,9 @@ form { display: grid; gap: 16px; }
 .checkout-search input { width: 100%; height: 58px; padding: 0 49px 0 55px; border: 1px solid #d2d9d5; border-radius: 17px; outline: 0; color: #17251f; background: #fff; box-shadow: 0 4px 12px rgba(13,48,34,.05); font-size: 15px; }
 .checkout-search input::placeholder { color: #858b88; }
 .checkout-search input:focus { border-color: #16845d; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
-.catalog-type-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin: 13px 0 14px; padding: 4px; border: 1px solid #e0e5e2; border-radius: 16px; background: #f3f6f4; }
+.catalog-type-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; margin: 13px 0 14px; padding: 4px; border: 1px solid #e0e5e2; border-radius: 16px; background: #f3f6f4; }
 .catalog-type-tabs button { display: flex; min-width: 0; height: 45px; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; border: 0; border-radius: 12px; color: #5b625f; background: transparent; font-size: 13px; font-weight: 620; cursor: pointer; }
-.catalog-type-tabs button.active { color: #086742; background: #fff; box-shadow: 0 3px 10px rgba(18,52,39,.09); }
+.catalog-type-tabs button.active { color: #fff; background: linear-gradient(145deg,#087d50,#005f3e); box-shadow: 0 5px 13px rgba(3,93,61,.2); }
 .catalog-type-tabs svg { width: 21px; height: 21px; flex: 0 0 21px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .catalog-message { display: grid; min-height: 210px; place-content: center; justify-items: center; gap: 8px; padding: 24px; color: #68736d; text-align: center; font-size: 12px; }
 .catalog-message strong { color: #34463d; font-size: 14px; }
@@ -438,7 +438,8 @@ form { display: grid; gap: 16px; }
 .catalog-product-visual { display: grid; width: 92px; height: 122px; place-items: center; overflow: hidden; align-self: center; }
 .catalog-product-visual img { width: 88px; height: 116px; object-fit: contain; mix-blend-mode: multiply; filter: contrast(1.04); }
 .catalog-product-visual--service { width: 76px; height: 76px; margin: auto; border-radius: 22px; color: #087246; background: linear-gradient(145deg,#eaf8ed,#d9f0df); }
-.catalog-product-visual--service svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
+.catalog-product-visual--other { width: 76px; height: 76px; margin: auto; border-radius: 22px; color: #087246; background: linear-gradient(145deg,#f1f8ed,#e0f0d9); }
+.catalog-product-visual--service svg,.catalog-product-visual--other svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
 .catalog-product-content { display: flex; min-width: 0; flex-direction: column; justify-content: center; }
 .catalog-product-content > strong { overflow: hidden; color: #151b18; font-size: 16px; font-weight: 680; line-height: 1.2; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .catalog-product-content > small { margin-top: 4px; overflow: hidden; color: #69716d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
@@ -575,7 +576,7 @@ form { display: grid; gap: 16px; }
   z-index: 8;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(3,1fr);
+  grid-template-columns: repeat(5,1fr);
   min-height: 76px;
   padding: 6px 20px max(7px,env(safe-area-inset-bottom));
   border-top: 1px solid #e4e7e5;
@@ -583,7 +584,7 @@ form { display: grid; gap: 16px; }
   box-shadow: 0 -8px 24px rgba(18,40,31,.045);
   backdrop-filter: blur(14px);
 }
-.bottom-nav button { position: relative; display: flex; min-width: 0; align-items: center; justify-content: center; flex-direction: column; gap: 3px; padding: 5px; border: 0; color: #707672; background: transparent; font-size: 11px; cursor: pointer; }
+.bottom-nav button { position: relative; display: flex; min-width: 0; align-items: center; justify-content: center; flex-direction: column; gap: 3px; padding: 5px 2px; border: 0; color: #707672; background: transparent; font-size: 10px; cursor: pointer; }
 .bottom-nav button::before { content: ""; position: absolute; top: -7px; left: 20%; right: 20%; height: 3px; border-radius: 0 0 3px 3px; background: transparent; }
 .bottom-nav button.active { color: #087246; }
 .bottom-nav button.active::before { background: #087246; }

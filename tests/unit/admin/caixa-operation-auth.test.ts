@@ -21,11 +21,13 @@ describe('resolução segura do local da Operação da Loja', () => {
       .mockResolvedValueOnce({ rows: [
         {
           token_id: 'token-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
-          role: 'funcionario', allow_vendas: true, allow_estoque: false, allow_entregas: false,
+          role: 'funcionario', display_name: 'Wallace',
+          allow_vendas: true, allow_estoque: false, allow_entregas: false,
         },
         {
           token_id: 'token-bloqueado', slug: 'loja-bloqueada', store_name: 'Loja Bloqueada',
-          role: 'funcionario', allow_vendas: false, allow_estoque: false, allow_entregas: false,
+          role: 'funcionario', display_name: 'Bloqueado',
+          allow_vendas: false, allow_estoque: false, allow_entregas: false,
         },
       ] });
     const dbPool = { query } as unknown as Pool;
@@ -33,6 +35,10 @@ describe('resolução segura do local da Operação da Loja', () => {
     const workplaces = await listOperationWorkplaces('test', 'person-1', dbPool);
 
     expect(workplaces.map((item) => item.id)).toEqual(['matrix', 'partner:rio-do-ouro']);
+    expect(workplaces[1]).toMatchObject({
+      displayName: 'Wallace',
+      modules: { vendas: true, estoque: false, entregas: false },
+    });
     expect(query).toHaveBeenCalledTimes(2);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain("mc.job = 'vendedor'");
@@ -56,6 +62,8 @@ describe('resolução segura do local da Operação da Loja', () => {
       role: 'funcionario',
       slug: 'rio-do-ouro',
       tokenId: 'secreto-no-servidor',
+      displayName: 'Wallace',
+      modules: { vendas: true, estoque: true, entregas: true },
     });
     expect(safe).toEqual({
       id: 'partner:rio-do-ouro',

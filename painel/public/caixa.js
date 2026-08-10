@@ -13,22 +13,13 @@
     elements.form.classList.remove('hidden');
   }
 
-  function storePartnerSession(payload) {
-    const key = 'farejador_partner_token_' + payload.slug;
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
-    const storage = elements.remember.checked ? localStorage : sessionStorage;
-    storage.setItem(key, payload.session_token);
-  }
-
   function completeLogin(payload) {
-    if (payload.scope === 'partner') {
-      storePartnerSession(payload);
-      window.location.assign(payload.redirect_path || ('/parceiro/' + payload.slug + '/'));
+    Caixa.saveSession(payload);
+    if (payload.scope === 'partner' && payload.modules && payload.modules.vendas === false) {
+      window.location.assign('/parceiro/' + encodeURIComponent(payload.slug) + '/');
       return;
     }
-    Caixa.saveSession(payload);
-    Caixa.showSession(payload.display_name, payload.username);
+    Caixa.showSession(payload);
   }
 
   function workplaceIcon(kind) {
@@ -161,13 +152,14 @@
       return;
     }
     try {
-      const response = await Caixa.authenticatedFetch('/api/caixa/me');
+      const response = await Caixa.authenticatedFetch(Caixa.operationPath('me', '/api/caixa/me'));
       if (!response.ok) throw new Error('invalid_session');
       const payload = await Caixa.json(response);
-      Caixa.showSession(
-        payload.display_name || Caixa.stored(Caixa.keys.name),
-        payload.username || Caixa.stored(Caixa.keys.user),
-      );
+      if (Caixa.isPartner() && payload.permissions && payload.permissions.vendas === false) {
+        window.location.assign('/parceiro/' + encodeURIComponent(Caixa.slug()) + '/');
+        return;
+      }
+      Caixa.showSession(payload);
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       Caixa.clearSession();

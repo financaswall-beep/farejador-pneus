@@ -55,12 +55,20 @@
     const search = ui.search.value.trim();
     if (search) params.set('search', search);
     try {
-      const response = await Caixa.authenticatedFetch('/api/caixa/catalogo?' + params.toString(), {
-        signal: controller.signal,
-      });
+      if (!Caixa.isPartner() && checkout.type === 'other') {
+        renderCatalog([]);
+        return;
+      }
+      const catalogUrl = Caixa.isPartner()
+        ? Caixa.operationPath('produtos')
+        : '/api/caixa/catalogo?' + params.toString();
+      const response = await Caixa.authenticatedFetch(catalogUrl, { signal: controller.signal });
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
-      renderCatalog(Array.isArray(payload.products) ? payload.products : []);
+      const products = Caixa.isPartner()
+        ? Caixa.normalizePartnerCatalog(Array.isArray(payload.rows) ? payload.rows : [], checkout.type, search)
+        : Array.isArray(payload.products) ? payload.products : [];
+      renderCatalog(products);
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
       if (failure instanceof Error && failure.message === 'invalid_session') return;
@@ -72,7 +80,7 @@
 
   function changeQuantity(product, delta) {
     const current = checkout.cart.get(product.product_id)?.quantity || 0;
-    const maximum = product.product_type === 'tire' ? Number(product.stock_quantity || 0) : 50;
+    const maximum = product.product_type === 'service' || product.stock_tracked === false ? 50 : Number(product.stock_quantity || 0);
     const next = Math.max(0, Math.min(maximum, current + delta));
     if (delta > 0 && next === current) {
       Caixa.showToast('Não há mais unidades disponíveis deste item.');
@@ -202,17 +210,9 @@
     ui.confirmButton.disabled = true;
     ui.confirmButton.textContent = 'REGISTRANDO…';
     renderCart();
-    const body = {
-      customer_name: checkout.customerName,
-      customer_phone: checkout.customerPhone || null,
-      payment_method: checkout.payment,
-      idempotency_key: checkout.idempotencyKey,
-      items: Array.from(checkout.cart.values()).map(function (line) {
-        return { product_id: line.product.product_id, quantity: line.quantity };
-      }),
-    };
+    const body = Caixa.saleRequestBody(checkout, cartTotals());
     try {
-      const response = await Caixa.authenticatedFetch('/api/caixa/vendas', {
+      const response = await Caixa.authenticatedFetch(Caixa.operationPath('vendas', '/api/caixa/vendas'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -224,12 +224,12 @@
       elements.checkoutReviewModal.classList.add('hidden');
       renderCart();
       await loadCatalog();
-      void Caixa.loadSales();
-      if (payload.receipt) {
+      if (!Caixa.isPartner()) void Caixa.loadSales();
+      if (!Caixa.isPartner() && payload.receipt) {
         elements.receiptModal.classList.remove('hidden');
         Caixa.renderReceipt(payload.receipt);
       }
-      Caixa.showToast('Venda registrada, estoque baixado e Financeiro atualizado.');
+      Caixa.showToast('Venda registrada, estoque baixado e financeiro atualizado.');
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
       const code = failure instanceof Error ? failure.message : 'request_failed';

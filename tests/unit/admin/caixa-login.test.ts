@@ -89,6 +89,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(script).toContain("payload.scope === 'partner'");
     expect(script).toContain("fetch('/api/caixa/login/escolher'");
     expect(script).toContain("'farejador_partner_token_' + payload.slug");
+    expect(script).toContain("Caixa.operationPath('me', '/api/caixa/me')");
     expect(route).toContain('authenticateOperation');
     expect(route).toContain('newOperationLoginTicket');
     expect(route).toContain('publicOperationWorkplace');
@@ -141,11 +142,18 @@ describe('login mobile da Operação da Loja', () => {
 
   it('entrega nova venda com catálogo, carrinho e fechamento pela API própria', () => {
     expect(html).toContain('Buscar produto, medida ou marca');
-    expect(html).toContain('REVISAR E FINALIZAR');
+    expect(html).toContain('FINALIZAR VENDA');
     expect(html).toContain('data-payment="pix"');
-    expect(script).toContain("authenticatedFetch('/api/caixa/catalogo?'");
-    expect(script).toContain("authenticatedFetch('/api/caixa/vendas'");
-    expect(script).toContain('Venda registrada, estoque baixado e Financeiro atualizado.');
+    expect(html).toContain('data-catalog-type="other"');
+    expect(html).toContain('id="operation-unit-label"');
+    expect(html).toContain('<span>Vender</span>');
+    expect(html).toContain('id="nav-stock"');
+    expect(html).toContain('id="nav-deliveries"');
+    expect(script).toContain("Caixa.operationPath('produtos')");
+    expect(script).toContain("Caixa.operationPath('vendas', '/api/caixa/vendas')");
+    expect(script).toContain("partner_stock_id: line.product.partner_stock_id");
+    expect(script).toContain("source_tag: 'walkin_balcao'");
+    expect(script).toContain('Venda registrada, estoque baixado e financeiro atualizado.');
     expect(route).toContain("'/api/caixa/catalogo'");
     expect(route).toContain("fastify.post('/api/caixa/vendas'");
     expect(script).not.toContain('/admin/api/');

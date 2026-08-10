@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260810-operacao-login1" />
-  <script defer src="/caixa/caixa-core.js?v=20260810-operacao-login1"></script>
-  <script defer src="/caixa/caixa-checkout-catalog.js?v=20260804-checkout2"></script>
-  <script defer src="/caixa/caixa-checkout.js?v=20260804-checkout2"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260810-operacao-vender1" />
+  <script defer src="/caixa/caixa-core.js?v=20260810-operacao-vender1"></script>
+  <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
+  <script defer src="/caixa/caixa-checkout.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260805-weekonly1"></script>
-  <script defer src="/caixa/caixa-profile.js?v=20260804-ci1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-vender1"></script>
+  <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
-  <script defer src="/caixa/caixa.js?v=20260810-operacao-login1"></script>
+  <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
 </head>
 <body>
   <main class="caixa-shell">
@@ -115,13 +115,13 @@
         </article>
       </section>
 
-      <section id="session-view" class="sales-app hidden" aria-label="Frente de Caixa da Matriz">
+      <section id="session-view" class="sales-app hidden" aria-label="Operação de vendas da loja">
         <header class="sales-header">
           <div class="sales-heading">
             <img src="/caixa/logo-2w.svg" width="58" height="58" alt="" class="sales-logo" />
             <div>
-              <h2 id="app-heading-title">Vendas</h2>
-              <p>Matriz</p>
+              <h2 id="app-heading-title">Vender</h2>
+              <p id="operation-unit-label">Matriz</p>
             </div>
           </div>
           <div class="operator-area">
@@ -157,6 +157,10 @@
             <button type="button" data-catalog-type="service" aria-pressed="false">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z"/></svg>
               Serviços
+            </button>
+            <button type="button" data-catalog-type="other" aria-pressed="false">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>
+              Outros
             </button>
           </nav>
 
@@ -198,7 +202,7 @@
 
             <button id="checkout-review-button" class="checkout-finish" type="button" disabled>
               <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/></svg>
-              REVISAR E FINALIZAR
+              FINALIZAR VENDA
             </button>
           </section>
         </div>
@@ -361,14 +365,22 @@
           </div>
         </div>
 
-        <nav class="bottom-nav" aria-label="Navegação do Frente de Caixa">
+        <nav class="bottom-nav" aria-label="Navegação da Operação da Loja">
           <button id="nav-cash" class="active" type="button" data-tab="cash" aria-current="page">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 4h12v5H6zM4 9h16v11H4zM7 13h3m2 0h2m2 0h1m-10 3h3m2 0h2m2 0h1"/></svg>
-            <span>Caixa</span>
+            <span>Vender</span>
           </button>
           <button id="nav-sales" type="button" data-tab="sales">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z"/><path d="M9 8h6m-6 4h6m-6 4h4"/></svg>
             <span>Vendas</span>
+          </button>
+          <button id="nav-stock" type="button" data-tab="stock">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>
+            <span>Estoque</span>
+          </button>
+          <button id="nav-deliveries" type="button" data-tab="deliveries">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 18H3v-5h8l2-5h4l2 5h2v5h-1M9 18h7M8 13l2-5H7M15 8l-1-3"/></svg>
+            <span>Entregas</span>
           </button>
           <button id="nav-profile" type="button" data-tab="profile">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>

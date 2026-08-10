@@ -2,6 +2,12 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { authenticatePersonCredentials } from '../../parceiro/people.js';
 
+export interface OperationModules {
+  vendas: boolean;
+  estoque: boolean;
+  entregas: boolean;
+}
+
 export type OperationWorkplace =
   | {
       id: 'matrix';
@@ -9,6 +15,7 @@ export type OperationWorkplace =
       name: 'Matriz';
       role: 'vendedor';
       collaboratorId: string;
+      modules: OperationModules;
     }
   | {
       id: string;
@@ -17,6 +24,8 @@ export type OperationWorkplace =
       role: string;
       slug: string;
       tokenId: string;
+      displayName: string;
+      modules: OperationModules;
     };
 
 export interface OperationAuthResult {
@@ -34,6 +43,7 @@ type PartnerRow = {
   slug: string;
   store_name: string;
   role: string;
+  display_name: string;
   allow_vendas: boolean;
   allow_estoque: boolean;
   allow_entregas: boolean;
@@ -69,6 +79,7 @@ export async function listOperationWorkplaces(
               pu.slug,
               COALESCE(pu.display_name, u.name) AS store_name,
               pat.role,
+              COALESCE(NULLIF(btrim(pat.label), ''), pp.username) AS display_name,
               CASE WHEN pat.role = 'owner' THEN true
                    ELSE COALESCE(ptp.allow_vendas, pup.allow_vendas, true) END AS allow_vendas,
               CASE WHEN pat.role = 'owner' THEN true
@@ -80,6 +91,8 @@ export async function listOperationWorkplaces(
            ON pu.id = pat.partner_unit_id AND pu.environment = pat.environment
          JOIN network.partners p
            ON p.id = pu.partner_id AND p.environment = pu.environment
+         JOIN network.partner_people pp
+           ON pp.id = pat.person_id AND pp.environment = pat.environment
          JOIN core.units u ON u.id = pu.unit_id
          LEFT JOIN network.partner_token_permissions ptp
            ON ptp.token_id = pat.id AND ptp.environment = pat.environment
@@ -104,6 +117,7 @@ export async function listOperationWorkplaces(
       name: 'Matriz',
       role: 'vendedor',
       collaboratorId: matrixRow.collaborator_id,
+      modules: { vendas: true, estoque: false, entregas: false },
     });
   }
 
@@ -116,6 +130,12 @@ export async function listOperationWorkplaces(
       role: row.role,
       slug: row.slug,
       tokenId: row.token_id,
+      displayName: row.display_name,
+      modules: {
+        vendas: row.allow_vendas,
+        estoque: row.allow_estoque,
+        entregas: row.allow_entregas,
+      },
     });
   }
   return workplaces;
