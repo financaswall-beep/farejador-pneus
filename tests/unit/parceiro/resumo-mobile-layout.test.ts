@@ -78,7 +78,10 @@ describe('partner mobile summary', () => {
     expect(css).toContain('.pos-shell.summary-screen[data-theme="dark"] .pos-main');
     expect(css).toContain('.pos-shell.summary-screen[data-theme="dark"] .mobile-summary-card');
     expect(css).toContain('.pos-shell.summary-screen[data-theme="dark"] .pos-summary-mobile-nav');
-    expect(css).toContain('background: rgba(12, 28, 23, .94)');
+    expect(css).toContain('background: linear-gradient(160deg, rgba(37, 42, 49, .82), rgba(21, 25, 30, .9))');
+    expect(css).toContain('color: var(--pos-yellow);');
+    expect(css).toContain('border-color: var(--pos-line);');
+    expect(css).not.toContain('background: rgba(12, 28, 23, .94)');
     expect(css).toContain('color: #f8fafc;');
   });
 });
