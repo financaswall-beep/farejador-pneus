@@ -64,7 +64,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(stockCount).toContain("countedLabel.textContent = 'Quantidade contada'");
     expect(style).toContain('"system-label counted-label"');
     expect(style).toContain('"system stepper"');
-    expect(style).toMatch(/\.stock-count-brand[^}]*font-size: 12px/);
+    expect(style).toMatch(/\.stock-count-brand[^}]*font-size: 14px/);
     expect(style).toMatch(/\.stock-count-field-label[^}]*font-size: 9px/);
     expect(style).toMatch(/\.stock-count-system-box b[^}]*font-size: 16px/);
     expect(style).toMatch(/\.stock-count-stepper input[^}]*font-size: 17px/);
