@@ -191,6 +191,7 @@ window.PARCEIRO_MODULES.core = () => ({
         this.retiradas = retiradas;
         this.estoque = estoque;
         this.clientes = clientes;
+        if (this.isOwner) await this.loadStockRequests(true);
 
         // Resumo (tela Resumo) e Financeiro (caixa/contas) seguem a permissão
         // efetiva — o dono PODE ter liberado ao funcionário (PLANO §2.3). O resumo

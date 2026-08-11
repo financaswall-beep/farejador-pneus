@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-08T07:05:39.023Z",
+  "geradoEm": "2026-08-10T23:55:32.901Z",
   "commitBase": "c0d7913",
-  "total": 84,
+  "total": 88,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -34,6 +34,7 @@
     "call:this.api('funcionarios', { method: 'POST', body: JSON.stringify({ label: (this.funcionarioForm.label || '').trim() || null, username, password, }), })",
     "call:this.api('me')",
     "call:this.api('meu-desempenho')",
+    "call:this.api('operacao/estoque/solicitacoes')",
     "call:this.api('photo-requests')",
     "call:this.api('push/subscribe', { method: 'POST', body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }), })",
     "call:this.api('push/vapid-key')",
@@ -71,6 +72,9 @@
     "call:this.api(`funcionarios/${f.id}`, { method: 'DELETE' })",
     "call:this.api(`itens/${tipo}/${encodeURIComponent(id)}/arquivar`, { method: 'POST' })",
     "call:this.api(`itens/order/${encodeURIComponent(r.order_id)}/desarquivar`, { method: 'POST' })",
+    "call:this.api(`operacao/estoque/${plural}/${this.stockRejectItem.id}/rejeitar`, { method: 'POST', body: JSON.stringify({ reason }), })",
+    "call:this.api(`operacao/estoque/cadastros/${item.id}/aprovar`, { method: 'POST', body: JSON.stringify({ average_cost: cost, sale_price: price, quantity_on_hand: quantity, minimum_quantity: item.item_type === 'servico' ? null : (this.stockApprovalForm.minimum_quantity ?? null), supplier_name: this.stockApprovalForm.supplier_name || null, }), })",
+    "call:this.api(`operacao/estoque/contagens/${item.id}/aprovar`, { method: 'POST', body: JSON.stringify({}), })",
     "call:this.api(`photo-requests/${item.id}/photo`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: preview.blob, })",
     "call:this.api(`relatorios/caixa?${qs.toString()}`)",
     "call:this.api(`relatorios/pneus?${qs.toString()}`)",

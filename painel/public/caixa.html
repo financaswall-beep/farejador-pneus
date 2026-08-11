@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260810-operacao-vender1" />
-  <script defer src="/caixa/caixa-core.js?v=20260810-carrinho-sessao1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260810-operacao-estoque1" />
+  <script defer src="/caixa/caixa-core.js?v=20260810-operacao-estoque1"></script>
+  <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-vender1"></script>
+  <script defer src="/caixa/caixa-stock-view.js?v=20260810-operacao-estoque1"></script>
+  <script defer src="/caixa/caixa-stock.js?v=20260810-operacao-estoque1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
@@ -293,6 +296,55 @@
           <div id="sales-list" class="sales-list" aria-live="polite"></div>
         </div>
 
+        <div id="stock-panel" class="app-panel stock-panel hidden">
+          <section class="stock-actions" aria-label="Ações de estoque">
+            <button id="stock-register-open" class="stock-action stock-action--primary" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10M18 14v6m-3-3h6"/></svg>
+              <span><strong>Cadastrar item</strong><small>Sem custo, preço ou saldo</small></span>
+            </button>
+            <button id="stock-count-open" class="stock-action" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4h8M9 2h6v4H9zM6 4H5a2 2 0 0 0-2 2v14h18V6a2 2 0 0 0-2-2h-1"/><path d="m7 12 2 2 4-5M14 14h3m-3 4h3"/></svg>
+              <span><strong>Fazer contagem</strong><small>Enviar para conferência</small></span>
+            </button>
+          </section>
+
+          <section class="stock-safety" aria-label="Proteção do estoque">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.4 7 10 4.1-1.6 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>
+            <p><strong>Estoque protegido</strong><span>Cadastros e contagens aguardam aprovação. O saldo oficial não muda sozinho.</span></p>
+          </section>
+
+          <section class="stock-metrics" aria-label="Resumo do estoque">
+            <div><span id="stock-units">—</span><small>unidades</small></div>
+            <div><span id="stock-products">—</span><small>itens</small></div>
+            <div><span id="stock-low">—</span><small>estoque baixo</small></div>
+          </section>
+
+          <div id="stock-pending" class="stock-pending hidden" role="status"></div>
+
+          <div class="stock-search">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <label class="sr-only" for="stock-search-input">Buscar item no estoque</label>
+            <input id="stock-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar por item, medida ou código" />
+            <button id="stock-search-clear" class="search-clear hidden" type="button" aria-label="Limpar busca">×</button>
+          </div>
+
+          <nav class="stock-type-tabs" aria-label="Tipo de item">
+            <button class="active" type="button" data-stock-type="produto" aria-pressed="true">Produtos</button>
+            <button type="button" data-stock-type="servico" aria-pressed="false">Serviços</button>
+          </nav>
+
+          <div id="stock-loading" class="catalog-message" role="status">Carregando estoque…</div>
+          <div id="stock-error" class="catalog-message catalog-message--error hidden" role="alert">
+            <strong>Não foi possível carregar o estoque.</strong>
+            <button id="stock-retry" type="button">Tentar novamente</button>
+          </div>
+          <div id="stock-empty" class="catalog-message hidden">
+            <strong>Nenhum item encontrado</strong>
+            <span>Altere a busca ou cadastre um novo item.</span>
+          </div>
+          <div id="stock-list" class="stock-list hidden" aria-live="polite"></div>
+        </div>
+
         <div id="profile-panel" class="app-panel profile-panel hidden">
           <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
           <div class="profile-identity">
@@ -391,6 +443,97 @@
 
         <div id="app-toast" class="app-toast hidden" role="status"></div>
       </section>
+
+      <div id="stock-register-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-register-title">
+        <button class="account-modal-backdrop" type="button" data-close-stock-register aria-label="Fechar cadastro"></button>
+        <article class="account-modal-sheet stock-modal-sheet">
+          <header>
+            <div><p>Estoque protegido</p><h2 id="stock-register-title">Cadastrar item</h2></div>
+            <button type="button" data-close-stock-register aria-label="Fechar">×</button>
+          </header>
+          <form id="stock-register-form" novalidate>
+            <div class="stock-form-notice">
+              <strong>Sem valores financeiros</strong>
+              <span>Você informa o item. O dono confere custo, preço e saldo antes de liberar.</span>
+            </div>
+            <label>Tipo do item
+              <select id="stock-item-type" required>
+                <option value="pneu">Pneu</option>
+                <option value="insumo">Insumo / material</option>
+                <option value="servico">Serviço</option>
+              </select>
+            </label>
+            <label>Nome do item
+              <input id="stock-item-name" maxlength="240" required placeholder="Ex.: Maggion Matrix Plus CG" />
+            </label>
+            <div class="stock-form-grid stock-form-grid--3" data-tire-fields>
+              <label>Largura<input id="stock-tire-width" type="number" min="1" max="999" inputmode="numeric" placeholder="90" /></label>
+              <label>Perfil<input id="stock-tire-aspect" type="number" min="1" max="999" inputmode="numeric" placeholder="90" /></label>
+              <label>Aro<input id="stock-tire-rim" type="number" min="1" max="30" inputmode="numeric" placeholder="18" /></label>
+            </div>
+            <div class="stock-form-grid" data-tire-fields>
+              <label>Condição
+                <select id="stock-tire-condition">
+                  <option value="novo">Novo</option>
+                  <option value="meia_vida">Meia-vida</option>
+                  <option value="remold">Remold</option>
+                </select>
+              </label>
+              <label>Posição
+                <select id="stock-tire-position">
+                  <option value="">Não informar</option>
+                  <option value="Dianteiro">Dianteiro</option>
+                  <option value="Traseiro">Traseiro</option>
+                  <option value="Ambos">Ambos</option>
+                </select>
+              </label>
+            </div>
+            <label>Marca<input id="stock-item-brand" maxlength="120" placeholder="Ex.: Maggion" /></label>
+            <div class="stock-form-grid" data-stock-fields>
+              <label>Estoque mínimo<input id="stock-item-minimum" type="number" min="0" max="999999" inputmode="numeric" placeholder="Opcional" /></label>
+              <label>Localização<input id="stock-item-shelf" maxlength="60" placeholder="Ex.: A-01" /></label>
+            </div>
+            <label>Código interno<input id="stock-item-sku" maxlength="80" placeholder="Opcional" /></label>
+            <p id="stock-register-error" class="account-modal-error" role="alert"></p>
+            <button id="stock-register-submit" class="account-modal-primary" type="submit">Salvar e enviar para aprovação</button>
+          </form>
+        </article>
+      </div>
+
+      <div id="stock-count-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-count-title">
+        <button class="account-modal-backdrop" type="button" data-close-stock-count aria-label="Fechar contagem"></button>
+        <article class="account-modal-sheet stock-modal-sheet">
+          <header>
+            <div><p>Conferência física</p><h2 id="stock-count-title">Fazer contagem</h2></div>
+            <button type="button" data-close-stock-count aria-label="Fechar">×</button>
+          </header>
+          <form id="stock-count-form" novalidate>
+            <div class="stock-form-notice">
+              <strong>A contagem não muda o saldo</strong>
+              <span>O dono verá a diferença e decidirá se deve ajustar o estoque oficial.</span>
+            </div>
+            <label>Item contado
+              <select id="stock-count-item" required></select>
+            </label>
+            <div class="stock-count-current">
+              <span>Saldo no sistema</span><strong id="stock-count-system">—</strong>
+            </div>
+            <label>Quantidade contada
+              <input id="stock-count-quantity" type="number" min="0" max="999999" inputmode="numeric" required placeholder="Digite o total encontrado" />
+            </label>
+            <label>Motivo da contagem
+              <select id="stock-count-reason" required>
+                <option value="rotina">Contagem de rotina</option>
+                <option value="inventario">Inventário</option>
+                <option value="divergencia">Suspeita de divergência</option>
+                <option value="outro">Outro</option>
+              </select>
+            </label>
+            <p id="stock-count-error" class="account-modal-error" role="alert"></p>
+            <button id="stock-count-submit" class="account-modal-primary" type="submit">Enviar contagem para conferência</button>
+          </form>
+        </article>
+      </div>
 
       <div id="receipt-modal" class="receipt-modal hidden" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
         <button class="receipt-backdrop" type="button" data-close-receipt aria-label="Fechar recibo"></button>

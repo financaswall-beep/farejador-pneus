@@ -6,10 +6,13 @@ const html = readFileSync(resolve('painel/public/caixa.html'), 'utf8');
 const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
 const scriptFiles = [
   'caixa-core.js',
+  'caixa-modules.js',
   'caixa-checkout-catalog.js',
   'caixa-checkout.js',
   'caixa-checkout-session.js',
   'caixa-sales-view.js',
+  'caixa-stock-view.js',
+  'caixa-stock.js',
   'caixa-sales.js',
   'caixa-profile.js',
   'caixa-photo.js',

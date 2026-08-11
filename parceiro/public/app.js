@@ -279,6 +279,7 @@ function parceiroApp() {
     window.PARCEIRO_MODULES.comissao, // passo 6: Bloco 2 telas #2/#3 — Comissão da equipe (dono) + Meu desempenho (chip)
     window.PARCEIRO_MODULES.estoqueKpis, // passo 7: KPIs/filtros/series de estoque + stockAvailable 0076
     window.PARCEIRO_MODULES.estoqueForms, // passo 7: form/inativar/catalogo + entrada/ajuste de saldo
+    window.PARCEIRO_MODULES.estoqueAprovacoes, // passo 7: fila segura de cadastro/contagem, só dono
     window.PARCEIRO_MODULES.pdvKpis, // passo 8: leitura do PDV (carrinho/caixa do dia/produtos/rotulos)
     window.PARCEIRO_MODULES.pdv, // passo 8: fluxo de vender (carrinho, checkout, finalizar, cancelar)
     window.PARCEIRO_MODULES.pdvClientes, // passo 8: cliente na venda (busca/cadastro/CRUD/VIP)

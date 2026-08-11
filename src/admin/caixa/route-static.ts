@@ -29,10 +29,13 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   }
   text('/caixa/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
   text('/caixa/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
+  text('/caixa/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-checkout-catalog.js', 'caixa-checkout-catalog.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-checkout.js', 'caixa-checkout.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-checkout-session.js', 'caixa-checkout-session.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
+  text('/caixa/caixa-stock-view.js', 'caixa-stock-view.js', 'text/javascript; charset=utf-8');
+  text('/caixa/caixa-stock.js', 'caixa-stock.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-profile.js', 'caixa-profile.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');

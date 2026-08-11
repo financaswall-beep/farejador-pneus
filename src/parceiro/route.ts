@@ -870,7 +870,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: await getPartnerRetiradas(getPartnerContext(request)) });
   });
 
-  fastify.get('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.get('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     return reply.status(200).send({ rows: await getPartnerEstoque(getPartnerContext(request)) });
   });
 
@@ -1425,7 +1425,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(result);
   });
 
-  fastify.post('/parceiro/:slug/api/estoque', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = stockSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -1445,7 +1445,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: [requirePartnerAuth, requireScreen('estoque')] }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = stockParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'stock_not_found' });
 

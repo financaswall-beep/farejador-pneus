@@ -183,10 +183,12 @@
     if (isPartner()) {
       if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
     } else if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
-    const initialTab = !isPartner() && window.location.hash === '#vendas' ? 'sales' : 'cash';
+    if (Caixa.applyModuleNavigation) Caixa.applyModuleNavigation();
+    const initialTab = Caixa.initialOperationTab ? Caixa.initialOperationTab() : 'cash';
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
-    else void Caixa.loadCatalog();
+    else if (initialTab === 'stock' && Caixa.loadStock) void Caixa.loadStock();
+    else if (initialTab === 'cash') void Caixa.loadCatalog();
   }
 
   function showLogin(message) {

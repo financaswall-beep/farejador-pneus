@@ -78,17 +78,22 @@
     const cash = tab === 'cash';
     const profile = tab === 'profile';
     const sales = tab === 'sales';
+    const stock = tab === 'stock';
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.profilePanel.classList.toggle('hidden', !profile);
+    document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     elements.sessionView.classList.toggle('is-profile', profile);
     elements.sessionView.classList.toggle('is-cash', cash);
-    elements.appHeadingTitle.textContent = profile ? 'Perfil' : cash ? 'Vender' : 'Vendas';
+    elements.sessionView.classList.toggle('is-stock', stock);
+    elements.appHeadingTitle.textContent = profile ? 'Perfil' : stock ? 'Estoque' : cash ? 'Vender' : 'Vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
+    document.getElementById('nav-stock').classList.toggle('active', stock);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
+    document.getElementById('nav-stock').toggleAttribute('aria-current', stock);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     if (profile) void loadProfileSummary();
   }
@@ -140,7 +145,12 @@
     void loadSales();
   });
   document.getElementById('nav-stock').addEventListener('click', function () {
-    Caixa.showToast('A tela Estoque será a próxima etapa.');
+    if (!Caixa.isPartner() || !Caixa.canModule('estoque')) {
+      Caixa.showToast('Estoque não está disponível para este acesso.');
+      return;
+    }
+    showTab('stock');
+    void Caixa.loadStock();
   });
   document.getElementById('nav-deliveries').addEventListener('click', function () {
     Caixa.showToast('A tela Entregas será implementada depois do Estoque.');

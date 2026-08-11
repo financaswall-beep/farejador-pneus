@@ -15,10 +15,6 @@
 
   function completeLogin(payload) {
     Caixa.saveSession(payload);
-    if (payload.scope === 'partner' && payload.modules && payload.modules.vendas === false) {
-      window.location.assign('/parceiro/' + encodeURIComponent(payload.slug) + '/');
-      return;
-    }
     Caixa.showSession(payload);
   }
 
@@ -155,10 +151,6 @@
       const response = await Caixa.authenticatedFetch(Caixa.operationPath('me', '/api/caixa/me'));
       if (!response.ok) throw new Error('invalid_session');
       const payload = await Caixa.json(response);
-      if (Caixa.isPartner() && payload.permissions && payload.permissions.vendas === false) {
-        window.location.assign('/parceiro/' + encodeURIComponent(Caixa.slug()) + '/');
-        return;
-      }
       Caixa.showSession(payload);
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;

@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 html { min-width: 320px; min-height: 100%; background: #e9eeeb; }
 body { min-height: 100vh; min-height: 100svh; margin: 0; color: var(--ink); background: #e9eeeb; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button, label { -webkit-tap-highlight-color: transparent; }
 .hidden { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
@@ -564,6 +564,59 @@ form { display: grid; gap: 16px; }
 .profile-actions .logout-button { border-color: #ef4444; color: #dc2626; }
 .profile-actions .logout-button:hover { background: #fff5f5; }
 
+/* Estoque mobile seguro: consulta + solicitacoes sem escrita no saldo oficial */
+.sales-app.is-stock .sales-header { min-height: 166px; padding-bottom: 43px; }
+.stock-panel { min-height: 690px; padding: 16px 14px 24px; }
+.stock-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.stock-action { display: flex; min-width: 0; min-height: 70px; align-items: center; gap: 9px; padding: 11px; border: 1px solid #b9d4c7; border-radius: 16px; color: #0c5f40; background: #fff; text-align: left; cursor: pointer; }
+.stock-action--primary { border-color: #087246; color: #fff; background: linear-gradient(145deg,#098654,#00633f); box-shadow: 0 7px 16px rgba(3,102,65,.18); }
+.stock-action svg { width: 30px; height: 30px; flex: 0 0 30px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.65; }
+.stock-action span { display: grid; min-width: 0; gap: 3px; }
+.stock-action strong,.stock-action small { overflow: hidden; text-overflow: ellipsis; }
+.stock-action strong { font-size: 12px; white-space: nowrap; }
+.stock-action small { color: #6e7d75; font-size: 8px; line-height: 1.25; }
+.stock-action--primary small { color: rgba(255,255,255,.78); }
+.stock-safety { display: flex; align-items: center; gap: 11px; margin-top: 11px; padding: 12px 13px; border: 1px solid #cce8d7; border-radius: 14px; color: #155d40; background: #edf9f1; }
+.stock-safety > svg { width: 29px; height: 29px; flex: 0 0 29px; fill: none; stroke: #087246; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.stock-safety p { display: grid; gap: 2px; margin: 0; }
+.stock-safety strong { font-size: 11px; }
+.stock-safety span { color: #5f7168; font-size: 9px; line-height: 1.35; }
+.stock-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 11px; }
+.stock-metrics div { display: grid; min-width: 0; min-height: 70px; place-content: center; justify-items: center; gap: 2px; border: 1px solid #e0e6e3; border-radius: 14px; background: #fff; box-shadow: 0 4px 12px rgba(15,42,31,.045); }
+.stock-metrics span { color: #087246; font-family: "Arial Narrow",Arial,sans-serif; font-size: 26px; font-weight: 700; line-height: 1; }
+.stock-metrics small { overflow: hidden; color: #6a746f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-pending { margin-top: 10px; padding: 9px 11px; border-radius: 10px; color: #78500c; background: #fff4d7; font-size: 9px; font-weight: 650; text-align: center; }
+.stock-search { position: relative; margin-top: 12px; }
+.stock-search > svg { position: absolute; top: 50%; left: 15px; width: 23px; height: 23px; transform: translateY(-50%); fill: none; stroke: #69736e; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; pointer-events: none; }
+.stock-search input { width: 100%; height: 52px; padding: 0 47px 0 49px; border: 1px solid #d1d9d5; border-radius: 15px; outline: 0; color: #17251f; background: #fff; font-size: 13px; }
+.stock-search input:focus { border-color: #16845d; box-shadow: 0 0 0 4px rgba(16,185,129,.1); }
+.stock-search .search-clear { position: absolute; top: 50%; right: 8px; width: 36px; height: 36px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 10px; color: #557067; background: #eef4f1; font-size: 19px; cursor: pointer; }
+.stock-type-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 10px 0; padding: 4px; border: 1px solid #e0e5e2; border-radius: 14px; background: #f3f6f4; }
+.stock-type-tabs button { height: 40px; border: 0; border-radius: 10px; color: #5f6964; background: transparent; font-size: 11px; font-weight: 650; cursor: pointer; }
+.stock-type-tabs button.active { color: #fff; background: linear-gradient(145deg,#087d50,#005f3e); }
+.stock-list { display: grid; gap: 9px; }
+.stock-card { display: grid; min-height: 132px; grid-template-columns: 90px minmax(0,1fr); gap: 10px; padding: 11px; border: 1px solid #e0e5e2; border-radius: 17px; background: #fff; box-shadow: 0 5px 14px rgba(12,42,30,.05); }
+.stock-card-visual { display: grid; width: 90px; height: 110px; place-items: center; overflow: hidden; }
+.stock-card-visual img { width: 82px; height: 108px; object-fit: contain; mix-blend-mode: multiply; }
+.stock-card-visual--icon { width: 72px; height: 72px; align-self: center; justify-self: center; border-radius: 21px; color: #087246; background: #eaf7ee; }
+.stock-card-visual--icon svg { width: 37px; height: 37px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
+.stock-card-content { display: flex; min-width: 0; justify-content: center; align-items: flex-start; flex-direction: column; }
+.stock-card-kicker { width: 100%; overflow: hidden; color: #66716b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-card-content > strong { width: 100%; margin-top: 3px; overflow: hidden; color: #17211d; font-size: 15px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.stock-card-details { width: 100%; margin-top: 4px; overflow: hidden; color: #68736d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-card-badge { display: inline-flex; max-width: 100%; min-height: 27px; align-items: center; margin-top: 8px; padding: 0 9px; overflow: hidden; border-radius: 9px; color: #145b3c; background: #eaf7e8; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-card-badge--low { color: #8a5a09; background: #fff2d2; }
+.stock-card-count { height: 33px; margin-top: 8px; padding: 0 14px; border: 1px solid #087246; border-radius: 10px; color: #087246; background: #fff; font-size: 10px; font-weight: 680; cursor: pointer; }
+.stock-modal-sheet form select { width: 100%; height: 51px; padding: 0 39px 0 13px; border: 1px solid #cfd8d3; border-radius: 12px; outline: 0; color: #17251f; background: #fff; }
+.stock-modal-sheet form select:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
+.stock-form-notice { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid #cee7d7; border-radius: 12px; color: #145a3d; background: #f0f9f3; }
+.stock-form-notice strong { font-size: 11px; }
+.stock-form-notice span { color: #62736a; font-size: 9px; line-height: 1.4; }
+.stock-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.stock-form-grid--3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.stock-count-current { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-radius: 12px; color: #5a6961; background: #f2f5f3; font-size: 11px; }
+.stock-count-current strong { color: #087246; font-size: 18px; }
+
 .caixa-app.compact-mode .sale-card { min-height: 112px; padding-block: 11px; }
 .caixa-app.compact-mode .sale-card-footer { margin-top: 9px; }
 .caixa-app.compact-mode .sale-icon { width: 42px; height: 42px; }
@@ -675,6 +728,10 @@ form { display: grid; gap: 16px; }
   .sale-status svg { display: none; }
   .sale-amount { font-size: 21px; }
   .receipt-button { padding-inline: 8px; }
+  .stock-actions { grid-template-columns: 1fr; }
+  .stock-action { min-height: 60px; }
+  .stock-card { grid-template-columns: 76px minmax(0,1fr); }
+  .stock-card-visual { width: 76px; }
 }
 
 @media (max-height: 900px) {

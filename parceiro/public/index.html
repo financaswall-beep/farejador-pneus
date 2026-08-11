@@ -1186,6 +1186,17 @@
       </section>
 
       <section x-show="currentSection === 'estoque'" class="pos-workspace stock-workspace">
+        <div class="stock-admin-tabs" x-show="isOwner">
+          <button type="button" :class="stockAdminTab === 'current' && 'active'" @click="setStockAdminTab('current')">
+            <i data-lucide="boxes"></i> Estoque atual
+          </button>
+          <button type="button" :class="stockAdminTab === 'requests' && 'active'" @click="setStockAdminTab('requests')">
+            <i data-lucide="clipboard-check"></i> Solicitações
+            <b x-show="stockPendingTotal" x-text="stockPendingTotal"></b>
+          </button>
+        </div>
+
+        <div x-show="!isOwner || stockAdminTab === 'current'">
         <div class="pos-stock-grid">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
@@ -1507,6 +1518,139 @@
                 <span x-text="isSaving('stock-adjust') ? 'Salvando...' : 'Confirmar saldo'"></span>
               </button>
             </div>
+          </div>
+        </div>
+        </div>
+
+        <div x-show="isOwner && stockAdminTab === 'requests'" class="stock-approval-workspace" x-cloak>
+          <header class="stock-approval-heading">
+            <div>
+              <h2>Aprovar alterações do estoque</h2>
+              <p>Revise os cadastros e as contagens enviados pela equipe.</p>
+            </div>
+            <span><i data-lucide="clock-3"></i><b x-text="stockPendingTotal"></b> pendentes</span>
+          </header>
+
+          <div class="stock-approval-guard">
+            <i data-lucide="shield-check"></i>
+            <div><strong>Proteção do financeiro</strong><span>Nada altera saldo, custo ou preço sem sua aprovação.</span></div>
+          </div>
+
+          <nav class="stock-approval-filters" aria-label="Filtrar solicitações">
+            <button type="button" :class="stockApprovalFilter === 'all' && 'active'" @click="stockApprovalFilter='all'">
+              Todas <b x-text="stockPendingTotal"></b>
+            </button>
+            <button type="button" :class="stockApprovalFilter === 'registration' && 'active'" @click="stockApprovalFilter='registration'">
+              Cadastros <b x-text="stockPendingRegistrations.length"></b>
+            </button>
+            <button type="button" :class="stockApprovalFilter === 'count' && 'active'" @click="stockApprovalFilter='count'">
+              Contagens <b x-text="stockPendingCounts.length"></b>
+            </button>
+          </nav>
+
+          <div x-show="stockApprovalLoading" class="stock-approval-loading"><i data-lucide="loader-circle"></i> Carregando solicitações...</div>
+          <div x-show="!stockApprovalLoading && !stockPendingTotal" class="stock-approval-empty">
+            <i data-lucide="badge-check"></i><h3>Tudo revisado</h3><p>Não há solicitações pendentes da equipe.</p>
+          </div>
+
+          <div x-show="!stockApprovalLoading && stockPendingTotal" class="stock-approval-columns" :class="stockApprovalFilter !== 'all' && 'single'">
+            <section class="stock-approval-panel" x-show="stockApprovalFilter === 'all' || stockApprovalFilter === 'registration'">
+              <header><span><i data-lucide="package-plus"></i><strong>Cadastros pendentes</strong></span><b x-text="stockPendingRegistrations.length"></b></header>
+              <p class="stock-approval-help">A equipe informa o produto. Você completa custo, preço e saldo inicial.</p>
+              <div class="stock-approval-list">
+                <template x-for="item in stockPendingRegistrations" :key="item.id">
+                  <article class="stock-request-card">
+                    <div class="stock-request-product">
+                      <picture x-show="item.item_type === 'pneu'"><source srcset="assets/pneu-detalhe.webp" type="image/webp"><img src="assets/pneu-detalhe.png" alt="Pneu"></picture>
+                      <span x-show="item.item_type !== 'pneu'" class="stock-request-type-icon"><i :data-lucide="item.item_type === 'servico' ? 'wrench' : 'package'"></i></span>
+                      <div><small x-text="stockRequestTypeLabel(item)"></small><strong x-text="item.item_name"></strong><em x-text="[item.brand, item.tire_size].filter(Boolean).join(' · ') || 'Sem marca/medida'"></em></div>
+                      <span class="stock-request-status">Pendente</span>
+                    </div>
+                    <dl class="stock-request-meta">
+                      <div><dt>Enviado por</dt><dd x-text="item.requested_by_label"></dd></div>
+                      <div><dt>Quando</dt><dd x-text="formatDateTime(item.created_at)"></dd></div>
+                      <div x-show="item.local_sku"><dt>Código</dt><dd x-text="item.local_sku"></dd></div>
+                    </dl>
+                    <footer>
+                      <button type="button" class="reject" @click="openStockRejection('cadastro', item)"><i data-lucide="x"></i> Rejeitar</button>
+                      <button type="button" class="review" @click="openRegistrationApproval(item)"><i data-lucide="search-check"></i> Revisar e aprovar</button>
+                    </footer>
+                  </article>
+                </template>
+                <div x-show="!stockPendingRegistrations.length" class="stock-approval-empty compact"><i data-lucide="check"></i><p>Sem cadastros pendentes.</p></div>
+              </div>
+            </section>
+
+            <section class="stock-approval-panel" x-show="stockApprovalFilter === 'all' || stockApprovalFilter === 'count'">
+              <header><span><i data-lucide="list-checks"></i><strong>Contagens pendentes</strong></span><b x-text="stockPendingCounts.length"></b></header>
+              <p class="stock-approval-help">Compare o saldo do sistema com a contagem física antes de atualizar.</p>
+              <div class="stock-approval-list">
+                <template x-for="item in stockPendingCounts" :key="item.id">
+                  <article class="stock-request-card count">
+                    <div class="stock-request-product">
+                      <span class="stock-request-type-icon"><i data-lucide="clipboard-list"></i></span>
+                      <div><small>Contagem física</small><strong x-text="item.item_name"></strong><em x-text="[item.brand, item.tire_size].filter(Boolean).join(' · ') || stockRequestTypeLabel(item)"></em></div>
+                      <span class="stock-request-status" :class="item.is_stale && 'warning'" x-text="item.is_stale ? 'Recontar' : 'Pendente'"></span>
+                    </div>
+                    <div class="stock-count-compare">
+                      <div><small>No sistema</small><strong x-text="(item.quantity_snapshot ?? 0) + ' un.'"></strong></div>
+                      <i data-lucide="arrow-right"></i>
+                      <div><small>Contado</small><strong x-text="item.counted_quantity + ' un.'"></strong></div>
+                      <div class="difference" :class="stockRequestDiff(item) < 0 ? 'negative' : 'positive'"><small>Diferença</small><strong x-text="stockRequestDiffLabel(item)"></strong></div>
+                    </div>
+                    <p x-show="item.is_stale" class="stock-request-stale"><i data-lucide="triangle-alert"></i> O estoque mudou depois desta contagem. Rejeite e peça uma nova.</p>
+                    <dl class="stock-request-meta">
+                      <div><dt>Enviado por</dt><dd x-text="item.requested_by_label"></dd></div>
+                      <div><dt>Motivo</dt><dd x-text="item.reason"></dd></div>
+                      <div><dt>Quando</dt><dd x-text="formatDateTime(item.created_at)"></dd></div>
+                    </dl>
+                    <footer>
+                      <button type="button" class="reject" @click="openStockRejection('contagem', item)"><i data-lucide="x"></i> Rejeitar</button>
+                      <button type="button" class="approve" :disabled="item.is_stale" @click="openCountApproval(item)"><i data-lucide="check"></i> Aprovar contagem</button>
+                    </footer>
+                  </article>
+                </template>
+                <div x-show="!stockPendingCounts.length" class="stock-approval-empty compact"><i data-lucide="check"></i><p>Sem contagens pendentes.</p></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="stock-approval-footnote"><i data-lucide="shield"></i> Toda aprovação fica registrada com responsável, data e valores aplicados.</div>
+        </div>
+
+        <div class="pos-modal-overlay" x-show="stockApprovalModal === 'registration'" x-cloak @click.self="closeStockApproval()">
+          <div class="pos-modal stock-approval-modal">
+            <div class="pos-modal-head"><h3>Revisar cadastro</h3><button class="pos-modal-close" @click="closeStockApproval()"><i data-lucide="x"></i></button></div>
+            <div x-show="stockApprovalItem" class="stock-approval-modal-body">
+              <div class="stock-approval-modal-product"><i data-lucide="package-check"></i><div><small x-text="stockRequestTypeLabel(stockApprovalItem)"></small><strong x-text="stockApprovalItem?.item_name"></strong><span x-text="[stockApprovalItem?.brand, stockApprovalItem?.tire_size].filter(Boolean).join(' · ')"></span></div></div>
+              <div class="stock-approval-form-grid">
+                <label>Custo unitário<input type="text" inputmode="decimal" :value="formatBRLDisplay(stockApprovalForm.average_cost)" @input="stockApprovalForm.average_cost=onCurrencyInput($event.target.value);$event.target.value=formatBRLDisplay(stockApprovalForm.average_cost)" placeholder="R$ 0,00"></label>
+                <label>Preço de venda<input type="text" inputmode="decimal" :value="formatBRLDisplay(stockApprovalForm.sale_price)" @input="stockApprovalForm.sale_price=onCurrencyInput($event.target.value);$event.target.value=formatBRLDisplay(stockApprovalForm.sale_price)" placeholder="R$ 0,00"></label>
+                <label x-show="stockApprovalItem?.item_type !== 'servico'">Saldo inicial<input type="number" min="0" step="1" x-model.number="stockApprovalForm.quantity_on_hand"></label>
+                <label x-show="stockApprovalItem?.item_type !== 'servico'">Estoque mínimo<input type="number" min="0" step="1" x-model.number="stockApprovalForm.minimum_quantity"></label>
+                <label class="wide">Fornecedor (opcional)<input x-model="stockApprovalForm.supplier_name" maxlength="160" placeholder="Nome do fornecedor"></label>
+              </div>
+              <p class="stock-approval-margin" x-show="num(stockApprovalForm.sale_price) > 0">Margem bruta estimada: <strong x-text="money(num(stockApprovalForm.sale_price)-num(stockApprovalForm.average_cost))"></strong> por unidade</p>
+              <footer><button type="button" class="pos-outline-action" @click="closeStockApproval()">Cancelar</button><button type="button" class="pos-form-submit success" :disabled="stockApprovalBusy" @click="approveRegistrationRequest()"><i data-lucide="check"></i><span x-text="stockApprovalBusy ? 'Aprovando...' : 'Aprovar e cadastrar'"></span></button></footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-modal-overlay" x-show="stockApprovalModal === 'count'" x-cloak @click.self="closeStockApproval()">
+          <div class="pos-modal pos-modal-narrow stock-approval-modal">
+            <div class="pos-modal-head"><h3>Confirmar contagem</h3><button class="pos-modal-close" @click="closeStockApproval()"><i data-lucide="x"></i></button></div>
+            <div x-show="stockApprovalItem" class="stock-approval-modal-body">
+              <p>O saldo de <strong x-text="stockApprovalItem?.item_name"></strong> será alterado após sua confirmação.</p>
+              <div class="stock-count-compare large"><div><small>Atual</small><strong x-text="(stockApprovalItem?.quantity_snapshot ?? 0)+' un.'"></strong></div><i data-lucide="arrow-right"></i><div><small>Novo saldo</small><strong x-text="(stockApprovalItem?.counted_quantity ?? 0)+' un.'"></strong></div></div>
+              <footer><button type="button" class="pos-outline-action" @click="closeStockApproval()">Cancelar</button><button type="button" class="pos-form-submit success" :disabled="stockApprovalBusy" @click="approveCountRequest()"><i data-lucide="check"></i><span x-text="stockApprovalBusy ? 'Aprovando...' : 'Aprovar contagem'"></span></button></footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-modal-overlay" x-show="stockRejectOpen" x-cloak @click.self="closeStockRejection()">
+          <div class="pos-modal pos-modal-narrow stock-approval-modal">
+            <div class="pos-modal-head"><h3>Rejeitar solicitação</h3><button class="pos-modal-close" @click="closeStockRejection()"><i data-lucide="x"></i></button></div>
+            <div class="stock-approval-modal-body"><p>O estoque não será alterado. Informe o motivo para manter a revisão clara.</p><label class="stock-reject-reason">Motivo<textarea x-model="stockRejectReason" maxlength="500" rows="4" placeholder="Ex: medida incorreta, recontar o produto..."></textarea></label><footer><button type="button" class="pos-outline-action" @click="closeStockRejection()">Cancelar</button><button type="button" class="stock-reject-confirm" :disabled="stockApprovalBusy" @click="rejectStockRequest()"><i data-lucide="x"></i><span x-text="stockApprovalBusy ? 'Rejeitando...' : 'Confirmar rejeição'"></span></button></footer></div>
           </div>
         </div>
       </section>
@@ -3135,7 +3279,8 @@
 <script src="./app.config.equipe.js?v=20260612-bloco2"></script>
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
-<script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
+ <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
+ <script src="./app.estoque.aprovacoes.js?v=20260810-aprovacao1"></script>
 <script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>
@@ -3144,7 +3289,7 @@
 <script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
-<script src="./app.core.js?v=20260810-resumo-permissao1"></script>
+ <script src="./app.core.js?v=20260810-aprovacao1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
 <script src="./app.resumo.js?v=20260810-resumo-web1"></script>
 <script src="./app.pedidos.js?v=20260611-onda-c"></script>
@@ -3152,6 +3297,6 @@
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.push.js?v=20260619-pushfix"></script>
-<script src="./app.js?v=20260806-mobile-checkout1"></script>
+ <script src="./app.js?v=20260810-aprovacao1"></script>
 </body>
 </html>
