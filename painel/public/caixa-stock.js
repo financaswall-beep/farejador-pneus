@@ -58,20 +58,37 @@
 
   function syncRegistrationType() {
     const type = byId('stock-item-type').value;
+    const isService = type === 'servico';
+    const isSupply = type === 'insumo';
     document.querySelectorAll('[data-tire-fields]').forEach(function (field) {
       field.classList.toggle('hidden', type !== 'pneu');
     });
     document.querySelectorAll('[data-stock-fields]').forEach(function (field) {
-      field.classList.toggle('hidden', type === 'servico');
+      field.classList.toggle('hidden', isService);
+    });
+    document.querySelectorAll('[data-product-fields]').forEach(function (field) {
+      field.classList.toggle('hidden', isService);
     });
     ['stock-tire-width', 'stock-tire-aspect', 'stock-tire-rim'].forEach(function (id) {
       byId(id).required = type === 'pneu';
     });
     byId('stock-tire-condition').required = type === 'pneu';
+    byId('stock-register-kicker').textContent = isService ? 'Catálogo de serviços' : 'Estoque protegido';
+    byId('stock-register-title').textContent = isService ? 'Cadastrar serviço' : 'Cadastrar produto';
+    byId('stock-register-notice-title').textContent = isService ? 'Preço protegido' : 'Sem valores financeiros';
+    byId('stock-register-notice-copy').textContent = isService
+      ? 'Você informa o serviço. O dono define custo e preço antes de liberar para venda.'
+      : 'Você informa o produto. O dono confere custo, preço e saldo antes de liberar.';
+    byId('stock-item-name-label').textContent = isService ? 'Nome do serviço' : (isSupply ? 'Nome do material' : 'Nome do produto');
+    byId('stock-item-name').placeholder = isService
+      ? 'Ex.: Troca de pneu' : (isSupply ? 'Ex.: Remendo para câmara' : 'Ex.: Maggion Matrix Plus CG');
+    byId('stock-register-submit').textContent = isService
+      ? 'Salvar serviço e enviar para aprovação' : 'Salvar produto e enviar para aprovação';
   }
 
-  function openRegister() {
+  function openRegister(type) {
     registerForm.reset();
+    byId('stock-item-type').value = type === 'servico' ? 'servico' : 'pneu';
     state.registrationKey = idempotencyKey('item');
     syncRegistrationType();
     byId('stock-register-error').textContent = '';
@@ -84,7 +101,7 @@
     const payload = {
       item_type: type,
       item_name: byId('stock-item-name').value.trim(),
-      brand: nullable(byId('stock-item-brand').value),
+      brand: type === 'servico' ? null : nullable(byId('stock-item-brand').value),
       local_sku: nullable(byId('stock-item-sku').value),
       idempotency_key: state.registrationKey,
     };
@@ -139,7 +156,8 @@
     void loadStock();
   });
 
-  byId('stock-register-open').addEventListener('click', openRegister);
+  byId('stock-product-open').addEventListener('click', function () { openRegister('pneu'); });
+  byId('stock-service-open').addEventListener('click', function () { openRegister('servico'); });
   byId('stock-count-open').addEventListener('click', function () { Caixa.openStockCount(''); });
   byId('stock-item-type').addEventListener('change', syncRegistrationType);
   byId('stock-retry').addEventListener('click', function () { void loadStock(); });

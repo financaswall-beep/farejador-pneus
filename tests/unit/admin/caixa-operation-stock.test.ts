@@ -30,12 +30,13 @@ describe('Estoque seguro na Operação da Loja', () => {
 
   it('mostra consulta, cadastro sem valores e contagem pendente no mobile', () => {
     expect(html).toContain('id="stock-panel"');
-    expect(html).toContain('Cadastrar item');
+    expect(html).toContain('Cadastrar produto');
+    expect(html).toContain('Cadastrar serviço');
     expect(html).toContain('Fazer contagem');
     expect(html).toContain('id="stock-count-list"');
     expect(html).toContain('Enviar contagem para aprovação');
     expect(html).toContain('O saldo não será alterado sem aprovação do dono');
-    expect(html).toContain('Sem custo, preço ou saldo');
+    expect(html).toContain('Sem valores financeiros');
     expect(html).toContain('O saldo oficial não muda sozinho');
     expect(html).not.toContain('id="stock-item-cost"');
     expect(html).not.toContain('id="stock-item-price"');
@@ -49,6 +50,31 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(style).toContain('.stock-card-brand');
     expect(style).not.toContain('.stock-card-condition--meia_vida');
     expect(style).not.toContain('.stock-card-condition--remold');
+  });
+
+  it('abre detalhes operacionais sem expor custo ou inventar histórico', () => {
+    expect(html).toContain('id="stock-detail-modal"');
+    expect(html).toContain('Detalhes do produto');
+    expect(html).toContain('Saldo no sistema');
+    expect(html).toContain('Disponível');
+    expect(html).toContain('Reservado');
+    expect(html).toContain('Consulta operacional: custo e dados financeiros permanecem protegidos.');
+    expect(stockView).toContain('data-stock-detail');
+    expect(stockView).toContain('fillDetail');
+    expect(stockView).toContain('Caixa.openStockCount(stockId)');
+    expect(stockView).not.toContain('average_cost');
+    expect(stockView).not.toContain('sale_price');
+    expect(html).not.toContain('Últimas movimentações');
+  });
+
+  it('separa produto e serviço usando o mesmo contrato seguro de cadastro', () => {
+    expect(stock).toContain("openRegister('pneu')");
+    expect(stock).toContain("openRegister('servico')");
+    expect(stock).toContain("type === 'servico' ? null : nullable");
+    expect(stock).toContain('O dono define custo e preço antes de liberar para venda.');
+    expect(stock).toContain('Salvar serviço e enviar para aprovação');
+    expect(html).not.toContain('Duração estimada');
+    expect(html).not.toContain('Consome material cadastrado');
   });
 
   it('usa uma API segura que nunca devolve ou grava custo e preço', () => {

@@ -23,6 +23,9 @@ describe('fila de aprovação do estoque no painel do dono', () => {
     expect(html).toContain('Foto enviada pelo funcionário');
     expect(app).toContain('stock-count:${item.id}');
     expect(backend).toContain('has_evidence');
+    expect(html).toContain("'Custo do serviço' : 'Custo unitário'");
+    expect(html).toContain("'Preço cobrado' : 'Preço de venda'");
+    expect(html).toContain("x-show=\"stockApprovalItem?.item_type !== 'servico'\">Fornecedor");
   });
 
   it('mantém a fila e as decisões exclusivamente para o dono', () => {
