@@ -12,6 +12,7 @@ const scriptFiles = [
   'caixa-checkout-session.js',
   'caixa-sales-view.js',
   'caixa-stock-view.js',
+  'caixa-stock-detail.js',
   'caixa-stock.js',
   'caixa-stock-count.js',
   'caixa-sales.js',

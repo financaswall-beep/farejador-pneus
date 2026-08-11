@@ -79,21 +79,24 @@
     const profile = tab === 'profile';
     const sales = tab === 'sales';
     const stock = tab === 'stock';
+    const stockDetail = tab === 'stock-detail';
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
+    document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
     elements.sessionView.classList.toggle('is-profile', profile);
     elements.sessionView.classList.toggle('is-cash', cash);
-    elements.sessionView.classList.toggle('is-stock', stock);
-    elements.appHeadingTitle.textContent = profile ? 'Perfil' : stock ? 'Estoque' : cash ? 'Vender' : 'Vendas';
+    elements.sessionView.classList.toggle('is-stock', stock || stockDetail);
+    elements.sessionView.classList.toggle('is-stock-detail', stockDetail);
+    elements.appHeadingTitle.textContent = profile ? 'Perfil' : stockDetail ? 'Detalhes do produto' : stock ? 'Estoque' : cash ? 'Vender' : 'Vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
-    document.getElementById('nav-stock').classList.toggle('active', stock);
+    document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
-    document.getElementById('nav-stock').toggleAttribute('aria-current', stock);
+    document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     if (profile) void loadProfileSummary();
   }

@@ -3,9 +3,6 @@
 
   const Caixa = window.Caixa;
   const byId = function (id) { return document.getElementById(id); };
-  const detailModal = byId('stock-detail-modal');
-  let selectedStockId = '';
-  let returnFocus = null;
 
   function text(tag, value, className) {
     const node = document.createElement(tag);
@@ -158,96 +155,21 @@
     banner.classList.toggle('hidden', total === 0);
   }
 
-  function statusLabel(value, service) {
-    if (service) return 'Disponível para venda';
-    return {
-      in_stock: 'Em estoque', low_stock: 'Estoque baixo', out_of_stock: 'Sem estoque',
-      reserved: 'Saldo reservado', untracked: 'Saldo não controlado',
-    }[value] || 'Ativo';
-  }
-
-  function quantity(value) {
-    return value == null ? 'Não informado' : `${Number(value)} un.`;
-  }
-
-  function detailIcon(type) {
-    if (type === 'servico') {
-      return Caixa.createSvg([{ d: 'm14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z' }]);
-    }
-    return Caixa.createSvg([
-      { d: 'm4 7 8-4 8 4-8 4-8-4Z' }, { d: 'M4 7v10l8 4 8-4V7M12 11v10' },
-    ]);
-  }
-
-  function fillDetail(row) {
-    const service = row.item_type === 'servico';
-    const tire = row.item_type === 'pneu';
-    byId('stock-detail-kicker').textContent = service ? 'Serviço cadastrado' : 'Produto cadastrado';
-    byId('stock-detail-title').textContent = service ? 'Detalhes do serviço' : 'Detalhes do produto';
-    byId('stock-detail-brand').textContent = row.brand || (service ? 'Serviço da loja' : 'Sem marca');
-    byId('stock-detail-primary').textContent = tire && row.tire_size ? row.tire_size : row.item_name;
-    byId('stock-detail-name').textContent = tire && row.tire_size && row.item_name !== row.tire_size ? row.item_name : '';
-    byId('stock-detail-name').classList.toggle('hidden', !byId('stock-detail-name').textContent);
-    byId('stock-detail-code').textContent = row.local_sku ? `Código ${row.local_sku}` : 'Sem código interno';
-    byId('stock-detail-condition').textContent = tire ? conditionLabel(row.tire_condition) : (service ? 'Serviço' : 'Material');
-    byId('stock-detail-position').textContent = tire && row.tire_position ? row.tire_position : (tire ? 'Posição não informada' : 'Cadastro operacional');
-    byId('stock-detail-on-hand').textContent = quantity(row.quantity_on_hand);
-    byId('stock-detail-available').textContent = quantity(row.quantity_available);
-    byId('stock-detail-reserved').textContent = quantity(row.quantity_reserved || 0);
-    byId('stock-detail-minimum').textContent = quantity(row.minimum_quantity);
-    byId('stock-detail-shelf').textContent = row.shelf_location || 'Não informada';
-    byId('stock-detail-status').textContent = statusLabel(row.stock_status, service);
-    byId('stock-detail-balance').classList.toggle('hidden', service);
-    byId('stock-detail-service-note').classList.toggle('hidden', !service);
-    byId('stock-detail-count').classList.toggle('hidden', service || !row.is_tracked);
-    byId('stock-detail-image').classList.toggle('hidden', !tire);
-    byId('stock-detail-icon').classList.toggle('hidden', tire);
-    if (!tire) byId('stock-detail-icon').replaceChildren(detailIcon(row.item_type));
-    byId('stock-detail-visual').classList.toggle('stock-detail-visual--icon', !tire);
-  }
-
-  function openDetail(stockId, trigger) {
-    const row = Caixa.stockState.rows.find(function (item) { return item.stock_id === stockId; });
-    if (!row) return;
-    selectedStockId = stockId;
-    returnFocus = trigger || null;
-    fillDetail(row);
-    detailModal.classList.remove('hidden');
-    detailModal.querySelector('[data-close-stock-detail]')?.focus({ preventScroll: true });
-  }
-
-  function closeDetail() {
-    detailModal.classList.add('hidden');
-    selectedStockId = '';
-    if (returnFocus && document.contains(returnFocus)) returnFocus.focus({ preventScroll: true });
-    returnFocus = null;
-  }
-
   byId('stock-list').addEventListener('click', function (event) {
     if (event.target.closest('[data-stock-count]')) return;
     const card = event.target.closest('[data-stock-detail]');
-    if (card) openDetail(card.dataset.stockDetail || '', card);
+    if (card) Caixa.openStockDetail(card.dataset.stockDetail || '', card);
   });
   byId('stock-list').addEventListener('keydown', function (event) {
     if (!['Enter', ' '].includes(event.key) || event.target.closest('[data-stock-count]')) return;
     const card = event.target.closest('[data-stock-detail]');
     if (!card) return;
     event.preventDefault();
-    openDetail(card.dataset.stockDetail || '', card);
-  });
-  byId('stock-detail-count').addEventListener('click', function () {
-    const stockId = selectedStockId;
-    closeDetail();
-    if (stockId) Caixa.openStockCount(stockId);
-  });
-  document.querySelectorAll('[data-close-stock-detail]').forEach(function (button) { button.addEventListener('click', closeDetail); });
-  document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && !detailModal.classList.contains('hidden')) closeDetail();
+    Caixa.openStockDetail(card.dataset.stockDetail || '', card);
   });
 
   Caixa.stockView = {
     renderList: renderList,
     renderSummary: renderSummary,
-    openDetail: openDetail,
   };
 }());

@@ -11,11 +11,14 @@ describe('Estoque seguro na Operação da Loja', () => {
   const modules = source('painel/public/caixa-modules.js');
   const stock = source('painel/public/caixa-stock.js');
   const stockCount = source('painel/public/caixa-stock-count.js');
+  const stockDetail = source('painel/public/caixa-stock-detail.js');
   const style = source('painel/public/caixa.css');
   const stockView = source('painel/public/caixa-stock-view.js');
   const login = source('painel/public/caixa.js');
   const backend = source('src/parceiro/operation-stock.ts');
+  const detailBackend = source('src/parceiro/operation-stock-detail.ts');
   const route = source('src/parceiro/route-operation-stock.ts');
+  const detailRoute = source('src/parceiro/route-operation-stock-detail.ts');
   const legacyRoute = source('src/parceiro/route.ts');
   const appRoutes = source('src/app/routes.ts');
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
@@ -52,19 +55,30 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(style).not.toContain('.stock-card-condition--remold');
   });
 
-  it('abre detalhes operacionais sem expor custo ou inventar histórico', () => {
-    expect(html).toContain('id="stock-detail-modal"');
+  it('abre uma tela completa de detalhes com histórico real e custo protegido', () => {
+    expect(html).toContain('id="stock-detail-panel"');
     expect(html).toContain('Detalhes do produto');
-    expect(html).toContain('Saldo no sistema');
-    expect(html).toContain('Disponível');
-    expect(html).toContain('Reservado');
-    expect(html).toContain('Consulta operacional: custo e dados financeiros permanecem protegidos.');
+    expect(html).toContain('Estoque disponível');
+    expect(html).toContain('Preço de venda');
+    expect(html).toContain('Custo protegido pelo proprietário');
+    expect(html).toContain('Últimas movimentações');
+    expect(html).toContain('Ver histórico completo');
+    expect(html).toContain('Toda movimentação fica registrada.');
     expect(stockView).toContain('data-stock-detail');
-    expect(stockView).toContain('fillDetail');
-    expect(stockView).toContain('Caixa.openStockCount(stockId)');
-    expect(stockView).not.toContain('average_cost');
-    expect(stockView).not.toContain('sale_price');
-    expect(html).not.toContain('Últimas movimentações');
+    expect(stockView).toContain('Caixa.openStockDetail');
+    expect(stockDetail).toContain("Caixa.operationPath(path)");
+    expect(stockDetail).toContain('Caixa.openStockCount(stockId)');
+    expect(stockDetail).toContain('movementTitle');
+    expect(stockDetail).not.toContain('average_cost');
+    expect(detailBackend).toContain('sale_price');
+    expect(detailBackend).not.toContain('average_cost');
+    expect(detailBackend).toContain("'stock_decrement_sale'");
+    expect(detailBackend).toContain("'stock_increment_purchase'");
+    expect(detailBackend).toContain("'partner_stock_count_approved'");
+    expect(detailBackend).toContain("movement->>'stock_id'=$2::text");
+    expect(detailRoute).toContain("'/parceiro/:slug/api/operacao/estoque/:stockId'");
+    expect(detailRoute).toContain("requireScreen('estoque')");
+    expect(appRoutes).toContain('registerPartnerOperationStockDetailRoutes');
   });
 
   it('separa produto e serviço usando o mesmo contrato seguro de cadastro', () => {
@@ -77,7 +91,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(html).not.toContain('Consome material cadastrado');
   });
 
-  it('usa uma API segura que nunca devolve ou grava custo e preço', () => {
+  it('usa uma API segura que não devolve custo nem grava saldo oficial', () => {
     expect(stock).toContain("Caixa.operationPath('operacao/estoque')");
     expect(stock).toContain("'operacao/estoque/cadastros'");
     expect(stockCount).toContain("operacao/estoque/contagens/lote");
@@ -86,7 +100,9 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(stockCount).toContain('/foto`');
     expect(backend).not.toContain('average_cost');
     expect(backend).not.toContain('sale_price');
+    expect(detailBackend).not.toContain('average_cost');
     expect(backend).not.toContain('UPDATE commerce.partner_stock_levels');
+    expect(detailBackend).not.toContain('UPDATE commerce.partner_stock_levels');
     expect(route).toContain(".strict().superRefine");
     expect(route).toContain("requireScreen('estoque')");
   });

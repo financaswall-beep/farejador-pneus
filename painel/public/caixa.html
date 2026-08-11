@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-estoque-pronto1" />
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-detalhe-estoque1" />
   <script defer src="/caixa/caixa-core.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
-  <script defer src="/caixa/caixa-stock-view.js?v=20260811-estoque-pronto1"></script>
+  <script defer src="/caixa/caixa-stock-view.js?v=20260811-detalhe-estoque1"></script>
+  <script defer src="/caixa/caixa-stock-detail.js?v=20260811-detalhe-estoque1"></script>
   <script defer src="/caixa/caixa-stock.js?v=20260811-estoque-pronto1"></script>
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-estoque1"></script>
@@ -350,6 +351,79 @@
           <div id="stock-list" class="stock-list hidden" aria-live="polite"></div>
         </div>
 
+        <div id="stock-detail-panel" class="app-panel stock-detail-page hidden" aria-labelledby="stock-detail-title">
+          <header class="stock-detail-header">
+            <button id="stock-detail-back" type="button" aria-label="Voltar ao estoque">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div>
+              <h2 id="stock-detail-title">Detalhes do produto</h2>
+              <p id="stock-detail-unit">Unidade parceira</p>
+            </div>
+            <div class="stock-detail-operator">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              <span><strong id="stock-detail-operator-name">Operador</strong><small><i></i> Online</small></span>
+            </div>
+          </header>
+
+          <div id="stock-detail-loading" class="stock-detail-message" role="status">Carregando detalhes e movimentações…</div>
+          <div id="stock-detail-error" class="stock-detail-message stock-detail-message--error hidden" role="alert">
+            <strong>Não foi possível carregar este produto.</strong>
+            <button id="stock-detail-retry" type="button">Tentar novamente</button>
+          </div>
+
+          <div id="stock-detail-content" class="stock-detail-content hidden">
+            <section class="stock-detail-product-card" aria-label="Dados do produto">
+              <div id="stock-detail-visual" class="stock-detail-visual" aria-hidden="true">
+                <img id="stock-detail-image" src="/caixa/catalog-tire.webp" alt="" />
+                <span id="stock-detail-icon" class="hidden"></span>
+              </div>
+              <div class="stock-detail-identity">
+                <strong id="stock-detail-primary">Produto</strong>
+                <span id="stock-detail-name"></span>
+                <small id="stock-detail-code">Sem código interno</small>
+                <div class="stock-detail-tags">
+                  <b id="stock-detail-position" class="muted">Aplicação não informada</b>
+                  <b id="stock-detail-status">Ativo</b>
+                </div>
+                <div id="stock-detail-stock-price" class="stock-detail-stock-price">
+                  <p><small>Estoque disponível</small><strong id="stock-detail-available">—</strong><span id="stock-detail-minimum">Estoque mínimo não informado</span></p>
+                  <p><small>Preço de venda</small><strong id="stock-detail-price">—</strong></p>
+                </div>
+                <p id="stock-detail-service-note" class="stock-detail-service-note hidden">Serviço sem controle de saldo</p>
+              </div>
+              <p class="stock-detail-safe">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                Custo protegido pelo proprietário
+              </p>
+            </section>
+
+            <div class="stock-detail-actions">
+              <button id="stock-detail-count" type="button">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4h8M9 2h6v4H9zM6 4H5a2 2 0 0 0-2 2v14h18V6a2 2 0 0 0-2-2h-1"/><path d="m7 12 2 2 4-5M14 14h3m-3 4h3"/></svg>
+                Fazer contagem
+              </button>
+              <button id="stock-detail-edit" type="button" disabled title="Edição será liberada na próxima etapa">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20ZM13.5 7l3.5 3.5"/></svg>
+                <span>Editar cadastro<small>Próxima etapa</small></span>
+              </button>
+            </div>
+
+            <section class="stock-detail-history" aria-labelledby="stock-detail-history-title">
+              <header><h3 id="stock-detail-history-title">Últimas movimentações</h3><span id="stock-detail-history-total"></span></header>
+              <div id="stock-detail-history-empty" class="stock-detail-history-empty hidden">Nenhuma movimentação registrada para este item.</div>
+              <ol id="stock-detail-history-list" aria-live="polite"></ol>
+              <button id="stock-detail-history-expand" class="stock-detail-history-button hidden" type="button">Ver histórico completo</button>
+              <button id="stock-detail-history-more" class="stock-detail-history-button hidden" type="button">Carregar mais movimentações</button>
+            </section>
+
+            <p class="stock-detail-audit">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.4 7 10 4.1-1.6 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>
+              Toda movimentação fica registrada.
+            </p>
+          </div>
+        </div>
+
         <div id="profile-panel" class="app-panel profile-panel hidden">
           <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
           <div class="profile-identity">
@@ -502,57 +576,6 @@
             <p id="stock-register-error" class="account-modal-error" role="alert"></p>
             <button id="stock-register-submit" class="account-modal-primary" type="submit">Salvar e enviar para aprovação</button>
           </form>
-        </article>
-      </div>
-
-      <div id="stock-detail-modal" class="account-modal stock-detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-detail-title">
-        <button class="account-modal-backdrop" type="button" data-close-stock-detail aria-label="Fechar detalhes"></button>
-        <article class="account-modal-sheet stock-detail-sheet">
-          <header>
-            <div><p id="stock-detail-kicker">Produto cadastrado</p><h2 id="stock-detail-title">Detalhes do produto</h2></div>
-            <button type="button" data-close-stock-detail aria-label="Fechar">×</button>
-          </header>
-          <div class="stock-detail-body">
-            <section class="stock-detail-hero">
-              <div id="stock-detail-visual" class="stock-detail-visual" aria-hidden="true">
-                <img id="stock-detail-image" src="/caixa/catalog-tire.webp" alt="" />
-                <span id="stock-detail-icon" class="hidden"><svg viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg></span>
-              </div>
-              <div class="stock-detail-identity">
-                <small id="stock-detail-brand">Sem marca</small>
-                <strong id="stock-detail-primary">Produto</strong>
-                <span id="stock-detail-name"></span>
-                <em id="stock-detail-code">Sem código interno</em>
-                <div class="stock-detail-tags">
-                  <b id="stock-detail-condition">Condição a confirmar</b>
-                  <b id="stock-detail-position" class="muted">Posição não informada</b>
-                </div>
-              </div>
-            </section>
-
-            <section id="stock-detail-balance" class="stock-detail-balance" aria-label="Posição do estoque">
-              <div><small>Saldo no sistema</small><strong id="stock-detail-on-hand">—</strong></div>
-              <div><small>Disponível</small><strong id="stock-detail-available">—</strong></div>
-              <div><small>Reservado</small><strong id="stock-detail-reserved">—</strong></div>
-              <div><small>Estoque mínimo</small><strong id="stock-detail-minimum">—</strong></div>
-            </section>
-
-            <dl class="stock-detail-meta">
-              <div><dt>Localização na loja</dt><dd id="stock-detail-shelf">Não informada</dd></div>
-              <div><dt>Situação</dt><dd id="stock-detail-status">Ativo</dd></div>
-            </dl>
-
-            <div id="stock-detail-service-note" class="stock-detail-service-note hidden">
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z"/></svg>
-              <span><strong>Serviço sem controle de saldo</strong><small>O valor é protegido e definido pelo proprietário.</small></span>
-            </div>
-
-            <p class="stock-detail-safe"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.8 2.9 8.4 7 10 4.1-1.6 7-5.2 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>Consulta operacional: custo e dados financeiros permanecem protegidos.</p>
-          </div>
-          <footer class="stock-detail-actions">
-            <button type="button" data-close-stock-detail>Voltar</button>
-            <button id="stock-detail-count" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4h8M9 2h6v4H9zM6 4H5a2 2 0 0 0-2 2v14h18V6a2 2 0 0 0-2-2h-1"/><path d="m7 12 2 2 4-5M14 14h3m-3 4h3"/></svg>Fazer contagem</button>
-          </footer>
         </article>
       </div>
 

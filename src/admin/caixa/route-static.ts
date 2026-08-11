@@ -35,6 +35,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/caixa/caixa-checkout-session.js', 'caixa-checkout-session.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-stock-view.js', 'caixa-stock-view.js', 'text/javascript; charset=utf-8');
+  text('/caixa/caixa-stock-detail.js', 'caixa-stock-detail.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-stock.js', 'caixa-stock.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-stock-count.js', 'caixa-stock-count.js', 'text/javascript; charset=utf-8');
   text('/caixa/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
