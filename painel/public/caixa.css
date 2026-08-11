@@ -607,8 +607,6 @@ form { display: grid; gap: 16px; }
 .stock-card-size { overflow: hidden; color: #17211d; font-size: 18px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .stock-card-model,.stock-card-code { overflow: hidden; color: #66716b; font-size: 9px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .stock-card-condition { display: inline-flex; width: fit-content; min-height: 27px; align-items: center; margin-top: 2px; padding: 0 10px; border-radius: 9px; color: #fff; background: #087246; font-size: 10px; font-weight: 760; }
-.stock-card-condition--meia_vida { color: #7b4b06; background: #ffedbd; }
-.stock-card-condition--remold { color: #164e63; background: #cffafe; }
 .stock-card-condition--unknown { color: #5f6964; background: #eef2f0; }
 .stock-card-side { display: grid; min-width: 94px; align-content: start; gap: 8px; }
 .stock-card-brand { display: flex; min-height: 21px; align-items: center; overflow: hidden; color: #17211d; font-size: 14px; font-weight: 800; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }

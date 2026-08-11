@@ -47,7 +47,8 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(stockView).toContain("if (count) actions.appendChild(count)");
     expect(style).toContain('.stock-card-content--tire');
     expect(style).toContain('.stock-card-brand');
-    expect(style).toContain('.stock-card-condition--meia_vida');
+    expect(style).not.toContain('.stock-card-condition--meia_vida');
+    expect(style).not.toContain('.stock-card-condition--remold');
   });
 
   it('usa uma API segura que nunca devolve ou grava custo e preço', () => {
