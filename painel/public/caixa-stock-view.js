@@ -36,6 +36,62 @@
       : `${available} ${available === 1 ? 'unidade' : 'unidades'}`;
   }
 
+  function stockBadge(row) {
+    const badge = text('span', stockLabel(row), 'stock-card-badge');
+    if (['low_stock', 'out_of_stock', 'reserved'].includes(row.stock_status)) badge.classList.add('stock-card-badge--low');
+    return badge;
+  }
+
+  function countButton(row) {
+    if (!row.is_tracked || row.item_type === 'servico') return null;
+    const count = document.createElement('button');
+    count.type = 'button';
+    count.className = 'stock-card-count';
+    count.dataset.stockCount = row.stock_id;
+    count.textContent = 'Contar';
+    return count;
+  }
+
+  function tireContent(row) {
+    const content = document.createElement('div');
+    content.className = 'stock-card-content stock-card-content--tire';
+
+    const identity = document.createElement('div');
+    identity.className = 'stock-card-identity';
+    identity.appendChild(text('strong', row.tire_size || row.item_name, 'stock-card-size'));
+    if (row.tire_size && row.item_name !== row.tire_size) {
+      identity.appendChild(text('span', row.item_name, 'stock-card-model'));
+    }
+    identity.appendChild(text('small', row.local_sku ? `Código ${row.local_sku}` : 'Sem código', 'stock-card-code'));
+    const condition = text('span', conditionLabel(row.tire_condition) || 'Condição a confirmar', 'stock-card-condition');
+    condition.classList.add(`stock-card-condition--${row.tire_condition || 'unknown'}`);
+    identity.appendChild(condition);
+
+    const actions = document.createElement('div');
+    actions.className = 'stock-card-side';
+    actions.appendChild(text('strong', row.brand || 'Sem marca', 'stock-card-brand'));
+    actions.appendChild(stockBadge(row));
+    const count = countButton(row);
+    if (count) actions.appendChild(count);
+
+    content.append(identity, actions);
+    return content;
+  }
+
+  function genericContent(row) {
+    const content = document.createElement('div');
+    content.className = 'stock-card-content stock-card-content--generic';
+    const kicker = [row.brand, row.local_sku ? `Cód. ${row.local_sku}` : ''].filter(Boolean).join(' · ');
+    if (kicker) content.appendChild(text('small', kicker, 'stock-card-kicker'));
+    content.appendChild(text('strong', row.item_name));
+    const details = [row.tire_size, row.tire_position].filter(Boolean).join(' · ');
+    if (details) content.appendChild(text('span', details, 'stock-card-details'));
+    content.appendChild(stockBadge(row));
+    const count = countButton(row);
+    if (count) content.appendChild(count);
+    return content;
+  }
+
   function createStockCard(row) {
     const card = document.createElement('article');
     card.className = 'stock-card';
@@ -49,26 +105,7 @@
       visual.appendChild(image);
     } else visual.appendChild(icon(row.item_type));
 
-    const content = document.createElement('div');
-    content.className = 'stock-card-content';
-    const kicker = [row.brand, row.local_sku ? `Cód. ${row.local_sku}` : ''].filter(Boolean).join(' · ');
-    if (kicker) content.appendChild(text('small', kicker, 'stock-card-kicker'));
-    content.appendChild(text('strong', row.item_name));
-    const details = [row.tire_size, conditionLabel(row.tire_condition), row.tire_position].filter(Boolean).join(' · ');
-    if (details) content.appendChild(text('span', details, 'stock-card-details'));
-
-    const badge = text('span', stockLabel(row), 'stock-card-badge');
-    if (['low_stock', 'out_of_stock', 'reserved'].includes(row.stock_status)) badge.classList.add('stock-card-badge--low');
-    content.appendChild(badge);
-
-    if (row.is_tracked && row.item_type !== 'servico') {
-      const count = document.createElement('button');
-      count.type = 'button';
-      count.className = 'stock-card-count';
-      count.dataset.stockCount = row.stock_id;
-      count.textContent = 'Contar';
-      content.appendChild(count);
-    }
+    const content = row.item_type === 'pneu' ? tireContent(row) : genericContent(row);
     card.append(visual, content);
     return card;
   }

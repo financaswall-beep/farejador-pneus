@@ -41,6 +41,13 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(html).not.toContain('id="stock-item-price"');
     expect(html).not.toContain('id="stock-item-quantity"');
     expect(stockView).toContain("image.src = '/caixa/catalog-tire.webp'");
+    expect(stockView).toContain("row.tire_size || row.item_name");
+    expect(stockView).toContain("conditionLabel(row.tire_condition) || 'Condição a confirmar'");
+    expect(stockView).toContain("actions.appendChild(stockBadge(row))");
+    expect(stockView).toContain("if (count) actions.appendChild(count)");
+    expect(style).toContain('.stock-card-content--tire');
+    expect(style).toContain('.stock-card-brand');
+    expect(style).toContain('.stock-card-condition--meia_vida');
   });
 
   it('usa uma API segura que nunca devolve ou grava custo e preço', () => {
