@@ -78,13 +78,31 @@ async function audit(
 export async function getPendingOperationStockRequests(ctx: PartnerContext) {
   const [registrations, counts] = await Promise.all([
     pool.query(
-      `SELECT id, item_type, local_sku, item_name, tire_size, tire_width_mm,
-              tire_aspect_ratio, tire_rim_diameter, brand, minimum_quantity,
-              tire_condition, shelf_location, tire_position,
-              requested_by_label, created_at
-         FROM commerce.partner_item_registration_requests
-        WHERE environment=$1 AND unit_id=$2 AND status='pending'
-        ORDER BY created_at ASC`,
+      `SELECT r.id, r.item_type, r.local_sku, r.item_name, r.tire_size,
+              r.tire_width_mm, r.tire_aspect_ratio, r.tire_rim_diameter,
+              r.brand, r.minimum_quantity, r.tire_condition, r.shelf_location,
+              r.tire_position, r.target_stock_id, r.stock_metadata_snapshot,
+              r.requested_by_label, r.created_at,
+              s.local_sku AS current_local_sku, s.item_name AS current_item_name,
+              s.tire_size AS current_tire_size, s.brand AS current_brand,
+              s.minimum_quantity AS current_minimum_quantity,
+              s.tire_condition AS current_tire_condition,
+              s.shelf_location AS current_shelf_location,
+              s.tire_position AS current_tire_position,
+              CASE WHEN r.target_stock_id IS NULL THEN false ELSE
+                s.id IS NULL OR r.stock_metadata_snapshot IS DISTINCT FROM jsonb_build_object(
+                  'local_sku',s.local_sku,'item_name',s.item_name,'item_type',s.item_type,
+                  'tire_size',s.tire_size,'tire_width_mm',s.tire_width_mm,
+                  'tire_aspect_ratio',s.tire_aspect_ratio,'tire_rim_diameter',s.tire_rim_diameter,
+                  'brand',s.brand,'minimum_quantity',s.minimum_quantity,
+                  'tire_condition',s.tire_condition,'shelf_location',s.shelf_location,
+                  'tire_position',s.tire_position
+                ) END AS is_stale
+         FROM commerce.partner_item_registration_requests r
+         LEFT JOIN commerce.partner_stock_levels s ON s.id=r.target_stock_id
+          AND s.environment=r.environment AND s.unit_id=r.unit_id AND s.deleted_at IS NULL
+        WHERE r.environment=$1 AND r.unit_id=$2 AND r.status='pending'
+        ORDER BY r.created_at ASC`,
       [ctx.environment, ctx.unitId],
     ),
     pool.query(
@@ -107,10 +125,13 @@ export async function getPendingOperationStockRequests(ctx: PartnerContext) {
       [ctx.environment, ctx.unitId],
     ),
   ]);
+  const creations = registrations.rows.filter((row) => !row.target_stock_id);
+  const updates = registrations.rows.filter((row) => Boolean(row.target_stock_id));
   return {
-    registrations: registrations.rows,
+    registrations: creations,
+    updates,
     counts: counts.rows,
-    pending_total: registrations.rows.length + counts.rows.length,
+    pending_total: creations.length + updates.length + counts.rows.length,
   };
 }
 
@@ -127,7 +148,7 @@ export async function approveOperationRegistration(
                 tire_aspect_ratio, tire_rim_diameter, brand, minimum_quantity,
                 tire_condition, shelf_location, tire_position, status
            FROM commerce.partner_item_registration_requests
-          WHERE id=$1 AND environment=$2 AND unit_id=$3
+          WHERE id=$1 AND environment=$2 AND unit_id=$3 AND target_stock_id IS NULL
           FOR UPDATE`,
         [requestId, ctx.environment, ctx.unitId],
       );

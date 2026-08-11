@@ -3,7 +3,7 @@
 
   const Caixa = window.Caixa;
   const byId = function (id) { return document.getElementById(id); };
-  const state = { stockId: '', page: 1, rows: [], total: 0, hasMore: false, expanded: false, trigger: null };
+  const state = { stockId: '', stock: null, page: 1, rows: [], total: 0, hasMore: false, expanded: false, trigger: null };
 
   function text(tag, value, className) {
     const node = document.createElement(tag);
@@ -93,7 +93,7 @@
   }
 
   function movementQuantity(row) {
-    if (row.quantity_delta == null) return 'Cadastro';
+    if (row.quantity_delta == null) return row.kind === 'update' ? 'Dados alterados' : 'Cadastro';
     const amount = Number(row.quantity_delta);
     if (amount === 0) return 'Sem diferença';
     const absolute = Math.abs(amount);
@@ -143,6 +143,15 @@
     byId('stock-detail-minimum').textContent = row.minimum_quantity == null ? 'Estoque mínimo não informado' : `Estoque mínimo: ${row.minimum_quantity}`;
     byId('stock-detail-price').textContent = row.sale_price == null ? 'Não definido' : Caixa.currency.format(Number(row.sale_price));
     byId('stock-detail-count').classList.toggle('hidden', service || !row.is_tracked);
+    const edit = byId('stock-detail-edit');
+    edit.disabled = Boolean(row.update_pending);
+    edit.title = row.update_pending
+      ? 'Alteração aguardando aprovação do proprietário'
+      : 'Editar dados operacionais do cadastro';
+    edit.querySelector('span').replaceChildren(
+      document.createTextNode(row.update_pending ? 'Alteração em análise' : 'Editar cadastro'),
+      text('small', row.update_pending ? 'Aguardando proprietário' : 'Vai para aprovação'),
+    );
     byId('stock-detail-image').classList.toggle('hidden', !tire);
     byId('stock-detail-icon').classList.toggle('hidden', tire);
     if (!tire) byId('stock-detail-icon').replaceChildren(itemIcon(row.item_type));
@@ -164,7 +173,7 @@
       const response = await Caixa.authenticatedFetch(Caixa.operationPath(path));
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
-      if (page === 1) { state.rows = []; renderStock(payload.stock); }
+      if (page === 1) { state.rows = []; state.stock = payload.stock; renderStock(payload.stock); }
       state.rows = state.rows.concat(payload.history.rows || []);
       state.page = page; state.total = Number(payload.history.total || 0);
       state.hasMore = Boolean(payload.history.has_more);
@@ -197,6 +206,9 @@
   byId('stock-detail-count').addEventListener('click', function () {
     const stockId = state.stockId; Caixa.showTab('stock'); if (stockId) Caixa.openStockCount(stockId);
   });
+  byId('stock-detail-edit').addEventListener('click', function () {
+    if (state.stock && Caixa.openStockEdit) Caixa.openStockEdit(state.stock);
+  });
   byId('stock-detail-history-expand').addEventListener('click', function () { state.expanded = !state.expanded; renderHistory(); });
   byId('stock-detail-history-more').addEventListener('click', function () { void load(state.page + 1); });
   document.addEventListener('keydown', function (event) {
@@ -204,4 +216,5 @@
   });
 
   Caixa.openStockDetail = open;
+  Caixa.refreshStockDetail = function () { return load(1); };
 }());

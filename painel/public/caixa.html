@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-detalhe-estoque1" />
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-tipografia1" />
   <script defer src="/caixa/caixa-core.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
@@ -13,7 +13,8 @@
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
   <script defer src="/caixa/caixa-stock-view.js?v=20260811-detalhe-estoque1"></script>
-  <script defer src="/caixa/caixa-stock-detail.js?v=20260811-detalhe-estoque1"></script>
+  <script defer src="/caixa/caixa-stock-detail.js?v=20260811-edicao-estoque1"></script>
+  <script defer src="/caixa/caixa-stock-edit.js?v=20260811-edicao-estoque1"></script>
   <script defer src="/caixa/caixa-stock.js?v=20260811-estoque-pronto1"></script>
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-estoque1"></script>
@@ -403,9 +404,9 @@
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 4h8M9 2h6v4H9zM6 4H5a2 2 0 0 0-2 2v14h18V6a2 2 0 0 0-2-2h-1"/><path d="m7 12 2 2 4-5M14 14h3m-3 4h3"/></svg>
                 Fazer contagem
               </button>
-              <button id="stock-detail-edit" type="button" disabled title="Edição será liberada na próxima etapa">
+              <button id="stock-detail-edit" type="button" title="Editar dados operacionais do cadastro">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20ZM13.5 7l3.5 3.5"/></svg>
-                <span>Editar cadastro<small>Próxima etapa</small></span>
+                <span>Editar cadastro<small>Vai para aprovação</small></span>
               </button>
             </div>
 
@@ -575,6 +576,40 @@
             <label>Código interno<input id="stock-item-sku" maxlength="80" placeholder="Opcional" /></label>
             <p id="stock-register-error" class="account-modal-error" role="alert"></p>
             <button id="stock-register-submit" class="account-modal-primary" type="submit">Salvar e enviar para aprovação</button>
+          </form>
+        </article>
+      </div>
+
+      <div id="stock-edit-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-edit-title">
+        <button class="account-modal-backdrop" type="button" data-close-stock-edit aria-label="Fechar edição"></button>
+        <article class="account-modal-sheet stock-modal-sheet stock-edit-sheet">
+          <header>
+            <div><p id="stock-edit-unit">Estoque protegido</p><h2 id="stock-edit-title">Editar cadastro</h2></div>
+            <button type="button" data-close-stock-edit aria-label="Fechar">×</button>
+          </header>
+          <form id="stock-edit-form" novalidate>
+            <div class="stock-form-notice">
+              <strong id="stock-edit-type">Produto cadastrado</strong>
+              <span>Tipo, saldo, custo e preço não podem ser alterados aqui.</span>
+            </div>
+            <label>Nome<input id="stock-edit-name" maxlength="240" required /></label>
+            <div class="stock-form-grid stock-form-grid--3" data-stock-edit-tire>
+              <label>Largura<input id="stock-edit-width" type="number" min="1" max="999" inputmode="numeric" /></label>
+              <label>Perfil<input id="stock-edit-aspect" type="number" min="1" max="999" inputmode="numeric" /></label>
+              <label>Aro<input id="stock-edit-rim" type="number" min="1" max="30" inputmode="numeric" /></label>
+            </div>
+            <div class="stock-form-grid" data-stock-edit-tire>
+              <label>Condição<select id="stock-edit-condition"><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></label>
+              <label>Posição<select id="stock-edit-position"><option value="">Não informar</option><option value="Dianteiro">Dianteiro</option><option value="Traseiro">Traseiro</option><option value="Ambos">Ambos</option></select></label>
+            </div>
+            <label data-stock-edit-product>Marca<input id="stock-edit-brand" maxlength="120" /></label>
+            <div class="stock-form-grid" data-stock-edit-stock>
+              <label>Estoque mínimo<input id="stock-edit-minimum" type="number" min="0" max="999999" inputmode="numeric" /></label>
+              <label>Localização<input id="stock-edit-shelf" maxlength="60" placeholder="Ex.: A-01" /></label>
+            </div>
+            <label>Código interno<input id="stock-edit-sku" maxlength="80" /></label>
+            <p id="stock-edit-error" class="account-modal-error" role="alert"></p>
+            <button id="stock-edit-submit" class="account-modal-primary" type="submit">Enviar alterações para aprovação</button>
           </form>
         </article>
       </div>

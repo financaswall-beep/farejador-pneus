@@ -73,6 +73,13 @@ describe('histórico operacional de um item do estoque', () => {
     expect(movement).toMatchObject({ kind: 'registration', quantity_delta: null });
   });
 
+  it('mostra a edição aprovada sem inventar movimento de saldo', () => {
+    const movement = normalizeOperationStockMovement(event('partner_stock_update_approved', {
+      request_id: 'edit-a009', stock_id: stockId, item_name: 'Maggion 90/90-18',
+    }), stockId);
+    expect(movement).toMatchObject({ kind: 'update', reference_id: 'edit-a009', quantity_delta: null });
+  });
+
   it('busca produto somente dentro da unidade autenticada e não devolve o evento bruto', async () => {
     mocks.query
       .mockResolvedValueOnce({ rows: [{ stock_id: stockId, item_name: '90/90-18', sale_price: '199.90' }] })

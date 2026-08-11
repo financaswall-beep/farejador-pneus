@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260810-contagem2" />
+  <link rel="stylesheet" href="./style.css?v=20260811-edicao-estoque1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -1526,7 +1526,7 @@
           <header class="stock-approval-heading">
             <div>
               <h2>Aprovar alterações do estoque</h2>
-              <p>Revise os cadastros e as contagens enviados pela equipe.</p>
+              <p>Revise os cadastros, as edições e as contagens enviados pela equipe.</p>
             </div>
             <span><i data-lucide="clock-3"></i><b x-text="stockPendingTotal"></b> pendentes</span>
           </header>
@@ -1542,6 +1542,9 @@
             </button>
             <button type="button" :class="stockApprovalFilter === 'registration' && 'active'" @click="stockApprovalFilter='registration'">
               Cadastros <b x-text="stockPendingRegistrations.length"></b>
+            </button>
+            <button type="button" :class="stockApprovalFilter === 'update' && 'active'" @click="stockApprovalFilter='update'">
+              Edições <b x-text="stockPendingUpdates.length"></b>
             </button>
             <button type="button" :class="stockApprovalFilter === 'count' && 'active'" @click="stockApprovalFilter='count'">
               Contagens <b x-text="stockPendingCounts.length"></b>
@@ -1578,6 +1581,34 @@
                   </article>
                 </template>
                 <div x-show="!stockPendingRegistrations.length" class="stock-approval-empty compact"><i data-lucide="check"></i><p>Sem cadastros pendentes.</p></div>
+              </div>
+            </section>
+
+            <section class="stock-approval-panel update" x-show="stockApprovalFilter === 'all' || stockApprovalFilter === 'update'">
+              <header><span><i data-lucide="file-pen-line"></i><strong>Edições pendentes</strong></span><b x-text="stockPendingUpdates.length"></b></header>
+              <p class="stock-approval-help">A equipe pode corrigir apenas dados operacionais. Saldo, custo e preço permanecem protegidos.</p>
+              <div class="stock-approval-list">
+                <template x-for="item in stockPendingUpdates" :key="item.id">
+                  <article class="stock-request-card update">
+                    <div class="stock-request-product">
+                      <span class="stock-request-type-icon"><i data-lucide="file-pen-line"></i></span>
+                      <div><small>Edição de cadastro</small><strong x-text="item.current_item_name || item.item_name"></strong><em x-text="stockUpdateFields(item).length + ' campo(s) alterado(s)'"></em></div>
+                      <span class="stock-request-status" :class="item.is_stale && 'warning'" x-text="item.is_stale ? 'Desatualizada' : 'Pendente'"></span>
+                    </div>
+                    <div class="stock-update-preview">
+                      <template x-for="change in stockUpdateFields(item).slice(0, 3)" :key="change[0]">
+                        <div><small x-text="change[0]"></small><span x-text="change[1] ?? 'Não informado'"></span><i data-lucide="arrow-right"></i><strong x-text="change[2] ?? 'Não informado'"></strong></div>
+                      </template>
+                    </div>
+                    <p x-show="item.is_stale" class="stock-request-stale"><i data-lucide="triangle-alert"></i> O cadastro mudou depois deste pedido. Rejeite e peça nova edição.</p>
+                    <dl class="stock-request-meta"><div><dt>Enviado por</dt><dd x-text="item.requested_by_label"></dd></div><div><dt>Quando</dt><dd x-text="formatDateTime(item.created_at)"></dd></div></dl>
+                    <footer>
+                      <button type="button" class="reject" @click="openStockRejection('edicao', item)"><i data-lucide="x"></i> Rejeitar</button>
+                      <button type="button" class="review" :disabled="item.is_stale" @click="openUpdateApproval(item)"><i data-lucide="search-check"></i> Revisar alteração</button>
+                    </footer>
+                  </article>
+                </template>
+                <div x-show="!stockPendingUpdates.length" class="stock-approval-empty compact"><i data-lucide="check"></i><p>Sem edições pendentes.</p></div>
               </div>
             </section>
 
@@ -1633,6 +1664,22 @@
               </div>
               <p class="stock-approval-margin" x-show="num(stockApprovalForm.sale_price) > 0"><span x-text="stockApprovalItem?.item_type === 'servico' ? 'Resultado bruto estimado:' : 'Margem bruta estimada:'"></span> <strong x-text="money(num(stockApprovalForm.sale_price)-num(stockApprovalForm.average_cost))"></strong><span x-show="stockApprovalItem?.item_type !== 'servico'"> por unidade</span></p>
               <footer><button type="button" class="pos-outline-action" @click="closeStockApproval()">Cancelar</button><button type="button" class="pos-form-submit success" :disabled="stockApprovalBusy" @click="approveRegistrationRequest()"><i data-lucide="check"></i><span x-text="stockApprovalBusy ? 'Aprovando...' : 'Aprovar e cadastrar'"></span></button></footer>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-modal-overlay" x-show="stockApprovalModal === 'update'" x-cloak @click.self="closeStockApproval()">
+          <div class="pos-modal stock-approval-modal">
+            <div class="pos-modal-head"><h3>Revisar alteração</h3><button class="pos-modal-close" @click="closeStockApproval()"><i data-lucide="x"></i></button></div>
+            <div x-show="stockApprovalItem" class="stock-approval-modal-body">
+              <div class="stock-approval-modal-product"><i data-lucide="file-pen-line"></i><div><small>Cadastro existente</small><strong x-text="stockApprovalItem?.current_item_name || stockApprovalItem?.item_name"></strong><span x-text="'Enviado por ' + (stockApprovalItem?.requested_by_label || 'funcionário')"></span></div></div>
+              <div class="stock-update-compare">
+                <template x-for="change in stockUpdateFields(stockApprovalItem)" :key="change[0]">
+                  <div><small x-text="change[0]"></small><span><em>Antes</em><b x-text="change[1] ?? 'Não informado'"></b></span><i data-lucide="arrow-right"></i><span class="after"><em>Depois</em><b x-text="change[2] ?? 'Não informado'"></b></span></div>
+                </template>
+              </div>
+              <p class="stock-update-safe"><i data-lucide="shield-check"></i> Esta aprovação não altera saldo, custo nem preço.</p>
+              <footer><button type="button" class="pos-outline-action" @click="closeStockApproval()">Cancelar</button><button type="button" class="pos-form-submit success" :disabled="stockApprovalBusy" @click="approveUpdateRequest()"><i data-lucide="check"></i><span x-text="stockApprovalBusy ? 'Aprovando...' : 'Aprovar alteração'"></span></button></footer>
             </div>
           </div>
         </div>
@@ -3286,7 +3333,7 @@
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
  <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
- <script src="./app.estoque.aprovacoes.js?v=20260810-contagem2"></script>
+ <script src="./app.estoque.aprovacoes.js?v=20260811-edicao-estoque1"></script>
 <script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>

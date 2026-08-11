@@ -12,6 +12,7 @@ describe('Estoque seguro na Operação da Loja', () => {
   const stock = source('painel/public/caixa-stock.js');
   const stockCount = source('painel/public/caixa-stock-count.js');
   const stockDetail = source('painel/public/caixa-stock-detail.js');
+  const stockEdit = source('painel/public/caixa-stock-edit.js');
   const style = source('painel/public/caixa.css');
   const stockView = source('painel/public/caixa-stock-view.js');
   const login = source('painel/public/caixa.js');
@@ -19,10 +20,13 @@ describe('Estoque seguro na Operação da Loja', () => {
   const detailBackend = source('src/parceiro/operation-stock-detail.ts');
   const route = source('src/parceiro/route-operation-stock.ts');
   const detailRoute = source('src/parceiro/route-operation-stock-detail.ts');
+  const updateRoute = source('src/parceiro/route-operation-stock-update.ts');
+  const updateBackend = source('src/parceiro/operation-stock-update.ts');
   const legacyRoute = source('src/parceiro/route.ts');
   const appRoutes = source('src/app/routes.ts');
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
   const countMigration = source('db/migrations/0167_partner_operation_count_batch_evidence.sql');
+  const updateMigration = source('db/migrations/0168_partner_operation_stock_updates.sql');
 
   it('permite que um acesso apenas de estoque permaneça na porta única', () => {
     expect(modules).toContain("if (canModule('vendas')) return 'cash'");
@@ -89,6 +93,25 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(stock).toContain('Salvar serviço e enviar para aprovação');
     expect(html).not.toContain('Duração estimada');
     expect(html).not.toContain('Consome material cadastrado');
+  });
+
+  it('edita somente o cadastro operacional e envia para aprovação do dono', () => {
+    expect(html).toContain('id="stock-edit-modal"');
+    expect(html).toContain('Tipo, saldo, custo e preço não podem ser alterados aqui.');
+    expect(stockDetail).toContain('Caixa.openStockEdit(state.stock)');
+    expect(stockDetail).toContain('row.update_pending');
+    expect(stockEdit).toContain('/edicoes`');
+    expect(stockEdit).not.toContain('average_cost');
+    expect(stockEdit).not.toContain('sale_price');
+    expect(stockEdit).not.toContain('quantity_on_hand');
+    expect(updateRoute).toContain("requireScreen('estoque')");
+    expect(updateRoute).toContain('requireOwner');
+    expect(updateBackend).toContain("'partner_stock_update_approved'");
+    expect(updateBackend).not.toMatch(/SET[\s\S]{0,300}average_cost/);
+    expect(updateBackend).not.toMatch(/SET[\s\S]{0,300}sale_price/);
+    expect(updateBackend).not.toMatch(/SET[\s\S]{0,300}quantity_on_hand\s*=/);
+    expect(updateMigration).toContain('partner_item_update_one_pending_idx');
+    expect(updateMigration).toContain('stock_metadata_snapshot');
   });
 
   it('usa uma API segura que não devolve custo nem grava saldo oficial', () => {

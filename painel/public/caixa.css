@@ -11,6 +11,10 @@
   --ink: #10231c;
   --muted: #6b7470;
   --line: #d9dedb;
+  --type-caption: 12px;
+  --type-small: 14px;
+  --type-body: 16px;
+  --type-button: 15px;
 }
 
 * { box-sizing: border-box; }
@@ -622,6 +626,8 @@ form { display: grid; gap: 16px; }
 .stock-card-content--generic .stock-card-count { margin-top: 8px; }
 .stock-modal-sheet form select { width: 100%; height: 51px; padding: 0 39px 0 13px; border: 1px solid #cfd8d3; border-radius: 12px; outline: 0; color: #17251f; background: #fff; }
 .stock-modal-sheet form select:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
+.stock-edit-sheet { max-height: min(94svh,820px); }
+.stock-edit-sheet form { overflow-y: auto; }
 .stock-form-notice { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid #cee7d7; border-radius: 12px; color: #145a3d; background: #f0f9f3; }
 .stock-form-notice strong { font-size: 11px; }
 .stock-form-notice span { color: #62736a; font-size: 9px; line-height: 1.4; }
@@ -866,6 +872,156 @@ form { display: grid; gap: 16px; }
 .help-content strong { color: #0b6445; }
 .help-content button { height: 48px; margin-top: 2px; border: 0; border-radius: 12px; color: #fff; background: #087246; font-weight: 680; cursor: pointer; }
 
+/* Etapa 2.5 — escala legível da Operação da Loja.
+ * Caption 12px, informação secundária 14px, corpo/campos 16px.
+ * Mantém o desenho existente sem permitir microtextos de 7–10px na interface. */
+.operation-modules strong,
+.chooser-kicker,
+.workplace-option small,
+.session-kicker,
+.secure-row p,
+.individual-access,
+.caixa-footer { font-size: var(--type-caption); }
+.workplace-chooser > p:not(.chooser-kicker,.login-error),
+.chooser-back,
+.cash-status-copy small,
+.remember-row,
+.login-error,
+.next-step strong,
+.next-step span { font-size: var(--type-small); }
+.chooser-back { min-height: 44px; }
+
+.photo-alert small,
+.weekly-week-nav small,
+.weekly-summary-head span,
+.weekly-reference span,
+.weekly-bar-value,
+.weekly-bar-item b,
+.weekly-bar-item small,
+.weekly-stats-grid small,
+.weekly-detail > header span { font-size: var(--type-caption); }
+.weekly-week-nav span,
+.weekly-detail dt,
+.weekly-detail dd,
+.sales-list-heading span,
+.sale-status { font-size: 13px; }
+.weekly-clear-day { min-height: 44px; font-size: 13px; }
+.sale-card-heading > strong,
+.sale-details > p,
+.receipt-button { font-size: var(--type-small); }
+.receipt-button { min-height: 44px; }
+
+.catalog-message,
+.catalog-product-content > small,
+.catalog-stock,
+.catalog-unavailable,
+.checkout-customer small,
+.checkout-customer em,
+.checkout-total small,
+.checkout-review-items small,
+.checkout-review-meta dt,
+.checkout-submit-error { font-size: var(--type-caption); }
+.catalog-type-tabs button,
+.checkout-customer strong,
+.checkout-review-items strong,
+.checkout-review-items b,
+.checkout-review-meta dd,
+.checkout-review-total span,
+.payment-methods button,
+.checkout-review-actions button { font-size: var(--type-small); }
+.payment-methods button,
+.checkout-review-actions button { min-height: 44px; }
+.checkout-finish { font-size: var(--type-button); }
+
+.profile-summary-grid small { font-size: var(--type-small); }
+.stock-action strong { font-size: var(--type-button); }
+.stock-action small,
+.stock-safety span,
+.stock-pending,
+.stock-card-details,
+.stock-form-notice span { font-size: 13px; }
+.stock-safety strong,
+.stock-type-tabs button,
+.stock-card-count,
+.stock-form-notice strong { font-size: var(--type-small); }
+.stock-metrics small,
+.stock-card-model,
+.stock-card-code,
+.stock-card-kicker,
+.stock-card-condition,
+.stock-card-badge { font-size: var(--type-caption); }
+.stock-card-count,
+.stock-type-tabs button { min-height: 44px; }
+.stock-search input { font-size: var(--type-body); }
+
+.stock-detail-header p,
+.stock-detail-operator strong,
+.stock-detail-identity > small,
+.stock-detail-tags b,
+.stock-detail-stock-price small,
+.stock-detail-stock-price span,
+.stock-detail-safe,
+.stock-detail-actions button small,
+.stock-detail-history > header span,
+.stock-movement > div span,
+.stock-detail-audit { font-size: var(--type-caption); }
+.stock-detail-service-note,
+.stock-movement > b,
+.stock-detail-history-empty { font-size: 13px; }
+.stock-detail-actions button,
+.stock-detail-history-button,
+.stock-movement > div strong { font-size: var(--type-small); }
+.stock-detail-actions button { min-height: 52px; }
+.stock-detail-actions button span { gap: 2px; }
+.stock-movement { min-height: 64px; }
+.stock-movement > div span { white-space: normal; line-height: 1.25; }
+
+.stock-count-intro strong,
+.stock-count-current,
+.stock-count-sheet form .stock-count-search input { font-size: var(--type-small); }
+.stock-count-intro span,
+.stock-count-progress-copy,
+.stock-count-tools > button,
+.stock-count-empty { font-size: 13px; }
+.stock-count-code,
+.stock-count-field-label,
+.stock-count-status,
+.stock-count-difference-fields select,
+.stock-count-photo,
+.stock-count-summary small,
+.stock-count-lock,
+.stock-count-actor-note { font-size: var(--type-caption) !important; }
+.stock-count-field-label { min-height: 28px; white-space: normal; line-height: 1.2; }
+.stock-count-tools > button,
+.stock-count-difference-fields select,
+.stock-count-photo { min-height: 44px; }
+.stock-count-card-content { grid-template-areas: "primary brand" "code brand" "system-label counted-label" "system stepper" "status status" "difference difference"; }
+
+.bottom-nav { min-height: 82px; }
+.bottom-nav button { min-height: 56px; font-size: 13px; }
+.app-toast { font-size: var(--type-small); }
+.receipt-sheet > header p,
+.receipt-meta small,
+.receipt-seller,
+.account-modal-sheet > header p,
+.account-modal-sheet form small,
+.caixa-photo-card > small { font-size: var(--type-caption); }
+.receipt-meta strong,
+.receipt-items > div,
+.receipt-total,
+.receipt-print,
+.receipt-done,
+.account-modal-sheet form label,
+.caixa-photo-card > p,
+.photo-shoot-button,
+.caixa-photo-actions button,
+.help-content { font-size: var(--type-small); }
+.receipt-content h3 { font-size: var(--type-button); }
+.account-modal-sheet form input,
+.stock-modal-sheet form select { font-size: var(--type-body); }
+.account-modal-error { font-size: 13px; }
+.account-modal-primary { font-size: var(--type-button); }
+
 @media (max-width: 520px) {
   .caixa-shell { display: block; padding: 0; background: var(--green-950); }
   .caixa-app { width: 100%; min-height: 100svh; border: 0; border-radius: 0; box-shadow: none; }
@@ -885,8 +1041,8 @@ form { display: grid; gap: 16px; }
   .app-panel { padding-inline: 11px; }
   .sale-card { grid-template-columns: 44px minmax(0,1fr); gap: 9px; padding-inline: 10px; }
   .sale-icon { width: 42px; height: 42px; }
-  .sale-card-heading > strong { font-size: 13px; }
-  .sale-status { padding-inline: 6px; font-size: 10px; }
+  .sale-card-heading > strong { font-size: var(--type-small); }
+  .sale-status { padding-inline: 6px; font-size: var(--type-caption); }
   .sale-status svg { display: none; }
   .sale-amount { font-size: 21px; }
   .receipt-button { padding-inline: 8px; }

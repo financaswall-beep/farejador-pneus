@@ -3,6 +3,7 @@ import type { PartnerContext } from './auth.js';
 
 const HISTORY_EVENTS = [
   'partner_item_registration_approved',
+  'partner_stock_update_approved',
   'partner_stock_count_approved',
   'stock_decrement_purchase_cancel',
   'stock_decrement_sale',
@@ -74,6 +75,7 @@ export function normalizeOperationStockMovement(
       break;
     }
     case 'partner_item_registration_approved': kind = 'registration'; delta = number(payload.quantity_on_hand); break;
+    case 'partner_stock_update_approved': kind = 'update'; delta = null; break;
     case 'stock_item_created': kind = 'registration'; delta = number(payload.quantity_on_hand); break;
     case 'stock_item_updated': kind = 'update'; delta = null; break;
     case 'stock_reserved': kind = 'reservation'; delta = reservedDelta == null ? null : -reservedDelta; break;
@@ -118,7 +120,15 @@ export async function getOperationStockDetail(
             CASE WHEN quantity_on_hand IS NULL THEN NULL
                  ELSE GREATEST(quantity_on_hand-quantity_reserved, 0) END AS quantity_available,
             minimum_quantity, sale_price, stock_status, tire_condition,
-            shelf_location, tire_position, is_tracked, updated_at
+            shelf_location, tire_position, is_tracked, updated_at,
+            EXISTS (
+              SELECT 1
+                FROM commerce.partner_item_registration_requests request
+               WHERE request.environment=partner_stock_levels.environment
+                 AND request.unit_id=partner_stock_levels.unit_id
+                 AND request.target_stock_id=partner_stock_levels.id
+                 AND request.status='pending'
+            ) AS update_pending
        FROM commerce.partner_stock_levels
       WHERE id=$1 AND environment=$2 AND unit_id=$3 AND deleted_at IS NULL`,
     [stockId, ctx.environment, ctx.unitId],

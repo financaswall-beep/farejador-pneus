@@ -641,6 +641,7 @@ html, body {
 .stock-approval-filters button.active { color: #111827; border-color: var(--pos-yellow); background: var(--pos-yellow); }
 .stock-approval-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .stock-approval-columns.single { grid-template-columns: 1fr; }
+.stock-approval-panel.update { grid-column: 1 / -1; }
 .stock-approval-panel {
   min-width: 0;
   overflow: hidden;
@@ -672,6 +673,12 @@ html, body {
 }
 .stock-approval-help { margin: 0; padding: 11px 16px; color: #94a3b8; border-bottom: 1px solid var(--pos-line); font-size: 11px; }
 .stock-approval-list { padding: 12px; display: grid; gap: 12px; }
+.stock-update-preview { display: grid; gap: 6px; margin-top: 10px; }
+.stock-update-preview > div { display: grid; grid-template-columns: 82px minmax(0,1fr) 16px minmax(0,1fr); align-items: center; gap: 7px; padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,.035); }
+.stock-update-preview small { color: #94a3b8; font-size: 9px; }
+.stock-update-preview span { overflow: hidden; color: #94a3b8; font-size: 10px; text-decoration: line-through; text-overflow: ellipsis; white-space: nowrap; }
+.stock-update-preview strong { overflow: hidden; color: #4ade80; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-update-preview svg { width: 14px; color: #64748b; }
 .stock-request-card { padding: 14px; border: 1px solid var(--pos-line); border-radius: 12px; background: var(--pos-panel-2); }
 .stock-request-product { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 11px; }
 .stock-request-product picture { width: 58px; height: 62px; display: grid; place-items: center; border-radius: 9px; overflow: hidden; background: rgba(255,255,255,.04); }
@@ -727,6 +734,16 @@ html, body {
 .stock-approval-modal-product small { color: var(--pos-yellow); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .stock-approval-modal-product strong { margin-top: 2px; color: #f8fafc; font-size: 15px; }
 .stock-approval-modal-product span { margin-top: 2px; color: #94a3b8; font-size: 11px; }
+.stock-update-compare { display: grid; gap: 8px; margin-top: 14px; }
+.stock-update-compare > div { display: grid; grid-template-columns: 84px minmax(0,1fr) 18px minmax(0,1fr); align-items: center; gap: 8px; padding: 9px; border: 1px solid var(--pos-line); border-radius: 9px; }
+.stock-update-compare small { color: #94a3b8; font-size: 10px; font-weight: 800; }
+.stock-update-compare span { display: grid; min-width: 0; gap: 2px; }
+.stock-update-compare em { color: #64748b; font-size: 8px; font-style: normal; text-transform: uppercase; }
+.stock-update-compare b { overflow: hidden; color: #cbd5e1; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-update-compare .after b { color: #4ade80; }
+.stock-update-compare svg { width: 15px; color: #64748b; }
+.stock-update-safe { display: flex; align-items: center; gap: 8px; margin-top: 13px !important; padding: 10px; border-radius: 9px; color: #4ade80; background: rgba(34,197,94,.08); }
+.stock-update-safe svg { width: 19px; flex: 0 0 19px; }
 .stock-approval-form-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 11px; }
 .stock-approval-form-grid label, .stock-reject-reason { display: grid; gap: 6px; color: #cbd5e1; font-size: 11px; font-weight: 750; }
 .stock-approval-form-grid label.wide { grid-column: 1/-1; }
@@ -767,6 +784,10 @@ html, body {
 .pos-shell[data-theme="light"] .stock-count-compare strong,
 .pos-shell[data-theme="light"] .stock-approval-empty h3,
 .pos-shell[data-theme="light"] .stock-approval-modal-product strong { color: #111827; }
+.pos-shell[data-theme="light"] .stock-update-preview > div { background: #f8fafc; }
+.pos-shell[data-theme="light"] .stock-update-compare b { color: #334155; }
+.pos-shell[data-theme="light"] .stock-update-compare .after b { color: #047857; }
+.pos-shell[data-theme="light"] .stock-update-safe { color: #047857; background: #ecfdf5; }
 .pos-shell[data-theme="light"] .stock-approval-heading p,
 .pos-shell[data-theme="light"] .stock-approval-help,
 .pos-shell[data-theme="light"] .stock-request-product em { color: #64748b; }
@@ -814,6 +835,7 @@ html, body {
   .stock-request-card footer { display: grid; grid-template-columns: 1fr; }
   .stock-request-card footer button { justify-content: center; }
   .stock-approval-form-grid { grid-template-columns: 1fr; }
+  .stock-update-preview > div, .stock-update-compare > div { grid-template-columns: 72px minmax(0,1fr) 15px minmax(0,1fr); gap: 5px; }
   .stock-approval-form-grid label.wide { grid-column: auto; }
   .stock-approval-modal-body footer { display: grid; grid-template-columns: 1fr; }
   .stock-approval-modal-body footer button { justify-content: center; width: 100% !important; }

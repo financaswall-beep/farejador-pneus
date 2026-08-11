@@ -6,7 +6,7 @@ window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
   stockAdminTab: 'current',
   stockApprovalFilter: 'all',
-  stockApprovalData: { registrations: [], counts: [], pending_total: 0 },
+  stockApprovalData: { registrations: [], updates: [], counts: [], pending_total: 0 },
   stockApprovalLoading: false,
   stockApprovalBusy: false,
   stockApprovalModal: null,
@@ -32,6 +32,10 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     return this.stockApprovalData?.counts || [];
   },
 
+  get stockPendingUpdates() {
+    return this.stockApprovalData?.updates || [];
+  },
+
   stockReviewError(error, fallback) {
     const code = error?.payload?.error || error?.message || '';
     const messages = {
@@ -39,6 +43,8 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
       stock_request_not_found: 'Esta solicitação não existe mais.',
       stock_request_already_reviewed: 'Esta solicitação já foi revisada.',
       stock_request_not_pending: 'Esta solicitação já saiu da fila.',
+      stock_update_stale: 'O cadastro mudou depois do pedido. Rejeite e peça uma nova edição.',
+      stock_update_conflict: 'Os novos dados entram em conflito com outro item do estoque.',
     };
     return messages[code] || (code && code !== 'internal_error' && !code.startsWith('api_')
       ? this.errMessage(error) : fallback);
@@ -77,6 +83,20 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     return `${diff > 0 ? '+' : ''}${diff}`;
   },
 
+  stockUpdateFields(item) {
+    const fields = [
+      ['Nome', item?.current_item_name, item?.item_name],
+      ['Marca', item?.current_brand, item?.brand],
+      ['Medida', item?.current_tire_size, item?.tire_size],
+      ['Condição', item?.current_tire_condition, item?.tire_condition],
+      ['Posição', item?.current_tire_position, item?.tire_position],
+      ['Estoque mínimo', item?.current_minimum_quantity, item?.minimum_quantity],
+      ['Localização', item?.current_shelf_location, item?.shelf_location],
+      ['Código', item?.current_local_sku, item?.local_sku],
+    ];
+    return fields.filter((field) => String(field[1] ?? '') !== String(field[2] ?? ''));
+  },
+
   openRegistrationApproval(item) {
     this.stockApprovalItem = item;
     this.stockApprovalModal = 'registration';
@@ -113,6 +133,12 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     if (this.stockApprovalItem?.id === item.id) {
       this.photoLightbox = { open: false, url: this.photoThumbUrls[key] };
     }
+  },
+
+  openUpdateApproval(item) {
+    this.stockApprovalItem = item;
+    this.stockApprovalModal = 'update';
+    this.$nextTick(() => lucide.createIcons());
   },
 
   closeStockApproval() {
@@ -189,6 +215,28 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     }
   },
 
+  async approveUpdateRequest() {
+    const item = this.stockApprovalItem;
+    if (!item || this.stockApprovalBusy) return;
+    this.stockApprovalBusy = true;
+    try {
+      await this.api(`operacao/estoque/edicoes/${item.id}/aprovar`, {
+        method: 'POST', body: JSON.stringify({}),
+      });
+      this.stockApprovalModal = null;
+      this.stockApprovalItem = null;
+      this.flash('Alteração aprovada. Cadastro atualizado sem mexer no saldo.', 'success');
+      await this.loadData();
+    } catch (error) {
+      const code = error?.payload?.error;
+      this.flash(this.stockReviewError(error, 'Não foi possível aprovar a alteração.'), 'error');
+      if (code === 'stock_update_stale') await this.loadStockRequests(true);
+    } finally {
+      this.stockApprovalBusy = false;
+      this.$nextTick(() => lucide.createIcons());
+    }
+  },
+
   openStockRejection(kind, item) {
     this.stockRejectKind = kind;
     this.stockRejectItem = item;
@@ -208,7 +256,7 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     const reason = this.stockRejectReason.trim();
     if (reason.length < 3) return this.flash('Explique o motivo da rejeição.', 'error');
     this.stockApprovalBusy = true;
-    const plural = this.stockRejectKind === 'cadastro' ? 'cadastros' : 'contagens';
+    const plural = this.stockRejectKind === 'contagem' ? 'contagens' : 'cadastros';
     try {
       await this.api(`operacao/estoque/${plural}/${this.stockRejectItem.id}/rejeitar`, {
         method: 'POST', body: JSON.stringify({ reason }),
