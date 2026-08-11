@@ -68,6 +68,7 @@
     weeklyTotalLabel: byId('weekly-total-label'),
     weeklyReference: byId('weekly-reference'),
     weeklyReferenceValue: byId('weekly-reference-value'),
+    weeklyGrid: byId('weekly-grid'),
     weeklyBars: byId('weekly-bars'),
     weeklyClearDay: byId('weekly-clear-day'),
     weeklySalesCount: byId('weekly-sales-count'),

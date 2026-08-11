@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-minhas-vendas1" />
-  <script defer src="/caixa/caixa-core.js?v=20260810-operacao-estoque1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-minhas-vendas2" />
+  <script defer src="/caixa/caixa-core.js?v=20260811-minhas-vendas2"></script>
   <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
-  <script defer src="/caixa/caixa-sales-view.js?v=20260811-minhas-vendas1"></script>
+  <script defer src="/caixa/caixa-sales-view.js?v=20260811-minhas-vendas2"></script>
   <script defer src="/caixa/caixa-stock-view.js?v=20260811-detalhe-estoque1"></script>
   <script defer src="/caixa/caixa-stock-detail.js?v=20260811-edicao-estoque1"></script>
   <script defer src="/caixa/caixa-stock-edit.js?v=20260811-edicao-estoque1"></script>
   <script defer src="/caixa/caixa-stock.js?v=20260811-estoque-pronto1"></script>
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-stock-receipts.js?v=20260811-recebimento1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260811-minhas-vendas1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260811-minhas-vendas2"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
@@ -242,6 +242,7 @@
 
             <div class="weekly-chart" role="group" aria-label="Faturamento diário da semana">
               <div class="weekly-chart-plot">
+                <div id="weekly-grid" class="weekly-grid" aria-hidden="true"></div>
                 <div id="weekly-reference" class="weekly-reference"><span id="weekly-reference-value"></span></div>
                 <div id="weekly-bars" class="weekly-bars"></div>
               </div>
@@ -250,10 +251,22 @@
             <section class="weekly-stats" aria-labelledby="weekly-stats-title">
               <h4 id="weekly-stats-title" class="sr-only">Indicadores da semana</h4>
               <div class="weekly-stats-grid">
-                <div><small>Vendas</small><strong id="weekly-sales-count">0</strong></div>
-                <div><small>Itens vendidos</small><strong id="weekly-items-count">0</strong></div>
-                <div><small>Ticket médio</small><strong id="weekly-ticket">—</strong></div>
-                <div class="weekly-commission"><small>Minha comissão</small><strong id="weekly-commission">—</strong></div>
+                <div>
+                  <span class="weekly-stat-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></span>
+                  <span><small>Vendas</small><strong id="weekly-sales-count">0</strong></span>
+                </div>
+                <div>
+                  <span class="weekly-stat-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 8h12l1 13H5L6 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg></span>
+                  <span><small>Itens vendidos</small><strong id="weekly-items-count">0</strong></span>
+                </div>
+                <div>
+                  <span class="weekly-stat-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.7-1.7-1-3-1-1.7 0-3 1-3 2.4 0 3.6 6 1.8 6 5.2 0 1.4-1.3 2.4-3 2.4-1.2 0-2.3-.4-3-1.2M12 5v14"/></svg></span>
+                  <span><small>Ticket médio</small><strong id="weekly-ticket">—</strong></span>
+                </div>
+                <div class="weekly-commission">
+                  <span class="weekly-stat-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="6" r="2"/><circle cx="15" cy="4" r="1.5"/><circle cx="18" cy="9" r="1.5"/><path d="M3 14h4l3 2h5a2 2 0 0 1 2 2H9l-3-1.5H3M17 18l3-3 1 1-4 5H9l-4-2H3"/></svg></span>
+                  <span><small>Minha comissão</small><strong id="weekly-commission">—</strong></span>
+                </div>
               </div>
             </section>
           </section>

@@ -81,6 +81,7 @@
     const stock = tab === 'stock';
     const stockDetail = tab === 'stock-detail';
     const stockReceipts = tab === 'stock-receipts';
+    if (!sales && state.weekOffset !== 0) state.weekOffset = 0;
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.profilePanel.classList.toggle('hidden', !profile);

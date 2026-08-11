@@ -1144,47 +1144,60 @@ form { display: grid; gap: 16px; }
 }
 
 /* Operação da Loja — Minhas vendas (mesmo desenho para Matriz e parceiros). */
-.sales-app.is-sales .sales-header { min-height: 178px; padding-bottom: 48px; }
-.my-sales-panel { padding: 0 13px 24px; background: #fbfcfa; }
+.sales-app.is-sales .sales-header {
+  min-height: 158px;
+  padding-bottom: 38px;
+  background: linear-gradient(115deg,#034a35 0%,#006044 52%,#003d2e 100%);
+}
+.sales-app.is-sales .sales-logo { border: 3px solid rgba(176,220,47,.82); border-radius: 50%; box-shadow: 0 7px 18px rgba(0,20,14,.24); }
+.my-sales-panel { padding: 0 13px 22px; background: #fbfcfa; }
 .my-sales-panel .weekly-summary { margin-top: 0; border-radius: 22px; }
-.my-sales-panel .weekly-week-nav { min-height: 72px; padding: 10px 15px; background: #fff; }
-.my-sales-panel .weekly-week-nav span { color: #111b17; font-size: 20px; font-weight: 780; }
-.my-sales-panel .weekly-week-nav small { color: #69746e; font-size: 14px; }
-.my-sales-panel .weekly-week-nav button { width: 46px; height: 46px; color: #2c3732; background: #fff; border: 1px solid #e0e6e2; }
-.my-sales-panel .weekly-summary-head { display: grid; justify-items: center; gap: 4px; padding: 24px 15px 0; text-align: center; }
-.my-sales-panel .weekly-summary-head > span { margin: 0; color: #66716b; font-size: 13px; font-weight: 650; }
-.my-sales-panel .weekly-summary-head h3 { font-size: 22px; }
-.my-sales-panel .weekly-summary-head > strong { margin-top: 5px; font-size: clamp(38px,11vw,50px); }
-.weekly-own-label { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #68736d; font-size: 13px; }
-.weekly-own-label svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.my-sales-panel .weekly-chart { padding: 24px 13px 0; }
-.my-sales-panel .weekly-chart-plot { height: 190px; }
-.my-sales-panel .weekly-bars { bottom: -46px; gap: 8px; }
-.my-sales-panel .weekly-bar-item { grid-template-rows: 23px minmax(0,1fr) 19px 19px; cursor: default; }
-.my-sales-panel .weekly-bar-value { max-width: 52px; color: #17231e; font-size: 11px; opacity: 1; }
-.my-sales-panel .weekly-bar-item i { width: min(100%,31px); background: linear-gradient(180deg,#2fb66d,#119451); }
+.my-sales-panel .weekly-week-nav { min-height: 64px; padding: 8px 14px; background: #fff; }
+.my-sales-panel .weekly-week-nav span { color: #111b17; font-size: 19px; font-weight: 780; }
+.my-sales-panel .weekly-week-nav small { color: #69746e; font-size: 13px; }
+.my-sales-panel .weekly-week-nav button { width: 43px; height: 43px; color: #2c3732; background: #fff; border: 1px solid #e0e6e2; }
+.my-sales-panel .weekly-summary-head { display: grid; justify-items: center; gap: 2px; padding: 17px 15px 0; text-align: center; }
+.my-sales-panel .weekly-summary-head > span { margin: 0; color: #66716b; font-size: 12px; font-weight: 650; }
+.my-sales-panel .weekly-summary-head h3 { font-size: 21px; }
+.my-sales-panel .weekly-summary-head > strong { margin-top: 3px; font-size: clamp(36px,10.5vw,46px); }
+.weekly-own-label { display: flex; align-items: center; gap: 5px; margin-top: 2px; color: #68736d; font-size: 12px; }
+.weekly-own-label svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.my-sales-panel .weekly-chart { padding: 15px 12px 0 39px; }
+.my-sales-panel .weekly-chart-plot { height: 137px; }
+.weekly-grid { position: absolute; z-index: 0; inset: 0; pointer-events: none; }
+.weekly-grid > span { position: absolute; right: 0; left: 0; border-top: 1px dashed #e0e6e2; }
+.weekly-grid b { position: absolute; right: calc(100% + 8px); top: 0; min-width: 25px; transform: translateY(-50%); color: #707a75; font-size: 10px; font-weight: 500; text-align: right; }
+.my-sales-panel .weekly-reference span { right: 0; bottom: 3px; left: auto; padding: 0 0 0 5px; text-align: right; }
+.my-sales-panel .weekly-bars { bottom: -37px; gap: 7px; }
+.my-sales-panel .weekly-bar-item { position: relative; grid-template-rows: minmax(0,1fr) 17px 17px; cursor: default; }
+.my-sales-panel .weekly-bar-value { position: absolute; z-index: 3; left: 50%; max-width: 45px; transform: translateX(-50%); color: #17231e; font-size: 9px; opacity: 1; }
+.my-sales-panel .weekly-bar-item i { grid-row: 1; width: min(100%,27px); background: linear-gradient(180deg,#2fb66d,#119451); }
 .my-sales-panel .weekly-bar-item.is-best i { background: linear-gradient(180deg,#087b49,#045d38); }
-.my-sales-panel .weekly-bar-item small,.my-sales-panel .weekly-bar-item b { font-size: 12px; }
-.my-sales-panel .weekly-bar-item small { align-self: center; color: #28342e; }
-.my-sales-panel .weekly-bar-item b { align-self: start; color: #66716b; font-weight: 500; }
-.my-sales-panel .weekly-stats { margin-top: 50px; padding: 16px; }
+.my-sales-panel .weekly-bar-item small,.my-sales-panel .weekly-bar-item b { font-size: 11px; }
+.my-sales-panel .weekly-bar-item small { grid-row: 2; align-self: center; color: #28342e; }
+.my-sales-panel .weekly-bar-item b { grid-row: 3; align-self: start; color: #66716b; font-weight: 500; }
+.my-sales-panel .weekly-stats { margin-top: 42px; padding: 0 10px 12px; border-top: 0; }
 .my-sales-panel .weekly-stats-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; margin: 0; overflow: hidden; border: 1px solid #e2e8e4; border-radius: 16px; }
-.my-sales-panel .weekly-stats-grid > div { min-height: 88px; padding: 15px 17px; border: 0; border-radius: 0; background: #fff; }
+.my-sales-panel .weekly-stats-grid > div { display: grid; min-height: 76px; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 9px; padding: 10px; border: 0; border-radius: 0; background: #fff; }
 .my-sales-panel .weekly-stats-grid > div:nth-child(even) { border-left: 1px solid #e2e8e4; }
 .my-sales-panel .weekly-stats-grid > div:nth-child(n+3) { border-top: 1px solid #e2e8e4; }
-.my-sales-panel .weekly-stats-grid small { min-height: 0; color: #36423c; font-size: 14px; }
-.my-sales-panel .weekly-stats-grid strong { margin-top: 5px; color: #121b17; font-size: 25px; }
+.weekly-stat-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 50%; color: #087246; background: #eaf7ed; }
+.weekly-stat-icon svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.65; }
+.my-sales-panel .weekly-stats-grid small { min-height: 0; color: #36423c; font-size: 12px; }
+.my-sales-panel .weekly-stats-grid strong { margin-top: 3px; color: #121b17; font-size: 22px; }
 .my-sales-panel .weekly-stats-grid .weekly-commission strong { color: #087246; }
-.my-sales-panel .sales-list-heading { margin: 25px 5px 13px; }
-.my-sales-panel .sales-list-heading h3 { font-size: 23px; }
-.my-sales-panel .sale-card { min-height: 177px; grid-template-columns: 54px minmax(0,1fr); padding: 16px 14px 11px; }
+.my-sales-panel .sales-list-heading { margin: 19px 5px 10px; }
+.my-sales-panel .sales-list-heading h3 { font-size: 21px; }
+.my-sales-panel .sale-card { min-height: 151px; grid-template-columns: 50px minmax(0,1fr); padding: 13px 12px 9px; }
 .my-sales-panel .sale-icon { color: #087246; background: #eef8ef; box-shadow: none; }
-.my-sales-panel .sale-card-heading > strong { font-size: 18px; }
-.my-sales-panel .sale-details > p { overflow: hidden; margin-top: 7px; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.my-sales-panel .sale-payment { display: block; margin-top: 4px; color: #087246; font-size: 14px; }
-.my-sales-panel .sale-amount { display: block; margin-top: 5px; font-size: 27px; }
-.sale-commission { display: flex; min-height: 45px; align-items: center; justify-content: space-between; gap: 8px; margin: 12px -2px -1px -68px; padding: 7px 0 0 68px; border-top: 1px solid #e1ebe5; color: #185b3e; background: linear-gradient(90deg,#f0f9f1,rgba(240,249,241,0)); font-size: 13px; font-weight: 650; }
-.sale-commission .receipt-button { height: 38px; }
+.my-sales-panel .sale-card-heading > strong { font-size: 17px; }
+.my-sales-panel .sale-card-body { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 8px; margin-top: 6px; }
+.my-sales-panel .sale-card-copy { min-width: 0; }
+.my-sales-panel .sale-card-copy > p { overflow: hidden; margin: 0; color: #555e5a; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.my-sales-panel .sale-payment { display: block; margin-top: 3px; color: #087246; font-size: 13px; }
+.my-sales-panel .sale-amount { align-self: end; font-size: 25px; }
+.sale-commission { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 7px; margin: 9px 0 -1px -62px; padding: 6px 0 0 62px; border-top: 1px solid #e1ebe5; color: #185b3e; background: linear-gradient(90deg,#f0f9f1,rgba(240,249,241,0)); font-size: 12px; font-weight: 650; }
+.sale-commission .receipt-button { height: 36px; }
 .receipt-items > div { display: grid; grid-template-columns: 54px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 68px; padding: 8px 0; border-bottom: 1px solid #e6ebe8; }
 .receipt-items img { width: 50px; height: 58px; object-fit: contain; mix-blend-mode: multiply; }
 .receipt-items span { display: grid; gap: 4px; min-width: 0; }

@@ -39,6 +39,10 @@
     return sale.commission_value + '% sobre ' + Caixa.currency.format(Number(sale.total_amount || 0));
   }
 
+  function commissionRate(value) {
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(Number(value || 0));
+  }
+
   function setSalesState(value) {
     elements.salesLoading.classList.toggle('hidden', value !== 'loading');
     elements.salesError.classList.toggle('hidden', value !== 'error');
@@ -78,6 +82,10 @@
     badge.appendChild(document.createTextNode(status.label));
     heading.append(title, badge);
 
+    const body = document.createElement('div');
+    body.className = 'sale-card-body';
+    const copy = document.createElement('div');
+    copy.className = 'sale-card-copy';
     const item = document.createElement('p');
     item.textContent = sale.item_summary || (sale.items_quantity + ' item(ns)');
     const meta = document.createElement('span');
@@ -90,16 +98,23 @@
     const commission = document.createElement('div');
     commission.className = 'sale-commission';
     const commissionText = document.createElement('span');
+    const rate = sale.commission_kind === 'percent' && Number(sale.commission_value || 0) > 0
+      ? ' (' + commissionRate(sale.commission_value) + '%)' : '';
     commissionText.textContent = status.className === 'cancelled'
       ? 'Comissão cancelada'
-      : 'Sua comissão: ' + Caixa.currency.format(Number(sale.commission_amount || 0));
+      : 'Sua comissão: ' + Caixa.currency.format(Number(sale.commission_amount || 0)) + rate;
     const detailsButton = document.createElement('button');
     detailsButton.type = 'button';
     detailsButton.className = 'receipt-button';
-    detailsButton.textContent = 'Ver detalhes';
+    detailsButton.append(
+      Caixa.createSvg([{ d: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3ZM9 8h6M9 12h6' }]),
+      document.createTextNode('Ver detalhes'),
+    );
     detailsButton.addEventListener('click', function () { void Caixa.openReceipt(sale.order_id); });
     commission.append(commissionText, detailsButton);
-    details.append(heading, item, meta, amount, commission);
+    copy.append(item, meta);
+    body.append(copy, amount);
+    details.append(heading, body, commission);
     article.append(saleIcon(), details);
     return article;
   }
@@ -117,11 +132,25 @@
       + String(last.getDate()).padStart(2, '0') + ' ' + month;
   }
 
+  function niceAxisStep(value) {
+    const safe = Math.max(1, Number(value || 0));
+    const power = Math.pow(10, Math.floor(Math.log10(safe)));
+    const normalized = safe / power;
+    const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return factor * power;
+  }
+
+  function axisLabel(value) {
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value);
+  }
+
   function renderWeeklySummary(payload) {
     const summary = payload.summary || {};
     const series = Array.isArray(payload.daily_series) ? payload.daily_series : [];
     const values = series.map(function (day) { return Number(day.revenue || 0); });
     const max = Math.max(1, ...values);
+    const axisStep = niceAxisStep(max / 3);
+    const axisMax = axisStep * 3;
     const average = series.length ? Number(summary.revenue || 0) / series.length : 0;
     const offset = Number(payload.week_offset || 0);
     elements.weeklySummary.classList.remove('hidden');
@@ -135,8 +164,17 @@
     elements.weeklyItemsCount.textContent = String(summary.items_quantity || 0);
     elements.weeklyTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
     elements.weeklyCommission.textContent = Caixa.currency.format(Number(summary.commission_amount || 0));
-    elements.weeklyReference.style.bottom = Math.min(94, average / max * 100) + '%';
+    elements.weeklyReference.style.bottom = Math.min(94, average / axisMax * 100) + '%';
     elements.weeklyReferenceValue.textContent = 'média ' + Caixa.currency.format(average);
+    elements.weeklyGrid.replaceChildren();
+    [3, 2, 1, 0].forEach(function (level) {
+      const line = document.createElement('span');
+      line.style.bottom = (level / 3 * 100) + '%';
+      const label = document.createElement('b');
+      label.textContent = axisLabel(axisStep * level);
+      line.appendChild(label);
+      elements.weeklyGrid.appendChild(line);
+    });
     elements.weeklyBars.replaceChildren();
     const dayFormat = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
     series.forEach(function (day) {
@@ -147,7 +185,9 @@
       value.className = 'weekly-bar-value';
       value.textContent = Number(day.revenue || 0) ? Number(day.revenue).toFixed(2).replace('.', ',') : '0';
       const bar = document.createElement('i');
-      bar.style.height = Math.max(3, Number(day.revenue || 0) / max * 100) + '%';
+      const ratio = Math.max(0.03, Number(day.revenue || 0) / axisMax);
+      bar.style.height = (ratio * 100) + '%';
+      value.style.bottom = Math.min(160, 38 + ratio * 136) + 'px';
       const dayName = document.createElement('small');
       dayName.textContent = dayFormat.format(date).replace('.', '');
       const dayNumber = document.createElement('b');

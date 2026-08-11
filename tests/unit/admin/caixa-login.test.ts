@@ -110,7 +110,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('data-period=');
     expect(html).not.toContain('class="sales-metrics"');
     expect(html).not.toContain('Buscar venda ou cliente');
-    expect(script).toContain("detailsButton.textContent = 'Ver detalhes'");
+    expect(script).toContain("document.createTextNode('Ver detalhes')");
     expect(script).toContain("item.image_url || '/caixa/catalog-tire.webp'");
     expect(script).toContain("Caixa.operationPath('minhas-vendas', '/api/caixa/vendas')");
     expect(script).toContain("'/recibo'");
@@ -125,6 +125,8 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Minha comissão');
     expect(script).toContain('payload.daily_series');
     expect(script).toContain("new URLSearchParams({ week: String(state.weekOffset) })");
+    expect(script).toContain('if (!sales && state.weekOffset !== 0) state.weekOffset = 0');
+    expect(html).toContain('id="weekly-grid"');
     expect(script).not.toContain('periodButtons');
     expect(script).not.toContain('selectWeeklyDay');
     expect(css).toContain('.weekly-reference');
