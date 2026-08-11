@@ -11,6 +11,7 @@ describe('Estoque seguro na Operação da Loja', () => {
   const modules = source('painel/public/caixa-modules.js');
   const stock = source('painel/public/caixa-stock.js');
   const stockCount = source('painel/public/caixa-stock-count.js');
+  const style = source('painel/public/caixa.css');
   const stockView = source('painel/public/caixa-stock-view.js');
   const login = source('painel/public/caixa.js');
   const backend = source('src/parceiro/operation-stock.ts');
@@ -54,6 +55,15 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(backend).not.toContain('UPDATE commerce.partner_stock_levels');
     expect(route).toContain(".strict().superRefine");
     expect(route).toContain("requireScreen('estoque')");
+  });
+
+  it('prioriza a medida e alinha saldo com quantidade na contagem mobile', () => {
+    expect(stockCount).toContain("row.item_type === 'pneu' && row.tire_size ? row.tire_size : row.item_name");
+    expect(stockCount).toContain("brand.className = 'stock-count-brand'");
+    expect(stockCount).toContain("systemLabel.textContent = 'Saldo no sistema'");
+    expect(stockCount).toContain("countedLabel.textContent = 'Quantidade contada'");
+    expect(style).toContain('"system-label counted-label"');
+    expect(style).toContain('"system stepper"');
   });
 
   it('grava solicitações isoladas por unidade e sem permissão de autoaprovação', () => {

@@ -143,14 +143,22 @@
       visual.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>';
     }
     const content = document.createElement('div'); content.className = 'stock-count-card-content';
-    const title = document.createElement('strong'); title.textContent = row.item_name;
-    const meta = document.createElement('span');
-    meta.textContent = [row.brand, row.tire_size, row.local_sku ? `Código ${row.local_sku}` : ''].filter(Boolean).join(' · ');
-    const controls = document.createElement('div'); controls.className = 'stock-count-card-controls';
-    const current = document.createElement('div'); current.className = 'stock-count-system-box';
-    current.innerHTML = '<small>Saldo no sistema</small>';
+    const primary = document.createElement('strong'); primary.className = 'stock-count-primary';
+    primary.textContent = row.item_type === 'pneu' && row.tire_size ? row.tire_size : row.item_name;
+    const brand = document.createElement('span'); brand.className = 'stock-count-brand';
+    brand.textContent = row.brand || 'Sem marca';
+    const code = document.createElement('span'); code.className = 'stock-count-code';
+    code.textContent = row.local_sku ? `Código ${row.local_sku}` : 'Sem código';
+    const systemLabel = document.createElement('small'); systemLabel.className = 'stock-count-field-label stock-count-system-label';
+    systemLabel.textContent = 'Saldo no sistema';
+    const countedLabel = document.createElement('small'); countedLabel.className = 'stock-count-field-label stock-count-counted-label';
+    countedLabel.textContent = 'Quantidade contada';
+    const current = document.createElement('button'); current.type = 'button'; current.className = 'stock-count-system-box';
+    current.title = 'Usar o saldo do sistema como quantidade contada';
+    current.setAttribute('aria-label', `Usar saldo do sistema para ${row.item_name}`);
     const currentValue = document.createElement('b'); currentValue.textContent = row.quantity_on_hand == null ? '—' : String(row.quantity_on_hand);
     current.appendChild(currentValue);
+    current.addEventListener('click', function () { setCount(entry, systemQuantity(entry)); });
     const stepper = document.createElement('div'); stepper.className = 'stock-count-stepper';
     const minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−'; minus.disabled = entry.counted == null || entry.counted === 0;
     const input = document.createElement('input'); input.type = 'number'; input.min = '0'; input.max = '999999'; input.inputMode = 'numeric';
@@ -166,10 +174,7 @@
     minus.addEventListener('click', function () { setCount(entry, Math.max(0, entry.counted - 1)); });
     plus.addEventListener('click', function () { setCount(entry, (entry.counted == null ? 0 : entry.counted) + 1); });
     stepper.append(minus, input, plus);
-    const same = document.createElement('button'); same.type = 'button'; same.className = 'stock-count-same'; same.textContent = 'Igual ao sistema';
-    same.addEventListener('click', function () { setCount(entry, systemQuantity(entry)); });
-    controls.append(current, stepper, same);
-    content.append(title, meta, controls);
+    content.append(primary, brand, code, systemLabel, countedLabel, current, stepper);
     if (entry.counted != null) {
       const diff = difference(entry);
       const status = document.createElement('p');

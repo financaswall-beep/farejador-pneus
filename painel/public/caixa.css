@@ -645,23 +645,25 @@ form { display: grid; gap: 16px; }
 .stock-count-card > img { width: 66px; height: 93px; align-self: start; object-fit: contain; mix-blend-mode: multiply; }
 .stock-count-package { display: grid; width: 58px; height: 58px; align-self: center; justify-self: center; place-items: center; border-radius: 17px; color: #087246; background: #eaf7ee; }
 .stock-count-package svg { width: 31px; height: 31px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
-.stock-count-card-content { min-width: 0; }
-.stock-count-card-content > strong { display: block; overflow: hidden; color: #17211d; font-size: 13px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.stock-count-card-content > span { display: block; margin-top: 3px; overflow: hidden; color: #6b756f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.stock-count-card-controls { display: grid; grid-template-columns: 74px minmax(123px,1fr); gap: 6px; margin-top: 8px; }
-.stock-count-system-box { display: grid; min-height: 43px; align-content: center; padding: 5px 8px; border-radius: 9px; background: #f1f5f2; }
-.stock-count-system-box small { color: #68746e !important; font-size: 7px !important; }
+.stock-count-card-content { display: grid; min-width: 0; grid-template-columns: minmax(76px,.8fr) minmax(116px,1.2fr); grid-template-areas: "primary brand" "code brand" "system-label counted-label" "system stepper" "status status" "difference difference"; column-gap: 8px; row-gap: 3px; align-items: end; }
+.stock-count-primary { grid-area: primary; overflow: hidden; color: #17211d; font-size: clamp(17px,4.8vw,21px); line-height: 1.05; text-overflow: ellipsis; white-space: nowrap; }
+.stock-count-brand { grid-area: brand; align-self: start; overflow: hidden; color: #26342e; font-size: 10px; font-weight: 720; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.stock-count-code { grid-area: code; overflow: hidden; color: #6b756f; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-count-field-label { align-self: end; padding-top: 4px; color: #68746e !important; font-size: 7px !important; line-height: 1.1; white-space: nowrap; }
+.stock-count-system-label { grid-area: system-label; }
+.stock-count-counted-label { grid-area: counted-label; }
+.stock-count-system-box { display: grid; min-height: 43px; grid-area: system; align-content: center; padding: 5px 8px; border: 0; border-radius: 9px; color: inherit; background: #f1f5f2; text-align: left; cursor: pointer; }
+.stock-count-system-box:focus-visible { outline: 2px solid #087246; outline-offset: 2px; }
 .stock-count-system-box b { color: #183b2d; font-size: 16px; }
-.stock-count-stepper { display: grid; height: 43px; grid-template-columns: 39px minmax(45px,1fr) 39px; overflow: hidden; border: 1px solid #bdd2c7; border-radius: 10px; }
+.stock-count-stepper { display: grid; height: 43px; grid-area: stepper; grid-template-columns: 36px minmax(42px,1fr) 36px; overflow: hidden; border: 1px solid #bdd2c7; border-radius: 10px; }
 .stock-count-stepper button { padding: 0; border: 0; color: #087246; background: #f3faf6; font-size: 22px; cursor: pointer; }
 .stock-count-stepper button:disabled { color: #aab7b0; cursor: default; }
 .stock-count-sheet form .stock-count-stepper input { width: 100%; height: 41px; padding: 0 3px; border: 0; border-inline: 1px solid #d4e0da; border-radius: 0; box-shadow: none; font-size: 17px; font-weight: 750; text-align: center; }
 .stock-count-stepper input::-webkit-inner-spin-button { appearance: none; margin: 0; }
-.stock-count-same { grid-column: 1/-1; min-height: 26px; padding: 0; border: 0; border-radius: 8px; color: #087246; background: #edf8f1; font-size: 8px; font-weight: 700; cursor: pointer; }
-.stock-count-status { margin: 7px 0 0; font-size: 9px; font-weight: 720; }
+.stock-count-status { grid-area: status; margin: 4px 0 0; font-size: 9px; font-weight: 720; }
 .stock-count-status.ok { color: #087246; }
 .stock-count-status.warning { color: #e05b13; }
-.stock-count-difference-fields { display: grid; grid-template-columns: minmax(0,1fr) 96px; gap: 6px; margin-top: 7px; }
+.stock-count-difference-fields { display: grid; grid-area: difference; grid-template-columns: minmax(0,1fr) 96px; gap: 6px; margin-top: 4px; }
 .stock-count-difference-fields select { width: 100%; height: 39px; padding: 0 29px 0 9px; border: 1px solid #e6b386; border-radius: 9px; outline: 0; color: #4c3526; background: #fffaf5; font-size: 9px; }
 .stock-count-photo { display: flex !important; min-height: 39px; align-items: center; justify-content: center; padding: 0 7px; border: 1px solid #087246; border-radius: 9px; color: #087246 !important; background: #fff; font-size: 8px !important; font-weight: 720 !important; text-align: center; cursor: pointer; }
 .stock-count-photo-preview { grid-column: 1/-1; width: 100%; height: 116px; border-radius: 10px; object-fit: cover; }
