@@ -73,6 +73,7 @@
     weeklySalesCount: byId('weekly-sales-count'),
     weeklyItemsCount: byId('weekly-items-count'),
     weeklyTicket: byId('weekly-ticket'),
+    weeklyCommission: byId('weekly-commission'),
     weeklyDetailPeriod: byId('weekly-detail-period'),
     weeklyPix: byId('weekly-pix'),
     weeklyCard: byId('weekly-card'),

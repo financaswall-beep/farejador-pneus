@@ -16,7 +16,7 @@ import {
   validateCaixaSession,
   type CaixaAuth,
 } from './queries.js';
-import { getCaixaSaleReceipt, getCaixaSales } from './sales.js';
+import { getCaixaMySaleDetail, getCaixaMySales } from './my-sales.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
@@ -127,11 +127,8 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const parsed = salesQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     const auth = (request as CaixaRequest).caixa!;
-    const payload = await getCaixaSales(
-      env.FAREJADOR_ENV,
-      parsed.data.period,
-      parsed.data.search,
-      parsed.data.week,
+    const payload = await getCaixaMySales(
+      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.week,
     );
     return reply.status(200).send({ ...payload, operator_name: auth.displayName });
   });
@@ -156,7 +153,9 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const auth = (request as CaixaRequest).caixa!;
     try {
       const result = await createCaixaSale(env.FAREJADOR_ENV, auth, parsed.data);
-      const receipt = await getCaixaSaleReceipt(env.FAREJADOR_ENV, result.order_id)
+      const receipt = await getCaixaMySaleDetail(
+        env.FAREJADOR_ENV, auth.collaboratorId, result.order_id,
+      )
         .catch((error: unknown) => {
           // A venda já foi confirmada atomicamente. Uma falha de leitura do
           // recibo não pode induzir o operador a repetir a cobrança.
@@ -177,7 +176,10 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     reply.header('Cache-Control', 'no-store');
     const parsed = receiptParamsSchema.safeParse(request.params ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_order_id' });
-    const receipt = await getCaixaSaleReceipt(env.FAREJADOR_ENV, parsed.data.orderId);
+    const auth = (request as CaixaRequest).caixa!;
+    const receipt = await getCaixaMySaleDetail(
+      env.FAREJADOR_ENV, auth.collaboratorId, parsed.data.orderId,
+    );
     if (!receipt) return reply.status(404).send({ error: 'sale_not_found' });
     return reply.status(200).send(receipt);
   });

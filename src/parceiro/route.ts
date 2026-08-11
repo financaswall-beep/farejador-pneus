@@ -105,7 +105,6 @@ import {
   getPartnerTokenCommission,
   upsertPartnerTokenCommission,
   getPartnerCommissionTeam,
-  getPartnerMyPerformance,
   getPartnerSelfIdentity,
   FuncionarioNotFoundError,
   type PartnerServiceMode,
@@ -115,6 +114,7 @@ import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/pa
 import { acquirePartnerSseSlot } from './sse-limit.js';
 import { isAllowedPushEndpoint } from './push-endpoint.js';
 import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
+import { registerPartnerMySalesRoutes } from './route-my-sales.js';
 
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
@@ -748,11 +748,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await getPartnerCommissionTeam(getPartnerContext(request)));
   });
 
-  // "Meu desempenho": QUALQUER logado, mas a query é amarrada a ctx.tokenId — a
-  // pessoa só vê o PRÓPRIO (dono ou funcionário). Sem :tokenId no caminho de propósito.
-  fastify.get('/parceiro/:slug/api/meu-desempenho', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
-    return reply.status(200).send(await getPartnerMyPerformance(getPartnerContext(request)));
-  });
+  registerPartnerMySalesRoutes(fastify);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURAÇÕES DA LOJA (Fase 1). 🔒 CADEADO DURO: TODOS estes endpoints usam

@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-recebimento1" />
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-minhas-vendas1" />
   <script defer src="/caixa/caixa-core.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
-  <script defer src="/caixa/caixa-sales-view.js?v=20260805-weekonly1"></script>
+  <script defer src="/caixa/caixa-sales-view.js?v=20260811-minhas-vendas1"></script>
   <script defer src="/caixa/caixa-stock-view.js?v=20260811-detalhe-estoque1"></script>
   <script defer src="/caixa/caixa-stock-detail.js?v=20260811-edicao-estoque1"></script>
   <script defer src="/caixa/caixa-stock-edit.js?v=20260811-edicao-estoque1"></script>
   <script defer src="/caixa/caixa-stock.js?v=20260811-estoque-pronto1"></script>
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-stock-receipts.js?v=20260811-recebimento1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260810-operacao-estoque1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260811-minhas-vendas1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
@@ -215,7 +215,7 @@
           </section>
         </div>
 
-        <div id="sales-panel" class="app-panel hidden">
+        <div id="sales-panel" class="app-panel my-sales-panel hidden">
           <section id="weekly-summary" class="weekly-summary hidden" aria-labelledby="weekly-summary-title">
             <header class="weekly-week-nav">
               <button id="weekly-prev" type="button" aria-label="Ver semana anterior">
@@ -231,57 +231,35 @@
             </header>
 
             <div class="weekly-summary-head">
-              <div>
-                <span id="weekly-total-label">Faturamento da semana</span>
-                <h3 id="weekly-summary-title">Resumo semanal</h3>
-              </div>
+              <span id="weekly-total-label">Faturamento da semana</span>
+              <h3 id="weekly-summary-title">Resumo semanal</h3>
               <strong id="weekly-total">—</strong>
+              <small class="weekly-own-label">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                Somente suas vendas
+              </small>
             </div>
 
-            <div class="weekly-chart" role="group" aria-label="Faturamento diário da semana; toque em um dia para detalhar">
+            <div class="weekly-chart" role="group" aria-label="Faturamento diário da semana">
               <div class="weekly-chart-plot">
                 <div id="weekly-reference" class="weekly-reference"><span id="weekly-reference-value"></span></div>
                 <div id="weekly-bars" class="weekly-bars"></div>
               </div>
             </div>
 
-            <button id="weekly-clear-day" class="weekly-clear-day hidden" type="button">
-              Ver a semana completa
-            </button>
-
             <section class="weekly-stats" aria-labelledby="weekly-stats-title">
-              <h4 id="weekly-stats-title">Estatísticas</h4>
+              <h4 id="weekly-stats-title" class="sr-only">Indicadores da semana</h4>
               <div class="weekly-stats-grid">
                 <div><small>Vendas</small><strong id="weekly-sales-count">0</strong></div>
                 <div><small>Itens vendidos</small><strong id="weekly-items-count">0</strong></div>
                 <div><small>Ticket médio</small><strong id="weekly-ticket">—</strong></div>
+                <div class="weekly-commission"><small>Minha comissão</small><strong id="weekly-commission">—</strong></div>
               </div>
-            </section>
-
-            <section class="weekly-detail" aria-labelledby="weekly-detail-title">
-              <header>
-                <h4 id="weekly-detail-title">Detalhamento</h4>
-                <span id="weekly-detail-period">Semana completa</span>
-              </header>
-              <dl>
-                <div><dt>Pix</dt><dd id="weekly-pix">—</dd></div>
-                <div><dt>Cartão</dt><dd id="weekly-card">—</dd></div>
-                <div><dt>Dinheiro</dt><dd id="weekly-cash">—</dd></div>
-                <div><dt>Outros / a receber</dt><dd id="weekly-other">—</dd></div>
-                <div class="weekly-detail-total"><dt>Faturamento total</dt><dd id="weekly-detail-total">—</dd></div>
-              </dl>
             </section>
           </section>
 
-          <div class="sales-search">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <label class="sr-only" for="sales-search-input">Buscar venda ou cliente</label>
-            <input id="sales-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar venda ou cliente" />
-            <button id="sales-search-clear" class="search-clear hidden" type="button" aria-label="Limpar busca">×</button>
-          </div>
-
           <div class="sales-list-heading">
-            <h3>Vendas recentes</h3>
+            <h3>Minhas vendas recentes</h3>
             <span id="sales-result-count"></span>
           </div>
           <div id="sales-loading" class="sales-loading" role="status">
@@ -295,7 +273,7 @@
           <div id="sales-empty" class="sales-empty hidden">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
             <strong>Nenhuma venda encontrada</strong>
-            <span>Limpe a busca para ver todas as vendas da semana.</span>
+            <span>Suas vendas desta semana aparecerão aqui.</span>
           </div>
           <div id="sales-list" class="sales-list" aria-live="polite"></div>
         </div>
@@ -732,18 +710,18 @@
         <article class="receipt-sheet">
           <header>
             <div>
-              <p>2W Pneus • Matriz</p>
-              <h2 id="receipt-title">Recibo da venda</h2>
+              <p>Minhas vendas</p>
+              <h2 id="receipt-title">Detalhes da venda</h2>
             </div>
             <button class="receipt-close" type="button" data-close-receipt aria-label="Fechar">×</button>
           </header>
           <div id="receipt-content" class="receipt-content"></div>
           <footer>
+            <button class="receipt-done" type="button" data-close-receipt>Fechar</button>
             <button id="receipt-print" class="receipt-print" type="button">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4V9h16v9h-2M7 14h10v7H7z"/></svg>
-              Imprimir recibo
+              Ver recibo
             </button>
-            <button class="receipt-done" type="button" data-close-receipt>Fechar</button>
           </footer>
         </article>
       </div>

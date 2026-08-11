@@ -3,7 +3,6 @@
 
   const Caixa = window.Caixa;
   const elements = Caixa.elements;
-  const state = Caixa.state;
 
   function statusInfo(status) {
     if (status === 'cancelled') return { label: 'Cancelada', className: 'cancelled' };
@@ -27,42 +26,38 @@
     return '#' + text.replace(/^PED-/i, '');
   }
 
-  function itemSummary(sale) {
-    const amount = Number(sale.items_quantity || 0);
-    let kind = sale.item_kind || 'item';
-    if (amount !== 1) {
-      if (kind === 'pneu') kind = 'pneus';
-      else if (kind === 'serviço') kind = 'serviços';
-      else kind = 'itens';
-    }
-    return amount + ' ' + kind;
+  function commissionStatus(value) {
+    if (value === 'paid') return 'Paga';
+    if (value === 'reversed') return 'Cancelada';
+    return 'A receber';
   }
 
-  function setSalesState(state) {
-    elements.salesLoading.classList.toggle('hidden', state !== 'loading');
-    elements.salesError.classList.toggle('hidden', state !== 'error');
-    elements.salesEmpty.classList.toggle('hidden', state !== 'empty');
-    elements.salesList.classList.toggle('hidden', state === 'loading' || state === 'error' || state === 'empty');
+  function commissionRule(sale) {
+    if (!sale.commission_kind || Number(sale.commission_value || 0) <= 0) return 'Sem comissão configurada';
+    if (sale.commission_kind === 'fixed') return 'Valor fixo por venda';
+    if (sale.commission_basis === 'margin') return sale.commission_value + '% sobre a margem';
+    return sale.commission_value + '% sobre ' + Caixa.currency.format(Number(sale.total_amount || 0));
   }
 
-  function saleIcon(sale) {
+  function setSalesState(value) {
+    elements.salesLoading.classList.toggle('hidden', value !== 'loading');
+    elements.salesError.classList.toggle('hidden', value !== 'error');
+    elements.salesEmpty.classList.toggle('hidden', value !== 'empty');
+    elements.salesList.classList.toggle('hidden', ['loading', 'error', 'empty'].includes(value));
+  }
+
+  function renderProfileSummary(summary) {
+    elements.profileMetricSales.textContent = String(summary.sales_count || 0);
+    elements.profileMetricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
+  }
+
+  function saleIcon() {
     const icon = document.createElement('span');
     icon.className = 'sale-icon';
-    if (sale.item_kind === 'pneu') {
-      icon.classList.add('sale-icon--tire');
-      const tireImage = document.createElement('img');
-      tireImage.src = '/caixa/catalog-tire.webp';
-      tireImage.alt = '';
-      tireImage.loading = 'lazy';
-      tireImage.decoding = 'async';
-      icon.appendChild(tireImage);
-      return icon;
-    }
-    icon.appendChild(Caixa.createSvg(sale.item_kind === 'serviço' ? [
-      { d: 'm14.7 6.3 3-3a5 5 0 0 1-6.4 6.4l-6.6 6.6a2.1 2.1 0 0 0 3 3l6.6-6.6a5 5 0 0 1 6.4-6.4l-3 3-3-3Z' },
-    ] : [
-      { d: 'M6 8h12l1 12H5L6 8Z' },
-      { d: 'M9 9V6a3 3 0 0 1 6 0v3' },
+    icon.appendChild(Caixa.createSvg([
+      { d: 'M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6' },
+      { tag: 'circle', cx: '9', cy: '20', r: '1' },
+      { tag: 'circle', cx: '18', cy: '20', r: '1' },
     ]));
     return icon;
   }
@@ -76,42 +71,37 @@
     const heading = document.createElement('div');
     heading.className = 'sale-card-heading';
     const title = document.createElement('strong');
-    title.textContent = orderLabel(sale.order_number) + ' · ' + sale.customer_name;
+    title.textContent = 'Pedido ' + orderLabel(sale.order_number);
     const badge = document.createElement('span');
     badge.className = 'sale-status sale-status--' + status.className;
     if (status.className === 'done') badge.appendChild(Caixa.createSvg([{ d: 'm5 12 4 4L19 6' }]));
     badge.appendChild(document.createTextNode(status.label));
     heading.append(title, badge);
 
-    const meta = document.createElement('p');
-    meta.appendChild(document.createTextNode(itemSummary(sale) + ' · '));
-    const payment = document.createElement('span');
-    payment.textContent = paymentLabel(sale.payment_method);
-    meta.appendChild(payment);
-
-    const footer = document.createElement('div');
-    footer.className = 'sale-card-footer';
+    const item = document.createElement('p');
+    item.textContent = sale.item_summary || (sale.items_quantity + ' item(ns)');
+    const meta = document.createElement('span');
+    meta.className = 'sale-payment';
+    meta.textContent = paymentLabel(sale.payment_method);
     const amount = document.createElement('strong');
     amount.className = 'sale-amount';
     amount.textContent = Caixa.currency.format(Number(sale.total_amount || 0));
-    const receiptButton = document.createElement('button');
-    receiptButton.type = 'button';
-    receiptButton.className = 'receipt-button';
-    receiptButton.appendChild(Caixa.createSvg([
-      { d: 'M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21V3Z' },
-      { d: 'M9 8h6M9 12h6M9 16h4' },
-    ]));
-    receiptButton.appendChild(document.createTextNode('Ver recibo'));
-    receiptButton.addEventListener('click', function () { void Caixa.openReceipt(sale.order_id); });
-    footer.append(amount, receiptButton);
-    details.append(heading, meta, footer);
-    article.append(saleIcon(sale), details);
-    return article;
-  }
 
-  function renderProfileSummary(summary) {
-    elements.profileMetricSales.textContent = String(summary.sales_count || 0);
-    elements.profileMetricRevenue.textContent = Caixa.currency.format(Number(summary.revenue || 0));
+    const commission = document.createElement('div');
+    commission.className = 'sale-commission';
+    const commissionText = document.createElement('span');
+    commissionText.textContent = status.className === 'cancelled'
+      ? 'Comissão cancelada'
+      : 'Sua comissão: ' + Caixa.currency.format(Number(sale.commission_amount || 0));
+    const detailsButton = document.createElement('button');
+    detailsButton.type = 'button';
+    detailsButton.className = 'receipt-button';
+    detailsButton.textContent = 'Ver detalhes';
+    detailsButton.addEventListener('click', function () { void Caixa.openReceipt(sale.order_id); });
+    commission.append(commissionText, detailsButton);
+    details.append(heading, item, meta, amount, commission);
+    article.append(saleIcon(), details);
+    return article;
   }
 
   function weeklyDate(value) {
@@ -120,107 +110,59 @@
 
   function weeklyRangeLabel(series) {
     if (!series.length) return 'Semana atual';
-    const format = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
-    return format.format(weeklyDate(series[0].date)) + ' – '
-      + format.format(weeklyDate(series[series.length - 1].date));
+    const first = weeklyDate(series[0].date);
+    const last = weeklyDate(series[series.length - 1].date);
+    const month = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(last).replace('.', '');
+    return String(first.getDate()).padStart(2, '0') + '–'
+      + String(last.getDate()).padStart(2, '0') + ' ' + month;
   }
 
-  function weeklyDayLabel(value, long) {
-    const format = new Intl.DateTimeFormat('pt-BR', long ? {
-      weekday: 'long', day: 'numeric', month: 'long',
-    } : { weekday: 'short', day: 'numeric', month: 'short' });
-    const label = format.format(weeklyDate(value)).replace('.', '');
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }
-
-  function detailValue(summary, key) {
-    return Number(summary && summary[key] || 0);
-  }
-
-  function renderWeeklyDetails(summary, selectedDay) {
-    const detail = selectedDay || summary;
-    const selected = Boolean(selectedDay);
-    const periodLabel = selected ? weeklyDayLabel(selectedDay.date, true) : 'Semana completa';
-    elements.weeklyTotalLabel.textContent = selected ? 'Faturamento do dia' : 'Faturamento da semana';
-    elements.weeklyTotal.textContent = Caixa.currency.format(detailValue(detail, 'revenue'));
-    elements.weeklySalesCount.textContent = String(detailValue(detail, 'sales_count'));
-    elements.weeklyItemsCount.textContent = String(detailValue(detail, 'items_quantity'));
-    elements.weeklyTicket.textContent = Caixa.currency.format(detailValue(detail, 'average_ticket'));
-    elements.weeklyDetailPeriod.textContent = periodLabel;
-    elements.weeklyPix.textContent = Caixa.currency.format(detailValue(detail, 'pix_revenue'));
-    elements.weeklyCard.textContent = Caixa.currency.format(detailValue(detail, 'card_revenue'));
-    elements.weeklyCash.textContent = Caixa.currency.format(detailValue(detail, 'cash_revenue'));
-    elements.weeklyOther.textContent = Caixa.currency.format(detailValue(detail, 'other_revenue'));
-    elements.weeklyDetailTotal.textContent = Caixa.currency.format(detailValue(detail, 'revenue'));
-    elements.weeklyClearDay.classList.toggle('hidden', !selected);
-  }
-
-  function selectWeeklyDay(date) {
-    if (!state.salesPayload || state.salesPayload.period !== '7d') return;
-    state.selectedSalesDay = date || null;
-    renderWeeklySummary(state.salesPayload, state.salesPayload.summary || {});
-  }
-
-  function renderWeeklySummary(payload, summary) {
-    elements.weeklySummary.classList.remove('hidden');
-
+  function renderWeeklySummary(payload) {
+    const summary = payload.summary || {};
     const series = Array.isArray(payload.daily_series) ? payload.daily_series : [];
     const values = series.map(function (day) { return Number(day.revenue || 0); });
     const max = Math.max(1, ...values);
-    const total = Number(summary.revenue || 0);
-    const average = series.length ? total / series.length : 0;
-    const weekOffset = Number(payload.week_offset || 0);
-    const selectedDay = series.find(function (day) { return day.date === state.selectedSalesDay; }) || null;
-    if (state.selectedSalesDay && !selectedDay) state.selectedSalesDay = null;
+    const average = series.length ? Number(summary.revenue || 0) / series.length : 0;
+    const offset = Number(payload.week_offset || 0);
+    elements.weeklySummary.classList.remove('hidden');
     elements.weeklyRange.textContent = weeklyRangeLabel(series);
-    elements.weeklyWeekState.textContent = weekOffset === 0
-      ? 'Semana atual'
-      : (weekOffset === -1 ? 'Semana anterior' : Math.abs(weekOffset) + ' semanas atrás');
-    elements.weeklyPrev.disabled = weekOffset <= -52;
-    elements.weeklyNext.disabled = weekOffset >= 0;
-    elements.weeklyReference.style.bottom = Math.min(96, (average / max) * 100) + '%';
+    elements.weeklyWeekState.textContent = offset === 0 ? 'Semana atual'
+      : (offset === -1 ? 'Semana anterior' : Math.abs(offset) + ' semanas atrás');
+    elements.weeklyPrev.disabled = offset <= -52;
+    elements.weeklyNext.disabled = offset >= 0;
+    elements.weeklyTotal.textContent = Caixa.currency.format(Number(summary.revenue || 0));
+    elements.weeklySalesCount.textContent = String(summary.sales_count || 0);
+    elements.weeklyItemsCount.textContent = String(summary.items_quantity || 0);
+    elements.weeklyTicket.textContent = Caixa.currency.format(Number(summary.average_ticket || 0));
+    elements.weeklyCommission.textContent = Caixa.currency.format(Number(summary.commission_amount || 0));
+    elements.weeklyReference.style.bottom = Math.min(94, average / max * 100) + '%';
     elements.weeklyReferenceValue.textContent = 'média ' + Caixa.currency.format(average);
     elements.weeklyBars.replaceChildren();
-
     const dayFormat = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
     series.forEach(function (day) {
-      const item = document.createElement('button');
-      const selected = state.selectedSalesDay === day.date;
-      item.type = 'button';
-      item.className = 'weekly-bar-item'
-        + (Number(day.revenue || 0) === max ? ' is-best' : '')
-        + (selected ? ' is-selected' : '');
-      item.setAttribute('aria-pressed', String(selected));
-      item.setAttribute('aria-label', weeklyDayLabel(day.date, true) + ': '
-        + Caixa.currency.format(Number(day.revenue || 0)) + ', '
-        + day.sales_count + (day.sales_count === 1 ? ' venda' : ' vendas'));
+      const date = weeklyDate(day.date);
+      const item = document.createElement('div');
+      item.className = 'weekly-bar-item' + (Number(day.revenue || 0) === max ? ' is-best' : '');
       const value = document.createElement('span');
       value.className = 'weekly-bar-value';
-      value.textContent = Number(day.revenue || 0) > 0 ? Caixa.currency.format(Number(day.revenue)) : 'R$ 0';
+      value.textContent = Number(day.revenue || 0) ? Number(day.revenue).toFixed(2).replace('.', ',') : '0';
       const bar = document.createElement('i');
-      bar.style.height = Math.max(3, (Number(day.revenue || 0) / max) * 100) + '%';
-      const date = weeklyDate(day.date);
-      const dateLabel = document.createElement('b');
-      dateLabel.textContent = String(date.getDate()).padStart(2, '0');
-      const dayLabel = document.createElement('small');
-      dayLabel.textContent = dayFormat.format(date).replace('.', '');
-      item.append(value, bar, dateLabel, dayLabel);
-      item.addEventListener('click', function () { selectWeeklyDay(day.date); });
+      bar.style.height = Math.max(3, Number(day.revenue || 0) / max * 100) + '%';
+      const dayName = document.createElement('small');
+      dayName.textContent = dayFormat.format(date).replace('.', '');
+      const dayNumber = document.createElement('b');
+      dayNumber.textContent = String(date.getDate()).padStart(2, '0');
+      item.append(value, bar, dayName, dayNumber);
       elements.weeklyBars.appendChild(item);
     });
-    renderWeeklyDetails(summary, selectedDay);
   }
 
   function renderSales(payload) {
-    state.salesPayload = payload;
-    const summary = payload.summary || {};
-    renderWeeklySummary(payload, summary);
+    renderWeeklySummary(payload);
     elements.salesList.replaceChildren();
     const sales = Array.isArray(payload.sales) ? payload.sales : [];
     sales.forEach(function (sale) { elements.salesList.appendChild(saleCard(sale)); });
-    elements.salesResultCount.textContent = sales.length
-      ? sales.length + (sales.length === 1 ? ' resultado' : ' resultados')
-      : '';
+    elements.salesResultCount.textContent = sales.length ? sales.length + ' na semana' : '';
     setSalesState(sales.length ? 'ready' : 'empty');
   }
 
@@ -239,44 +181,58 @@
     const meta = document.createElement('div');
     meta.className = 'receipt-meta';
     meta.append(
-      textBlock('Venda', orderLabel(receipt.order_number)),
+      textBlock('Pedido', orderLabel(receipt.order_number)),
       textBlock('Data', Caixa.dateTime.format(new Date(receipt.created_at))),
-      textBlock('Cliente', receipt.customer_name),
       textBlock('Pagamento', paymentLabel(receipt.payment_method)),
       textBlock('Status', statusInfo(receipt.status).label),
     );
     elements.receiptContent.appendChild(meta);
-
-    const itemsTitle = document.createElement('h3');
-    itemsTitle.textContent = 'Itens';
-    elements.receiptContent.appendChild(itemsTitle);
+    const title = document.createElement('h3');
+    title.textContent = 'Itens';
+    elements.receiptContent.appendChild(title);
     const items = document.createElement('div');
     items.className = 'receipt-items';
     (receipt.items || []).forEach(function (item) {
       const row = document.createElement('div');
-      const description = document.createElement('span');
-      description.textContent = item.quantity + '× ' + item.product_name;
+      const image = document.createElement('img');
+      image.src = item.image_url || '/caixa/catalog-tire.webp';
+      image.alt = '';
+      const copy = document.createElement('span');
+      const name = document.createElement('b');
+      name.textContent = item.quantity + '× ' + item.product_name;
+      const unit = document.createElement('small');
+      unit.textContent = Caixa.currency.format(Number(item.unit_price || 0)) + ' cada';
+      copy.append(name, unit);
       const value = document.createElement('strong');
       value.textContent = Caixa.currency.format(Number(item.line_total || 0));
-      row.append(description, value);
+      row.append(image, copy, value);
       items.appendChild(row);
     });
     elements.receiptContent.appendChild(items);
-
     const total = document.createElement('div');
     total.className = 'receipt-total';
-    const label = document.createElement('span');
-    label.textContent = 'Total da venda';
-    const value = document.createElement('strong');
-    value.textContent = Caixa.currency.format(Number(receipt.total_amount || 0));
-    total.append(label, value);
+    const totalLabel = document.createElement('span');
+    totalLabel.textContent = 'Total da venda';
+    const totalValue = document.createElement('strong');
+    totalValue.textContent = Caixa.currency.format(Number(receipt.total_amount || 0));
+    total.append(totalLabel, totalValue);
     elements.receiptContent.appendChild(total);
-    if (receipt.seller_name) {
-      const seller = document.createElement('p');
-      seller.className = 'receipt-seller';
-      seller.textContent = 'Atendimento: ' + receipt.seller_name;
-      elements.receiptContent.appendChild(seller);
-    }
+    const commission = document.createElement('section');
+    commission.className = 'receipt-commission';
+    const kicker = document.createElement('small');
+    kicker.textContent = 'MINHA COMISSÃO';
+    const amount = document.createElement('strong');
+    amount.textContent = 'Você ganhou ' + Caixa.currency.format(Number(receipt.commission_amount || 0));
+    const rule = document.createElement('span');
+    rule.textContent = commissionRule(receipt);
+    const status = document.createElement('em');
+    status.textContent = commissionStatus(receipt.commission_status);
+    commission.append(kicker, amount, rule, status);
+    elements.receiptContent.appendChild(commission);
+    const seller = document.createElement('p');
+    seller.className = 'receipt-seller';
+    seller.textContent = 'Venda registrada para ' + receipt.seller_name;
+    elements.receiptContent.appendChild(seller);
   }
 
   Object.assign(Caixa, {
@@ -285,6 +241,5 @@
     renderProfileSummary: renderProfileSummary,
     renderSales: renderSales,
     renderReceipt: renderReceipt,
-    selectWeeklyDay: selectWeeklyDay,
   });
 }());

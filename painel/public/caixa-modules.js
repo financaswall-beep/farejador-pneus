@@ -34,7 +34,7 @@
   }
 
   function initialOperationTab() {
-    if (!Caixa.isPartner() && window.location.hash === '#vendas') return 'sales';
+    if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('vendas')) return 'cash';
     if (Caixa.isPartner() && canModule('estoque')) return 'stock';
     return 'profile';

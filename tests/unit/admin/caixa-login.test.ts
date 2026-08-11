@@ -31,7 +31,7 @@ const route = [
 const photoRoute = readFileSync(resolve('src/admin/caixa/route-photo.ts'), 'utf8');
 const staticRoute = readFileSync(resolve('src/admin/caixa/route-static.ts'), 'utf8');
 const queries = readFileSync(resolve('src/admin/caixa/queries.ts'), 'utf8');
-const salesQueries = readFileSync(resolve('src/admin/caixa/sales.ts'), 'utf8');
+const salesQueries = readFileSync(resolve('src/admin/caixa/my-sales.ts'), 'utf8');
 const appRoutes = readFileSync(resolve('src/app/routes.ts'), 'utf8');
 
 describe('login mobile da Operação da Loja', () => {
@@ -104,13 +104,15 @@ describe('login mobile da Operação da Loja', () => {
   });
 
   it('entrega uma aba de vendas funcional sem usar a API administrativa', () => {
-    expect(html).toContain('Vendas recentes');
+    expect(html).toContain('Minhas vendas recentes');
+    expect(html).toContain('Somente suas vendas');
+    expect(html).toContain('id="weekly-commission"');
     expect(html).not.toContain('data-period=');
     expect(html).not.toContain('class="sales-metrics"');
-    expect(html).toContain('Buscar venda ou cliente');
-    expect(script).toContain("document.createTextNode('Ver recibo')");
-    expect(script).toContain("tireImage.src = '/caixa/catalog-tire.webp'");
-    expect(script).toContain("authenticatedFetch('/api/caixa/vendas?'");
+    expect(html).not.toContain('Buscar venda ou cliente');
+    expect(script).toContain("detailsButton.textContent = 'Ver detalhes'");
+    expect(script).toContain("item.image_url || '/caixa/catalog-tire.webp'");
+    expect(script).toContain("Caixa.operationPath('minhas-vendas', '/api/caixa/vendas')");
     expect(script).toContain("'/recibo'");
     expect(script).not.toContain('/admin/api/');
     expect(salesQueries).toContain("u.slug='main'");
@@ -119,14 +121,12 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="weekly-bars"');
     expect(html).toContain('id="weekly-prev"');
     expect(html).toContain('id="weekly-next"');
-    expect(html).toContain('id="weekly-detail-period"');
     expect(html).toContain('Itens vendidos');
-    expect(html).toContain('Faturamento total');
+    expect(html).toContain('Minha comissão');
     expect(script).toContain('payload.daily_series');
-    expect(script).toContain("new URLSearchParams({ period: '7d', week: String(state.weekOffset) })");
+    expect(script).toContain("new URLSearchParams({ week: String(state.weekOffset) })");
     expect(script).not.toContain('periodButtons');
-    expect(script).toContain("item.setAttribute('aria-pressed'");
-    expect(script).toContain('selectWeeklyDay');
+    expect(script).not.toContain('selectWeeklyDay');
     expect(css).toContain('.weekly-reference');
     expect(css).toContain('.weekly-bar-item.is-selected');
     expect(route).toContain('week: z.coerce.number().int().min(-52).max(0)');
