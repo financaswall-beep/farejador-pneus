@@ -13,6 +13,7 @@ describe('fila de aprovação do estoque no painel do dono', () => {
   const updateBackend = source('src/parceiro/operation-stock-update.ts');
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
   const evidenceMigration = source('db/migrations/0167_partner_operation_count_batch_evidence.sql');
+  const purchases = source('parceiro/public/app.financeiro.compras.js');
 
   it('oferece filtros e revisão separada para cadastros, edições e contagens', () => {
     expect(html).toContain('Aprovar alterações do estoque');
@@ -60,5 +61,16 @@ describe('fila de aprovação do estoque no painel do dono', () => {
     expect(migration).toContain('approved_stock_id');
     expect(migration).toContain('partner_item_registration_stock');
     expect(evidenceMigration).toContain('partner_stock_count_evidence');
+  });
+
+  it('dá ao dono uma fila de compras sem antecipar a entrada no estoque', () => {
+    expect(html).toContain("stockAdminTab === 'purchases'");
+    expect(html).toContain('Compras e recebimentos');
+    expect(html).toContain('Aguardando recebimento');
+    expect(html).toContain('Registrar e enviar para recebimento');
+    expect(html).toContain('Valores visíveis só para o dono');
+    expect(purchases).toContain('purchasesPendingReceipt');
+    expect(purchases).toContain('Mercadoria aguardando conferência da equipe.');
+    expect(purchases).not.toContain('Compra registrada e estoque atualizado.');
   });
 });

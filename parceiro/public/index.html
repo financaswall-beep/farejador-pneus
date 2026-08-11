@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260811-edicao-estoque1" />
+  <link rel="stylesheet" href="./style.css?v=20260811-recebimento1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -1194,6 +1194,10 @@
             <i data-lucide="clipboard-check"></i> Solicitações
             <b x-show="stockPendingTotal" x-text="stockPendingTotal"></b>
           </button>
+          <button type="button" :class="stockAdminTab === 'purchases' && 'active'" @click="setStockAdminTab('purchases')">
+            <i data-lucide="package-check"></i> Compras
+            <b x-show="purchasesPendingReceipt.length" x-text="purchasesPendingReceipt.length"></b>
+          </button>
         </div>
 
         <div x-show="!isOwner || stockAdminTab === 'current'">
@@ -1520,6 +1524,79 @@
             </div>
           </div>
         </div>
+        </div>
+
+        <div x-show="isOwner && stockAdminTab === 'purchases'" class="stock-purchase-workspace" x-cloak>
+          <header class="stock-purchase-heading">
+            <div><h2>Compras e recebimentos</h2><p>Você informa os valores; a equipe confere somente produtos e quantidades.</p></div>
+            <button type="button" @click="openPurchaseModal()"><i data-lucide="plus"></i> Registrar compra</button>
+          </header>
+
+          <div class="stock-approval-guard">
+            <i data-lucide="shield-check"></i>
+            <div><strong>Entrada protegida</strong><span>A compra só aumenta o estoque depois que um funcionário confirmar o recebimento.</span></div>
+          </div>
+
+          <section class="stock-purchase-panel">
+            <header><span><i data-lucide="clock-3"></i><strong>Aguardando recebimento</strong></span><b x-text="purchasesPendingReceipt.length"></b></header>
+            <div class="stock-purchase-list">
+              <template x-for="purchase in purchasesPendingReceipt" :key="purchase.id">
+                <article class="stock-purchase-card">
+                  <span class="stock-purchase-icon"><i data-lucide="package-open"></i></span>
+                  <div>
+                    <small x-text="'Compra #' + purchase.id.slice(0, 8).toUpperCase()"></small>
+                    <strong x-text="purchase.supplier_name || 'Fornecedor não informado'"></strong>
+                    <p><span x-text="purchase.items.length + (purchase.items.length === 1 ? ' produto' : ' produtos')"></span><span x-text="purchaseExpectedUnits(purchase) + ' unidades esperadas'"></span></p>
+                    <template x-for="item in purchase.items" :key="item.item_id || item.item_name">
+                      <em x-text="(item.tire_size || item.item_name) + ' · ' + item.quantity + ' un.'"></em>
+                    </template>
+                  </div>
+                  <aside><b>Aguardando equipe</b><strong x-text="money(purchase.total_amount)"></strong><small x-text="formatDateTime(purchase.created_at)"></small></aside>
+                </article>
+              </template>
+              <div x-show="!purchasesPendingReceipt.length" class="stock-approval-empty compact"><i data-lucide="badge-check"></i><p>Nenhuma compra aguardando recebimento.</p></div>
+            </div>
+          </section>
+
+          <section class="stock-purchase-panel received">
+            <header><span><i data-lucide="history"></i><strong>Recebidas recentemente</strong></span></header>
+            <div class="stock-purchase-history">
+              <template x-for="purchase in purchasesRecentlyReceived" :key="purchase.id">
+                <div>
+                  <span><b x-text="purchase.supplier_name || 'Fornecedor não informado'"></b><small x-text="purchase.received_by_label ? 'Recebida por ' + purchase.received_by_label : 'Compra anterior ao novo fluxo'"></small></span>
+                  <span><b x-text="purchaseReceivedUnits(purchase) + ' un.'"></b><small x-text="formatDateTime(purchase.received_at || purchase.purchased_at)"></small></span>
+                </div>
+              </template>
+              <div x-show="!purchasesRecentlyReceived.length" class="stock-approval-empty compact"><p>Nenhum recebimento recente.</p></div>
+            </div>
+          </section>
+
+          <div class="pos-modal-overlay" x-show="purchaseModalOpen" x-cloak @click.self="closePurchaseModal()">
+            <div class="pos-modal stock-purchase-modal">
+              <div class="pos-modal-head"><h3>Registrar compra</h3><button class="pos-modal-close" @click="closePurchaseModal()"><i data-lucide="x"></i></button></div>
+              <div class="pos-stock-side-form">
+                <div class="stock-purchase-form-notice"><i data-lucide="lock-keyhole"></i><span><strong>Valores visíveis só para o dono</strong><small>O funcionário receberá apenas produto, marca, medida e quantidade.</small></span></div>
+                <label>Fornecedor<input x-model="purchaseForm.supplier_name" placeholder="Ex: Distribuidora Maggion" /></label>
+                <label>Produto<input x-model="purchaseForm.item_name" placeholder="Ex: Matrix Plus CG" /></label>
+                <div class="pos-stock-size-row"><label>Medida<div><input type="number" min="1" max="999" x-model.number="purchaseForm.tire_width" placeholder="90" /><span>/</span><input type="number" min="1" max="999" x-model.number="purchaseForm.tire_aspect" placeholder="90" /><span>-</span><input type="number" min="1" max="30" x-model.number="purchaseForm.tire_rim" placeholder="18" /></div></label></div>
+                <div class="pos-stock-form-grid">
+                  <label>Marca<input x-model="purchaseForm.brand" placeholder="Maggion" /></label>
+                  <label>Condição<select x-model="purchaseForm.tire_condition"><option value="">Selecione</option><option value="novo">Novo</option><option value="meia_vida">Meia-vida</option><option value="remold">Remold</option></select></label>
+                </div>
+                <div class="pos-stock-form-grid stock-purchase-values">
+                  <label>Quantidade<input type="number" min="1" step="1" x-model.number="purchaseForm.quantity" /></label>
+                  <label>Custo unitário<input type="text" inputmode="decimal" :value="formatBRLDisplay(purchaseForm.unit_cost)" @input="purchaseForm.unit_cost = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(purchaseForm.unit_cost)" /></label>
+                  <label>Preço de venda<input type="text" inputmode="decimal" :value="formatBRLDisplay(purchaseForm.sale_price)" @input="purchaseForm.sale_price = onCurrencyInput($event.target.value); $event.target.value = formatBRLDisplay(purchaseForm.sale_price)" /></label>
+                </div>
+                <div class="pos-stock-form-grid">
+                  <label>Pagamento<select x-model="purchaseForm.payment_status"><option value="paid_now">Pago agora</option><option value="payable">A pagar</option></select></label>
+                  <label x-show="purchaseForm.payment_status === 'payable'">Vencimento<input type="date" x-model="purchaseForm.payable_due_date" /></label>
+                </div>
+                <div class="pos-form-total"><span>Total da compra</span><b x-text="money(num(purchaseForm.quantity) * num(purchaseForm.unit_cost))"></b></div>
+                <button type="button" @click="savePurchase()" :disabled="saving" class="pos-form-submit success"><i data-lucide="package-plus"></i><span x-text="isSaving('purchase') ? 'Registrando...' : 'Registrar e enviar para recebimento'"></span></button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div x-show="isOwner && stockAdminTab === 'requests'" class="stock-approval-workspace" x-cloak>
@@ -3333,13 +3410,13 @@
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
  <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
- <script src="./app.estoque.aprovacoes.js?v=20260811-edicao-estoque1"></script>
+ <script src="./app.estoque.aprovacoes.js?v=20260811-recebimento1"></script>
 <script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.score.js?v=20260611-onda-c"></script>
-<script src="./app.financeiro.compras.js?v=20260731-condicao2"></script>
+<script src="./app.financeiro.compras.js?v=20260811-recebimento1"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
  <script src="./app.core.js?v=20260810-aprovacao1"></script>
@@ -3350,6 +3427,6 @@
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.push.js?v=20260619-pushfix"></script>
- <script src="./app.js?v=20260810-aprovacao1"></script>
+ <script src="./app.js?v=20260811-recebimento1"></script>
 </body>
 </html>

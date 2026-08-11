@@ -66,12 +66,28 @@ export const REQUIRED_SCHEMA_SQL = `
     AND to_regclass('commerce.partner_item_registration_requests') IS NOT NULL
     AND to_regclass('commerce.partner_stock_count_requests') IS NOT NULL
     AND to_regclass('commerce.partner_stock_count_evidence') IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
+         AND table_name='partner_purchases'
+         AND column_name='receipt_status'
+         AND is_nullable='NO'
+    )
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
+         AND table_name='partner_purchase_items'
+         AND column_name='received_quantity'
+    )
+    AND to_regclass('commerce.partner_purchases_receipt_idempotency_uniq') IS NOT NULL
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0167. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0169. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0167_partner_operation_count_batch_evidence');
+    throw new Error('required_schema_missing:0169_partner_purchase_receiving');
   }
 }

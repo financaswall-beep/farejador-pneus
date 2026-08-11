@@ -23,6 +23,7 @@ import type { FastifyReply } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres';
 import { createPartnerFixture, getStockQty } from './helpers/partner-fixtures';
+import type { PartnerContext } from '../../src/parceiro/auth.js';
 
 let db: IntegrationDb;
 
@@ -49,6 +50,19 @@ async function importQueries() {
 
 async function importAuth() {
   return import('../../src/parceiro/auth.js');
+}
+
+async function receivePurchase(ctx: PartnerContext, purchaseId: string): Promise<void> {
+  const items = await db.pool.query<{ id: string; quantity: number }>(
+    `SELECT id, quantity FROM commerce.partner_purchase_items
+      WHERE purchase_id=$1 AND environment=$2 ORDER BY created_at`,
+    [purchaseId, ctx.environment],
+  );
+  const operation = await import('../../src/parceiro/operation-purchase-receipt.js');
+  await operation.receiveOperationPurchase(ctx, 'Fixture', purchaseId, {
+    idempotency_key: `receipt-${randomUUID()}`,
+    items: items.rows.map((item) => ({ item_id: item.id, received_quantity: Number(item.quantity) })),
+  });
 }
 
 // Helper: factory de reply mock no estilo do tests/unit/admin/auth.test.ts
@@ -152,7 +166,7 @@ describe('Portal Parceiro — custo histórico da venda', () => {
       estimated_result_month: '70.00',
     });
 
-    await q.registerPartnerPurchase(f.ctx, {
+    const purchase = await q.registerPartnerPurchase(f.ctx, {
       supplier_name: null,
       purchased_at: null,
       payment_method: 'pix',
@@ -171,6 +185,7 @@ describe('Portal Parceiro — custo histórico da venda', () => {
         sale_price: 150,
       }],
     }, db.pool);
+    await receivePurchase(f.ctx, purchase.purchase_id);
 
     const after = await db.pool.query<{
       unit_cost_snapshot: string; average_cost: string; estimated_result_month: string;
@@ -298,9 +313,9 @@ describe('Portal Parceiro - variantes por condicao', () => {
       }],
     }, db.pool);
 
-    await purchase('novo', 10, 100);
-    await purchase('novo', 5, 120);
-    await purchase('remold', 4, 70);
+    await receivePurchase(f.ctx, (await purchase('novo', 10, 100)).purchase_id);
+    await receivePurchase(f.ctx, (await purchase('novo', 5, 120)).purchase_id);
+    await receivePurchase(f.ctx, (await purchase('remold', 4, 70)).purchase_id);
 
     const variants = await db.pool.query<{
       id: string; tire_condition: string; quantity_on_hand: number; average_cost: string;

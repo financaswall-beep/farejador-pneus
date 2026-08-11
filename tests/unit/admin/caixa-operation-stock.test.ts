@@ -27,6 +27,11 @@ describe('Estoque seguro na Operação da Loja', () => {
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
   const countMigration = source('db/migrations/0167_partner_operation_count_batch_evidence.sql');
   const updateMigration = source('db/migrations/0168_partner_operation_stock_updates.sql');
+  const receiptMigration = source('db/migrations/0169_partner_purchase_receiving.sql');
+  const receiptUi = source('painel/public/caixa-stock-receipts.js');
+  const receiptBackend = source('src/parceiro/operation-purchase-receipt.ts');
+  const receiptRoute = source('src/parceiro/route-operation-purchases.ts');
+  const purchaseQueries = source('src/parceiro/queries.ts');
 
   it('permite que um acesso apenas de estoque permaneça na porta única', () => {
     expect(modules).toContain("if (canModule('vendas')) return 'cash'");
@@ -166,5 +171,35 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(legacyRoute).toContain("fastify.get('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }");
     expect(legacyRoute).toContain("fastify.post('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }");
     expect(legacyRoute).toContain("fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: ownerOnly }");
+  });
+
+  it('recebe compra com quantidades, sem revelar valores ao funcionário', () => {
+    expect(html).toContain('id="stock-receipts-open"');
+    expect(html).toContain('id="stock-receipts-panel"');
+    expect(html).toContain('Custos e valores da compra ficam ocultos');
+    expect(html).toContain('Conferi os produtos e as quantidades');
+    expect(receiptUi).toContain("Caixa.operationPath('operacao/compras')");
+    expect(receiptUi).toContain('received_quantity');
+    expect(receiptUi).not.toContain('unit_cost');
+    expect(receiptUi).not.toContain('sale_price');
+    expect(receiptRoute).toContain("requireScreen('estoque')");
+    expect(receiptRoute).toContain('api/operacao/compras/:purchaseId/receber');
+    expect(receiptBackend).toContain("receipt_status='pending'");
+    expect(receiptBackend).toContain('receipt_idempotency_key');
+    expect(receiptMigration).toContain("CHECK (receipt_status IN ('pending', 'received'))");
+    expect(receiptMigration).toContain('received_quantity');
+  });
+
+  it('não movimenta estoque ao registrar; só na confirmação do recebimento', () => {
+    const registerBlock = purchaseQueries.slice(
+      purchaseQueries.indexOf('export async function registerPartnerPurchase'),
+      purchaseQueries.indexOf('export async function deletePartnerPurchase'),
+    );
+    expect(registerBlock).toContain('receipt_status');
+    expect(registerBlock).toContain("'pending'");
+    expect(registerBlock).not.toContain('UPDATE commerce.partner_stock_levels');
+    expect(registerBlock).not.toContain('INSERT INTO commerce.partner_stock_levels');
+    expect(legacyRoute).toContain("fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }");
+    expect(legacyRoute).toContain("fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: ownerOnly }");
   });
 });

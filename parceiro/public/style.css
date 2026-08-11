@@ -766,9 +766,54 @@ html, body {
 .stock-count-compare.large div { padding: 8px; text-align: center; }
 .stock-count-compare.large strong { color: var(--pos-yellow); font-size: 22px; }
 
-.pos-shell[data-theme="light"] .stock-approval-workspace { color: #111827; }
+/* Compras: dono registra valores; equipe recebe mercadoria sem acesso financeiro */
+.stock-purchase-workspace { display: grid; gap: 15px; color: #f8fafc; }
+.stock-purchase-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.stock-purchase-heading h2 { margin: 0; font-size: 22px; font-weight: 900; }
+.stock-purchase-heading p { margin: 4px 0 0; color: #94a3b8; font-size: 13px; }
+.stock-purchase-heading > button { display: inline-flex; min-height: 42px; align-items: center; gap: 7px; padding: 0 15px; border-radius: 10px; color: #111827; background: var(--pos-yellow); font-size: 12px; font-weight: 850; white-space: nowrap; }
+.stock-purchase-heading > button svg { width: 17px; }
+.stock-purchase-panel { overflow: hidden; border: 1px solid var(--pos-line); border-radius: 14px; background: var(--pos-panel); }
+.stock-purchase-panel > header { display: flex; min-height: 55px; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--pos-line); }
+.stock-purchase-panel > header span { display: flex; align-items: center; gap: 9px; }
+.stock-purchase-panel > header svg { width: 19px; color: var(--pos-yellow); }
+.stock-purchase-panel > header strong { font-size: 14px; }
+.stock-purchase-panel > header > b { display: grid; min-width: 27px; height: 27px; place-items: center; border-radius: 999px; color: #111827; background: var(--pos-yellow); font-size: 11px; }
+.stock-purchase-list { display: grid; gap: 10px; padding: 12px; }
+.stock-purchase-card { display: grid; grid-template-columns: 52px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--pos-line); border-radius: 12px; background: var(--pos-panel-2); }
+.stock-purchase-icon { display: grid; width: 50px; height: 50px; place-items: center; border-radius: 50%; color: #4ade80; background: rgba(34,197,94,.1); }
+.stock-purchase-icon svg { width: 25px; }
+.stock-purchase-card > div { display: grid; min-width: 0; gap: 3px; }
+.stock-purchase-card > div > small { color: var(--pos-yellow); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.stock-purchase-card > div > strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-purchase-card p { display: flex; flex-wrap: wrap; gap: 5px 12px; margin: 3px 0 0; color: #cbd5e1; font-size: 11px; }
+.stock-purchase-card em { margin-top: 3px; color: #94a3b8; font-size: 10px; font-style: normal; }
+.stock-purchase-card aside { display: grid; justify-items: end; gap: 5px; text-align: right; }
+.stock-purchase-card aside > b { padding: 5px 8px; border-radius: 999px; color: #fde047; background: rgba(250,204,21,.1); font-size: 9px; }
+.stock-purchase-card aside > strong { color: #4ade80; font-size: 15px; }
+.stock-purchase-card aside > small { color: #64748b; font-size: 9px; }
+.stock-purchase-panel.received { margin-bottom: 8px; }
+.stock-purchase-history { padding: 0 14px; }
+.stock-purchase-history > div { display: flex; min-height: 63px; align-items: center; justify-content: space-between; gap: 12px; }
+.stock-purchase-history > div + div { border-top: 1px solid var(--pos-line); }
+.stock-purchase-history span { display: grid; gap: 3px; }
+.stock-purchase-history span:last-child { justify-items: end; text-align: right; }
+.stock-purchase-history b { font-size: 12px; }
+.stock-purchase-history small { color: #94a3b8; font-size: 10px; }
+.stock-purchase-form-notice { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid rgba(34,197,94,.25); border-radius: 10px; color: #4ade80; background: rgba(34,197,94,.08); }
+.stock-purchase-form-notice > svg { width: 24px; flex: 0 0 24px; }
+.stock-purchase-form-notice span { display: grid; gap: 2px; }
+.stock-purchase-form-notice strong { font-size: 12px; }
+.stock-purchase-form-notice small { color: #cbd5e1; font-size: 10px; }
+.stock-purchase-modal { width: min(660px,calc(100vw - 28px)); max-height: min(92vh,840px); overflow-y: auto; }
+.stock-purchase-values { grid-template-columns: 110px repeat(2,minmax(0,1fr)); }
+
+.pos-shell[data-theme="light"] .stock-approval-workspace,
+.pos-shell[data-theme="light"] .stock-purchase-workspace { color: #111827; }
 .pos-shell[data-theme="light"] .stock-admin-tabs,
 .pos-shell[data-theme="light"] .stock-approval-panel,
+.pos-shell[data-theme="light"] .stock-purchase-panel,
+.pos-shell[data-theme="light"] .stock-purchase-card,
 .pos-shell[data-theme="light"] .stock-request-card,
 .pos-shell[data-theme="light"] .stock-approval-heading > span,
 .pos-shell[data-theme="light"] .stock-approval-modal-product { background: #fff; }
@@ -779,6 +824,9 @@ html, body {
 .pos-shell[data-theme="light"] .stock-approval-form-grid label,
 .pos-shell[data-theme="light"] .stock-reject-reason { color: #475569; }
 .pos-shell[data-theme="light"] .stock-approval-heading h2,
+.pos-shell[data-theme="light"] .stock-purchase-heading h2,
+.pos-shell[data-theme="light"] .stock-purchase-panel > header strong,
+.pos-shell[data-theme="light"] .stock-purchase-card > div > strong,
 .pos-shell[data-theme="light"] .stock-approval-panel > header strong,
 .pos-shell[data-theme="light"] .stock-request-product strong,
 .pos-shell[data-theme="light"] .stock-count-compare strong,
@@ -789,12 +837,18 @@ html, body {
 .pos-shell[data-theme="light"] .stock-update-compare .after b { color: #047857; }
 .pos-shell[data-theme="light"] .stock-update-safe { color: #047857; background: #ecfdf5; }
 .pos-shell[data-theme="light"] .stock-approval-heading p,
+.pos-shell[data-theme="light"] .stock-purchase-heading p,
 .pos-shell[data-theme="light"] .stock-approval-help,
 .pos-shell[data-theme="light"] .stock-request-product em { color: #64748b; }
 .pos-shell[data-theme="light"] .stock-approval-guard { border-color: #a7f3d0; background: #ecfdf5; }
 .pos-shell[data-theme="light"] .stock-approval-guard strong,
 .pos-shell[data-theme="light"] .stock-approval-guard > svg { color: #047857; }
 .pos-shell[data-theme="light"] .stock-approval-guard span { color: #334155; }
+.pos-shell[data-theme="light"] .stock-purchase-card p,
+.pos-shell[data-theme="light"] .stock-purchase-form-notice small { color: #475569; }
+.pos-shell[data-theme="light"] .stock-purchase-card em,
+.pos-shell[data-theme="light"] .stock-purchase-history small { color: #64748b; }
+.pos-shell[data-theme="light"] .stock-purchase-form-notice { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
 .pos-shell[data-theme="light"] .stock-count-evidence-badge { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
 .pos-shell[data-theme="light"] .stock-count-evidence-preview { border-color: #dbe5df; background: #f8faf9; }
 .pos-shell[data-theme="light"] .stock-count-evidence-preview > span { color: #047857; }
@@ -839,6 +893,13 @@ html, body {
   .stock-approval-form-grid label.wide { grid-column: auto; }
   .stock-approval-modal-body footer { display: grid; grid-template-columns: 1fr; }
   .stock-approval-modal-body footer button { justify-content: center; width: 100% !important; }
+  .stock-purchase-heading { align-items: flex-start; flex-direction: column; }
+  .stock-purchase-heading > button { width: 100%; justify-content: center; }
+  .stock-purchase-card { grid-template-columns: 45px minmax(0,1fr); }
+  .stock-purchase-icon { width: 43px; height: 43px; }
+  .stock-purchase-card aside { grid-column: 2; grid-template-columns: auto 1fr; align-items: center; justify-items: start; text-align: left; }
+  .stock-purchase-card aside > small { grid-column: 1/-1; }
+  .stock-purchase-values { grid-template-columns: 1fr; }
 }
 
 /* ========================================================================

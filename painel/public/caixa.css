@@ -694,6 +694,71 @@ form { display: grid; gap: 16px; }
 .stock-detail-history-button { width: 100%; min-height: 43px; margin-top: 9px; border: 1px solid #0a754a; border-radius: 11px; color: #087246; background: #fff; font-size: 10px; font-weight: 730; cursor: pointer; }
 .stock-detail-history-button:disabled { opacity: .6; cursor: wait; }
 .stock-detail-audit { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; padding: 11px; border-radius: 11px; color: #3e6c58; background: #f0f7f3; font-size: 9px; }
+
+/* Recebimento de compra: o operador confere quantidades sem ver custos */
+.stock-receipts-page { min-height: 760px; margin-top: 0; padding: 0 15px 28px; border-radius: 0; box-shadow: none; }
+.stock-receipts-content { display: grid; gap: 13px; }
+.stock-receipts-intro { display: flex; align-items: center; gap: 11px; padding: 13px; border: 1px solid #cee5d7; border-radius: 14px; background: #f2faf5; }
+.stock-receipts-intro > span { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 50%; color: #087246; background: #dff2e6; }
+.stock-receipts-intro svg,.stock-receipt-summary svg,.stock-receipt-card svg,.stock-receipt-submit svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.stock-receipts-intro p { display: grid; gap: 3px; margin: 0; }
+.stock-receipts-intro strong { color: #173228; font-size: 15px; }
+.stock-receipts-intro small { color: #62746b; font-size: 13px; line-height: 1.35; }
+.stock-receipts-list { display: grid; gap: 10px; }
+.stock-receipt-card { display: grid; width: 100%; min-height: 102px; grid-template-columns: 47px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 13px; border: 1px solid #dce5e0; border-radius: 16px; color: #17251f; background: #fff; box-shadow: 0 5px 15px rgba(11,48,34,.055); text-align: left; cursor: pointer; }
+.stock-receipt-card:focus-visible { outline: 3px solid rgba(8,114,70,.18); outline-offset: 2px; }
+.stock-receipt-card-icon { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 50%; color: #087246; background: #e9f7ee; }
+.stock-receipt-card-copy { display: grid; min-width: 0; gap: 4px; }
+.stock-receipt-card-copy strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-receipt-card-copy span { overflow: hidden; color: #4f5f57; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-receipt-card-copy small { color: #758078; font-size: 12px; }
+.stock-receipt-card-side { display: flex; align-items: center; gap: 4px; color: #087246; }
+.stock-receipt-card-side b { font-size: 13px; }
+.stock-receipt-card-side svg { width: 19px; height: 19px; }
+.stock-receipts-empty { display: grid; min-height: 190px; place-content: center; gap: 6px; padding: 24px; border: 1px dashed #c9d7d0; border-radius: 15px; color: #6d7b74; text-align: center; }
+.stock-receipts-empty strong { color: #294238; font-size: 16px; }
+.stock-receipts-empty span { font-size: 13px; line-height: 1.4; }
+.stock-receipt-summary { display: grid; grid-template-columns: 47px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 13px; border: 1px solid #dce5e0; border-radius: 16px; background: #fff; }
+.stock-receipt-summary > span { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 50%; color: #fff; background: #087246; }
+.stock-receipt-summary p { display: grid; min-width: 0; gap: 3px; margin: 0; }
+.stock-receipt-summary strong { font-size: 16px; }
+.stock-receipt-summary small { overflow: hidden; color: #65736c; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-receipt-summary > b { padding: 7px 9px; border-radius: 999px; color: #a45c08; background: #fff3d9; font-size: 12px; }
+.stock-receipt-section-title { margin: 4px 0 -2px; color: #15271f; font-size: 18px; }
+.stock-receipt-items { display: grid; gap: 9px; }
+.stock-receipt-item { display: grid; min-height: 120px; grid-template-columns: 65px minmax(0,1fr) 126px; align-items: center; gap: 9px; padding: 11px; border: 1px solid #dfe6e2; border-radius: 15px; background: #fff; }
+.stock-receipt-item > img { width: 61px; height: 93px; object-fit: contain; mix-blend-mode: multiply; }
+.stock-receipt-item-copy { display: grid; min-width: 0; gap: 4px; }
+.stock-receipt-item-copy strong { overflow: hidden; color: #14231d; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-receipt-item-copy span { overflow: hidden; color: #4f6057; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.stock-receipt-item-copy small { color: #738078; font-size: 12px; text-transform: capitalize; }
+.stock-receipt-quantity { display: grid; min-width: 0; gap: 5px; }
+.stock-receipt-quantity > small { color: #5d6d65; font-size: 11px; font-weight: 650; text-align: center; }
+.stock-receipt-stepper { display: grid; height: 44px; grid-template-columns: 36px minmax(42px,1fr) 36px; overflow: hidden; border: 1px solid #bcd3c7; border-radius: 10px; }
+.stock-receipt-stepper button { border: 0; color: #087246; background: #f0f8f3; font-size: 23px; cursor: pointer; }
+.stock-receipt-stepper input { width: 100%; min-width: 0; border: 0; border-inline: 1px solid #d5e1db; outline: 0; color: #17251f; background: #fff; font-size: 17px; font-weight: 750; text-align: center; }
+.stock-receipt-stepper input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+.stock-receipt-expected-label { color: #087246 !important; }
+.stock-receipt-totals { display: grid; grid-template-columns: repeat(3,1fr); overflow: hidden; border: 1px solid #d8e4de; border-radius: 13px; background: #f8fbf9; }
+.stock-receipt-totals div { display: grid; min-height: 62px; place-content: center; gap: 3px; text-align: center; }
+.stock-receipt-totals div + div { border-left: 1px solid #dfe7e3; }
+.stock-receipt-totals small { color: #6a7770; font-size: 12px; }
+.stock-receipt-totals strong { color: #087246; font-size: 19px; }
+.stock-receipt-totals strong.warning { color: #e36316; }
+.stock-receipt-confirm { display: flex; min-height: 52px; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid #cee4d7; border-radius: 13px; color: #184d39; background: #f1faf4; font-size: 14px; font-weight: 650; cursor: pointer; }
+.stock-receipt-confirm input { width: 22px; height: 22px; accent-color: #087246; }
+.stock-receipt-audit { margin: 0; color: #68766f; font-size: 12px; line-height: 1.4; text-align: center; }
+.stock-receipt-submit { display: flex; min-height: 55px; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 13px; color: #fff; background: linear-gradient(145deg,#098654,#00633f); box-shadow: 0 8px 20px rgba(3,102,65,.2); font-size: 15px; font-weight: 780; text-transform: uppercase; cursor: pointer; }
+.stock-receipt-submit:disabled { color: #84918a; background: #e6ebe8; box-shadow: none; cursor: not-allowed; }
+.stock-receipt-submit-error:empty { display: none; }
+
+@media (max-width: 370px) {
+  .stock-receipt-item { grid-template-columns: 54px minmax(0,1fr); }
+  .stock-receipt-item > img { width: 51px; height: 80px; }
+  .stock-receipt-quantity { grid-column: 2; }
+  .stock-receipt-card-side b { display: none; }
+}
+
 .stock-count-current { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-radius: 12px; color: #5a6961; background: #f2f5f3; font-size: 11px; }
 .stock-count-current strong { color: #087246; font-size: 18px; }
 

@@ -1465,7 +1465,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/parceiro/:slug/api/compras', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -1475,7 +1475,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send(await registerPartnerPurchase(getPartnerContext(request), parsed.data));
   });
 
-  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.delete('/parceiro/:slug/api/compras/:purchaseId', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = purchaseParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'purchase_not_found' });
 

@@ -9,6 +9,7 @@ import { registerParceiroRoute } from '../parceiro/route.js';
 import { registerPartnerOperationStockRoutes } from '../parceiro/route-operation-stock.js';
 import { registerPartnerOperationStockDetailRoutes } from '../parceiro/route-operation-stock-detail.js';
 import { registerPartnerOperationStockUpdateRoutes } from '../parceiro/route-operation-stock-update.js';
+import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operation-purchases.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
 import { registerEntregadorRoute } from '../admin/entregador/route.js';
 import { registerCaixaRoute } from '../admin/caixa/route.js';
@@ -28,6 +29,7 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerPartnerOperationStockRoutes(fastify);
   registerPartnerOperationStockDetailRoutes(fastify);
   registerPartnerOperationStockUpdateRoutes(fastify);
+  registerPartnerOperationPurchaseRoutes(fastify);
   // Porta única de login (/login) — 0095. Aditiva: o login por slug continua.
   await registerLoginGlobalRoute(fastify);
   // Portal do entregador (/entregas) — 0125. Dormente atrás de MATRIZ_ENTREGADOR_PORTAL.

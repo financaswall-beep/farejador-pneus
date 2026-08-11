@@ -781,11 +781,16 @@ export async function getPartnerCompras(ctx: PartnerContext, opts: PartnerListOp
     const result = await client.query(
       `SELECT pp.id, pp.supplier_name, pp.purchased_at, pp.total_amount,
               pp.payment_method, pp.notes, pp.created_at,
-              pp.payment_status, pp.payable_due_date,
+              pp.payment_status, pp.payable_due_date, pp.receipt_status,
+              pp.received_at, pp.received_by_label,
               COALESCE(jsonb_agg(jsonb_build_object(
+                'item_id', ppi.id,
                 'item_name', ppi.item_name,
                 'quantity', ppi.quantity,
+                'received_quantity', ppi.received_quantity,
                 'unit_cost', ppi.unit_cost,
+                'tire_size', ppi.tire_size,
+                'brand', ppi.brand,
                 'tire_condition', ppi.tire_condition,
                 'subtotal', (ppi.quantity * ppi.unit_cost)
               ) ORDER BY ppi.created_at) FILTER (WHERE ppi.id IS NOT NULL), '[]'::jsonb) AS items
@@ -1863,8 +1868,8 @@ export async function registerPartnerPurchase(
       `INSERT INTO commerce.partner_purchases (
          environment, unit_id, supplier_name, purchased_at, total_amount,
          payment_method, notes, created_by, idempotency_key,
-         payment_status, payable_due_date
-       ) VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, $6, $7, $8, $9, $10, $11::date)
+         payment_status, payable_due_date, receipt_status
+       ) VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, $6, $7, $8, $9, $10, $11::date, 'pending')
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
@@ -1884,141 +1889,42 @@ export async function registerPartnerPurchase(
     );
 
     const purchaseId = purchase.rows[0]!.id;
-    const moves: Array<{ stock_id: string; new_qty: number; new_status: string }> = [];
 
     const existingItems = await client.query<{ cnt: string }>(
       `SELECT COUNT(*)::text AS cnt FROM commerce.partner_purchase_items WHERE purchase_id = $1`,
       [purchaseId],
     );
     const alreadyProcessed = Number(existingItems.rows[0]?.cnt ?? 0) > 0;
-    if (alreadyProcessed) {
-      return { purchase_id: purchaseId };
-    }
-
-    for (const item of input.items) {
+    if (!alreadyProcessed) {
+      for (const item of input.items) {
       await client.query(
         `INSERT INTO commerce.partner_purchase_items (
-           environment, purchase_id, product_id, item_name, quantity, unit_cost, tire_condition
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           environment, purchase_id, product_id, item_name, quantity, unit_cost,
+           tire_condition, tire_size, tire_width_mm, tire_aspect_ratio,
+           tire_rim_diameter, brand, sale_price
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           ctx.environment, purchaseId, item.product_id ?? null, item.item_name,
           item.quantity, item.unit_cost, requireTireCondition(item.tire_condition),
+          normalizeText(item.tire_size), item.tire_width_mm ?? null,
+          item.tire_aspect_ratio ?? null, item.tire_rim_diameter ?? null,
+          normalizeText(item.brand), item.sale_price ?? null,
         ],
       );
-
-      const supplierName = normalizeText(input.supplier_name);
-      const itemName = item.item_name.trim();
-      const tireSize = normalizeText(item.tire_size);
-      const brand = normalizeText(item.brand);
-      const tireCondition = requireTireCondition(item.tire_condition);
-      const quantity = Number(item.quantity);
-      const unitCost = Number(item.unit_cost);
-
-      const existingStock = await client.query<{ stock_id: string; quantity_on_hand: number | null; average_cost: string | null }>(
-        `SELECT id AS stock_id, quantity_on_hand, average_cost
-         FROM commerce.partner_stock_levels
-         WHERE environment = $1
-           AND unit_id = $2
-           AND lower(trim(item_name)) = lower(trim($3))
-           AND lower(trim(COALESCE(tire_size,''))) = lower(trim(COALESCE($4::text,'')))
-           AND lower(trim(COALESCE(brand,''))) = lower(trim(COALESCE($5::text,'')))
-           AND lower(trim(COALESCE(supplier_name,''))) = lower(trim(COALESCE($6::text,'')))
-           AND tire_condition = $7
-           AND deleted_at IS NULL
-         ORDER BY updated_at DESC
-         LIMIT 1
-         FOR UPDATE`,
-        [ctx.environment, ctx.unitId, itemName, tireSize, brand, supplierName, tireCondition],
-      );
-
-      if (existingStock.rowCount && existingStock.rowCount > 0) {
-        const prevQty = Number(existingStock.rows[0]!.quantity_on_hand ?? 0);
-        const prevAvg = Number(existingStock.rows[0]!.average_cost ?? 0);
-        const newTotalQty = prevQty + quantity;
-        const weightedAvgCost = newTotalQty > 0
-          ? ((prevAvg * prevQty) + (unitCost * quantity)) / newTotalQty
-          : unitCost;
-
-        const updated = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
-          `UPDATE commerce.partner_stock_levels
-           SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + $4,
-               average_cost = $5,
-               sale_price = COALESCE($6, sale_price),
-               is_tracked = true,
-               stock_status = commerce.partner_stock_status(
-                 COALESCE(quantity_on_hand, 0) + $4,
-                 quantity_reserved,
-                 minimum_quantity,
-                 true
-               ),
-               updated_by = $7,
-               updated_at = now()
-           WHERE id = $1
-             AND environment = $2
-             AND unit_id = $3
-           RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
-          [
-            existingStock.rows[0]!.stock_id,
-            ctx.environment,
-            ctx.unitId,
-            quantity,
-            weightedAvgCost,
-            item.sale_price ?? null,
-            `partner:${ctx.slug}`,
-          ],
-        );
-        if (updated.rowCount && updated.rowCount > 0) moves.push(updated.rows[0]!);
-      } else {
-        const inserted = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
-          `INSERT INTO commerce.partner_stock_levels (
-             environment, unit_id, product_id, item_name, tire_size,
-             tire_width_mm, tire_aspect_ratio, tire_rim_diameter,
-             brand, supplier_name, quantity_on_hand, minimum_quantity,
-             average_cost, sale_price, tire_condition, is_tracked, stock_status, updated_by
-           ) VALUES (
-             $1, $2, $3, $4, $5,
-             $6, $7, $8,
-             $9, $10, $11, NULL,
-             $12, $13, $14, true,
-             commerce.partner_stock_status($11, 0, NULL, true),
-             $15
-           )
-           RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
-          [
-            ctx.environment,
-            ctx.unitId,
-            item.product_id ?? null,
-            itemName,
-            tireSize,
-            item.tire_width_mm ?? null,
-            item.tire_aspect_ratio ?? null,
-            item.tire_rim_diameter ?? null,
-            brand,
-            supplierName,
-            quantity,
-            unitCost,
-            item.sale_price ?? null,
-            tireCondition,
-            `partner:${ctx.slug}`,
-          ],
-        );
-        if (inserted.rowCount && inserted.rowCount > 0) moves.push(inserted.rows[0]!);
       }
-    }
 
-    if (moves.length > 0) {
       await client.query(
-        `INSERT INTO audit.events (
-           environment, domain, entity_table, entity_id, event_type,
-           actor_label, payload_after
-         ) VALUES ($1, 'stock', 'commerce.partner_stock_levels', $2,
-                   'stock_increment_purchase', $3, $4::jsonb)`,
-        [
-          ctx.environment,
-          purchaseId,
-          `partner:${ctx.slug}`,
-          JSON.stringify({ purchase_id: purchaseId, moves, items: input.items }),
-        ],
+      `INSERT INTO audit.events (
+         environment, domain, entity_table, entity_id, event_type,
+         actor_label, payload_after
+       ) VALUES ($1, 'stock', 'commerce.partner_purchases', $2,
+                 'partner_purchase_awaiting_receipt', $3, $4::jsonb)`,
+      [ctx.environment, purchaseId, `partner:${ctx.slug}`, JSON.stringify({
+        purchase_id: purchaseId,
+        unit_id: ctx.unitId,
+        item_count: input.items.length,
+        expected_units: input.items.reduce((sum, item) => sum + Number(item.quantity), 0),
+      })],
       );
     }
 
@@ -2083,8 +1989,10 @@ export async function deletePartnerPurchase(
   purchaseId: string,
 ): Promise<{ purchase_id: string; deleted: boolean; stock_moves: Array<{ stock_id: string; new_qty: number; new_status: string }> }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const purchaseRow = await client.query<{ id: string; supplier_name: string | null }>(
-      `SELECT id, supplier_name
+    const purchaseRow = await client.query<{
+      id: string; supplier_name: string | null; receipt_status: 'pending' | 'received';
+    }>(
+      `SELECT id, supplier_name, receipt_status
        FROM commerce.partner_purchases
        WHERE id = $1 AND environment = $2 AND unit_id = $3 AND deleted_at IS NULL
        FOR UPDATE`,
@@ -2114,10 +2022,10 @@ export async function deletePartnerPurchase(
 
     const supplierName = normalizeText(purchaseRow.rows[0]!.supplier_name);
     const items = await client.query<{
-      product_id: string | null; item_name: string; quantity: number;
-      tire_condition: TireCondition | null;
+      product_id: string | null; item_name: string; quantity: number; received_quantity: number | null;
+      tire_size: string | null; brand: string | null; tire_condition: TireCondition | null;
     }>(
-      `SELECT product_id, item_name, quantity, tire_condition
+      `SELECT product_id, item_name, quantity, received_quantity, tire_size, brand, tire_condition
        FROM commerce.partner_purchase_items
        WHERE purchase_id = $1 AND environment = $2`,
       [purchaseId, ctx.environment],
@@ -2125,7 +2033,9 @@ export async function deletePartnerPurchase(
 
     const moves: Array<{ stock_id: string; new_qty: number; new_status: string }> = [];
     const failedReversals: Array<{ item_name: string; quantity: number }> = [];
-    for (const item of items.rows) {
+    for (const item of purchaseRow.rows[0]!.receipt_status === 'received' ? items.rows : []) {
+      const reversedQuantity = Number(item.received_quantity ?? item.quantity);
+      if (reversedQuantity === 0) continue;
       const moved = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
         `WITH target AS (
            SELECT id
@@ -2135,27 +2045,30 @@ export async function deletePartnerPurchase(
              AND lower(item_name) = lower($3)
              AND supplier_name IS NOT DISTINCT FROM $4
              AND tire_condition IS NOT DISTINCT FROM $5
+             AND ($6::text IS NULL OR lower(trim(COALESCE(tire_size,''))) = lower(trim($6)))
+             AND ($7::text IS NULL OR lower(trim(COALESCE(brand,''))) = lower(trim($7)))
              AND deleted_at IS NULL
              AND is_tracked
-             AND quantity_on_hand >= $6
+             AND quantity_on_hand >= $8
            ORDER BY updated_at DESC
            LIMIT 1
            FOR UPDATE
          )
          UPDATE commerce.partner_stock_levels ps
-         SET quantity_on_hand = ps.quantity_on_hand - $6,
+         SET quantity_on_hand = ps.quantity_on_hand - $8,
              -- A5: estorno de compra recalcula status pelo helper. Se o disponível
              -- voltar a <= 0 com reserva aberta, o item volta corretamente a 'reserved'.
              stock_status = commerce.partner_stock_status(
-               ps.quantity_on_hand - $6, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
-             updated_by = $7,
+               ps.quantity_on_hand - $8, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
+             updated_by = $9,
              updated_at = now()
          FROM target
          WHERE ps.id = target.id
          RETURNING ps.id AS stock_id, ps.quantity_on_hand AS new_qty, ps.stock_status AS new_status`,
         [
           ctx.environment, ctx.unitId, item.item_name, supplierName,
-          item.tire_condition, Number(item.quantity), `partner:${ctx.slug}`,
+          item.tire_condition, normalizeText(item.tire_size), normalizeText(item.brand),
+          reversedQuantity, `partner:${ctx.slug}`,
         ],
       );
       if (moved.rowCount && moved.rowCount > 0) {
@@ -2165,7 +2078,7 @@ export async function deletePartnerPurchase(
         // registra. Se sobrar item sem estorno, ABORTA o delete inteiro abaixo
         // (rollback automatico via throw). Etapa 7 vai resolver com FK direta
         // partner_purchase_items -> partner_stock_levels.
-        failedReversals.push({ item_name: item.item_name, quantity: Number(item.quantity) });
+        failedReversals.push({ item_name: item.item_name, quantity: reversedQuantity });
       }
     }
 

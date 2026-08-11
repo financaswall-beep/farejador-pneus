@@ -19,11 +19,15 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_item_registration_requests')`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_stock_count_requests')`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_stock_count_evidence')`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`table_name='partner_purchases'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='receipt_status'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='received_quantity'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain('partner_purchases_receipt_idempotency_uniq');
   });
 
-  it('recusa iniciar antes da migration 0167', async () => {
+  it('recusa iniciar antes da migration 0169', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0167_partner_operation_count_batch_evidence');
+      .rejects.toThrow('required_schema_missing:0169_partner_purchase_receiving');
   });
 });

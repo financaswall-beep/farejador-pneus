@@ -11,6 +11,33 @@
  */
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.financeiroCompras = () => ({
+    purchaseModalOpen: false,
+
+    get purchasesPendingReceipt() {
+      return (this.compras || []).filter((purchase) => purchase.receipt_status === 'pending');
+    },
+
+    get purchasesRecentlyReceived() {
+      return (this.compras || []).filter((purchase) => purchase.receipt_status === 'received').slice(0, 5);
+    },
+
+    purchaseExpectedUnits(purchase) {
+      return (purchase?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    },
+
+    purchaseReceivedUnits(purchase) {
+      return (purchase?.items || []).reduce((sum, item) => sum + Number(item.received_quantity || 0), 0);
+    },
+
+    openPurchaseModal() {
+      this.purchaseModalOpen = true;
+      this.$nextTick(() => lucide.createIcons());
+    },
+
+    closePurchaseModal() {
+      this.purchaseModalOpen = false;
+    },
+
     // â”€â”€â”€ FORMS: PURCHASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async savePurchase() {
       if (!this.purchaseForm.item_name.trim()) { this.flash('Informe o pneu comprado.'); return; }
@@ -52,10 +79,11 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
         });
         const wasPayable = this.purchaseForm.payment_status === 'payable';
         this.purchaseForm = { supplier_name: '', item_name: '', tire_width: null, tire_aspect: null, tire_rim: null, brand: '', tire_condition: '', quantity: 1, unit_cost: 0, sale_price: null, payment_status: 'paid_now', payable_due_date: '' };
+        this.purchaseModalOpen = false;
         await this.loadData();
         this.flash(wasPayable
-          ? 'Compra registrada (a prazo) — conta a pagar criada.'
-          : 'Compra registrada e estoque atualizado.');
+          ? 'Compra a prazo registrada. Conta criada e mercadoria aguardando recebimento.'
+          : 'Compra registrada. Mercadoria aguardando conferência da equipe.');
       } catch (err) {
         this.flash(this.errMessage(err));
       } finally {
