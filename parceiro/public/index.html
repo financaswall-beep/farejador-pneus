@@ -27,7 +27,7 @@
   <script src="https://unpkg.com/lucide@1.17.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=20260810-resumo-web1" />
+  <link rel="stylesheet" href="./style.css?v=20260810-contagem2" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
@@ -1599,9 +1599,10 @@
                       <div class="difference" :class="stockRequestDiff(item) < 0 ? 'negative' : 'positive'"><small>Diferença</small><strong x-text="stockRequestDiffLabel(item)"></strong></div>
                     </div>
                     <p x-show="item.is_stale" class="stock-request-stale"><i data-lucide="triangle-alert"></i> O estoque mudou depois desta contagem. Rejeite e peça uma nova.</p>
+                    <span x-show="item.has_evidence" class="stock-count-evidence-badge"><i data-lucide="camera"></i> Foto anexada</span>
                     <dl class="stock-request-meta">
                       <div><dt>Enviado por</dt><dd x-text="item.requested_by_label"></dd></div>
-                      <div><dt>Motivo</dt><dd x-text="item.reason"></dd></div>
+                      <div><dt>Motivo</dt><dd x-text="item.reason_detail || item.reason"></dd></div>
                       <div><dt>Quando</dt><dd x-text="formatDateTime(item.created_at)"></dd></div>
                     </dl>
                     <footer>
@@ -1642,6 +1643,11 @@
             <div x-show="stockApprovalItem" class="stock-approval-modal-body">
               <p>O saldo de <strong x-text="stockApprovalItem?.item_name"></strong> será alterado após sua confirmação.</p>
               <div class="stock-count-compare large"><div><small>Atual</small><strong x-text="(stockApprovalItem?.quantity_snapshot ?? 0)+' un.'"></strong></div><i data-lucide="arrow-right"></i><div><small>Novo saldo</small><strong x-text="(stockApprovalItem?.counted_quantity ?? 0)+' un.'"></strong></div></div>
+              <div x-show="stockApprovalItem?.has_evidence" class="stock-count-evidence-preview">
+                <span><i data-lucide="camera"></i> Foto enviada pelo funcionário</span>
+                <p x-show="!photoLightbox.url">Carregando foto...</p>
+                <img x-show="photoLightbox.url" :src="photoLightbox.url" alt="Foto enviada como prova da contagem" />
+              </div>
               <footer><button type="button" class="pos-outline-action" @click="closeStockApproval()">Cancelar</button><button type="button" class="pos-form-submit success" :disabled="stockApprovalBusy" @click="approveCountRequest()"><i data-lucide="check"></i><span x-text="stockApprovalBusy ? 'Aprovando...' : 'Aprovar contagem'"></span></button></footer>
             </div>
           </div>
@@ -3280,7 +3286,7 @@
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
  <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
- <script src="./app.estoque.aprovacoes.js?v=20260810-aprovacao1"></script>
+ <script src="./app.estoque.aprovacoes.js?v=20260810-contagem2"></script>
 <script src="./app.pdv.kpis.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.js?v=20260806-mobile-checkout1"></script>
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>

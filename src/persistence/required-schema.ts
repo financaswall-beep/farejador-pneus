@@ -65,12 +65,13 @@ export const REQUIRED_SCHEMA_SQL = `
     AND to_regclass('marketing.meta_messaging_referrals') IS NOT NULL
     AND to_regclass('commerce.partner_item_registration_requests') IS NOT NULL
     AND to_regclass('commerce.partner_stock_count_requests') IS NOT NULL
+    AND to_regclass('commerce.partner_stock_count_evidence') IS NOT NULL
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0166. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0167. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0166_partner_operation_inventory_requests');
+    throw new Error('required_schema_missing:0167_partner_operation_count_batch_evidence');
   }
 }

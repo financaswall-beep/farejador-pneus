@@ -10,6 +10,7 @@ describe('fila de aprovação do estoque no painel do dono', () => {
   const route = source('src/parceiro/route-operation-stock.ts');
   const backend = source('src/parceiro/operation-stock-owner.ts');
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
+  const evidenceMigration = source('db/migrations/0167_partner_operation_count_batch_evidence.sql');
 
   it('oferece abas, filtros e revisão separada para cadastros e contagens', () => {
     expect(html).toContain('Aprovar alterações do estoque');
@@ -19,6 +20,9 @@ describe('fila de aprovação do estoque no painel do dono', () => {
     expect(html).toContain('Nada altera saldo, custo ou preço sem sua aprovação');
     expect(html).toContain('Aprovar e cadastrar');
     expect(html).toContain('Aprovar contagem');
+    expect(html).toContain('Foto enviada pelo funcionário');
+    expect(app).toContain('stock-count:${item.id}');
+    expect(backend).toContain('has_evidence');
   });
 
   it('mantém a fila e as decisões exclusivamente para o dono', () => {
@@ -41,5 +45,6 @@ describe('fila de aprovação do estoque no painel do dono', () => {
     expect(migration).toContain('stock_updated_at_snapshot TIMESTAMPTZ NOT NULL');
     expect(migration).toContain('approved_stock_id');
     expect(migration).toContain('partner_item_registration_stock');
+    expect(evidenceMigration).toContain('partner_stock_count_evidence');
   });
 });

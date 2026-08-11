@@ -90,16 +90,36 @@ window.PARCEIRO_MODULES.estoqueAprovacoes = () => ({
     this.$nextTick(() => lucide.createIcons());
   },
 
-  openCountApproval(item) {
+  async openCountApproval(item) {
     this.stockApprovalItem = item;
     this.stockApprovalModal = 'count';
+    this.photoLightbox = { open: false, url: null };
     this.$nextTick(() => lucide.createIcons());
+    if (!item?.has_evidence) return;
+    const key = `stock-count:${item.id}`;
+    if (!this.photoThumbUrls[key]) {
+      try {
+        const response = await fetch(`/parceiro/${this.slug}/api/operacao/estoque/contagens/${item.id}/foto`, {
+          headers: { Authorization: `Bearer ${this.apiToken}` },
+        });
+        if (!response.ok) throw new Error('photo_load_failed');
+        const blob = await response.blob();
+        this.photoThumbUrls = { ...this.photoThumbUrls, [key]: URL.createObjectURL(blob) };
+      } catch (_) {
+        this.flash('A contagem existe, mas não foi possível abrir a foto.', 'error');
+        return;
+      }
+    }
+    if (this.stockApprovalItem?.id === item.id) {
+      this.photoLightbox = { open: false, url: this.photoThumbUrls[key] };
+    }
   },
 
   closeStockApproval() {
     if (this.stockApprovalBusy) return;
     this.stockApprovalModal = null;
     this.stockApprovalItem = null;
+    this.photoLightbox = { open: false, url: null };
   },
 
   async approveRegistrationRequest() {

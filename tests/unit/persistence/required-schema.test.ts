@@ -18,11 +18,12 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('marketing.meta_messaging_referrals')`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_item_registration_requests')`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_stock_count_requests')`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.partner_stock_count_evidence')`);
   });
 
-  it('recusa iniciar antes da migration 0166', async () => {
+  it('recusa iniciar antes da migration 0167', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0166_partner_operation_inventory_requests');
+      .rejects.toThrow('required_schema_missing:0167_partner_operation_count_batch_evidence');
   });
 });

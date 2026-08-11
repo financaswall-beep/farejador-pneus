@@ -1,11 +1,12 @@
 {
-  "geradoEm": "2026-08-10T23:55:32.901Z",
+  "geradoEm": "2026-08-11T00:50:18.990Z",
   "commitBase": "c0d7913",
-  "total": 88,
+  "total": 90,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
     "call:fetch(`/parceiro/${this.slug}/api/logout`, { method: 'POST', headers: this.apiHeaders(false) })",
+    "call:fetch(`/parceiro/${this.slug}/api/operacao/estoque/contagens/${item.id}/foto`, { headers: { Authorization: `Bearer ${this.apiToken}` }, })",
     "call:fetch(`/parceiro/${this.slug}/api/photo-requests/${photoRequestId}/image`, { headers: { Authorization: `Bearer ${this.apiToken}` }, })",
     "call:fetch(`/parceiro/${this.slug}/api/set-credentials`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ username, password }), })",
     "call:new EventSource(url)",
@@ -89,6 +90,7 @@
     "lit:`/parceiro/${this.slug}/api/chat/stream?ticket=${encodeURIComponent(issued.ticket)}`",
     "lit:`/parceiro/${this.slug}/api/login`",
     "lit:`/parceiro/${this.slug}/api/logout`",
+    "lit:`/parceiro/${this.slug}/api/operacao/estoque/contagens/${item.id}/foto`",
     "lit:`/parceiro/${this.slug}/api/photo-requests/${photoRequestId}/image`",
     "lit:`/parceiro/${this.slug}/api/set-credentials`"
   ]

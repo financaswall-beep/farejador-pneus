@@ -114,22 +114,8 @@
     banner.classList.toggle('hidden', total === 0);
   }
 
-  function fillCountItems(rows) {
-    const select = byId('stock-count-item');
-    const current = select.value;
-    select.replaceChildren();
-    rows.filter(function (row) { return row.is_tracked && row.item_type !== 'servico'; }).forEach(function (row) {
-      const option = document.createElement('option');
-      option.value = row.stock_id;
-      option.textContent = `${row.item_name}${row.tire_size ? ` · ${row.tire_size}` : ''}`;
-      select.appendChild(option);
-    });
-    if (current && rows.some(function (row) { return row.stock_id === current; })) select.value = current;
-  }
-
   Caixa.stockView = {
     renderList: renderList,
     renderSummary: renderSummary,
-    fillCountItems: fillCountItems,
   };
 }());

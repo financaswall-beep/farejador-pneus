@@ -89,9 +89,14 @@ export async function getPendingOperationStockRequests(ctx: PartnerContext) {
     ),
     pool.query(
       `SELECT r.id, r.stock_id, r.quantity_snapshot, r.counted_quantity,
-              r.reason, r.requested_by_label, r.created_at,
+              r.reason, r.reason_detail, r.batch_id,
+              r.requested_by_label, r.created_at,
               s.item_name, s.item_type, s.tire_size, s.brand,
               s.quantity_reserved,
+              EXISTS (
+                SELECT 1 FROM commerce.partner_stock_count_evidence e
+                 WHERE e.request_id=r.id AND e.environment=r.environment AND e.unit_id=r.unit_id
+              ) AS has_evidence,
               (s.quantity_on_hand IS DISTINCT FROM r.quantity_snapshot
                OR s.updated_at IS DISTINCT FROM r.stock_updated_at_snapshot) AS is_stale
          FROM commerce.partner_stock_count_requests r

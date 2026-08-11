@@ -14,6 +14,10 @@ import {
   requestOperationItemRegistration,
   requestOperationStockCount,
 } from '../../../src/parceiro/operation-stock.js';
+import {
+  attachOperationStockCountEvidence,
+  requestOperationStockCountBatch,
+} from '../../../src/parceiro/operation-stock-count.js';
 
 const ctx: PartnerContext = {
   environment: 'test',
@@ -73,7 +77,7 @@ describe('operações seguras de estoque do funcionário', () => {
 
   it('fotografa o saldo na contagem sem atualizar o estoque oficial', async () => {
     mocks.query
-      .mockResolvedValueOnce({ rows: [{ quantity_on_hand: 12, is_tracked: true, item_type: 'pneu', updated_at: '2026-08-10T10:00:00Z' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'stock-a', quantity_on_hand: 12, is_tracked: true, item_type: 'pneu', updated_at: '2026-08-10T10:00:00Z' }] })
       .mockResolvedValueOnce({
         rows: [{ id: 'count-a', status: 'pending', created_at: '2026-08-10T00:00:00Z', quantity_snapshot: 12 }],
       });
@@ -92,9 +96,46 @@ describe('operações seguras de estoque do funcionário', () => {
       .not.toContain('UPDATE commerce.partner_stock_levels');
   });
 
+  it('envia um lote de contagens na mesma transação e conserva o batch_id', async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [
+        { id: 'stock-a', quantity_on_hand: 12, is_tracked: true, item_type: 'pneu', updated_at: '2026-08-10T10:00:00Z' },
+        { id: 'stock-b', quantity_on_hand: 1, is_tracked: true, item_type: 'pneu', updated_at: '2026-08-10T10:00:00Z' },
+      ] })
+      .mockResolvedValueOnce({ rows: [{ id: 'count-a', stock_id: 'stock-a', status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'count-b', stock_id: 'stock-b', status: 'pending' }] });
+
+    const result = await requestOperationStockCountBatch(ctx, 'Wallace', {
+      batch_id: '10000000-0000-4000-8000-000000000001',
+      items: [
+        { stock_id: 'stock-a', counted_quantity: 12, reason: 'rotina', idempotency_key: 'count-a-12345678' },
+        { stock_id: 'stock-b', counted_quantity: 3, reason: 'divergencia', reason_detail: 'Mercadoria encontrada', idempotency_key: 'count-b-12345678' },
+      ],
+    });
+
+    expect(result.requests).toHaveLength(2);
+    expect(String(mocks.query.mock.calls[1]?.[0])).toContain('batch_id');
+    expect(mocks.query.mock.calls[2]?.[1]).toContain('Mercadoria encontrada');
+    expect(mocks.query.mock.calls.map((call) => String(call[0])).join('\n'))
+      .not.toContain('UPDATE commerce.partner_stock_levels');
+  });
+
+  it('anexa foto somente à contagem pendente criada pelo mesmo funcionário', async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ id: 'evidence-a' }] });
+
+    await expect(attachOperationStockCountEvidence(ctx, 'count-a', {
+      bytes: Buffer.from('jpeg'), mime: 'image/jpeg', sizeBytes: 4,
+    })).resolves.toBe('attached');
+
+    const sql = String(mocks.query.mock.calls[0]?.[0]);
+    expect(sql).toContain("r.status='pending'");
+    expect(sql).toContain('r.requested_by_token_id=$8');
+    expect(mocks.query.mock.calls[0]?.[1]).toContain('token-a');
+  });
+
   it('recusa contagem de serviço ou item sem controle de saldo', async () => {
     mocks.query.mockResolvedValueOnce({
-      rows: [{ quantity_on_hand: null, is_tracked: false, item_type: 'servico' }],
+      rows: [{ id: 'service-a', quantity_on_hand: null, is_tracked: false, item_type: 'servico' }],
     });
 
     await expect(requestOperationStockCount(ctx, 'Wallace', {

@@ -19,14 +19,7 @@ export interface OperationItemRegistrationInput {
   idempotency_key: string;
 }
 
-export interface OperationStockCountInput {
-  stock_id: string;
-  counted_quantity: number;
-  reason: 'rotina' | 'inventario' | 'divergencia' | 'outro';
-  idempotency_key: string;
-}
-
-interface SafeStockRow {
+export interface SafeStockRow {
   stock_id: string;
   local_sku: string | null;
   item_name: string;
@@ -57,14 +50,6 @@ interface RequestResult {
   id: string;
   status: 'pending';
   created_at: string;
-}
-
-export class StockUnavailableForCountError extends Error {
-  readonly code = 'stock_unavailable_for_count';
-
-  constructor() {
-    super('stock_unavailable_for_count');
-  }
 }
 
 export async function getOperationStock(ctx: PartnerContext): Promise<{
@@ -154,48 +139,8 @@ export async function requestOperationItemRegistration(
   });
 }
 
-export async function requestOperationStockCount(
-  ctx: PartnerContext,
-  actorLabel: string,
-  data: OperationStockCountInput,
-): Promise<RequestResult & { quantity_snapshot: number | null }> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const stock = await client.query<{
-      quantity_on_hand: number | null;
-      is_tracked: boolean;
-      item_type: OperationItemType;
-      updated_at: string;
-    }>(
-      `SELECT quantity_on_hand, is_tracked, item_type, updated_at
-         FROM commerce.partner_stock_levels
-        WHERE id=$1 AND environment=$2 AND unit_id=$3 AND deleted_at IS NULL
-        FOR SHARE`,
-      [data.stock_id, ctx.environment, ctx.unitId],
-    );
-    const row = stock.rows[0];
-    if (!row || !row.is_tracked || row.item_type === 'servico') {
-      throw new StockUnavailableForCountError();
-    }
-
-    const inserted = await client.query<RequestResult & { quantity_snapshot: number | null }>(
-      `INSERT INTO commerce.partner_stock_count_requests (
-         environment, unit_id, stock_id, requested_by_token_id,
-          requested_by_label, quantity_snapshot, stock_updated_at_snapshot,
-          counted_quantity, reason, idempotency_key
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (environment, unit_id, idempotency_key) DO NOTHING
-       RETURNING id, status, created_at, quantity_snapshot`,
-      [ctx.environment, ctx.unitId, data.stock_id, ctx.tokenId, actorLabel,
-        row.quantity_on_hand, row.updated_at, data.counted_quantity, data.reason,
-        data.idempotency_key],
-    );
-    if (inserted.rows[0]) return inserted.rows[0];
-    const existing = await client.query<RequestResult & { quantity_snapshot: number | null }>(
-      `SELECT id, status, created_at, quantity_snapshot
-         FROM commerce.partner_stock_count_requests
-        WHERE environment=$1 AND unit_id=$2 AND idempotency_key=$3`,
-      [ctx.environment, ctx.unitId, data.idempotency_key],
-    );
-    return existing.rows[0]!;
-  });
-}
+export {
+  requestOperationStockCount,
+  StockUnavailableForCountError,
+} from './operation-stock-count.js';
+export type { OperationStockCountInput } from './operation-stock-count.js';

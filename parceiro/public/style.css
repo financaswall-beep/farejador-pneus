@@ -716,6 +716,8 @@ html, body {
 .stock-approval-empty.compact > svg { width: 22px; height: 22px; }
 .stock-approval-footnote { margin-top: 14px; display: flex; justify-content: center; align-items: center; gap: 7px; color: #64748b; font-size: 10px; }
 .stock-approval-footnote svg { width: 14px; }
+.stock-count-evidence-badge { display: inline-flex; width: fit-content; align-items: center; gap: 6px; margin-top: 9px; padding: 5px 8px; border: 1px solid rgba(74,222,128,.3); border-radius: 999px; color: #4ade80; background: rgba(34,197,94,.08); font-size: 9px; font-weight: 800; }
+.stock-count-evidence-badge svg { width: 13px; height: 13px; }
 .stock-approval-modal { width: min(620px, calc(100vw - 28px)); }
 .stock-approval-modal-body { padding: 18px; color: #cbd5e1; }
 .stock-approval-modal-body > p { margin: 0 0 14px; font-size: 13px; }
@@ -734,6 +736,11 @@ html, body {
 .stock-approval-form-grid input:focus, .stock-reject-reason textarea:focus { border-color: var(--pos-yellow); box-shadow: 0 0 0 3px rgba(255,208,0,.08); }
 .stock-approval-margin { margin-top: 12px !important; padding: 9px 11px; border-radius: 8px; color: #cbd5e1; background: rgba(34,197,94,.08); }
 .stock-approval-margin strong { color: #4ade80; }
+.stock-count-evidence-preview { display: grid; gap: 8px; margin-top: 13px; padding: 10px; border: 1px solid var(--pos-line); border-radius: 10px; background: rgba(255,255,255,.025); }
+.stock-count-evidence-preview > span { display: flex; align-items: center; gap: 6px; color: #4ade80; font-size: 10px; font-weight: 800; }
+.stock-count-evidence-preview > span svg { width: 15px; height: 15px; }
+.stock-count-evidence-preview > p { margin: 12px 0 !important; color: #94a3b8; text-align: center; font-size: 11px !important; }
+.stock-count-evidence-preview img { width: 100%; max-height: 260px; border-radius: 8px; object-fit: contain; background: #050a08; }
 .stock-approval-modal-body footer .pos-form-submit { width: auto; margin: 0; padding-inline: 18px; }
 .stock-approval-modal-body footer .pos-outline-action { min-height: 42px; padding: 0 16px; border: 1px solid var(--pos-line); border-radius: 9px; color: #cbd5e1; }
 .stock-reject-confirm { min-height: 42px; padding: 0 16px; display: inline-flex; align-items: center; gap: 7px; border-radius: 9px; color: #fff; background: #dc2626; font-size: 12px; font-weight: 850; }
@@ -767,6 +774,9 @@ html, body {
 .pos-shell[data-theme="light"] .stock-approval-guard strong,
 .pos-shell[data-theme="light"] .stock-approval-guard > svg { color: #047857; }
 .pos-shell[data-theme="light"] .stock-approval-guard span { color: #334155; }
+.pos-shell[data-theme="light"] .stock-count-evidence-badge { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
+.pos-shell[data-theme="light"] .stock-count-evidence-preview { border-color: #dbe5df; background: #f8faf9; }
+.pos-shell[data-theme="light"] .stock-count-evidence-preview > span { color: #047857; }
 .pos-shell[data-theme="light"] .stock-approval-filters button { color: #64748b; background: #fff; }
 .pos-shell[data-theme="light"] .stock-approval-filters button.active,
 .pos-shell[data-theme="light"] .stock-admin-tabs button.active,

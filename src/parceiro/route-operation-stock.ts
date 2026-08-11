@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { PHOTO_MAX_UPLOAD_BYTES, PhotoRejectedError, reencodePhoto } from './photo-upload.js';
+import { rateLimitHit } from '../shared/rate-limit.js';
 import {
   getPartnerContext,
   requirePartnerAuth,
@@ -14,6 +16,11 @@ import {
   requestOperationStockCount,
   StockUnavailableForCountError,
 } from './operation-stock.js';
+import {
+  attachOperationStockCountEvidence,
+  getOperationStockCountEvidence,
+  requestOperationStockCountBatch,
+} from './operation-stock-count.js';
 import {
   approveOperationRegistration,
   approveOperationStockCount,
@@ -63,12 +70,25 @@ const itemRegistrationSchema = z.object({
   }
 });
 
-const stockCountSchema = z.object({
+const stockCountItemSchema = z.object({
   stock_id: uuidSchema,
   counted_quantity: z.number().int().nonnegative().max(999999),
   reason: z.enum(['rotina', 'inventario', 'divergencia', 'outro']),
+  reason_detail: optionalText(300),
   idempotency_key: z.string().min(8).max(120),
 }).strict();
+
+const stockCountSchema = stockCountItemSchema;
+
+const stockCountBatchSchema = z.object({
+  batch_id: uuidSchema,
+  items: z.array(stockCountItemSchema).min(1).max(200),
+}).strict().superRefine((value, ctx) => {
+  const ids = value.items.map((item) => item.stock_id);
+  if (new Set(ids).size !== ids.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'duplicate_stock_id' });
+  }
+});
 
 const registrationApprovalSchema = z.object({
   average_cost: z.number().nonnegative().max(99999999),
@@ -109,6 +129,12 @@ export function registerPartnerOperationStockRoutes(fastify: FastifyInstance): v
   const stockScreen = [requirePartnerAuth, requireScreen('estoque')];
   const ownerOnly = [requirePartnerAuth, requireOwner];
 
+  for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
+    if (!fastify.hasContentTypeParser(mime)) {
+      fastify.addContentTypeParser(mime, { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+    }
+  }
+
   fastify.get('/parceiro/:slug/api/operacao/estoque', { preHandler: stockScreen }, async (request: PartnerAuthedRequest, reply) => {
     if (!validateParams(request, reply)) return;
     return reply.status(200).send(await getOperationStock(getPartnerContext(request)));
@@ -139,9 +165,65 @@ export function registerPartnerOperationStockRoutes(fastify: FastifyInstance): v
     }
   });
 
+  fastify.post('/parceiro/:slug/api/operacao/estoque/contagens/lote', { preHandler: stockScreen }, async (request: PartnerAuthedRequest, reply) => {
+    if (!validateParams(request, reply)) return;
+    const parsed = stockCountBatchSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return validationError(reply, parsed);
+    const ctx = getPartnerContext(request);
+    try {
+      const result = await requestOperationStockCountBatch(ctx, await actorLabel(request), parsed.data);
+      return reply.status(202).send(result);
+    } catch (error) {
+      if (error instanceof StockUnavailableForCountError) {
+        return reply.status(409).send({ error: error.code });
+      }
+      throw error;
+    }
+  });
+
+  fastify.post('/parceiro/:slug/api/operacao/estoque/contagens/:requestId/foto', {
+    preHandler: stockScreen,
+    bodyLimit: PHOTO_MAX_UPLOAD_BYTES,
+  }, async (request: PartnerAuthedRequest, reply) => {
+    if (!validateParams(request, reply)) return;
+    const requestId = uuidSchema.safeParse((request.params as { requestId?: string }).requestId);
+    if (!requestId.success) return reply.status(404).send({ error: 'stock_request_not_found' });
+    const ctx = getPartnerContext(request);
+    if (rateLimitHit(`stock-count-photo:${ctx.tokenId}:${request.ip}`, 30, 5 * 60_000)) {
+      return reply.status(429).send({ error: 'rate_limited' });
+    }
+    if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+      return reply.status(415).send({ error: 'not_an_image' });
+    }
+    try {
+      const photo = await reencodePhoto(request.body);
+      if (photo.bytes.length > 4 * 1024 * 1024) {
+        return reply.status(413).send({ error: 'photo_too_large' });
+      }
+      const status = await attachOperationStockCountEvidence(ctx, requestId.data, {
+        bytes: photo.bytes, mime: photo.mime, sizeBytes: photo.bytes.length,
+      });
+      if (status === 'not_found') return reply.status(404).send({ error: 'stock_request_not_found' });
+      return reply.status(200).send({ ok: true, attached: status === 'attached' });
+    } catch (error) {
+      if (error instanceof PhotoRejectedError) return reply.status(415).send({ error: error.reason });
+      throw error;
+    }
+  });
+
   fastify.get('/parceiro/:slug/api/operacao/estoque/solicitacoes', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
     if (!validateParams(request, reply)) return;
     return reply.status(200).send(await getPendingOperationStockRequests(getPartnerContext(request)));
+  });
+
+  fastify.get('/parceiro/:slug/api/operacao/estoque/contagens/:requestId/foto', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
+    if (!validateParams(request, reply)) return;
+    const requestId = uuidSchema.safeParse((request.params as { requestId?: string }).requestId);
+    if (!requestId.success) return reply.status(404).send({ error: 'photo_not_found' });
+    const photo = await getOperationStockCountEvidence(getPartnerContext(request), requestId.data);
+    if (!photo) return reply.status(404).send({ error: 'photo_not_found' });
+    return reply.status(200).header('Content-Type', photo.mime)
+      .header('Cache-Control', 'private, max-age=300').send(photo.bytes);
   });
 
   fastify.post('/parceiro/:slug/api/operacao/estoque/cadastros/:requestId/aprovar', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {

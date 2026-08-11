@@ -10,6 +10,7 @@ describe('Estoque seguro na Operação da Loja', () => {
   const html = source('painel/public/caixa.html');
   const modules = source('painel/public/caixa-modules.js');
   const stock = source('painel/public/caixa-stock.js');
+  const stockCount = source('painel/public/caixa-stock-count.js');
   const stockView = source('painel/public/caixa-stock-view.js');
   const login = source('painel/public/caixa.js');
   const backend = source('src/parceiro/operation-stock.ts');
@@ -17,6 +18,7 @@ describe('Estoque seguro na Operação da Loja', () => {
   const legacyRoute = source('src/parceiro/route.ts');
   const appRoutes = source('src/app/routes.ts');
   const migration = source('db/migrations/0166_partner_operation_inventory_requests.sql');
+  const countMigration = source('db/migrations/0167_partner_operation_count_batch_evidence.sql');
 
   it('permite que um acesso apenas de estoque permaneça na porta única', () => {
     expect(modules).toContain("if (canModule('vendas')) return 'cash'");
@@ -29,6 +31,9 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(html).toContain('id="stock-panel"');
     expect(html).toContain('Cadastrar item');
     expect(html).toContain('Fazer contagem');
+    expect(html).toContain('id="stock-count-list"');
+    expect(html).toContain('Enviar contagem para aprovação');
+    expect(html).toContain('O saldo não será alterado sem aprovação do dono');
     expect(html).toContain('Sem custo, preço ou saldo');
     expect(html).toContain('O saldo oficial não muda sozinho');
     expect(html).not.toContain('id="stock-item-cost"');
@@ -40,7 +45,10 @@ describe('Estoque seguro na Operação da Loja', () => {
   it('usa uma API segura que nunca devolve ou grava custo e preço', () => {
     expect(stock).toContain("Caixa.operationPath('operacao/estoque')");
     expect(stock).toContain("'operacao/estoque/cadastros'");
-    expect(stock).toContain("'operacao/estoque/contagens'");
+    expect(stockCount).toContain("operacao/estoque/contagens/lote");
+    expect(stockCount).toContain('counted_quantity');
+    expect(stockCount).toContain('reason_detail');
+    expect(stockCount).toContain('/foto`');
     expect(backend).not.toContain('average_cost');
     expect(backend).not.toContain('sale_price');
     expect(backend).not.toContain('UPDATE commerce.partner_stock_levels');
@@ -56,6 +64,15 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(migration).toContain('REVOKE UPDATE, DELETE');
     expect(migration).toContain("status = 'pending'");
     expect(appRoutes).toContain('registerPartnerOperationStockRoutes');
+  });
+
+  it('corrige a validação do token sem abrir a tabela de credenciais', () => {
+    expect(countMigration).toContain('validate_partner_operation_request_actor');
+    expect(countMigration).toContain('SECURITY DEFINER');
+    expect(countMigration).toContain('DROP TRIGGER IF EXISTS env_match_partner_stock_count_token');
+    expect(countMigration).toContain('partner_request_actor_invalid');
+    expect(countMigration).toContain('partner_stock_count_evidence');
+    expect(countMigration).not.toContain('GRANT SELECT ON network.partner_access_tokens');
   });
 
   it('fecha o atalho antigo que alterava o estoque oficial para funcionários', () => {
