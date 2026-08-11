@@ -652,13 +652,13 @@ form { display: grid; gap: 16px; }
 .stock-count-field-label { align-self: end; padding-top: 5px; color: #56665e !important; font-size: 9px !important; line-height: 1.1; white-space: nowrap; }
 .stock-count-system-label { grid-area: system-label; }
 .stock-count-counted-label { grid-area: counted-label; }
-.stock-count-system-box { display: grid; min-height: 47px; grid-area: system; align-content: center; padding: 6px 9px; border: 0; border-radius: 9px; color: inherit; background: #f1f5f2; text-align: left; cursor: pointer; }
+.stock-count-system-box { display: grid; min-height: 43px; grid-area: system; align-content: center; padding: 5px 8px; border: 0; border-radius: 9px; color: inherit; background: #f1f5f2; text-align: left; cursor: pointer; }
 .stock-count-system-box:focus-visible { outline: 2px solid #087246; outline-offset: 2px; }
-.stock-count-system-box b { color: #183b2d; font-size: 19px; }
-.stock-count-stepper { display: grid; height: 47px; grid-area: stepper; grid-template-columns: 38px minmax(42px,1fr) 38px; overflow: hidden; border: 1px solid #bdd2c7; border-radius: 10px; }
-.stock-count-stepper button { padding: 0; border: 0; color: #087246; background: #f3faf6; font-size: 24px; cursor: pointer; }
+.stock-count-system-box b { color: #183b2d; font-size: 16px; }
+.stock-count-stepper { display: grid; height: 43px; grid-area: stepper; grid-template-columns: 36px minmax(42px,1fr) 36px; overflow: hidden; border: 1px solid #bdd2c7; border-radius: 10px; }
+.stock-count-stepper button { padding: 0; border: 0; color: #087246; background: #f3faf6; font-size: 22px; cursor: pointer; }
 .stock-count-stepper button:disabled { color: #aab7b0; cursor: default; }
-.stock-count-sheet form .stock-count-stepper input { width: 100%; height: 45px; padding: 0 3px; border: 0; border-inline: 1px solid #d4e0da; border-radius: 0; box-shadow: none; font-size: 20px; font-weight: 750; text-align: center; }
+.stock-count-sheet form .stock-count-stepper input { width: 100%; height: 41px; padding: 0 3px; border: 0; border-inline: 1px solid #d4e0da; border-radius: 0; box-shadow: none; font-size: 17px; font-weight: 750; text-align: center; }
 .stock-count-stepper input::-webkit-inner-spin-button { appearance: none; margin: 0; }
 .stock-count-status { grid-area: status; margin: 4px 0 0; font-size: 9px; font-weight: 720; }
 .stock-count-status.ok { color: #087246; }

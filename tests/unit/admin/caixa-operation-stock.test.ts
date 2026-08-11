@@ -66,7 +66,8 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(style).toContain('"system stepper"');
     expect(style).toMatch(/\.stock-count-brand[^}]*font-size: 12px/);
     expect(style).toMatch(/\.stock-count-field-label[^}]*font-size: 9px/);
-    expect(style).toMatch(/\.stock-count-system-box b[^}]*font-size: 19px/);
+    expect(style).toMatch(/\.stock-count-system-box b[^}]*font-size: 16px/);
+    expect(style).toMatch(/\.stock-count-stepper input[^}]*font-size: 17px/);
   });
 
   it('grava solicitações isoladas por unidade e sem permissão de autoaprovação', () => {
