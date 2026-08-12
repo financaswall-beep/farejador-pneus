@@ -99,4 +99,11 @@ describe('logística da Matriz dentro da Operação da Loja', () => {
     expect(html).toContain('id="matrix-route-summary"');
     expect(html).toContain('id="matrix-route-close"');
   });
+
+  it('formata o valor a cobrar sem derrubar a renderização da fila', () => {
+    const sharedUi = source('painel/public/caixa-deliveries.js');
+
+    expect(sharedUi).toContain('Caixa.currency.format(Number(row.total_amount))');
+    expect(sharedUi).not.toContain('Caixa.currency(row.total_amount)');
+  });
 });

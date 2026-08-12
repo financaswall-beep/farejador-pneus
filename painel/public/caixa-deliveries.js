@@ -29,7 +29,7 @@
     if (row.delivery_status === 'delivered') return `${row.payment_method || 'Pagamento'} • Pago`;
     const method = normalize(row.payment_method);
     const charge = !Caixa.isPartner() && Number(row.total_amount) > 0
-      ? ` • Cobrar ${Caixa.currency(row.total_amount)}` : '';
+      ? ` • Cobrar ${Caixa.currency.format(Number(row.total_amount))}` : '';
     if (!Caixa.isPartner()) return `${row.payment_method || 'Pagamento na entrega'}${charge}`;
     if (!method || method === 'a receber') return `Pagamento na entrega${charge}`;
     return `${row.payment_method} • A receber`;
