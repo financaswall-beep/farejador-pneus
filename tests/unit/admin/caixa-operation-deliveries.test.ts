@@ -30,6 +30,9 @@ describe('Entregas na Operação da Loja', () => {
     expect(modules).toContain("return 'deliveries'");
     expect(css).toContain('.delivery-status-tabs');
     expect(css).toContain('.delivery-product-visual');
+    expect(css).toContain('.delivery-card-details');
+    expect(css).toContain('contain: strict');
+    expect(ui).toContain("courier.classList.add('delivery-meta--courier')");
   });
 
   it('mostra foto identificada, rota, contato e ações de andamento', () => {

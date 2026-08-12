@@ -63,6 +63,23 @@
     return line;
   }
 
+  function deliveryDetails(row) {
+    const details = document.createElement('div');
+    details.className = 'delivery-card-details';
+    details.append(
+      metaRow('M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', row.customer_name || 'Cliente não identificado'),
+      metaRow('M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0ZM12 10h.01', row.delivery_address || 'Endereço não informado'),
+      metaRow('M3 6h18v12H3zM3 9a3 3 0 0 0 3-3m12 0a3 3 0 0 0 3 3', paymentLabel(row)),
+    );
+    const courier = metaRow(
+      'M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+      row.delivery_courier || 'Não atribuído', 'Entregador: ',
+    );
+    courier.classList.add('delivery-meta--courier');
+    details.appendChild(courier);
+    return details;
+  }
+
   async function loadPhoto(photoId, image, badge) {
     if (!photoId) return;
     if (state.photos.has(photoId)) {
@@ -140,10 +157,7 @@
     const title = document.createElement('h4'); title.textContent = `Pedido ${orderLabel(row.order_id)}`;
     const status = document.createElement('span'); status.className = 'delivery-status'; status.textContent = statusLabel(row);
     head.append(title, status); card.appendChild(head);
-    card.appendChild(metaRow('M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', row.customer_name || 'Cliente não identificado'));
-    card.appendChild(metaRow('M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0ZM12 10h.01', row.delivery_address || 'Endereço não informado'));
-    card.appendChild(metaRow('M3 6h18v12H3zM3 9a3 3 0 0 0 3-3m12 0a3 3 0 0 0 3 3', paymentLabel(row)));
-    card.appendChild(metaRow('M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0 0-8 4 4 0 0 0 0 8Z', row.delivery_courier || 'Não atribuído', 'Entregador: '));
+    card.appendChild(deliveryDetails(row));
     const product = document.createElement('div'); product.className = 'delivery-product';
     const visual = document.createElement('div'); visual.className = 'delivery-product-visual';
     const image = document.createElement('img'); image.src = '/caixa/catalog-tire.webp'; image.alt = '';
