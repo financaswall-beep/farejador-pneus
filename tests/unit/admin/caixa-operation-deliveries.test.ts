@@ -58,7 +58,7 @@ describe('Entregas na Operação da Loja', () => {
     expect(route).toContain("requireScreen('entregas')");
     expect(route).toContain("'/parceiro/:slug/api/operacao/entregas'");
     expect(route).toContain("'/parceiro/:slug/api/operacao/entregas/fotos/:photoRequestId'");
-    expect(ui).toContain("Caixa.operationPath('operacao/entregas')");
+    expect(ui).toContain("Caixa.operationPath('operacao/entregas', '/api/caixa/entregas')");
     expect(appRoutes).toContain('registerPartnerOperationDeliveryRoutes');
     expect(staticRoute).toContain("'/caixa/caixa-deliveries.js'");
   });

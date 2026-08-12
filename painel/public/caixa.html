@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-entregas1" />
-  <script defer src="/caixa/caixa-core.js?v=20260811-entregas1"></script>
-  <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-entregas-matriz1" />
+  <script defer src="/caixa/caixa-core.js?v=20260811-entregas-matriz1"></script>
+  <script defer src="/caixa/caixa-modules.js?v=20260811-entregas-matriz1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
   <script defer src="/caixa/caixa-checkout-session.js?v=20260810-carrinho-sessao1"></script>
@@ -18,8 +18,9 @@
   <script defer src="/caixa/caixa-stock.js?v=20260811-estoque-pronto1"></script>
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-stock-receipts.js?v=20260811-recebimento1"></script>
-  <script defer src="/caixa/caixa-sales.js?v=20260811-minhas-vendas2"></script>
-  <script defer src="/caixa/caixa-deliveries.js?v=20260811-entregas1"></script>
+  <script defer src="/caixa/caixa-sales.js?v=20260811-entregas-matriz1"></script>
+  <script defer src="/caixa/caixa-deliveries-matrix.js?v=20260811-entregas-matriz1"></script>
+  <script defer src="/caixa/caixa-deliveries.js?v=20260811-entregas-matriz1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
@@ -299,6 +300,15 @@
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 6.5L4 9m16 6-2 2.5A7 7 0 0 1 5.5 15"/></svg>
             </button>
           </header>
+          <section id="matrix-route-summary" class="matrix-route-summary hidden" aria-label="Minha rota atual">
+            <div>
+              <small>MINHA ROTA</small>
+              <strong id="matrix-route-number">Rota em andamento</strong>
+              <span id="matrix-route-started">Iniciada agora</span>
+            </div>
+            <p><strong id="matrix-route-progress-label">0/0</strong><small>entregues</small></p>
+            <span class="matrix-route-progress"><i id="matrix-route-progress-bar"></i></span>
+          </section>
           <nav class="delivery-status-tabs" aria-label="Filtrar entregas por status">
             <button type="button" data-delivery-filter="pending" aria-pressed="false"><span>A preparar</span><strong id="delivery-count-pending">0</strong></button>
             <button class="active" type="button" data-delivery-filter="dispatched" aria-pressed="true"><span>Em rota</span><strong id="delivery-count-dispatched">0</strong></button>
@@ -313,6 +323,11 @@
               <input id="delivery-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar cliente ou pedido" />
             </label>
           </div>
+          <section id="matrix-route-start" class="matrix-route-operation hidden">
+            <div><strong>Monte sua rota</strong><span id="matrix-route-selected">Nenhuma entrega selecionada</span></div>
+            <label>Km inicial (opcional)<input id="matrix-route-km-start" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45210" /></label>
+            <button id="matrix-route-open" type="button" disabled>Começar rota</button>
+          </section>
           <div id="deliveries-loading" class="delivery-message" role="status">Carregando entregas…</div>
           <div id="deliveries-error" class="delivery-message delivery-message--error hidden" role="alert">
             <strong>Não foi possível carregar as entregas.</strong><button id="deliveries-retry" type="button">Tentar novamente</button>
@@ -321,6 +336,26 @@
             <strong>Nenhuma entrega neste status</strong><span>Quando houver pedidos, eles aparecerão aqui.</span>
           </div>
           <div id="deliveries-list" class="deliveries-list hidden" aria-live="polite"></div>
+          <section id="matrix-route-close" class="matrix-route-operation matrix-route-close hidden">
+            <div><strong>Finalizar rota</strong><span>Finalize ou informe todas as paradas antes de encerrar.</span></div>
+            <div class="matrix-route-close-fields">
+              <label>Km final<input id="matrix-route-km-end" type="number" min="0" max="9999999" inputmode="decimal" placeholder="Ex.: 45245" /></label>
+              <label>Combustível<input id="matrix-route-fuel" type="number" min="0" max="99999" step="0.01" inputmode="decimal" placeholder="R$ 0,00" /></label>
+            </div>
+            <label class="matrix-route-receipt">Fotografar comprovante<input id="matrix-route-receipt" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label>
+            <span id="matrix-route-receipt-status"></span>
+            <p id="matrix-route-error" role="alert"></p>
+            <button id="matrix-route-close-button" type="button">Encerrar minha rota</button>
+          </section>
+          <div id="delivery-failure-modal" class="delivery-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="delivery-failure-title">
+            <button class="delivery-dialog-backdrop" type="button" data-close-delivery-failure aria-label="Fechar"></button>
+            <article>
+              <header><div><small>REGISTRO OPERACIONAL</small><h3 id="delivery-failure-title">Não consegui entregar</h3></div><button type="button" data-close-delivery-failure aria-label="Fechar">×</button></header>
+              <label>Conte o motivo<textarea id="delivery-failure-reason" maxlength="500" rows="4" placeholder="Ex.: cliente ausente"></textarea></label>
+              <p id="delivery-failure-error" role="alert"></p>
+              <button id="delivery-failure-submit" type="button">Registrar ocorrência</button>
+            </article>
+          </div>
         </div>
 
         <div id="stock-panel" class="app-panel stock-panel hidden">
@@ -515,10 +550,10 @@
           <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
           <div class="profile-identity">
             <h3 id="session-name">Operador</h3>
-            <span>Operador de Caixa</span>
+            <span id="profile-role-label">Operador de Caixa</span>
           </div>
 
-          <section class="profile-summary" aria-labelledby="profile-summary-title">
+          <section id="profile-sales-summary" class="profile-summary" aria-labelledby="profile-summary-title">
             <h4 id="profile-summary-title">Resumo de hoje</h4>
             <div class="profile-summary-grid">
               <div>

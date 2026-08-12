@@ -13,7 +13,7 @@ export type OperationWorkplace =
       id: 'matrix';
       kind: 'matrix';
       name: 'Matriz';
-      role: 'vendedor';
+      role: 'vendedor' | 'entregador';
       collaboratorId: string;
       modules: OperationModules;
     }
@@ -36,6 +36,8 @@ export interface OperationAuthResult {
 
 type MatrixRow = {
   collaborator_id: string;
+  job: 'vendedor' | 'entregador';
+  work_area: string | null;
 };
 
 type PartnerRow = {
@@ -64,13 +66,13 @@ export async function listOperationWorkplaces(
 ): Promise<OperationWorkplace[]> {
   const [matrix, partners] = await Promise.all([
     dbPool.query<MatrixRow>(
-      `SELECT mc.id AS collaborator_id
+      `SELECT mc.id AS collaborator_id, mc.job, mc.work_area
          FROM network.matriz_collaborators mc
         WHERE mc.environment = $1
           AND mc.person_id = $2
           AND mc.revoked_at IS NULL
-          AND mc.job = 'vendedor'
-          AND mc.work_area = 'sales'
+          AND ((mc.job = 'vendedor' AND mc.work_area = 'sales')
+            OR mc.job = 'entregador')
         LIMIT 1`,
       [environment, personId],
     ),
@@ -111,13 +113,14 @@ export async function listOperationWorkplaces(
   const workplaces: OperationWorkplace[] = [];
   const matrixRow = matrix.rows[0];
   if (matrixRow) {
+    const isCourier = matrixRow.job === 'entregador';
     workplaces.push({
       id: 'matrix',
       kind: 'matrix',
       name: 'Matriz',
-      role: 'vendedor',
+      role: matrixRow.job,
       collaboratorId: matrixRow.collaborator_id,
-      modules: { vendas: true, estoque: false, entregas: false },
+      modules: { vendas: !isCourier, estoque: false, entregas: isCourier },
     });
   }
 

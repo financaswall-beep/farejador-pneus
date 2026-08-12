@@ -22,6 +22,7 @@ export function registerCaixaPhotoRoutes(
   fastify: FastifyInstance,
   flagGate: PreHandler,
   requireCaixaAuth: PreHandler,
+  requireVendas: PreHandler,
 ): void {
   for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
     if (!fastify.hasContentTypeParser(mime)) {
@@ -30,7 +31,7 @@ export function registerCaixaPhotoRoutes(
   }
 
   fastify.get('/api/caixa/photo-requests', {
-    preHandler: [flagGate, requireCaixaAuth],
+    preHandler: [flagGate, requireCaixaAuth, requireVendas],
   }, async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
     if (!env.PHOTO_REQUESTS) return reply.status(200).send({ enabled: false, photo_requests: [] });
@@ -41,7 +42,7 @@ export function registerCaixaPhotoRoutes(
   });
 
   fastify.post('/api/caixa/photo-requests/:photoRequestId/photo', {
-    preHandler: [flagGate, requireCaixaAuth],
+    preHandler: [flagGate, requireCaixaAuth, requireVendas],
     bodyLimit: PHOTO_MAX_UPLOAD_BYTES,
   }, async (request: CaixaRequest, reply) => {
     if (!env.PHOTO_REQUESTS) return reply.status(404).send({ error: 'feature_off' });
@@ -79,7 +80,7 @@ export function registerCaixaPhotoRoutes(
   });
 
   fastify.post('/api/caixa/photo-stream-ticket', {
-    preHandler: [flagGate, requireCaixaAuth],
+    preHandler: [flagGate, requireCaixaAuth, requireVendas],
   }, async (request: CaixaRequest, reply) => {
     if (!env.PHOTO_REQUESTS) return reply.status(404).send({ error: 'feature_off' });
     const auth = request.caixa!;

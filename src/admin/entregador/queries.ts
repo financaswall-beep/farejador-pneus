@@ -144,6 +144,7 @@ export interface EntregadorDeliveryCard {
   customer_phone: string | null;
   delivery_address: string | null;
   cobrar: string;              // total_amount cru (COD — o que ele recebe na porta). Um número só.
+  payment_method: string | null;
   delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
   scheduled_date: string;      // YYYY-MM-DD (D+1 padrão ou remarcada)
   scheduled_raw: string | null;
@@ -165,7 +166,7 @@ export interface EntregadorRota {
 // SELECT do card — só campo operacional. NADA de custo/lucro/despesa/frete.
 const CARD_SELECT = `
   SELECT o.id AS order_id, c.name AS customer_name, c.phone_e164 AS customer_phone,
-         o.delivery_address, o.total_amount::text AS cobrar, o.delivery_status,
+         o.delivery_address, o.total_amount::text AS cobrar, o.payment_method, o.delivery_status,
          o.scheduled_delivery_date::text AS scheduled_raw,
          COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
          approved_photo.photo_request_id,

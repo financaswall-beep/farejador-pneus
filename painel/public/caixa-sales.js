@@ -17,6 +17,7 @@
   }
 
   async function loadProfileSummary() {
+    if (!Caixa.canModule('vendas')) return;
     try {
       const response = await Caixa.authenticatedFetch(salesPath() + '?week=0');
       const payload = await Caixa.json(response);
@@ -148,7 +149,7 @@
     void Caixa.loadStock();
   });
   document.getElementById('nav-deliveries').addEventListener('click', function () {
-    if (!Caixa.isPartner() || !Caixa.canModule('entregas')) {
+    if (!Caixa.canModule('entregas')) {
       Caixa.showToast('Entregas não está disponível para este acesso.');
       return;
     }

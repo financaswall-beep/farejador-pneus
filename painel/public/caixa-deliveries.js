@@ -18,16 +18,20 @@
   function normalize(value) { return String(value || '').trim().toLocaleLowerCase('pt-BR'); }
   function operatorName() { return Caixa.stored(Caixa.keys.name) || 'Operador'; }
   function orderLabel(id) { return '#' + String(id || '').replace(/-/g, '').slice(0, 6).toUpperCase(); }
-  function statusLabel(status) {
-    if (status === 'dispatched') return 'Em rota';
-    if (status === 'delivered') return 'Entregue';
-    if (status === 'failed') return 'Não entregue';
+  function statusLabel(row) {
+    if (row.delivery_status === 'dispatched') return 'Em rota';
+    if (row.delivery_status === 'delivered') return 'Entregue';
+    if (row.delivery_status === 'failed') return 'Não entregue';
+    if (row.in_route) return 'Na rota';
     return 'Aguardando saída';
   }
   function paymentLabel(row) {
     if (row.delivery_status === 'delivered') return `${row.payment_method || 'Pagamento'} • Pago`;
     const method = normalize(row.payment_method);
-    if (!method || method === 'a receber') return 'Pagamento na entrega';
+    const charge = !Caixa.isPartner() && Number(row.total_amount) > 0
+      ? ` • Cobrar ${Caixa.currency(row.total_amount)}` : '';
+    if (!Caixa.isPartner()) return `${row.payment_method || 'Pagamento na entrega'}${charge}`;
+    if (!method || method === 'a receber') return `Pagamento na entrega${charge}`;
     return `${row.payment_method} • A receber`;
   }
   function itemLabel(row) {
@@ -65,10 +69,11 @@
       image.src = state.photos.get(photoId); badge.textContent = 'FOTO DO PRODUTO'; return;
     }
     try {
-      const response = await Caixa.authenticatedFetch(
-        Caixa.operationPath(`operacao/entregas/fotos/${encodeURIComponent(photoId)}`),
-      );
-      if (!response.ok) return;
+      const path = Caixa.isPartner()
+        ? Caixa.operationPath(`operacao/entregas/fotos/${encodeURIComponent(photoId)}`)
+        : Caixa.matrixDeliveries.photoPath(photoId);
+      const response = await Caixa.authenticatedFetch(path);
+      if (!response.ok) { badge.textContent = 'REFERÊNCIA DO PRODUTO'; return; }
       const url = URL.createObjectURL(await response.blob());
       state.photos.set(photoId, url); image.src = url; badge.textContent = 'FOTO DO PRODUTO';
     } catch (failure) {
@@ -84,6 +89,13 @@
   }
 
   function renderActions(row, card) {
+    if (!Caixa.isPartner() && Caixa.matrixDeliveries) {
+      Caixa.matrixDeliveries.renderActions(row, card, {
+        actionButton: actionButton,
+        phoneHref: phoneHref,
+      });
+      return;
+    }
     const actions = document.createElement('div'); actions.className = 'delivery-actions';
     if (row.delivery_status === 'pending' && !row.delivery_courier) {
       actions.appendChild(actionButton('Assumir entrega', 'claim', true));
@@ -126,7 +138,7 @@
     card.dataset.orderId = row.order_id; card.dataset.address = row.delivery_address || '';
     const head = document.createElement('header');
     const title = document.createElement('h4'); title.textContent = `Pedido ${orderLabel(row.order_id)}`;
-    const status = document.createElement('span'); status.className = 'delivery-status'; status.textContent = statusLabel(row.delivery_status);
+    const status = document.createElement('span'); status.className = 'delivery-status'; status.textContent = statusLabel(row);
     head.append(title, status); card.appendChild(head);
     card.appendChild(metaRow('M20 21a8 8 0 0 0-16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', row.customer_name || 'Cliente não identificado'));
     card.appendChild(metaRow('M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0ZM12 10h.01', row.delivery_address || 'Endereço não informado'));
@@ -156,9 +168,11 @@
   function render() {
     const query = normalize(state.query);
     const rows = state.rows.filter(function (row) {
-      const status = state.filter === 'pending'
-        ? row.delivery_status === 'pending' || row.delivery_status === 'failed'
-        : row.delivery_status === state.filter;
+      const status = !Caixa.isPartner() && Caixa.matrixDeliveries
+        ? Caixa.matrixDeliveries.matchesFilter(row, state.filter)
+        : state.filter === 'pending'
+          ? row.delivery_status === 'pending' || row.delivery_status === 'failed'
+          : row.delivery_status === state.filter;
       if (!status) return false;
       return !query || normalize([row.order_id, row.customer_name, row.delivery_address, itemLabel(row)].join(' ')).includes(query);
     });
@@ -186,14 +200,16 @@
   }
 
   async function loadDeliveries() {
-    if (!Caixa.isPartner() || !Caixa.canModule('entregas')) return;
+    if (!Caixa.canModule('entregas')) return;
     if (state.request) state.request.abort(); state.request = new AbortController();
     els.loading.classList.remove('hidden'); els.error.classList.add('hidden'); els.empty.classList.add('hidden'); els.list.classList.add('hidden');
     try {
-      const response = await Caixa.authenticatedFetch(Caixa.operationPath('operacao/entregas'), { signal: state.request.signal });
+      const feedPath = Caixa.operationPath('operacao/entregas', '/api/caixa/entregas');
+      const response = await Caixa.authenticatedFetch(feedPath, { signal: state.request.signal });
       const payload = await Caixa.json(response); if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.rows = Array.isArray(payload.rows) ? payload.rows : [];
       els.pending.textContent = payload.summary?.preparing ?? 0; els.dispatched.textContent = payload.summary?.dispatched ?? 0; els.delivered.textContent = payload.summary?.delivered ?? 0;
+      if (!Caixa.isPartner() && Caixa.matrixDeliveries) Caixa.matrixDeliveries.sync(payload, loadDeliveries);
       if (state.filter === 'dispatched' && !payload.summary?.dispatched && payload.summary?.preparing) selectFilter('pending'); else render();
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
@@ -210,6 +226,9 @@
     const target = event.target.closest('[data-delivery-action]'); if (!target || target.disabled) return;
     const card = target.closest('[data-order-id]'); if (!card) return;
     const action = target.dataset.deliveryAction; const id = card.dataset.orderId;
+    if (!Caixa.isPartner() && Caixa.matrixDeliveries) {
+      void Caixa.matrixDeliveries.handleAction(action, target, card); return;
+    }
     if (action === 'route') window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.dataset.address)}`, '_blank', 'noopener');
     else if (action === 'payment') card.querySelector('.delivery-payment-choices').classList.toggle('hidden');
     else if (action === 'deliver') void updateDelivery(id, 'delivered', target.dataset.payment);

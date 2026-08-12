@@ -19,6 +19,7 @@ import {
 import { getCaixaMySaleDetail, getCaixaMySales } from './my-sales.js';
 import { createCaixaSale, getCaixaCatalog } from './checkout.js';
 import { registerCaixaPhotoRoutes } from './route-photo.js';
+import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
@@ -113,16 +114,31 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     }
     (request as CaixaRequest).caixa = auth;
   };
-  registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth);
+  const requireCaixaModule = (module: keyof CaixaAuth['modules']) => async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    const auth = (request as CaixaRequest).caixa;
+    if (!auth?.modules[module]) await reply.status(403).send({ error: 'forbidden' });
+  };
+  const requireVendas = requireCaixaModule('vendas');
+  const requireEntregas = requireCaixaModule('entregas');
+  registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
+  registerCaixaDeliveryRoutes(fastify, flagGate, requireCaixaAuth, requireEntregas);
   registerCaixaOperationLoginRoutes(fastify, flagGate);
 
   fastify.get('/api/caixa/me', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const auth = (request as CaixaRequest).caixa!;
-    return reply.status(200).send({ display_name: auth.displayName, username: auth.username });
+    return reply.status(200).send({
+      display_name: auth.displayName,
+      username: auth.username,
+      role: auth.job,
+      modules: auth.modules,
+    });
   });
 
-  fastify.get('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
+  fastify.get('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth, requireVendas] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const parsed = salesQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
@@ -133,7 +149,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     return reply.status(200).send({ ...payload, operator_name: auth.displayName });
   });
 
-  fastify.get('/api/caixa/catalogo', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
+  fastify.get('/api/caixa/catalogo', { preHandler: [flagGate, requireCaixaAuth, requireVendas] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const parsed = catalogQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
@@ -144,7 +160,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     ));
   });
 
-  fastify.post('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
+  fastify.post('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth, requireVendas] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const parsed = createSaleSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
@@ -171,7 +187,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   });
 
   fastify.get('/api/caixa/vendas/:orderId/recibo', {
-    preHandler: [flagGate, requireCaixaAuth],
+    preHandler: [flagGate, requireCaixaAuth, requireVendas],
   }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const parsed = receiptParamsSchema.safeParse(request.params ?? {});

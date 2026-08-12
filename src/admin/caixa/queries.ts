@@ -6,11 +6,19 @@ import { fakeVerify, hashPassword, hashSessionToken, verifyPassword } from '../.
 const CAIXA_SESSION_PREFIX = 'cs_';
 const CAIXA_SESSION_TTL_HOURS = 12;
 
+export interface CaixaModules {
+  vendas: boolean;
+  estoque: boolean;
+  entregas: boolean;
+}
+
 export interface CaixaAuth {
   personId: string;
   collaboratorId: string;
   displayName: string;
   username: string;
+  job: 'vendedor' | 'entregador';
+  modules: CaixaModules;
 }
 
 export interface CaixaLoginResult {
@@ -25,6 +33,14 @@ function newCaixaSessionToken(): { token: string; hash: string } {
   return { token, hash: hashSessionToken(token) };
 }
 
+function modulesForJob(job: 'vendedor' | 'entregador'): CaixaModules {
+  return {
+    vendas: job === 'vendedor',
+    estoque: false,
+    entregas: job === 'entregador',
+  };
+}
+
 export function isCaixaSessionToken(value: string): boolean {
   return /^cs_[a-f0-9]{64}$/.test(value);
 }
@@ -37,23 +53,27 @@ export function isCaixaSessionToken(value: string): boolean {
 export async function mintCaixaSessionForPerson(
   environment: 'prod' | 'test',
   personId: string,
+  collaboratorId: string,
   dbPool: Pool = defaultPool,
 ): Promise<CaixaLoginResult | null> {
   const result = await dbPool.query<{
     display_name: string;
     username: string;
+    job: 'vendedor' | 'entregador';
   }>(
-    `SELECT mc.display_name, pp.username
+    `SELECT mc.display_name, pp.username, mc.job
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp
          ON pp.id = mc.person_id AND pp.environment = mc.environment
       WHERE mc.environment = $1
         AND mc.person_id = $2
+        AND mc.id = $3
         AND mc.revoked_at IS NULL
-        AND mc.job = 'vendedor' AND mc.work_area = 'sales'
+        AND ((mc.job = 'vendedor' AND mc.work_area = 'sales')
+          OR mc.job = 'entregador')
         AND pp.revoked_at IS NULL
       LIMIT 1`,
-    [environment, personId],
+    [environment, personId, collaboratorId],
   );
   const row = result.rows[0];
   if (!row) return null;
@@ -143,6 +163,7 @@ export async function validateCaixaSession(
     collaborator_id: string;
     display_name: string;
     username: string;
+    job: 'vendedor' | 'entregador';
   }>(
     `UPDATE network.matriz_staff_sessions s
         SET last_used_at = now()
@@ -152,9 +173,11 @@ export async function validateCaixaSession(
       WHERE s.session_hash = $1 AND s.environment = $2
         AND s.revoked_at IS NULL AND s.expires_at > now()
         AND mc.person_id = s.person_id AND mc.environment = s.environment
-        AND mc.revoked_at IS NULL AND mc.job = 'vendedor' AND mc.work_area = 'sales'
+        AND mc.revoked_at IS NULL
+        AND ((mc.job = 'vendedor' AND mc.work_area = 'sales')
+          OR mc.job = 'entregador')
         AND pp.revoked_at IS NULL
-      RETURNING s.person_id, mc.id AS collaborator_id, mc.display_name, pp.username`,
+      RETURNING s.person_id, mc.id AS collaborator_id, mc.display_name, pp.username, mc.job`,
     [hashSessionToken(sessionToken), environment],
   );
   const row = result.rows[0];
@@ -164,6 +187,8 @@ export async function validateCaixaSession(
     collaboratorId: row.collaborator_id,
     displayName: row.display_name,
     username: row.username,
+    job: row.job,
+    modules: modulesForJob(row.job),
   };
 }
 

@@ -1,5 +1,4 @@
-(function () {
-  'use strict';
+(function () { 'use strict';
 
   const Caixa = window.Caixa = window.Caixa || {};
   const keys = {
@@ -177,13 +176,16 @@
     elements.operatorLabel.textContent = firstName(name);
     elements.profileInitials.textContent = initials(name);
     elements.profileUsername.textContent = data.username || stored(keys.user) || '—';
+    const courier = stored(keys.role) === 'entregador';
+    byId('profile-role-label').textContent = courier ? 'Entregador da Matriz' : 'Operador de Caixa';
+    byId('profile-sales-summary').classList.toggle('hidden', courier);
     elements.operationUnitLabel.textContent = unitName;
     elements.sessionView.dataset.scope = scope();
     if (Caixa.bindCheckoutSession) Caixa.bindCheckoutSession(sessionFingerprint());
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
-    if (isPartner()) {
+    if (isPartner() || (Caixa.canModule && !Caixa.canModule('vendas'))) {
       if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
     } else if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
     if (Caixa.applyModuleNavigation) Caixa.applyModuleNavigation();

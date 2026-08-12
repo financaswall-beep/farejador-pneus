@@ -17,7 +17,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
   it('lista Matriz e somente parceiras com ao menos um módulo operacional', async () => {
     const query = vi.fn()
-      .mockResolvedValueOnce({ rows: [{ collaborator_id: 'collab-1' }] })
+      .mockResolvedValueOnce({ rows: [{ collaborator_id: 'collab-1', job: 'vendedor', work_area: 'sales' }] })
       .mockResolvedValueOnce({ rows: [
         {
           token_id: 'token-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
@@ -42,8 +42,29 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(query).toHaveBeenCalledTimes(2);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain("mc.job = 'vendedor'");
+    expect(sql).toContain("mc.job = 'entregador'");
     expect(sql).toContain('network.partner_token_permissions');
     expect(sql).toContain('network.partner_unit_permissions');
+  });
+
+  it('leva o entregador da Matriz direto ao módulo Entregas sem liberar Vendas', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({
+        rows: [{ collaborator_id: 'courier-1', job: 'entregador', work_area: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-courier', dbPool);
+
+    expect(workplaces).toEqual([{
+      id: 'matrix',
+      kind: 'matrix',
+      name: 'Matriz',
+      role: 'entregador',
+      collaboratorId: 'courier-1',
+      modules: { vendas: false, estoque: false, entregas: true },
+    }]);
   });
 
   it('não expõe IDs internos e retorna nulo para conta sem local permitido', async () => {

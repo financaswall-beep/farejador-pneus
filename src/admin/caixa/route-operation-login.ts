@@ -45,13 +45,18 @@ async function issueOperationSession(
   workplace: OperationWorkplace,
 ) {
   if (workplace.kind === 'matrix') {
-    const session = await mintCaixaSessionForPerson(environment, personId);
+    const session = await mintCaixaSessionForPerson(
+      environment,
+      personId,
+      workplace.collaboratorId,
+    );
     if (!session) return null;
     return {
       mode: 'direct' as const,
       scope: 'matrix' as const,
       workplace_id: workplace.id,
       store_name: workplace.name,
+      role: workplace.role,
       modules: workplace.modules,
       ...session,
     };
