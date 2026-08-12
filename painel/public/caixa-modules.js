@@ -35,8 +35,10 @@
 
   function initialOperationTab() {
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
+    if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('vendas')) return 'cash';
     if (Caixa.isPartner() && canModule('estoque')) return 'stock';
+    if (Caixa.isPartner() && canModule('entregas')) return 'deliveries';
     return 'profile';
   }
 

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-minhas-vendas2" />
-  <script defer src="/caixa/caixa-core.js?v=20260811-minhas-vendas2"></script>
+  <link rel="stylesheet" href="/caixa/caixa.css?v=20260811-entregas1" />
+  <script defer src="/caixa/caixa-core.js?v=20260811-entregas1"></script>
   <script defer src="/caixa/caixa-modules.js?v=20260810-operacao-estoque1"></script>
   <script defer src="/caixa/caixa-checkout-catalog.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-checkout.js?v=20260810-carrinho-sessao1"></script>
@@ -19,6 +19,7 @@
   <script defer src="/caixa/caixa-stock-count.js?v=20260811-contagem6"></script>
   <script defer src="/caixa/caixa-stock-receipts.js?v=20260811-recebimento1"></script>
   <script defer src="/caixa/caixa-sales.js?v=20260811-minhas-vendas2"></script>
+  <script defer src="/caixa/caixa-deliveries.js?v=20260811-entregas1"></script>
   <script defer src="/caixa/caixa-profile.js?v=20260810-operacao-vender1"></script>
   <script defer src="/caixa/caixa-photo.js?v=20260804-foto1"></script>
   <script defer src="/caixa/caixa.js?v=20260810-operacao-vender1"></script>
@@ -289,6 +290,37 @@
             <span>Suas vendas desta semana aparecerão aqui.</span>
           </div>
           <div id="sales-list" class="sales-list" aria-live="polite"></div>
+        </div>
+
+        <div id="deliveries-panel" class="app-panel deliveries-panel hidden">
+          <header class="deliveries-title">
+            <div><h3>Pedidos de hoje</h3><p>Pendências anteriores continuam visíveis</p></div>
+            <button id="deliveries-refresh" type="button" aria-label="Atualizar entregas">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6 6.5L4 9m16 6-2 2.5A7 7 0 0 1 5.5 15"/></svg>
+            </button>
+          </header>
+          <nav class="delivery-status-tabs" aria-label="Filtrar entregas por status">
+            <button type="button" data-delivery-filter="pending" aria-pressed="false"><span>A preparar</span><strong id="delivery-count-pending">0</strong></button>
+            <button class="active" type="button" data-delivery-filter="dispatched" aria-pressed="true"><span>Em rota</span><strong id="delivery-count-dispatched">0</strong></button>
+            <button type="button" data-delivery-filter="delivered" aria-pressed="false"><span>Entregues</span><strong id="delivery-count-delivered">0</strong></button>
+          </nav>
+          <div class="delivery-tools">
+            <button class="delivery-date" type="button" aria-label="Entregas de hoje">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>Hoje
+            </button>
+            <label class="delivery-search" for="delivery-search-input">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <input id="delivery-search-input" type="search" maxlength="80" autocomplete="off" placeholder="Buscar cliente ou pedido" />
+            </label>
+          </div>
+          <div id="deliveries-loading" class="delivery-message" role="status">Carregando entregas…</div>
+          <div id="deliveries-error" class="delivery-message delivery-message--error hidden" role="alert">
+            <strong>Não foi possível carregar as entregas.</strong><button id="deliveries-retry" type="button">Tentar novamente</button>
+          </div>
+          <div id="deliveries-empty" class="delivery-message hidden">
+            <strong>Nenhuma entrega neste status</strong><span>Quando houver pedidos, eles aparecerão aqui.</span>
+          </div>
+          <div id="deliveries-list" class="deliveries-list hidden" aria-live="polite"></div>
         </div>
 
         <div id="stock-panel" class="app-panel stock-panel hidden">

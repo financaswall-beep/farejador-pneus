@@ -51,6 +51,7 @@
     app: document.querySelector('.caixa-app'),
     cashPanel: byId('cash-panel'),
     salesPanel: byId('sales-panel'),
+    deliveriesPanel: byId('deliveries-panel'),
     profilePanel: byId('profile-panel'),
     salesSearch: byId('sales-search-input'),
     searchClear: byId('sales-search-clear'),
@@ -190,6 +191,7 @@
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
     else if (initialTab === 'stock' && Caixa.loadStock) void Caixa.loadStock();
+    else if (initialTab === 'deliveries' && Caixa.loadDeliveries) void Caixa.loadDeliveries();
     else if (initialTab === 'cash') void Caixa.loadCatalog();
   }
 

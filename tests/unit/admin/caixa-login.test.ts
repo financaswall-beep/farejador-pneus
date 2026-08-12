@@ -17,6 +17,7 @@ const scriptFiles = [
   'caixa-stock.js',
   'caixa-stock-count.js',
   'caixa-sales.js',
+  'caixa-deliveries.js',
   'caixa-profile.js',
   'caixa-photo.js',
   'caixa.js',
