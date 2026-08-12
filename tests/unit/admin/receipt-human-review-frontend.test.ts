@@ -39,6 +39,16 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     expect(html).toMatch(/:disabled="!![^\"]+"/);
   });
 
+  it('organiza a revisao em comprovante, dados e acoes sem esticar o formulario', () => {
+    const html = read('painel/public/index.html');
+
+    expect(html).toContain('max-w-7xl');
+    expect(html).toContain('Comprovante enviado');
+    expect(html).toContain('Dados do lançamento');
+    expect(html).toContain('Rejeitar comprovante');
+    expect(html).toContain('Ampliar comprovante');
+  });
+
   it('reusa a mesma chave em retry e separa erro do admin e do entregador', () => {
     const module = readFileSync(modulePath, 'utf8');
     const courier = read('painel/public/entregas.js');

@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260802-bot-hourly1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260812-revisao-comprovantes1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -4219,44 +4219,145 @@
           </button>
         </div>
 
-        <section x-show="adminUser?.role === 'owner' && !(logisticaTab === 'rotas' && logisticaRotaSelecionada()) && logistica?.receipt_approval && receiptReviewQueue().length" class="bg-white border border-amber-200 rounded-xl overflow-hidden shadow-sm">
-          <div class="p-5 border-b border-amber-100 bg-amber-50/60 flex items-start justify-between gap-4">
-            <div><h2 class="text-base font-semibold text-amber-950">Comprovantes aguardando sua aprovação</h2><p class="text-xs text-amber-800 mt-1">A IA só sugere. Revise os campos e confirme; antes disso, nenhum valor entra no Financeiro.</p></div>
-            <span class="rounded-full bg-white border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-800" x-text="receiptReviewQueue().length"></span>
-          </div>
-          <div class="divide-y divide-gray-100">
-            <template x-for="entry in receiptReviewQueue()" :key="entry.receipt.id">
-              <div class="p-5 space-y-4" x-init="receiptReviewDraft(entry.receipt)">
-                <div class="flex items-start gap-3">
-                  <a x-show="receiptUrls[entry.receipt.id]" :href="receiptUrls[entry.receipt.id]" target="_blank" class="flex-shrink-0"><img :src="receiptUrls[entry.receipt.id]" class="w-16 h-16 object-cover rounded-lg border border-gray-200" alt="comprovante para revisar"></a>
-                  <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><span class="font-semibold text-gray-900" x-text="entry.trip.trip_number"></span><span class="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800" x-text="receiptWorkflowLabel(entry.receipt)"></span></div><p class="text-xs text-gray-500 mt-1" x-text="entry.receipt.latest_attempt?.summary || entry.receipt.ai_summary || 'Sem sugestão automática; preencha manualmente.'"></p><p x-show="entry.receipt.latest_attempt?.confidence != null" class="text-[11px] text-gray-400 mt-1" x-text="'Confiança da IA: ' + Math.round(Number(entry.receipt.latest_attempt.confidence) * 100) + '%' "></p></div>
-                  <button x-show="logistica?.receipt_ai" @click="lerComprovante(entry.receipt)" :disabled="!!receiptReviewBusy[entry.receipt.id]" class="px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium hover:bg-gray-50 disabled:opacity-50">Ler de novo</button>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <label class="text-xs text-gray-600">Valor confirmado<input type="number" min="0.01" step="0.01" x-model="receiptReviewDrafts[entry.receipt.id].amount" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label class="text-xs text-gray-600">Categoria<select x-model="receiptReviewDrafts[entry.receipt.id].category" class="mt-1 w-full rounded-lg border-gray-200 text-sm"><template x-for="category in receiptCategoryOptions()" :key="category.id"><option :value="category.id" x-text="category.label"></option></template></select></label>
-                  <label class="text-xs text-gray-600 sm:col-span-2">Estabelecimento<input type="text" maxlength="200" x-model="receiptReviewDrafts[entry.receipt.id].merchant" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label class="text-xs text-gray-600">Data do documento<input type="date" x-model="receiptReviewDrafts[entry.receipt.id].document_date" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label class="text-xs text-gray-600">Competência<input type="date" x-model="receiptReviewDrafts[entry.receipt.id].competence_month" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label class="text-xs text-gray-600">Situação<select x-model="receiptReviewDrafts[entry.receipt.id].payment_status" class="mt-1 w-full rounded-lg border-gray-200 text-sm"><option value="paid">Pago</option><option value="pending">A pagar</option></select></label>
-                  <label x-show="receiptReviewDrafts[entry.receipt.id].payment_status === 'paid'" class="text-xs text-gray-600">Data do pagamento<input type="date" x-model="receiptReviewDrafts[entry.receipt.id].payment_date" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label x-show="receiptReviewDrafts[entry.receipt.id].payment_status === 'pending'" class="text-xs text-gray-600">Vencimento<input type="date" x-model="receiptReviewDrafts[entry.receipt.id].due_date" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                  <label class="text-xs text-gray-600 sm:col-span-2 lg:col-span-4">Observação opcional<input type="text" maxlength="500" x-model="receiptReviewDrafts[entry.receipt.id].note" class="mt-1 w-full rounded-lg border-gray-200 text-sm"></label>
-                </div>
-                <div x-show="receiptAmountAttention(entry.receipt)" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">O valor informado difere mais de 20% da sugestão da IA. Confira antes de aprovar.</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-700">
-                  <label class="flex items-start gap-2"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].competence_confirmed" class="mt-0.5 rounded border-gray-300"><span>Confirmo a competência caso seja diferente da data do documento.</span></label>
-                  <label class="flex items-start gap-2"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].retroactive_confirmed" class="mt-0.5 rounded border-gray-300"><span>Confirmo o lançamento caso seja retroativo há mais de 3 meses.</span></label>
-                  <label x-show="receiptReviewDrafts[entry.receipt.id].possible_duplicate_required" class="flex items-start gap-2 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].possible_duplicate_confirmed" class="mt-0.5 rounded border-amber-400"><span>Conferi a possível duplicidade e quero continuar.</span></label>
-                  <label x-show="receiptReviewDrafts[entry.receipt.id].legacy_expense_required" class="flex items-start gap-2 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].legacy_expense_confirmed" class="mt-0.5 rounded border-amber-400"><span>Confirmo o vínculo com a despesa legada, sem criar outra.</span></label>
-                </div>
-                <label class="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-950"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].confirmed" class="mt-0.5 rounded border-emerald-400"><span>Revisei valor, categoria, datas e pagamento. Autorizo este lançamento no Financeiro.</span></label>
-                <p x-show="receiptReviewMessages[entry.receipt.id]" class="text-xs text-rose-700" x-text="receiptReviewMessages[entry.receipt.id]"></p>
-                <div class="flex flex-col lg:flex-row lg:items-end gap-3">
-                  <button @click="approveReceipt(entry.receipt)" :disabled="!!receiptApprovalDisabled(entry.receipt)" class="px-4 py-2.5 rounded-lg bg-emerald-700 text-white text-sm font-semibold disabled:opacity-40">Aprovar e lançar</button>
-                  <div class="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center"><input type="text" maxlength="500" placeholder="Motivo para rejeitar" x-model="receiptReviewDrafts[entry.receipt.id].reject_reason" class="rounded-lg border-gray-200 text-sm"><label class="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].reject_confirmed" class="rounded border-gray-300">Confirmo a rejeição</label><button @click="rejectReceipt(entry.receipt)" :disabled="!!receiptRejectDisabled(entry.receipt)" class="px-3 py-2 rounded-lg border border-rose-200 text-rose-700 text-sm font-medium disabled:opacity-40">Rejeitar</button></div>
-                </div>
+        <section x-show="adminUser?.role === 'owner' && !(logisticaTab === 'rotas' && logisticaRotaSelecionada()) && logistica?.receipt_approval && receiptReviewQueue().length"
+                 aria-labelledby="receipt-review-heading"
+                 class="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div class="flex flex-col gap-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="flex items-start gap-3">
+              <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-700 shadow-sm">
+                <i data-lucide="receipt-text" class="h-5 w-5"></i>
               </div>
+              <div>
+                <h2 id="receipt-review-heading" class="text-lg font-semibold text-gray-950">Comprovantes aguardando sua aprovação</h2>
+                <p class="mt-1 max-w-2xl text-sm text-gray-600">Confira a imagem e os dados antes de lançar a despesa no Financeiro.</p>
+              </div>
+            </div>
+            <span class="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm">
+              <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+              <span x-text="receiptReviewQueue().length + (receiptReviewQueue().length === 1 ? ' pendente' : ' pendentes')"></span>
+            </span>
+          </div>
+
+          <div class="space-y-5 bg-gray-50/70 p-4 sm:p-6">
+            <template x-for="entry in receiptReviewQueue()" :key="entry.receipt.id">
+              <article class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" x-init="receiptReviewDraft(entry.receipt)">
+                <header class="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-lg font-semibold text-gray-950" x-text="entry.trip.trip_number"></span>
+                      <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                        <span x-text="receiptWorkflowLabel(entry.receipt)"></span>
+                      </span>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500">
+                      <span class="inline-flex items-center gap-1.5"><i data-lucide="user-round" class="h-3.5 w-3.5"></i><span x-text="entry.trip.courier_name || 'Entregador não informado'"></span></span>
+                      <span class="inline-flex items-center gap-1.5"><i data-lucide="calendar-clock" class="h-3.5 w-3.5"></i><span x-text="formatDateTime(entry.receipt.created_at)"></span></span>
+                    </div>
+                  </div>
+                  <button x-show="logistica?.receipt_ai" @click="lerComprovante(entry.receipt)" :disabled="!!receiptReviewBusy[entry.receipt.id]"
+                          class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50">
+                    <i data-lucide="scan-text" class="h-4 w-4"></i>
+                    <span x-text="receiptReviewBusy[entry.receipt.id] ? 'Lendo…' : 'Ler novamente'"></span>
+                  </button>
+                </header>
+
+                <div class="grid grid-cols-1 xl:grid-cols-12">
+                  <aside class="border-b border-gray-200 bg-slate-50 p-5 sm:p-6 xl:col-span-4 xl:border-b-0 xl:border-r">
+                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Comprovante enviado</p>
+                    <a x-show="receiptUrls[entry.receipt.id]" :href="receiptUrls[entry.receipt.id]" target="_blank"
+                       class="group relative block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                      <img :src="receiptUrls[entry.receipt.id]" class="h-80 w-full object-contain p-2 transition group-hover:scale-[1.01]" alt="comprovante para revisar">
+                      <span class="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-gray-950/80 px-3 py-1.5 text-xs font-medium text-white shadow-sm">
+                        <i data-lucide="maximize-2" class="h-3.5 w-3.5"></i>Ampliar comprovante
+                      </span>
+                    </a>
+                    <div x-show="!receiptUrls[entry.receipt.id]" class="flex h-80 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white text-center text-sm text-gray-500">
+                      <i data-lucide="image-off" class="mb-2 h-8 w-8 text-gray-300"></i>
+                      Imagem indisponível
+                    </div>
+                    <div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+                      <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-800"><i data-lucide="sparkles" class="h-4 w-4"></i>Sugestão da IA</div>
+                      <p class="mt-2 text-sm leading-relaxed text-gray-700" x-text="entry.receipt.latest_attempt?.summary || entry.receipt.ai_summary || 'Sem sugestão automática; preencha manualmente.'"></p>
+                      <p x-show="entry.receipt.latest_attempt?.confidence != null" class="mt-2 text-xs font-medium text-indigo-700" x-text="'Confiança: ' + Math.round(Number(entry.receipt.latest_attempt.confidence) * 100) + '%'"></p>
+                    </div>
+                  </aside>
+
+                  <div class="space-y-5 p-5 sm:p-6 xl:col-span-8">
+                    <div>
+                      <div class="mb-4 flex items-center gap-2">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><i data-lucide="file-pen-line" class="h-4 w-4"></i></div>
+                        <div><h3 class="text-base font-semibold text-gray-950">Dados do lançamento</h3><p class="text-xs text-gray-500">Edite somente se algo estiver diferente do comprovante.</p></div>
+                      </div>
+                      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                        <label class="text-xs font-medium text-gray-600 lg:col-span-2">Valor confirmado
+                          <div class="relative mt-1.5"><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-semibold text-gray-500">R$</span><input type="number" min="0.01" step="0.01" x-model="receiptReviewDrafts[entry.receipt.id].amount" class="w-full rounded-lg border-gray-200 py-2.5 pl-10 pr-3 text-base font-semibold tabular-nums focus:border-emerald-600 focus:ring-emerald-600"></div>
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 lg:col-span-2">Categoria
+                          <select x-model="receiptReviewDrafts[entry.receipt.id].category" class="mt-1.5 w-full rounded-lg border-gray-200 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600"><template x-for="category in receiptCategoryOptions()" :key="category.id"><option :value="category.id" x-text="category.label"></option></template></select>
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 sm:col-span-2 lg:col-span-2">Situação
+                          <select x-model="receiptReviewDrafts[entry.receipt.id].payment_status" class="mt-1.5 w-full rounded-lg border-gray-200 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600"><option value="paid">Pago</option><option value="pending">A pagar</option></select>
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 sm:col-span-2 lg:col-span-6">Estabelecimento
+                          <input type="text" maxlength="200" x-model="receiptReviewDrafts[entry.receipt.id].merchant" placeholder="Nome que aparece no comprovante" class="mt-1.5 w-full rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600">
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 lg:col-span-2">Data do documento
+                          <input type="date" x-model="receiptReviewDrafts[entry.receipt.id].document_date" class="mt-1.5 w-full rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600">
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 lg:col-span-2">Competência
+                          <input type="date" x-model="receiptReviewDrafts[entry.receipt.id].competence_month" class="mt-1.5 w-full rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600">
+                        </label>
+                        <label x-show="receiptReviewDrafts[entry.receipt.id].payment_status === 'paid'" class="text-xs font-medium text-gray-600 lg:col-span-2">Data do pagamento
+                          <input type="date" x-model="receiptReviewDrafts[entry.receipt.id].payment_date" class="mt-1.5 w-full rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600">
+                        </label>
+                        <label x-show="receiptReviewDrafts[entry.receipt.id].payment_status === 'pending'" class="text-xs font-medium text-gray-600 lg:col-span-2">Vencimento
+                          <input type="date" x-model="receiptReviewDrafts[entry.receipt.id].due_date" class="mt-1.5 w-full rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600">
+                        </label>
+                        <label class="text-xs font-medium text-gray-600 sm:col-span-2 lg:col-span-6">Observação opcional
+                          <textarea maxlength="500" rows="2" x-model="receiptReviewDrafts[entry.receipt.id].note" placeholder="Inclua uma observação somente se necessário" class="mt-1.5 w-full resize-none rounded-lg border-gray-200 px-3 py-2.5 text-sm focus:border-emerald-600 focus:ring-emerald-600"></textarea>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div x-show="receiptAmountAttention(entry.receipt)" class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900"><i data-lucide="triangle-alert" class="mt-0.5 h-4 w-4 flex-shrink-0"></i><span>O valor informado difere mais de 20% da sugestão da IA. Confira antes de aprovar.</span></div>
+
+                    <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                      <h4 class="text-sm font-semibold text-gray-800">Confirmações adicionais</h4>
+                      <div class="mt-3 grid grid-cols-1 gap-3 text-sm text-gray-700 md:grid-cols-2">
+                        <label class="flex items-start gap-2.5"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].competence_confirmed" class="mt-0.5 rounded border-gray-300 text-emerald-700 focus:ring-emerald-600"><span>Confirmo a competência caso seja diferente da data do documento.</span></label>
+                        <label class="flex items-start gap-2.5"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].retroactive_confirmed" class="mt-0.5 rounded border-gray-300 text-emerald-700 focus:ring-emerald-600"><span>Confirmo o lançamento caso seja retroativo há mais de 3 meses.</span></label>
+                        <label x-show="receiptReviewDrafts[entry.receipt.id].possible_duplicate_required" class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].possible_duplicate_confirmed" class="mt-0.5 rounded border-amber-400"><span>Conferi a possível duplicidade e quero continuar.</span></label>
+                        <label x-show="receiptReviewDrafts[entry.receipt.id].legacy_expense_required" class="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].legacy_expense_confirmed" class="mt-0.5 rounded border-amber-400"><span>Confirmo o vínculo com a despesa legada, sem criar outra.</span></label>
+                      </div>
+                    </div>
+
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+                      <input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].confirmed" class="mt-0.5 h-4 w-4 rounded border-emerald-400 text-emerald-700 focus:ring-emerald-600">
+                      <span><strong class="block font-semibold">Dados conferidos</strong><span class="mt-0.5 block text-emerald-800">Revisei valor, categoria, datas e pagamento. Autorizo este lançamento no Financeiro.</span></span>
+                    </label>
+
+                    <p x-show="receiptReviewMessages[entry.receipt.id]" class="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700"><i data-lucide="circle-alert" class="h-4 w-4 flex-shrink-0"></i><span x-text="receiptReviewMessages[entry.receipt.id]"></span></p>
+
+                    <div class="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 lg:flex-row lg:items-start lg:justify-between">
+                      <details class="group w-full rounded-xl border border-rose-200 bg-white lg:max-w-md">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-rose-700">
+                          <span class="inline-flex items-center gap-2"><i data-lucide="circle-x" class="h-4 w-4"></i>Rejeitar comprovante</span>
+                          <i data-lucide="chevron-down" class="h-4 w-4 transition group-open:rotate-180"></i>
+                        </summary>
+                        <div class="space-y-3 border-t border-rose-100 bg-rose-50/50 p-4">
+                          <label class="block text-xs font-medium text-rose-900">Motivo da rejeição
+                            <textarea maxlength="500" rows="2" placeholder="Explique por que este comprovante não pode ser aceito" x-model="receiptReviewDrafts[entry.receipt.id].reject_reason" class="mt-1.5 w-full resize-none rounded-lg border-rose-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-rose-500 focus:ring-rose-500"></textarea>
+                          </label>
+                          <label class="flex items-center gap-2 text-xs text-rose-900"><input type="checkbox" x-model="receiptReviewDrafts[entry.receipt.id].reject_confirmed" class="rounded border-rose-300 text-rose-600 focus:ring-rose-500">Confirmo a rejeição</label>
+                          <button @click="rejectReceipt(entry.receipt)" :disabled="!!receiptRejectDisabled(entry.receipt)" class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-600 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40"><i data-lucide="x" class="h-4 w-4"></i>Rejeitar sem lançar</button>
+                        </div>
+                      </details>
+                      <button @click="approveReceipt(entry.receipt)" :disabled="!!receiptApprovalDisabled(entry.receipt)" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40 lg:w-auto lg:min-w-56"><i data-lucide="circle-check" class="h-5 w-5"></i><span x-text="receiptReviewBusy[entry.receipt.id] ? 'Salvando…' : 'Aprovar e lançar'"></span></button>
+                    </div>
+                  </div>
+                </div>
+              </article>
             </template>
           </div>
         </section>
