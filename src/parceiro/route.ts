@@ -115,6 +115,7 @@ import { acquirePartnerSseSlot } from './sse-limit.js';
 import { isAllowedPushEndpoint } from './push-endpoint.js';
 import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
 import { registerPartnerMySalesRoutes } from './route-my-sales.js';
+import { registerPartnerFuncionarioReactivationRoute } from './route-funcionarios.js';
 
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
@@ -686,6 +687,8 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     if (!result.revoked) return reply.status(404).send({ error: 'funcionario_not_found' });
     return reply.status(200).send(result);
   });
+
+  registerPartnerFuncionarioReactivationRoute(fastify);
 
   // ── Bloco 2 (0100): acesso + comissão POR PESSOA. Tudo ownerOnly e escopado à
   // própria unidade dentro das queries (assertUnitFuncionario → 404 se não for dele). ──

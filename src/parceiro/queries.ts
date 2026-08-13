@@ -24,7 +24,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import type { PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { withPartnerContext } from './db.js';
 import { hashPassword, verifyPassword, fakeVerify, newSessionToken, hashSessionToken } from './password.js';
 import { pool } from '../persistence/db.js';
@@ -3274,6 +3274,51 @@ export async function revokePartnerFuncionario(
     );
   }
   return { revoked: (res.rowCount ?? 0) > 0 };
+}
+
+/** Reativa um funcionário revogado, preservando o mesmo vínculo e seu histórico. */
+export async function reactivatePartnerFuncionario(
+  ctx: PartnerContext,
+  tokenId: string,
+  dbPool: Pool = pool,
+): Promise<{ reactivated: boolean }> {
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const target = await client.query<{ person_id: string | null }>(
+      `SELECT person_id FROM network.partner_access_tokens
+        WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+          AND role = 'funcionario' AND revoked_at IS NOT NULL
+        FOR UPDATE`,
+      [tokenId, ctx.environment, ctx.partnerUnitId],
+    );
+    const row = target.rows[0];
+    if (!row) {
+      await client.query('ROLLBACK');
+      return { reactivated: false };
+    }
+    if (row.person_id) {
+      await client.query(
+        `UPDATE network.partner_people SET revoked_at = NULL
+          WHERE id = $1 AND environment = $2 AND revoked_at IS NOT NULL`,
+        [row.person_id, ctx.environment],
+      );
+    }
+    const result = await client.query(
+      `UPDATE network.partner_access_tokens SET revoked_at = NULL
+        WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+          AND role = 'funcionario' AND revoked_at IS NOT NULL`,
+      [tokenId, ctx.environment, ctx.partnerUnitId],
+    );
+    await client.query('COMMIT');
+    return { reactivated: (result.rowCount ?? 0) === 1 };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    if (isUsernameConflict(err)) throw new PartnerUsernameConflictError();
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────

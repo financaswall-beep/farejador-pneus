@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-11T16:28:32.809Z",
+  "geradoEm": "2026-08-13T02:51:44.592Z",
   "commitBase": "c0d7913",
-  "total": 587,
+  "total": 590,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -199,6 +199,8 @@
     "funcPermForm": "value:object",
     "funcionarioForm": "value:object",
     "funcionarios": "value:array",
+    "funcionariosAtivos": "getter",
+    "funcionariosDesativados": "getter",
     "goToSection": "function",
     "healthChecks": "getter",
     "healthScore": "getter",
@@ -396,6 +398,7 @@
     "pushServerEnabled": "value:boolean",
     "pushShouldOfferBanner": "getter",
     "pushSupported": "value:boolean",
+    "reactivateFuncionario": "function",
     "receivableCustomerQuery": "value:string",
     "receivableCustomerResults": "value:array",
     "receivableCustomerSearchTimer": "value:null",

@@ -3177,7 +3177,7 @@
              A permissão ainda é "um perfil só" da loja (permForm); o acesso POR PESSOA
              é o Bloco 2 (precisa de migration). Aqui o painel já abre por funcionário e
              deixa claro que o acesso é compartilhado por enquanto. -->
-        <div x-show="configTab === 'equipe'" class="pos-page-grid customers equipe-premium">
+        <div x-show="configTab === 'equipe'" x-data="{ funcionarioView: 'ativos' }" class="pos-page-grid customers equipe-premium">
           <section class="pos-panel pos-data-panel">
             <div class="pos-panel-head">
               <div>
@@ -3186,8 +3186,17 @@
               </div>
             </div>
 
+            <div class="pos-seg" role="group" aria-label="Situação dos funcionários" style="margin:10px 0 12px;">
+              <button type="button" :class="{ on: funcionarioView === 'ativos' }" @click="funcionarioView = 'ativos'; selectedFuncionario = null">
+                Equipe ativa <span x-text="funcionariosAtivos.length"></span>
+              </button>
+              <button type="button" :class="{ on: funcionarioView === 'desativados' }" @click="funcionarioView = 'desativados'; selectedFuncionario = null">
+                Desativados <span x-text="funcionariosDesativados.length"></span>
+              </button>
+            </div>
+
             <div style="margin-top:4px;">
-              <template x-for="f in funcionarios" :key="f.id">
+              <template x-for="f in (funcionarioView === 'ativos' ? funcionariosAtivos : funcionariosDesativados)" :key="f.id">
                 <button type="button" @click="selectFuncionario(f)"
                   style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;border-radius:10px;border:1px solid var(--pos-border,#e2e8f0);background:transparent;cursor:pointer;margin-bottom:8px;"
                   :style="{ boxShadow: (selectedFuncionario && selectedFuncionario.id === f.id) ? 'inset 0 0 0 2px #2563eb' : '', opacity: f.revoked_at ? '0.6' : '1' }">
@@ -3201,12 +3210,15 @@
                   <i data-lucide="chevron-right" style="flex:none;color:var(--pos-muted,#94a3b8);"></i>
                 </button>
               </template>
-              <div x-show="!funcionarios.length" class="pos-empty">
-                Nenhum funcionário cadastrado ainda. Use "Adicionar funcionário" ao lado.
+              <div x-show="funcionarioView === 'ativos' && !funcionariosAtivos.length" class="pos-empty">
+                Nenhum funcionário ativo. Use "Adicionar funcionário" ao lado.
+              </div>
+              <div x-show="funcionarioView === 'desativados' && !funcionariosDesativados.length" class="pos-empty">
+                Nenhum funcionário desativado.
               </div>
             </div>
 
-            <button @click="selectedFuncionario = null; revokeConfirmId = null; $nextTick(() => lucide.createIcons())"
+            <button x-show="funcionarioView === 'ativos'" @click="selectedFuncionario = null; revokeConfirmId = null; $nextTick(() => lucide.createIcons())"
                     class="pos-outline-action" style="margin-top:6px;">
               <i data-lucide="user-plus"></i> Adicionar funcionário
             </button>
@@ -3229,7 +3241,7 @@
                 </div>
 
                 <!-- Bloco 2 (0100): ACESSO + COMISSÃO por pessoa. Carrega ao abrir (funcConfigLoaded). -->
-                <div x-show="!funcConfigLoaded" style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
+                <div x-show="!funcConfigLoaded && !selectedFuncionario.revoked_at" style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
                   <i data-lucide="loader" style="width:14px;height:14px;"></i> Carregando o acesso desta pessoa…
                 </div>
 
@@ -3333,9 +3345,15 @@
                 </template>
 
                 <template x-if="selectedFuncionario.revoked_at">
-                  <p style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
-                    <i data-lucide="user-x" style="width:14px;height:14px;"></i> Login desativado — sem acesso ao painel.
-                  </p>
+                  <div>
+                    <p style="margin-top:12px;font-size:13px;color:var(--pos-muted,#94a3b8);">
+                      <i data-lucide="user-x" style="width:14px;height:14px;"></i> Login desativado — sem acesso ao painel.
+                    </p>
+                    <button @click="reactivateFuncionario(selectedFuncionario)" :disabled="saving" class="pos-form-submit success" style="margin-top:12px;">
+                      <i data-lucide="user-check"></i>
+                      <span x-text="isSaving('funcionario') ? 'Reativando...' : 'Reativar funcionário'"></span>
+                    </button>
+                  </div>
                 </template>
               </div>
             </template>
@@ -3405,7 +3423,7 @@
 <script src="./app.foto.js?v=20260614-foto-viva"></script>
 <script src="./app.chat.js?v=20260611-onda-c"></script>
 <script src="./app.chat.cliente.js?v=20260731-condicao2"></script>
-<script src="./app.config.js?v=20260612-bloco2"></script>
+<script src="./app.config.js?v=20260812-equipe-ativos1"></script>
 <script src="./app.config.equipe.js?v=20260612-bloco2"></script>
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>

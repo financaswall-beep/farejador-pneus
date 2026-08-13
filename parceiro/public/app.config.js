@@ -12,6 +12,8 @@
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.config = () => ({
     get isOwner() { return this.role === 'owner'; },
+    get funcionariosAtivos() { return this.funcionarios.filter((f) => !f.revoked_at); },
+    get funcionariosDesativados() { return this.funcionarios.filter((f) => !!f.revoked_at); },
 
     // Pode VER a tela? Dono vê tudo; funcionário depende da permissão efetiva
     // (resolvida no servidor em /api/me.permissions). Usado no menu pra Resumo e
@@ -110,10 +112,26 @@ window.PARCEIRO_MODULES.config = () => ({
         await this.api(`funcionarios/${f.id}`, { method: 'DELETE' });
         await this.loadFuncionarios();
         this.revokeConfirmId = null;
-        this.selectedFuncionario = this.funcionarios.find((x) => x.id === f.id) || null;
+        this.selectedFuncionario = null;
         this.flash('Login desativado.', 'success');
       } catch (err) {
         this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
+    },
+
+    async reactivateFuncionario(f) {
+      this.saving = true; this.savingAction = 'funcionario';
+      try {
+        await this.api(`funcionarios/${f.id}/reativar`, { method: 'POST' });
+        await this.loadFuncionarios();
+        this.selectedFuncionario = null;
+        this.flash('Funcionário reativado e devolvido à equipe.', 'success');
+      } catch (err) {
+        this.flash(err && err.payload && err.payload.error === 'username_taken'
+          ? 'Esse usuário já foi usado por outra conta. Escolha outro login para reativar.'
+          : this.errMessage(err));
       } finally {
         this.saving = false; this.savingAction = '';
       }
