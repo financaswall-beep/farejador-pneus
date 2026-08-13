@@ -15,6 +15,26 @@ window.PAINEL_MODULES.logisticaResultado = function () {
         semCusto: Number(r.itens_sem_custo || 0),
       };
     },
+    logisticaHistoricoResumo() {
+      const rows = (this.logistica?.finalizadas || []).filter((d) => this.logisticaDentroPeriodo(d));
+      const entregues = rows.filter((d) => d.delivery_status === 'delivered').length;
+      const concluidas = rows.length;
+      const tempos = rows.map((d) => {
+        if (!d?.created_at || !d?.delivered_at || d.delivery_status !== 'delivered') return null;
+        const minutos = (new Date(d.delivered_at).getTime() - new Date(d.created_at).getTime()) / 60000;
+        return Number.isFinite(minutos) && minutos >= 0 ? minutos : null;
+      }).filter((value) => value != null);
+      const mediaMinutos = tempos.length
+        ? Math.round(tempos.reduce((sum, value) => sum + value, 0) / tempos.length) : null;
+      return {
+        concluidas,
+        taxaSucesso: concluidas ? Math.round((entregues / concluidas) * 1000) / 10 : 0,
+        tempoMedio: mediaMinutos == null ? 'Sem dados'
+          : mediaMinutos >= 60
+            ? `${Math.floor(mediaMinutos / 60)}h ${String(mediaMinutos % 60).padStart(2, '0')}min`
+            : `${mediaMinutos}min`,
+      };
+    },
     logisticaRotaSelecionada() {
       if (!this.logisticaRotaSelecionadaId) return null;
       return (this.logistica?.rotas_recentes || [])

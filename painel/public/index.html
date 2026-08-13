@@ -6,7 +6,7 @@
 <title>Farejador — Painel</title>
 
 <!-- CSS compilado localmente no build; sem runtime Tailwind no navegador. -->
-<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260812-revisao-comprovantes1" />
+<link rel="stylesheet" href="/admin/painel/tailwind.css?v=20260812-logistica-redesign1" />
 <style>
   [x-cloak]{display:none!important}
   .farejador-sidebar-nav{scrollbar-width:thin;scrollbar-color:rgba(110,231,183,.35) transparent}
@@ -34,7 +34,7 @@
 <script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
 <script src="/admin/painel/app.logistica.js?v=20260717-comprovantes1"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260717-comprovantes1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20260812-logistica-redesign1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260719-colab-dialog1"></script>
@@ -4150,7 +4150,7 @@
                       class="whitespace-nowrap border-b-2 px-4 py-3.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" x-text="tab.label"></button>
             </template>
           </nav>
-          <div x-show="!(logisticaTab === 'rotas' && logisticaRotaSelecionada())"
+          <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas' || logisticaTab === 'historico'"
                class="mb-3 flex items-center xl:mb-0">
             <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
               <button @click="setLogisticaPeriodo('hoje')"
@@ -4180,7 +4180,7 @@
 
       <div x-show="logistica" class="space-y-5">
         <!-- Os cards são filtros reais da fila. -->
-        <div x-show="!(logisticaTab === 'rotas' && logisticaRotaSelecionada())" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div x-show="logisticaTab === 'visao'" class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <button @click="setLogisticaFiltro('todas', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-emerald-200 hover:shadow-sm transition">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -4219,10 +4219,10 @@
           </button>
         </div>
 
-        <section x-show="adminUser?.role === 'owner' && logisticaTab === 'visao' && logistica?.receipt_approval && receiptReviewQueue().length"
+        <details x-ref="receiptReviewDetails" x-show="adminUser?.role === 'owner' && logisticaTab === 'visao' && logistica?.receipt_approval && receiptReviewQueue().length"
                  aria-labelledby="receipt-review-heading"
                  class="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div class="flex flex-col gap-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <summary class="flex cursor-pointer list-none flex-col gap-4 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div class="flex items-start gap-3">
               <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-700 shadow-sm">
                 <i data-lucide="receipt-text" class="h-5 w-5"></i>
@@ -4235,8 +4235,9 @@
             <span class="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm">
               <span class="h-2 w-2 rounded-full bg-amber-500"></span>
               <span x-text="receiptReviewQueue().length + (receiptReviewQueue().length === 1 ? ' pendente' : ' pendentes')"></span>
+              <i data-lucide="chevron-down" class="h-3.5 w-3.5"></i>
             </span>
-          </div>
+          </summary>
 
           <div class="space-y-5 bg-gray-50/70 p-4 sm:p-6">
             <template x-for="entry in receiptReviewQueue()" :key="entry.receipt.id">
@@ -4360,123 +4361,126 @@
               </article>
             </template>
           </div>
-        </section>
+        </details>
 
-        <!-- Visão e Entregas compartilham a mesma fila; em Entregas ela ocupa a largura toda. -->
-        <div x-show="(logisticaTab === 'visao' || logisticaTab === 'entregas' || logisticaTab === 'rotas') && !(logisticaTab === 'rotas' && logisticaRotaSelecionada())" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          <section x-show="logisticaTab !== 'rotas'"
-                   :class="logisticaTab === 'entregas' ? 'lg:col-span-12' : 'lg:col-span-8'"
-                   class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <!-- Cada aba tem uma responsabilidade visual própria. -->
+        <div x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div><h2 class="text-xl font-semibold text-gray-950">Rotas da Matriz</h2><p class="mt-1 text-sm text-gray-500">Acompanhe a rota aberta e consulte o resultado das últimas saídas.</p></div>
+          <button x-show="!logisticaRotaAtual()" @click="$nextTick(() => $refs.logisticaCourierName?.focus())" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"><i data-lucide="plus" class="h-4 w-4"></i>Nova rota</button>
+        </div>
+
+        <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas' || (logisticaTab === 'rotas' && !logisticaRotaSelecionada())" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <section x-show="logisticaTab === 'entregas'"
+                   class="lg:col-span-12 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div class="p-5 border-b border-gray-100">
-              <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+              <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <h2 class="text-base font-semibold">Fila de entregas</h2>
-                  <p class="text-xs text-gray-400 mt-0.5" x-text="logisticaEntregasView().length + ' pedido(s) no filtro'"></p>
+                  <h2 class="text-lg font-semibold text-gray-950">Fila de entregas</h2>
+                  <p class="text-sm text-gray-500 mt-1" x-text="logisticaEntregasView().length + ' pedido(s) no filtro de ' + logisticaPeriodoLabel().toLowerCase()"></p>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-2">
-                  <label class="relative block">
-                    <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
-                    <input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido ou cliente"
-                           class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50">
-                  </label>
-                  <div class="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-                    <template x-for="f in [
-                      { id: 'todas', label: 'Todas' },
-                      { id: 'aguardando', label: 'Aguardando' },
-                      { id: 'rota', label: 'Em rota' },
-                      { id: 'problemas', label: 'Problemas' }
-                    ]" :key="f.id">
-                      <button @click="setLogisticaFiltro(f.id)"
-                              :class="logisticaFiltro === f.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
-                              class="px-3 py-2 text-xs font-medium border-r border-gray-200 last:border-r-0 transition-colors" x-text="f.label"></button>
-                    </template>
-                  </div>
+                <button x-show="!logisticaRotaAtual() && entregasSemRota().length" @click="setLogisticaTab('rotas')"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+                  <i data-lucide="route" class="h-4 w-4"></i>Montar rota
+                </button>
+              </div>
+              <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+                <label class="relative block flex-1">
+                  <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i>
+                  <input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido, cliente ou bairro"
+                         class="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-50">
+                </label>
+                <div class="inline-flex overflow-x-auto rounded-lg border border-gray-200">
+                  <template x-for="f in [
+                    { id: 'todas', label: 'Todos' },
+                    { id: 'aguardando', label: 'Aguardando' },
+                    { id: 'rota', label: 'Em rota' },
+                    { id: 'problemas', label: 'Problemas' }
+                  ]" :key="f.id">
+                    <button @click="setLogisticaFiltro(f.id)"
+                            :class="logisticaFiltro === f.id ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'"
+                            class="whitespace-nowrap px-3 py-2.5 text-xs font-medium border-r border-gray-200 last:border-r-0 transition-colors" x-text="f.label"></button>
+                  </template>
                 </div>
               </div>
             </div>
 
             <div class="overflow-x-auto">
-              <table class="w-full min-w-[980px] text-sm">
+              <table class="w-full min-w-[1040px] text-sm">
                 <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide">
                   <tr>
-                    <th class="px-4 py-3 font-medium">Pedido</th>
-                    <th class="px-4 py-3 font-medium">Cliente e endereço</th>
-                    <th class="px-4 py-3 font-medium">Entrega</th>
+                    <th class="px-5 py-3 font-medium">Pedido e cliente</th>
+                    <th class="px-4 py-3 font-medium">Destino</th>
                     <th class="px-4 py-3 font-medium">Pagamento</th>
+                    <th class="px-4 py-3 font-medium">Previsão</th>
                     <th class="px-4 py-3 font-medium">Status</th>
-                    <th class="px-4 py-3 font-medium text-right">Ação</th>
+                    <th class="px-5 py-3 font-medium text-right">Ação</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                   <template x-for="d in logisticaEntregasView()" :key="d.order_id">
-                    <tr class="hover:bg-gray-50/70 transition-colors align-top">
-                      <td class="px-4 py-3.5">
-                        <div class="font-semibold text-gray-800 tabular-nums" x-text="logisticaOrderLabel(d)"></div>
-                        <div class="text-[11px] text-gray-400 mt-1" x-text="logisticaItens(d)"></div>
-                      </td>
-                      <td class="px-4 py-3.5">
-                        <div class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></div>
-                        <div class="text-xs text-gray-500 mt-0.5 max-w-[260px] truncate" x-text="d.delivery_address || 'Sem endereço'"></div>
-                        <div class="flex items-center gap-1.5 mt-2">
-                          <a x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido.')" target="_blank" rel="noopener"
-                             class="p-1.5 rounded-md border border-gray-200 text-emerald-700 hover:bg-emerald-50" title="WhatsApp"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i></a>
-                          <a x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener"
-                             class="p-1.5 rounded-md border border-gray-200 text-sky-700 hover:bg-sky-50" title="Waze"><i data-lucide="navigation" class="w-3.5 h-3.5"></i></a>
-                          <a x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener"
-                             class="p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" title="Google Maps"><i data-lucide="map" class="w-3.5 h-3.5"></i></a>
+                    <tr class="hover:bg-gray-50/70 transition-colors align-middle">
+                      <td class="px-5 py-4">
+                        <div class="flex items-center gap-3">
+                          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700"><i data-lucide="clipboard-list" class="h-4 w-4"></i></div>
+                          <div><div class="font-semibold text-gray-900 tabular-nums" x-text="logisticaOrderLabel(d)"></div><div class="text-xs text-gray-500 mt-0.5" x-text="d.customer_name || 'Cliente'"></div><div class="text-[11px] text-gray-400 mt-0.5 max-w-[210px] truncate" x-text="logisticaItens(d)"></div></div>
                         </div>
                       </td>
-                      <td class="px-4 py-3.5">
-                        <span class="inline-flex px-2 py-1 rounded-md text-[11px] font-medium" :class="dataEntregaClass(d)" x-text="dataEntregaLabel(d) || 'sem data'"></span>
-                        <input x-show="d.delivery_status === 'pending'" type="date" :value="d.scheduled_date"
-                               @change="remarcarEntrega(d, $event.target.value)" :disabled="logisticaSaving"
-                               class="block mt-1.5 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-600 outline-none focus:border-emerald-600">
+                      <td class="px-4 py-4">
+                        <div class="flex items-start gap-2"><i data-lucide="map-pin" class="mt-0.5 h-4 w-4 flex-shrink-0 text-gray-400"></i><div><div class="max-w-[250px] truncate text-sm text-gray-800" x-text="d.delivery_address || 'Sem endereço'"></div><div class="mt-2 flex items-center gap-1.5"><a x-show="d.customer_phone" :href="waLink(d.customer_phone, 'Olá! Sou o entregador e estou a caminho com seu pedido.')" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-emerald-700 hover:bg-emerald-50" title="WhatsApp"><i data-lucide="message-circle" class="h-3.5 w-3.5"></i></a><a x-show="d.delivery_address" :href="wazeNavUrl(d)" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-sky-700 hover:bg-sky-50" title="Waze"><i data-lucide="navigation" class="h-3.5 w-3.5"></i></a><a x-show="d.delivery_address" :href="mapsNavUrl(d)" target="_blank" rel="noopener" class="rounded-md border border-gray-200 p-1.5 text-gray-600 hover:bg-gray-50" title="Google Maps"><i data-lucide="map" class="h-3.5 w-3.5"></i></a></div></div></div>
                       </td>
-                      <td class="px-4 py-3.5">
-                        <div class="text-xs text-gray-600" x-text="logisticaPagamentoLabel(d)"></div>
-                        <div class="font-semibold text-gray-800 tabular-nums mt-1" x-text="formatCurrency(Number(d.total_amount || 0))"></div>
-                      </td>
-                      <td class="px-4 py-3.5">
-                        <span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium"
-                              :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span>
-                        <div x-show="d.trip_id && rotaDoPedido(d)" class="text-[11px] text-gray-400 mt-1" x-text="rotaDoPedido(d) ? rotaDoPedido(d).trip_number : ''"></div>
-                        <div x-show="d.delivery_failure_reason" class="text-[11px] text-rose-600 mt-1 max-w-[150px]" x-text="d.delivery_failure_reason"></div>
-                      </td>
-                      <td class="px-4 py-3.5">
+                      <td class="px-4 py-4"><div class="text-sm text-gray-700" x-text="logisticaPagamentoLabel(d)"></div><div class="font-semibold text-gray-900 tabular-nums mt-1" x-text="formatCurrency(Number(d.total_amount || 0))"></div></td>
+                      <td class="px-4 py-4"><span class="inline-flex px-2 py-1 rounded-md text-[11px] font-medium" :class="dataEntregaClass(d)" x-text="dataEntregaLabel(d) || 'sem data'"></span><input x-show="d.delivery_status === 'pending'" type="date" :value="d.scheduled_date" @change="remarcarEntrega(d, $event.target.value)" :disabled="logisticaSaving" class="block mt-1.5 border border-gray-200 rounded-md px-2 py-1 text-[11px] text-gray-600 outline-none focus:border-emerald-600"></td>
+                      <td class="px-4 py-4"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span><div x-show="d.trip_id && rotaDoPedido(d)" class="text-[11px] text-gray-400 mt-1" x-text="rotaDoPedido(d) ? rotaDoPedido(d).trip_number : ''"></div><div x-show="d.delivery_failure_reason" class="text-[11px] text-rose-600 mt-1 max-w-[150px]" x-text="d.delivery_failure_reason"></div></td>
+                      <td class="px-5 py-4">
                         <div class="flex flex-col items-end gap-1.5">
-                          <input x-show="d.delivery_status === 'pending' && !d.trip_id" x-model="logisticaCouriers[d.order_id]"
-                                 placeholder="Entregador (opcional)" class="w-36 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] outline-none focus:border-emerald-600">
+                          <input x-show="d.delivery_status === 'pending' && !d.trip_id" x-model="logisticaCouriers[d.order_id]" placeholder="Entregador (opcional)" class="w-40 border border-gray-200 rounded-md px-2 py-1.5 text-[11px] outline-none focus:border-emerald-600">
                           <div class="flex items-center justify-end gap-1.5 flex-wrap">
-                            <button x-show="d.delivery_status === 'pending' && !d.trip_id && logisticaRotaAtual()" @click="pendurarNaRota(d)" :disabled="logisticaSaving"
-                                    class="px-2.5 py-1.5 rounded-md border border-emerald-700 text-emerald-800 text-[11px] font-medium hover:bg-emerald-50 disabled:opacity-50">Pôr na rota</button>
-                            <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving"
-                                    class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Saiu</button>
-                            <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]"
-                                    class="border border-gray-200 rounded-md px-1.5 py-1.5 text-[11px] outline-none focus:border-emerald-600">
-                              <option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option>
-                            </select>
-                            <button x-show="d.delivery_status === 'dispatched'" @click="logisticaStatus(d, 'delivered')" :disabled="logisticaSaving"
-                                    class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Entregue</button>
-                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaRecolocar(d)" :disabled="logisticaSaving"
-                                    class="px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 text-[11px] font-medium hover:bg-gray-50 disabled:opacity-50">Recolocar</button>
-                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaConfirmarFalha(d)" :disabled="logisticaSaving"
-                                    class="px-2.5 py-1.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium hover:bg-rose-100 disabled:opacity-50">Confirmar falha</button>
-                            <button x-show="d.delivery_status !== 'failed'" @click="logisticaFalhou(d)" :disabled="logisticaSaving"
-                                    class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50" title="Marcar como não entregue"><i data-lucide="circle-x" class="w-4 h-4"></i></button>
+                            <button x-show="d.delivery_status === 'pending' && !d.trip_id && logisticaRotaAtual()" @click="pendurarNaRota(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md border border-emerald-700 text-emerald-800 text-[11px] font-medium hover:bg-emerald-50 disabled:opacity-50">Pôr na rota</button>
+                            <button x-show="d.delivery_status === 'pending'" @click="logisticaStatus(d, 'dispatched')" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Saiu</button>
+                            <select x-show="d.delivery_status === 'dispatched'" x-model="logisticaPays[d.order_id]" class="border border-gray-200 rounded-md px-1.5 py-1.5 text-[11px] outline-none focus:border-emerald-600"><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option></select>
+                            <button x-show="d.delivery_status === 'dispatched'" @click="logisticaStatus(d, 'delivered')" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-emerald-700 text-white text-[11px] font-medium hover:bg-emerald-800 disabled:opacity-50">Entregue</button>
+                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaRecolocar(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md border border-gray-200 text-gray-700 text-[11px] font-medium hover:bg-gray-50 disabled:opacity-50">Recolocar</button>
+                            <button x-show="d.delivery_status === 'failed' && d.status !== 'cancelled'" @click="logisticaConfirmarFalha(d)" :disabled="logisticaSaving" class="px-2.5 py-1.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-medium hover:bg-rose-100 disabled:opacity-50">Confirmar falha</button>
+                            <button x-show="d.delivery_status !== 'failed'" @click="logisticaFalhou(d)" :disabled="logisticaSaving" class="p-1.5 rounded-md text-gray-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-50" title="Marcar como não entregue"><i data-lucide="circle-x" class="w-4 h-4"></i></button>
                           </div>
                         </div>
                       </td>
                     </tr>
                   </template>
-                  <tr x-show="!logisticaEntregasView().length">
-                    <td colspan="6" class="px-5 py-14 text-center">
-                      <i data-lucide="package-check" class="w-9 h-9 text-gray-300 mx-auto mb-2"></i>
-                      <p class="text-sm font-medium text-gray-600">Nenhuma entrega neste filtro</p>
-                      <p class="text-xs text-gray-400 mt-1">Troque o período ou limpe a busca.</p>
-                    </td>
-                  </tr>
+                  <tr x-show="!logisticaEntregasView().length"><td colspan="6" class="px-5 py-14 text-center"><i data-lucide="package-check" class="w-9 h-9 text-gray-300 mx-auto mb-2"></i><p class="text-sm font-medium text-gray-600">Nenhuma entrega neste filtro</p><p class="text-xs text-gray-400 mt-1">Troque o período ou limpe a busca.</p></td></tr>
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          <section x-show="logisticaTab === 'visao'"
+                   class="lg:col-span-8 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+              <div><h2 class="text-lg font-semibold text-gray-950">Operação de hoje</h2><p class="mt-1 text-sm text-gray-500">O que precisa da sua atenção agora</p></div>
+              <button @click="setLogisticaFiltro('todas', true)" class="text-xs font-semibold text-emerald-700 hover:underline">Ver entregas</button>
+            </div>
+            <div class="divide-y divide-gray-100">
+              <button x-show="adminUser?.role === 'owner' && logistica?.receipt_approval && receiptReviewQueue().length" @click="$refs.receiptReviewDetails.open = true; $refs.receiptReviewDetails.scrollIntoView({ behavior: 'smooth', block: 'start' })" class="flex w-full items-center gap-4 p-4 text-left hover:bg-amber-50/40">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700"><i data-lucide="receipt-text" class="h-5 w-5"></i></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-gray-900">Comprovantes aguardando aprovação</p><p class="mt-0.5 text-xs text-gray-500" x-text="receiptReviewQueue().length + (receiptReviewQueue().length === 1 ? ' comprovante precisa de revisão' : ' comprovantes precisam de revisão')"></p></div>
+                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700" x-text="receiptReviewQueue().length"></span><i data-lucide="chevron-right" class="h-4 w-4 text-gray-400"></i>
+              </button>
+              <button x-show="logisticaResumoCards().aguardando" @click="setLogisticaFiltro('aguardando', true)" class="flex w-full items-center gap-4 p-4 text-left hover:bg-gray-50">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700"><i data-lucide="package" class="h-5 w-5"></i></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-gray-900">Entregas aguardando saída</p><p class="mt-0.5 text-xs text-gray-500">Pedidos prontos para organizar ou colocar em rota</p></div>
+                <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700" x-text="logisticaResumoCards().aguardando"></span><i data-lucide="chevron-right" class="h-4 w-4 text-gray-400"></i>
+              </button>
+              <button x-show="logisticaResumoCards().rota" @click="setLogisticaFiltro('rota', true)" class="flex w-full items-center gap-4 p-4 text-left hover:bg-gray-50">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><i data-lucide="truck" class="h-5 w-5"></i></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-gray-900">Entregas em andamento</p><p class="mt-0.5 text-xs text-gray-500">Acompanhe quem já saiu para entrega</p></div>
+                <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700" x-text="logisticaResumoCards().rota"></span><i data-lucide="chevron-right" class="h-4 w-4 text-gray-400"></i>
+              </button>
+              <button x-show="logisticaResumoCards().problemas" @click="setLogisticaFiltro('problemas', true)" class="flex w-full items-center gap-4 p-4 text-left hover:bg-rose-50/40">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600"><i data-lucide="triangle-alert" class="h-5 w-5"></i></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-gray-900">Entregas com problema</p><p class="mt-0.5 text-xs text-gray-500">Decida entre recolocar ou confirmar a falha</p></div>
+                <span class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700" x-text="logisticaResumoCards().problemas"></span><i data-lucide="chevron-right" class="h-4 w-4 text-gray-400"></i>
+              </button>
+              <div x-show="!(adminUser?.role === 'owner' && logistica?.receipt_approval && receiptReviewQueue().length) && !logisticaResumoCards().aguardando && !logisticaResumoCards().rota && !logisticaResumoCards().problemas" class="p-10 text-center"><i data-lucide="circle-check-big" class="mx-auto h-9 w-9 text-emerald-600"></i><p class="mt-3 text-sm font-semibold text-gray-800">Operação em dia</p><p class="mt-1 text-xs text-gray-500">Nenhuma pendência exige decisão agora.</p></div>
             </div>
           </section>
 
@@ -4561,7 +4565,7 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-2 mb-4">Escolha o entregador, informe o odômetro e marque os pedidos que sairão juntos.</p>
                 <div class="grid grid-cols-2 gap-2 mb-3">
-                  <input x-model="rotaForm.courier_name" type="text" placeholder="Nome do entregador" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
+                  <input x-ref="logisticaCourierName" x-model="rotaForm.courier_name" type="text" placeholder="Nome do entregador" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
                   <input x-model="rotaForm.km_start" type="number" min="0" placeholder="KM inicial" class="border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-600">
                 </div>
                 <div class="max-h-64 overflow-y-auto space-y-1.5 mb-3">
@@ -4579,15 +4583,6 @@
             </template>
           </aside>
         </div>
-
-        <!-- Decisões pendentes: aparece na visão sem esconder o motivo real. -->
-        <button x-show="logisticaTab === 'visao' && (logistica?.reportadas || []).length"
-                @click="setLogisticaFiltro('problemas', true)"
-                class="w-full bg-white border border-rose-100 rounded-xl p-4 flex items-center gap-4 text-left hover:border-rose-200 hover:shadow-sm transition">
-          <div class="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><i data-lucide="triangle-alert" class="w-5 h-5 text-rose-600"></i></div>
-          <div class="flex-1"><p class="text-sm font-semibold text-gray-800">Entregas com problema</p><p class="text-xs text-gray-500 mt-0.5" x-text="(logistica?.reportadas || []).length + ' precisam de decisão'"></p></div>
-          <span class="px-3 py-2 rounded-lg border border-rose-200 text-xs font-medium text-rose-700">Resolver agora</span>
-        </button>
 
         <!-- Resultado de uma rota fechada: detalhe dentro da própria subaba Rotas. -->
         <template x-if="logisticaTab === 'rotas' && logisticaRotaSelecionada()">
@@ -4714,52 +4709,51 @@
           </div>
         </template>
 
-        <!-- Lista de rotas fechadas; o resultado abre dentro da própria subaba. -->
-        <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div><h2 class="text-base font-semibold">Rotas recentes</h2><p class="text-xs text-gray-400 mt-0.5">KM, despesas comprovadas e resultado real das últimas saídas</p></div>
-            <span class="text-xs text-gray-400 tabular-nums" x-text="(logistica?.rotas_recentes || []).length + ' rota(s)'"></span>
+        <!-- Rotas recentes em cards: cada card abre o resultado completo já existente. -->
+        <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="space-y-4">
+          <div class="flex items-center justify-between gap-3"><div><h3 class="text-base font-semibold text-gray-900">Rotas concluídas</h3><p class="mt-1 text-xs text-gray-500">KM, despesas comprovadas e resultado real.</p></div><span class="text-xs text-gray-400 tabular-nums" x-text="(logistica?.rotas_recentes || []).length + ' rota(s)'"></span></div>
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
+              <article class="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                  <div><div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-white"><i data-lucide="check" class="h-5 w-5"></i></div><h4 class="mt-3 text-lg font-semibold text-gray-950" x-text="t.trip_number"></h4><p class="mt-1 text-sm text-gray-500"><span x-text="t.courier_name"></span><span x-text="' · ' + rotaDataFechamento(t)"></span></p></div>
+                  <span class="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Concluída</span>
+                </div>
+                <div class="mt-5 grid grid-cols-2 gap-3">
+                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Entregas</p><p class="mt-1 text-lg font-semibold tabular-nums"><span x-text="rotaResultado(t)?.entregues || 0"></span><span class="text-sm font-normal text-gray-400" x-text="' / ' + Number(t.deliveries_count || 0)"></span></p></div>
+                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">KM percorridos</p><p class="mt-1 text-lg font-semibold tabular-nums" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></p></div>
+                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Despesas</p><p class="mt-1 text-sm font-semibold tabular-nums" x-text="formatCurrency(rotaResultado(t)?.despesas || 0)"></p></div>
+                  <div class="rounded-lg bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Resultado</p><p class="mt-1 text-sm font-semibold tabular-nums" :class="rotaResultadoValorClass(t)" x-text="formatCurrency(rotaResultado(t)?.resultado || 0)"></p></div>
+                </div>
+                <div class="mt-4 flex items-center justify-between gap-3 text-xs"><span class="text-gray-500" x-text="(t.receipts || []).length + ' comprovante(s)'"></span><span x-show="rotaResultado(t)?.comprovantesPendentes.length" class="font-semibold text-amber-700" x-text="rotaResultado(t).comprovantesPendentes.length + ' pendente(s)'"></span><span x-show="!rotaResultado(t)?.comprovantesPendentes.length" class="font-medium" :class="rotaResultadoBadgeClass(t)" x-text="rotaResultadoLabel(t)"></span></div>
+                <button @click="abrirResultadoRota(t)" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"><i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>Ver resultado</button>
+              </article>
+            </template>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[1040px] text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide">
-                <tr><th class="px-4 py-3 font-medium">Rota</th><th class="px-4 py-3 font-medium">Entregador</th><th class="px-4 py-3 font-medium text-center">Entregas</th><th class="px-4 py-3 font-medium text-center">KM</th><th class="px-4 py-3 font-medium text-right">Despesas</th><th class="px-4 py-3 font-medium text-right">Resultado</th><th class="px-4 py-3 font-medium">Comprovantes</th><th class="px-4 py-3 font-medium text-right">Ação</th></tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="t in (logistica?.rotas_recentes || [])" :key="t.id">
-                  <tr class="align-middle hover:bg-gray-50/70">
-                    <td class="px-4 py-3"><p class="font-semibold text-emerald-800" x-text="t.trip_number"></p><p class="text-[11px] text-gray-400 mt-1" x-text="rotaDataFechamento(t)"></p></td>
-                    <td class="px-4 py-3 text-gray-700" x-text="t.courier_name"></td>
-                    <td class="px-4 py-3 text-center tabular-nums"><span x-text="rotaResultado(t)?.entregues || 0"></span><span class="text-gray-400" x-text="' / ' + Number(t.deliveries_count || 0)"></span></td>
-                    <td class="px-4 py-3 text-center tabular-nums" x-text="rotaKm(t) != null ? rotaKm(t) + ' km' : '—'"></td>
-                    <td class="px-4 py-3 text-right font-medium tabular-nums" x-text="formatCurrency(rotaResultado(t)?.despesas || 0)"></td>
-                    <td class="px-4 py-3 text-right"><p class="font-semibold tabular-nums" :class="rotaResultadoValorClass(t)" x-text="formatCurrency(rotaResultado(t)?.resultado || 0)"></p><p class="text-[10px] mt-1" :class="rotaResultadoBadgeClass(t)" x-text="rotaResultadoLabel(t)"></p></td>
-                    <td class="px-4 py-3"><span class="text-xs text-gray-600" x-text="(t.receipts || []).length + ' arquivo(s)'"></span><p x-show="rotaResultado(t)?.comprovantesPendentes.length" class="text-[10px] text-amber-600 mt-1" x-text="rotaResultado(t).comprovantesPendentes.length + ' pendente(s)'"></p></td>
-                    <td class="px-4 py-3 text-right"><button @click="abrirResultadoRota(t)" class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"><i data-lucide="chart-no-axes-combined" class="w-3.5 h-3.5"></i>Ver resultado</button></td>
-                  </tr>
-                </template>
-                <tr x-show="!(logistica?.rotas_recentes || []).length"><td colspan="8" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma rota fechada ainda.</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div x-show="!(logistica?.rotas_recentes || []).length" class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center"><i data-lucide="route" class="mx-auto h-9 w-9 text-gray-300"></i><p class="mt-3 text-sm font-semibold text-gray-700">Nenhuma rota fechada ainda</p><p class="mt-1 text-xs text-gray-500">As rotas concluídas aparecerão aqui com o resultado financeiro.</p></div>
         </section>
 
-        <!-- Histórico de entregas sem misturar com a fila operacional. -->
-        <section x-show="logisticaTab === 'historico'" class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div class="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div><h2 class="text-base font-semibold">Entregas finalizadas</h2><p class="text-xs text-gray-400 mt-0.5" x-text="logisticaFinalizadasView().length + ' resultado(s) em ' + logisticaPeriodoLabel().toLowerCase()"></p></div>
-            <label class="relative block"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i><input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido ou cliente" class="w-full sm:w-64 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-600"></label>
+        <!-- Histórico: indicadores do período e entregas finalizadas. -->
+        <section x-show="logisticaTab === 'historico'" class="space-y-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 class="text-xl font-semibold text-gray-950">Histórico de entregas</h2><p class="mt-1 text-sm text-gray-500" x-text="'Resultados de ' + logisticaPeriodoLabel().toLowerCase()"></p></div></div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="circle-check" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Entregas concluídas</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().concluidas"></p></div></article>
+            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="target" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Taxa de sucesso</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().taxaSucesso.toLocaleString('pt-BR') + '%' "></p></div></article>
+            <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="clock-3" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Tempo médio</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().tempoMedio"></p></div></article>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide"><tr><th class="px-4 py-3 font-medium">Pedido</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Itens</th><th class="px-4 py-3 font-medium text-right">Total</th><th class="px-4 py-3 font-medium text-right">Resultado</th></tr></thead>
-              <tbody class="divide-y divide-gray-100">
-                <template x-for="d in logisticaFinalizadasView()" :key="d.order_id">
-                  <tr><td class="px-4 py-3 font-semibold tabular-nums" x-text="logisticaOrderLabel(d)"></td><td class="px-4 py-3"><p class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></p><p class="text-xs text-gray-400 truncate max-w-[260px]" x-text="d.delivery_address || 'Sem endereço'"></p></td><td class="px-4 py-3 text-xs text-gray-500" x-text="logisticaItens(d)"></td><td class="px-4 py-3 text-right font-semibold tabular-nums" x-text="formatCurrency(Number(d.total_amount || 0))"></td><td class="px-4 py-3 text-right"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span></td></tr>
-                </template>
-                <tr x-show="!logisticaFinalizadasView().length"><td colspan="5" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma entrega finalizada neste período.</td></tr>
-              </tbody>
-            </table>
+          <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between"><div><h3 class="text-base font-semibold text-gray-900">Entregas finalizadas</h3><p class="mt-1 text-xs text-gray-500" x-text="logisticaFinalizadasView().length + ' resultado(s) no período'"></p></div><label class="relative block"><i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-3"></i><input x-model.debounce.250ms="logisticaBusca" type="search" placeholder="Buscar pedido, cliente ou rota" class="w-full sm:w-72 border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-emerald-600"></label></div>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[900px] text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200 text-left text-[11px] text-gray-500 uppercase tracking-wide"><tr><th class="px-5 py-3 font-medium">Pedido</th><th class="px-4 py-3 font-medium">Cliente</th><th class="px-4 py-3 font-medium">Rota / entregador</th><th class="px-4 py-3 font-medium">Finalização</th><th class="px-4 py-3 font-medium">Valor</th><th class="px-5 py-3 font-medium text-right">Resultado</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="d in logisticaFinalizadasView()" :key="d.order_id">
+                    <tr class="hover:bg-gray-50/70"><td class="px-5 py-4"><p class="font-semibold tabular-nums" x-text="logisticaOrderLabel(d)"></p><p class="mt-1 max-w-[210px] truncate text-[11px] text-gray-400" x-text="logisticaItens(d)"></p></td><td class="px-4 py-4"><p class="font-medium text-gray-800" x-text="d.customer_name || 'Cliente'"></p><p class="text-xs text-gray-400 truncate max-w-[240px]" x-text="d.delivery_address || 'Sem endereço'"></p></td><td class="px-4 py-4"><p class="text-sm font-medium text-gray-700" x-text="rotaDoPedido(d)?.trip_number || 'Sem rota'"></p><p class="mt-1 text-xs text-gray-400" x-text="d.delivery_courier || rotaDoPedido(d)?.courier_name || 'Não informado'"></p></td><td class="px-4 py-4 text-sm text-gray-600" x-text="formatDateTime(d.delivered_at || d.created_at)"></td><td class="px-4 py-4 font-semibold tabular-nums" x-text="formatCurrency(Number(d.total_amount || 0))"></td><td class="px-5 py-4 text-right"><span class="inline-flex px-2.5 py-1 rounded-md border text-[11px] font-medium" :class="logisticaStatusClass(d)" x-text="logisticaStatusLabel(d.delivery_status)"></span><p x-show="d.delivery_failure_reason" class="mt-1 max-w-[180px] text-right text-[11px] text-rose-600" x-text="d.delivery_failure_reason"></p></td></tr>
+                  </template>
+                  <tr x-show="!logisticaFinalizadasView().length"><td colspan="6" class="px-5 py-12 text-center text-sm text-gray-400">Nenhuma entrega finalizada neste período.</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </div>

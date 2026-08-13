@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-10T04:47:18.034Z",
+  "geradoEm": "2026-08-13T00:38:09.907Z",
   "commitBase": "dd64a35",
-  "total": 1025,
+  "total": 1026,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -549,6 +549,7 @@
     "logisticaFalhou": "function",
     "logisticaFiltro": "value:string",
     "logisticaFinalizadasView": "function",
+    "logisticaHistoricoResumo": "function",
     "logisticaItens": "function",
     "logisticaLoaded": "value:boolean",
     "logisticaMsg": "value:null",

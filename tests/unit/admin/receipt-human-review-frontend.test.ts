@@ -52,8 +52,8 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
   it('mantem a revisao restrita a visao geral da logistica', () => {
     const html = read('painel/public/index.html');
     const reviewSection = html.slice(
-      html.indexOf('<section x-show="adminUser?.role === \'owner\' && logisticaTab'),
-      html.indexOf('<!-- Visão e Entregas compartilham a mesma fila'),
+      html.indexOf('<details x-ref="receiptReviewDetails"'),
+      html.indexOf('<!-- Cada aba tem uma responsabilidade visual própria'),
     );
 
     expect(reviewSection).toContain("logisticaTab === 'visao'");
