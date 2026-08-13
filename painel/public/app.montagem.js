@@ -24,7 +24,6 @@ window.PAINEL_MONTAR = function (estado) {
     window.PAINEL_MODULES.comprasRelatorios, // histórico paginado + fornecedores + preços, sem fonte financeira paralela
     window.PAINEL_MODULES.comprasAcoes, // Etapa 5: mutacoes com idempotencia persistente
     window.PAINEL_MODULES.logistica, // app.logistica.js (linhas 1233-1405 pré-obra): logística (0121) leitura: cards, rota, datas D+1, deep-links
-    window.PAINEL_MODULES.logisticaPeriodos, // filtros, períodos e seleção das quatro visões da Logística
     window.PAINEL_MODULES.logisticaResultado, // memória de cálculo e detalhamento do resultado por rota
     window.PAINEL_MODULES.logisticaComprovantes, // Etapa 7: revisão humana e idempotente
     window.PAINEL_MODULES.logisticaAcoes, // app.logistica.acoes.js (linhas 1406-1530 pré-obra): logística ações: remarcar/pendurar/abrir/fechar rota/comprovante IA

@@ -13,6 +13,21 @@ function loadPainelModule(file: string, moduleName: string): PainelModule {
 }
 
 describe('seguranca de inicializacao do painel', () => {
+  it('serve todos os modulos JavaScript declarados pelo HTML', () => {
+    const html = readFileSync('painel/public/index.html', 'utf8');
+    const staticRoute = readFileSync('src/admin/painel/route-static.ts', 'utf8');
+    const scripts = [...html.matchAll(
+      /<script(?: defer)? src="\/admin\/painel\/([^"?]+\.js)(?:\?[^\"]*)?"/g,
+    )].map((match) => match[1]);
+
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts) {
+      if (script === 'app.js' || script.startsWith('vendor/')) continue;
+      expect(staticRoute, `${script} precisa estar liberado em route-static.ts`)
+        .toContain(`'${script}'`);
+    }
+  });
+
   it('mantem os formatadores seguros antes de existir uma selecao', () => {
     const atacado = loadPainelModule('app.atacado.js', 'atacado');
     const compras = loadPainelModule('app.compras.acoes.js', 'comprasAcoes');

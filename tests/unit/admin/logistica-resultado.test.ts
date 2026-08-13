@@ -64,7 +64,8 @@ describe('getMatrizLogistica — resultado real por rota', () => {
 
     expect(telaAtiva).toContain('Ver resultado');
     expect(telaAtiva).toContain("logisticaTab === 'rotas' && logisticaRotaSelecionada()");
-    expect(telaAtiva).toContain('Comprovante de despesa');
+    expect(telaAtiva).toContain('enviarComprovante(logisticaRotaAtual(), $event)');
+    expect(telaAtiva).toContain('Despesas da rota');
     expect(telaAtiva).not.toContain('x-model="fecharForm.fuel_spent"');
     expect(actions).toContain('fuel_spent: null');
   });
