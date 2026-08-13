@@ -4219,7 +4219,7 @@
           </button>
         </div>
 
-        <section x-show="adminUser?.role === 'owner' && !(logisticaTab === 'rotas' && logisticaRotaSelecionada()) && logistica?.receipt_approval && receiptReviewQueue().length"
+        <section x-show="adminUser?.role === 'owner' && logisticaTab === 'visao' && logistica?.receipt_approval && receiptReviewQueue().length"
                  aria-labelledby="receipt-review-heading"
                  class="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div class="flex flex-col gap-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">

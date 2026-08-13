@@ -49,6 +49,19 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
     expect(html).toContain('Ampliar comprovante');
   });
 
+  it('mantem a revisao restrita a visao geral da logistica', () => {
+    const html = read('painel/public/index.html');
+    const reviewSection = html.slice(
+      html.indexOf('<section x-show="adminUser?.role === \'owner\' && logisticaTab'),
+      html.indexOf('<!-- Visão e Entregas compartilham a mesma fila'),
+    );
+
+    expect(reviewSection).toContain("logisticaTab === 'visao'");
+    expect(reviewSection).not.toContain("logisticaTab === 'entregas'");
+    expect(reviewSection).not.toContain("logisticaTab === 'rotas'");
+    expect(reviewSection).not.toContain("logisticaTab === 'historico'");
+  });
+
   it('reusa a mesma chave em retry e separa erro do admin e do entregador', () => {
     const module = readFileSync(modulePath, 'utf8');
     const courier = read('painel/public/entregas.js');
