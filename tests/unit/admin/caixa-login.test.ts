@@ -45,6 +45,8 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Seu acesso e sua unidade serão identificados pelo login');
     expect(html).toContain('ENTRAR NA OPERAÇÃO');
     expect(html).toContain('Cada funcionário entra com sua própria conta.');
+    expect(html).toContain('href="/login?modo=painel"');
+    expect(html).toContain('Sou administrador da loja');
     expect(html).toContain('Vendas');
     expect(html).toContain('Estoque');
     expect(html).toContain('Entregas');

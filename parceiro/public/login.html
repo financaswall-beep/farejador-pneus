@@ -5,8 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#065f46" />
   <title>2W — Portal do Parceiro</title>
-  <link rel="stylesheet" href="/login.css?v=20260806-parceiro-mobile2" />
-  <script defer src="/login.js?v=20260806-parceiro-mobile2"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var narrow = window.matchMedia('(max-width: 768px)').matches;
+      var touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+      if (params.get('modo') === 'painel') {
+        if (narrow && touch) document.documentElement.classList.add('panel-mobile-override');
+        return;
+      }
+      if (narrow && touch) window.location.replace('/operacao');
+    })();
+  </script>
+  <link rel="stylesheet" href="/login.css?v=20260813-login-separado1" />
+  <script defer src="/login.js?v=20260813-login-separado1"></script>
 </head>
 <body>
   <main class="login-shell">
@@ -87,6 +99,7 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
           </button>
           <button class="text-button" id="btn-primeiro" type="button">Primeiro acesso — recebi um código</button>
+          <a class="operation-access" href="/operacao">Sou funcionário — acessar Operação da Loja</a>
         </form>
 
         <form id="form-primeiro" class="auth-form first-form" autocomplete="off">

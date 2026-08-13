@@ -216,6 +216,8 @@ form { display: grid; gap: 16px; }
 .secure-row svg { width: 23px; height: 23px; padding: 4px; border-radius: 50%; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; background: #eaf7ec; }
 .secure-row p { margin: 0; white-space: nowrap; font-size: 11px; }
 .individual-access { margin: 14px 0 0; color: #6e7973; text-align: center; font-size: 11px; }
+.admin-access-link { display: block; margin: 9px auto 0; color: #4f675c; font-size: 12px; font-weight: 720; text-align: center; text-decoration: none; }
+.admin-access-link:hover { color: #064e3b; text-decoration: underline; text-underline-offset: 3px; }
 
 .session-card {
   position: relative;
