@@ -53,7 +53,7 @@ button, label { -webkit-tap-highlight-color: transparent; }
   inset: 0 0 auto;
   height: 430px;
   pointer-events: none;
-  background: url('/caixa/hero-atendente-v1.webp') center 55% / cover no-repeat;
+  background: url('/operacao/hero-atendente-v1.webp') center 55% / cover no-repeat;
 }
 .cashier-photo::after {
   content: "";
@@ -268,7 +268,7 @@ form { display: grid; gap: 16px; }
   color: #fff;
   background:
     linear-gradient(110deg, rgba(0,43,31,.86) 0%, rgba(0,76,52,.72) 52%, rgba(0,45,32,.84) 100%),
-    url('/caixa/vendas-hero.webp') center 46% / cover no-repeat;
+    url('/operacao/vendas-hero.webp') center 46% / cover no-repeat;
   box-shadow: inset 0 -1px 0 rgba(255,255,255,.08);
 }
 .sales-heading { display: flex; align-items: center; gap: 13px; min-width: 0; }
@@ -1258,13 +1258,15 @@ form { display: grid; gap: 16px; }
 .delivery-product-visual img { position: relative; z-index: 0; display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply; }
 .delivery-product-visual span { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; padding: 5px 3px; overflow: hidden; color: #fff; background: rgba(8,28,20,.82); font-size: 9px; font-weight: 800; letter-spacing: .02em; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .delivery-product > strong { min-width: 0; overflow-wrap: anywhere; color: #1b2923; font-size: 15px; line-height: 1.35; }
-.delivery-actions { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin-top: 11px; }
+.delivery-actions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin-top: 11px; }
 .delivery-main-action,.delivery-outline-action,.delivery-contact { display: flex; min-height: 48px; align-items: center; justify-content: center; border-radius: 12px; font-size: 14px; font-weight: 750; cursor: pointer; }
 .delivery-main-action { border: 0; color: #fff; background: linear-gradient(135deg,#07804f,#005f3e); }
 .delivery-main-action:only-child { grid-column: 1/-1; }
 .delivery-outline-action { grid-column: 1/-1; border: 1px solid #087246; color: #087246; background: #fff; }
 .delivery-outline-action:disabled { color: #75807b; border-color: #d8deda; background: #f5f7f6; cursor: default; }
-.delivery-contact { border: 1px solid #a8cdbb; color: #087246; background: #fff; text-decoration: none; }
+.delivery-contact { grid-column: span 2; border: 1px solid #a8cdbb; color: #087246; background: #fff; text-decoration: none; }
+.delivery-navigation { display: flex; grid-column: span 2; min-height: 48px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #b9ccc2; border-radius: 12px; color: #183c2d; background: #fff; font-size: 13px; font-weight: 750; text-decoration: none; }
+.delivery-navigation img { width: 27px; height: 27px; object-fit: contain; }
 .delivery-payment-choices { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 9px; padding: 10px; border-radius: 12px; background: #edf8f1; }
 .delivery-payment-choices strong { grid-column: 1/-1; color: #244238; font-size: 13px; text-align: center; }
 .delivery-payment-choices button { min-height: 44px; border: 1px solid #a8cdbb; border-radius: 10px; color: #075f40; background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }

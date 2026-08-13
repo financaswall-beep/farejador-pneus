@@ -99,7 +99,7 @@
   function createReceiptItem(item, index) {
     const card = node('article', null, 'stock-receipt-item');
     const image = document.createElement('img');
-    image.src = '/caixa/catalog-tire.webp';
+    image.src = '/operacao/catalog-tire.webp';
     image.alt = '';
     const identity = node('div', null, 'stock-receipt-item-copy');
     identity.append(

@@ -235,7 +235,7 @@
     (receipt.items || []).forEach(function (item) {
       const row = document.createElement('div');
       const image = document.createElement('img');
-      image.src = item.image_url || '/caixa/catalog-tire.webp';
+      image.src = item.image_url || '/operacao/catalog-tire.webp';
       image.alt = '';
       const copy = document.createElement('span');
       const name = document.createElement('b');

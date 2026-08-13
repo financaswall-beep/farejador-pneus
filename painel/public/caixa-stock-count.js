@@ -137,7 +137,7 @@
     card.dataset.stockId = row.stock_id;
     let visual;
     if (row.item_type === 'pneu') {
-      visual = document.createElement('img'); visual.src = '/caixa/catalog-tire.webp'; visual.alt = '';
+      visual = document.createElement('img'); visual.src = '/operacao/catalog-tire.webp'; visual.alt = '';
     } else {
       visual = document.createElement('div'); visual.className = 'stock-count-package';
       visual.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>';

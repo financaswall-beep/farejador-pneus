@@ -9,7 +9,7 @@ describe('Etapa 10 - fronteiras de logistica e folha', () => {
     const touchedFlows = [
       'painel/public/app.logistica.acoes.js',
       'painel/public/app.logistica.js',
-      'painel/public/entregas.js',
+      'painel/public/caixa-deliveries-matrix.js',
     ];
     for (const file of touchedFlows) {
       expect(source(file), file).not.toMatch(/\b(?:window\.)?(?:confirm|prompt)\s*\(/);

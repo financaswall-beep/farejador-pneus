@@ -51,13 +51,13 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('Farejador');
     expect(css).toContain('.cash-status');
     expect(css).toContain('.operation-modules');
-    expect(css).toContain("url('/caixa/hero-atendente-v1.webp')");
-    expect(staticRoute).toContain("'/caixa/hero-atendente-v1.webp'");
+    expect(css).toContain("url('/operacao/hero-atendente-v1.webp')");
+    expect(staticRoute).toContain("'/operacao/hero-atendente-v1.webp'");
     expect(staticRoute).toContain("'assets/caixa-login-atendente-v1.webp'");
-    expect(staticRoute).toContain("'/caixa/catalog-tire.webp'");
+    expect(staticRoute).toContain("'/operacao/catalog-tire.webp'");
     expect(staticRoute).toContain("'assets/catalog-tire.webp'");
-    expect(css).toContain("url('/caixa/vendas-hero.webp')");
-    expect(staticRoute).toContain("'/caixa/vendas-hero.webp'");
+    expect(css).toContain("url('/operacao/vendas-hero.webp')");
+    expect(staticRoute).toContain("'/operacao/vendas-hero.webp'");
     expect(staticRoute).toContain("'assets/vendas-hero.webp'");
   });
 
@@ -71,13 +71,15 @@ describe('login mobile da Operação da Loja', () => {
   });
 
   it('serve a porta e a API separadas do admin e da logística', () => {
-    expect(staticRoute).toContain("text('/caixa', 'caixa.html'");
-    expect(staticRoute).toContain("['/vendas', '/caixa/vendas']");
-    expect(staticRoute).toContain("redirect('/caixa#vendas')");
+    expect(staticRoute).toContain("text('/operacao', 'caixa.html'");
+    expect(staticRoute).toContain("['/caixa', '/caixa/', '/vendas', '/caixa/vendas']");
+    expect(staticRoute).toContain("redirect('/operacao#vendas')");
+    expect(staticRoute).toContain("['/entregas', '/entregas/']");
+    expect(staticRoute).toContain("redirect('/operacao#entregas')");
     expect(script).toContain("window.location.hash === '#vendas'");
     scriptFiles.forEach((file) => {
-      expect(html).toContain(`/caixa/${file}`);
-      expect(staticRoute).toContain(`'/caixa/${file}'`);
+      expect(html).toContain(`/operacao/${file}`);
+      expect(staticRoute).toContain(`'/operacao/${file}'`);
     });
     expect(route).toContain("'/api/caixa/login'");
     expect(route).toContain("'/api/caixa/login/escolher'");
@@ -89,6 +91,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(route).toContain('MATRIZ_CAIXA_PORTAL');
     expect(route).toContain('OPERACAO_LOJA_PORTAL');
     expect(appRoutes).toContain('registerCaixaRoute');
+    expect(appRoutes).not.toContain('registerEntregadorRoute');
   });
 
   it('resolve Matriz ou parceira no servidor e mostra escolha só para vários vínculos', () => {
@@ -113,7 +116,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('class="sales-metrics"');
     expect(html).not.toContain('Buscar venda ou cliente');
     expect(script).toContain("document.createTextNode('Ver detalhes')");
-    expect(script).toContain("item.image_url || '/caixa/catalog-tire.webp'");
+    expect(script).toContain("item.image_url || '/operacao/catalog-tire.webp'");
     expect(script).toContain("Caixa.operationPath('minhas-vendas', '/api/caixa/vendas')");
     expect(script).toContain("'/recibo'");
     expect(script).not.toContain('/admin/api/');
@@ -139,7 +142,7 @@ describe('login mobile da Operação da Loja', () => {
   it('toca e abre a fila de fotos da Matriz em tempo real', () => {
     expect(html).toContain('id="photo-alert"');
     expect(html).toContain('id="photo-modal"');
-    expect(script).toContain("new Audio('/caixa/som-pedido-novo.mp3')");
+    expect(script).toContain("new Audio('/operacao/som-pedido-novo.mp3')");
     expect(script).toContain("new EventSource('/api/caixa/photo-stream?ticket='");
     expect(script).toContain("data.kind === 'photo_request'");
     expect(script).toContain("capture = 'environment'");
@@ -147,7 +150,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(photoRoute).toContain("'/api/caixa/photo-requests'");
     expect(photoRoute).toContain("'/api/caixa/photo-stream-ticket'");
     expect(photoRoute).toContain("'/api/caixa/photo-stream'");
-    expect(staticRoute).toContain("'/caixa/som-pedido-novo.mp3'");
+    expect(staticRoute).toContain("'/operacao/som-pedido-novo.mp3'");
     expect(staticRoute).toContain("'som-pedido-novo.mp3'");
   });
 

@@ -105,11 +105,29 @@
     return button;
   }
 
+  function navigationLink(label, href, logo) {
+    const link = document.createElement('a');
+    link.href = href; link.target = '_blank'; link.rel = 'noopener';
+    link.className = 'delivery-navigation'; link.setAttribute('aria-label', `Abrir rota no ${label}`);
+    const image = document.createElement('img'); image.src = logo; image.alt = '';
+    const copy = document.createElement('span'); copy.textContent = label;
+    link.append(image, copy); return link;
+  }
+
+  function navigationLinks(address) {
+    const query = encodeURIComponent(address || '');
+    return [
+      navigationLink('Maps', `https://www.google.com/maps/dir/?api=1&destination=${query}&utm_source=2w_pneus&utm_campaign=directions_request`, '/operacao/maps-logo.png'),
+      navigationLink('Waze', `https://waze.com/ul?q=${query}&navigate=yes&utm_source=2w_pneus`, '/operacao/waze-logo.png'),
+    ];
+  }
+
   function renderActions(row, card) {
     if (!Caixa.isPartner() && Caixa.matrixDeliveries) {
       Caixa.matrixDeliveries.renderActions(row, card, {
         actionButton: actionButton,
         phoneHref: phoneHref,
+        navigationLinks: navigationLinks,
       });
       return;
     }
@@ -122,7 +140,7 @@
       const assigned = actionButton(`Com ${row.delivery_courier}`, 'assigned', false); assigned.disabled = true;
       actions.appendChild(assigned);
     } else if (row.delivery_status === 'dispatched') {
-      actions.appendChild(actionButton('Ver rota', 'route', true));
+      actions.append(...navigationLinks(card.dataset.address));
       if (row.customer_phone) {
         const phone = document.createElement('a'); phone.href = phoneHref(row.customer_phone, false);
         phone.className = 'delivery-contact'; phone.setAttribute('aria-label', 'Ligar para o cliente');
@@ -160,7 +178,7 @@
     card.appendChild(deliveryDetails(row));
     const product = document.createElement('div'); product.className = 'delivery-product';
     const visual = document.createElement('div'); visual.className = 'delivery-product-visual';
-    const image = document.createElement('img'); image.src = '/caixa/catalog-tire.webp'; image.alt = '';
+    const image = document.createElement('img'); image.src = '/operacao/catalog-tire.webp'; image.alt = '';
     const badge = document.createElement('span'); badge.textContent = row.photo_request_id ? 'CARREGANDO FOTO' : 'REFERÊNCIA DO PRODUTO';
     visual.append(image, badge);
     const item = document.createElement('strong'); item.textContent = itemLabel(row);
@@ -243,8 +261,7 @@
     if (!Caixa.isPartner() && Caixa.matrixDeliveries) {
       void Caixa.matrixDeliveries.handleAction(action, target, card); return;
     }
-    if (action === 'route') window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.dataset.address)}`, '_blank', 'noopener');
-    else if (action === 'payment') card.querySelector('.delivery-payment-choices').classList.toggle('hidden');
+    if (action === 'payment') card.querySelector('.delivery-payment-choices').classList.toggle('hidden');
     else if (action === 'deliver') void updateDelivery(id, 'delivered', target.dataset.payment);
     else if (action === 'dispatch') void updateDelivery(id, 'dispatched');
     else if (action === 'claim') void updateDelivery(id, 'pending');

@@ -53,7 +53,7 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(html).not.toContain('id="stock-item-cost"');
     expect(html).not.toContain('id="stock-item-price"');
     expect(html).not.toContain('id="stock-item-quantity"');
-    expect(stockView).toContain("image.src = '/caixa/catalog-tire.webp'");
+    expect(stockView).toContain("image.src = '/operacao/catalog-tire.webp'");
     expect(stockView).toContain("row.tire_size || row.item_name");
     expect(stockView).toContain("conditionLabel(row.tire_condition) || 'Condição a confirmar'");
     expect(stockView).toContain("actions.appendChild(stockBadge(row))");

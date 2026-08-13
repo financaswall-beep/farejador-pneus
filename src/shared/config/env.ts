@@ -189,10 +189,10 @@ const envSchema = z.object({
   // for contornada. O default conserva o teto debatido para comprovante de rota.
   MATRIZ_RECEIPT_APPROVAL_MAX_AMOUNT: z.string().transform(Number)
     .pipe(z.number().positive().max(1_000_000)).default('10000'),
-  // Portais mobile ficam invisíveis (404) por padrão e usam sessões próprias.
-  // /entregas atende somente o colaborador entregador e nunca cancela pedidos.
+  // Compatibilidade da implantação 0125. O portal isolado foi aposentado em favor
+  // de /operacao; manter a leitura evita quebrar ambientes que ainda declaram a flag.
   MATRIZ_ENTREGADOR_PORTAL: booleanStringSchema,
-  // /caixa aceita somente vendedor ativo da área de vendas da Matriz.
+  // /operacao aceita vendedor e entregador ativos conforme seu vínculo.
   MATRIZ_CAIXA_PORTAL: booleanStringSchema,
   // Login unificado de Matriz + parceiros; OFF preserva a porta atual da Matriz.
   OPERACAO_LOJA_PORTAL: booleanStringSchema,

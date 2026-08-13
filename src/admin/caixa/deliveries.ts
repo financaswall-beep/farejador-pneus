@@ -49,7 +49,7 @@ function mapDelivery(
 }
 
 /**
- * Adapta a logística existente da Matriz ao contrato visual do /caixa.
+ * Adapta a logística existente da Matriz ao contrato visual de /operacao.
  * A seleção, posse e todas as escritas continuam nas queries do entregador.
  */
 export async function getCaixaDeliveries(auth: CaixaAuth) {

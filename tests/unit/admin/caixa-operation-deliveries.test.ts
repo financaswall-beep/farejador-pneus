@@ -24,7 +24,7 @@ describe('Entregas na Operação da Loja', () => {
     expect(html).toContain('data-delivery-filter="dispatched"');
     expect(html).toContain('data-delivery-filter="delivered"');
     expect(html).toContain('Buscar cliente ou pedido');
-    expect(html).toContain('/caixa/caixa-deliveries.js');
+    expect(html).toContain('/operacao/caixa-deliveries.js');
     expect(tabs).not.toContain('será implementada na próxima etapa');
     expect(tabs).toContain("showTab('deliveries')");
     expect(modules).toContain("return 'deliveries'");
@@ -38,7 +38,10 @@ describe('Entregas na Operação da Loja', () => {
   it('mostra foto identificada, rota, contato e ações de andamento', () => {
     expect(ui).toContain("badge.textContent = 'FOTO DO PRODUTO'");
     expect(ui).toContain("'REFERÊNCIA DO PRODUTO'");
-    expect(ui).toContain('https://www.google.com/maps/search/');
+    expect(ui).toContain('https://www.google.com/maps/dir/');
+    expect(ui).toContain('https://waze.com/ul?');
+    expect(ui).toContain("'/operacao/maps-logo.png'");
+    expect(ui).toContain("'/operacao/waze-logo.png'");
     expect(ui).toContain('https://wa.me/');
     expect(ui).toContain("action === 'claim'");
     expect(ui).toContain("action === 'dispatch'");
@@ -63,6 +66,6 @@ describe('Entregas na Operação da Loja', () => {
     expect(route).toContain("'/parceiro/:slug/api/operacao/entregas/fotos/:photoRequestId'");
     expect(ui).toContain("Caixa.operationPath('operacao/entregas', '/api/caixa/entregas')");
     expect(appRoutes).toContain('registerPartnerOperationDeliveryRoutes');
-    expect(staticRoute).toContain("'/caixa/caixa-deliveries.js'");
+    expect(staticRoute).toContain("'/operacao/caixa-deliveries.js'");
   });
 });

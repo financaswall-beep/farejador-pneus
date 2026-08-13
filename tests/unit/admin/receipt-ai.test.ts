@@ -17,7 +17,7 @@ describe('Etapa 7 — IA de comprovante apenas sugere', () => {
 
   it('faz painel e entregador persistirem sugestao sem chamar o lancador antigo', () => {
     const adminRoute = source('src/admin/painel/route-logistica-rotas.ts');
-    const courierRoute = source('src/admin/entregador/route.ts');
+    const courierRoute = source('src/admin/caixa/route-deliveries.ts');
 
     expect(adminRoute).not.toContain('recordReceiptAiResult');
     expect(courierRoute).not.toContain('recordReceiptAiResult');

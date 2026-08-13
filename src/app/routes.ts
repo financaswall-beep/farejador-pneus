@@ -12,7 +12,6 @@ import { registerPartnerOperationStockUpdateRoutes } from '../parceiro/route-ope
 import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operation-purchases.js';
 import { registerPartnerOperationDeliveryRoutes } from '../parceiro/route-operation-deliveries.js';
 import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
-import { registerEntregadorRoute } from '../admin/entregador/route.js';
 import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
 import { registerPublicLegalRoutes } from '../public/legal.route.js';
@@ -34,8 +33,6 @@ export async function registerRoutes(fastify: FastifyInstance): Promise<void> {
   registerPartnerOperationDeliveryRoutes(fastify);
   // Porta única de login (/login) — 0095. Aditiva: o login por slug continua.
   await registerLoginGlobalRoute(fastify);
-  // Portal do entregador (/entregas) — 0125. Dormente atrás de MATRIZ_ENTREGADOR_PORTAL.
-  await registerEntregadorRoute(fastify);
-  // Frente de Caixa da Matriz (/caixa) — login móvel isolado do admin e da logística.
+  // Operação da Loja (/operacao) — Matriz e parceiros; URLs antigas redirecionam.
   await registerCaixaRoute(fastify);
 }

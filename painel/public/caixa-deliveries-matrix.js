@@ -107,7 +107,7 @@
         helpers.actionButton('Não entreguei', 'fail', false),
       );
     } else if (row.delivery_status === 'dispatched') {
-      actions.appendChild(helpers.actionButton('Ver rota', 'route', true));
+      actions.append(...helpers.navigationLinks(card.dataset.address));
       if (row.customer_phone) {
         actions.append(
           contactLink('Ligar para o cliente', helpers.phoneHref(row.customer_phone, false), 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c1 .3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z'),
@@ -160,8 +160,7 @@
       target.textContent = selected.has(id) ? 'Entrega selecionada' : 'Selecionar entrega';
       target.classList.toggle('is-selected', selected.has(id)); syncSelection(); return true;
     }
-    if (action === 'route') window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(card.dataset.address)}`, '_blank', 'noopener');
-    else if (action === 'payment') card.querySelector('.delivery-payment-choices').classList.toggle('hidden');
+    if (action === 'payment') card.querySelector('.delivery-payment-choices').classList.toggle('hidden');
     else if (action === 'deliver') await updateStatus(id, 'delivered', target.dataset.payment);
     else if (action === 'dispatch') await updateStatus(id, 'dispatched');
     else if (action === 'fail') openFailure(id);
@@ -193,7 +192,10 @@
       });
       const payload = await Caixa.json(response); if (!response.ok) throw new Error(payload.error || 'upload');
       els.receiptStatus.textContent = payload.duplicate ? 'Comprovante já anexado.' : 'Comprovante enviado.';
-    } catch (error) { els.receiptStatus.textContent = 'Não foi possível enviar a foto.'; }
+    } catch (error) {
+      els.receiptStatus.textContent = error.message === 'receipt_exact_duplicate'
+        ? 'Este arquivo já foi usado em outro comprovante.' : 'Não foi possível enviar a foto.';
+    }
     finally { els.receipt.value = ''; }
   }
 

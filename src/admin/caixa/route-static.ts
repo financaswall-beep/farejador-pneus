@@ -21,58 +21,64 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
     fastify.get(url, { preHandler: flagGate }, async (_request, reply) =>
       sendStatic(reply, file, type, cacheControl));
 
-  text('/caixa', 'caixa.html', 'text/html; charset=utf-8');
-  text('/caixa/', 'caixa.html', 'text/html; charset=utf-8');
-  for (const url of ['/vendas', '/caixa/vendas']) {
+  text('/operacao', 'caixa.html', 'text/html; charset=utf-8');
+  text('/operacao/', 'caixa.html', 'text/html; charset=utf-8');
+  for (const url of ['/caixa', '/caixa/', '/vendas', '/caixa/vendas']) {
     fastify.get(url, { preHandler: flagGate }, async (_request, reply) =>
-      reply.header('Cache-Control', 'no-store').redirect('/caixa#vendas'));
+      reply.header('Cache-Control', 'no-store').redirect('/operacao#vendas'));
   }
-  text('/caixa/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
-  text('/caixa/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-checkout-catalog.js', 'caixa-checkout-catalog.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-checkout.js', 'caixa-checkout.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-checkout-session.js', 'caixa-checkout-session.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock-view.js', 'caixa-stock-view.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock-detail.js', 'caixa-stock-detail.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock-edit.js', 'caixa-stock-edit.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock.js', 'caixa-stock.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock-count.js', 'caixa-stock-count.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-stock-receipts.js', 'caixa-stock-receipts.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-deliveries-matrix.js', 'caixa-deliveries-matrix.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-deliveries.js', 'caixa-deliveries.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-profile.js', 'caixa-profile.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');
-  text('/caixa/caixa.js', 'caixa.js', 'text/javascript; charset=utf-8');
-  fastify.get('/caixa/som-pedido-novo.mp3', { preHandler: flagGate }, async (_request, reply) => {
+  for (const url of ['/entregas', '/entregas/']) {
+    fastify.get(url, { preHandler: flagGate }, async (_request, reply) =>
+      reply.header('Cache-Control', 'no-store').redirect('/operacao#entregas'));
+  }
+  text('/operacao/caixa.css', 'caixa.css', 'text/css; charset=utf-8', 'public, max-age=86400');
+  text('/operacao/caixa-core.js', 'caixa-core.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-modules.js', 'caixa-modules.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-checkout-catalog.js', 'caixa-checkout-catalog.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-checkout.js', 'caixa-checkout.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-checkout-session.js', 'caixa-checkout-session.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-sales-view.js', 'caixa-sales-view.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-view.js', 'caixa-stock-view.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-detail.js', 'caixa-stock-detail.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-edit.js', 'caixa-stock-edit.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock.js', 'caixa-stock.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-count.js', 'caixa-stock-count.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-stock-receipts.js', 'caixa-stock-receipts.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-deliveries-matrix.js', 'caixa-deliveries-matrix.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-deliveries.js', 'caixa-deliveries.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-profile.js', 'caixa-profile.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa.js', 'caixa.js', 'text/javascript; charset=utf-8');
+  fastify.get('/operacao/som-pedido-novo.mp3', { preHandler: flagGate }, async (_request, reply) => {
     const content = await readFile(path.join(partnerAssetsDir, 'som-pedido-novo.mp3'));
     return reply.header('Content-Type', 'audio/mpeg')
       .header('Cache-Control', 'public, max-age=31536000, immutable').send(content);
   });
   text(
-    '/caixa/logo-2w.svg',
+    '/operacao/logo-2w.svg',
     'assets/2w-app-icon-1024.svg',
     'image/svg+xml',
     'public, max-age=31536000, immutable',
   );
   text(
-    '/caixa/hero-atendente-v1.webp',
+    '/operacao/hero-atendente-v1.webp',
     'assets/caixa-login-atendente-v1.webp',
     'image/webp',
     'public, max-age=31536000, immutable',
   );
   text(
-    '/caixa/catalog-tire.webp',
+    '/operacao/catalog-tire.webp',
     'assets/catalog-tire.webp',
     'image/webp',
     'public, max-age=31536000, immutable',
   );
   text(
-    '/caixa/vendas-hero.webp',
+    '/operacao/vendas-hero.webp',
     'assets/vendas-hero.webp',
     'image/webp',
     'public, max-age=31536000, immutable',
   );
+  text('/operacao/maps-logo.png', 'assets/navigation-google-maps-official-v1.png', 'image/png', 'public, max-age=31536000, immutable');
+  text('/operacao/waze-logo.png', 'assets/navigation-waze-official-v1.png', 'image/png', 'public, max-age=31536000, immutable');
 }

@@ -11,7 +11,7 @@ import Fastify from 'fastify';
 import { loggerOptions, logger } from '../shared/logger.js';
 import { pool } from '../persistence/db.js';
 import { registerPainelRoute } from '../admin/painel/route.js';
-import { registerEntregadorRoute } from '../admin/entregador/route.js';
+import { registerCaixaRoute } from '../admin/caixa/route.js';
 // 0132: o painel autentica por login humano + cookie — sem esta rota o preview
 // não tem como logar (o front não usa mais bearer).
 import { registerAdminLoginRoute } from '../admin/login.route.js';
@@ -38,7 +38,7 @@ fastify.addContentTypeParser(
 async function start(): Promise<void> {
   await registerAdminLoginRoute(fastify);
   await registerPainelRoute(fastify);
-  await registerEntregadorRoute(fastify);
+  await registerCaixaRoute(fastify);
   startClientesKanbanNotifyHub();
   const port = Number(process.env.PREVIEW_MATRIZ_PORT ?? 4200);
   await fastify.listen({ port, host: '0.0.0.0' });

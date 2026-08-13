@@ -44,12 +44,12 @@
         return visual;
       }
       const image = document.createElement('img');
-      image.src = product.image_url || '/caixa/catalog-tire.webp';
+      image.src = product.image_url || '/operacao/catalog-tire.webp';
       image.alt = '';
       image.loading = 'lazy';
       image.decoding = 'async';
       image.addEventListener('error', function () {
-        if (!image.src.endsWith('/caixa/catalog-tire.webp')) image.src = '/caixa/catalog-tire.webp';
+        if (!image.src.endsWith('/operacao/catalog-tire.webp')) image.src = '/operacao/catalog-tire.webp';
       });
       visual.appendChild(image);
       return visual;

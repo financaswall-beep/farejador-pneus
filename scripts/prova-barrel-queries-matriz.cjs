@@ -66,8 +66,8 @@ function walk(dir) {
   }
   return out;
 }
-// './queries.js' só é o barrel quando o importador mora em src/admin/painel/
-// (ex.: entregador/route.ts tem um './queries.js' PRÓPRIO — não é o barrel).
+// './queries.js' só é o barrel quando o importador mora em src/admin/painel/.
+// Outros módulos administrativos podem ter um './queries.js' próprio.
 let importsChecados = 0;
 for (const arquivo of walk(path.join(RAIZ, 'src'))) {
   if (arquivo.endsWith(`${path.sep}queries.ts`) && arquivo.includes('painel')) continue;

@@ -104,7 +104,7 @@
     visual.className = 'stock-card-visual' + (row.item_type === 'pneu' ? '' : ' stock-card-visual--icon');
     if (row.item_type === 'pneu') {
       const image = document.createElement('img');
-      image.src = '/caixa/catalog-tire.webp';
+      image.src = '/operacao/catalog-tire.webp';
       image.alt = '';
       visual.appendChild(image);
     } else visual.appendChild(icon(row.item_type));

@@ -114,8 +114,8 @@ export async function revokeMatrizCollaborator(
                            WHERE pat.person_id = pp.id AND pat.revoked_at IS NULL)`,
       [personId],
     );
-    // 0125: mata as sessões do portal /entregas na hora (defesa em profundidade —
-    // o middleware do portal já morre pelo JOIN do colaborador; isto apaga a linha viva).
+    // Revoga também as sessões da Operação da Loja imediatamente. O middleware
+    // já recusa o colaborador revogado; limpar a sessão mantém defesa em profundidade.
     await client.query(
       `UPDATE network.matriz_staff_sessions SET revoked_at = now()
         WHERE person_id = $1 AND revoked_at IS NULL`,

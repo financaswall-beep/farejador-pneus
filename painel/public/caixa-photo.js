@@ -25,7 +25,7 @@
   function unlockAudio() {
     if (audioUnlocked) return;
     try {
-      alertAudio = new Audio('/caixa/som-pedido-novo.mp3');
+      alertAudio = new Audio('/operacao/som-pedido-novo.mp3');
       alertAudio.preload = 'auto';
       alertAudio.muted = true;
       const primed = alertAudio.play();

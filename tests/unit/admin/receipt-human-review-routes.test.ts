@@ -7,7 +7,7 @@ const source = (path: string) => readFileSync(resolve(path), 'utf8');
 describe('Etapa 7 — portaria da decisao humana', () => {
   it('expoe aprovacao e rejeicao apenas na portaria administrativa autenticada', () => {
     const admin = source('src/admin/painel/route-logistica-rotas.ts');
-    const courier = source('src/admin/entregador/route.ts');
+    const courier = source('src/admin/caixa/route-deliveries.ts');
     const approval = admin.slice(admin.indexOf("'/admin/api/logistica/comprovantes/aprovar'"),
       admin.indexOf("'/admin/api/logistica/comprovantes/rejeitar'"));
     const rejection = admin.slice(admin.indexOf("'/admin/api/logistica/comprovantes/rejeitar'"),

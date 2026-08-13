@@ -64,7 +64,7 @@ describe('Etapa 7 — fila administrativa de aprovacao humana', () => {
 
   it('reusa a mesma chave em retry e separa erro do admin e do entregador', () => {
     const module = readFileSync(modulePath, 'utf8');
-    const courier = read('painel/public/entregas.js');
+    const courier = read('painel/public/caixa-deliveries-matrix.js');
 
     expect(module).toContain('duplicate_trip_number');
     expect(module).toContain('Este comprovante já está na');
