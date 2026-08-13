@@ -106,35 +106,6 @@ window.PAINEL_MODULES.logistica = function () {
       if (d?.delivery_status === 'delivered' && d.delivered_at) return this.logisticaDateISO(d.delivered_at);
       return this.logisticaDateISO(d?.scheduled_date || d?.created_at);
     },
-    logisticaDentroPeriodo(d) {
-      const data = this.logisticaDataOperacional(d);
-      if (!data) return true;
-      if (this.logisticaPeriodo === 'amanha') return data === this.amanhaISO();
-      if (this.logisticaPeriodo === '7dias') return data >= this.hojeISO() && data <= this.logisticaPeriodoFinalISO();
-      return data === this.hojeISO();
-    },
-    logisticaPeriodoLabel() {
-      if (this.logisticaPeriodo === 'amanha') return 'Amanhã';
-      if (this.logisticaPeriodo === '7dias') return 'Próximos 7 dias';
-      return 'Hoje';
-    },
-    setLogisticaPeriodo(periodo) {
-      this.logisticaPeriodo = periodo;
-      this.$nextTick(() => window.lucide && window.lucide.createIcons());
-    },
-    setLogisticaFiltro(filtro, abrirEntregas = false) {
-      this.logisticaFiltro = filtro;
-      if (abrirEntregas) {
-        this.logisticaTab = 'entregas';
-        this.logisticaRotaSelecionadaId = null;
-      }
-      this.$nextTick(() => window.lucide && window.lucide.createIcons());
-    },
-    setLogisticaTab(tab) {
-      this.logisticaTab = tab;
-      this.logisticaRotaSelecionadaId = null;
-      this.$nextTick(() => window.lucide && window.lucide.createIcons());
-    },
     logisticaTodasEntregas() {
       const rows = [
         ...(this.logistica?.reportadas || []),

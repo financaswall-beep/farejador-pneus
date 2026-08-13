@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const html = readFileSync(resolve('painel/public/index.html'), 'utf8');
 const readModule = readFileSync(resolve('painel/public/app.logistica.js'), 'utf8');
+const periodModule = readFileSync(resolve('painel/public/app.logistica.periodos.js'), 'utf8');
 const resultModule = readFileSync(resolve('painel/public/app.logistica.resultado.js'), 'utf8');
 
 function logisticsHtml(): string {
@@ -17,7 +18,9 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
 
   it('preserva menu externo, banner e navegacao existentes', () => {
     expect(screen).toContain('/admin/painel/assets/logistica-hero-v2.webp');
-    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260812-logistica-redesign1');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260813-logistica-redesign2');
+    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260813-logistica-redesign2');
+    expect(html).toContain('/admin/painel/app.montagem.js?v=20260813-logistica-redesign2');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
     expect(screen).toContain('aria-label="Seções de Logística"');
     expect(screen).toContain("{ id: 'visao', label: 'Visão geral' }");
@@ -30,10 +33,12 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
     expect(screen).toContain('Operação de hoje');
     expect(screen).toContain('Fila de entregas');
     expect(screen).toContain('Rotas da Matriz');
-    expect(screen).toContain('Rotas concluídas');
+    expect(screen).toContain('Concluída');
     expect(screen).toContain('Histórico de entregas');
     expect(screen).toContain('Taxa de sucesso');
     expect(screen).toContain('Tempo médio');
+    expect(screen).toContain('Planejar próxima saída');
+    expect(screen).toContain('Últimos 30 dias');
   });
 
   it('mantem todas as acoes operacionais de entrega e rota', () => {
@@ -57,6 +62,7 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
     expect(resultModule).toContain('d.delivered_at');
     expect(resultModule).toContain('this.logisticaDentroPeriodo(d)');
     expect(readModule).toContain('logisticaFinalizadasView()');
+    expect(periodModule).toContain("this.logisticaPeriodo === '30dias'");
   });
 
   it('mantem a revisao detalhada recolhida e exclusiva da visao geral', () => {
