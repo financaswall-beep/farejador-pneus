@@ -33,8 +33,8 @@
 <script src="/admin/painel/app.compras.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
-<script src="/admin/painel/app.logistica.js?v=20260813-logistica-redesign2"></script>
-<script src="/admin/painel/app.logistica.resultado.js?v=20260813-logistica-hotfix1"></script>
+<script src="/admin/painel/app.logistica.js?v=20260813-logistica-cards1"></script>
+<script src="/admin/painel/app.logistica.resultado.js?v=20260813-logistica-cards1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.logistica.acoes.js?v=20260717-comprovantes1"></script>
 <script src="/admin/painel/app.colaboradores.js?v=20260719-colab-dialog1"></script>
@@ -4178,18 +4178,9 @@
         <span>A Logística está indisponível neste ambiente. Ative <span class="font-mono text-xs bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">MATRIZ_LOGISTICS</span>.</span>
       </div>
 
-      <div x-show="logistica" class="space-y-5">
+      <div x-show="logistica" class="flex flex-col gap-5">
         <!-- Os cards são filtros reais da fila. -->
-        <div x-show="logisticaTab === 'visao'" class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-          <button @click="setLogisticaFiltro('todas', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-emerald-200 hover:shadow-sm transition">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs font-medium text-gray-500" x-text="'Entregas · ' + logisticaPeriodoLabel()"></p>
-                <p class="text-3xl font-semibold text-emerald-800 tabular-nums mt-2" x-text="logisticaResumoCards().total"></p>
-              </div>
-              <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="package" class="w-6 h-6 text-emerald-700"></i></div>
-            </div>
-          </button>
+        <div x-show="logisticaTab === 'visao'" class="order-1 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           <button @click="setLogisticaFiltro('aguardando', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-amber-200 hover:shadow-sm transition">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -4208,6 +4199,15 @@
               <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="truck" class="w-6 h-6 text-emerald-700"></i></div>
             </div>
           </button>
+          <button @click="logisticaTab = 'historico'; logisticaRotaSelecionadaId = null; logisticaBusca = ''; $nextTick(() => window.lucide && window.lucide.createIcons())" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-emerald-200 hover:shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-medium text-gray-500" x-text="'Entregues · ' + logisticaPeriodoLabel()"></p>
+                <p class="text-3xl font-semibold text-emerald-800 tabular-nums mt-2" x-text="logisticaResumoCards().entregues"></p>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center"><i data-lucide="circle-check" class="w-6 h-6 text-emerald-700"></i></div>
+            </div>
+          </button>
           <button @click="setLogisticaFiltro('problemas', true)" class="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-rose-200 hover:shadow-sm transition">
             <div class="flex items-center justify-between gap-3">
               <div>
@@ -4221,7 +4221,7 @@
 
         <details x-ref="receiptReviewDetails" x-show="adminUser?.role === 'owner' && logisticaTab === 'visao' && logistica?.receipt_approval && receiptReviewQueue().length"
                  aria-labelledby="receipt-review-heading"
-                 class="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                 class="order-3 mx-auto w-full max-w-7xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <summary class="flex cursor-pointer list-none flex-col gap-4 bg-gradient-to-r from-amber-50 via-white to-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div class="flex items-start gap-3">
               <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-700 shadow-sm">
@@ -4364,12 +4364,12 @@
         </details>
 
         <!-- Cada aba tem uma responsabilidade visual própria. -->
-        <div x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div><h2 class="text-xl font-semibold text-gray-950">Rotas da Matriz</h2><p class="mt-1 text-sm text-gray-500">Acompanhe a rota aberta e consulte o resultado das últimas saídas.</p></div>
           <button x-show="!logisticaRotaAtual()" @click="$nextTick(() => $refs.novaRotaCard?.scrollIntoView({ behavior: 'smooth', block: 'center' }))" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"><i data-lucide="plus" class="h-4 w-4"></i>Nova rota</button>
         </div>
 
-        <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas'" class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <div x-show="logisticaTab === 'visao' || logisticaTab === 'entregas'" class="order-2 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <section x-show="logisticaTab === 'entregas'"
                    class="lg:col-span-12 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div class="p-5 border-b border-gray-100">
@@ -4495,7 +4495,7 @@
 
         <!-- Resultado de uma rota fechada: detalhe dentro da própria subaba Rotas. -->
         <template x-if="logisticaTab === 'rotas' && logisticaRotaSelecionada()">
-          <div class="space-y-5">
+          <div class="order-2 space-y-5">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                 <button @click="voltarParaRotas()" class="inline-flex self-start items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
@@ -4619,7 +4619,7 @@
         </template>
 
         <!-- Rotas recentes em cards: cada card abre o resultado completo já existente. -->
-        <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="space-y-4">
+        <section x-show="logisticaTab === 'rotas' && !logisticaRotaSelecionada()" class="order-2 space-y-4">
           <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <template x-if="logisticaRotaAtual()">
               <article class="flex flex-col rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
@@ -4656,7 +4656,7 @@
         </section>
 
         <!-- Histórico: indicadores do período e entregas finalizadas. -->
-        <section x-show="logisticaTab === 'historico'" class="space-y-4">
+        <section x-show="logisticaTab === 'historico'" class="order-1 space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 class="text-xl font-semibold text-gray-950">Histórico de entregas</h2><p class="mt-1 text-sm text-gray-500">Concluídas, canceladas e não entregues</p></div><select x-model="logisticaPeriodo" class="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700"><option value="30dias">Últimos 30 dias</option><option value="7dias">Últimos 7 dias</option><option value="hoje">Hoje</option></select></div>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <article class="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><i data-lucide="circle-check" class="h-5 w-5"></i></div><div><p class="text-xs text-gray-500">Entregas concluídas</p><p class="mt-1 text-2xl font-semibold tabular-nums" x-text="logisticaHistoricoResumo().concluidas"></p></div></article>

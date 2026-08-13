@@ -129,7 +129,8 @@ window.PAINEL_MODULES.logistica = function () {
     logisticaEntregasView() {
       let rows;
       if (this.logisticaFiltro === 'problemas') {
-        return (this.logistica?.reportadas || []).filter((d) => this.logisticaBuscaMatch(d));
+        return (this.logistica?.reportadas || [])
+          .filter((d) => this.logisticaDentroPeriodo(d) && this.logisticaBuscaMatch(d));
       }
       else {
         rows = [...(this.logistica?.abertas || []), ...(this.logistica?.reportadas || [])];
@@ -144,10 +145,10 @@ window.PAINEL_MODULES.logistica = function () {
     logisticaResumoCards() {
       const noPeriodo = this.logisticaTodasEntregas().filter((d) => this.logisticaDentroPeriodo(d));
       return {
-        total: noPeriodo.length,
         aguardando: noPeriodo.filter((d) => d.delivery_status === 'pending').length,
         rota: noPeriodo.filter((d) => d.delivery_status === 'dispatched').length,
-        problemas: (this.logistica?.reportadas || []).length,
+        entregues: noPeriodo.filter((d) => d.delivery_status === 'delivered').length,
+        problemas: (this.logistica?.reportadas || []).filter((d) => this.logisticaDentroPeriodo(d)).length,
       };
     },
     logisticaOrderLabel(d) {

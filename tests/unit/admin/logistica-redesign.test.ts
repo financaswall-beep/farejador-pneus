@@ -17,8 +17,8 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
 
   it('preserva menu externo, banner e navegacao existentes', () => {
     expect(screen).toContain('/admin/painel/assets/logistica-hero-v2.webp');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260813-logistica-redesign2');
-    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260813-logistica-hotfix1');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260813-logistica-cards1');
+    expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260813-logistica-cards1');
     expect(html).toContain('/admin/painel/app.montagem.js?v=20260813-logistica-hotfix1');
     expect(html).not.toContain('app.logistica.periodos.js');
     expect(screen).toContain('aria-labelledby="logistica-heading"');
@@ -39,6 +39,22 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
     expect(screen).toContain('Tempo médio');
     expect(screen).toContain('Planejar próxima saída');
     expect(screen).toContain('Últimos 30 dias');
+  });
+
+  it('ordena os indicadores pelo fluxo operacional e mantem os numeros no periodo', () => {
+    const aguardando = screen.indexOf('Aguardando saída');
+    const emRota = screen.indexOf('>Em rota<');
+    const entregues = screen.indexOf("'Entregues · '");
+    const problemas = screen.indexOf('Com problema');
+
+    expect(aguardando).toBeGreaterThan(-1);
+    expect(aguardando).toBeLessThan(emRota);
+    expect(emRota).toBeLessThan(entregues);
+    expect(entregues).toBeLessThan(problemas);
+    expect(readModule).toContain("entregues: noPeriodo.filter((d) => d.delivery_status === 'delivered').length");
+    expect(readModule).toContain('(this.logistica?.reportadas || []).filter((d) => this.logisticaDentroPeriodo(d)).length');
+    expect(readModule).toContain('.filter((d) => this.logisticaDentroPeriodo(d) && this.logisticaBuscaMatch(d))');
+    expect(screen).toContain("logisticaTab = 'historico'; logisticaRotaSelecionadaId = null");
   });
 
   it('mantem todas as acoes operacionais de entrega e rota', () => {
