@@ -71,6 +71,9 @@
     byId('finance-commission-count').textContent = staff
       ? countText(staff, 'colaborador', 'colaboradores')
       : 'Nenhum colaborador com comissão';
+    byId('finance-commissions').classList.toggle(
+      'hidden', Caixa.stored(Caixa.keys.role) !== 'owner',
+    );
     setState('ready');
   }
 
@@ -124,6 +127,10 @@
       }
       if (button.dataset.financeDetail === 'out' && Caixa.openFinanceOutputs) {
         Caixa.openFinanceOutputs();
+        return;
+      }
+      if (button.dataset.financeDetail === 'commissions' && Caixa.openFinanceCommissions) {
+        Caixa.openFinanceCommissions();
         return;
       }
       openFullFinance();

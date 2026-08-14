@@ -1048,6 +1048,92 @@ form { display: grid; gap: 16px; }
 .finance-entries-page.is-output .finance-entries-list section > header strong,
 .finance-entries-page.is-output .finance-entry-card > b { color: #c7432a; }
 .finance-entries-page.is-output .finance-entry-card-icon { color: #c7432a; background: #fff0eb; }
+
+/* Financeiro · comissões e remuneração */
+.finance-commission-page { min-height: 650px; padding: 0 14px 110px; color: #101b16; background: #fff; }
+.finance-commission-toolbar { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; margin: 0 -14px 16px; padding: 22px 16px 20px; color: #fff; background: linear-gradient(120deg,#006643,#00472f); }
+.finance-commission-toolbar > button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 50%; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
+.finance-commission-toolbar > button svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.finance-commission-toolbar h2,.finance-commission-toolbar p { margin: 0; }
+.finance-commission-toolbar h2 { font-size: 25px; letter-spacing: -.035em; }
+.finance-commission-toolbar p { margin-top: 3px; color: #d4eadf; font-size: 14px; }
+.finance-commission-toolbar > span { padding: 9px 12px; border: 1px solid rgba(255,255,255,.68); border-radius: 12px; font-size: 13px; }
+.finance-commission-ranges { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 9px; margin: 16px 1px; }
+.finance-commission-ranges button { min-height: 47px; padding: 5px; border: 1px solid #b9c7c0; border-radius: 13px; color: #075f40; background: #fff; font-size: 15px; font-weight: 720; cursor: pointer; }
+.finance-commission-ranges button.active { border-color: #08794f; color: #fff; background: linear-gradient(135deg,#087e51,#00623f); box-shadow: 0 7px 16px rgba(0,102,67,.16); }
+.finance-commission-message { display: grid; min-height: 300px; place-items: center; align-content: center; gap: 12px; color: #607068; text-align: center; }
+.finance-commission-message > i { width: 30px; height: 30px; border: 3px solid #d9e6df; border-top-color: #07804f; border-radius: 50%; animation: finance-spin .8s linear infinite; }
+.finance-commission-message--error { color: #9b342f; }
+.finance-commission-message button { min-height: 44px; padding: 0 16px; border: 1px solid #087246; border-radius: 11px; color: #087246; background: #fff; font-weight: 700; cursor: pointer; }
+.finance-commission-total { display: grid; min-height: 148px; align-content: center; gap: 5px; padding: 24px 22px; border: 1px solid #dfe7e2; border-radius: 20px; background: #fff; box-shadow: 0 8px 21px rgba(22,53,40,.07); }
+.finance-commission-total small { color: #26352e; font-size: 17px; font-weight: 750; }
+.finance-commission-total strong { color: #006943; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(39px,12vw,53px); line-height: 1.08; letter-spacing: -.045em; white-space: nowrap; }
+.finance-commission-total span { color: #65736c; font-size: 15px; }
+.finance-commission-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 14px 0 22px; overflow: hidden; border: 1px solid #dfe7e2; border-radius: 18px; background: #fff; box-shadow: 0 7px 18px rgba(22,53,40,.06); }
+.finance-commission-metrics p { display: grid; min-width: 0; grid-template-columns: 37px minmax(0,1fr); align-items: center; gap: 10px; margin: 0; padding: 18px 15px; }
+.finance-commission-metrics p + p { border-left: 1px solid #e2e8e4; }
+.finance-commission-metrics svg { width: 30px; height: 30px; fill: none; stroke: #087a50; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.finance-commission-metrics span,.finance-commission-metrics small { display: block; }
+.finance-commission-metrics strong { font-size: 17px; }
+.finance-commission-metrics small { margin-top: 2px; color: #6b7770; font-size: 11px; }
+.finance-commission-page h3 { margin: 0 5px 11px; font-size: 21px; letter-spacing: -.03em; }
+.finance-commission-list { overflow: hidden; border: 1px solid #dfe7e2; border-radius: 18px; background: #fff; box-shadow: 0 7px 18px rgba(22,53,40,.07); }
+.finance-commission-list article { display: grid; min-height: 80px; grid-template-columns: 48px minmax(0,1fr) auto 73px; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; }
+.finance-commission-list article + article { border-top: 1px solid #e5ebe7; }
+.finance-commission-avatar { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#168c60,#004d34); font-size: 14px; font-weight: 800; }
+.finance-commission-list article > div { min-width: 0; }
+.finance-commission-list article > div strong,.finance-commission-list article > div small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finance-commission-list article > div strong { font-size: 16px; }
+.finance-commission-list article > div small { margin-top: 3px; color: #69756f; font-size: 12px; }
+.finance-commission-list article > b { color: #067149; font-size: 16px; white-space: nowrap; }
+.finance-commission-row-action { min-height: 42px; padding: 0 12px; border: 1px solid #096c49; border-radius: 12px; color: #096c49; background: #fff; font-size: 13px; font-weight: 730; cursor: pointer; }
+.finance-commission-row-action--paid { border-color: #05945c; color: #fff; background: #07945c; }
+.finance-commission-row-action--open { border-color: #c6d0cb; color: #66736c; }
+.finance-commission-info { display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: center; gap: 10px; margin: 14px 0; padding: 12px 14px; border-radius: 13px; color: #315d49; background: #edf8f2; font-size: 12px; line-height: 1.4; }
+.finance-commission-info b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fff; background: #08774e; font-family: Georgia,serif; }
+.finance-commission-history { width: 100%; min-height: 52px; border: 1px solid #087246; border-radius: 14px; color: #087246; background: #fff; font-size: 15px; font-weight: 750; cursor: pointer; }
+.finance-commission-empty { margin: 0; padding: 25px 16px; color: #6a7770; text-align: center; font-size: 14px; }
+.finance-commission-person { display: grid; grid-template-columns: 65px minmax(0,1fr); align-items: center; gap: 14px; margin: 14px 0 16px; padding: 15px; border: 1px solid #dfe7e2; border-radius: 18px; box-shadow: 0 7px 18px rgba(22,53,40,.07); }
+.finance-commission-person > b { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#168c60,#004d34); font-size: 19px; }
+.finance-commission-person div > strong,.finance-commission-person div > span,.finance-commission-person div > small { display: block; }
+.finance-commission-person div > strong { font-size: 21px; }
+.finance-commission-person div > span { margin-top: 2px; color: #69756f; font-size: 14px; }
+.finance-commission-person div > small { margin-top: 5px; color: #08784e; }
+.finance-commission-person div > small i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #10a263; }
+.finance-commission-person div > small em { font-style: normal; }
+.finance-commission-detail-total { margin-bottom: 24px; padding: 21px 19px 0; overflow: hidden; border: 1px solid #dfe7e2; border-radius: 20px; box-shadow: 0 8px 21px rgba(22,53,40,.07); }
+.finance-commission-detail-total > small { color: #26352e; font-size: 17px; font-weight: 750; }
+.finance-commission-detail-total > strong { display: block; margin: 4px 0 14px; color: #006943; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(39px,12vw,50px); letter-spacing: -.045em; }
+.finance-commission-detail-total > div { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 0 -19px; border-top: 1px solid #e1e8e4; }
+.finance-commission-detail-total p { display: grid; min-height: 72px; align-content: center; gap: 3px; margin: 0; padding: 9px 5px; text-align: center; }
+.finance-commission-detail-total p + p { border-left: 1px solid #e1e8e4; }
+.finance-commission-detail-total b { font-size: 15px; }
+.finance-commission-detail-total span { color: #6b7770; font-size: 11px; }
+.finance-commission-sales { overflow: hidden; border: 1px solid #dfe7e2; border-radius: 18px; background: #fff; box-shadow: 0 7px 18px rgba(22,53,40,.06); }
+.finance-commission-sales article { display: grid; min-height: 75px; grid-template-columns: 42px minmax(0,1fr) auto; align-items: center; gap: 11px; padding: 11px 13px; }
+.finance-commission-sales article + article { border-top: 1px solid #e5ebe7; }
+.finance-commission-sale-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; color: #08774e; background: #edf8f2; font-weight: 800; }
+.finance-commission-sales article > div { min-width: 0; }
+.finance-commission-sales article > div strong,.finance-commission-sales article > div small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finance-commission-sales article > div strong { font-size: 15px; }
+.finance-commission-sales article > div small { margin-top: 3px; color: #6b7770; font-size: 11px; }
+.finance-commission-sales article > div:last-child { text-align: right; }
+.finance-commission-sales article > div:last-child span,.finance-commission-sales article > div:last-child b { display: block; white-space: nowrap; }
+.finance-commission-sales article > div:last-child span { font-size: 12px; }
+.finance-commission-sales article > div:last-child b { margin-top: 3px; color: #08774e; font-size: 14px; }
+.finance-commission-payment-error { min-height: 17px; margin: 0 2px 7px; color: #a3312d; font-size: 12px; }
+.finance-commission-pay { width: 100%; min-height: 57px; border: 0; border-radius: 14px; color: #fff; background: linear-gradient(135deg,#008c55,#00633f); font-size: 16px; font-weight: 790; cursor: pointer; }
+.finance-commission-pay:disabled { color: #65736c; background: #e7eeea; cursor: default; }
+.finance-commission-pay[data-status="paid"] { color: #fff; background: #07945c; }
+
+@media (max-width: 380px) {
+  .finance-commission-toolbar > span { padding-inline: 8px; font-size: 11px; }
+  .finance-commission-ranges { gap: 6px; }
+  .finance-commission-ranges button { font-size: 13px; }
+  .finance-commission-list article { grid-template-columns: 43px minmax(0,1fr) auto; }
+  .finance-commission-list article > b { grid-column: 2; }
+  .finance-commission-row-action { grid-column: 3; grid-row: 1 / span 2; }
+}
 .sales-app.is-finance-detail .sales-header { min-height: 132px; padding-bottom: 22px; }
 
 @media (max-width: 370px) {

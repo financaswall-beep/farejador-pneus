@@ -20,6 +20,8 @@ const scriptFiles = [
   'caixa-deliveries-matrix.js',
   'caixa-deliveries.js',
   'caixa-finance.js',
+  'caixa-finance-entries.js',
+  'caixa-finance-commissions.js',
   'caixa-profile.js',
   'caixa-photo.js',
   'caixa.js',
@@ -29,6 +31,7 @@ const script = scriptFiles
   .join('\n');
 const route = [
   'src/admin/caixa/route.ts',
+  'src/admin/caixa/route-commissions.ts',
   'src/admin/caixa/route-operation-login.ts',
 ].map((file) => readFileSync(resolve(file), 'utf8')).join('\n');
 const photoRoute = readFileSync(resolve('src/admin/caixa/route-photo.ts'), 'utf8');
@@ -226,6 +229,13 @@ describe('login mobile da Operação da Loja', () => {
     expect(route).toContain("'/api/caixa/financeiro-simples'");
     expect(route).toContain("'/api/caixa/financeiro-entradas'");
     expect(route).toContain("'/api/caixa/financeiro-saidas'");
+    expect(route).toContain("'/api/caixa/financeiro-comissoes'");
+    expect(route).toContain("'/api/caixa/financeiro-comissoes/:collaboratorId'");
+    expect(html).toContain('id="finance-commissions-panel"');
+    expect(html).toContain('id="finance-commission-detail-panel"');
+    expect(script).toContain("Caixa.operationPath('financeiro-comissoes'");
+    expect(script).toContain("window.location.hash = '#financeiro/comissoes'");
+    expect(css).toContain('.finance-commission-list');
     expect(route).toContain("requireCaixaModule('financeiro')");
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });

@@ -6,6 +6,10 @@ const migration = readFileSync(
   resolve(process.cwd(), 'db/migrations/0154_monthly_continuity.sql'),
   'utf8',
 );
+const payrollBridge = readFileSync(
+  resolve(process.cwd(), 'db/migrations/0170_partner_payroll_commission_bridge.sql'),
+  'utf8',
+);
 const monthlyFees = readFileSync(
   resolve(process.cwd(), 'src/admin/painel/queries-mensalidades.ts'),
   'utf8',
@@ -57,6 +61,15 @@ describe('continuidade mensal da Matriz e dos parceiros', () => {
     expect(migration).toContain('-v_entry.commission_amount');
     expect(migration).toContain('v_entry.settlement_period_id IS NOT NULL');
     expect(migration).toContain('v_totals.earned_amount+v_totals.adjustment_amount');
+  });
+
+  it('integra a comissão do parceiro à remuneração sem duplicar a saída', () => {
+    expect(payrollBridge).toContain('finance.partner_payroll_periods');
+    expect(payrollBridge).toContain('finance.partner_payroll_items');
+    expect(payrollBridge).toContain('commission_period_id');
+    expect(payrollBridge).toContain('payable_id');
+    expect(payrollBridge).toContain('partner_payroll_backfill_incomplete');
+    expect(payrollBridge).not.toContain('INSERT INTO finance.partner_expenses');
   });
 
   it('recupera mensalidades atrasadas usando historico de termos', () => {

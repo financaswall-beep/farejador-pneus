@@ -24,6 +24,7 @@ import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 import { getMatrizSimpleFinance } from './simple-finance.js';
 import { getMatrizFinanceEntries } from './finance-entries.js';
 import { getMatrizFinanceOutputs } from './finance-outputs.js';
+import { registerCaixaCommissionRoutes } from './route-commissions.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -135,6 +136,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
   registerCaixaDeliveryRoutes(fastify, flagGate, requireCaixaAuth, requireEntregas);
   registerCaixaOperationLoginRoutes(fastify, flagGate);
+  registerCaixaCommissionRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
 
   fastify.get('/api/caixa/me', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

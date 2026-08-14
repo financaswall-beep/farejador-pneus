@@ -85,6 +85,8 @@
     const deliveries = tab === 'deliveries';
     const finance = tab === 'finance';
     const financeEntries = tab === 'finance-in' || tab === 'finance-out';
+    const financeCommissions = tab === 'finance-commissions';
+    const financeCommissionDetail = tab === 'finance-commission-detail';
     if (financeEntries && Caixa.setFinanceMovementMode) {
       Caixa.setFinanceMovementMode(tab === 'finance-out' ? 'out' : 'in');
     }
@@ -94,6 +96,8 @@
     elements.deliveriesPanel.classList.toggle('hidden', !deliveries);
     elements.financePanel.classList.toggle('hidden', !finance);
     document.getElementById('finance-entries-panel').classList.toggle('hidden', !financeEntries);
+    document.getElementById('finance-commissions-panel').classList.toggle('hidden', !financeCommissions);
+    document.getElementById('finance-commission-detail-panel').classList.toggle('hidden', !financeCommissionDetail);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
@@ -104,30 +108,34 @@
     elements.sessionView.classList.toggle('is-stock', stock || stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-stock-detail', stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-deliveries', deliveries);
-    elements.sessionView.classList.toggle('is-finance', finance || financeEntries);
-    elements.sessionView.classList.toggle('is-finance-detail', financeEntries);
+    elements.sessionView.classList.toggle('is-finance', finance || financeEntries || financeCommissions || financeCommissionDetail);
+    elements.sessionView.classList.toggle('is-finance-detail', financeEntries || financeCommissions || financeCommissionDetail);
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
-          : stock ? 'Estoque' : deliveries ? 'Entregas' : (finance || financeEntries) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
+          : stock ? 'Estoque' : deliveries ? 'Entregas' : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
-    document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries);
+    document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries || financeCommissions || financeCommissionDetail);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
-    document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries);
+    document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries || financeCommissions || financeCommissionDetail);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
-    if (!financeEntries && ['#financeiro/entradas', '#financeiro/saidas'].includes(window.location.hash)) {
+    if (!(financeEntries || financeCommissions || financeCommissionDetail)
+      && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/comissoes'].includes(window.location.hash)
+        || window.location.hash.startsWith('#financeiro/comissoes/'))) {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
     if (profile) void loadProfileSummary();
     if (financeEntries && Caixa.loadFinanceEntries) void Caixa.loadFinanceEntries();
+    if (financeCommissions && Caixa.loadFinanceCommissions) void Caixa.loadFinanceCommissions();
+    if (financeCommissionDetail && Caixa.loadFinanceCommissionDetail) void Caixa.loadFinanceCommissionDetail();
   }
 
   Object.assign(Caixa, {

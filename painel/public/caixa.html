@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-movements1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-commissions1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260813-financeiro1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260813-operacao1"></script>
@@ -21,8 +21,9 @@
   <script defer src="/operacao/caixa-sales.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-movements1"></script>
+  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
+  <script defer src="/operacao/caixa-finance-commissions.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -655,6 +656,55 @@
             <div class="finance-entries-list-heading"><h3>Movimentações</h3><span id="finance-entries-visible"></span></div>
             <div id="finance-entries-list" class="finance-entries-list"></div>
             <button id="finance-entries-full" class="finance-entries-full" type="button">Ver no financeiro completo<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+        </div>
+
+        <div id="finance-commissions-panel" class="app-panel finance-commission-page hidden" aria-labelledby="finance-commissions-title">
+          <header class="finance-commission-toolbar">
+            <button id="finance-commissions-back" type="button" aria-label="Voltar ao Financeiro"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div><h2 id="finance-commissions-title">Comissões</h2><p id="finance-commissions-unit">Unidade</p></div>
+            <span>Proprietário</span>
+          </header>
+          <div id="finance-commissions-ranges" class="finance-commission-ranges" role="group" aria-label="Período das comissões">
+            <button type="button" data-commission-range="today">Hoje</button>
+            <button type="button" data-commission-range="7d">7 dias</button>
+            <button type="button" data-commission-range="15d">15 dias</button>
+            <button class="active" type="button" data-commission-range="30d">1 mês</button>
+          </div>
+          <div id="finance-commissions-loading" class="finance-commission-message" role="status"><i></i><span>Calculando comissões…</span></div>
+          <div id="finance-commissions-error" class="finance-commission-message finance-commission-message--error hidden" role="alert"><strong>Não foi possível carregar as comissões.</strong><button id="finance-commissions-retry" type="button">Tentar novamente</button></div>
+          <div id="finance-commissions-content" class="hidden">
+            <section class="finance-commission-total"><small>Comissões do período</small><strong id="finance-commissions-total">R$ 0,00</strong><span id="finance-commissions-people">Nenhum colaborador</span></section>
+            <section class="finance-commission-metrics"><p><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6m-6 4h6m-6 4h4"/></svg><span><strong id="finance-commissions-sales">0</strong> vendas</span></p><p><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20V10m5 10V4m5 16v-7m5 7V7"/></svg><span><strong id="finance-commissions-average">R$ 0,00</strong><small>média por venda</small></span></p></section>
+            <h3>Por colaborador</h3>
+            <div id="finance-commissions-list" class="finance-commission-list"></div>
+            <p class="finance-commission-info"><b>i</b><span>O pagamento só é liberado depois do fechamento da remuneração. Ao pagar, a saída entra no Financeiro.</span></p>
+            <button id="finance-commissions-history" class="finance-commission-history" type="button">Ver histórico de pagamentos</button>
+          </div>
+        </div>
+
+        <div id="finance-commission-detail-panel" class="app-panel finance-commission-page finance-commission-detail-page hidden" aria-labelledby="finance-commission-detail-title">
+          <header class="finance-commission-toolbar">
+            <button id="finance-commission-detail-back" type="button" aria-label="Voltar às comissões"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div><h2 id="finance-commission-detail-title">Detalhes da comissão</h2><p id="finance-commission-detail-unit">Unidade</p></div>
+            <span>Proprietário</span>
+          </header>
+          <section class="finance-commission-person"><b id="finance-commission-person-avatar">CO</b><div><strong id="finance-commission-person-name">Colaborador</strong><span id="finance-commission-person-role">Vendedor</span><small><i></i><em id="finance-commission-person-status">Ativo</em></small></div></section>
+          <div id="finance-commission-detail-ranges" class="finance-commission-ranges" role="group" aria-label="Período da comissão">
+            <button type="button" data-commission-detail-range="today">Hoje</button>
+            <button type="button" data-commission-detail-range="7d">7 dias</button>
+            <button type="button" data-commission-detail-range="15d">15 dias</button>
+            <button class="active" type="button" data-commission-detail-range="30d">1 mês</button>
+          </div>
+          <div id="finance-commission-detail-loading" class="finance-commission-message" role="status"><i></i><span>Buscando detalhes…</span></div>
+          <div id="finance-commission-detail-error" class="finance-commission-message finance-commission-message--error hidden" role="alert"><strong>Não foi possível carregar os detalhes.</strong><button id="finance-commission-detail-retry" type="button">Tentar novamente</button></div>
+          <div id="finance-commission-detail-content" class="hidden">
+            <section class="finance-commission-detail-total"><small>Comissão do período</small><strong id="finance-commission-detail-total">R$ 0,00</strong><div><p><b id="finance-commission-detail-sales">0</b><span>vendas</span></p><p><b id="finance-commission-detail-gross">R$ 0,00</b><span>vendidos</span></p><p><b id="finance-commission-detail-rule">—</b><span>de comissão</span></p></div></section>
+            <h3>Vendas que geraram comissão</h3>
+            <div id="finance-commission-detail-list" class="finance-commission-sales"></div>
+            <p class="finance-commission-info"><b>i</b><span id="finance-commission-payment-note">O pagamento ficará registrado como saída no Financeiro.</span></p>
+            <p id="finance-commission-payment-error" class="finance-commission-payment-error" role="alert"></p>
+            <button id="finance-commission-pay" class="finance-commission-pay" type="button">Em aberto</button>
           </div>
         </div>
 

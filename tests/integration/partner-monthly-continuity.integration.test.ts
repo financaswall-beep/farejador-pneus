@@ -132,6 +132,20 @@ describe('continuidade mensal do parceiro', () => {
       amount: '20.00',
       competence_month: entry.rows[0]!.competence_month,
     });
+    const payroll = await db.pool.query<{
+      commission_amount: string; total_due: string; payable_id: string;
+    }>(
+      `SELECT item.commission_amount::text,item.total_due::text,item.payable_id
+         FROM finance.partner_payroll_items item
+         JOIN finance.partner_payroll_periods period
+           ON period.environment=item.environment AND period.id=item.payroll_period_id
+        WHERE item.environment='test' AND item.token_id=$1`,
+      [fixture.tokenId],
+    );
+    expect(payroll.rows).toHaveLength(1);
+    expect(payroll.rows[0]).toMatchObject({
+      commission_amount: '20.00', total_due: '20.00', payable_id: payable.rows[0]!.id,
+    });
 
     await partner.cancelPartnerSale(
       fixture.ctx,
