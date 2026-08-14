@@ -954,7 +954,7 @@ form { display: grid; gap: 16px; }
 .finance-hero > small::before,.finance-hero > small::after { content: ""; width: 28px; height: 1px; background: #75d53a; }
 .finance-hero--negative > small { color: #ff999d; }
 .finance-hero--negative > small::before,.finance-hero--negative > small::after { background: #ff5b62; }
-.finance-hero > strong { display: block; margin-top: 10px; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(40px,11vw,56px); font-weight: 650; letter-spacing: -.045em; line-height: .96; text-shadow: 0 4px 18px rgba(0,0,0,.2); }
+.finance-hero > strong { display: block; margin-top: 10px; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(38px,10.5vw,53px); font-weight: 650; letter-spacing: -.045em; line-height: .96; text-shadow: 0 4px 18px rgba(0,0,0,.2); }
 .finance-hero > span { margin-top: 8px; color: rgba(255,255,255,.88); font-size: 15px; }
 .finance-hero > p { display: flex; min-height: 32px; align-items: center; gap: 7px; margin: 10px 0 0; padding: 0 13px; border: 1px solid rgba(46,221,121,.72); border-radius: 18px; color: #70e49f; background: rgba(0,63,39,.46); }
 .finance-hero--negative > p { color: #ff858a; border-color: rgba(255,70,80,.65); background: rgba(64,5,12,.45); }
@@ -964,7 +964,7 @@ form { display: grid; gap: 16px; }
 .finance-body > h3 { margin: 14px 0 10px; color: #17231e; font-size: 18px; letter-spacing: -.02em; }
 .finance-cash-summary { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid #cdd8d1; border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 9px 22px rgba(26,52,41,.08); }
 .finance-cash-summary button { position: relative; display: flex; min-width: 0; min-height: 112px; align-items: center; justify-content: center; gap: 8px; padding: 13px 8px; border: 0; color: #075d3d; background: transparent; text-align: center; cursor: pointer; }
-.finance-cash-summary button + button { color: #e94f16; border-left: 1px solid #d9dfdb; }
+.finance-cash-summary button + button { color: #dc2626; border-left: 1px solid #d9dfdb; }
 .finance-cash-summary svg { position: static; width: 23px; height: 23px; flex: 0 0 23px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .finance-cash-summary span { display: grid; min-width: 0; justify-items: center; }
 .finance-cash-summary small,.finance-cash-summary strong,.finance-cash-summary em { display: block; }
@@ -978,8 +978,7 @@ form { display: grid; gap: 16px; }
 .finance-pending-list strong { overflow: hidden; font-size: 14px; font-weight: 660; text-overflow: ellipsis; white-space: nowrap; }
 .finance-pending-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; }
 .finance-pending-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
-.finance-pending-icon--document { color: #e79816; background: #fff3dd; }
-.finance-pending-icon--clock { color: #ef5b29; background: #fff0e9; }
+.finance-pending-icon--document,.finance-pending-icon--clock { color: #087246; background: #eaf7f0; }
 .finance-commissions { display: grid; width: 100%; min-height: 100px; grid-template-columns: 54px minmax(0,1fr) 28px; align-items: center; gap: 13px; margin-top: 16px; padding: 14px 17px; overflow: hidden; border: 1px solid rgba(0,86,57,.9); border-radius: 18px; color: #fff; background:
   linear-gradient(110deg,rgba(0,62,42,.92),rgba(0,45,33,.94)),
   url('/operacao/finance-hero.webp') center 74% / cover no-repeat;
@@ -997,7 +996,7 @@ form { display: grid; gap: 16px; }
 @media (max-width: 370px) {
   .finance-period-wrap { width: min(calc(100% - 80px),232px); }
   .finance-hero { min-height: 220px; }
-  .finance-hero > strong { font-size: 40px; }
+  .finance-hero > strong { font-size: 38px; }
   .finance-body { width: 100%; padding-inline: 12px; }
   .finance-cash-summary button { min-height: 108px; padding-inline: 6px; gap: 5px; }
   .finance-cash-summary svg { width: 20px; height: 20px; flex-basis: 20px; }
