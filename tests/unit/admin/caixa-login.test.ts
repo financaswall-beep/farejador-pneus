@@ -19,6 +19,7 @@ const scriptFiles = [
   'caixa-sales.js',
   'caixa-deliveries-matrix.js',
   'caixa-deliveries.js',
+  'caixa-finance.js',
   'caixa-profile.js',
   'caixa-photo.js',
   'caixa.js',
@@ -187,6 +188,23 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('<dd>Administrador</dd>');
     expect(script).toContain("authenticatedFetch('/api/caixa/password'");
     expect(script).toContain('loadProfileSummary');
+  });
+
+  it('entrega o Financeiro simples somente por modulo autorizado', () => {
+    expect(html).toContain('id="finance-panel"');
+    expect(html).toContain('id="nav-finance"');
+    expect(html).toContain('Resumo do mês');
+    expect(html).toContain('Pendências');
+    expect(html).toContain('Comissões');
+    expect(html).toContain('Ver financeiro completo');
+    expect(css).toContain('.finance-hero');
+    expect(css).toContain("url('/operacao/finance-hero.webp')");
+    expect(staticRoute).toContain("'/operacao/finance-hero.webp'");
+    expect(script).toContain("Caixa.canModule('financeiro')");
+    expect(script).toContain("Caixa.operationPath('financeiro-simples'");
+    expect(script).toContain("window.location.hash === '#financeiro'");
+    expect(route).toContain("'/api/caixa/financeiro-simples'");
+    expect(route).toContain("requireCaixaModule('financeiro')");
   });
 
   it('aceita somente vendedor ativo da área de vendas e usa token próprio', () => {

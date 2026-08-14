@@ -17,7 +17,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
   it('lista Matriz e somente parceiras com ao menos um módulo operacional', async () => {
     const query = vi.fn()
-      .mockResolvedValueOnce({ rows: [{ collaborator_id: 'collab-1', job: 'vendedor', work_area: 'sales' }] })
+      .mockResolvedValueOnce({ rows: [{ collaborator_id: 'collab-1', job: 'vendedor', work_area: 'sales', panel_role: null }] })
       .mockResolvedValueOnce({ rows: [
         {
           token_id: 'token-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
@@ -37,7 +37,7 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(workplaces.map((item) => item.id)).toEqual(['matrix', 'partner:rio-do-ouro']);
     expect(workplaces[1]).toMatchObject({
       displayName: 'Wallace',
-      modules: { vendas: true, estoque: false, entregas: false },
+      modules: { vendas: true, estoque: false, entregas: false, financeiro: false },
     });
     expect(query).toHaveBeenCalledTimes(2);
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
@@ -50,7 +50,7 @@ describe('resolução segura do local da Operação da Loja', () => {
   it('leva o entregador da Matriz direto ao módulo Entregas sem liberar Vendas', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({
-        rows: [{ collaborator_id: 'courier-1', job: 'entregador', work_area: null }],
+        rows: [{ collaborator_id: 'courier-1', job: 'entregador', work_area: null, panel_role: null }],
       })
       .mockResolvedValueOnce({ rows: [] });
     const dbPool = { query } as unknown as Pool;
@@ -63,8 +63,43 @@ describe('resolução segura do local da Operação da Loja', () => {
       name: 'Matriz',
       role: 'entregador',
       collaboratorId: 'courier-1',
-      modules: { vendas: false, estoque: false, entregas: true },
+      modules: { vendas: false, estoque: false, entregas: true, financeiro: false },
     }]);
+  });
+
+  it('libera o Financeiro somente para owner/admin da Matriz', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        collaborator_id: 'admin-1', job: 'colaborador', work_area: 'administrative', panel_role: 'admin',
+      }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-admin', dbPool);
+
+    expect(workplaces).toEqual([{
+      id: 'matrix', kind: 'matrix', name: 'Matriz', role: 'admin', collaboratorId: 'admin-1',
+      modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+    }]);
+    expect(String(query.mock.calls[0]?.[0])).toContain('mc.panel_role IS NOT NULL');
+  });
+
+  it('mantem o proprietario parceiro no app mesmo quando so o Financeiro esta disponivel', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{
+        token_id: 'owner-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
+        role: 'owner', display_name: 'Dono', allow_vendas: false,
+        allow_estoque: false, allow_entregas: false,
+      }] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-owner', dbPool);
+
+    expect(workplaces[0]).toMatchObject({
+      role: 'owner',
+      modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+    });
   });
 
   it('não expõe IDs internos e retorna nulo para conta sem local permitido', async () => {
@@ -84,7 +119,7 @@ describe('resolução segura do local da Operação da Loja', () => {
       slug: 'rio-do-ouro',
       tokenId: 'secreto-no-servidor',
       displayName: 'Wallace',
-      modules: { vendas: true, estoque: true, entregas: true },
+      modules: { vendas: true, estoque: true, entregas: true, financeiro: false },
     });
     expect(safe).toEqual({
       id: 'partner:rio-do-ouro',

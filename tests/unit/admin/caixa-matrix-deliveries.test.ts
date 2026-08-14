@@ -27,7 +27,7 @@ const courier: CaixaAuth = {
   displayName: 'Marcos',
   username: 'marcos',
   job: 'entregador',
-  modules: { vendas: false, estoque: false, entregas: true },
+  modules: { vendas: false, estoque: false, entregas: true, financeiro: false },
 };
 
 describe('logística da Matriz dentro da Operação da Loja', () => {
@@ -76,7 +76,7 @@ describe('logística da Matriz dentro da Operação da Loja', () => {
 
     const auth = await validateCaixaSession('test', `cs_${'a'.repeat(64)}`, dbPool);
 
-    expect(auth?.modules).toEqual({ vendas: false, estoque: false, entregas: true });
+    expect(auth?.modules).toEqual({ vendas: false, estoque: false, entregas: true, financeiro: false });
     expect(String(query.mock.calls[0]?.[0])).toContain("mc.job = 'entregador'");
   });
 

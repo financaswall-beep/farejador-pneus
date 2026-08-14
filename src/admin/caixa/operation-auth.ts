@@ -6,6 +6,7 @@ export interface OperationModules {
   vendas: boolean;
   estoque: boolean;
   entregas: boolean;
+  financeiro: boolean;
 }
 
 export type OperationWorkplace =
@@ -13,7 +14,7 @@ export type OperationWorkplace =
       id: 'matrix';
       kind: 'matrix';
       name: 'Matriz';
-      role: 'vendedor' | 'entregador';
+      role: 'owner' | 'admin' | 'vendedor' | 'entregador' | 'colaborador';
       collaboratorId: string;
       modules: OperationModules;
     }
@@ -36,8 +37,9 @@ export interface OperationAuthResult {
 
 type MatrixRow = {
   collaborator_id: string;
-  job: 'vendedor' | 'entregador';
+  job: 'vendedor' | 'entregador' | 'colaborador';
   work_area: string | null;
+  panel_role: 'owner' | 'admin' | null;
 };
 
 type PartnerRow = {
@@ -66,12 +68,13 @@ export async function listOperationWorkplaces(
 ): Promise<OperationWorkplace[]> {
   const [matrix, partners] = await Promise.all([
     dbPool.query<MatrixRow>(
-      `SELECT mc.id AS collaborator_id, mc.job, mc.work_area
+      `SELECT mc.id AS collaborator_id, mc.job, mc.work_area, mc.panel_role
          FROM network.matriz_collaborators mc
         WHERE mc.environment = $1
           AND mc.person_id = $2
           AND mc.revoked_at IS NULL
-          AND ((mc.job = 'vendedor' AND mc.work_area = 'sales')
+          AND (mc.panel_role IS NOT NULL
+            OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
             OR mc.job = 'entregador')
         LIMIT 1`,
       [environment, personId],
@@ -114,18 +117,26 @@ export async function listOperationWorkplaces(
   const matrixRow = matrix.rows[0];
   if (matrixRow) {
     const isCourier = matrixRow.job === 'entregador';
+    const canSell = matrixRow.job === 'vendedor' && matrixRow.work_area === 'sales';
+    const panelRole = matrixRow.panel_role ?? null;
     workplaces.push({
       id: 'matrix',
       kind: 'matrix',
       name: 'Matriz',
-      role: matrixRow.job,
+      role: panelRole ?? matrixRow.job,
       collaboratorId: matrixRow.collaborator_id,
-      modules: { vendas: !isCourier, estoque: false, entregas: isCourier },
+      modules: {
+        vendas: canSell,
+        estoque: false,
+        entregas: isCourier,
+        financeiro: panelRole !== null,
+      },
     });
   }
 
   for (const row of partners.rows) {
-    if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas) continue;
+    const canSeeFinance = row.role === 'owner';
+    if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas && !canSeeFinance) continue;
     workplaces.push({
       id: `partner:${row.slug}`,
       kind: 'partner',
@@ -138,6 +149,7 @@ export async function listOperationWorkplaces(
         vendas: row.allow_vendas,
         estoque: row.allow_estoque,
         entregas: row.allow_entregas,
+        financeiro: canSeeFinance,
       },
     });
   }

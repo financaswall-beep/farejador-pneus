@@ -51,7 +51,7 @@
     cashPanel: byId('cash-panel'),
     salesPanel: byId('sales-panel'),
     deliveriesPanel: byId('deliveries-panel'),
-    profilePanel: byId('profile-panel'),
+    financePanel: byId('finance-panel'), profilePanel: byId('profile-panel'),
     salesSearch: byId('sales-search-input'),
     searchClear: byId('sales-search-clear'),
     salesList: byId('sales-list'),
@@ -176,8 +176,8 @@
     elements.operatorLabel.textContent = firstName(name);
     elements.profileInitials.textContent = initials(name);
     elements.profileUsername.textContent = data.username || stored(keys.user) || '—';
-    const courier = stored(keys.role) === 'entregador';
-    byId('profile-role-label').textContent = courier ? 'Entregador da Matriz' : 'Operador de Caixa';
+    const role = stored(keys.role); const courier = role === 'entregador';
+    byId('profile-role-label').textContent = role === 'owner' ? 'Proprietário' : role === 'admin' ? 'Administrador' : courier ? 'Entregador da Matriz' : 'Operador de Caixa';
     byId('profile-sales-summary').classList.toggle('hidden', courier);
     elements.operationUnitLabel.textContent = unitName;
     elements.sessionView.dataset.scope = scope();
@@ -193,7 +193,7 @@
     Caixa.showTab(initialTab);
     if (initialTab === 'sales') void Caixa.loadSales();
     else if (initialTab === 'stock' && Caixa.loadStock) void Caixa.loadStock();
-    else if (initialTab === 'deliveries' && Caixa.loadDeliveries) void Caixa.loadDeliveries();
+    else if (initialTab === 'deliveries' && Caixa.loadDeliveries) void Caixa.loadDeliveries(); else if (initialTab === 'finance' && Caixa.loadFinance) void Caixa.loadFinance();
     else if (initialTab === 'cash') void Caixa.loadCatalog();
   }
 

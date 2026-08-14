@@ -47,6 +47,7 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/caixa-sales.js', 'caixa-sales.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-deliveries-matrix.js', 'caixa-deliveries-matrix.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-deliveries.js', 'caixa-deliveries.js', 'text/javascript; charset=utf-8');
+  text('/operacao/caixa-finance.js', 'caixa-finance.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-profile.js', 'caixa-profile.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa-photo.js', 'caixa-photo.js', 'text/javascript; charset=utf-8');
   text('/operacao/caixa.js', 'caixa.js', 'text/javascript; charset=utf-8');
@@ -81,4 +82,5 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   );
   text('/operacao/maps-logo.png', 'assets/navigation-google-maps-official-v1.png', 'image/png', 'public, max-age=31536000, immutable');
   text('/operacao/waze-logo.png', 'assets/navigation-waze-official-v1.png', 'image/png', 'public, max-age=31536000, immutable');
+  text('/operacao/finance-hero.webp', 'assets/finance-simple-hero-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
 }

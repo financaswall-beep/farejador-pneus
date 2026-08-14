@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260813-login-separado1" />
-  <script defer src="/operacao/caixa-core.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260813-operacao1"></script>
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260813-financeiro1" />
+  <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260813-operacao1"></script>
@@ -18,9 +18,10 @@
   <script defer src="/operacao/caixa-stock.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-receipts.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-finance.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -547,6 +548,72 @@
           </div>
         </div>
 
+        <div id="finance-panel" class="app-panel finance-panel hidden">
+          <div class="finance-period-wrap">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            <strong id="finance-period-label">Este mês</strong>
+            <svg class="finance-period-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+            <label class="sr-only" for="finance-period-input">Escolher mês</label>
+            <input id="finance-period-input" type="month" />
+          </div>
+
+          <div id="finance-loading" class="finance-loading" role="status">
+            <span></span><strong>Organizando o financeiro…</strong>
+          </div>
+          <div id="finance-error" class="finance-error hidden" role="alert">
+            <strong>Não foi possível carregar o financeiro.</strong>
+            <span id="finance-error-copy">Tente novamente em instantes.</span>
+            <button id="finance-retry" type="button">Tentar novamente</button>
+          </div>
+
+          <div id="finance-content" class="hidden">
+            <section id="finance-hero" class="finance-hero finance-hero--positive" aria-labelledby="finance-result-label">
+              <small id="finance-result-label">Sobrou</small>
+              <strong id="finance-net">R$ 0,00</strong>
+              <span>movimento do período</span>
+              <p id="finance-status"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 16 6-6 4 4 6-8M15 6h5v5"/></svg><b>Este mês está positivo</b></p>
+            </section>
+
+            <div class="finance-body">
+              <h3>Resumo do mês</h3>
+              <section class="finance-cash-summary" aria-label="Entradas e saídas">
+                <button type="button" data-finance-detail="in">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 17 16 6m-7 0h7v7"/></svg>
+                  <span><small>Entrou</small><strong id="finance-in">R$ 0,00</strong><em>vendas e recebimentos</em></span>
+                </button>
+                <button type="button" data-finance-detail="out">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 7 11 11m0-7v7H9"/></svg>
+                  <span><small>Saiu</small><strong id="finance-out">R$ 0,00</strong><em>contas e despesas</em></span>
+                </button>
+              </section>
+
+              <h3>Pendências</h3>
+              <section class="finance-pending-list" aria-label="Pendências financeiras">
+                <button type="button" data-finance-detail="receivable">
+                  <span class="finance-pending-icon finance-pending-icon--document"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6m-6 4h6"/></svg></span>
+                  <strong id="finance-receivable">Nenhum valor para receber</strong>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+                <button type="button" data-finance-detail="due">
+                  <span class="finance-pending-icon finance-pending-icon--clock"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6l4 2"/></svg></span>
+                  <strong id="finance-due">Nenhuma conta vence hoje</strong>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </section>
+
+              <button id="finance-commissions" class="finance-commissions" type="button" data-finance-detail="commissions">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="8" cy="6" r="2"/><circle cx="15" cy="4" r="1.5"/><circle cx="18" cy="9" r="1.5"/><path d="M3 14h4l3 2h5a2 2 0 0 1 2 2H9l-3-1.5H3M17 18l3-3 1 1-4 5H9l-4-2H3"/></svg>
+                <span><small>Comissões</small><strong id="finance-commission-total">R$ 0,00</strong><em id="finance-commission-count">Nenhum colaborador com comissão</em></span>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+
+              <button id="finance-full" class="finance-full" type="button">
+                <span>Ver financeiro completo</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div id="profile-panel" class="app-panel profile-panel hidden">
           <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
           <div class="profile-identity">
@@ -636,6 +703,10 @@
           <button id="nav-deliveries" type="button" data-tab="deliveries">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M5 18H3v-5h8l2-5h4l2 5h2v5h-1M9 18h7M8 13l2-5H7M15 8l-1-3"/></svg>
             <span>Entregas</span>
+          </button>
+          <button id="nav-finance" type="button" data-tab="finance">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.7-1.7-1-3-1-1.7 0-3 1-3 2.4 0 3.6 6 1.8 6 5.2 0 1.4-1.3 2.4-3 2.4-1.2 0-2.3-.4-3-1.2M12 5v14"/></svg>
+            <span>Financeiro</span>
           </button>
           <button id="nav-profile" type="button" data-tab="profile">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>

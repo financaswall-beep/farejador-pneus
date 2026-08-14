@@ -83,10 +83,12 @@
     const stockDetail = tab === 'stock-detail';
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
+    const finance = tab === 'finance';
     if (!sales && state.weekOffset !== 0) state.weekOffset = 0;
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.deliveriesPanel.classList.toggle('hidden', !deliveries);
+    elements.financePanel.classList.toggle('hidden', !finance);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
@@ -97,19 +99,22 @@
     elements.sessionView.classList.toggle('is-stock', stock || stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-stock-detail', stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-deliveries', deliveries);
+    elements.sessionView.classList.toggle('is-finance', finance);
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
-          : stock ? 'Estoque' : deliveries ? 'Entregas' : cash ? 'Vender' : 'Minhas vendas';
+          : stock ? 'Estoque' : deliveries ? 'Entregas' : finance ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
+    document.getElementById('nav-finance').classList.toggle('active', finance);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
+    document.getElementById('nav-finance').toggleAttribute('aria-current', finance);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     if (profile) void loadProfileSummary();
   }
@@ -155,6 +160,14 @@
     }
     showTab('deliveries');
     void Caixa.loadDeliveries();
+  });
+  document.getElementById('nav-finance').addEventListener('click', function () {
+    if (!Caixa.canModule('financeiro')) {
+      Caixa.showToast('Financeiro disponível somente para proprietário ou administrador.');
+      return;
+    }
+    showTab('finance');
+    void Caixa.loadFinance();
   });
   document.getElementById('nav-cash').addEventListener('click', function () {
     showTab('cash');

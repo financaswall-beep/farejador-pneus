@@ -116,7 +116,7 @@ import { isAllowedPushEndpoint } from './push-endpoint.js';
 import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
 import { registerPartnerMySalesRoutes } from './route-my-sales.js';
 import { registerPartnerFuncionarioReactivationRoute } from './route-funcionarios.js';
-
+import { registerPartnerSimpleFinanceRoute } from './route-simple-finance.js';
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
 // Extrai o bearer cru (Authorization: Bearer … ou x-partner-token). Usado pra
@@ -752,6 +752,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   registerPartnerMySalesRoutes(fastify);
+  registerPartnerSimpleFinanceRoute(fastify);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURAÇÕES DA LOJA (Fase 1). 🔒 CADEADO DURO: TODOS estes endpoints usam
