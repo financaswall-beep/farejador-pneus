@@ -197,6 +197,9 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Pendências');
     expect(html).toContain('Comissões');
     expect(html).toContain('Ver financeiro completo');
+    expect(html).toContain('id="finance-entries-panel"');
+    expect(html).toContain('id="finance-entries-range"');
+    expect(html).toContain('Entrou no período');
     expect(html).toContain('<option value="today">Hoje</option>');
     expect(html).toContain('<option value="7d">7 dias</option>');
     expect(html).toContain('<option value="15d">15 dias</option>');
@@ -212,9 +215,12 @@ describe('login mobile da Operação da Loja', () => {
     expect(staticRoute).toContain("'/operacao/finance-shell-negative-v3.webp'");
     expect(script).toContain("Caixa.canModule('financeiro')");
     expect(script).toContain("Caixa.operationPath('financeiro-simples'");
+    expect(readFileSync(resolve('painel/public/caixa-finance-entries.js'), 'utf8'))
+      .toContain("Caixa.operationPath('financeiro-entradas'");
     expect(script).toContain("'?range=' + encodeURIComponent(range)");
     expect(script).toContain("window.location.hash === '#financeiro'");
     expect(route).toContain("'/api/caixa/financeiro-simples'");
+    expect(route).toContain("'/api/caixa/financeiro-entradas'");
     expect(route).toContain("requireCaixaModule('financeiro')");
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });

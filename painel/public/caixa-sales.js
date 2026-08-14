@@ -84,11 +84,13 @@
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
     const finance = tab === 'finance';
+    const financeEntries = tab === 'finance-in';
     if (!sales && state.weekOffset !== 0) state.weekOffset = 0;
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.deliveriesPanel.classList.toggle('hidden', !deliveries);
     elements.financePanel.classList.toggle('hidden', !finance);
+    document.getElementById('finance-entries-panel').classList.toggle('hidden', !financeEntries);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
@@ -99,24 +101,30 @@
     elements.sessionView.classList.toggle('is-stock', stock || stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-stock-detail', stockDetail || stockReceipts);
     elements.sessionView.classList.toggle('is-deliveries', deliveries);
-    elements.sessionView.classList.toggle('is-finance', finance);
+    elements.sessionView.classList.toggle('is-finance', finance || financeEntries);
+    elements.sessionView.classList.toggle('is-finance-detail', financeEntries);
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
-          : stock ? 'Estoque' : deliveries ? 'Entregas' : finance ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
+          : stock ? 'Estoque' : deliveries ? 'Entregas' : (finance || financeEntries) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
-    document.getElementById('nav-finance').classList.toggle('active', finance);
+    document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
-    document.getElementById('nav-finance').toggleAttribute('aria-current', finance);
+    document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
+    if (!financeEntries && window.location.hash === '#financeiro/entradas') {
+      const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
+      window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+    }
     if (profile) void loadProfileSummary();
+    if (financeEntries && Caixa.loadFinanceEntries) void Caixa.loadFinanceEntries();
   }
 
   Object.assign(Caixa, {
@@ -167,6 +175,7 @@
       return;
     }
     showTab('finance');
+    window.location.hash = '#financeiro';
     void Caixa.loadFinance();
   });
   document.getElementById('nav-cash').addEventListener('click', function () {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-range1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-entries1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -21,7 +21,8 @@
   <script defer src="/operacao/caixa-sales.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-range1"></script>
+  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-entries1"></script>
+  <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-entries1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -616,6 +617,44 @@
                 <span>Ver financeiro completo</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
               </button>
             </div>
+          </div>
+        </div>
+
+        <div id="finance-entries-panel" class="app-panel finance-entries-page hidden" aria-labelledby="finance-entries-title">
+          <header class="finance-entries-toolbar">
+            <button id="finance-entries-back" type="button" aria-label="Voltar ao Financeiro">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div><small>Financeiro</small><h2 id="finance-entries-title">Entradas</h2></div>
+            <label class="finance-entries-period">
+              <span>Período</span>
+              <select id="finance-entries-range" aria-label="Período das entradas">
+                <option value="today">Hoje</option>
+                <option value="7d">7 dias</option>
+                <option value="15d">15 dias</option>
+                <option value="30d" selected>1 mês</option>
+              </select>
+            </label>
+          </header>
+
+          <section class="finance-entries-summary" aria-label="Total de entradas">
+            <span class="finance-entries-summary-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 17 16 6m-7 0h7v7"/></svg>
+            </span>
+            <div><small>Entrou no período</small><strong id="finance-entries-total">R$ 0,00</strong><p id="finance-entries-count">Nenhuma movimentação</p></div>
+          </section>
+
+          <div id="finance-entries-loading" class="finance-entries-message" role="status"><span></span>Buscando entradas…</div>
+          <div id="finance-entries-error" class="finance-entries-message finance-entries-message--error hidden" role="alert">
+            <strong>Não foi possível carregar as entradas.</strong><button id="finance-entries-retry" type="button">Tentar novamente</button>
+          </div>
+          <div id="finance-entries-empty" class="finance-entries-message hidden"><strong>Nenhuma entrada neste período</strong><span>Quando uma venda ou recebimento for confirmado, aparecerá aqui.</span></div>
+
+          <div id="finance-entries-content" class="finance-entries-content hidden">
+            <section id="finance-entries-methods" class="finance-entries-methods" aria-label="Entradas por forma de pagamento"></section>
+            <div class="finance-entries-list-heading"><h3>Movimentações</h3><span id="finance-entries-visible"></span></div>
+            <div id="finance-entries-list" class="finance-entries-list"></div>
+            <button id="finance-entries-full" class="finance-entries-full" type="button">Ver no financeiro completo<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
           </div>
         </div>
 

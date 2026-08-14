@@ -117,8 +117,14 @@
   byId('finance-retry').addEventListener('click', function () { void loadFinance(); });
   byId('finance-full').addEventListener('click', openFullFinance);
   document.querySelectorAll('[data-finance-detail]').forEach(function (button) {
-    button.addEventListener('click', openFullFinance);
+    button.addEventListener('click', function () {
+      if (button.dataset.financeDetail === 'in' && Caixa.openFinanceEntries) {
+        Caixa.openFinanceEntries();
+        return;
+      }
+      openFullFinance();
+    });
   });
 
-  Object.assign(Caixa, { loadFinance: loadFinance });
+  Object.assign(Caixa, { loadFinance: loadFinance, openFullFinance: openFullFinance });
 }());

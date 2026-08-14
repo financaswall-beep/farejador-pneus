@@ -22,6 +22,7 @@ import { registerCaixaPhotoRoutes } from './route-photo.js';
 import { registerCaixaDeliveryRoutes } from './route-deliveries.js';
 import { registerCaixaOperationLoginRoutes } from './route-operation-login.js';
 import { getMatrizSimpleFinance } from './simple-finance.js';
+import { getMatrizFinanceEntries } from './finance-entries.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -156,6 +157,21 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     } catch (error) {
       const code = error instanceof Error ? error.message : 'finance_unavailable';
       logger.error({ err: error }, 'simple matrix finance unavailable');
+      return reply.status(503).send({ error: code });
+    }
+  });
+
+  fastify.get('/api/caixa/financeiro-entradas', {
+    preHandler: [flagGate, requireCaixaAuth, requireFinanceiro],
+  }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
+    try {
+      return reply.status(200).send(await getMatrizFinanceEntries(parsed.data.range));
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'finance_unavailable';
+      logger.error({ err: error }, 'matrix finance entries unavailable');
       return reply.status(503).send({ error: code });
     }
   });

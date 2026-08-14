@@ -36,6 +36,7 @@
   }
 
   function initialOperationTab() {
+    if (canModule('financeiro') && window.location.hash === '#financeiro/entradas') return 'finance-in';
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';

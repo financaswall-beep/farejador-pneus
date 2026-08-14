@@ -53,10 +53,7 @@ async function getCashSummary(
   return result.rows[0] ?? { entradas: '0', saidas: '0' };
 }
 
-export async function getMatrizSimpleFinance(
-  range: SimpleFinanceRange,
-  dbPool: Pool = defaultPool,
-): Promise<SimpleFinancePayload> {
+export async function ensureMatrizFinanceAvailable(dbPool: Pool = defaultPool): Promise<void> {
   if (!env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) {
     throw new MatrizCentralLedgerUnavailableError('disabled');
   }
@@ -64,6 +61,13 @@ export async function getMatrizSimpleFinance(
   if (health.status === 'red' || health.status === 'disabled') {
     throw new MatrizCentralLedgerUnavailableError(`integration_${health.status}`);
   }
+}
+
+export async function getMatrizSimpleFinance(
+  range: SimpleFinanceRange,
+  dbPool: Pool = defaultPool,
+): Promise<SimpleFinancePayload> {
+  await ensureMatrizFinanceAvailable(dbPool);
 
   const today = saoPauloToday();
   const period = today.slice(0, 7);
