@@ -122,6 +122,10 @@
         Caixa.openFinanceEntries();
         return;
       }
+      if (button.dataset.financeDetail === 'out' && Caixa.openFinanceOutputs) {
+        Caixa.openFinanceOutputs();
+        return;
+      }
       openFullFinance();
     });
   });

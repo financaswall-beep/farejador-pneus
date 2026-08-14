@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-entries1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-movements1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -21,8 +21,8 @@
   <script defer src="/operacao/caixa-sales.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-entries1"></script>
-  <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-entries1"></script>
+  <script defer src="/operacao/caixa-finance.js?v=20260814-finance-movements1"></script>
+  <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -639,16 +639,16 @@
 
           <section class="finance-entries-summary" aria-label="Total de entradas">
             <span class="finance-entries-summary-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M5 17 16 6m-7 0h7v7"/></svg>
+              <svg viewBox="0 0 24 24"><path id="finance-entries-summary-path" d="M5 17 16 6m-7 0h7v7"/></svg>
             </span>
-            <div><small>Entrou no período</small><strong id="finance-entries-total">R$ 0,00</strong><p id="finance-entries-count">Nenhuma movimentação</p></div>
+            <div><small id="finance-entries-summary-label">Entrou no período</small><strong id="finance-entries-total">R$ 0,00</strong><p id="finance-entries-count">Nenhuma movimentação</p></div>
           </section>
 
           <div id="finance-entries-loading" class="finance-entries-message" role="status"><span></span>Buscando entradas…</div>
           <div id="finance-entries-error" class="finance-entries-message finance-entries-message--error hidden" role="alert">
-            <strong>Não foi possível carregar as entradas.</strong><button id="finance-entries-retry" type="button">Tentar novamente</button>
+            <strong id="finance-entries-error-copy">Não foi possível carregar as entradas.</strong><button id="finance-entries-retry" type="button">Tentar novamente</button>
           </div>
-          <div id="finance-entries-empty" class="finance-entries-message hidden"><strong>Nenhuma entrada neste período</strong><span>Quando uma venda ou recebimento for confirmado, aparecerá aqui.</span></div>
+          <div id="finance-entries-empty" class="finance-entries-message hidden"><strong id="finance-entries-empty-copy">Nenhuma entrada neste período</strong><span id="finance-entries-empty-hint">Quando uma venda ou recebimento for confirmado, aparecerá aqui.</span></div>
 
           <div id="finance-entries-content" class="finance-entries-content hidden">
             <section id="finance-entries-methods" class="finance-entries-methods" aria-label="Entradas por forma de pagamento"></section>

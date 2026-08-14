@@ -215,12 +215,17 @@ describe('login mobile da Operação da Loja', () => {
     expect(staticRoute).toContain("'/operacao/finance-shell-negative-v3.webp'");
     expect(script).toContain("Caixa.canModule('financeiro')");
     expect(script).toContain("Caixa.operationPath('financeiro-simples'");
-    expect(readFileSync(resolve('painel/public/caixa-finance-entries.js'), 'utf8'))
-      .toContain("Caixa.operationPath('financeiro-entradas'");
+    const movements = readFileSync(resolve('painel/public/caixa-finance-entries.js'), 'utf8');
+    expect(movements).toContain("resource: 'financeiro-entradas'");
+    expect(movements).toContain("resource: 'financeiro-saidas'");
+    expect(movements).toContain('Caixa.operationPath(mode.resource, mode.matrixPath)');
+    expect(movements).toContain("hash: '#financeiro/saidas'");
+    expect(css).toContain('.finance-entries-page.is-output');
     expect(script).toContain("'?range=' + encodeURIComponent(range)");
     expect(script).toContain("window.location.hash === '#financeiro'");
     expect(route).toContain("'/api/caixa/financeiro-simples'");
     expect(route).toContain("'/api/caixa/financeiro-entradas'");
+    expect(route).toContain("'/api/caixa/financeiro-saidas'");
     expect(route).toContain("requireCaixaModule('financeiro')");
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });

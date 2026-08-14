@@ -1,6 +1,12 @@
 import type { SimpleFinanceRange } from './simple-finance.js';
 
-export type OperationFinanceEntryKind = 'sale' | 'receivable' | 'other';
+export type OperationFinanceEntryKind =
+  | 'sale'
+  | 'receivable'
+  | 'purchase'
+  | 'expense'
+  | 'payable'
+  | 'other';
 
 export interface OperationFinanceEntry {
   id: string;
@@ -11,7 +17,7 @@ export interface OperationFinanceEntry {
   payment_method: string | null;
   amount: number;
   entry_date: string;
-  occurred_at: string;
+  occurred_at: string | null;
 }
 
 export interface OperationFinanceEntriesPayload {

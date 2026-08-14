@@ -1041,6 +1041,13 @@ form { display: grid; gap: 16px; }
 .finance-entry-card > b { color: #087246; font-size: 15px; white-space: nowrap; }
 .finance-entries-full { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; border: 1px solid #087246; border-radius: 14px; color: #087246; background: #fff; font-size: 14px; font-weight: 750; cursor: pointer; }
 .finance-entries-full svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+.finance-entries-page.is-output .finance-entries-summary { background: linear-gradient(135deg,#d9582f,#982d28); box-shadow: 0 13px 27px rgba(143,42,34,.18); }
+.finance-entries-page.is-output .finance-entries-summary-icon { background: rgba(255,255,255,.12); }
+.finance-entries-page.is-output .finance-entries-summary-icon svg { stroke: #ffe1d8; }
+.finance-entries-page.is-output .finance-entries-methods strong,
+.finance-entries-page.is-output .finance-entries-list section > header strong,
+.finance-entries-page.is-output .finance-entry-card > b { color: #c7432a; }
+.finance-entries-page.is-output .finance-entry-card-icon { color: #c7432a; background: #fff0eb; }
 .sales-app.is-finance-detail .sales-header { min-height: 132px; padding-bottom: 22px; }
 
 @media (max-width: 370px) {

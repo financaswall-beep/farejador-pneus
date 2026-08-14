@@ -11,6 +11,23 @@
   const content = byId('finance-entries-content');
   const list = byId('finance-entries-list');
   const methods = byId('finance-entries-methods');
+  const modes = {
+    in: {
+      title: 'Entradas', summary: 'Entrou no período', singular: 'entrada', plural: 'entradas',
+      resource: 'financeiro-entradas', matrixPath: '/api/caixa/financeiro-entradas',
+      hash: '#financeiro/entradas', tab: 'finance-in',
+      empty: 'Nenhuma entrada neste período',
+      hint: 'Quando uma venda ou recebimento for confirmado, aparecerá aqui.',
+    },
+    out: {
+      title: 'Saídas', summary: 'Saiu no período', singular: 'saída', plural: 'saídas',
+      resource: 'financeiro-saidas', matrixPath: '/api/caixa/financeiro-saidas',
+      hash: '#financeiro/saidas', tab: 'finance-out',
+      empty: 'Nenhuma saída neste período',
+      hint: 'Quando uma compra, despesa ou conta for paga, aparecerá aqui.',
+    },
+  };
+  let direction = 'in';
   let request = null;
 
   const dateLabel = new Intl.DateTimeFormat('pt-BR', {
@@ -19,6 +36,22 @@
   const timeLabel = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
   });
+
+  function currentMode() { return modes[direction]; }
+
+  function setDirection(value) {
+    direction = value === 'out' ? 'out' : 'in';
+    const mode = currentMode();
+    panel.classList.toggle('is-output', direction === 'out');
+    byId('finance-entries-title').textContent = mode.title;
+    byId('finance-entries-summary-label').textContent = mode.summary;
+    byId('finance-entries-error-copy').textContent = 'Não foi possível carregar as ' + mode.plural + '.';
+    byId('finance-entries-empty-copy').textContent = mode.empty;
+    byId('finance-entries-empty-hint').textContent = mode.hint;
+    byId('finance-entries-summary-path').setAttribute(
+      'd', direction === 'out' ? 'm5 7 11 11m0-7v7H9' : 'M5 17 16 6m-7 0h7v7',
+    );
+  }
 
   function setState(name) {
     loading.classList.toggle('hidden', name !== 'loading');
@@ -38,25 +71,29 @@
   }
 
   function icon(kind) {
-    return Caixa.createSvg(kind === 'sale' ? [
+    if (kind === 'sale') return Caixa.createSvg([
       { d: 'M3 4h2l2.4 10.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6' },
       { tag: 'circle', cx: '9', cy: '20', r: '1' },
       { tag: 'circle', cx: '18', cy: '20', r: '1' },
-    ] : [{ d: 'M4 7h16v11H4zM7 12h10M8 7a4 4 0 0 0 8 0' }]);
+    ]);
+    if (kind === 'purchase') return Caixa.createSvg([
+      { d: 'm4 7 8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10' },
+    ]);
+    if (kind === 'payable') return Caixa.createSvg([
+      { d: 'M5 4h14v17H5zM8 2v4m8-4v4M5 9h14M8 13h5' },
+    ]);
+    return Caixa.createSvg([{ d: 'M4 7h16v11H4zM7 12h10M8 7a4 4 0 0 0 8 0' }]);
   }
 
   function dayTitle(value) {
     const parts = value.split('-').map(Number);
     const day = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12));
-    const today = new Date();
     const localToday = new Intl.DateTimeFormat('en-CA', {
       year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Sao_Paulo',
-    }).format(today);
+    }).format(new Date());
     if (value === localToday) return 'Hoje';
-    const yesterday = new Date(Date.UTC(...localToday.split('-').map(Number).map(function (part, index) {
-      return index === 1 ? part - 1 : part;
-    })));
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const todayParts = localToday.split('-').map(Number);
+    const yesterday = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2] - 1));
     if (value === yesterday.toISOString().slice(0, 10)) return 'Ontem';
     const formatted = dateLabel.format(day);
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
@@ -70,7 +107,7 @@
     visual.appendChild(icon(row.kind));
     const copy = document.createElement('div');
     const title = document.createElement('strong');
-    title.textContent = row.title || 'Entrada';
+    title.textContent = row.title || (direction === 'out' ? 'Saída' : 'Entrada');
     const subtitle = document.createElement('span');
     subtitle.textContent = row.subtitle || row.origin || 'Movimentação financeira';
     const meta = document.createElement('small');
@@ -136,8 +173,9 @@
     if (!Caixa.token() || !Caixa.canModule('financeiro')) return;
     if (request) request.abort();
     const controller = new AbortController(); request = controller; setState('loading');
+    const mode = currentMode();
     try {
-      const path = Caixa.operationPath('financeiro-entradas', '/api/caixa/financeiro-entradas');
+      const path = Caixa.operationPath(mode.resource, mode.matrixPath);
       const response = await Caixa.authenticatedFetch(
         path + '?range=' + encodeURIComponent(range.value), { signal: controller.signal },
       );
@@ -151,10 +189,12 @@
     } finally { if (request === controller) request = null; }
   }
 
-  function openFinanceEntries() {
+  function openFinanceMovement(value) {
+    setDirection(value);
     range.value = byId('finance-period-input').value || '30d';
-    window.location.hash = '#financeiro/entradas';
-    Caixa.showTab('finance-in');
+    const mode = currentMode();
+    window.location.hash = mode.hash;
+    Caixa.showTab(mode.tab);
   }
 
   function closeFinanceEntries() {
@@ -170,9 +210,15 @@
   byId('finance-entries-full').addEventListener('click', function () { Caixa.openFullFinance(); });
   window.addEventListener('hashchange', function () {
     if (!Caixa.token() || !Caixa.canModule('financeiro')) return;
-    if (window.location.hash === '#financeiro/entradas' && panel.classList.contains('hidden')) {
-      Caixa.showTab('finance-in');
+    const target = Object.keys(modes).find(function (key) { return modes[key].hash === window.location.hash; });
+    if (target && panel.classList.contains('hidden')) {
+      setDirection(target); Caixa.showTab(currentMode().tab);
     }
   });
-  Object.assign(Caixa, { openFinanceEntries: openFinanceEntries, loadFinanceEntries: loadFinanceEntries });
+  Object.assign(Caixa, {
+    openFinanceEntries: function () { openFinanceMovement('in'); },
+    openFinanceOutputs: function () { openFinanceMovement('out'); },
+    setFinanceMovementMode: setDirection,
+    loadFinanceEntries: loadFinanceEntries,
+  });
 }());

@@ -84,7 +84,10 @@
     const stockReceipts = tab === 'stock-receipts';
     const deliveries = tab === 'deliveries';
     const finance = tab === 'finance';
-    const financeEntries = tab === 'finance-in';
+    const financeEntries = tab === 'finance-in' || tab === 'finance-out';
+    if (financeEntries && Caixa.setFinanceMovementMode) {
+      Caixa.setFinanceMovementMode(tab === 'finance-out' ? 'out' : 'in');
+    }
     if (!sales && state.weekOffset !== 0) state.weekOffset = 0;
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
@@ -119,7 +122,7 @@
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
     document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
-    if (!financeEntries && window.location.hash === '#financeiro/entradas') {
+    if (!financeEntries && ['#financeiro/entradas', '#financeiro/saidas'].includes(window.location.hash)) {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }

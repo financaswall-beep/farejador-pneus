@@ -49,6 +49,7 @@ describe('Financeiro simples do proprietario parceiro', () => {
   it('trava a API no owner e nao transforma permissao de funcionario em acesso financeiro', () => {
     expect(route).toContain("fastify.get('/parceiro/:slug/api/financeiro-simples'");
     expect(route).toContain("fastify.get('/parceiro/:slug/api/financeiro-entradas'");
+    expect(route).toContain("fastify.get('/parceiro/:slug/api/financeiro-saidas'");
     expect(route).toContain('preHandler: [requirePartnerAuth, requireOwner]');
     expect(routeRoot).toContain('registerPartnerSimpleFinanceRoute(fastify)');
     expect(operationAuth).toContain("const canSeeFinance = row.role === 'owner'");
