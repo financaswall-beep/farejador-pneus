@@ -1,5 +1,6 @@
 import type { PartnerContext } from './auth.js';
 import { withPartnerContext } from './db.js';
+import { pool } from '../persistence/db.js';
 import type { SimpleFinancePayload } from '../shared/simple-finance.js';
 
 interface SimpleFinanceRow {
@@ -10,6 +11,9 @@ interface SimpleFinanceRow {
   due_today_total: string;
   due_today_count: number;
   commission_total: string;
+}
+
+interface CommissionCollaboratorsRow {
   commission_collaborators: number;
 }
 
@@ -22,9 +26,10 @@ export async function getPartnerSimpleFinance(
   ctx: PartnerContext,
   period: string,
 ): Promise<SimpleFinancePayload> {
-  return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const result = await client.query<SimpleFinanceRow>(
-      `WITH bounds AS (
+  const [finance, collaborators] = await Promise.all([
+    withPartnerContext(ctx.partnerUnitId, async (client) => {
+      const result = await client.query<SimpleFinanceRow>(
+        `WITH bounds AS (
          SELECT to_date($3,'YYYY-MM')::date AS month_start_date,
                 (to_date($3,'YYYY-MM')::timestamp AT TIME ZONE 'America/Sao_Paulo') AS month_start_at,
                 ((to_date($3,'YYYY-MM')+interval '1 month')::timestamp
@@ -90,31 +95,41 @@ export async function getPartnerSimpleFinance(
                   AND pp.status='open'
                   AND pp.due_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date)
                 AS due_today_count,
-              commissions.total::text AS commission_total,
-              (SELECT count(*)::int FROM network.partner_access_tokens pat
-                JOIN network.partner_token_commission cfg
-                  ON cfg.environment=pat.environment AND cfg.token_id=pat.id
-               WHERE pat.environment=$1 AND pat.partner_unit_id=$4
-                 AND pat.role='funcionario' AND pat.revoked_at IS NULL AND cfg.active)
-                AS commission_collaborators
+              commissions.total::text AS commission_total
          FROM cash_in,cash_out,commissions`,
-      [ctx.environment, ctx.unitId, period, ctx.partnerUnitId],
-    );
-    const row = result.rows[0]!;
-    const cashIn = Number(row.cash_in ?? 0);
-    const cashOut = Number(row.cash_out ?? 0);
-    return {
-      period,
-      unit_name: ctx.unitName,
-      cash_in: cashIn,
-      cash_out: cashOut,
-      cash_net: Math.round((cashIn - cashOut) * 100) / 100,
-      receivable_total: Number(row.receivable_total ?? 0),
-      receivable_count: Number(row.receivable_count ?? 0),
-      due_today_total: Number(row.due_today_total ?? 0),
-      due_today_count: Number(row.due_today_count ?? 0),
-      commission_total: Number(row.commission_total ?? 0),
-      commission_collaborators: Number(row.commission_collaborators ?? 0),
-    };
-  });
+        [ctx.environment, ctx.unitId, period],
+      );
+      return result.rows[0]!;
+    }),
+    // Credenciais e regras de comissão são tabelas administrativas sem GRANT
+    // para o pool restrito do portal. A contagem roda no backend, escopada pelos
+    // IDs da sessão; não amplia a superfície SQL disponível ao parceiro.
+    pool.query<CommissionCollaboratorsRow>(
+      `SELECT count(*)::int AS commission_collaborators
+         FROM network.partner_access_tokens pat
+         JOIN network.partner_token_commission cfg
+           ON cfg.environment=pat.environment AND cfg.token_id=pat.id
+        WHERE pat.environment=$1 AND pat.partner_unit_id=$2
+          AND pat.role='funcionario' AND pat.revoked_at IS NULL AND cfg.active`,
+      [ctx.environment, ctx.partnerUnitId],
+    ),
+  ]);
+  const row = finance;
+  const cashIn = Number(row.cash_in ?? 0);
+  const cashOut = Number(row.cash_out ?? 0);
+  return {
+    period,
+    unit_name: ctx.unitName,
+    cash_in: cashIn,
+    cash_out: cashOut,
+    cash_net: Math.round((cashIn - cashOut) * 100) / 100,
+    receivable_total: Number(row.receivable_total ?? 0),
+    receivable_count: Number(row.receivable_count ?? 0),
+    due_today_total: Number(row.due_today_total ?? 0),
+    due_today_count: Number(row.due_today_count ?? 0),
+    commission_total: Number(row.commission_total ?? 0),
+    commission_collaborators: Number(
+      collaborators.rows[0]?.commission_collaborators ?? 0,
+    ),
+  };
 }

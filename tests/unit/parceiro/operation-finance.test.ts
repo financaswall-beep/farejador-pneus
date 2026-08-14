@@ -3,10 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { PartnerContext } from '../../../src/parceiro/auth.js';
 
-const query = vi.fn();
-vi.mock('../../../src/parceiro/db.js', () => ({
-  withPartnerContext: vi.fn(async (_partnerUnitId: string, callback: (client: { query: typeof query }) => unknown) => callback({ query })),
+const { partnerQuery, adminQuery } = vi.hoisted(() => ({
+  partnerQuery: vi.fn(),
+  adminQuery: vi.fn(),
 }));
+vi.mock('../../../src/parceiro/db.js', () => ({
+  withPartnerContext: vi.fn(async (_partnerUnitId: string, callback: (client: { query: typeof partnerQuery }) => unknown) => callback({ query: partnerQuery })),
+}));
+vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: adminQuery } }));
 
 import { getPartnerSimpleFinance } from '../../../src/parceiro/simple-finance.js';
 
@@ -16,12 +20,13 @@ const operationAuth = readFileSync(resolve('src/admin/caixa/operation-auth.ts'),
 
 describe('Financeiro simples do proprietario parceiro', () => {
   it('calcula o saldo sem aceitar unidade ou papel enviados pelo navegador', async () => {
-    query.mockResolvedValueOnce({ rows: [{
+    partnerQuery.mockResolvedValueOnce({ rows: [{
       cash_in: '18450.00', cash_out: '5670.00',
       receivable_total: '2360.00', receivable_count: 5,
       due_today_total: '480.00', due_today_count: 1,
-      commission_total: '1280.00', commission_collaborators: 4,
+      commission_total: '1280.00',
     }] });
+    adminQuery.mockResolvedValueOnce({ rows: [{ commission_collaborators: 4 }] });
     const context: PartnerContext = {
       environment: 'test', partnerId: 'partner-1', partnerUnitId: 'partner-unit-1',
       unitId: 'unit-1', slug: 'rio-do-ouro', partnerName: 'Rio',
@@ -35,7 +40,9 @@ describe('Financeiro simples do proprietario parceiro', () => {
       receivable_total: 2360, due_today_count: 1,
       commission_total: 1280, commission_collaborators: 4,
     });
-    expect(query.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', '2026-08', 'partner-unit-1']);
+    expect(partnerQuery.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', '2026-08']);
+    expect(partnerQuery.mock.calls[0]?.[0]).not.toContain('partner_access_tokens');
+    expect(adminQuery.mock.calls[0]?.[1]).toEqual(['test', 'partner-unit-1']);
   });
 
   it('trava a API no owner e nao transforma permissao de funcionario em acesso financeiro', () => {
