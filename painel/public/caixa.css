@@ -888,20 +888,11 @@ form { display: grid; gap: 16px; }
   background-image: url('/operacao/finance-shell-negative-v3.webp');
 }
 .sales-app.is-finance .sales-header {
-  min-height: 188px;
-  padding-bottom: 62px;
+  min-height: 176px;
+  padding-bottom: 48px;
   background: transparent;
   box-shadow: none;
 }
-.sales-app.is-finance .sales-logo { border: 2px solid rgba(255,255,255,.88); border-radius: 50%; }
-.sales-app.is-finance .sales-heading { flex: 1 1 auto; gap: 8px; }
-.sales-app.is-finance .sales-heading > div { min-width: 0; }
-.sales-app.is-finance .sales-heading h2 { font-size: 28px; }
-.sales-app.is-finance .sales-heading p { overflow: hidden; color: rgba(255,255,255,.94); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.sales-app.is-finance .operator-area { flex: 0 0 124px; }
-.sales-app.is-finance .operator-button { width: 124px; max-width: 124px; gap: 6px; padding-inline: 8px; }
-.sales-app.is-finance .operator-button svg { width: 18px; height: 18px; flex-basis: 18px; }
-.sales-app.is-finance .operator-button span { font-size: 12.5px; }
 .finance-panel {
   min-height: 680px;
   margin-top: -68px;
@@ -920,7 +911,7 @@ form { display: grid; gap: 16px; }
   grid-template-columns: 21px minmax(0,1fr) 17px;
   align-items: center;
   gap: 7px;
-  margin: 0 auto 26px;
+  margin: 0 auto 38px;
   padding: 0 14px;
   overflow: hidden;
   border: 1px solid rgba(130,221,71,.55);
@@ -944,7 +935,7 @@ form { display: grid; gap: 16px; }
   position: relative;
   z-index: 2;
   display: flex;
-  min-height: 212px;
+  min-height: 220px;
   align-items: center;
   flex-direction: column;
   margin: 0;
@@ -1005,7 +996,7 @@ form { display: grid; gap: 16px; }
 
 @media (max-width: 370px) {
   .finance-period-wrap { width: min(calc(100% - 80px),232px); }
-  .finance-hero { min-height: 208px; }
+  .finance-hero { min-height: 220px; }
   .finance-hero > strong { font-size: 40px; }
   .finance-body { width: 100%; padding-inline: 12px; }
   .finance-cash-summary button { min-height: 108px; padding-inline: 6px; gap: 5px; }
@@ -1236,7 +1227,6 @@ form { display: grid; gap: 16px; }
   .sales-heading h2 { font-size: 23px; white-space: nowrap; }
   .sales-heading p { font-size: 16px; line-height: 1.08; }
   .operator-button { max-width: 100px; padding-inline: 8px; }
-  .sales-app.is-finance .operator-button { width: 124px; max-width: 124px; }
 }
 
 @media (max-width: 370px) {
