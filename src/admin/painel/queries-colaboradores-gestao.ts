@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
+import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
 
 type Queryable = Pick<Pool, 'query'>;
 type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
@@ -13,6 +14,7 @@ export interface CollaboratorManagementRow {
   eligible_in_competence: boolean;
   employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
   payment_method: string | null; payment_note: string | null; compensation_starts_on: string | null;
+  benefits: OperationBenefit[]; benefits_total: number;
   commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
   commission_value: number; commission_starts_on: string | null; commission_active: boolean;
   sales_count: number; revenue: number; margin: number; items_without_cost: number; deliveries_count: number;
@@ -46,6 +48,7 @@ export async function getMatrizCollaboratorManagement(
               cp.employment_type, COALESCE(cp.base_salary, 0) AS monthly_base_salary,
               COALESCE(cp.base_salary, 0) AS base_salary,
               cp.payment_day, cp.payment_method, cp.payment_note, cp.starts_on AS compensation_starts_on,
+              COALESCE(cp.benefits,'[]'::jsonb) AS benefits,
               cr.kind AS commission_kind, cr.basis AS commission_basis,
               COALESCE(cr.value, 0) AS commission_value, cr.starts_on AS commission_starts_on,
               COALESCE(cr.active, false) AS commission_active
@@ -187,11 +190,13 @@ export async function getMatrizCollaboratorManagement(
   const frozen = new Map(payroll.rows.map((r: any) => [r.collaborator_id, r]));
   const rows: CollaboratorManagementRow[] = people.rows.map((p: any) => {
     const q = perf.get(p.id) as any ?? {}; const a = adj.get(p.id) as any ?? {}; const f = frozen.get(p.id) as any;
+    const benefits = benefitsOf(p.benefits);
     const row: CollaboratorManagementRow = {
       ...p, active: Boolean(p.active),
       eligible_in_competence: Boolean(p.eligible_in_competence ?? p.active),
       base_salary: n(p.base_salary), monthly_base_salary: n(p.monthly_base_salary),
       payment_day: p.payment_day === null ? null : n(p.payment_day),
+      benefits, benefits_total: benefitTotal(benefits),
       commission_value: n(p.commission_value), commission_active: Boolean(p.commission_active),
       sales_count: n(q.sales_count), revenue: n(q.revenue), margin: n(q.margin), items_without_cost: n(q.items_without_cost),
       deliveries_count: n(q.deliveries_count), trips_count: n(q.trips_count), distance_km: n(q.distance_km),
@@ -203,7 +208,8 @@ export async function getMatrizCollaboratorManagement(
     };
     row.commission_amount = f ? n(f.commission_amount) : n(q.commission_amount);
     if (f) Object.assign(row, { base_salary: n(f.base_salary), additions: n(f.additions), deductions: n(f.deductions) });
-    row.total_due = f ? n(f.total_due) : Math.max(0, Math.round((row.base_salary + row.commission_amount + row.additions - row.deductions) * 100) / 100);
+    row.total_due = f ? n(f.total_due) : Math.max(0, Math.round((row.base_salary + row.benefits_total
+      + row.commission_amount + row.additions - row.deductions) * 100) / 100);
     return row;
   });
   const active = rows.filter((r) => r.active);

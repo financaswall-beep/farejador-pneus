@@ -11,6 +11,7 @@ import Fastify from 'fastify';
 import { loggerOptions, logger } from '../shared/logger.js';
 import { partnerPool } from '../parceiro/db.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
+import { registerPartnerOperationTeamRoutes } from '../parceiro/route-operation-team.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 
@@ -33,6 +34,7 @@ fastify.addContentTypeParser(
 
 async function start(): Promise<void> {
   await registerParceiroRoute(fastify);
+  registerPartnerOperationTeamRoutes(fastify);
   // Hub de tempo real (Fatia 3): no preview tambem, pra testar SSE local
   // apontando pro banco de prod (.env.preview).
   startPartnerChatNotifyHub();

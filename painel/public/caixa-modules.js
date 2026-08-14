@@ -12,6 +12,7 @@
   }
 
   function canModule(name) {
+    if (name === 'team') return Caixa.stored(Caixa.keys.role) === 'owner';
     if (name === 'profile') return true;
     return modules()[name] === true;
   }
@@ -27,6 +28,7 @@
     setNavigationVisibility('nav-stock', Caixa.isPartner() && canModule('estoque'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
+    setNavigationVisibility('nav-team', canModule('team'));
     setNavigationVisibility('nav-profile', !canModule('financeiro'));
     const nav = document.querySelector('.bottom-nav');
     if (nav) {
@@ -40,6 +42,9 @@
     if (canModule('financeiro') && window.location.hash === '#financeiro/saidas') return 'finance-out';
     if (canModule('financeiro') && window.location.hash === '#financeiro/comissoes') return 'finance-commissions';
     if (canModule('financeiro') && window.location.hash.startsWith('#financeiro/comissoes/')) return 'finance-commission-detail';
+    if (canModule('team') && window.location.hash === '#equipe') return 'team';
+    if (canModule('team') && window.location.hash.startsWith('#equipe/remuneracao/')) return 'team-remuneration';
+    if (canModule('team') && window.location.hash.startsWith('#equipe/comissao/')) return 'team-commission';
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';

@@ -87,6 +87,9 @@
     const financeEntries = tab === 'finance-in' || tab === 'finance-out';
     const financeCommissions = tab === 'finance-commissions';
     const financeCommissionDetail = tab === 'finance-commission-detail';
+    const team = tab === 'team';
+    const teamRemuneration = tab === 'team-remuneration';
+    const teamCommission = tab === 'team-commission';
     if (financeEntries && Caixa.setFinanceMovementMode) {
       Caixa.setFinanceMovementMode(tab === 'finance-out' ? 'out' : 'in');
     }
@@ -98,6 +101,9 @@
     document.getElementById('finance-entries-panel').classList.toggle('hidden', !financeEntries);
     document.getElementById('finance-commissions-panel').classList.toggle('hidden', !financeCommissions);
     document.getElementById('finance-commission-detail-panel').classList.toggle('hidden', !financeCommissionDetail);
+    document.getElementById('team-panel').classList.toggle('hidden', !team);
+    document.getElementById('team-remuneration-panel').classList.toggle('hidden', !teamRemuneration);
+    document.getElementById('team-commission-panel').classList.toggle('hidden', !teamCommission);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
@@ -110,21 +116,27 @@
     elements.sessionView.classList.toggle('is-deliveries', deliveries);
     elements.sessionView.classList.toggle('is-finance', finance || financeEntries || financeCommissions || financeCommissionDetail);
     elements.sessionView.classList.toggle('is-finance-detail', financeEntries || financeCommissions || financeCommissionDetail);
+    elements.sessionView.classList.toggle('is-team', team || teamRemuneration || teamCommission);
+    elements.sessionView.classList.toggle('is-team-detail', teamRemuneration || teamCommission);
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
-          : stock ? 'Estoque' : deliveries ? 'Entregas' : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
+          : stock ? 'Estoque' : deliveries ? 'Entregas'
+            : (team || teamRemuneration || teamCommission) ? 'Equipe'
+              : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').classList.toggle('active', deliveries);
     document.getElementById('nav-finance').classList.toggle('active', finance || financeEntries || financeCommissions || financeCommissionDetail);
+    document.getElementById('nav-team').classList.toggle('active', team || teamRemuneration || teamCommission);
     document.getElementById('nav-profile').classList.toggle('active', profile);
     document.getElementById('nav-cash').toggleAttribute('aria-current', cash);
     document.getElementById('nav-sales').toggleAttribute('aria-current', sales);
     document.getElementById('nav-stock').toggleAttribute('aria-current', stock || stockDetail || stockReceipts);
     document.getElementById('nav-deliveries').toggleAttribute('aria-current', deliveries);
     document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries || financeCommissions || financeCommissionDetail);
+    document.getElementById('nav-team').toggleAttribute('aria-current', team || teamRemuneration || teamCommission);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
     if (!(financeEntries || financeCommissions || financeCommissionDetail)
       && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/comissoes'].includes(window.location.hash)
@@ -132,10 +144,17 @@
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
+    if (!(team || teamRemuneration || teamCommission) && window.location.hash.startsWith('#equipe')) {
+      const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
+      window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+    }
     if (profile) void loadProfileSummary();
     if (financeEntries && Caixa.loadFinanceEntries) void Caixa.loadFinanceEntries();
     if (financeCommissions && Caixa.loadFinanceCommissions) void Caixa.loadFinanceCommissions();
     if (financeCommissionDetail && Caixa.loadFinanceCommissionDetail) void Caixa.loadFinanceCommissionDetail();
+    if (team && Caixa.loadTeam) void Caixa.loadTeam();
+    if (teamRemuneration && Caixa.loadTeamRemuneration) void Caixa.loadTeamRemuneration();
+    if (teamCommission && Caixa.loadTeamCommission) void Caixa.loadTeamCommission();
   }
 
   Object.assign(Caixa, {
@@ -188,6 +207,14 @@
     showTab('finance');
     window.location.hash = '#financeiro';
     void Caixa.loadFinance();
+  });
+  document.getElementById('nav-team').addEventListener('click', function () {
+    if (!Caixa.canModule('team')) {
+      Caixa.showToast('Equipe disponível somente para o proprietário.');
+      return;
+    }
+    window.location.hash = '#equipe';
+    showTab('team');
   });
   document.getElementById('nav-cash').addEventListener('click', function () {
     showTab('cash');

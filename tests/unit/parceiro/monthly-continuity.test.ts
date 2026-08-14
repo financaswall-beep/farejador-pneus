@@ -10,6 +10,10 @@ const payrollBridge = readFileSync(
   resolve(process.cwd(), 'db/migrations/0170_partner_payroll_commission_bridge.sql'),
   'utf8',
 );
+const operationTeam = readFileSync(
+  resolve(process.cwd(), 'db/migrations/0171_operation_team_remuneration.sql'),
+  'utf8',
+);
 const monthlyFees = readFileSync(
   resolve(process.cwd(), 'src/admin/painel/queries-mensalidades.ts'),
   'utf8',
@@ -70,6 +74,12 @@ describe('continuidade mensal da Matriz e dos parceiros', () => {
     expect(payrollBridge).toContain('payable_id');
     expect(payrollBridge).toContain('partner_payroll_backfill_incomplete');
     expect(payrollBridge).not.toContain('INSERT INTO finance.partner_expenses');
+    expect(operationTeam).toContain('network.partner_collaborator_compensation');
+    expect(operationTeam).toContain('finance.prepare_partner_payroll_period');
+    expect(operationTeam).toMatch(/base_salary,\s*benefits,commission_amount,total_due/);
+    expect(operationTeam).toContain('finance.run_partner_staff_payroll_seed');
+    expect(operationTeam).not.toContain('INSERT INTO finance.partner_expenses');
+    expect(scheduler).toContain('run_partner_staff_payroll_seed');
   });
 
   it('recupera mensalidades atrasadas usando historico de termos', () => {

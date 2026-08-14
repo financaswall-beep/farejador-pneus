@@ -10,29 +10,36 @@ import {
   ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState,
   postMatrizExpensePayment,
 } from './matriz-ledger-expenses.js';
+import type { OperationBenefit } from '../../shared/operation-team.js';
 export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-ajustes-causais.js';
 
 export interface MatrizCompensationInput {
   collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
   base_salary: number; payment_day: number; payment_method: 'pix' | 'transferencia' | 'dinheiro' | 'outro';
-  payment_note?: string | null; starts_on: string; environment?: 'prod' | 'test'; actor_label?: string | null;
+  payment_note?: string | null; starts_on: string; benefits?: OperationBenefit[];
+  environment?: 'prod' | 'test'; actor_label?: string | null;
 }
 
 export async function saveMatrizCollaboratorCompensation(input: MatrizCompensationInput, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const r = await dbPool.query(
     `INSERT INTO network.matriz_collaborator_compensation
-       (collaborator_id, environment, employment_type, base_salary, payment_day, payment_method, payment_note, starts_on, updated_by)
-     SELECT mc.id, mc.environment, $3, $4, $5, $6, $7, $8::date, $9
+       (collaborator_id, environment, employment_type, base_salary, payment_day, payment_method,
+        payment_note, starts_on, updated_by, benefits)
+     SELECT mc.id, mc.environment, $3, $4, $5, $6, $7, $8::date, $9,
+            COALESCE($10::jsonb,'[]'::jsonb)
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
      ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET
        employment_type=EXCLUDED.employment_type, base_salary=EXCLUDED.base_salary,
        payment_day=EXCLUDED.payment_day, payment_method=EXCLUDED.payment_method,
        payment_note=EXCLUDED.payment_note,
+       benefits=CASE WHEN $10::jsonb IS NULL
+         THEN network.matriz_collaborator_compensation.benefits ELSE EXCLUDED.benefits END,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.employment_type, input.base_salary, input.payment_day,
-     input.payment_method, input.payment_note ?? null, input.starts_on, input.actor_label ?? null],
+     input.payment_method, input.payment_note ?? null, input.starts_on, input.actor_label ?? null,
+     input.benefits === undefined ? null : JSON.stringify(input.benefits)],
   );
   if (!r.rows[0]) throw new Error('collaborator_not_found');
   return { saved: true, collaborator_id: r.rows[0].collaborator_id };
@@ -157,6 +164,7 @@ export async function closeMatrizPayroll(input: {
       const calculation = {
         competence: input.competence,
         configured_base_salary: row.base_salary,
+        recurring_benefits: row.benefits,
         salary_rule: 'full_configured_monthly_amount',
         commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
         rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis, value: row.commission_value } : null,
@@ -176,7 +184,7 @@ export async function closeMatrizPayroll(input: {
            commission_amount,additions,deductions,total_due,due_date,calculation,source_expense_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)`,
         [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
-         row.commission_amount, row.additions, row.deductions, row.total_due, dueDate,
+         row.commission_amount, row.additions + row.benefits_total, row.deductions, row.total_due, dueDate,
          JSON.stringify(calculation), expense.rows[0]!.id]);
       await ensureMatrizExpenseAccrual(
         client,

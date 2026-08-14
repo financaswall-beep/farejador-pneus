@@ -22,6 +22,9 @@ const scriptFiles = [
   'caixa-finance.js',
   'caixa-finance-entries.js',
   'caixa-finance-commissions.js',
+  'caixa-team.js',
+  'caixa-team-remuneration.js',
+  'caixa-team-commission.js',
   'caixa-profile.js',
   'caixa-photo.js',
   'caixa.js',
@@ -32,6 +35,7 @@ const script = scriptFiles
 const route = [
   'src/admin/caixa/route.ts',
   'src/admin/caixa/route-commissions.ts',
+  'src/admin/caixa/route-team.ts',
   'src/admin/caixa/route-operation-login.ts',
 ].map((file) => readFileSync(resolve(file), 'utf8')).join('\n');
 const photoRoute = readFileSync(resolve('src/admin/caixa/route-photo.ts'), 'utf8');
@@ -238,6 +242,25 @@ describe('login mobile da Operação da Loja', () => {
     expect(css).toContain('.finance-commission-list');
     expect(route).toContain("requireCaixaModule('financeiro')");
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
+  });
+
+  it('entrega a Equipe somente ao proprietário e reaproveita a interface na Matriz e no parceiro', () => {
+    expect(html).toContain('id="team-panel"');
+    expect(html).toContain('id="team-remuneration-panel"');
+    expect(html).toContain('id="team-commission-panel"');
+    expect(html).toContain('id="nav-team"');
+    expect(html).toContain('Novo colaborador');
+    expect(html).toContain('Salvar remuneração');
+    expect(html).toContain('Salvar regra de comissão');
+    expect(script).toContain("Caixa.stored(Caixa.keys.role) === 'owner'");
+    expect(script).toContain("Caixa.operationPath('equipe', '/api/caixa/equipe')");
+    expect(script).toContain("window.location.hash = '#equipe'");
+    expect(route).toContain("'/api/caixa/equipe'");
+    expect(route).toContain("'/api/caixa/equipe/:collaboratorId/remuneracao'");
+    expect(route).toContain("'/api/caixa/equipe/:collaboratorId/comissao'");
+    expect(route).toContain("error: 'owner_required'");
+    expect(css).toContain('.team-member-card');
+    expect(css).toContain('.team-rule-options');
   });
 
   it('aceita somente vendedor ativo da área de vendas e usa token próprio', () => {

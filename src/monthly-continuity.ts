@@ -12,9 +12,14 @@ interface StaffRolloverResult {
   payables_created: number;
 }
 
+interface PayrollSeedResult {
+  environment: 'prod' | 'test'; current_month: string; periods_created: number;
+}
+
 export async function runMonthlyContinuityCycle(): Promise<{
   monthly_fees_created: number;
   staff_commissions: StaffRolloverResult;
+  staff_payroll: PayrollSeedResult;
 }> {
   const client = await pool.connect();
   try {
@@ -27,10 +32,15 @@ export async function runMonthlyContinuityCycle(): Promise<{
       `SELECT finance.run_partner_staff_commission_rollover($1::env_t) AS result`,
       [env.FAREJADOR_ENV],
     );
+    const payroll = await client.query<{ result: PayrollSeedResult }>(
+      `SELECT finance.run_partner_staff_payroll_seed($1::env_t) AS result`,
+      [env.FAREJADOR_ENV],
+    );
     await client.query('COMMIT');
     return {
       monthly_fees_created: monthlyFees,
       staff_commissions: staff.rows[0]!.result,
+      staff_payroll: payroll.rows[0]!.result,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

@@ -13,6 +13,9 @@ import { operatorLabel } from './route-helpers.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
 const money = z.number().finite().min(0).max(10_000_000);
+const benefits = z.array(z.object({
+  name: z.string().trim().min(2).max(60), amount: money, active: z.boolean().default(true),
+})).max(12).optional();
 const safePaymentReference = z.string().trim().max(160).nullable().optional().refine((value) => {
   if (!value) return true;
   return !/@/.test(value) && !/\d{6,}/.test(value)
@@ -22,7 +25,7 @@ const compensationSchema = z.object({
   collaborator_id: z.string().uuid(), employment_type: z.enum(['clt', 'mei', 'autonomo', 'outro']),
   base_salary: money, payment_day: z.number().int().min(1).max(28),
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
-  payment_note: safePaymentReference, starts_on: z.string().date(),
+  payment_note: safePaymentReference, starts_on: z.string().date(), benefits,
 });
 const commissionSchema = z.object({
   collaborator_id: z.string().uuid(), kind: z.enum(['percent', 'fixed']),

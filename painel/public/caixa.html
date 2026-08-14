@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-finance-commissions1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-operation-team1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -24,6 +24,9 @@
   <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260814-finance-commissions1"></script>
+  <script defer src="/operacao/caixa-team.js?v=20260814-operation-team1"></script>
+  <script defer src="/operacao/caixa-team-remuneration.js?v=20260814-operation-team1"></script>
+  <script defer src="/operacao/caixa-team-commission.js?v=20260814-operation-team1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -708,6 +711,74 @@
           </div>
         </div>
 
+        <div id="team-panel" class="app-panel team-page hidden" aria-labelledby="team-title">
+          <header class="team-toolbar">
+            <span class="team-logo" aria-hidden="true">2W<small>PNEUS</small></span>
+            <div><h2 id="team-title">Colaboradores</h2><p id="team-unit">Unidade</p></div>
+            <span class="team-owner">Proprietário</span>
+          </header>
+          <div id="team-loading" class="team-message" role="status"><i></i><span>Buscando sua equipe…</span></div>
+          <div id="team-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar os colaboradores.</strong><button id="team-retry" type="button">Tentar novamente</button></div>
+          <div id="team-content" class="hidden">
+            <section class="team-summary">
+              <p><b class="team-summary-icon">●●</b><span><strong id="team-active-count">0 colaboradores</strong><small>todos ativos</small></span></p>
+              <p><b class="team-summary-icon">$</b><span><strong id="team-commission-total">R$ 0,00</strong><small>comissões do mês</small></span></p>
+            </section>
+            <button id="team-new-member" class="team-new-member" type="button"><b>＋</b>Novo colaborador</button>
+            <label class="team-search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="team-search" placeholder="Buscar colaborador" maxlength="80" /></label>
+            <div id="team-filters" class="team-filters"><button class="active" type="button" data-team-filter="all">Todos</button><button type="button" data-team-filter="sales">Vendedores</button><button type="button" data-team-filter="delivery">Entregadores</button></div>
+            <h3>Minha equipe</h3>
+            <div id="team-list" class="team-list"></div>
+            <p class="team-private-note"><b>🔒</b>Salários e regras são visíveis somente ao proprietário.</p>
+          </div>
+        </div>
+
+        <div id="team-remuneration-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-remuneration-title">
+          <header class="team-toolbar team-toolbar--back">
+            <button id="team-remuneration-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div><h2 id="team-remuneration-title">Remuneração</h2><p id="team-remuneration-unit">Unidade</p></div><span class="team-owner">Proprietário</span>
+          </header>
+          <div id="team-remuneration-loading" class="team-message" role="status"><i></i><span>Carregando remuneração…</span></div>
+          <div id="team-remuneration-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a remuneração.</strong><button id="team-remuneration-retry" type="button">Tentar novamente</button></div>
+          <form id="team-remuneration-form" class="team-detail-content hidden">
+            <section class="team-person"><b id="team-remuneration-avatar">CO</b><div><strong id="team-remuneration-name">Colaborador</strong><span id="team-remuneration-role">Função</span><small><i></i><em id="team-remuneration-status">Ativo</em></small></div></section>
+            <h3>Salário</h3>
+            <section class="team-form-card">
+              <label>Salário mensal<span class="team-input-money">R$ <input id="team-base-salary" type="number" min="0" max="10000000" step="0.01" required /></span></label>
+              <label>Dia do pagamento<span>Todo dia <input id="team-payment-day" type="number" min="1" max="28" step="1" required /></span></label>
+              <label>Início da vigência<input id="team-compensation-start" type="date" required /></label>
+              <label>Vínculo<select id="team-employment-type"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
+            </section>
+            <p class="team-private-note"><b>🔒</b>Visível somente para o proprietário.</p>
+            <h3>Benefícios e adicionais</h3>
+            <section class="team-form-card"><div id="team-benefits" class="team-benefits"></div><button id="team-add-benefit" class="team-add-benefit" type="button">＋ Adicionar benefício</button></section>
+            <h3>Resumo mensal</h3>
+            <section class="team-fixed-summary"><p><span>Salário</span><strong id="team-summary-salary">R$ 0,00</strong></p><p><span>Benefícios</span><strong id="team-summary-benefits">R$ 0,00</strong></p><p><b>Total fixo</b><b id="team-summary-fixed">R$ 0,00</b></p><small>Comissões calculadas separadamente</small></section>
+            <p id="team-remuneration-save-error" class="team-save-error" role="alert"></p>
+            <button id="team-remuneration-save" class="team-primary" type="submit">Salvar remuneração</button>
+            <button id="team-open-commission" class="team-secondary" type="button">Configurar regra de comissão</button>
+          </form>
+        </div>
+
+        <div id="team-commission-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-commission-title">
+          <header class="team-toolbar team-toolbar--back">
+            <button id="team-commission-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div><h2 id="team-commission-title">Regra de comissão</h2><p id="team-commission-unit">Unidade</p></div><span class="team-owner">Proprietário</span>
+          </header>
+          <div id="team-commission-loading" class="team-message" role="status"><i></i><span>Carregando regra…</span></div>
+          <div id="team-commission-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a regra.</strong><button id="team-commission-retry" type="button">Tentar novamente</button></div>
+          <form id="team-commission-form" class="team-detail-content hidden">
+            <section class="team-person"><b id="team-commission-avatar">CO</b><div><strong id="team-commission-name">Colaborador</strong><span id="team-commission-role">Função</span><small><i></i><em id="team-commission-status">Ativo</em></small></div></section>
+            <h3>Modelo da comissão</h3>
+            <div class="team-rule-options"><label><input type="radio" name="team-commission-kind" value="percent" /><span><b>Porcentagem</b><small>Percentual sobre o valor vendido</small></span></label><label><input type="radio" name="team-commission-kind" value="fixed" /><span><b>Valor fixo</b><small>Um valor por venda, entrega ou viagem</small></span></label><label><input type="radio" name="team-commission-kind" value="none" /><span><b>Sem comissão</b><small>Não gera comissão nas operações</small></span></label></div>
+            <section id="team-rule-fields" class="team-form-card team-rule-fields"><label id="team-commission-value-label">Percentual<span class="team-input-money"><input id="team-commission-value" type="number" min="0" step="0.01" /> <em id="team-commission-unit-symbol">%</em></span></label><label>Base de cálculo<select id="team-commission-basis"></select></label><label>Início da vigência<input id="team-commission-start" type="date" required /></label></section>
+            <p id="team-commission-example" class="team-rule-example">Exemplo: venda de R$ 1.000,00 <strong>Comissão: R$ 0,00</strong></p>
+            <p class="team-private-note"><b>i</b>A nova regra não altera comissões de vendas anteriores.</p>
+            <p id="team-commission-save-error" class="team-save-error" role="alert"></p>
+            <button id="team-commission-save" class="team-primary" type="submit">Salvar regra de comissão</button>
+          </form>
+        </div>
+
         <div id="profile-panel" class="app-panel profile-panel hidden">
           <div id="profile-initials" class="profile-avatar" aria-hidden="true">OP</div>
           <div class="profile-identity">
@@ -801,6 +872,10 @@
           <button id="nav-finance" type="button" data-tab="finance">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.7-.7-1.7-1-3-1-1.7 0-3 1-3 2.4 0 3.6 6 1.8 6 5.2 0 1.4-1.3 2.4-3 2.4-1.2 0-2.3-.4-3-1.2M12 5v14"/></svg>
             <span>Financeiro</span>
+          </button>
+          <button id="nav-team" type="button" data-tab="team">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4 4 0 0 1 7 0"/></svg>
+            <span>Equipe</span>
           </button>
           <button id="nav-profile" type="button" data-tab="profile">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
