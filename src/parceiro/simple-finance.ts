@@ -1,7 +1,11 @@
 import type { PartnerContext } from './auth.js';
 import { withPartnerContext } from './db.js';
 import { pool } from '../persistence/db.js';
-import type { SimpleFinancePayload } from '../shared/simple-finance.js';
+import {
+  simpleFinanceRangeDays,
+  type SimpleFinancePayload,
+  type SimpleFinanceRange,
+} from '../shared/simple-finance.js';
 
 interface SimpleFinanceRow {
   cash_in: string;
@@ -17,35 +21,50 @@ interface CommissionCollaboratorsRow {
   commission_collaborators: number;
 }
 
+function saoPauloMonth(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}`;
+}
+
 /**
- * Resumo de caixa do dono. A consulta segue a mesma regra da view
- * network.partner_unit_summary, mas recebe a competencia explicitamente para o
- * seletor mensal do app. Tudo roda sob o contexto/RLS da propria unidade.
+ * Resumo de caixa do dono. Entradas e saídas respeitam o intervalo rápido do
+ * app; pendências e comissões permanecem como fotografia operacional atual.
+ * Tudo roda sob o contexto/RLS da própria unidade.
  */
 export async function getPartnerSimpleFinance(
   ctx: PartnerContext,
-  period: string,
+  range: SimpleFinanceRange,
 ): Promise<SimpleFinancePayload> {
+  const days = simpleFinanceRangeDays(range);
   const [finance, collaborators] = await Promise.all([
     withPartnerContext(ctx.partnerUnitId, async (client) => {
       const result = await client.query<SimpleFinanceRow>(
         `WITH bounds AS (
-         SELECT to_date($3,'YYYY-MM')::date AS month_start_date,
-                (to_date($3,'YYYY-MM')::timestamp AT TIME ZONE 'America/Sao_Paulo') AS month_start_at,
-                ((to_date($3,'YYYY-MM')+interval '1 month')::timestamp
-                  AT TIME ZONE 'America/Sao_Paulo') AS month_end_at
+         SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date
+                  AS month_start_date,
+                ((date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo')
+                  - (($3::int-1)*interval '1 day')) AT TIME ZONE 'America/Sao_Paulo')
+                  AS range_start_at,
+                ((date_trunc('day',now() AT TIME ZONE 'America/Sao_Paulo')
+                  + interval '1 day') AT TIME ZONE 'America/Sao_Paulo') AS range_end_at,
+                ((now() AT TIME ZONE 'America/Sao_Paulo')::date-($3::int-1))
+                  AS range_start_date,
+                ((now() AT TIME ZONE 'America/Sao_Paulo')::date+1) AS range_end_date
        ), cash_in AS (
          SELECT
            COALESCE((SELECT sum(po.total_amount)
              FROM commerce.partner_orders po,bounds b
             WHERE po.environment=$1 AND po.unit_id=$2
               AND po.status<>'cancelled' AND po.deleted_at IS NULL
-              AND po.created_at>=b.month_start_at AND po.created_at<b.month_end_at
+              AND po.created_at>=b.range_start_at AND po.created_at<b.range_end_at
               AND (po.payment_method IS NULL OR po.payment_method<>'A receber')),0)
            + COALESCE((SELECT sum(pre.amount)
              FROM finance.partner_receivables_effective pre,bounds b
             WHERE pre.environment=$1 AND pre.unit_id=$2 AND pre.status='received'
-              AND pre.received_at>=b.month_start_at AND pre.received_at<b.month_end_at),0)
+              AND pre.received_at>=b.range_start_at AND pre.received_at<b.range_end_at),0)
            AS total
        ), cash_out AS (
          SELECT
@@ -53,18 +72,18 @@ export async function getPartnerSimpleFinance(
              FROM commerce.partner_purchases pp,bounds b
             WHERE pp.environment=$1 AND pp.unit_id=$2 AND pp.deleted_at IS NULL
               AND pp.payment_status='paid_now'
-              AND pp.purchased_at>=b.month_start_at AND pp.purchased_at<b.month_end_at),0)
+              AND pp.purchased_at>=b.range_start_at AND pp.purchased_at<b.range_end_at),0)
            + COALESCE((SELECT sum(pe.amount)
              FROM finance.partner_expenses pe,bounds b
             WHERE pe.environment=$1 AND pe.unit_id=$2 AND pe.deleted_at IS NULL
               AND pe.source_payable_id IS NULL
-              AND pe.expense_date>=b.month_start_date
-              AND pe.expense_date<(b.month_start_date+interval '1 month')::date),0)
+              AND pe.expense_date>=b.range_start_date
+              AND pe.expense_date<b.range_end_date),0)
            + COALESCE((SELECT sum(pp2.amount)
              FROM finance.partner_payables pp2,bounds b
             WHERE pp2.environment=$1 AND pp2.unit_id=$2 AND pp2.deleted_at IS NULL
-              AND pp2.status='paid' AND pp2.paid_at>=b.month_start_at
-              AND pp2.paid_at<b.month_end_at),0) AS total
+              AND pp2.status='paid' AND pp2.paid_at>=b.range_start_at
+              AND pp2.paid_at<b.range_end_at),0) AS total
        ), commissions AS (
          SELECT
            COALESCE((SELECT sum(ce.commission_amount)
@@ -97,7 +116,7 @@ export async function getPartnerSimpleFinance(
                 AS due_today_count,
               commissions.total::text AS commission_total
          FROM cash_in,cash_out,commissions`,
-        [ctx.environment, ctx.unitId, period],
+        [ctx.environment, ctx.unitId, days],
       );
       return result.rows[0]!;
     }),
@@ -118,7 +137,8 @@ export async function getPartnerSimpleFinance(
   const cashIn = Number(row.cash_in ?? 0);
   const cashOut = Number(row.cash_out ?? 0);
   return {
-    period,
+    period: saoPauloMonth(),
+    range,
     unit_name: ctx.unitName,
     cash_in: cashIn,
     cash_out: cashOut,

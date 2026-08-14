@@ -61,7 +61,8 @@ const changePasswordSchema = z.object({
 });
 
 const simpleFinanceQuerySchema = z.object({
-  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  range: z.enum(['today', '7d', '15d', '30d']).default('30d'),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 });
 
 type CaixaRequest = FastifyRequest & { caixa?: CaixaAuth };
@@ -151,7 +152,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     const parsed = simpleFinanceQuerySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     try {
-      return reply.status(200).send(await getMatrizSimpleFinance(parsed.data.period));
+      return reply.status(200).send(await getMatrizSimpleFinance(parsed.data.range));
     } catch (error) {
       const code = error instanceof Error ? error.message : 'finance_unavailable';
       logger.error({ err: error }, 'simple matrix finance unavailable');

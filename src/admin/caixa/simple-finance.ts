@@ -2,11 +2,14 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { getMatrizLedgerOpenItems } from '../painel/matriz-ledger-open-items.js';
-import { getMatrizLedgerStatement } from '../painel/matriz-ledger-statement.js';
 import { getMatrizLedgerIntegrationHealth } from '../painel/matriz-ledger-integration-health.js';
 import { getMatrizCollaboratorManagement } from '../painel/queries-colaboradores-gestao.js';
 import { MatrizCentralLedgerUnavailableError } from '../painel/queries-financeiro-read-switch.js';
-import type { SimpleFinancePayload } from '../../shared/simple-finance.js';
+import {
+  simpleFinanceRangeDays,
+  type SimpleFinancePayload,
+  type SimpleFinanceRange,
+} from '../../shared/simple-finance.js';
 
 function saoPauloToday(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -16,8 +19,42 @@ function saoPauloToday(): string {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
+function shiftIsoDate(value: string, days: number): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1, day! + days));
+  return date.toISOString().slice(0, 10);
+}
+
+async function getCashSummary(
+  range: SimpleFinanceRange,
+  environment: 'prod' | 'test',
+  dbPool: Pool,
+): Promise<{ entradas: string; saidas: string }> {
+  const today = saoPauloToday();
+  const start = shiftIsoDate(today, -(simpleFinanceRangeDays(range) - 1));
+  const end = shiftIsoDate(today, 1);
+  const result = await dbPool.query<{ entradas: string; saidas: string }>(
+    `WITH tx AS (
+       SELECT t.id
+         FROM finance.matriz_ledger_transactions t
+        WHERE t.environment=$1 AND t.cash_on>=$2::date AND t.cash_on<$3::date
+          AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
+            WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
+     )
+     SELECT COALESCE(sum(e.amount) FILTER (
+              WHERE e.account_code='cash' AND e.side='debit'),0)::numeric(14,2)::text entradas,
+            COALESCE(sum(e.amount) FILTER (
+              WHERE e.account_code='cash' AND e.side='credit'),0)::numeric(14,2)::text saidas
+       FROM tx
+       JOIN finance.matriz_ledger_entries e
+         ON e.environment=$1 AND e.transaction_id=tx.id`,
+    [environment, start, end],
+  );
+  return result.rows[0] ?? { entradas: '0', saidas: '0' };
+}
+
 export async function getMatrizSimpleFinance(
-  period: string,
+  range: SimpleFinanceRange,
   dbPool: Pool = defaultPool,
 ): Promise<SimpleFinancePayload> {
   if (!env.MATRIZ_CENTRAL_LEDGER || !env.MATRIZ_CENTRAL_LEDGER_READ) {
@@ -28,20 +65,20 @@ export async function getMatrizSimpleFinance(
     throw new MatrizCentralLedgerUnavailableError(`integration_${health.status}`);
   }
 
+  const today = saoPauloToday();
+  const period = today.slice(0, 7);
   const competence = `${period}-01`;
-  const [statement, openItems, collaborators] = await Promise.all([
-    getMatrizLedgerStatement({
-      period, basis: 'caixa', limit: 1, offset: 0, environment: env.FAREJADOR_ENV,
-    }, dbPool),
+  const [summary, openItems, collaborators] = await Promise.all([
+    getCashSummary(range, env.FAREJADOR_ENV, dbPool),
     getMatrizLedgerOpenItems(env.FAREJADOR_ENV, dbPool),
     getMatrizCollaboratorManagement(competence, env.FAREJADOR_ENV, dbPool),
   ]);
-  const today = saoPauloToday();
   const dueToday = openItems.a_pagar.itens.filter((item) => item.due_date === today);
-  const cashIn = Number(statement.summary.entradas ?? 0);
-  const cashOut = Number(statement.summary.saidas ?? 0);
+  const cashIn = Number(summary.entradas ?? 0);
+  const cashOut = Number(summary.saidas ?? 0);
   return {
     period,
+    range,
     unit_name: 'Matriz',
     cash_in: cashIn,
     cash_out: cashOut,

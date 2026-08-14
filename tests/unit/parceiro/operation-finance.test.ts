@@ -33,14 +33,15 @@ describe('Financeiro simples do proprietario parceiro', () => {
       unitName: 'Borracharia Rio do Ouro', role: 'owner', tokenId: 'owner-token',
     };
 
-    const payload = await getPartnerSimpleFinance(context, '2026-08');
+    const payload = await getPartnerSimpleFinance(context, '7d');
 
     expect(payload).toMatchObject({
       cash_in: 18450, cash_out: 5670, cash_net: 12780,
       receivable_total: 2360, due_today_count: 1,
-      commission_total: 1280, commission_collaborators: 4,
+      commission_total: 1280, commission_collaborators: 4, range: '7d',
     });
-    expect(partnerQuery.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', '2026-08']);
+    expect(partnerQuery.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', 7]);
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain('range_start_at');
     expect(partnerQuery.mock.calls[0]?.[0]).not.toContain('partner_access_tokens');
     expect(adminQuery.mock.calls[0]?.[1]).toEqual(['test', 'partner-unit-1']);
   });
@@ -51,5 +52,6 @@ describe('Financeiro simples do proprietario parceiro', () => {
     expect(routeRoot).toContain('registerPartnerSimpleFinanceRoute(fastify)');
     expect(operationAuth).toContain("const canSeeFinance = row.role === 'owner'");
     expect(operationAuth).toContain('financeiro: canSeeFinance');
+    expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });
 });

@@ -11,9 +11,6 @@ vi.mock('../../../src/shared/config/env.js', () => ({
 vi.mock('../../../src/admin/painel/matriz-ledger-integration-health.js', () => ({
   getMatrizLedgerIntegrationHealth: vi.fn(async () => ({ status: 'green' })),
 }));
-vi.mock('../../../src/admin/painel/matriz-ledger-statement.js', () => ({
-  getMatrizLedgerStatement: vi.fn(async () => ({ summary: { entradas: '18450.00', saidas: '5670.00' } })),
-}));
 vi.mock('../../../src/admin/painel/matriz-ledger-open-items.js', () => ({
   getMatrizLedgerOpenItems: vi.fn(async () => ({
     a_receber: { total: '2360.00', itens: [{ valor: '2360.00', due_date: null }] },
@@ -40,13 +37,18 @@ vi.mock('../../../src/persistence/db.js', () => ({ pool: {} }));
 import { getMatrizSimpleFinance } from '../../../src/admin/caixa/simple-finance.js';
 
 describe('Financeiro simples da Matriz', () => {
-  it('le exclusivamente o livro central e reaproveita a comissao da folha', async () => {
-    const payload = await getMatrizSimpleFinance('2026-08', {} as Pool);
+  it('le exclusivamente o livro central no intervalo e reaproveita a comissao da folha', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{ entradas: '18450.00', saidas: '5670.00' }],
+    }));
+    const payload = await getMatrizSimpleFinance('15d', { query } as unknown as Pool);
 
     expect(payload).toMatchObject({
       unit_name: 'Matriz', cash_in: 18450, cash_out: 5670, cash_net: 12780,
       receivable_total: 2360, receivable_count: 1,
-      commission_total: 1280, commission_collaborators: 2,
+      commission_total: 1280, commission_collaborators: 2, range: '15d',
     });
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0]?.[1]?.[0]).toBe('test');
   });
 });

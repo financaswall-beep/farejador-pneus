@@ -5,7 +5,8 @@ import type { PartnerAuthedRequest } from './auth.js';
 import { getPartnerSimpleFinance } from './simple-finance.js';
 
 const querySchema = z.object({
-  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  range: z.enum(['today', '7d', '15d', '30d']).default('30d'),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 });
 
 /** Valores consolidados do app operacional ficam exclusivos do proprietário. */
@@ -17,7 +18,7 @@ export function registerPartnerSimpleFinanceRoute(fastify: FastifyInstance): voi
     const parsed = querySchema.safeParse(request.query ?? {});
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send(await getPartnerSimpleFinance(
-      getPartnerContext(request), parsed.data.period,
+      getPartnerContext(request), parsed.data.range,
     ));
   });
 }

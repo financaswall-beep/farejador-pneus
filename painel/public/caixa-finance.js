@@ -11,24 +11,18 @@
   const content = byId('finance-content');
   let request = null;
 
-  function monthValue(date) {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
-    }).formatToParts(date);
-    const values = Object.fromEntries(parts.map(function (part) { return [part.type, part.value]; }));
-    return values.year + '-' + values.month;
+  const rangeLabels = { today: 'Hoje', '7d': '7 dias', '15d': '15 dias', '30d': '1 mês' };
+
+  function selectedRange() {
+    return Object.prototype.hasOwnProperty.call(rangeLabels, periodInput.value)
+      ? periodInput.value : '30d';
   }
 
-  function currentPeriod() { return monthValue(new Date()); }
-
-  function periodText(value) {
-    if (value === currentPeriod()) return 'Este mês';
-    const parts = value.split('-').map(Number);
-    if (parts.length !== 2 || !parts[0] || !parts[1]) return 'Este mês';
-    const text = new Intl.DateTimeFormat('pt-BR', {
-      month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo',
-    }).format(new Date(Date.UTC(parts[0], parts[1] - 1, 2)));
-    return text.charAt(0).toUpperCase() + text.slice(1);
+  function statusText(range, positive) {
+    if (range === 'today') return positive ? 'Hoje está positivo' : 'Hoje está negativo';
+    if (range === '7d') return positive ? 'Últimos 7 dias positivos' : 'Últimos 7 dias negativos';
+    if (range === '15d') return positive ? 'Últimos 15 dias positivos' : 'Últimos 15 dias negativos';
+    return positive ? 'Último mês positivo' : 'Último mês negativo';
   }
 
   function setState(name, message) {
@@ -52,8 +46,9 @@
     hero.classList.toggle('finance-hero--negative', !positive);
     byId('finance-result-label').textContent = positive ? 'Sobrou' : 'Prejuízo';
     byId('finance-net').textContent = Caixa.currency.format(net);
-    byId('finance-status').querySelector('b').textContent = positive
-      ? 'Este mês está positivo' : 'Este mês fechou negativo';
+    byId('finance-status').querySelector('b').textContent = statusText(
+      payload.range || selectedRange(), positive,
+    );
     byId('finance-in').textContent = Caixa.currency.format(Number(payload.cash_in || 0));
     byId('finance-out').textContent = Caixa.currency.format(Number(payload.cash_out || 0));
 
@@ -85,13 +80,13 @@
     const controller = new AbortController();
     request = controller;
     setState('loading');
-    const period = periodInput.value || currentPeriod();
-    periodInput.value = period;
-    periodLabel.textContent = periodText(period);
+    const range = selectedRange();
+    periodInput.value = range;
+    periodLabel.textContent = rangeLabels[range];
     try {
       const path = Caixa.operationPath('financeiro-simples', '/api/caixa/financeiro-simples');
       const response = await Caixa.authenticatedFetch(
-        path + '?period=' + encodeURIComponent(period), { signal: controller.signal },
+        path + '?range=' + encodeURIComponent(range), { signal: controller.signal },
       );
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
@@ -116,13 +111,8 @@
     window.location.href = '/login?modo=painel';
   }
 
-  const now = currentPeriod();
-  const minimum = new Date();
-  minimum.setFullYear(minimum.getFullYear() - 3);
-  periodInput.max = now;
-  periodInput.min = monthValue(minimum);
-  periodInput.value = now;
-  periodLabel.textContent = 'Este mês';
+  periodInput.value = '30d';
+  periodLabel.textContent = rangeLabels['30d'];
   periodInput.addEventListener('change', function () { void loadFinance(); });
   byId('finance-retry').addEventListener('click', function () { void loadFinance(); });
   byId('finance-full').addEventListener('click', openFullFinance);

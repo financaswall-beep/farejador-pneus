@@ -197,6 +197,10 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Pendências');
     expect(html).toContain('Comissões');
     expect(html).toContain('Ver financeiro completo');
+    expect(html).toContain('<option value="today">Hoje</option>');
+    expect(html).toContain('<option value="7d">7 dias</option>');
+    expect(html).toContain('<option value="15d">15 dias</option>');
+    expect(html).toContain('<option value="30d" selected>1 mês</option>');
     expect(css).toContain('.finance-hero');
     expect(css).toContain("url('/operacao/finance-hero.webp')");
     expect(css).toContain("url('/operacao/finance-shell-positive-v3.webp')");
@@ -208,9 +212,11 @@ describe('login mobile da Operação da Loja', () => {
     expect(staticRoute).toContain("'/operacao/finance-shell-negative-v3.webp'");
     expect(script).toContain("Caixa.canModule('financeiro')");
     expect(script).toContain("Caixa.operationPath('financeiro-simples'");
+    expect(script).toContain("'?range=' + encodeURIComponent(range)");
     expect(script).toContain("window.location.hash === '#financeiro'");
     expect(route).toContain("'/api/caixa/financeiro-simples'");
     expect(route).toContain("requireCaixaModule('financeiro')");
+    expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });
 
   it('aceita somente vendedor ativo da área de vendas e usa token próprio', () => {
