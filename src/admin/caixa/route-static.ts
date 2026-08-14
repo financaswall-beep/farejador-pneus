@@ -85,4 +85,6 @@ export function registerCaixaStaticRoutes(fastify: FastifyInstance, flagGate: Fl
   text('/operacao/finance-hero.webp', 'assets/finance-simple-hero-v1.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/finance-shell-positive-v2.webp', 'assets/finance-shell-positive-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
   text('/operacao/finance-shell-negative-v2.webp', 'assets/finance-shell-negative-v2.webp', 'image/webp', 'public, max-age=31536000, immutable');
+  text('/operacao/finance-shell-positive-v3.webp', 'assets/finance-shell-positive-v3.webp', 'image/webp', 'public, max-age=31536000, immutable');
+  text('/operacao/finance-shell-negative-v3.webp', 'assets/finance-shell-negative-v3.webp', 'image/webp', 'public, max-age=31536000, immutable');
 }

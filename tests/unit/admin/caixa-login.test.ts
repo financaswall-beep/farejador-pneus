@@ -199,11 +199,13 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Ver financeiro completo');
     expect(css).toContain('.finance-hero');
     expect(css).toContain("url('/operacao/finance-hero.webp')");
-    expect(css).toContain("url('/operacao/finance-shell-positive-v2.webp')");
-    expect(css).toContain("url('/operacao/finance-shell-negative-v2.webp')");
+    expect(css).toContain("url('/operacao/finance-shell-positive-v3.webp')");
+    expect(css).toContain("url('/operacao/finance-shell-negative-v3.webp')");
     expect(staticRoute).toContain("'/operacao/finance-hero.webp'");
     expect(staticRoute).toContain("'/operacao/finance-shell-positive-v2.webp'");
     expect(staticRoute).toContain("'/operacao/finance-shell-negative-v2.webp'");
+    expect(staticRoute).toContain("'/operacao/finance-shell-positive-v3.webp'");
+    expect(staticRoute).toContain("'/operacao/finance-shell-negative-v3.webp'");
     expect(script).toContain("Caixa.canModule('financeiro')");
     expect(script).toContain("Caixa.operationPath('financeiro-simples'");
     expect(script).toContain("window.location.hash === '#financeiro'");
