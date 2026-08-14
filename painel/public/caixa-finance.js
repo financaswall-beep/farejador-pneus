@@ -47,6 +47,7 @@
     const net = Number(payload.cash_net || 0);
     const positive = net >= 0;
     const hero = byId('finance-hero');
+    byId('session-view').classList.toggle('finance-negative', !positive);
     hero.classList.toggle('finance-hero--positive', positive);
     hero.classList.toggle('finance-hero--negative', !positive);
     byId('finance-result-label').textContent = positive ? 'Sobrou' : 'Prejuízo';

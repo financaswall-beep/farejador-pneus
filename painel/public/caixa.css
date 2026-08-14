@@ -879,14 +879,19 @@ form { display: grid; gap: 16px; }
 .bottom-nav svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.65; }
 .bottom-nav button.active svg { stroke-width: 2; }
 
-/* Financeiro simples — proprietario/admin no app operacional */
-.sales-app.is-finance { background: #f1f5f0; }
+/* Financeiro simples — base curva pronta; dados reais ficam em HTML por cima. */
+.sales-app.is-finance {
+  background:
+    #f6f6f0 url('/operacao/finance-shell-positive-v2.webp') center calc(190px - 32.23vw) / 100% auto no-repeat;
+}
+.sales-app.is-finance.finance-negative {
+  background-image: url('/operacao/finance-shell-negative-v2.webp');
+}
 .sales-app.is-finance .sales-header {
   min-height: 188px;
   padding-bottom: 62px;
-  background:
-    linear-gradient(105deg,rgba(0,48,34,.9),rgba(0,84,55,.72) 55%,rgba(0,37,26,.86)),
-    url('/operacao/finance-hero.webp') center 35% / cover no-repeat;
+  background: transparent;
+  box-shadow: none;
 }
 .sales-app.is-finance .sales-logo { border: 2px solid rgba(255,255,255,.88); border-radius: 50%; }
 .sales-app.is-finance .sales-heading { flex: 1 1 auto; gap: 8px; }
@@ -901,9 +906,9 @@ form { display: grid; gap: 16px; }
   min-height: 680px;
   margin-top: -68px;
   padding: 0 0 24px;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0;
-  background: #f1f5f0;
+  background: transparent;
   box-shadow: none;
 }
 .finance-period-wrap {
@@ -939,53 +944,32 @@ form { display: grid; gap: 16px; }
   position: relative;
   z-index: 2;
   display: flex;
-  min-height: 330px;
+  min-height: 206px;
   align-items: center;
   flex-direction: column;
-  margin: 0 15px;
-  padding: 42px 15px 72px;
-  overflow: hidden;
-  border: 1.5px solid rgba(255,255,255,.86);
-  border-radius: 30px 30px 48% 48% / 30px 30px 12% 12%;
+  margin: 0;
+  padding: 20px 15px 24px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
   color: #fff;
-  background:
-    radial-gradient(circle at 50% 23%,rgba(0,142,75,.46),transparent 40%),
-    linear-gradient(120deg,rgba(0,54,37,.74),rgba(0,30,23,.92)),
-    url('/operacao/finance-hero.webp') center 36% / cover no-repeat;
-  box-shadow: 0 17px 38px rgba(0,49,33,.18),inset 0 0 34px rgba(21,191,100,.1);
+  background: transparent;
+  box-shadow: none;
   text-align: center;
 }
-.finance-hero::after {
-  content: "";
-  position: absolute;
-  right: -4%;
-  bottom: -18px;
-  left: -4%;
-  height: 34px;
-  border-top: 5px solid #79d63e;
-  border-radius: 50% 50% 0 0;
-  background: #f1f5f0;
-  box-shadow: 0 -3px 0 rgba(255,255,255,.9);
-}
-.finance-hero--negative {
-  border-color: rgba(255,174,174,.9);
-  background:
-    radial-gradient(circle at 50% 20%,rgba(132,31,36,.52),transparent 43%),
-    linear-gradient(120deg,rgba(61,8,14,.84),rgba(20,5,8,.94)),
-    url('/operacao/finance-hero.webp') center 36% / cover no-repeat;
-}
-.finance-hero--negative::after { border-top-color: #ff3f48; }
+.finance-hero::after { display: none; }
+.finance-hero--negative { background: transparent; }
 .finance-hero > small { display: flex; align-items: center; gap: 12px; font-size: 21px; }
 .finance-hero > small::before,.finance-hero > small::after { content: ""; width: 28px; height: 1px; background: #75d53a; }
 .finance-hero--negative > small { color: #ff999d; }
 .finance-hero--negative > small::before,.finance-hero--negative > small::after { background: #ff5b62; }
-.finance-hero > strong { display: block; margin-top: 20px; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(45px,13vw,66px); font-weight: 650; letter-spacing: -.05em; line-height: .96; text-shadow: 0 4px 18px rgba(0,0,0,.2); }
-.finance-hero > span { margin-top: 14px; color: rgba(255,255,255,.88); font-size: 15px; }
-.finance-hero > p { display: flex; min-height: 43px; align-items: center; gap: 9px; margin: 24px 0 0; padding: 0 18px; border: 1px solid rgba(46,221,121,.72); border-radius: 23px; color: #70e49f; background: rgba(0,63,39,.46); }
+.finance-hero > strong { display: block; margin-top: 10px; font-family: "Arial Narrow","Roboto Condensed",Arial,sans-serif; font-size: clamp(43px,12vw,60px); font-weight: 650; letter-spacing: -.05em; line-height: .96; text-shadow: 0 4px 18px rgba(0,0,0,.2); }
+.finance-hero > span { margin-top: 8px; color: rgba(255,255,255,.88); font-size: 15px; }
+.finance-hero > p { display: flex; min-height: 39px; align-items: center; gap: 9px; margin: 15px 0 0; padding: 0 17px; border: 1px solid rgba(46,221,121,.72); border-radius: 23px; color: #70e49f; background: rgba(0,63,39,.46); }
 .finance-hero--negative > p { color: #ff858a; border-color: rgba(255,70,80,.65); background: rgba(64,5,12,.45); }
 .finance-hero > p svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .finance-hero > p b { font-size: 14px; font-weight: 650; }
-.finance-body { position: relative; z-index: 3; padding: 18px 15px 6px; }
+.finance-body { position: relative; z-index: 3; padding: 9px 15px 6px; }
 .finance-body > h3 { margin: 14px 2px 10px; color: #17231e; font-size: 18px; letter-spacing: -.02em; }
 .finance-cash-summary { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; border: 1px solid #cdd8d1; border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 9px 22px rgba(26,52,41,.08); }
 .finance-cash-summary button { position: relative; display: block; min-width: 0; min-height: 142px; padding: 25px 12px 16px; border: 0; color: #075d3d; background: transparent; text-align: left; cursor: pointer; }
@@ -1021,8 +1005,8 @@ form { display: grid; gap: 16px; }
 
 @media (max-width: 370px) {
   .finance-period-wrap { width: min(calc(100% - 86px),275px); }
-  .finance-hero { min-height: 310px; margin-inline: 10px; }
-  .finance-hero > strong { font-size: 44px; }
+  .finance-hero { min-height: 187px; }
+  .finance-hero > strong { font-size: 42px; }
   .finance-body { padding-inline: 10px; }
   .finance-cash-summary button { min-height: 132px; padding-inline: 9px; }
   .finance-cash-summary svg { left: 10px; width: 23px; height: 23px; }
