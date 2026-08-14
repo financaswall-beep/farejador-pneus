@@ -882,7 +882,7 @@ form { display: grid; gap: 16px; }
 /* Financeiro simples — base curva pronta; dados reais ficam em HTML por cima. */
 .sales-app.is-finance {
   background:
-    #fff url('/operacao/finance-shell-positive-v2.webp') center calc(190px - min(32.23vw,145.7px)) / 100% auto no-repeat;
+    #fff url('/operacao/finance-shell-positive-v2.webp') center top / 100% clamp(690px,calc(345px + 91.4vw),758px) no-repeat;
 }
 .sales-app.is-finance.finance-negative {
   background-image: url('/operacao/finance-shell-negative-v2.webp');
@@ -890,7 +890,7 @@ form { display: grid; gap: 16px; }
 .sales-app.is-finance .sales-header {
   min-height: 188px;
   padding-bottom: 62px;
-  background: linear-gradient(105deg,#003b2a,#005238 58%,#003a29);
+  background: transparent;
   box-shadow: none;
 }
 .sales-app.is-finance .sales-logo { border: 2px solid rgba(255,255,255,.88); border-radius: 50%; }

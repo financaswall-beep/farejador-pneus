@@ -7,7 +7,7 @@ const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
 
 describe('legibilidade da Operação da Loja', () => {
   it('publica a folha com uma versão própria para invalidar o cache', () => {
-    expect(html).toContain('/operacao/caixa.css?v=20260814-finance-shell4');
+    expect(html).toContain('/operacao/caixa.css?v=20260814-finance-shell5');
   });
 
   it('define uma escala mínima compartilhada para textos operacionais', () => {
@@ -34,7 +34,8 @@ describe('legibilidade da Operação da Loja', () => {
   });
 
   it('mantém o financeiro centralizado e proporcional no celular e no desktop', () => {
-    expect(css).toContain("calc(190px - min(32.23vw,145.7px))");
+    expect(css).toContain("center top / 100% clamp(690px,calc(345px + 91.4vw),758px)");
+    expect(css).toMatch(/\.sales-app\.is-finance \.sales-header\s*\{[^}]*background:\s*transparent/);
     expect(css).toMatch(/\.finance-body\s*\{[^}]*width:\s*100%[^}]*padding:\s*9px 20px 6px[^}]*background:\s*#fff/);
     expect(css).toMatch(/\.finance-hero > strong\s*\{[^}]*font-size:\s*clamp\(40px,11vw,56px\)/);
     expect(css).toMatch(/\.finance-cash-summary button\s*\{[^}]*display:\s*flex[^}]*min-height:\s*112px[^}]*justify-content:\s*center/);
