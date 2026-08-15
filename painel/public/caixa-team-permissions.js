@@ -12,13 +12,12 @@
     pedidos: ['Pedidos', 'Consultar e acompanhar pedidos da unidade', 'P'],
     clientes: ['Clientes', 'Consultar e cadastrar clientes', 'C'],
     retiradas: ['Retiradas', 'Organizar pedidos para retirada no balcão', 'T'],
-    batepapo: ['Bate-papo', 'Acessar conversas da própria unidade', 'B'],
     resumo: ['Resumo da loja', 'Visualizar os indicadores gerais da unidade', 'S'],
     financeiro: ['Financeiro', 'Ver entradas, saídas, pendências e comissões', '$'],
   };
   const groups = {
     operation: ['vendas', 'estoque', 'entregas'],
-    portal: ['pedidos', 'clientes', 'retiradas', 'batepapo', 'resumo'],
+    portal: ['pedidos', 'clientes', 'retiradas', 'resumo'],
     management: ['financeiro'],
   };
 

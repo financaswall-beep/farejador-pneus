@@ -7,7 +7,7 @@ const css = readFileSync(resolve('painel/public/caixa.css'), 'utf8');
 
 describe('legibilidade da Operação da Loja', () => {
   it('publica a folha com uma versão própria para invalidar o cache', () => {
-    expect(html).toContain('/operacao/caixa.css?v=20260815-itemized-commission1');
+    expect(html).toContain('/operacao/caixa.css?v=20260815-team-finish1');
   });
 
   it('define uma escala mínima compartilhada para textos operacionais', () => {
@@ -31,6 +31,11 @@ describe('legibilidade da Operação da Loja', () => {
     expect(css).toMatch(/\.chooser-back\s*\{\s*min-height:\s*44px/);
     expect(css).toMatch(/\.stock-detail-actions button\s*\{\s*min-height:\s*52px/);
     expect(css).toMatch(/\.bottom-nav button\s*\{\s*min-height:\s*56px/);
+  });
+
+  it('mantém todos os campos de remuneração no mesmo tamanho legível', () => {
+    expect(css).toMatch(/\.team-form-card > label\s*\{[^}]*font-size:\s*16px/);
+    expect(css).toMatch(/\.team-form-card input,\.team-form-card select\s*\{[^}]*font-size:\s*16px/);
   });
 
   it('mantém o financeiro centralizado e proporcional no celular e no desktop', () => {

@@ -238,11 +238,14 @@ describe('login mobile da Operação da Loja', () => {
     expect(route).toContain("'/api/caixa/financeiro-comissoes/:collaboratorId'");
     expect(html).toContain('id="finance-commissions-panel"');
     expect(html).toContain('id="finance-commission-detail-panel"');
+    expect(html).toContain('id="finance-commission-detail-rules"');
     expect(html).toContain('<small>Financeiro</small><h2 id="finance-commissions-title">Comissões</h2>');
     expect(html).toContain('<small>Financeiro</small><h2 id="finance-commission-detail-title">Detalhes da comissão</h2>');
     expect(html).not.toContain('<span>Proprietário</span>');
     expect(script).toContain("Caixa.operationPath('financeiro-comissoes'");
     expect(script).toContain("window.location.hash = '#financeiro/comissoes'");
+    expect(script).toContain("return 'Por tipo de item'");
+    expect(script).toContain('commission_item_rules');
     expect(css).toContain('.finance-commission-list');
     expect(route).toContain("requireCaixaModule('financeiro')");
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
@@ -265,10 +268,13 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).not.toContain('id="team-title">Colaboradores');
     expect(html).toContain('id="team-create-modal"');
     expect(html).toContain('id="team-create-form"');
+    expect(html).toContain('id="team-inactive-toggle"');
+    expect(html).toContain('id="team-open-finance-commission"');
     expect(html).toContain('sem acesso de proprietário');
     expect(html).toContain('Salvar remuneração');
     expect(html).toContain('Salvar regra de comissão');
     expect(html).toContain('Salvar permissões');
+    expect(script).not.toContain('Bate-papo');
     expect(script).toContain("Caixa.stored(Caixa.keys.role) === 'owner'");
     expect(script).toContain("Caixa.operationPath('equipe', '/api/caixa/equipe')");
     expect(script).toContain("window.location.hash = '#equipe'");

@@ -9,6 +9,7 @@ import {
   type OperationCommissionSale,
   type OperationCommissionsPayload,
 } from '../shared/operation-commissions.js';
+import { commissionItemRulesOf } from '../shared/operation-team.js';
 import type { PartnerContext } from './auth.js';
 import { settlePartnerPayable } from './queries.js';
 
@@ -17,6 +18,7 @@ type Queryable = Pick<Pool, 'query'>;
 type TeamRow = {
   token_id: string; label: string | null; username: string | null; active: boolean;
   commission_kind: 'percent' | 'fixed' | null; commission_value: string;
+  commission_itemized: boolean; commission_item_rules: unknown;
   sales_count: number; gross_sales: string; commission_amount: string; unsettled_count: number;
 };
 
@@ -55,6 +57,8 @@ async function teamRows(
        SELECT pat.id token_id,pat.label,pat.login_username username,
               pat.revoked_at IS NULL active,cfg.kind commission_kind,
               COALESCE(cfg.value,0)::text commission_value,
+              COALESCE(cfg.itemized,false) commission_itemized,
+              COALESCE(cfg.item_rules,'{}'::jsonb) commission_item_rules,
               COALESCE(t.sales_count,0)::int sales_count,
               COALESCE(t.gross_sales,0)::text gross_sales,
               COALESCE(t.commission_amount,0)::text commission_amount,
@@ -106,6 +110,8 @@ function collaboratorOf(row: TeamRow, settlements: SettlementRow[]): OperationCo
     commission_basis: row.commission_kind === 'percent' ? 'revenue' : 'sale',
     commission_value: money(row.commission_value),
     commission_amount: money(row.commission_amount),
+    commission_itemized: Boolean(row.commission_itemized),
+    commission_item_rules: commissionItemRulesOf(row.commission_item_rules),
     status: canPay ? 'payable' : (allPaid && Number(row.unsettled_count || 0) === 0 ? 'paid' : 'open'),
     payment_target_id: canPay ? open[0]!.payable_id : null,
     payment_total: canPay ? money(open[0]!.payable_amount) : null,
@@ -143,11 +149,13 @@ export async function getPartnerOperationCommissionDetail(
   const bounds = operationCommissionBounds(range);
   const result = await db.query<{
     id: string; reference: string; occurred_at: string; payment_method: string | null;
-    gross_amount: string; commission_amount: string;
+    gross_amount: string; commission_amount: string; commission_itemized: boolean;
+    commission_rules: unknown;
   }>(
     `SELECT ce.id::text id,'Pedido #'||right(ce.partner_order_id::text,6) reference,
             ce.realized_at occurred_at,po.payment_method,
-            ce.gross_amount::text,ce.commission_amount::text
+            ce.gross_amount::text,ce.commission_amount::text,
+            ce.commission_itemized,ce.commission_rules
        FROM finance.partner_staff_commission_entries ce
        JOIN commerce.partner_orders po
          ON po.environment=ce.environment AND po.id=ce.partner_order_id
@@ -163,6 +171,8 @@ export async function getPartnerOperationCommissionDetail(
     payment_method: row.payment_method,
     gross_amount: money(row.gross_amount),
     commission_amount: money(row.commission_amount),
+    commission_itemized: Boolean(row.commission_itemized),
+    commission_item_rules: commissionItemRulesOf(row.commission_rules),
   }));
   return { range, unit_name: ctx.unitName, collaborator, sales };
 }

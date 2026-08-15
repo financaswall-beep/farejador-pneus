@@ -1,4 +1,5 @@
 import { simpleFinanceRangeDays, type SimpleFinanceRange } from './simple-finance.js';
+import type { OperationCommissionItemRules } from './operation-team.js';
 
 export type OperationCommissionStatus = 'open' | 'payable' | 'paid';
 
@@ -9,6 +10,8 @@ export interface OperationCommissionSale {
   payment_method: string | null;
   gross_amount: number;
   commission_amount: number;
+  commission_itemized: boolean;
+  commission_item_rules: OperationCommissionItemRules;
 }
 
 export interface OperationCommissionCollaborator {
@@ -23,6 +26,8 @@ export interface OperationCommissionCollaborator {
   commission_basis: string | null;
   commission_value: number;
   commission_amount: number;
+  commission_itemized: boolean;
+  commission_item_rules: OperationCommissionItemRules;
   status: OperationCommissionStatus;
   payment_target_id: string | null;
   payment_total: number | null;

@@ -10,6 +10,7 @@ import {
   type OperationCommissionSale,
   type OperationCommissionsPayload,
 } from '../../shared/operation-commissions.js';
+import { commissionItemRulesOf, emptyCommissionItemRules } from '../../shared/operation-team.js';
 import {
   getMatrizCollaboratorManagement,
   payMatrizPayrollItem,
@@ -48,6 +49,8 @@ const salesFactsSql = `WITH retail AS (
 ), sales AS (SELECT * FROM retail UNION ALL SELECT * FROM wholesale), ruled AS (
   SELECT s.*,rule.kind commission_kind,rule.basis commission_basis,
          COALESCE(rule.value,0) commission_value,
+         COALESCE(rule.itemized,false) commission_itemized,
+         COALESCE(rule.item_rules,'{}'::jsonb) commission_item_rules,
          CASE
            WHEN rule.active AND rule.itemized AND s.sale_channel='retail'
              THEN finance.matriz_retail_itemized_commission($1,s.source_id,rule.item_rules)
@@ -111,6 +114,8 @@ export async function getMatrizOperationCommissions(
         commission_basis: row.commission_basis,
         commission_value: money(row.commission_value),
         commission_amount: money(value?.commission_amount),
+        commission_itemized: Boolean(row.commission_itemized),
+        commission_item_rules: row.commission_item_rules ?? emptyCommissionItemRules(),
         status: row.payroll_status === 'paid' ? 'paid'
           : (row.payroll_status === 'pending' && row.payroll_item_id ? 'payable' : 'open'),
         payment_target_id: row.payroll_status === 'pending' ? row.payroll_item_id : null,
@@ -141,11 +146,12 @@ export async function getMatrizOperationCommissionDetail(
   const bounds = operationCommissionBounds(range);
   const result = await db.query<{
     id: string; reference: string; occurred_at: string; payment_method: string | null;
-    gross_amount: string; commission_amount: string;
+    gross_amount: string; commission_amount: string; commission_itemized: boolean;
+    commission_item_rules: unknown;
   }>(
     `${salesFactsSql}
      SELECT id,reference,occurred_at,payment_method,gross_amount::text,
-            commission_amount::text
+            commission_amount::text,commission_itemized,commission_item_rules
        FROM ruled WHERE collaborator_id=$4
        ORDER BY occurred_at DESC LIMIT 200`,
     [env.FAREJADOR_ENV, bounds.start, bounds.end, collaboratorId],
@@ -157,6 +163,8 @@ export async function getMatrizOperationCommissionDetail(
     payment_method: row.payment_method,
     gross_amount: money(row.gross_amount),
     commission_amount: money(row.commission_amount),
+    commission_itemized: Boolean(row.commission_itemized),
+    commission_item_rules: commissionItemRulesOf(row.commission_item_rules),
   }));
   return { range, unit_name: 'Matriz', collaborator, sales };
 }

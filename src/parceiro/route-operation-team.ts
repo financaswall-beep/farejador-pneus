@@ -55,7 +55,7 @@ const commission = z.discriminatedUnion('kind', [
 ]);
 const permissions = z.object({
   vendas: z.boolean(), estoque: z.boolean(), pedidos: z.boolean(), clientes: z.boolean(),
-  entregas: z.boolean(), retiradas: z.boolean(), batepapo: z.boolean(),
+  entregas: z.boolean(), retiradas: z.boolean(), batepapo: z.boolean().default(false),
   resumo: z.boolean(), financeiro: z.boolean(),
 });
 const newMember = z.object({

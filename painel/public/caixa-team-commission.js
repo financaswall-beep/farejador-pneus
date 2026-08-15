@@ -187,6 +187,9 @@
     const historyToggle = document.getElementById('team-commission-history-toggle');
     historyToggle.textContent = 'Ver histórico de regras'; historyToggle.setAttribute('aria-expanded', 'false');
     document.getElementById('team-commission-save-error').textContent = '';
+    document.getElementById('team-open-finance-commission').classList.toggle(
+      'hidden', !Caixa.canModule('financeiro'),
+    );
   }
 
   async function load(force) {
@@ -252,6 +255,9 @@
   document.getElementById('team-commission-retry').addEventListener('click', function () { void load(true); });
   document.getElementById('team-commission-back').addEventListener('click', back);
   document.getElementById('team-commission-history-toggle').addEventListener('click', toggleHistory);
+  document.getElementById('team-open-finance-commission').addEventListener('click', function () {
+    if (Caixa.openFinanceCommissionDetail) Caixa.openFinanceCommissionDetail(memberId());
+  });
   document.querySelectorAll('input[name="team-commission-kind"]').forEach(function (radio) { radio.addEventListener('change', refreshFields); });
   document.getElementById('team-commission-value').addEventListener('input', refreshFields);
   document.getElementById('team-commission-basis').addEventListener('change', refreshFields);

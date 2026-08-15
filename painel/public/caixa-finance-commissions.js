@@ -10,6 +10,8 @@
   let listRequest = null;
   let detailRequest = null;
   let detailPayload = null;
+  const itemGroups = ['tire', 'service', 'other'];
+  const itemLabels = { tire: 'Pneus', service: 'Serviços', other: 'Outros' };
 
   function initials(name) {
     const words = String(name || 'Colaborador').trim().split(/\s+/).filter(Boolean);
@@ -23,9 +25,34 @@
   }
 
   function ruleLabel(row) {
+    if (row.commission_itemized) return 'Por tipo de item';
     if (!row.commission_kind || !Number(row.commission_value || 0)) return 'Sem regra';
     if (row.commission_kind === 'percent') return Number(row.commission_value).toLocaleString('pt-BR') + '%';
     return Caixa.currency.format(Number(row.commission_value)) + ' por venda';
+  }
+
+  function itemRuleLabel(rule, group) {
+    if (!rule || rule.kind === 'none' || !Number(rule.value || 0)) return 'Sem comissão';
+    if (rule.kind === 'percent') return Number(rule.value).toLocaleString('pt-BR') + '%';
+    return Caixa.currency.format(Number(rule.value)) + (group === 'tire' ? ' por pneu' : ' por item');
+  }
+
+  function renderRuleBreakdown(row) {
+    const section = byId('finance-commission-detail-rules');
+    section.replaceChildren();
+    section.classList.toggle('hidden', !row.commission_itemized);
+    if (!row.commission_itemized) return;
+    const title = document.createElement('h3');
+    title.textContent = 'Regra atual por item';
+    section.appendChild(title);
+    itemGroups.forEach(function (group) {
+      const card = document.createElement('p');
+      const label = document.createElement('small');
+      const value = document.createElement('strong');
+      label.textContent = itemLabels[group];
+      value.textContent = itemRuleLabel(row.commission_item_rules && row.commission_item_rules[group], group);
+      card.append(label, value); section.appendChild(card);
+    });
   }
 
   function paymentLabel(value) {
@@ -149,9 +176,12 @@
     const values = document.createElement('div');
     const sale = document.createElement('span');
     const commission = document.createElement('b');
+    const appliedRule = document.createElement('small');
     sale.textContent = Caixa.currency.format(Number(row.gross_amount || 0));
     commission.textContent = Caixa.currency.format(Number(row.commission_amount || 0));
-    values.append(sale, commission);
+    appliedRule.className = 'finance-commission-sale-rule';
+    appliedRule.textContent = row.commission_itemized ? 'por tipo de item' : 'regra da venda';
+    values.append(sale, commission, appliedRule);
     article.append(icon, copy, values);
     return article;
   }
@@ -168,6 +198,7 @@
     byId('finance-commission-detail-sales').textContent = Number(row.sales_count || 0);
     byId('finance-commission-detail-gross').textContent = Caixa.currency.format(Number(row.gross_sales || 0));
     byId('finance-commission-detail-rule').textContent = ruleLabel(row);
+    renderRuleBreakdown(row);
     const list = byId('finance-commission-detail-list');
     list.replaceChildren();
     const sales = Array.isArray(payload.sales) ? payload.sales : [];

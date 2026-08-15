@@ -1108,6 +1108,23 @@ form { display: grid; gap: 16px; }
 .finance-commission-detail-total p + p { border-left: 1px solid #e1e8e4; }
 .finance-commission-detail-total b { font-size: 15px; }
 .finance-commission-detail-total span { color: #6b7770; font-size: 11px; }
+.finance-commission-rule-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 0;
+  margin: -9px 0 22px;
+  overflow: hidden;
+  border: 1px solid #dfe7e2;
+  border-radius: 16px;
+  background: #f6faf8;
+  box-shadow: 0 6px 16px rgba(22,53,40,.05);
+}
+.finance-commission-rule-breakdown h3 { grid-column: 1/-1; margin: 0; padding: 13px 14px 9px; font-size: 15px; }
+.finance-commission-rule-breakdown p { min-width: 0; margin: 0; padding: 11px 7px 13px; border-top: 1px solid #e1e8e4; text-align: center; }
+.finance-commission-rule-breakdown p + p { border-left: 1px solid #e1e8e4; }
+.finance-commission-rule-breakdown small,.finance-commission-rule-breakdown strong { display: block; }
+.finance-commission-rule-breakdown small { color: #69756f; font-size: 11px; }
+.finance-commission-rule-breakdown strong { margin-top: 4px; color: #076f49; font-size: 12px; line-height: 1.25; }
 .finance-commission-sales { overflow: hidden; border: 1px solid #dfe7e2; border-radius: 18px; background: #fff; box-shadow: 0 7px 18px rgba(22,53,40,.06); }
 .finance-commission-sales article { display: grid; min-height: 75px; grid-template-columns: 42px minmax(0,1fr) auto; align-items: center; gap: 11px; padding: 11px 13px; }
 .finance-commission-sales article + article { border-top: 1px solid #e5ebe7; }
@@ -1120,6 +1137,7 @@ form { display: grid; gap: 16px; }
 .finance-commission-sales article > div:last-child span,.finance-commission-sales article > div:last-child b { display: block; white-space: nowrap; }
 .finance-commission-sales article > div:last-child span { font-size: 12px; }
 .finance-commission-sales article > div:last-child b { margin-top: 3px; color: #08774e; font-size: 14px; }
+.finance-commission-sales .finance-commission-sale-rule { margin-top: 3px; color: #718078; font-size: 9px; }
 .finance-commission-payment-error { min-height: 17px; margin: 0 2px 7px; color: #a3312d; font-size: 12px; }
 .finance-commission-pay { width: 100%; min-height: 57px; border: 0; border-radius: 14px; color: #fff; background: linear-gradient(135deg,#008c55,#00633f); font-size: 16px; font-weight: 790; cursor: pointer; }
 .finance-commission-pay:disabled { color: #65736c; background: #e7eeea; cursor: default; }
@@ -1777,6 +1795,18 @@ form { display: grid; gap: 16px; }
 .team-filters button.active { border-color: #07814f; color: #fff; background: linear-gradient(135deg,#099358,#00633f); }
 .team-page h3 { margin: 18px 2px 11px; font-size: 21px; letter-spacing: -.03em; }
 .team-list { display: grid; gap: 12px; }
+.team-inactive-toggle {
+  width: 100%;
+  min-height: 47px;
+  margin: 13px 0 0;
+  border: 1px solid #087246;
+  border-radius: 13px;
+  color: #087246;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
 .team-member-card {
   padding: 14px;
   border: 1px solid #dfe7e2;
@@ -1867,7 +1897,7 @@ form { display: grid; gap: 16px; }
   gap: 10px;
   padding: 9px 14px;
   color: #24322b;
-  font-size: 14px;
+  font-size: 16px;
 }
 .team-form-card > label + label { border-top: 1px solid #e5ebe7; }
 .team-form-card > label > span { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
@@ -1881,11 +1911,12 @@ form { display: grid; gap: 16px; }
   color: #17231e;
   background: #fff;
   font: inherit;
+  font-size: 16px;
   text-align: right;
 }
 .team-form-card input:focus,.team-form-card select:focus { border-color: #118056; box-shadow: 0 0 0 3px rgba(17,128,86,.1); }
 .team-form-card input[type="date"],.team-form-card select { width: 160px; }
-.team-input-money input { width: 116px; }
+.team-input-money input { width: 132px; }
 .team-input-money em { font-style: normal; }
 .team-benefits { display: grid; }
 .team-benefit-row {

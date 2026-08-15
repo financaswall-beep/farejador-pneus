@@ -26,7 +26,11 @@ describe('comissoes da Matriz na Operacao da Loja', () => {
         id: 'person-1', display_name: 'Wallace', username: 'wallace',
         job_title: 'Vendedor', job: 'vendedor', active: true,
         commission_active: true, commission_kind: 'percent', commission_basis: 'revenue',
-        commission_value: 5, payroll_item_id: 'payroll-1', payroll_status: 'pending',
+        commission_value: 5, commission_itemized: true,
+        commission_item_rules: {
+          tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
+          other: { kind: 'none', value: 0 },
+        }, payroll_item_id: 'payroll-1', payroll_status: 'pending',
         total_due: 2519.99,
       }],
     });
@@ -40,6 +44,7 @@ describe('comissoes da Matriz na Operacao da Loja', () => {
     expect(payload.collaborators[0]).toMatchObject({
       status: 'payable', commission_amount: 19.99,
       payment_target_id: 'payroll-1', payment_total: 2519.99,
+      commission_itemized: true,
     });
   });
 });

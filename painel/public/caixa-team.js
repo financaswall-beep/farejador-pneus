@@ -3,7 +3,7 @@
 
   const Caixa = window.Caixa;
   const state = Caixa.teamState = Caixa.teamState || {
-    payload: null, memberId: '', filter: 'all', search: '', request: null,
+    payload: null, memberId: '', filter: 'all', search: '', showInactive: false, request: null,
   };
 
   function path(suffix) {
@@ -72,6 +72,7 @@
     const members = (state.payload && state.payload.members) || [];
     const query = state.search.trim().toLocaleLowerCase('pt-BR');
     return members.filter(function (member) {
+      if (member.active === state.showInactive) return false;
       if (state.filter !== 'all' && member.work_area !== state.filter) return false;
       return !query || [member.name, member.username, member.role].some(function (value) {
         return String(value || '').toLocaleLowerCase('pt-BR').includes(query);
@@ -85,10 +86,22 @@
     document.getElementById('team-active-count').textContent = payload.active_count + (payload.active_count === 1 ? ' colaborador' : ' colaboradores');
     document.getElementById('team-commission-total').textContent = Caixa.currency.format(payload.commission_total || 0);
     const list = document.getElementById('team-list'); list.replaceChildren();
+    const inactiveCount = payload.members.filter(function (member) { return !member.active; }).length;
+    const inactiveToggle = document.getElementById('team-inactive-toggle');
+    inactiveToggle.classList.toggle('hidden', inactiveCount === 0);
+    inactiveToggle.textContent = state.showInactive
+      ? 'Voltar para equipe ativa'
+      : 'Ver desativados (' + inactiveCount + ')';
+    document.getElementById('team-list-title').textContent = state.showInactive
+      ? 'Colaboradores desativados'
+      : 'Minha equipe';
     const members = visibleMembers();
     if (!members.length) {
       const empty = document.createElement('p'); empty.className = 'team-empty';
-      empty.textContent = 'Nenhum colaborador encontrado.'; list.appendChild(empty); return;
+      empty.textContent = state.showInactive
+        ? 'Nenhum colaborador desativado encontrado.'
+        : 'Nenhum colaborador ativo encontrado.';
+      list.appendChild(empty); return;
     }
     members.forEach(function (member) { list.appendChild(memberCard(member)); });
   }
@@ -168,7 +181,7 @@
       });
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
-      closeNewMember(); state.payload = null; await loadTeam(true);
+      closeNewMember(); state.payload = null; state.showInactive = false; await loadTeam(true);
       Caixa.showToast('Colaborador criado. Agora confira as permissões de acesso.');
       const member = state.payload && state.payload.members.find(function (item) { return item.id === payload.id; });
       if (member) openMember(member, 'permissoes');
@@ -192,6 +205,10 @@
     render();
   });
   document.getElementById('team-new-member').addEventListener('click', openNewMember);
+  document.getElementById('team-inactive-toggle').addEventListener('click', function () {
+    state.showInactive = !state.showInactive;
+    render();
+  });
   document.querySelectorAll('[data-close-team-create]').forEach(function (button) {
     button.addEventListener('click', closeNewMember);
   });

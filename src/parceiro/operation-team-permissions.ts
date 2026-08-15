@@ -10,7 +10,7 @@ import {
 
 const available = [
   'vendas', 'estoque', 'pedidos', 'clientes', 'entregas',
-  'retiradas', 'batepapo', 'resumo', 'financeiro',
+  'retiradas', 'resumo', 'financeiro',
 ] as const;
 
 async function member(ctx: PartnerContext, tokenId: string, db: Pick<Pool, 'query'>) {
@@ -56,7 +56,12 @@ export async function savePartnerOperationPermissions(
   input: PartnerPermissionsInput,
   db: Pool = defaultPool,
 ): Promise<OperationPermissionsPayload> {
-  const permissions = await upsertPartnerTokenPermissions(ctx, tokenId, input);
+  const permissions = await upsertPartnerTokenPermissions(ctx, tokenId, {
+    ...input,
+    // O Bate-papo foi aposentado nos portais. Mantemos a chave legada
+    // desligada no banco para não reabrir o módulo por uma tela antiga.
+    batepapo: false,
+  });
   await db.query(
     `UPDATE network.partner_sessions SET revoked_at=now()
       WHERE environment=$1 AND token_id=$2 AND revoked_at IS NULL`,

@@ -42,7 +42,8 @@ describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () =
       'prod', 'unit-partner-1', 'employee-1',
     ]);
     expect(result).toMatchObject({ unit_name: 'Borracharia Rio do Ouro', permissions, locked: false });
-    expect(result?.available_permissions).toHaveLength(9);
+    expect(result?.available_permissions).toHaveLength(8);
+    expect(result?.available_permissions).not.toContain('batepapo');
   });
 
   it('salva e revoga somente as sessÃµes do colaborador alterado', async () => {
@@ -56,6 +57,9 @@ describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () =
       context, 'employee-1', { ...permissions, financeiro: true }, db,
     );
 
+    expect(upsertPartnerTokenPermissions).toHaveBeenCalledWith(context, 'employee-1', {
+      ...permissions, financeiro: true, batepapo: false,
+    });
     expect(String(query.mock.calls[0]?.[0])).toContain('UPDATE network.partner_sessions');
     expect(query.mock.calls[0]?.[1]).toEqual(['prod', 'employee-1']);
     expect(result.permissions.financeiro).toBe(true);
