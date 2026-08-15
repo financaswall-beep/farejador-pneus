@@ -51,23 +51,27 @@ export interface MatrizCommissionInput {
   basis: 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip'; value: number;
   starts_on: string; active?: boolean; environment?: 'prod' | 'test'; actor_label?: string | null;
   itemized?: boolean; item_rules?: OperationCommissionItemRules;
+  settlement_frequency?: 'weekly' | 'monthly';
 }
 
 export async function saveMatrizCollaboratorCommission(input: MatrizCommissionInput, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const r = await dbPool.query(
     `INSERT INTO network.matriz_collaborator_commission_rules
-       (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by,itemized,item_rules)
-     SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8,$9,COALESCE($10::jsonb,'{}'::jsonb)
+       (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by,
+        itemized,item_rules,settlement_frequency)
+     SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8,$9,
+            COALESCE($10::jsonb,'{}'::jsonb),$11
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
      ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET kind=EXCLUDED.kind, basis=EXCLUDED.basis,
        value=EXCLUDED.value, active=EXCLUDED.active,
        itemized=EXCLUDED.itemized,item_rules=EXCLUDED.item_rules,
+       settlement_frequency=EXCLUDED.settlement_frequency,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.kind, input.basis, input.value, input.starts_on,
      input.active ?? true, input.actor_label ?? null, input.itemized ?? false,
-     JSON.stringify(input.item_rules ?? {})],
+     JSON.stringify(input.item_rules ?? {}), input.settlement_frequency ?? 'monthly'],
   );
   if (!r.rows[0]) throw new Error('collaborator_not_found');
   return { saved: true, collaborator_id: r.rows[0].collaborator_id };
@@ -152,7 +156,8 @@ export async function closeMatrizPayroll(input: {
     if (overview.collaborators.some((row) => row.eligible_in_competence
       && row.items_without_cost > 0
       && row.commission_active && row.commission_kind === 'percent'
-      && row.commission_basis === 'margin')) {
+      && row.commission_basis === 'margin'
+      && row.commission_settlement_frequency !== 'weekly')) {
       throw new Error('payroll_has_unresolved_costs');
     }
     const eligible = overview.collaborators.filter((r) => r.eligible_in_competence
@@ -173,7 +178,8 @@ export async function closeMatrizPayroll(input: {
         commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
         rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis,
           value: row.commission_value, itemized: row.commission_itemized,
-          item_rules: row.commission_item_rules } : null,
+          item_rules: row.commission_item_rules,
+          settlement_frequency: row.commission_settlement_frequency } : null,
         production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin,
           items_without_cost: row.items_without_cost, deliveries: row.deliveries_count, trips: row.trips_count },
       };

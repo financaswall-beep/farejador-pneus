@@ -148,14 +148,15 @@ export async function getPartnerOperationCommissionRule(
   const row = await find(ctx, tokenId, db); if (!row) return null;
   const history = await db.query<{
     kind: 'percent' | 'fixed'; value: string; active: boolean; starts_on: string;
-    itemized: boolean; item_rules: unknown;
-  }>(`SELECT kind,value::text,active,starts_on::text,itemized,item_rules
+    itemized: boolean; item_rules: unknown; settlement_frequency: 'weekly' | 'monthly';
+  }>(`SELECT kind,value::text,active,starts_on::text,itemized,item_rules,
+             settlement_frequency
         FROM network.partner_token_commission_history
        WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3
        ORDER BY starts_on DESC,updated_at DESC LIMIT 24`,
   [ctx.environment, ctx.partnerUnitId, tokenId]);
-  const config = await db.query<{ itemized: boolean; item_rules: unknown }>(
-    `SELECT itemized,item_rules FROM network.partner_token_commission
+  const config = await db.query<{ itemized: boolean; item_rules: unknown; settlement_frequency: 'weekly' | 'monthly' }>(
+    `SELECT itemized,item_rules,settlement_frequency FROM network.partner_token_commission
       WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3`,
     [ctx.environment, ctx.partnerUnitId, tokenId],
   );
@@ -165,6 +166,7 @@ export async function getPartnerOperationCommissionRule(
     active: row.commission_active, starts_on: row.commission_starts_on || localDate(),
     itemized: Boolean(config.rows[0]?.itemized),
     item_rules: commissionItemRulesOf(config.rows[0]?.item_rules),
+    settlement_frequency: config.rows[0]?.settlement_frequency ?? 'monthly',
     available_bases: ['revenue', 'sale'],
     history: history.rows.map((item) => ({
       ...item, value: money(item.value), basis: item.kind === 'fixed' ? 'sale' : 'revenue',
@@ -176,6 +178,7 @@ export async function getPartnerOperationCommissionRule(
 export async function savePartnerOperationCommissionRule(ctx: PartnerContext, tokenId: string, input: {
   kind: 'percent' | 'fixed'; basis: 'revenue' | 'sale'; value: number; active: boolean; starts_on: string;
   itemized: boolean; item_rules: OperationCommissionItemRules;
+  settlement_frequency: 'weekly' | 'monthly';
 }, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
   if (!input.itemized && ((input.kind === 'percent' && input.basis !== 'revenue') || (input.kind === 'fixed' && input.basis !== 'sale'))) {
     throw new Error('invalid_commission_basis');
@@ -196,20 +199,26 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
     [ctx.environment, ctx.partnerUnitId, tokenId]);
     if (!member.rows[0]) throw new Error('collaborator_not_found');
     await client.query(`INSERT INTO network.partner_token_commission_history
-      (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by,itemized,item_rules)
-      VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10::jsonb)
+      (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by,
+       itemized,item_rules,settlement_frequency)
+      VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10::jsonb,$11)
       ON CONFLICT (token_id,starts_on) DO UPDATE SET kind=EXCLUDED.kind,value=EXCLUDED.value,
         active=EXCLUDED.active,itemized=EXCLUDED.itemized,item_rules=EXCLUDED.item_rules,
+        settlement_frequency=EXCLUDED.settlement_frequency,
         updated_by=EXCLUDED.updated_by,updated_at=now()`,
     [ctx.environment, ctx.partnerUnitId, tokenId, compatibility.kind, compatibility.value,
-     compatibility.active, input.starts_on, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules)]);
+     compatibility.active, input.starts_on, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules),
+     input.settlement_frequency]);
     await client.query(`INSERT INTO network.partner_token_commission
-      (token_id,environment,partner_unit_id,kind,value,active,updated_by,itemized,item_rules)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) ON CONFLICT (token_id) DO UPDATE SET
+      (token_id,environment,partner_unit_id,kind,value,active,updated_by,itemized,item_rules,
+       settlement_frequency)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) ON CONFLICT (token_id) DO UPDATE SET
       kind=EXCLUDED.kind,value=EXCLUDED.value,active=EXCLUDED.active,itemized=EXCLUDED.itemized,
-      item_rules=EXCLUDED.item_rules,updated_at=now(),updated_by=EXCLUDED.updated_by`,
+      item_rules=EXCLUDED.item_rules,settlement_frequency=EXCLUDED.settlement_frequency,
+      updated_at=now(),updated_by=EXCLUDED.updated_by`,
     [tokenId, ctx.environment, ctx.partnerUnitId, compatibility.kind, compatibility.value,
-     compatibility.active, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules)]);
+     compatibility.active, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules),
+     input.settlement_frequency]);
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
   finally { client.release(); }

@@ -19,6 +19,7 @@ export interface CollaboratorManagementRow {
   commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
   commission_value: number; commission_starts_on: string | null; commission_active: boolean;
   commission_itemized: boolean; commission_item_rules: OperationCommissionItemRules;
+  commission_settlement_frequency: 'weekly' | 'monthly';
   sales_count: number; revenue: number; margin: number; items_without_cost: number; deliveries_count: number;
   trips_count: number; distance_km: number; on_time_pct: number | null;
   additions: number; deductions: number; commission_amount: number; total_due: number;
@@ -55,7 +56,8 @@ export async function getMatrizCollaboratorManagement(
               COALESCE(cr.value, 0) AS commission_value, cr.starts_on AS commission_starts_on,
               COALESCE(cr.active, false) AS commission_active,
               COALESCE(cr.itemized,false) AS commission_itemized,
-              COALESCE(cr.item_rules,'{}'::jsonb) AS commission_item_rules
+              COALESCE(cr.item_rules,'{}'::jsonb) AS commission_item_rules,
+              COALESCE(cr.settlement_frequency,'monthly') AS commission_settlement_frequency
          FROM network.matriz_collaborators mc
          JOIN network.partner_people pp ON pp.id = mc.person_id
          LEFT JOIN LATERAL (
@@ -145,7 +147,9 @@ export async function getMatrizCollaboratorManagement(
          UNION ALL SELECT * FROM trip_events UNION ALL SELECT * FROM delivery_events
        ), ruled AS (
          SELECT e.*, cr.kind, cr.basis, cr.value, cr.active,cr.itemized,cr.item_rules,
+                cr.settlement_frequency,
                 CASE
+                  WHEN cr.settlement_frequency='weekly' THEN 0
                   WHEN cr.active AND cr.itemized AND e.event_type='sale' AND e.sale_channel='retail'
                     THEN finance.matriz_retail_itemized_commission($1,e.source_id,cr.item_rules)
                   WHEN cr.active AND cr.itemized AND e.event_type='sale' AND e.sale_channel='wholesale'
@@ -158,7 +162,8 @@ export async function getMatrizCollaboratorManagement(
                   ELSE 0 END AS commission_amount
            FROM events e
            LEFT JOIN LATERAL (
-             SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules
+             SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules,
+                    r.settlement_frequency
                FROM network.matriz_collaborator_commission_rules r
               WHERE r.collaborator_id=e.id AND r.environment=$1
                 AND r.starts_on <= e.event_date

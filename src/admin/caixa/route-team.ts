@@ -45,6 +45,7 @@ const commission = z.object({
   kind: z.enum(['percent', 'fixed']),
   basis: z.enum(['margin', 'revenue', 'sale', 'delivery', 'trip']),
   value: money, active: z.boolean(), starts_on: z.string().date(),
+  settlement_frequency: z.enum(['weekly', 'monthly']).default('monthly'),
   itemized: z.boolean().default(false),
   item_rules: commissionItemRules.default({
     tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 },

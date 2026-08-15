@@ -10,6 +10,8 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
   let closePayroll: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').closeMatrizPayroll;
   let payPayrollItem: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').payMatrizPayrollItem;
   let reviewAdjustment: typeof import('../../src/admin/painel/queries-colaboradores-folha.js').reviewMatrizPayrollCausalAdjustment;
+  let closeWeeklyCommission: typeof import('../../src/admin/caixa/operation-commissions.js').closeMatrizWeeklyCommissions;
+  let settleExpense: typeof import('../../src/admin/painel/queries-financeiro-despesas-integridade.js').settleMatrizExpense;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -26,6 +28,8 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       payMatrizPayrollItem: payPayrollItem,
       reviewMatrizPayrollCausalAdjustment: reviewAdjustment,
     } = await import('../../src/admin/painel/queries-colaboradores-folha.js'));
+    ({ closeMatrizWeeklyCommissions: closeWeeklyCommission } = await import('../../src/admin/caixa/operation-commissions.js'));
+    ({ settleMatrizExpense: settleExpense } = await import('../../src/admin/painel/queries-financeiro-despesas-integridade.js'));
   }, 120_000);
   afterAll(async () => { if (db) await stopPostgres(db); });
 
@@ -163,6 +167,92 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
         WHERE i.id=$1`, [payroll.rows[0].id],
     );
     expect(paid.rows[0]).toEqual({ payment_status: 'paid', status: 'paid', expense_status: 'paid' });
+  });
+
+  it('fecha comissão semanal da Matriz e mantém salário na folha mensal', async () => {
+    const person = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.partner_people (environment,username)
+       VALUES ('test','vendedor.semanal') RETURNING id`,
+    );
+    const collaborator = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area)
+       VALUES ('test',$1,'Vendedor Semanal','vendedor','Vendedor','sales') RETURNING id`,
+      [person.rows[0]!.id],
+    );
+    const collaboratorId = collaborator.rows[0]!.id;
+    await saveCompensation({
+      collaborator_id: collaboratorId, employment_type: 'informal', base_salary: 2300,
+      payment_day: 5, payment_method: 'pix', starts_on: '2027-01-01', environment: 'test',
+    }, db.pool);
+    await saveCommission({
+      collaborator_id: collaboratorId, kind: 'fixed', basis: 'sale', value: 20,
+      starts_on: '2027-01-01', settlement_frequency: 'weekly', environment: 'test',
+    }, db.pool);
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
+       VALUES ('test',91002,'Cliente semanal') RETURNING id`,
+    );
+    const unit = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.units (environment,slug,name)
+       VALUES ('test','main','Matriz semanal')
+       ON CONFLICT (environment,slug) DO UPDATE SET name=core.units.name RETURNING id`,
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.orders
+         (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
+          seller_collaborator_id,created_at)
+       VALUES ('test',$1,$2,200,'confirmed','pickup',$3,'2027-01-05T15:00:00Z')`,
+      [contact.rows[0]!.id, unit.rows[0]!.id, collaboratorId],
+    );
+
+    const runClose = async () => {
+      const client = await db.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await closeWeeklyCommission(client, new Date('2027-01-11T15:00:00Z'));
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK'); throw error;
+      } finally { client.release(); }
+    };
+    expect(await runClose()).toEqual({ periods_created: 1 });
+    expect(await runClose()).toEqual({ periods_created: 0 });
+    const weekly = await db.pool.query(
+      `SELECT period.id,period.period_start::text,period.period_end::text,
+              period.commission_amount::text,period.payment_status,period.source_expense_id,
+              expense.amount::text expense_amount
+         FROM finance.matriz_commission_periods period
+         JOIN commerce.matriz_expenses expense ON expense.id=period.source_expense_id
+        WHERE period.environment='test' AND period.collaborator_id=$1`,
+      [collaboratorId],
+    );
+    expect(weekly.rows[0]).toMatchObject({
+      period_start: '2027-01-03', period_end: '2027-01-09',
+      commission_amount: '20.00', payment_status: 'pending', expense_amount: '20.00',
+    });
+
+    const closed = await closePayroll({ competence: '2027-01-01', environment: 'test' }, db.pool);
+    const salary = await db.pool.query(
+      `SELECT base_salary::text,commission_amount::text,total_due::text
+         FROM finance.matriz_payroll_items
+        WHERE environment='test' AND payroll_period_id=$1 AND collaborator_id=$2`,
+      [closed.period_id, collaboratorId],
+    );
+    expect(salary.rows[0]).toEqual({
+      base_salary: '2300.00', commission_amount: '0.00', total_due: '2300.00',
+    });
+    await settleExpense(weekly.rows[0].source_expense_id, 'test', db.pool, {
+      actor_label: 'proprietario-teste', idempotency_key: 'weekly-expense-payment-test',
+    });
+    const paid = await db.pool.query(
+      `SELECT payment_status,paid_by FROM finance.matriz_commission_periods WHERE id=$1`,
+      [weekly.rows[0].id],
+    );
+    expect(paid.rows[0]).toEqual({
+      payment_status: 'paid', paid_by: 'financeiro:despesa',
+    });
   });
 
   it('inclui na folha quem foi desligado dentro da competência', async () => {

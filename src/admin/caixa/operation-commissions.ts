@@ -15,63 +15,21 @@ import {
   getMatrizCollaboratorManagement,
   payMatrizPayrollItem,
 } from '../painel/queries.js';
+import { getMatrizExpenseLedgerState, postMatrizExpensePayment } from '../painel/matriz-ledger-expenses.js';
+import {
+  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  operationFingerprint, recordIntegrityEvent,
+} from '../painel/stage5-integrity.js';
+import { matrizCommissionFactsSql } from './operation-commission-facts.js';
+export { closeMatrizWeeklyCommissions } from './operation-commission-rollover.js';
 
 type Queryable = Pick<Pool, 'query'>;
 
-const salesFactsSql = `WITH retail AS (
-  SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
-         'Pedido #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,
-         o.created_at occurred_at,o.payment_method,o.total_amount gross_amount,
-         COALESCE(items.margin,0) margin,'retail'::text sale_channel,o.id source_id
-    FROM commerce.orders o
-    JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(sum((oi.unit_price-oi.matriz_unit_cost)*oi.quantity-oi.discount_amount)
-                 FILTER (WHERE oi.matriz_unit_cost IS NOT NULL),0) margin
-        FROM commerce.order_items oi
-       WHERE oi.environment=o.environment AND oi.order_id=o.id
-    ) items ON true
-   WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
-     AND o.status<>'cancelled' AND o.created_at >= $2::date AND o.created_at < $3::date
-), wholesale AS (
-  SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
-         'Atacado #'||right(o.id::text,6) reference,o.created_at occurred_at,
-         NULL::text payment_method,o.total_amount gross_amount,
-         COALESCE(items.margin,0) margin,'wholesale'::text sale_channel,o.id source_id
-    FROM commerce.wholesale_orders o
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*oi.quantity),0) margin
-        FROM commerce.wholesale_order_items oi
-       WHERE oi.environment=o.environment AND oi.order_id=o.id
-    ) items ON true
-   WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
-     AND o.status='confirmed' AND o.created_at >= $2::date AND o.created_at < $3::date
-), sales AS (SELECT * FROM retail UNION ALL SELECT * FROM wholesale), ruled AS (
-  SELECT s.*,rule.kind commission_kind,rule.basis commission_basis,
-         COALESCE(rule.value,0) commission_value,
-         COALESCE(rule.itemized,false) commission_itemized,
-         COALESCE(rule.item_rules,'{}'::jsonb) commission_item_rules,
-         CASE
-           WHEN rule.active AND rule.itemized AND s.sale_channel='retail'
-             THEN finance.matriz_retail_itemized_commission($1,s.source_id,rule.item_rules)
-           WHEN rule.active AND rule.itemized AND s.sale_channel='wholesale'
-             THEN finance.matriz_wholesale_itemized_commission($1,s.source_id,rule.item_rules)
-           WHEN rule.active AND rule.kind='percent' AND rule.basis='margin'
-             THEN round(s.margin*rule.value/100,2)
-           WHEN rule.active AND rule.kind='percent' AND rule.basis='revenue'
-             THEN round(s.gross_amount*rule.value/100,2)
-           WHEN rule.active AND rule.kind='fixed' AND rule.basis='sale'
-             THEN rule.value
-           ELSE 0 END commission_amount
-    FROM sales s
-    LEFT JOIN LATERAL (
-      SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules
-        FROM network.matriz_collaborator_commission_rules r
-       WHERE r.environment=$1 AND r.collaborator_id=s.collaborator_id
-         AND r.starts_on <= (s.occurred_at AT TIME ZONE 'America/Sao_Paulo')::date
-       ORDER BY r.starts_on DESC LIMIT 1
-    ) rule ON true
-)`;
+type SettlementRow = {
+  collaborator_id: string; target_id: string; payment_total: string;
+  payment_status: 'pending' | 'paid'; period_start: string; period_end: string;
+  settlement_frequency: 'weekly' | 'monthly';
+};
 
 async function performanceRows(range: SimpleFinanceRange, db: Queryable) {
   const bounds = operationCommissionBounds(range);
@@ -79,8 +37,8 @@ async function performanceRows(range: SimpleFinanceRange, db: Queryable) {
     collaborator_id: string; sales_count: number; gross_sales: string;
     commission_amount: string;
   }>(
-    `${salesFactsSql}
-     SELECT collaborator_id,count(*)::int sales_count,
+    `${matrizCommissionFactsSql}
+     SELECT collaborator_id,count(*) FILTER (WHERE commission_amount>0)::int sales_count,
             COALESCE(sum(gross_amount),0)::text gross_sales,
             COALESCE(sum(commission_amount),0)::text commission_amount
        FROM ruled GROUP BY collaborator_id`,
@@ -93,15 +51,39 @@ export async function getMatrizOperationCommissions(
   db: Queryable = defaultPool,
 ): Promise<OperationCommissionsPayload> {
   const bounds = operationCommissionBounds(range);
-  const [management, performance] = await Promise.all([
+  const [management, performance, settlementResult] = await Promise.all([
     getMatrizCollaboratorManagement(bounds.competence, env.FAREJADOR_ENV, db),
     performanceRows(range, db),
+    db.query<SettlementRow>(
+      `SELECT item.collaborator_id,item.id target_id,item.total_due::text payment_total,
+              item.payment_status,period.competence::text period_start,
+              (period.competence+interval '1 month-1 day')::date::text period_end,
+              'monthly'::text settlement_frequency
+         FROM finance.matriz_payroll_items item
+         JOIN finance.matriz_payroll_periods period
+           ON period.environment=item.environment AND period.id=item.payroll_period_id
+        WHERE item.environment=$1
+        UNION ALL
+       SELECT weekly.collaborator_id,weekly.id,weekly.commission_amount::text,
+              weekly.payment_status,weekly.period_start::text,weekly.period_end::text,
+              'weekly'::text
+         FROM finance.matriz_commission_periods weekly
+        WHERE weekly.environment=$1
+        ORDER BY period_start DESC`,
+      [env.FAREJADOR_ENV],
+    ),
   ]);
   const values = new Map(performance.rows.map((row) => [row.collaborator_id, row]));
   const collaborators: OperationCommissionCollaborator[] = management.collaborators
     .filter((row) => row.commission_active || values.has(row.id) || row.payroll_item_id)
     .map((row): OperationCommissionCollaborator => {
       const value = values.get(row.id);
+      const frequency = row.commission_settlement_frequency ?? 'monthly';
+      const ownSettlements = settlementResult.rows.filter((item) =>
+        item.collaborator_id === row.id);
+      const pending = ownSettlements.filter((item) => item.payment_status === 'pending')
+        .sort((a, b) => a.period_start.localeCompare(b.period_start))[0];
+      const paid = ownSettlements.some((item) => item.payment_status === 'paid');
       return {
         id: row.id,
         name: row.display_name,
@@ -116,10 +98,12 @@ export async function getMatrizOperationCommissions(
         commission_amount: money(value?.commission_amount),
         commission_itemized: Boolean(row.commission_itemized),
         commission_item_rules: row.commission_item_rules ?? emptyCommissionItemRules(),
-        status: row.payroll_status === 'paid' ? 'paid'
-          : (row.payroll_status === 'pending' && row.payroll_item_id ? 'payable' : 'open'),
-        payment_target_id: row.payroll_status === 'pending' ? row.payroll_item_id : null,
-        payment_total: row.payroll_status === 'pending' ? money(row.total_due) : null,
+        settlement_frequency: pending?.settlement_frequency ?? frequency,
+        status: pending ? 'payable' : (paid && !Number(value?.commission_amount ?? 0) ? 'paid' : 'open'),
+        payment_target_id: pending?.target_id ?? null,
+        payment_total: pending ? money(pending.payment_total) : null,
+        payment_period_start: pending?.period_start ?? null,
+        payment_period_end: pending?.period_end ?? null,
       };
     })
     .sort((a, b) => b.commission_amount - a.commission_amount || a.name.localeCompare(b.name));
@@ -144,17 +128,25 @@ export async function getMatrizOperationCommissionDetail(
   const collaborator = overview.collaborators.find((row) => row.id === collaboratorId);
   if (!collaborator) return null;
   const bounds = operationCommissionBounds(range);
+  const detailStart = collaborator.status === 'payable' && collaborator.payment_period_start
+    ? collaborator.payment_period_start : bounds.start;
+  const detailEnd = collaborator.status === 'payable' && collaborator.payment_period_end
+    ? new Date(`${collaborator.payment_period_end}T12:00:00Z`).toISOString().slice(0, 10)
+    : bounds.end;
+  const exclusiveEnd = collaborator.status === 'payable' && collaborator.payment_period_end
+    ? new Date(new Date(`${detailEnd}T12:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10)
+    : detailEnd;
   const result = await db.query<{
     id: string; reference: string; occurred_at: string; payment_method: string | null;
     gross_amount: string; commission_amount: string; commission_itemized: boolean;
     commission_item_rules: unknown;
   }>(
-    `${salesFactsSql}
+    `${matrizCommissionFactsSql}
      SELECT id,reference,occurred_at,payment_method,gross_amount::text,
             commission_amount::text,commission_itemized,commission_item_rules
-       FROM ruled WHERE collaborator_id=$4
+       FROM ruled WHERE collaborator_id=$4 AND commission_amount>0
        ORDER BY occurred_at DESC LIMIT 200`,
-    [env.FAREJADOR_ENV, bounds.start, bounds.end, collaboratorId],
+    [env.FAREJADOR_ENV, detailStart, exclusiveEnd, collaboratorId],
   );
   const sales: OperationCommissionSale[] = result.rows.map((row) => ({
     id: row.id,
@@ -166,7 +158,13 @@ export async function getMatrizOperationCommissionDetail(
     commission_itemized: Boolean(row.commission_itemized),
     commission_item_rules: commissionItemRulesOf(row.commission_item_rules),
   }));
-  return { range, unit_name: 'Matriz', collaborator, sales };
+  const detailCollaborator = collaborator.status === 'payable' ? {
+    ...collaborator,
+    sales_count: sales.length,
+    gross_sales: money(sales.reduce((sum, sale) => sum + sale.gross_amount, 0)),
+    commission_amount: money(sales.reduce((sum, sale) => sum + sale.commission_amount, 0)),
+  } : collaborator;
+  return { range, unit_name: 'Matriz', collaborator: detailCollaborator, sales };
 }
 
 export async function payMatrizOperationCommission(
@@ -182,11 +180,61 @@ export async function payMatrizOperationCommission(
         AND item.payment_status='pending'`,
     [env.FAREJADOR_ENV, payrollItemId, collaboratorId],
   );
-  if (allowed.rowCount !== 1) throw new Error('commission_payment_not_available');
-  return payMatrizPayrollItem({
-    item_id: payrollItemId,
-    environment: env.FAREJADOR_ENV,
-    actor_label: actorLabel,
-    idempotency_key: idempotencyKey,
-  }, db);
+  if (allowed.rowCount === 1) {
+    return payMatrizPayrollItem({
+      item_id: payrollItemId,
+      environment: env.FAREJADOR_ENV,
+      actor_label: actorLabel,
+      idempotency_key: idempotencyKey,
+    }, db);
+  }
+  const client = await db.connect();
+  const operation = {
+    environment: env.FAREJADOR_ENV, domain: 'matriz_commission.pay',
+    idempotencyKey, fingerprint: operationFingerprint({ period_id: payrollItemId }),
+  };
+  try {
+    await client.query('BEGIN');
+    const started = await beginIntegrityOperation<{
+      paid: true; period_id: string; paid_at: string;
+    }>(client, operation);
+    if (started.replayed) { await client.query('COMMIT'); return started.result; }
+    const period = await client.query<{
+      source_expense_id: string; commission_amount: string; payment_status: string;
+    }>(
+      `SELECT source_expense_id,commission_amount::text,payment_status
+         FROM finance.matriz_commission_periods
+        WHERE environment=$1 AND id=$2 AND collaborator_id=$3 FOR UPDATE`,
+      [env.FAREJADOR_ENV, payrollItemId, collaboratorId],
+    );
+    if (!period.rows[0] || period.rows[0].payment_status !== 'pending') {
+      throw new Error('commission_payment_not_available');
+    }
+    const expense = await getMatrizExpenseLedgerState(
+      client, env.FAREJADOR_ENV, period.rows[0].source_expense_id,
+    );
+    if (expense.paymentStatus !== 'pending') throw new Error('commission_payment_not_available');
+    const paidAt = new Date().toISOString();
+    await client.query(`SELECT set_config('app.actor_label',$1,true)`, [actorLabel]);
+    await client.query(
+      `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=$3::timestamptz
+        WHERE environment=$1 AND id=$2 AND payment_status='pending' AND deleted_at IS NULL`,
+      [env.FAREJADOR_ENV, period.rows[0].source_expense_id, paidAt],
+    );
+    await postMatrizExpensePayment(client, expense, paidAt, actorLabel);
+    const result = integrityResult({ paid: true as const, period_id: payrollItemId, paid_at: paidAt });
+    await recordIntegrityEvent(client, {
+      environment: env.FAREJADOR_ENV, domain: 'matriz_commission',
+      entityTable: 'finance.matriz_commission_periods', entityId: payrollItemId,
+      eventType: 'weekly_commission_paid', actorLabel, idempotencyKey,
+      before: { payment_status: 'pending', amount: period.rows[0].commission_amount },
+      after: { payment_status: 'paid', paid_at: paidAt },
+    });
+    await completeIntegrityOperation(
+      client, operation, 'finance.matriz_commission_periods', payrollItemId, result,
+    );
+    await client.query('COMMIT'); return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined); throw error;
+  } finally { client.release(); }
 }

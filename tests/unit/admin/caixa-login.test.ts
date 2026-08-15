@@ -22,6 +22,7 @@ const scriptFiles = [
   'caixa-finance.js',
   'caixa-finance-entries.js',
   'caixa-finance-commissions.js',
+  'caixa-finance-commission-detail.js',
   'caixa-team.js',
   'caixa-team-remuneration.js',
   'caixa-team-commission.js',

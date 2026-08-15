@@ -44,7 +44,8 @@
       const title = document.createElement('strong'); title.textContent = historyLabel(item);
       const date = document.createElement('time'); date.textContent = formatDate(item.starts_on);
       const detail = document.createElement('small');
-      detail.textContent = item.active ? (item.itemized ? 'Cálculo separado por item' : 'Base: ' + (basisLabels[item.basis] || item.basis)) : 'Regra desativada';
+      const frequency = item.settlement_frequency === 'weekly' ? 'Pagamento semanal' : 'Pagamento mensal';
+      detail.textContent = item.active ? (item.itemized ? 'Cálculo separado por item · ' + frequency : 'Base: ' + (basisLabels[item.basis] || item.basis) + ' · ' + frequency) : 'Regra desativada';
       row.append(title, date, detail); list.appendChild(row);
     });
   }
@@ -178,6 +179,9 @@
       radio.checked = radio.value === kind;
     });
     document.getElementById('team-commission-value').value = data.value || '';
+    document.querySelectorAll('input[name="team-commission-frequency"]').forEach(function (radio) {
+      radio.checked = radio.value === (data.settlement_frequency || 'monthly');
+    });
     const start = document.getElementById('team-commission-start'); start.value = String(data.starts_on).slice(0, 10);
     if (Caixa.isPartner()) start.max = new Date().toISOString().slice(0, 10); else start.removeAttribute('max');
     renderBases(data.kind, data.basis); refreshFields();
@@ -206,6 +210,7 @@
 
   async function save(event) {
     event.preventDefault(); const kindChoice = selectedKind();
+    const frequency = document.querySelector('input[name="team-commission-frequency"]:checked');
     let body;
     if (salesRule()) {
       const rules = readItemRules();
@@ -217,6 +222,7 @@
         value: representative ? representative.value : 0,
         active: Boolean(representative), itemized: true, item_rules: rules,
         starts_on: document.getElementById('team-commission-start').value,
+        settlement_frequency: frequency ? frequency.value : 'monthly',
       };
     } else {
       const fallbackKind = payload.kind || 'percent'; const kind = kindChoice === 'none' ? fallbackKind : kindChoice;
@@ -225,6 +231,7 @@
         value: kindChoice === 'none' ? 0 : Number(document.getElementById('team-commission-value').value || 0),
         active: kindChoice !== 'none', itemized: false, item_rules: blankItemRules(),
         starts_on: document.getElementById('team-commission-start').value,
+        settlement_frequency: frequency ? frequency.value : 'monthly',
       };
     }
     const error = document.getElementById('team-commission-save-error'); error.textContent = '';

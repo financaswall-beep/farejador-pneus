@@ -21,6 +21,98 @@ afterAll(async () => {
 });
 
 describe('continuidade mensal do parceiro', () => {
+  it('fecha comissão semanal no domingo sem misturar salário e sem duplicar', async () => {
+    const partner = await import('../../src/parceiro/queries.js');
+    const fixture = await createPartnerFixture(db.pool, {
+      role: 'funcionario', initialStockQty: 5,
+    });
+    await db.pool.query(
+      `INSERT INTO network.partner_token_commission
+        (token_id,environment,partner_unit_id,kind,value,active,updated_by,settlement_frequency)
+       VALUES ($1,'test',$2,'percent',10,true,'integration-test','weekly')`,
+      [fixture.tokenId, fixture.partnerUnitId],
+    );
+    const competence = new Date().toISOString().slice(0, 7) + '-01';
+    await db.pool.query(
+      `INSERT INTO network.partner_collaborator_compensation
+        (environment,partner_unit_id,token_id,employment_type,base_salary,payment_day,
+         payment_method,starts_on,benefits,updated_by)
+       VALUES ('test',$1,$2,'informal',2300,5,'pix',$3::date,'[]'::jsonb,'integration-test')`,
+      [fixture.partnerUnitId, fixture.tokenId, competence],
+    );
+    const sale = await partner.registerPartnerSale(fixture.ctx, {
+      customer_name: 'Cliente da semana',
+      items: [{ partner_stock_id: fixture.stockId, quantity: 1, unit_price: 200 }],
+      payment_method: 'pix', fulfillment_mode: 'pickup', source_tag: 'porta',
+      idempotency_key: `weekly-continuity-${randomUUID()}`,
+    });
+    const entry = await db.pool.query<{
+      settlement_frequency: string; period_close_at: string; competence_month: string;
+    }>(
+      `SELECT settlement_frequency,competence_month::text,
+              ((((realized_at AT TIME ZONE 'America/Sao_Paulo')::date
+                - extract(dow FROM realized_at AT TIME ZONE 'America/Sao_Paulo')::int)+7)::date
+                + time '12:00') AT TIME ZONE 'America/Sao_Paulo' period_close_at
+         FROM finance.partner_staff_commission_entries
+        WHERE environment='test' AND partner_order_id=$1`,
+      [sale.order_id],
+    );
+    expect(entry.rows[0]?.settlement_frequency).toBe('weekly');
+
+    const closeAt = entry.rows[0]!.period_close_at;
+    const first = await db.pool.query<{ result: {
+      weekly_periods_closed: number; payables_created: number;
+    } }>(
+      `SELECT finance.run_partner_staff_commission_rollover('test'::env_t,$1) result`,
+      [closeAt],
+    );
+    const retry = await db.pool.query<{ result: {
+      weekly_periods_closed: number; payables_created: number;
+    } }>(
+      `SELECT finance.run_partner_staff_commission_rollover('test'::env_t,$1) result`,
+      [closeAt],
+    );
+    expect(first.rows[0]!.result).toMatchObject({
+      weekly_periods_closed: 1, payables_created: 1,
+    });
+    expect(retry.rows[0]!.result).toMatchObject({
+      weekly_periods_closed: 0, payables_created: 0,
+    });
+    const weekly = await db.pool.query(
+      `SELECT period.settlement_frequency,period.period_start::text,period.period_end::text,
+              period.payable_amount::text,payable.amount::text,
+              (SELECT count(*)::int FROM finance.partner_payroll_items item
+                WHERE item.commission_period_id=period.id) payroll_items
+         FROM finance.partner_staff_commission_periods period
+         JOIN finance.partner_payables payable ON payable.id=period.payable_id
+        WHERE period.environment='test' AND period.token_id=$1
+          AND period.settlement_frequency='weekly'`,
+      [fixture.tokenId],
+    );
+    expect(weekly.rows[0]).toMatchObject({
+      settlement_frequency: 'weekly', payable_amount: '20.00', amount: '20.00',
+      payroll_items: 0,
+    });
+
+    const [year, month] = entry.rows[0]!.competence_month.split('-').map(Number);
+    const nextMonth = new Date(Date.UTC(year!, month!, 1, 15)).toISOString();
+    await db.pool.query(
+      `SELECT finance.run_partner_staff_payroll_seed('test'::env_t,$1)`,
+      [nextMonth],
+    );
+    const salary = await db.pool.query(
+      `SELECT item.base_salary::text,item.commission_amount::text,item.total_due::text
+         FROM finance.partner_payroll_items item
+         JOIN finance.partner_payroll_periods period ON period.id=item.payroll_period_id
+        WHERE item.environment='test' AND item.token_id=$1
+          AND period.competence_month=$2::date`,
+      [fixture.tokenId, entry.rows[0]!.competence_month],
+    );
+    expect(salary.rows[0]).toEqual({
+      base_salary: '2300.00', commission_amount: '0.00', total_due: '2300.00',
+    });
+  });
+
   it('congela, fecha uma vez e carrega o estorno para o mes seguinte', async () => {
     const partner = await import('../../src/parceiro/queries.js');
     const fixture = await createPartnerFixture(db.pool, {

@@ -43,6 +43,7 @@ const commissionItemRules = z.object({
   }
 });
 const itemizedFields = {
+  settlement_frequency: z.enum(['weekly', 'monthly']).default('monthly'),
   itemized: z.boolean().default(false),
   item_rules: commissionItemRules.default({
     tire: { kind: 'none' as const, value: 0 }, service: { kind: 'none' as const, value: 0 },

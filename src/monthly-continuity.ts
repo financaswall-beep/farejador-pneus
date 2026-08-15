@@ -2,6 +2,7 @@ import { generateCurrentMatrizPartnerMonthlyFees } from './admin/painel/queries-
 import { pool } from './persistence/db.js';
 import { env } from './shared/config/env.js';
 import { logger } from './shared/logger.js';
+import { closeMatrizWeeklyCommissions } from './admin/caixa/operation-commissions.js';
 
 const MONTHLY_CONTINUITY_INTERVAL_MS = 60 * 60_000;
 
@@ -20,6 +21,7 @@ export async function runMonthlyContinuityCycle(): Promise<{
   monthly_fees_created: number;
   staff_commissions: StaffRolloverResult;
   staff_payroll: PayrollSeedResult;
+  matriz_weekly_commissions: { periods_created: number };
 }> {
   const client = await pool.connect();
   try {
@@ -28,6 +30,7 @@ export async function runMonthlyContinuityCycle(): Promise<{
       client,
       env.FAREJADOR_ENV,
     );
+    const matrizWeekly = await closeMatrizWeeklyCommissions(client);
     const staff = await client.query<{ result: StaffRolloverResult }>(
       `SELECT finance.run_partner_staff_commission_rollover($1::env_t) AS result`,
       [env.FAREJADOR_ENV],
@@ -41,6 +44,7 @@ export async function runMonthlyContinuityCycle(): Promise<{
       monthly_fees_created: monthlyFees,
       staff_commissions: staff.rows[0]!.result,
       staff_payroll: payroll.rows[0]!.result,
+      matriz_weekly_commissions: matrizWeekly,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

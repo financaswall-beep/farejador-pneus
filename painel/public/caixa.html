@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260815-team-finish1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260815-commission-calendar1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -23,10 +23,11 @@
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
-  <script defer src="/operacao/caixa-finance-commissions.js?v=20260815-team-finish1"></script>
+  <script defer src="/operacao/caixa-finance-commissions.js?v=20260815-commission-calendar1"></script>
+  <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
   <script defer src="/operacao/caixa-team-remuneration.js?v=20260814-operation-team1"></script>
-  <script defer src="/operacao/caixa-team-commission.js?v=20260815-team-finish1"></script>
+  <script defer src="/operacao/caixa-team-commission.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team-permissions.js?v=20260815-team-finish1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
@@ -800,6 +801,11 @@
               </section>
               <p id="team-commission-migration-note" class="team-private-note hidden"><b>!</b>Esta é uma regra antiga por venda inteira. Revise os grupos e salve para ativar o cálculo separado.</p>
             </div>
+            <h3>Quando pagar</h3>
+            <section class="team-commission-frequency" aria-label="Frequência de fechamento da comissão">
+              <label><input type="radio" name="team-commission-frequency" value="weekly" /><span><b>Semanal</b><small>Fecha todo sábado; libera no domingo</small></span></label>
+              <label><input type="radio" name="team-commission-frequency" value="monthly" /><span><b>Mensal</b><small>Fecha no último dia do mês</small></span></label>
+            </section>
             <section class="team-form-card team-rule-meta team-rule-start"><label>Início da vigência<span><input id="team-commission-start" type="date" required /><i aria-hidden="true">›</i></span></label></section>
             <p class="team-private-note"><b>i</b>A nova regra não altera comissões de vendas anteriores.</p>
             <button id="team-commission-history-toggle" class="team-secondary team-history-toggle" type="button" aria-expanded="false">Ver histórico de regras</button>

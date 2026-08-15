@@ -27,6 +27,7 @@ describe('comissoes da Matriz na Operacao da Loja', () => {
         job_title: 'Vendedor', job: 'vendedor', active: true,
         commission_active: true, commission_kind: 'percent', commission_basis: 'revenue',
         commission_value: 5, commission_itemized: true,
+        commission_settlement_frequency: 'monthly',
         commission_item_rules: {
           tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
           other: { kind: 'none', value: 0 },
@@ -34,10 +35,17 @@ describe('comissoes da Matriz na Operacao da Loja', () => {
         total_due: 2519.99,
       }],
     });
-    const db = { query: vi.fn(async () => ({ rows: [{
-      collaborator_id: 'person-1', sales_count: 1, gross_sales: '399.80',
-      commission_amount: '19.99',
-    }] })) };
+    const db = { query: vi.fn(async (sql: string) => {
+      if (sql.includes('FROM finance.matriz_payroll_items')) return { rows: [{
+        collaborator_id: 'person-1', target_id: 'payroll-1', payment_total: '2519.99',
+        payment_status: 'pending', period_start: '2026-08-01', period_end: '2026-08-31',
+        settlement_frequency: 'monthly',
+      }] };
+      return { rows: [{
+        collaborator_id: 'person-1', sales_count: 1, gross_sales: '399.80',
+        commission_amount: '19.99',
+      }] };
+    }) };
 
     const payload = await getMatrizOperationCommissions('30d', db as never);
 

@@ -28,9 +28,12 @@ export interface OperationCommissionCollaborator {
   commission_amount: number;
   commission_itemized: boolean;
   commission_item_rules: OperationCommissionItemRules;
+  settlement_frequency: 'weekly' | 'monthly';
   status: OperationCommissionStatus;
   payment_target_id: string | null;
   payment_total: number | null;
+  payment_period_start: string | null;
+  payment_period_end: string | null;
 }
 
 export interface OperationCommissionsPayload {
@@ -72,7 +75,9 @@ export function operationCommissionBounds(range: SimpleFinanceRange): {
     // continuam sendo janelas móveis para consulta operacional.
     start: range === '30d'
       ? competence
-      : shiftIsoDate(today, -(simpleFinanceRangeDays(range) - 1)),
+      : range === '7d'
+        ? shiftIsoDate(today, -new Date(`${today}T12:00:00Z`).getUTCDay())
+        : shiftIsoDate(today, -(simpleFinanceRangeDays(range) - 1)),
     end: shiftIsoDate(today, 1),
     competence,
   };

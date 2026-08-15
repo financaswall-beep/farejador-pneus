@@ -65,7 +65,7 @@ describe('Financeiro simples do proprietario parceiro', () => {
     expect(route).toContain("z.enum(['today', '7d', '15d', '30d'])");
   });
 
-  it('alinha um mes a competencia da folha e nao libera pagamento com fatos ainda abertos', async () => {
+  it('mantem o periodo fechado mais antigo pagavel mesmo com fatos do periodo atual abertos', async () => {
     const context: PartnerContext = {
       environment: 'test', partnerId: 'partner-1', partnerUnitId: 'partner-unit-1',
       unitId: 'unit-1', slug: 'rio-do-ouro', partnerName: 'Rio',
@@ -79,7 +79,8 @@ describe('Financeiro simples do proprietario parceiro', () => {
       }] };
       return { rows: [{
         token_id: 'seller-1', payable_id: 'payable-old', payable_amount: '19.99',
-        payable_status: 'open',
+        payable_status: 'open', settlement_frequency: 'weekly',
+        period_start: '2026-07-05', period_end: '2026-07-11',
       }] };
     });
 
@@ -90,8 +91,10 @@ describe('Financeiro simples do proprietario parceiro', () => {
 
     expect(bounds.start).toBe(bounds.competence);
     expect(payload.collaborators[0]).toMatchObject({
-      name: 'Wallace', commission_amount: 19.99, status: 'open',
-      payment_target_id: null, payment_total: null,
+      name: 'Wallace', commission_amount: 19.99, status: 'payable',
+      payment_target_id: 'payable-old', payment_total: 19.99,
+      payment_period_start: '2026-07-05', payment_period_end: '2026-07-11',
+      settlement_frequency: 'weekly',
     });
   });
 
@@ -109,7 +112,8 @@ describe('Financeiro simples do proprietario parceiro', () => {
       }] };
       return { rows: [{
         token_id: 'seller-1', payable_id: 'payable-1', payable_amount: '19.99',
-        payable_status: 'open',
+        payable_status: 'open', settlement_frequency: 'monthly',
+        period_start: '2026-08-01', period_end: '2026-08-31',
       }] };
     });
 

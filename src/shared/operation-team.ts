@@ -5,6 +5,7 @@ export interface OperationBenefit {
 }
 
 export type OperationCommissionKind = 'percent' | 'fixed';
+export type OperationCommissionSettlementFrequency = 'weekly' | 'monthly';
 export type OperationCommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
 export type OperationCommissionItemGroup = 'tire' | 'service' | 'other';
 export type OperationCommissionItemKind = OperationCommissionKind | 'none';
@@ -64,6 +65,7 @@ export interface OperationCommissionRulePayload {
   starts_on: string;
   itemized: boolean;
   item_rules: OperationCommissionItemRules;
+  settlement_frequency: OperationCommissionSettlementFrequency;
   available_bases: OperationCommissionBasis[];
   history: OperationCommissionHistoryItem[];
 }
@@ -76,6 +78,7 @@ export interface OperationCommissionHistoryItem {
   starts_on: string;
   itemized: boolean;
   item_rules: OperationCommissionItemRules;
+  settlement_frequency: OperationCommissionSettlementFrequency;
 }
 
 export type OperationPermissionKey =

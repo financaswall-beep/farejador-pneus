@@ -128,7 +128,9 @@ export async function getMatrizOperationCommissionRule(
   const history = await db.query<{
     kind: 'percent' | 'fixed'; basis: OperationCommissionBasis;
     value: string; active: boolean; starts_on: string; itemized: boolean; item_rules: unknown;
-  }>(`SELECT kind,basis,value::text,active,starts_on::text,itemized,item_rules
+    settlement_frequency: 'weekly' | 'monthly';
+  }>(`SELECT kind,basis,value::text,active,starts_on::text,itemized,item_rules,
+             settlement_frequency
         FROM network.matriz_collaborator_commission_rules
        WHERE environment=$1 AND collaborator_id=$2
        ORDER BY starts_on DESC,updated_at DESC LIMIT 24`, [env.FAREJADOR_ENV, collaboratorId]);
@@ -140,6 +142,7 @@ export async function getMatrizOperationCommissionRule(
     starts_on: found.source.commission_starts_on || localDate(), available_bases: available,
     itemized: found.source.commission_itemized,
     item_rules: found.source.commission_item_rules ?? emptyCommissionItemRules(),
+    settlement_frequency: found.source.commission_settlement_frequency ?? 'monthly',
     history: history.rows.map((row) => ({ ...row, value: money(row.value),
       item_rules: commissionItemRulesOf(row.item_rules) })),
   };
@@ -149,6 +152,7 @@ export async function saveMatrizOperationCommissionRule(input: {
   collaborator_id: string; kind: 'percent' | 'fixed'; basis: OperationCommissionBasis;
   value: number; active: boolean; starts_on: string; actor_label: string;
   itemized: boolean; item_rules: OperationCommissionItemRules;
+  settlement_frequency: 'weekly' | 'monthly';
 }, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
   const found = await findMember(input.collaborator_id, db);
   const salesRule = input.itemized && found?.source.work_area !== 'delivery';
