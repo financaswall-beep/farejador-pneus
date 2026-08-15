@@ -75,6 +75,11 @@ export interface CreateMatrizCollaboratorInput {
   work_area: MatrizCollaboratorWorkArea;
   panel_role?: MatrizPanelRole | null;
   actor_label?: string | null;
+  operation_permissions?: {
+    vendas: boolean;
+    entregas: boolean;
+    financeiro: boolean;
+  };
 }
 
 /** Cria o colaborador: pessoa da porta única (0095) + vínculo 0124, atômico. */
@@ -102,6 +107,17 @@ export async function createMatrizCollaborator(
       [environment, person.rows[0]!.id, input.display_name.trim(), operationalJob(input.work_area),
        input.job_title.trim(), input.work_area, input.panel_role ?? null, input.actor_label ?? null],
     );
+    if (input.operation_permissions) {
+      await client.query(
+        `INSERT INTO network.matriz_collaborator_operation_permissions
+           (collaborator_id, environment, allow_vendas, allow_entregas,
+            allow_financeiro, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [collab.rows[0]!.id, environment, input.operation_permissions.vendas,
+         input.operation_permissions.entregas, input.operation_permissions.financeiro,
+         input.actor_label ?? null],
+      );
+    }
     await client.query('COMMIT');
     return { id: collab.rows[0]!.id, username: cleanUsername };
   } catch (err) {

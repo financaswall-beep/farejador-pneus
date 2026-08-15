@@ -3142,12 +3142,14 @@ export async function createPartnerFuncionario(
   label: string | null,
   username: string,
   password: string,
+  initialPermissions?: PartnerPermissions,
+  dbPool: Pool = pool,
 ): Promise<CreatedFuncionario> {
   const fillerToken = randomBytes(32).toString('hex');
   const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
   const cleanUsername = username.trim();
   const passwordHash = await hashPassword(password);
-  const client = await pool.connect();
+  const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
     // Porta única (0095): o funcionário nasce como PESSOA (username único NA REDE —
@@ -3168,6 +3170,22 @@ export async function createPartnerFuncionario(
        RETURNING id, created_at`,
       [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash, person.rows[0]!.id],
     );
+    if (initialPermissions) {
+      await client.query(
+        `INSERT INTO network.partner_token_permissions
+           (token_id, environment, partner_unit_id,
+            allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
+            allow_entregas, allow_retiradas, allow_batepapo, allow_resumo,
+            allow_financeiro, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        [res.rows[0]!.id, ctx.environment, ctx.partnerUnitId,
+         initialPermissions.vendas, initialPermissions.estoque,
+         initialPermissions.pedidos, initialPermissions.clientes,
+         initialPermissions.entregas, initialPermissions.retiradas,
+         initialPermissions.batepapo, initialPermissions.resumo,
+         initialPermissions.financeiro, `owner:${ctx.slug}`],
+      );
+    }
     await client.query('COMMIT');
     const row = res.rows[0]!;
     return { id: row.id, label: cleanLabel, username: cleanUsername, created_at: row.created_at };

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { logger } from '../../shared/logger.js';
 import type { CaixaAuth } from './queries.js';
 import {
+  createMatrizOperationMember,
   getMatrizOperationCommissionRule, getMatrizOperationCompensation,
   getMatrizOperationTeam, saveMatrizOperationCommissionRule,
   saveMatrizOperationCompensation,
@@ -42,10 +43,18 @@ const commission = z.object({
 const permissions = z.object({
   vendas: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
 });
+const newMember = z.object({
+  name: z.string().trim().min(2).max(120),
+  username: z.string().trim().min(3).max(60)
+    .regex(/^[a-zA-Z0-9._-]+$/, 'usuario_invalido'),
+  password: z.string().min(12).max(200),
+  role: z.enum(['vendedor', 'entregador', 'administrativo']),
+});
 
 function failure(reply: FastifyReply, error: unknown, label: string) {
   const code = error instanceof Error ? error.message : 'team_unavailable';
   if (code === 'collaborator_not_found') return reply.status(404).send({ error: code });
+  if (code === 'username_taken') return reply.status(409).send({ error: code });
   if (code === 'owner_permissions_locked') return reply.status(409).send({ error: code });
   if (code === 'invalid_commission_basis') return reply.status(400).send({ error: code });
   logger.error({ err: error }, label);
@@ -69,6 +78,18 @@ export function registerCaixaTeamRoutes(
     reply.header('Cache-Control', 'no-store');
     try { return reply.status(200).send(await getMatrizOperationTeam()); }
     catch (error) { return failure(reply, error, 'matrix operation team unavailable'); }
+  });
+
+  fastify.post('/api/caixa/equipe', { preHandler: guards }, async (request, reply) => {
+    const body = newMember.safeParse(request.body ?? {});
+    if (!body.success) return reply.status(400).send({ error: body.error.issues[0]?.message ?? 'invalid_request' });
+    const auth = (request as AuthenticatedRequest).caixa!;
+    try {
+      const created = await createMatrizOperationMember({
+        ...body.data, actor_label: auth.displayName,
+      });
+      return reply.status(201).send({ created: true, ...created });
+    } catch (error) { return failure(reply, error, 'matrix operation member create failed'); }
   });
 
   fastify.get('/api/caixa/equipe/:collaboratorId/remuneracao', { preHandler: guards }, async (request, reply) => {

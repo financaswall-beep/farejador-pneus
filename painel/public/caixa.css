@@ -1195,6 +1195,21 @@ form { display: grid; gap: 16px; }
 .account-modal-sheet form input { width: 100%; height: 51px; padding: 0 13px; border: 1px solid #cfd8d3; border-radius: 12px; outline: 0; color: #17251f; background: #fff; }
 .account-modal-sheet form input:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
 .account-modal-sheet form small { color: #7b837f; font-size: 10px; font-weight: 400; }
+.team-create-sheet { max-height: min(92svh,820px); }
+.team-create-sheet form select {
+  width: 100%; height: 51px; padding: 0 40px 0 13px; border: 1px solid #cfd8d3;
+  border-radius: 12px; outline: 0; color: #17251f; background: #fff;
+}
+.team-create-sheet form select:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
+.team-create-intro { display: grid; grid-template-columns: 47px minmax(0,1fr); align-items: center; gap: 12px; padding: 13px; border: 1px solid #dce9e2; border-radius: 14px; background: #f4faf6; }
+.team-create-intro > b { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 50%; color: #fff; background: linear-gradient(145deg,#109b64,#006743); font-size: 25px; font-weight: 400; }
+.team-create-intro p,.team-create-security { margin: 0; }
+.team-create-intro strong,.team-create-intro span { display: block; }
+.team-create-intro strong { color: #123a2a; font-size: 15px; }
+.team-create-intro span { margin-top: 2px; color: #66756e; font-size: 12px; line-height: 1.35; }
+.team-create-passwords { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 11px; }
+.team-create-security { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border-radius: 11px; color: #176044; background: #eef8f2; font-size: 12px; line-height: 1.4; }
+.team-create-security b { display: grid; width: 23px; height: 23px; flex: 0 0 23px; place-items: center; border-radius: 50%; color: #fff; background: #098457; }
 .photo-modal-sheet { max-height: min(90svh,790px); }
 .photo-request-list { display: grid; gap: 13px; padding: 18px 18px max(22px,env(safe-area-inset-bottom)); }
 .caixa-photo-card { display: grid; gap: 8px; padding: 16px; border: 1px solid #f1c7a9; border-radius: 17px; background: #fffaf6; box-shadow: 0 5px 14px rgba(93,45,14,.06); }
@@ -1362,7 +1377,8 @@ form { display: grid; gap: 16px; }
 .help-content { font-size: var(--type-small); }
 .receipt-content h3 { font-size: var(--type-button); }
 .account-modal-sheet form input,
-.stock-modal-sheet form select { font-size: var(--type-body); }
+.stock-modal-sheet form select,
+.team-create-sheet form select { font-size: var(--type-body); }
 .account-modal-error { font-size: 13px; }
 .account-modal-primary { font-size: var(--type-button); }
 
@@ -2144,4 +2160,5 @@ form { display: grid; gap: 16px; }
   .team-rule-meta select,.team-rule-meta input[type="date"] { width: 145px; text-align: right; }
   .team-permission-row { grid-template-columns: 38px minmax(0,1fr) 46px; gap: 9px; padding-inline: 11px; }
   .team-permission-row > b { width: 37px; height: 37px; }
+  .team-create-passwords { grid-template-columns: 1fr; }
 }

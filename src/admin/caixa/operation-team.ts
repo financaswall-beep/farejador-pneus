@@ -8,6 +8,7 @@ import {
   type OperationTeamMember, type OperationTeamPayload,
 } from '../../shared/operation-team.js';
 import {
+  createMatrizCollaborator,
   getMatrizCollaboratorManagement,
   saveMatrizCollaboratorCommission,
   saveMatrizCollaboratorCompensation,
@@ -50,6 +51,26 @@ async function findMember(id: string, db: Queryable) {
   const snapshot = await management(db);
   const source = snapshot.collaborators.find((row) => row.id === id);
   return source ? { source, member: memberOf(source) } : null;
+}
+
+export async function createMatrizOperationMember(input: {
+  name: string; username: string; password: string;
+  role: 'vendedor' | 'entregador' | 'administrativo'; actor_label: string;
+}, db: Pool = defaultPool): Promise<{ id: string; username: string }> {
+  const profile = input.role === 'vendedor'
+    ? { job: 'vendedor' as const, job_title: 'Vendedor', work_area: 'sales' as const,
+        permissions: { vendas: true, entregas: false, financeiro: false } }
+    : input.role === 'entregador'
+      ? { job: 'entregador' as const, job_title: 'Entregador', work_area: 'delivery' as const,
+          permissions: { vendas: false, entregas: true, financeiro: false } }
+      : { job: 'colaborador' as const, job_title: 'Administrativo', work_area: 'administrative' as const,
+          permissions: { vendas: false, entregas: false, financeiro: false } };
+  return createMatrizCollaborator({
+    display_name: input.name, username: input.username, password: input.password,
+    job: profile.job, job_title: profile.job_title, work_area: profile.work_area,
+    panel_role: null, actor_label: input.actor_label,
+    operation_permissions: profile.permissions,
+  }, db);
 }
 
 export async function getMatrizOperationTeam(

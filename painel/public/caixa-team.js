@@ -108,7 +108,79 @@
     } finally { state.request = null; }
   }
 
-  Object.assign(Caixa, { teamPath: path, loadTeam: loadTeam });
+  function configureNewMemberRoles() {
+    const select = document.getElementById('team-create-role');
+    const roles = Caixa.isPartner()
+      ? [['vendedor', 'Vendedor'], ['estoque', 'Estoque'], ['entregador', 'Entregador']]
+      : [['vendedor', 'Vendedor'], ['entregador', 'Entregador'], ['administrativo', 'Administrativo']];
+    select.replaceChildren();
+    roles.forEach(function (role) {
+      const option = document.createElement('option');
+      option.value = role[0]; option.textContent = role[1]; select.appendChild(option);
+    });
+  }
+
+  function closeNewMember() {
+    document.getElementById('team-create-modal').classList.add('hidden');
+    document.getElementById('team-create-form').reset();
+    document.getElementById('team-create-error').textContent = '';
+  }
+
+  function openNewMember() {
+    configureNewMemberRoles();
+    document.getElementById('team-create-form').reset();
+    document.getElementById('team-create-error').textContent = '';
+    document.getElementById('team-create-modal').classList.remove('hidden');
+    document.getElementById('team-create-name').focus({ preventScroll: true });
+  }
+
+  function newMemberError(code) {
+    if (code === 'username_taken') return 'Este usuário já está sendo usado. Escolha outro.';
+    if (code === 'usuario_invalido') return 'Use somente letras, números, ponto, traço ou sublinhado no usuário.';
+    if (code === 'owner_required') return 'Somente o proprietário pode criar colaboradores.';
+    return 'Não foi possível criar o colaborador. Confira os campos e tente novamente.';
+  }
+
+  async function submitNewMember(event) {
+    event.preventDefault();
+    const error = document.getElementById('team-create-error');
+    const submit = document.getElementById('team-create-submit');
+    const name = document.getElementById('team-create-name').value.trim();
+    const username = document.getElementById('team-create-username').value.trim().toLowerCase();
+    const password = document.getElementById('team-create-password').value;
+    const confirmation = document.getElementById('team-create-confirm').value;
+    const role = document.getElementById('team-create-role').value;
+    error.textContent = '';
+    if (name.length < 2 || !/^[a-zA-Z0-9._-]{3,60}$/.test(username)) {
+      error.textContent = 'Informe o nome e um usuário válido com pelo menos 3 caracteres.'; return;
+    }
+    if (password.length < 12) {
+      error.textContent = 'A senha provisória precisa ter pelo menos 12 caracteres.'; return;
+    }
+    if (password !== confirmation) {
+      error.textContent = 'A confirmação não corresponde à senha provisória.'; return;
+    }
+    submit.disabled = true; submit.textContent = 'CRIANDO…';
+    try {
+      const response = await Caixa.authenticatedFetch(path(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, username: username, password: password, role: role }),
+      });
+      const payload = await Caixa.json(response);
+      if (!response.ok) throw new Error(payload.error || 'request_failed');
+      closeNewMember(); state.payload = null; await loadTeam(true);
+      Caixa.showToast('Colaborador criado. Agora confira as permissões de acesso.');
+      const member = state.payload && state.payload.members.find(function (item) { return item.id === payload.id; });
+      if (member) openMember(member, 'permissoes');
+    } catch (failure) {
+      if (failure instanceof Error && failure.message === 'invalid_session') return;
+      error.textContent = newMemberError(failure instanceof Error ? failure.message : 'request_failed');
+    } finally {
+      submit.disabled = false; submit.textContent = 'Criar colaborador';
+    }
+  }
+
+  Object.assign(Caixa, { teamPath: path, loadTeam: loadTeam, closeNewMember: closeNewMember });
   document.getElementById('team-retry').addEventListener('click', function () { void loadTeam(true); });
   document.getElementById('team-search').addEventListener('input', function (event) {
     state.search = event.target.value; render();
@@ -119,10 +191,11 @@
     document.querySelectorAll('[data-team-filter]').forEach(function (item) { item.classList.toggle('active', item === button); });
     render();
   });
-  document.getElementById('team-new-member').addEventListener('click', function () {
-    const destination = Caixa.isPartner()
-      ? '/parceiro/' + encodeURIComponent(Caixa.slug()) + '/#configuracoes'
-      : '/admin/#colaboradores';
-    window.open(destination, '_blank', 'noopener');
+  document.getElementById('team-new-member').addEventListener('click', openNewMember);
+  document.querySelectorAll('[data-close-team-create]').forEach(function (button) {
+    button.addEventListener('click', closeNewMember);
+  });
+  document.getElementById('team-create-form').addEventListener('submit', function (event) {
+    void submitNewMember(event);
   });
 }());
