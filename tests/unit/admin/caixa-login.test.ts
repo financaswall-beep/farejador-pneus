@@ -252,6 +252,10 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="team-permissions-panel"');
     expect(html).toContain('id="nav-team"');
     expect(html).toContain('Novo colaborador');
+    expect(html).toContain('id="team-title" class="sr-only">Equipe');
+    expect(html).toContain('class="team-detail-heading"');
+    expect(html).not.toContain('class="team-toolbar');
+    expect(html).not.toContain('id="team-title">Colaboradores');
     expect(html).toContain('id="team-create-modal"');
     expect(html).toContain('id="team-create-form"');
     expect(html).toContain('sem acesso de proprietário');

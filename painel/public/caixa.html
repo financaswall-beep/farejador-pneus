@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-operation-member1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260815-team-header1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -713,11 +713,7 @@
         </div>
 
         <div id="team-panel" class="app-panel team-page hidden" aria-labelledby="team-title">
-          <header class="team-toolbar">
-            <span class="team-logo" aria-hidden="true">2W<small>PNEUS</small></span>
-            <div><h2 id="team-title">Colaboradores</h2><p id="team-unit">Unidade</p></div>
-            <span class="team-owner">Proprietário</span>
-          </header>
+          <h2 id="team-title" class="sr-only">Equipe</h2><p id="team-unit" class="sr-only">Unidade</p>
           <div id="team-loading" class="team-message" role="status"><i></i><span>Buscando sua equipe…</span></div>
           <div id="team-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar os colaboradores.</strong><button id="team-retry" type="button">Tentar novamente</button></div>
           <div id="team-content" class="hidden">
@@ -735,9 +731,9 @@
         </div>
 
         <div id="team-remuneration-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-remuneration-title">
-          <header class="team-toolbar team-toolbar--back">
+          <header class="team-detail-heading">
             <button id="team-remuneration-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="team-remuneration-title">Remuneração</h2><p id="team-remuneration-unit">Unidade</p></div><span class="team-owner">Proprietário</span>
+            <div><small>Equipe</small><h2 id="team-remuneration-title">Remuneração</h2><p id="team-remuneration-unit" class="sr-only">Unidade</p></div>
           </header>
           <div id="team-remuneration-loading" class="team-message" role="status"><i></i><span>Carregando remuneração…</span></div>
           <div id="team-remuneration-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a remuneração.</strong><button id="team-remuneration-retry" type="button">Tentar novamente</button></div>
@@ -762,9 +758,9 @@
         </div>
 
         <div id="team-commission-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-commission-title">
-          <header class="team-toolbar team-toolbar--back">
+          <header class="team-detail-heading">
             <button id="team-commission-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="team-commission-title">Regra de comissão</h2><p id="team-commission-unit">Unidade</p></div><span class="team-owner"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.4-4.2 2.8-6.3 7-6.3s6.6 2.1 7 6.3"/></svg>Proprietário</span>
+            <div><small>Equipe</small><h2 id="team-commission-title">Regra de comissão</h2><p id="team-commission-unit" class="sr-only">Unidade</p></div>
           </header>
           <div id="team-commission-loading" class="team-message" role="status"><i></i><span>Carregando regra…</span></div>
           <div id="team-commission-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a regra.</strong><button id="team-commission-retry" type="button">Tentar novamente</button></div>
@@ -792,9 +788,9 @@
         </div>
 
         <div id="team-permissions-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-permissions-title">
-          <header class="team-toolbar team-toolbar--back">
+          <header class="team-detail-heading">
             <button id="team-permissions-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="team-permissions-title">Permissões</h2><p id="team-permissions-unit">Unidade</p></div><span class="team-owner"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.4-4.2 2.8-6.3 7-6.3s6.6 2.1 7 6.3"/></svg>Proprietário</span>
+            <div><small>Equipe</small><h2 id="team-permissions-title">Permissões</h2><p id="team-permissions-unit" class="sr-only">Unidade</p></div>
           </header>
           <div id="team-permissions-loading" class="team-message" role="status"><i></i><span>Carregando permissões…</span></div>
           <div id="team-permissions-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar as permissões.</strong><button id="team-permissions-retry" type="button">Tentar novamente</button></div>

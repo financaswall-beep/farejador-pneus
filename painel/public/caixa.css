@@ -1622,22 +1622,20 @@ form { display: grid; gap: 16px; }
 /* Equipe, remuneração e regra de comissão — Operação da Loja */
 .team-page {
   min-height: 650px;
-  padding: 0 14px 112px;
+  padding: 16px 14px 112px;
   color: #111b17;
   background: #fff;
 }
-.team-toolbar {
+.team-detail-heading {
   display: grid;
-  grid-template-columns: 72px minmax(0,1fr) auto;
+  grid-template-columns: 43px minmax(0,1fr);
   align-items: center;
-  gap: 13px;
-  margin: 0 -14px 18px;
-  padding: 21px 16px 20px;
-  color: #fff;
-  background: linear-gradient(120deg,#08754c,#00472f);
+  gap: 11px;
+  margin: 0 0 16px;
+  padding: 2px 1px 13px;
+  border-bottom: 1px solid #e1e8e4;
 }
-.team-toolbar--back { grid-template-columns: 43px minmax(0,1fr) auto; }
-.team-toolbar--back > button {
+.team-detail-heading > button {
   display: grid;
   width: 42px;
   height: 42px;
@@ -1645,11 +1643,11 @@ form { display: grid; gap: 16px; }
   padding: 0;
   border: 0;
   border-radius: 50%;
-  color: #fff;
-  background: rgba(255,255,255,.08);
+  color: #087246;
+  background: #edf7f2;
   cursor: pointer;
 }
-.team-toolbar--back > button svg {
+.team-detail-heading > button svg {
   width: 27px;
   height: 27px;
   fill: none;
@@ -1658,34 +1656,9 @@ form { display: grid; gap: 16px; }
   stroke-linejoin: round;
   stroke-width: 2;
 }
-.team-logo {
-  display: grid;
-  width: 68px;
-  height: 68px;
-  place-items: center;
-  align-content: center;
-  border: 2px solid rgba(255,255,255,.92);
-  border-radius: 50%;
-  font-size: 26px;
-  font-weight: 900;
-  line-height: .82;
-  letter-spacing: -.06em;
-}
-.team-logo small { display: block; margin-top: 5px; font-size: 9px; letter-spacing: .08em; }
-.team-toolbar h2,.team-toolbar p { margin: 0; }
-.team-toolbar h2 { font-size: 25px; letter-spacing: -.035em; }
-.team-toolbar p { margin-top: 3px; color: #d6eee2; font-size: 14px; }
-.team-owner {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255,255,255,.72);
-  border-radius: 13px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.team-owner svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.team-detail-heading h2,.team-detail-heading p,.team-detail-heading small { margin: 0; }
+.team-detail-heading h2 { color: #12231c; font-size: 22px; line-height: 1.08; letter-spacing: -.035em; }
+.team-detail-heading small { display: block; margin-bottom: 3px; color: #087246; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; }
 .team-message {
   display: grid;
   min-height: 330px;
@@ -2138,12 +2111,8 @@ form { display: grid; gap: 16px; }
 
 @media (max-width: 390px) {
   .team-page { padding-inline: 10px; }
-  .team-toolbar { margin-inline: -10px; grid-template-columns: 58px minmax(0,1fr) auto; padding-inline: 12px; }
-  .team-toolbar--back { grid-template-columns: 40px minmax(0,1fr) auto; }
-  .team-logo { width: 55px; height: 55px; font-size: 22px; }
-  .team-toolbar h2 { font-size: 21px; }
-  .team-toolbar p { font-size: 12px; }
-  .team-owner { padding-inline: 8px; font-size: 11px; }
+  .team-detail-heading { grid-template-columns: 40px minmax(0,1fr); }
+  .team-detail-heading h2 { font-size: 20px; }
   .team-summary p { grid-template-columns: 38px minmax(0,1fr); padding-inline: 9px; }
   .team-summary-icon { width: 37px; height: 37px; }
   .team-summary strong { font-size: 14px; }
