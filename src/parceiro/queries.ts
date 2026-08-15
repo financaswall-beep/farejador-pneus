@@ -3483,10 +3483,11 @@ export async function upsertPartnerTokenCommission(
   const active = !!input.active;
   await pool.query(
     `INSERT INTO network.partner_token_commission
-       (token_id, environment, partner_unit_id, kind, value, active, updated_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (token_id, environment, partner_unit_id, kind, value, active, updated_by,itemized,item_rules)
+     VALUES ($1, $2, $3, $4, $5, $6, $7,false,'{}'::jsonb)
      ON CONFLICT (token_id) DO UPDATE SET
         kind = EXCLUDED.kind, value = EXCLUDED.value, active = EXCLUDED.active,
+        itemized=false,item_rules='{}'::jsonb,
         updated_at = now(), updated_by = EXCLUDED.updated_by`,
     [tokenId, ctx.environment, ctx.partnerUnitId, kind, value, active, `owner:${ctx.slug}`],
   );

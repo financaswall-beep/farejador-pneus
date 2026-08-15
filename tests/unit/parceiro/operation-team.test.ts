@@ -63,15 +63,31 @@ describe('equipe da Operação do parceiro', () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [member] })
       .mockResolvedValueOnce({ rows: [{
-        kind: 'percent', value: '5.00', active: true, starts_on: '2026-08-01',
-      }] });
+        kind: 'percent', value: '5.00', active: true, starts_on: '2026-08-01', itemized: true,
+        item_rules: {
+          tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
+          other: { kind: 'none', value: 0 },
+        },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ itemized: true, item_rules: {
+        tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
+        other: { kind: 'none', value: 0 },
+      } }] });
     const db = { query } as unknown as Pool;
 
     const result = await getPartnerOperationCommissionRule(context, 'employee-1', db);
 
     expect(query.mock.calls[1]?.[1]).toEqual(['prod', 'unit-partner-1', 'employee-1']);
     expect(result?.history).toEqual([{
-      kind: 'percent', basis: 'revenue', value: 5, active: true, starts_on: '2026-08-01',
+      kind: 'percent', basis: 'revenue', value: 5, active: true, starts_on: '2026-08-01', itemized: true,
+      item_rules: {
+        tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
+        other: { kind: 'none', value: 0 },
+      },
     }]);
+    expect(result).toMatchObject({ itemized: true, item_rules: {
+      tire: { kind: 'fixed', value: 10 }, service: { kind: 'percent', value: 5 },
+      other: { kind: 'none', value: 0 },
+    } });
   });
 });

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260815-team-header1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260815-itemized-commission1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
@@ -26,7 +26,7 @@
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260814-operation-member1"></script>
   <script defer src="/operacao/caixa-team-remuneration.js?v=20260814-operation-team1"></script>
-  <script defer src="/operacao/caixa-team-commission.js?v=20260814-operation-team2"></script>
+  <script defer src="/operacao/caixa-team-commission.js?v=20260815-itemized-commission1"></script>
   <script defer src="/operacao/caixa-team-permissions.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
@@ -666,8 +666,7 @@
         <div id="finance-commissions-panel" class="app-panel finance-commission-page hidden" aria-labelledby="finance-commissions-title">
           <header class="finance-commission-toolbar">
             <button id="finance-commissions-back" type="button" aria-label="Voltar ao Financeiro"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="finance-commissions-title">Comissões</h2><p id="finance-commissions-unit">Unidade</p></div>
-            <span>Proprietário</span>
+            <div><small>Financeiro</small><h2 id="finance-commissions-title">Comissões</h2><p id="finance-commissions-unit" class="sr-only">Unidade</p></div>
           </header>
           <div id="finance-commissions-ranges" class="finance-commission-ranges" role="group" aria-label="Período das comissões">
             <button type="button" data-commission-range="today">Hoje</button>
@@ -690,8 +689,7 @@
         <div id="finance-commission-detail-panel" class="app-panel finance-commission-page finance-commission-detail-page hidden" aria-labelledby="finance-commission-detail-title">
           <header class="finance-commission-toolbar">
             <button id="finance-commission-detail-back" type="button" aria-label="Voltar às comissões"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="finance-commission-detail-title">Detalhes da comissão</h2><p id="finance-commission-detail-unit">Unidade</p></div>
-            <span>Proprietário</span>
+            <div><small>Financeiro</small><h2 id="finance-commission-detail-title">Detalhes da comissão</h2><p id="finance-commission-detail-unit" class="sr-only">Unidade</p></div>
           </header>
           <section class="finance-commission-person"><b id="finance-commission-person-avatar">CO</b><div><strong id="finance-commission-person-name">Colaborador</strong><span id="finance-commission-person-role">Vendedor</span><small><i></i><em id="finance-commission-person-status">Ativo</em></small></div></section>
           <div id="finance-commission-detail-ranges" class="finance-commission-ranges" role="group" aria-label="Período da comissão">
@@ -766,19 +764,41 @@
           <div id="team-commission-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a regra.</strong><button id="team-commission-retry" type="button">Tentar novamente</button></div>
           <form id="team-commission-form" class="team-detail-content hidden">
             <section class="team-person"><b id="team-commission-avatar">CO</b><div><strong id="team-commission-name">Colaborador</strong><span id="team-commission-role">Função</span><small><i></i><em id="team-commission-status">Ativo</em></small></div></section>
-            <h3>Modelo da comissão</h3>
-            <div class="team-rule-options"><label><input type="radio" name="team-commission-kind" value="percent" /><span><b>Porcentagem</b><small>Percentual sobre o valor vendido</small></span></label><label><input type="radio" name="team-commission-kind" value="fixed" /><span><b>Valor fixo</b><small>Um valor definido por venda ou serviço</small></span></label><label><input type="radio" name="team-commission-kind" value="none" /><span><b>Sem comissão</b><small>Não gera comissão nas vendas</small></span></label></div>
-            <div id="team-rule-fields" class="team-rule-fields">
-              <label id="team-commission-value-label" class="team-rule-value">Percentual<span><input id="team-commission-value" type="number" min="0" step="0.01" inputmode="decimal" /><em id="team-commission-unit-symbol">%</em></span></label>
-              <p id="team-commission-example" class="team-rule-example">Exemplo: venda de R$ 1.000,00 <strong>Comissão: R$ 0,00</strong></p>
-              <h3>Onde se aplica</h3>
-              <section class="team-rule-scope" aria-label="Aplicação da regra atual">
-                <label><input type="checkbox" checked disabled /><span>Produtos</span></label>
-                <label><input type="checkbox" checked disabled /><span>Serviços</span></label>
-                <label><input type="checkbox" checked disabled /><span>Outros itens</span></label>
-              </section>
-              <section class="team-form-card team-rule-meta"><label>Base de cálculo<span><select id="team-commission-basis"></select><i aria-hidden="true">›</i></span></label><label>Início da vigência<span><input id="team-commission-start" type="date" required /><i aria-hidden="true">›</i></span></label></section>
+            <div id="team-commission-legacy-rule">
+              <h3>Modelo da comissão</h3>
+              <div class="team-rule-options"><label><input type="radio" name="team-commission-kind" value="percent" /><span><b>Porcentagem</b><small>Percentual sobre o valor vendido</small></span></label><label><input type="radio" name="team-commission-kind" value="fixed" /><span><b>Valor fixo</b><small>Um valor por venda, entrega ou rota</small></span></label><label><input type="radio" name="team-commission-kind" value="none" /><span><b>Sem comissão</b><small>Não gera comissão</small></span></label></div>
+              <div id="team-rule-fields" class="team-rule-fields">
+                <label id="team-commission-value-label" class="team-rule-value">Percentual<span><input id="team-commission-value" type="number" min="0" step="0.01" inputmode="decimal" /><em id="team-commission-unit-symbol">%</em></span></label>
+                <p id="team-commission-example" class="team-rule-example">Exemplo: venda de R$ 1.000,00 <strong>Comissão: R$ 0,00</strong></p>
+                <section class="team-form-card team-rule-meta"><label>Base de cálculo<span><select id="team-commission-basis"></select><i aria-hidden="true">›</i></span></label></section>
+              </div>
             </div>
+            <div id="team-commission-itemized-rule" class="hidden">
+              <h3>Comissão por tipo de item</h3>
+              <p class="team-item-rule-intro">Cada parte da venda é calculada separadamente. Assim um serviço barato nunca recebe a comissão fixa de um pneu.</p>
+              <section class="team-item-rules" aria-label="Regras por tipo de item">
+                <article data-commission-group="tire">
+                  <div class="team-item-rule-heading"><b>Pneus</b><small>Fixo é cobrado por pneu vendido</small></div>
+                  <label>Modelo<select id="team-commission-tire-kind"><option value="percent">Porcentagem</option><option value="fixed">Valor fixo por pneu</option><option value="none">Sem comissão</option></select></label>
+                  <label class="team-item-rule-value"><span>Valor</span><b><em id="team-commission-tire-symbol">%</em><input id="team-commission-tire-value" type="number" min="0" step="0.01" inputmode="decimal" /></b></label>
+                  <small id="team-commission-tire-example" class="team-item-rule-example">Exemplo</small>
+                </article>
+                <article data-commission-group="service">
+                  <div class="team-item-rule-heading"><b>Serviços</b><small>Percentual acompanha o preço do serviço</small></div>
+                  <label>Modelo<select id="team-commission-service-kind"><option value="percent">Porcentagem</option><option value="none">Sem comissão</option></select></label>
+                  <label class="team-item-rule-value"><span>Valor</span><b><em id="team-commission-service-symbol">%</em><input id="team-commission-service-value" type="number" min="0" max="100" step="0.01" inputmode="decimal" /></b></label>
+                  <small id="team-commission-service-example" class="team-item-rule-example">Exemplo</small>
+                </article>
+                <article data-commission-group="other">
+                  <div class="team-item-rule-heading"><b>Outros itens</b><small>Insumos e mercadorias que não são pneus</small></div>
+                  <label>Modelo<select id="team-commission-other-kind"><option value="percent">Porcentagem</option><option value="none">Sem comissão</option></select></label>
+                  <label class="team-item-rule-value"><span>Valor</span><b><em id="team-commission-other-symbol">%</em><input id="team-commission-other-value" type="number" min="0" max="100" step="0.01" inputmode="decimal" /></b></label>
+                  <small id="team-commission-other-example" class="team-item-rule-example">Exemplo</small>
+                </article>
+              </section>
+              <p id="team-commission-migration-note" class="team-private-note hidden"><b>!</b>Esta é uma regra antiga por venda inteira. Revise os grupos e salve para ativar o cálculo separado.</p>
+            </div>
+            <section class="team-form-card team-rule-meta team-rule-start"><label>Início da vigência<span><input id="team-commission-start" type="date" required /><i aria-hidden="true">›</i></span></label></section>
             <p class="team-private-note"><b>i</b>A nova regra não altera comissões de vendas anteriores.</p>
             <button id="team-commission-history-toggle" class="team-secondary team-history-toggle" type="button" aria-expanded="false">Ver histórico de regras</button>
             <section id="team-commission-history" class="team-rule-history hidden" aria-label="Histórico de regras"></section>

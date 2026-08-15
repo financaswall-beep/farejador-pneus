@@ -12,6 +12,8 @@ type Environment = 'prod' | 'test';
 
 const commissionSql = `CASE
   WHEN o.status='cancelled' THEN 0
+  WHEN cr.active AND cr.itemized
+    THEN finance.matriz_retail_itemized_commission(o.environment,o.id,cr.item_rules)
   WHEN cr.active AND cr.kind='percent' AND cr.basis='margin'
     THEN round(items.margin*cr.value/100.0,2)
   WHEN cr.active AND cr.kind='percent' AND cr.basis='revenue'
@@ -34,7 +36,7 @@ const itemLateralSql = `LEFT JOIN LATERAL (
 ) items ON true`;
 
 const ruleLateralSql = `LEFT JOIN LATERAL (
-  SELECT r.kind,r.basis,r.value,r.active
+  SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules
     FROM network.matriz_collaborator_commission_rules r
    WHERE r.environment=o.environment AND r.collaborator_id=o.seller_collaborator_id
      AND r.starts_on <= (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date

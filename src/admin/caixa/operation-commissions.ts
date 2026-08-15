@@ -21,7 +21,7 @@ const salesFactsSql = `WITH retail AS (
   SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
          'Pedido #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,
          o.created_at occurred_at,o.payment_method,o.total_amount gross_amount,
-         COALESCE(items.margin,0) margin
+         COALESCE(items.margin,0) margin,'retail'::text sale_channel,o.id source_id
     FROM commerce.orders o
     JOIN core.units u ON u.id=o.unit_id AND u.environment=o.environment AND u.slug='main'
     LEFT JOIN LATERAL (
@@ -36,7 +36,7 @@ const salesFactsSql = `WITH retail AS (
   SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
          'Atacado #'||right(o.id::text,6) reference,o.created_at occurred_at,
          NULL::text payment_method,o.total_amount gross_amount,
-         COALESCE(items.margin,0) margin
+         COALESCE(items.margin,0) margin,'wholesale'::text sale_channel,o.id source_id
     FROM commerce.wholesale_orders o
     LEFT JOIN LATERAL (
       SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*oi.quantity),0) margin
@@ -49,6 +49,10 @@ const salesFactsSql = `WITH retail AS (
   SELECT s.*,rule.kind commission_kind,rule.basis commission_basis,
          COALESCE(rule.value,0) commission_value,
          CASE
+           WHEN rule.active AND rule.itemized AND s.sale_channel='retail'
+             THEN finance.matriz_retail_itemized_commission($1,s.source_id,rule.item_rules)
+           WHEN rule.active AND rule.itemized AND s.sale_channel='wholesale'
+             THEN finance.matriz_wholesale_itemized_commission($1,s.source_id,rule.item_rules)
            WHEN rule.active AND rule.kind='percent' AND rule.basis='margin'
              THEN round(s.margin*rule.value/100,2)
            WHEN rule.active AND rule.kind='percent' AND rule.basis='revenue'
@@ -58,7 +62,7 @@ const salesFactsSql = `WITH retail AS (
            ELSE 0 END commission_amount
     FROM sales s
     LEFT JOIN LATERAL (
-      SELECT r.kind,r.basis,r.value,r.active
+      SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules
         FROM network.matriz_collaborator_commission_rules r
        WHERE r.environment=$1 AND r.collaborator_id=s.collaborator_id
          AND r.starts_on <= (s.occurred_at AT TIME ZONE 'America/Sao_Paulo')::date

@@ -9,6 +9,8 @@
     revenue: 'Valor final da venda', margin: 'Margem da venda', sale: 'Por venda',
     delivery: 'Por entrega concluída', trip: 'Por rota concluída',
   };
+  const itemGroups = ['tire', 'service', 'other'];
+  const itemLabels = { tire: 'Pneus', service: 'Serviços', other: 'Outros' };
 
   function formatDate(value) {
     const parts = String(value || '').slice(0, 10).split('-');
@@ -17,6 +19,15 @@
 
   function historyLabel(item) {
     if (!item.active) return 'Sem comissão';
+    if (item.itemized) {
+      return itemGroups.map(function (group) {
+        const rule = (item.item_rules && item.item_rules[group]) || { kind: 'none', value: 0 };
+        if (rule.kind === 'none') return itemLabels[group] + ': sem comissão';
+        return itemLabels[group] + ': ' + (rule.kind === 'percent'
+          ? Number(rule.value || 0).toLocaleString('pt-BR') + '%'
+          : Caixa.currency.format(Number(rule.value || 0)) + ' por pneu');
+      }).join(' · ');
+    }
     return item.kind === 'percent'
       ? Number(item.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
       : Caixa.currency.format(Number(item.value || 0)) + ' por ' + String(basisLabels[item.basis] || item.basis).toLowerCase();
@@ -33,7 +44,7 @@
       const title = document.createElement('strong'); title.textContent = historyLabel(item);
       const date = document.createElement('time'); date.textContent = formatDate(item.starts_on);
       const detail = document.createElement('small');
-      detail.textContent = item.active ? 'Base: ' + (basisLabels[item.basis] || item.basis) : 'Regra desativada';
+      detail.textContent = item.active ? (item.itemized ? 'Cálculo separado por item' : 'Base: ' + (basisLabels[item.basis] || item.basis)) : 'Regra desativada';
       row.append(title, date, detail); list.appendChild(row);
     });
   }
@@ -89,6 +100,67 @@
     document.getElementById('team-commission-example').querySelector('strong').textContent = 'Comissão: ' + Caixa.currency.format(example);
   }
 
+  function salesRule() {
+    const available = (payload && payload.available_bases) || [];
+    return available.includes('revenue') && available.includes('sale');
+  }
+
+  function blankItemRules() {
+    return {
+      tire: { kind: 'none', value: 0 },
+      service: { kind: 'none', value: 0 },
+      other: { kind: 'none', value: 0 },
+    };
+  }
+
+  function itemRulesFrom(data) {
+    if (data.itemized && data.item_rules) return data.item_rules;
+    const rules = blankItemRules();
+    if (!data.active) return rules;
+    if (data.kind === 'fixed') rules.tire = { kind: 'fixed', value: Number(data.value || 0) };
+    else itemGroups.forEach(function (group) { rules[group] = { kind: 'percent', value: Number(data.value || 0) }; });
+    return rules;
+  }
+
+  function readItemRules() {
+    const result = blankItemRules();
+    itemGroups.forEach(function (group) {
+      const kind = document.getElementById('team-commission-' + group + '-kind').value;
+      result[group] = {
+        kind: kind,
+        value: kind === 'none' ? 0 : Number(document.getElementById('team-commission-' + group + '-value').value || 0),
+      };
+    });
+    return result;
+  }
+
+  function refreshItemRule(group) {
+    const kind = document.getElementById('team-commission-' + group + '-kind').value;
+    const input = document.getElementById('team-commission-' + group + '-value');
+    const wrapper = input.closest('.team-item-rule-value');
+    input.disabled = kind === 'none'; wrapper.classList.toggle('is-disabled', kind === 'none');
+    if (kind === 'percent') input.max = '100'; else input.removeAttribute('max');
+    document.getElementById('team-commission-' + group + '-symbol').textContent = kind === 'fixed' ? 'R$' : '%';
+    const value = Number(input.value || 0);
+    const example = group === 'tire'
+      ? (kind === 'fixed' ? '2 pneus vendidos → ' + Caixa.currency.format(value * 2)
+        : 'Pneu de R$ 200 → ' + Caixa.currency.format(200 * value / 100))
+      : group === 'service'
+        ? 'Serviço de R$ 25 → ' + Caixa.currency.format(kind === 'none' ? 0 : 25 * value / 100)
+        : 'Item de R$ 100 → ' + Caixa.currency.format(kind === 'none' ? 0 : value);
+    document.getElementById('team-commission-' + group + '-example').textContent = kind === 'none' ? 'Não gera comissão.' : example;
+  }
+
+  function renderItemRules(data) {
+    const rules = itemRulesFrom(data);
+    itemGroups.forEach(function (group) {
+      document.getElementById('team-commission-' + group + '-kind').value = rules[group].kind;
+      document.getElementById('team-commission-' + group + '-value').value = rules[group].value || '';
+      refreshItemRule(group);
+    });
+    document.getElementById('team-commission-migration-note').classList.toggle('hidden', data.itemized || !data.active);
+  }
+
   function render(data) {
     payload = data; const member = data.member;
     document.getElementById('team-commission-unit').textContent = data.unit_name;
@@ -96,6 +168,9 @@
     document.getElementById('team-commission-name').textContent = member.name;
     document.getElementById('team-commission-role').textContent = member.role;
     document.getElementById('team-commission-status').textContent = member.active ? 'Ativo' : 'Inativo';
+    const itemized = salesRule();
+    document.getElementById('team-commission-legacy-rule').classList.toggle('hidden', itemized);
+    document.getElementById('team-commission-itemized-rule').classList.toggle('hidden', !itemized);
     const kind = data.active ? data.kind : 'none';
     document.querySelectorAll('input[name="team-commission-kind"]').forEach(function (radio) {
       const available = radio.value === 'none' || basesFor(radio.value).length > 0;
@@ -106,6 +181,7 @@
     const start = document.getElementById('team-commission-start'); start.value = String(data.starts_on).slice(0, 10);
     if (Caixa.isPartner()) start.max = new Date().toISOString().slice(0, 10); else start.removeAttribute('max');
     renderBases(data.kind, data.basis); refreshFields();
+    if (itemized) renderItemRules(data);
     renderHistory(data.history || []);
     document.getElementById('team-commission-history').classList.add('hidden');
     const historyToggle = document.getElementById('team-commission-history-toggle');
@@ -127,12 +203,27 @@
 
   async function save(event) {
     event.preventDefault(); const kindChoice = selectedKind();
-    const fallbackKind = payload.kind || 'percent'; const kind = kindChoice === 'none' ? fallbackKind : kindChoice;
-    const available = basesFor(kind); const body = {
-      kind: kind, basis: document.getElementById('team-commission-basis').value || available[0],
-      value: kindChoice === 'none' ? 0 : Number(document.getElementById('team-commission-value').value || 0),
-      active: kindChoice !== 'none', starts_on: document.getElementById('team-commission-start').value,
-    };
+    let body;
+    if (salesRule()) {
+      const rules = readItemRules();
+      const representative = itemGroups.map(function (group) { return rules[group]; })
+        .find(function (rule) { return rule.kind !== 'none' && rule.value > 0; });
+      body = {
+        kind: representative && representative.kind === 'fixed' ? 'fixed' : 'percent',
+        basis: representative && representative.kind === 'fixed' ? 'sale' : 'revenue',
+        value: representative ? representative.value : 0,
+        active: Boolean(representative), itemized: true, item_rules: rules,
+        starts_on: document.getElementById('team-commission-start').value,
+      };
+    } else {
+      const fallbackKind = payload.kind || 'percent'; const kind = kindChoice === 'none' ? fallbackKind : kindChoice;
+      const available = basesFor(kind); body = {
+        kind: kind, basis: document.getElementById('team-commission-basis').value || available[0],
+        value: kindChoice === 'none' ? 0 : Number(document.getElementById('team-commission-value').value || 0),
+        active: kindChoice !== 'none', itemized: false, item_rules: blankItemRules(),
+        starts_on: document.getElementById('team-commission-start').value,
+      };
+    }
     const error = document.getElementById('team-commission-save-error'); error.textContent = '';
     const button = document.getElementById('team-commission-save'); button.disabled = true; button.textContent = 'Salvando…';
     try {
@@ -164,4 +255,8 @@
   document.querySelectorAll('input[name="team-commission-kind"]').forEach(function (radio) { radio.addEventListener('change', refreshFields); });
   document.getElementById('team-commission-value').addEventListener('input', refreshFields);
   document.getElementById('team-commission-basis').addEventListener('change', refreshFields);
+  itemGroups.forEach(function (group) {
+    document.getElementById('team-commission-' + group + '-kind').addEventListener('change', function () { refreshItemRule(group); });
+    document.getElementById('team-commission-' + group + '-value').addEventListener('input', function () { refreshItemRule(group); });
+  });
 }());

@@ -6,6 +6,15 @@ export interface OperationBenefit {
 
 export type OperationCommissionKind = 'percent' | 'fixed';
 export type OperationCommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
+export type OperationCommissionItemGroup = 'tire' | 'service' | 'other';
+export type OperationCommissionItemKind = OperationCommissionKind | 'none';
+
+export interface OperationCommissionItemRule {
+  kind: OperationCommissionItemKind;
+  value: number;
+}
+
+export type OperationCommissionItemRules = Record<OperationCommissionItemGroup, OperationCommissionItemRule>;
 
 export interface OperationTeamMember {
   id: string;
@@ -53,6 +62,8 @@ export interface OperationCommissionRulePayload {
   value: number;
   active: boolean;
   starts_on: string;
+  itemized: boolean;
+  item_rules: OperationCommissionItemRules;
   available_bases: OperationCommissionBasis[];
   history: OperationCommissionHistoryItem[];
 }
@@ -63,6 +74,8 @@ export interface OperationCommissionHistoryItem {
   value: number;
   active: boolean;
   starts_on: string;
+  itemized: boolean;
+  item_rules: OperationCommissionItemRules;
 }
 
 export type OperationPermissionKey =
@@ -96,4 +109,32 @@ export function benefitsOf(value: unknown): OperationBenefit[] {
 
 export function benefitTotal(benefits: OperationBenefit[]): number {
   return money(benefits.reduce((sum, item) => sum + (item.active ? item.amount : 0), 0));
+}
+
+export function emptyCommissionItemRules(): OperationCommissionItemRules {
+  return {
+    tire: { kind: 'none', value: 0 },
+    service: { kind: 'none', value: 0 },
+    other: { kind: 'none', value: 0 },
+  };
+}
+
+export function commissionItemRulesOf(value: unknown): OperationCommissionItemRules {
+  const rules = emptyCommissionItemRules();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return rules;
+  const source = value as Record<string, unknown>;
+  (Object.keys(rules) as OperationCommissionItemGroup[]).forEach((group) => {
+    const candidate = source[group];
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return;
+    const row = candidate as Record<string, unknown>;
+    const rawKind = String(row.kind ?? 'none');
+    const kind: OperationCommissionItemKind = rawKind === 'percent'
+      ? 'percent' : rawKind === 'fixed' && group === 'tire' ? 'fixed' : 'none';
+    const valueAmount = kind === 'none' ? 0 : money(row.value);
+    rules[group] = {
+      kind: kind === 'percent' && valueAmount > 100 ? 'none' : kind,
+      value: kind === 'percent' && valueAmount > 100 ? 0 : valueAmount,
+    };
+  });
+  return rules;
 }

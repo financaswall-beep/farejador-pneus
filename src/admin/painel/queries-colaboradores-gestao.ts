@@ -3,6 +3,7 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
 import { benefitsOf, benefitTotal, type OperationBenefit } from '../../shared/operation-team.js';
+import { commissionItemRulesOf, type OperationCommissionItemRules } from '../../shared/operation-team.js';
 
 type Queryable = Pick<Pool, 'query'>;
 type WorkArea = 'sales' | 'delivery' | 'administrative' | 'workshop' | 'other';
@@ -17,6 +18,7 @@ export interface CollaboratorManagementRow {
   benefits: OperationBenefit[]; benefits_total: number;
   commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
   commission_value: number; commission_starts_on: string | null; commission_active: boolean;
+  commission_itemized: boolean; commission_item_rules: OperationCommissionItemRules;
   sales_count: number; revenue: number; margin: number; items_without_cost: number; deliveries_count: number;
   trips_count: number; distance_km: number; on_time_pct: number | null;
   additions: number; deductions: number; commission_amount: number; total_due: number;
@@ -51,7 +53,9 @@ export async function getMatrizCollaboratorManagement(
               COALESCE(cp.benefits,'[]'::jsonb) AS benefits,
               cr.kind AS commission_kind, cr.basis AS commission_basis,
               COALESCE(cr.value, 0) AS commission_value, cr.starts_on AS commission_starts_on,
-              COALESCE(cr.active, false) AS commission_active
+              COALESCE(cr.active, false) AS commission_active,
+              COALESCE(cr.itemized,false) AS commission_itemized,
+              COALESCE(cr.item_rules,'{}'::jsonb) AS commission_item_rules
          FROM network.matriz_collaborators mc
          JOIN network.partner_people pp ON pp.id = mc.person_id
          LEFT JOIN LATERAL (
@@ -73,6 +77,7 @@ export async function getMatrizCollaboratorManagement(
          -- Venda conta na competencia de created_at. Cancelada antes do
          -- fechamento sai da apuracao; salario nao tem rateio por dia.
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
+                o.id AS source_id, 'retail'::text AS sale_channel,
                 (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
                 1::int AS sales_count, o.total_amount AS revenue, items.margin,
                 items.items_without_cost, 0::int AS deliveries_count, 0::int AS trips_count,
@@ -91,6 +96,7 @@ export async function getMatrizCollaboratorManagement(
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), wholesale AS (
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
+                o.id AS source_id, 'wholesale'::text AS sale_channel,
                 (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
                 1::int AS sales_count, o.total_amount AS revenue, items.margin,
                 0::int AS items_without_cost, 0::int AS deliveries_count, 0::int AS trips_count,
@@ -105,6 +111,7 @@ export async function getMatrizCollaboratorManagement(
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), trip_events AS (
          SELECT t.courier_collaborator_id AS id, 'trip'::text AS event_type,
+                t.id AS source_id, NULL::text AS sale_channel,
                 (t.ended_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
                 0::int AS sales_count, 0::numeric AS revenue, 0::numeric AS margin,
                 0::int AS items_without_cost, 0::int AS deliveries_count, 1::int AS trips_count,
@@ -118,6 +125,7 @@ export async function getMatrizCollaboratorManagement(
             AND (t.ended_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), delivery_events AS (
          SELECT t.courier_collaborator_id AS id, 'delivery'::text AS event_type,
+                o.id AS source_id, NULL::text AS sale_channel,
                 (o.delivered_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
                 0::int AS sales_count, 0::numeric AS revenue, 0::numeric AS margin,
                 0::int AS items_without_cost, 1::int AS deliveries_count, 0::int AS trips_count,
@@ -136,8 +144,12 @@ export async function getMatrizCollaboratorManagement(
          SELECT * FROM retail UNION ALL SELECT * FROM wholesale
          UNION ALL SELECT * FROM trip_events UNION ALL SELECT * FROM delivery_events
        ), ruled AS (
-         SELECT e.*, cr.kind, cr.basis, cr.value, cr.active,
+         SELECT e.*, cr.kind, cr.basis, cr.value, cr.active,cr.itemized,cr.item_rules,
                 CASE
+                  WHEN cr.active AND cr.itemized AND e.event_type='sale' AND e.sale_channel='retail'
+                    THEN finance.matriz_retail_itemized_commission($1,e.source_id,cr.item_rules)
+                  WHEN cr.active AND cr.itemized AND e.event_type='sale' AND e.sale_channel='wholesale'
+                    THEN finance.matriz_wholesale_itemized_commission($1,e.source_id,cr.item_rules)
                   WHEN cr.active AND cr.kind='percent' AND cr.basis='margin' THEN e.margin*cr.value/100
                   WHEN cr.active AND cr.kind='percent' AND cr.basis='revenue' THEN e.revenue*cr.value/100
                   WHEN cr.active AND cr.kind='fixed' AND cr.basis='sale' AND e.event_type='sale' THEN cr.value
@@ -146,7 +158,8 @@ export async function getMatrizCollaboratorManagement(
                   ELSE 0 END AS commission_amount
            FROM events e
            LEFT JOIN LATERAL (
-             SELECT r.kind,r.basis,r.value,r.active FROM network.matriz_collaborator_commission_rules r
+             SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules
+               FROM network.matriz_collaborator_commission_rules r
               WHERE r.collaborator_id=e.id AND r.environment=$1
                 AND r.starts_on <= e.event_date
               ORDER BY r.starts_on DESC LIMIT 1
@@ -198,6 +211,8 @@ export async function getMatrizCollaboratorManagement(
       payment_day: p.payment_day === null ? null : n(p.payment_day),
       benefits, benefits_total: benefitTotal(benefits),
       commission_value: n(p.commission_value), commission_active: Boolean(p.commission_active),
+      commission_itemized: Boolean(p.commission_itemized),
+      commission_item_rules: commissionItemRulesOf(p.commission_item_rules),
       sales_count: n(q.sales_count), revenue: n(q.revenue), margin: n(q.margin), items_without_cost: n(q.items_without_cost),
       deliveries_count: n(q.deliveries_count), trips_count: n(q.trips_count), distance_km: n(q.distance_km),
       on_time_pct: q.on_time_pct === null || q.on_time_pct === undefined ? null : n(q.on_time_pct),

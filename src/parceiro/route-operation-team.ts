@@ -29,9 +29,29 @@ const compensation = z.object({
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
   starts_on: startsOn, benefits,
 });
+const commissionItemRule = z.object({
+  kind: z.enum(['percent', 'fixed', 'none']), value: money,
+});
+const commissionItemRules = z.object({
+  tire: commissionItemRule,
+  service: commissionItemRule,
+  other: commissionItemRule,
+}).superRefine((rules, ctx) => {
+  if (rules.service.kind === 'fixed' || rules.other.kind === 'fixed'
+      || Object.values(rules).some((rule) => rule.kind === 'percent' && rule.value > 100)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_item_rules' });
+  }
+});
+const itemizedFields = {
+  itemized: z.boolean().default(false),
+  item_rules: commissionItemRules.default({
+    tire: { kind: 'none' as const, value: 0 }, service: { kind: 'none' as const, value: 0 },
+    other: { kind: 'none' as const, value: 0 },
+  }),
+};
 const commission = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('percent'), basis: z.literal('revenue'), value: money.max(100), active: z.boolean(), starts_on: startsOn }),
-  z.object({ kind: z.literal('fixed'), basis: z.literal('sale'), value: money, active: z.boolean(), starts_on: startsOn }),
+  z.object({ kind: z.literal('percent'), basis: z.literal('revenue'), value: money.max(100), active: z.boolean(), starts_on: startsOn, ...itemizedFields }),
+  z.object({ kind: z.literal('fixed'), basis: z.literal('sale'), value: money, active: z.boolean(), starts_on: startsOn, ...itemizedFields }),
 ]);
 const permissions = z.object({
   vendas: z.boolean(), estoque: z.boolean(), pedidos: z.boolean(), clientes: z.boolean(),

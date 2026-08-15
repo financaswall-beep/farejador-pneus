@@ -1050,14 +1050,13 @@ form { display: grid; gap: 16px; }
 .finance-entries-page.is-output .finance-entry-card-icon { color: #c7432a; background: #fff0eb; }
 
 /* Financeiro · comissões e remuneração */
-.finance-commission-page { min-height: 650px; padding: 0 14px 110px; color: #101b16; background: #fff; }
-.finance-commission-toolbar { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; margin: 0 -14px 16px; padding: 22px 16px 20px; color: #fff; background: linear-gradient(120deg,#006643,#00472f); }
-.finance-commission-toolbar > button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 50%; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
+.finance-commission-page { min-height: 650px; padding: 16px 14px 110px; color: #101b16; background: #fff; }
+.finance-commission-toolbar { display: grid; grid-template-columns: 43px minmax(0,1fr); align-items: center; gap: 11px; margin: 0 0 16px; padding: 2px 1px 13px; border-bottom: 1px solid #e1e8e4; }
+.finance-commission-toolbar > button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 50%; color: #087246; background: #edf7f2; cursor: pointer; }
 .finance-commission-toolbar > button svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
-.finance-commission-toolbar h2,.finance-commission-toolbar p { margin: 0; }
-.finance-commission-toolbar h2 { font-size: 25px; letter-spacing: -.035em; }
-.finance-commission-toolbar p { margin-top: 3px; color: #d4eadf; font-size: 14px; }
-.finance-commission-toolbar > span { padding: 9px 12px; border: 1px solid rgba(255,255,255,.68); border-radius: 12px; font-size: 13px; }
+.finance-commission-toolbar h2,.finance-commission-toolbar p,.finance-commission-toolbar small { margin: 0; }
+.finance-commission-toolbar h2 { color: #12231c; font-size: 22px; line-height: 1.08; letter-spacing: -.035em; }
+.finance-commission-toolbar small { display: block; margin-bottom: 3px; color: #087246; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; }
 .finance-commission-ranges { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 9px; margin: 16px 1px; }
 .finance-commission-ranges button { min-height: 47px; padding: 5px; border: 1px solid #b9c7c0; border-radius: 13px; color: #075f40; background: #fff; font-size: 15px; font-weight: 720; cursor: pointer; }
 .finance-commission-ranges button.active { border-color: #08794f; color: #fff; background: linear-gradient(135deg,#087e51,#00623f); box-shadow: 0 7px 16px rgba(0,102,67,.16); }
@@ -1127,7 +1126,8 @@ form { display: grid; gap: 16px; }
 .finance-commission-pay[data-status="paid"] { color: #fff; background: #07945c; }
 
 @media (max-width: 380px) {
-  .finance-commission-toolbar > span { padding-inline: 8px; font-size: 11px; }
+  .finance-commission-toolbar { grid-template-columns: 40px minmax(0,1fr); }
+  .finance-commission-toolbar h2 { font-size: 20px; }
   .finance-commission-ranges { gap: 6px; }
   .finance-commission-ranges button { font-size: 13px; }
   .finance-commission-list article { grid-template-columns: 43px minmax(0,1fr) auto; }
@@ -1930,8 +1930,11 @@ form { display: grid; gap: 16px; }
 .team-rule-fields { margin-top: 14px; }
 .team-rule-fields.is-disabled { opacity: .45; }
 .team-rule-value {
-  display: block;
-  padding: 8px 15px 10px;
+  display: grid;
+  width: min(100%,220px);
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  padding: 8px 12px;
   border: 1px solid #9aa69f;
   border-radius: 14px;
   color: #6d7772;
@@ -1939,19 +1942,19 @@ form { display: grid; gap: 16px; }
   font-size: 12px;
 }
 .team-rule-value:focus-within { border-color: #08774e; box-shadow: 0 0 0 3px rgba(8,119,78,.1); }
-.team-rule-value > span { display: flex; align-items: baseline; gap: 7px; margin-top: 2px; }
+.team-rule-value > span { display: flex; align-items: baseline; gap: 5px; margin-top: 0; }
 .team-rule-value input {
   min-width: 0;
-  width: 135px;
+  width: 84px;
   padding: 0;
   border: 0;
   outline: 0;
   color: #121a16;
   background: transparent;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 750;
 }
-.team-rule-value em { color: #18231e; font-size: 18px; font-style: normal; }
+.team-rule-value em { color: #18231e; font-size: 15px; font-style: normal; }
 .team-rule-example {
   margin: 12px 0 18px;
   padding: 12px 15px;
@@ -1981,6 +1984,7 @@ form { display: grid; gap: 16px; }
 .team-rule-scope label + label { border-top: 1px solid #e5ebe7; }
 .team-rule-scope input { width: 22px; height: 22px; margin: 0; opacity: 1; accent-color: #08774e; }
 .team-rule-meta { margin-top: 14px; }
+.team-rule-start { margin-top: 14px; }
 .team-rule-meta > label > span { min-width: 0; }
 .team-rule-meta select,.team-rule-meta input[type="date"] {
   width: 174px;
@@ -2011,6 +2015,42 @@ form { display: grid; gap: 16px; }
 .team-rule-history strong { color: #17231e; font-size: 13px; }
 .team-rule-history time { color: #627068; font-size: 12px; }
 .team-rule-history small { grid-column: 1/-1; color: #68766f; font-size: 11px; }
+.team-item-rule-intro { margin: -2px 0 12px; color: #617068; font-size: 12px; line-height: 1.45; }
+.team-item-rules { display: grid; gap: 10px; }
+.team-item-rules article {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 132px;
+  gap: 10px 12px;
+  padding: 13px 14px;
+  border: 1px solid #dce6e0;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(22,53,40,.055);
+}
+.team-item-rule-heading { grid-column: 1/-1; }
+.team-item-rule-heading b,.team-item-rule-heading small { display: block; }
+.team-item-rule-heading b { color: #15241c; font-size: 16px; }
+.team-item-rule-heading small { margin-top: 2px; color: #68766f; font-size: 11px; }
+.team-item-rules article > label { color: #68766f; font-size: 11px; }
+.team-item-rules select {
+  width: 100%; height: 39px; margin-top: 4px; padding: 0 9px;
+  border: 1px solid #d3ddd7; border-radius: 10px; color: #1e2d25; background: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+}
+.team-item-rule-value > b {
+  display: flex; height: 39px; align-items: center; gap: 5px; margin-top: 4px;
+  padding: 0 9px; border: 1px solid #d3ddd7; border-radius: 10px; background: #fff;
+}
+.team-item-rule-value em { color: #526159; font-size: 12px; font-style: normal; font-weight: 700; }
+.team-item-rule-value input {
+  width: 100%; min-width: 0; border: 0; outline: 0; color: #102019; background: transparent;
+  font-size: 17px; font-weight: 750; text-align: right;
+}
+.team-item-rule-value.is-disabled { opacity: .42; }
+.team-item-rule-example {
+  grid-column: 1/-1; min-height: 25px; padding: 6px 9px; border-radius: 8px;
+  color: #276047; background: #f0f8f4; font-size: 11px;
+}
 .team-permission-intro {
   display: grid;
   grid-template-columns: 42px minmax(0,1fr);

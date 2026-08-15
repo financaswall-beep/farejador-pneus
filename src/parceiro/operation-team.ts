@@ -1,8 +1,9 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../persistence/db.js';
 import {
-  benefitTotal, benefitsOf, money,
+  benefitTotal, benefitsOf, commissionItemRulesOf, emptyCommissionItemRules, money,
   type OperationBenefit, type OperationCommissionRulePayload,
+  type OperationCommissionItemRules,
   type OperationCompensationPayload, type OperationTeamMember, type OperationTeamPayload,
 } from '../shared/operation-team.js';
 import type { PartnerContext } from './auth.js';
@@ -147,28 +148,46 @@ export async function getPartnerOperationCommissionRule(
   const row = await find(ctx, tokenId, db); if (!row) return null;
   const history = await db.query<{
     kind: 'percent' | 'fixed'; value: string; active: boolean; starts_on: string;
-  }>(`SELECT kind,value::text,active,starts_on::text
+    itemized: boolean; item_rules: unknown;
+  }>(`SELECT kind,value::text,active,starts_on::text,itemized,item_rules
         FROM network.partner_token_commission_history
        WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3
        ORDER BY starts_on DESC,updated_at DESC LIMIT 24`,
   [ctx.environment, ctx.partnerUnitId, tokenId]);
+  const config = await db.query<{ itemized: boolean; item_rules: unknown }>(
+    `SELECT itemized,item_rules FROM network.partner_token_commission
+      WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3`,
+    [ctx.environment, ctx.partnerUnitId, tokenId],
+  );
   return {
     unit_name: ctx.unitName, member: memberOf(row), kind: row.commission_kind ?? 'percent',
     basis: row.commission_kind === 'fixed' ? 'sale' : 'revenue', value: money(row.commission_value),
     active: row.commission_active, starts_on: row.commission_starts_on || localDate(),
+    itemized: Boolean(config.rows[0]?.itemized),
+    item_rules: commissionItemRulesOf(config.rows[0]?.item_rules),
     available_bases: ['revenue', 'sale'],
     history: history.rows.map((item) => ({
       ...item, value: money(item.value), basis: item.kind === 'fixed' ? 'sale' : 'revenue',
+      item_rules: commissionItemRulesOf(item.item_rules),
     })),
   };
 }
 
 export async function savePartnerOperationCommissionRule(ctx: PartnerContext, tokenId: string, input: {
   kind: 'percent' | 'fixed'; basis: 'revenue' | 'sale'; value: number; active: boolean; starts_on: string;
+  itemized: boolean; item_rules: OperationCommissionItemRules;
 }, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
-  if ((input.kind === 'percent' && input.basis !== 'revenue') || (input.kind === 'fixed' && input.basis !== 'sale')) {
+  if (!input.itemized && ((input.kind === 'percent' && input.basis !== 'revenue') || (input.kind === 'fixed' && input.basis !== 'sale'))) {
     throw new Error('invalid_commission_basis');
   }
+  const rules = input.itemized ? commissionItemRulesOf(input.item_rules) : emptyCommissionItemRules();
+  const representative = (['tire', 'service', 'other'] as const)
+    .map((group) => rules[group]).find((rule) => rule.kind !== 'none' && rule.value > 0);
+  const compatibility = input.itemized ? {
+    kind: representative?.kind === 'fixed' ? 'fixed' as const : 'percent' as const,
+    value: representative?.value ?? 0,
+    active: Boolean(representative) && input.active,
+  } : { kind: input.kind, value: input.value, active: input.active };
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -177,16 +196,20 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
     [ctx.environment, ctx.partnerUnitId, tokenId]);
     if (!member.rows[0]) throw new Error('collaborator_not_found');
     await client.query(`INSERT INTO network.partner_token_commission_history
-      (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8)
+      (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by,itemized,item_rules)
+      VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10::jsonb)
       ON CONFLICT (token_id,starts_on) DO UPDATE SET kind=EXCLUDED.kind,value=EXCLUDED.value,
-        active=EXCLUDED.active,updated_by=EXCLUDED.updated_by,updated_at=now()`,
-    [ctx.environment, ctx.partnerUnitId, tokenId, input.kind, input.value, input.active, input.starts_on, `owner:${ctx.slug}`]);
+        active=EXCLUDED.active,itemized=EXCLUDED.itemized,item_rules=EXCLUDED.item_rules,
+        updated_by=EXCLUDED.updated_by,updated_at=now()`,
+    [ctx.environment, ctx.partnerUnitId, tokenId, compatibility.kind, compatibility.value,
+     compatibility.active, input.starts_on, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules)]);
     await client.query(`INSERT INTO network.partner_token_commission
-      (token_id,environment,partner_unit_id,kind,value,active,updated_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (token_id) DO UPDATE SET
-      kind=EXCLUDED.kind,value=EXCLUDED.value,active=EXCLUDED.active,updated_at=now(),updated_by=EXCLUDED.updated_by`,
-    [tokenId, ctx.environment, ctx.partnerUnitId, input.kind, input.value, input.active, `owner:${ctx.slug}`]);
+      (token_id,environment,partner_unit_id,kind,value,active,updated_by,itemized,item_rules)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) ON CONFLICT (token_id) DO UPDATE SET
+      kind=EXCLUDED.kind,value=EXCLUDED.value,active=EXCLUDED.active,itemized=EXCLUDED.itemized,
+      item_rules=EXCLUDED.item_rules,updated_at=now(),updated_by=EXCLUDED.updated_by`,
+    [tokenId, ctx.environment, ctx.partnerUnitId, compatibility.kind, compatibility.value,
+     compatibility.active, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules)]);
     await client.query('COMMIT');
   } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
   finally { client.release(); }

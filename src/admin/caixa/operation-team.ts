@@ -2,8 +2,9 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import {
-  benefitTotal, benefitsOf, money,
+  benefitTotal, benefitsOf, commissionItemRulesOf, emptyCommissionItemRules, money,
   type OperationBenefit, type OperationCommissionBasis,
+  type OperationCommissionItemRules,
   type OperationCommissionRulePayload, type OperationCompensationPayload,
   type OperationTeamMember, type OperationTeamPayload,
 } from '../../shared/operation-team.js';
@@ -126,8 +127,8 @@ export async function getMatrizOperationCommissionRule(
   const fallback = available[0] ?? 'revenue';
   const history = await db.query<{
     kind: 'percent' | 'fixed'; basis: OperationCommissionBasis;
-    value: string; active: boolean; starts_on: string;
-  }>(`SELECT kind,basis,value::text,active,starts_on::text
+    value: string; active: boolean; starts_on: string; itemized: boolean; item_rules: unknown;
+  }>(`SELECT kind,basis,value::text,active,starts_on::text,itemized,item_rules
         FROM network.matriz_collaborator_commission_rules
        WHERE environment=$1 AND collaborator_id=$2
        ORDER BY starts_on DESC,updated_at DESC LIMIT 24`, [env.FAREJADOR_ENV, collaboratorId]);
@@ -137,19 +138,39 @@ export async function getMatrizOperationCommissionRule(
     basis: found.source.commission_basis ?? fallback,
     value: money(found.source.commission_value), active: found.source.commission_active,
     starts_on: found.source.commission_starts_on || localDate(), available_bases: available,
-    history: history.rows.map((row) => ({ ...row, value: money(row.value) })),
+    itemized: found.source.commission_itemized,
+    item_rules: found.source.commission_item_rules ?? emptyCommissionItemRules(),
+    history: history.rows.map((row) => ({ ...row, value: money(row.value),
+      item_rules: commissionItemRulesOf(row.item_rules) })),
   };
 }
 
 export async function saveMatrizOperationCommissionRule(input: {
   collaborator_id: string; kind: 'percent' | 'fixed'; basis: OperationCommissionBasis;
   value: number; active: boolean; starts_on: string; actor_label: string;
+  itemized: boolean; item_rules: OperationCommissionItemRules;
 }, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
   const found = await findMember(input.collaborator_id, db);
-  if (!found || !roleBases(found.source.work_area).includes(input.basis)) {
+  const salesRule = input.itemized && found?.source.work_area !== 'delivery';
+  if (!found || (input.itemized && !salesRule)
+      || (!input.itemized && !roleBases(found.source.work_area).includes(input.basis))) {
     throw new Error('invalid_commission_basis');
   }
-  await saveMatrizCollaboratorCommission({ ...input, environment: env.FAREJADOR_ENV }, db);
+  const rules = commissionItemRulesOf(input.item_rules);
+  const representative = (['tire', 'service', 'other'] as const)
+    .map((group) => rules[group]).find((rule) => rule.kind !== 'none' && rule.value > 0);
+  const compatibility = salesRule
+    ? {
+        kind: representative?.kind === 'fixed' ? 'fixed' as const : 'percent' as const,
+        basis: representative?.kind === 'fixed' ? 'sale' as const : 'revenue' as const,
+        value: representative?.value ?? 0,
+        active: Boolean(representative) && input.active,
+      }
+    : { kind: input.kind, basis: input.basis, value: input.value, active: input.active };
+  await saveMatrizCollaboratorCommission({
+    ...input, ...compatibility, itemized: salesRule, item_rules: salesRule ? rules : emptyCommissionItemRules(),
+    environment: env.FAREJADOR_ENV,
+  }, db);
   const saved = await getMatrizOperationCommissionRule(input.collaborator_id, db);
   if (!saved) throw new Error('collaborator_not_found');
   return saved;

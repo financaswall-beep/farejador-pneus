@@ -11,6 +11,7 @@ import {
   postMatrizExpensePayment,
 } from './matriz-ledger-expenses.js';
 import type { OperationBenefit } from '../../shared/operation-team.js';
+import type { OperationCommissionItemRules } from '../../shared/operation-team.js';
 export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-ajustes-causais.js';
 
 export interface MatrizCompensationInput {
@@ -49,21 +50,24 @@ export interface MatrizCommissionInput {
   collaborator_id: string; kind: 'percent' | 'fixed';
   basis: 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip'; value: number;
   starts_on: string; active?: boolean; environment?: 'prod' | 'test'; actor_label?: string | null;
+  itemized?: boolean; item_rules?: OperationCommissionItemRules;
 }
 
 export async function saveMatrizCollaboratorCommission(input: MatrizCommissionInput, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const r = await dbPool.query(
     `INSERT INTO network.matriz_collaborator_commission_rules
-       (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by)
-     SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8
+       (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by,itemized,item_rules)
+     SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8,$9,COALESCE($10::jsonb,'{}'::jsonb)
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
      ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET kind=EXCLUDED.kind, basis=EXCLUDED.basis,
        value=EXCLUDED.value, active=EXCLUDED.active,
+       itemized=EXCLUDED.itemized,item_rules=EXCLUDED.item_rules,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.kind, input.basis, input.value, input.starts_on,
-     input.active ?? true, input.actor_label ?? null],
+     input.active ?? true, input.actor_label ?? null, input.itemized ?? false,
+     JSON.stringify(input.item_rules ?? {})],
   );
   if (!r.rows[0]) throw new Error('collaborator_not_found');
   return { saved: true, collaborator_id: r.rows[0].collaborator_id };
@@ -167,7 +171,9 @@ export async function closeMatrizPayroll(input: {
         recurring_benefits: row.benefits,
         salary_rule: 'full_configured_monthly_amount',
         commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
-        rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis, value: row.commission_value } : null,
+        rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis,
+          value: row.commission_value, itemized: row.commission_itemized,
+          item_rules: row.commission_item_rules } : null,
         production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin,
           items_without_cost: row.items_without_cost, deliveries: row.deliveries_count, trips: row.trips_count },
       };

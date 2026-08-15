@@ -28,10 +28,28 @@ const compensation = z.object({
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
   starts_on: z.string().date(), benefits,
 });
+const commissionItemRule = z.object({
+  kind: z.enum(['percent', 'fixed', 'none']), value: money,
+});
+const commissionItemRules = z.object({
+  tire: commissionItemRule,
+  service: commissionItemRule,
+  other: commissionItemRule,
+}).superRefine((rules, ctx) => {
+  if (rules.service.kind === 'fixed' || rules.other.kind === 'fixed'
+      || Object.values(rules).some((rule) => rule.kind === 'percent' && rule.value > 100)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_item_rules' });
+  }
+});
 const commission = z.object({
   kind: z.enum(['percent', 'fixed']),
   basis: z.enum(['margin', 'revenue', 'sale', 'delivery', 'trip']),
   value: money, active: z.boolean(), starts_on: z.string().date(),
+  itemized: z.boolean().default(false),
+  item_rules: commissionItemRules.default({
+    tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 },
+    other: { kind: 'none', value: 0 },
+  }),
 }).superRefine((row, ctx) => {
   if (row.kind === 'percent' && (!['margin', 'revenue'].includes(row.basis) || row.value > 100)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_rule' });

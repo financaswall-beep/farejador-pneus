@@ -238,6 +238,9 @@ describe('login mobile da Operação da Loja', () => {
     expect(route).toContain("'/api/caixa/financeiro-comissoes/:collaboratorId'");
     expect(html).toContain('id="finance-commissions-panel"');
     expect(html).toContain('id="finance-commission-detail-panel"');
+    expect(html).toContain('<small>Financeiro</small><h2 id="finance-commissions-title">Comissões</h2>');
+    expect(html).toContain('<small>Financeiro</small><h2 id="finance-commission-detail-title">Detalhes da comissão</h2>');
+    expect(html).not.toContain('<span>Proprietário</span>');
     expect(script).toContain("Caixa.operationPath('financeiro-comissoes'");
     expect(script).toContain("window.location.hash = '#financeiro/comissoes'");
     expect(css).toContain('.finance-commission-list');
@@ -249,6 +252,10 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="team-panel"');
     expect(html).toContain('id="team-remuneration-panel"');
     expect(html).toContain('id="team-commission-panel"');
+    expect(html).toContain('id="team-commission-tire-kind"');
+    expect(html).toContain('Valor fixo por pneu');
+    expect(html).toContain('id="team-commission-service-kind"');
+    expect(html).not.toContain('aria-label="Aplicação da regra atual"');
     expect(html).toContain('id="team-permissions-panel"');
     expect(html).toContain('id="nav-team"');
     expect(html).toContain('Novo colaborador');
