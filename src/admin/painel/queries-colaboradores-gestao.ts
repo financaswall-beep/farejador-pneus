@@ -14,6 +14,7 @@ export interface CollaboratorManagementRow {
   work_area: WorkArea; panel_role: 'owner' | 'admin' | null; active: boolean;
   eligible_in_competence: boolean;
   employment_type: string | null; base_salary: number; monthly_base_salary: number; payment_day: number | null;
+  salary_frequency: 'weekly' | 'monthly';
   payment_method: string | null; payment_note: string | null; compensation_starts_on: string | null;
   benefits: OperationBenefit[]; benefits_total: number;
   commission_kind: 'percent' | 'fixed' | null; commission_basis: CommissionBasis | null;
@@ -49,7 +50,8 @@ export async function getMatrizCollaboratorManagement(
               finance.matriz_collaborator_in_competence(
                 mc.created_at,mc.revoked_at,$2::date) AS eligible_in_competence,
               cp.employment_type, COALESCE(cp.base_salary, 0) AS monthly_base_salary,
-              COALESCE(cp.base_salary, 0) AS base_salary,
+              CASE WHEN COALESCE(cp.salary_frequency,'monthly')='weekly' THEN 0 ELSE COALESCE(cp.base_salary,0) END AS base_salary,
+              COALESCE(cp.salary_frequency,'monthly') AS salary_frequency,
               cp.payment_day, cp.payment_method, cp.payment_note, cp.starts_on AS compensation_starts_on,
               COALESCE(cp.benefits,'[]'::jsonb) AS benefits,
               cr.kind AS commission_kind, cr.basis AS commission_basis,

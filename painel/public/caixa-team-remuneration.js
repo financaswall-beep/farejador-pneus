@@ -27,6 +27,28 @@
     const number = Number(value || 0); return Number.isFinite(number) ? Math.round(number * 100) / 100 : 0;
   }
 
+  function salaryFrequency() {
+    return document.querySelector('input[name="team-salary-frequency"]:checked')?.value || 'monthly';
+  }
+
+  function boundary(frequency) {
+    const date = new Date(); date.setHours(12, 0, 0, 0);
+    if (frequency === 'weekly') date.setDate(date.getDate() + ((7 - date.getDay()) % 7));
+    else { date.setMonth(date.getMonth() + 1, 1); }
+    return date.toISOString().slice(0, 10);
+  }
+
+  function applySalaryFrequency(changed) {
+    const frequency = salaryFrequency(); const weekly = frequency === 'weekly';
+    document.getElementById('team-salary-value-label').textContent = weekly ? 'Salário por semana' : 'Salário mensal';
+    document.getElementById('team-payment-day-row').classList.toggle('hidden', weekly);
+    document.getElementById('team-summary-salary-label').textContent = weekly ? 'Salário por semana' : 'Salário mensal';
+    if (changed && payload && frequency !== (payload.salary_frequency || 'monthly')) {
+      document.getElementById('team-compensation-start').value = boundary(frequency);
+    }
+    updateSummary();
+  }
+
   function benefitRow(benefit) {
     const row = document.createElement('div'); row.className = 'team-benefit-row';
     const name = document.createElement('input'); name.maxLength = 60; name.placeholder = 'Nome do benefício';
@@ -54,7 +76,12 @@
     const benefits = readBenefits().reduce(function (sum, item) { return sum + (item.active ? item.amount : 0); }, 0);
     document.getElementById('team-summary-salary').textContent = Caixa.currency.format(salary);
     document.getElementById('team-summary-benefits').textContent = Caixa.currency.format(benefits);
-    document.getElementById('team-summary-fixed').textContent = Caixa.currency.format(salary + benefits);
+    const weekly = salaryFrequency() === 'weekly';
+    document.getElementById('team-summary-fixed-label').textContent = weekly ? 'Frequências separadas' : 'Total fixo mensal';
+    document.getElementById('team-summary-fixed').textContent = weekly ? 'Semanal + mensal' : Caixa.currency.format(salary + benefits);
+    document.getElementById('team-summary-note').textContent = weekly
+      ? 'O valor do salário é de cada semana; benefícios continuam mensais.'
+      : 'Comissões calculadas separadamente';
   }
 
   function render(data) {
@@ -65,13 +92,15 @@
     document.getElementById('team-remuneration-role').textContent = member.role;
     document.getElementById('team-remuneration-status').textContent = member.active ? 'Ativo' : 'Inativo';
     document.getElementById('team-base-salary').value = data.base_salary || '';
+    const frequency = data.salary_frequency || 'monthly';
+    document.querySelectorAll('input[name="team-salary-frequency"]').forEach(function (radio) { radio.checked = radio.value === frequency; });
     document.getElementById('team-payment-day').value = data.payment_day || 5;
     const start = document.getElementById('team-compensation-start'); start.value = String(data.starts_on).slice(0, 10);
-    if (Caixa.isPartner()) start.max = new Date().toISOString().slice(0, 10); else start.removeAttribute('max');
+    start.removeAttribute('max');
     document.getElementById('team-employment-type').value = data.employment_type || 'outro';
     const benefits = document.getElementById('team-benefits'); benefits.replaceChildren();
     (data.benefits || []).forEach(function (item) { benefits.appendChild(benefitRow(item)); });
-    updateSummary(); document.getElementById('team-remuneration-save-error').textContent = '';
+    applySalaryFrequency(false); document.getElementById('team-remuneration-save-error').textContent = '';
   }
 
   async function load(force) {
@@ -92,6 +121,7 @@
     const body = {
       employment_type: document.getElementById('team-employment-type').value,
       base_salary: moneyValue(document.getElementById('team-base-salary').value),
+      salary_frequency: salaryFrequency(),
       payment_day: Number(document.getElementById('team-payment-day').value),
       payment_method: payload.payment_method || 'pix',
       starts_on: document.getElementById('team-compensation-start').value, benefits: readBenefits(),
@@ -104,8 +134,7 @@
       payload = data; state.payload = null; render(data); Caixa.showToast('Remuneração salva com segurança.');
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'invalid_session') return;
-      error.textContent = failure instanceof Error && failure.message === 'future_start_not_allowed'
-        ? 'No parceiro, a vigência começa hoje ou em uma data anterior.' : 'Não foi possível salvar. Confira os campos.';
+      error.textContent = 'Não foi possível salvar. Confira os campos.';
     } finally { button.disabled = false; button.textContent = 'Salvar remuneração'; }
   }
 
@@ -115,6 +144,9 @@
   document.getElementById('team-remuneration-retry').addEventListener('click', function () { void load(true); });
   document.getElementById('team-remuneration-back').addEventListener('click', back);
   document.getElementById('team-base-salary').addEventListener('input', updateSummary);
+  document.querySelectorAll('input[name="team-salary-frequency"]').forEach(function (radio) {
+    radio.addEventListener('change', function () { applySalaryFrequency(true); });
+  });
   document.getElementById('team-add-benefit').addEventListener('click', function () {
     const rows = document.querySelectorAll('.team-benefit-row');
     if (rows.length >= 12) return Caixa.showToast('Limite de 12 benefícios por colaborador.');

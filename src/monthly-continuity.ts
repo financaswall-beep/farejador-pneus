@@ -3,6 +3,7 @@ import { pool } from './persistence/db.js';
 import { env } from './shared/config/env.js';
 import { logger } from './shared/logger.js';
 import { closeMatrizWeeklyCommissions } from './admin/caixa/operation-commissions.js';
+import { closeMatrizWeeklySalaries } from './admin/caixa/operation-salary-rollover.js';
 
 const MONTHLY_CONTINUITY_INTERVAL_MS = 60 * 60_000;
 
@@ -22,6 +23,8 @@ export async function runMonthlyContinuityCycle(): Promise<{
   staff_commissions: StaffRolloverResult;
   staff_payroll: PayrollSeedResult;
   matriz_weekly_commissions: { periods_created: number };
+  matriz_weekly_salaries: { periods_created: number };
+  staff_salaries: StaffRolloverResult;
 }> {
   const client = await pool.connect();
   try {
@@ -31,6 +34,7 @@ export async function runMonthlyContinuityCycle(): Promise<{
       env.FAREJADOR_ENV,
     );
     const matrizWeekly = await closeMatrizWeeklyCommissions(client);
+    const matrizSalaries = await closeMatrizWeeklySalaries(client);
     const staff = await client.query<{ result: StaffRolloverResult }>(
       `SELECT finance.run_partner_staff_commission_rollover($1::env_t) AS result`,
       [env.FAREJADOR_ENV],
@@ -39,12 +43,18 @@ export async function runMonthlyContinuityCycle(): Promise<{
       `SELECT finance.run_partner_staff_payroll_seed($1::env_t) AS result`,
       [env.FAREJADOR_ENV],
     );
+    const salaries = await client.query<{ result: StaffRolloverResult }>(
+      `SELECT finance.run_partner_staff_salary_rollover($1::env_t) AS result`,
+      [env.FAREJADOR_ENV],
+    );
     await client.query('COMMIT');
     return {
       monthly_fees_created: monthlyFees,
       staff_commissions: staff.rows[0]!.result,
       staff_payroll: payroll.rows[0]!.result,
       matriz_weekly_commissions: matrizWeekly,
+      matriz_weekly_salaries: matrizSalaries,
+      staff_salaries: salaries.rows[0]!.result,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

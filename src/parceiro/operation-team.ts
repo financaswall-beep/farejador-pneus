@@ -12,7 +12,8 @@ type Queryable = Pick<Pool, 'query'>;
 
 type PartnerMemberRow = {
   id: string; name: string; username: string | null; active: boolean; role_name: string;
-  base_salary: string; payment_day: number | null; starts_on: string | null;
+  base_salary: string; salary_frequency: 'weekly' | 'monthly';
+  payment_day: number | null; starts_on: string | null;
   benefits: unknown; commission_kind: 'percent' | 'fixed' | null;
   commission_value: string; commission_active: boolean; commission_starts_on: string | null;
   commission_amount: string;
@@ -29,7 +30,8 @@ function memberOf(row: PartnerMemberRow): OperationTeamMember {
   return {
     id: row.id, name: row.name, username: row.username, role: row.role_name,
     work_area: row.role_name === 'Entregador' ? 'delivery' : 'sales', active: row.active,
-    base_salary: money(row.base_salary), benefits_total: benefitTotal(benefits),
+    base_salary: money(row.base_salary), salary_frequency: row.salary_frequency ?? 'monthly',
+    benefits_total: benefitTotal(benefits),
     payment_day: row.payment_day, compensation_starts_on: row.starts_on,
     commission_kind: row.commission_kind,
     commission_basis: row.commission_kind === 'fixed' ? 'sale' : 'revenue',
@@ -46,7 +48,8 @@ async function rows(ctx: PartnerContext, db: Queryable): Promise<PartnerMemberRo
                        AND NOT COALESCE(ptp.allow_vendas,pup.allow_vendas,true) THEN 'Entregador'
                  WHEN COALESCE(ptp.allow_vendas,pup.allow_vendas,true) THEN 'Vendedor'
                  ELSE 'Colaborador' END role_name,
-            COALESCE(comp.base_salary,0)::text base_salary,comp.payment_day,
+            COALESCE(comp.base_salary,0)::text base_salary,
+            COALESCE(comp.salary_frequency,'monthly') salary_frequency,comp.payment_day,
             comp.starts_on,COALESCE(comp.benefits,'[]'::jsonb) benefits,
             cfg.kind commission_kind,COALESCE(cfg.value,0)::text commission_value,
             COALESCE(cfg.active,false) commission_active,hist.starts_on commission_starts_on,
@@ -104,14 +107,15 @@ export async function getPartnerOperationCompensation(
 ): Promise<OperationCompensationPayload | null> {
   const row = await find(ctx, tokenId, db); if (!row) return null;
   const benefits = benefitsOf(row.benefits); const total = benefitTotal(benefits);
-  const detail = await db.query<{ employment_type: OperationCompensationPayload['employment_type']; payment_method: OperationCompensationPayload['payment_method'] }>(
-    `SELECT employment_type,payment_method FROM network.partner_collaborator_compensation
+  const detail = await db.query<{ employment_type: OperationCompensationPayload['employment_type']; payment_method: OperationCompensationPayload['payment_method']; salary_frequency: OperationCompensationPayload['salary_frequency'] }>(
+    `SELECT employment_type,payment_method,salary_frequency FROM network.partner_collaborator_compensation
       WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3 AND starts_on<=current_date
       ORDER BY starts_on DESC LIMIT 1`, [ctx.environment, ctx.partnerUnitId, tokenId],
   );
   return {
     unit_name: ctx.unitName, member: memberOf(row), employment_type: detail.rows[0]?.employment_type ?? 'outro',
-    base_salary: money(row.base_salary), payment_day: row.payment_day ?? 5,
+    base_salary: money(row.base_salary), salary_frequency: detail.rows[0]?.salary_frequency ?? 'monthly',
+    payment_day: row.payment_day ?? 5,
     payment_method: detail.rows[0]?.payment_method ?? 'pix', starts_on: row.starts_on || localDate(), benefits,
     benefits_total: total, fixed_total: money(money(row.base_salary) + total),
   };
@@ -119,23 +123,26 @@ export async function getPartnerOperationCompensation(
 
 export async function savePartnerOperationCompensation(ctx: PartnerContext, tokenId: string, input: {
   employment_type: OperationCompensationPayload['employment_type']; base_salary: number;
+  salary_frequency: OperationCompensationPayload['salary_frequency'];
   payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
   starts_on: string; benefits: OperationBenefit[];
 }, db: Pool = defaultPool): Promise<OperationCompensationPayload> {
   const result = await db.query(
     `INSERT INTO network.partner_collaborator_compensation
-       (environment,partner_unit_id,token_id,employment_type,base_salary,payment_day,
+       (environment,partner_unit_id,token_id,employment_type,base_salary,salary_frequency,payment_day,
         payment_method,starts_on,benefits,updated_by)
-     SELECT pat.environment,pat.partner_unit_id,pat.id,$4,$5,$6,$7,$8::date,$9::jsonb,$10
+     SELECT pat.environment,pat.partner_unit_id,pat.id,$4,$5,$6,$7,$8,$9::date,$10::jsonb,$11
        FROM network.partner_access_tokens pat
       WHERE pat.environment=$1 AND pat.partner_unit_id=$2 AND pat.id=$3
         AND pat.role='funcionario' AND pat.revoked_at IS NULL
      ON CONFLICT (token_id,starts_on) DO UPDATE SET employment_type=EXCLUDED.employment_type,
-       base_salary=EXCLUDED.base_salary,payment_day=EXCLUDED.payment_day,
+       base_salary=EXCLUDED.base_salary,salary_frequency=EXCLUDED.salary_frequency,
+       payment_day=EXCLUDED.payment_day,
        payment_method=EXCLUDED.payment_method,benefits=EXCLUDED.benefits,
        updated_by=EXCLUDED.updated_by,updated_at=now() RETURNING id`,
     [ctx.environment, ctx.partnerUnitId, tokenId, input.employment_type, input.base_salary,
-     input.payment_day, input.payment_method, input.starts_on, JSON.stringify(input.benefits), `owner:${ctx.slug}`],
+     input.salary_frequency, input.payment_day, input.payment_method, input.starts_on,
+     JSON.stringify(input.benefits), `owner:${ctx.slug}`],
   );
   if (!result.rows[0]) throw new Error('collaborator_not_found');
   const saved = await getPartnerOperationCompensation(ctx, tokenId, db);

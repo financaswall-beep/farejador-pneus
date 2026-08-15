@@ -273,6 +273,10 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="team-open-finance-commission"');
     expect(html).toContain('sem acesso de proprietário');
     expect(html).toContain('Salvar remuneração');
+    expect(html).toContain('name="team-salary-frequency" value="weekly"');
+    expect(html).toContain('Valor exato da semana; fecha sábado');
+    expect(script).toContain('salary_frequency: salaryFrequency()');
+    expect(script).toContain('benefícios continuam mensais');
     expect(html).toContain('Salvar regra de comissão');
     expect(html).toContain('Salvar permissões');
     expect(script).not.toContain('Bate-papo');

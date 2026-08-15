@@ -23,7 +23,8 @@ const safePaymentReference = z.string().trim().max(160).nullable().optional().re
 }, 'payment_reference_must_be_masked');
 const compensationSchema = z.object({
   collaborator_id: z.string().uuid(), employment_type: z.enum(['clt', 'mei', 'autonomo', 'outro']),
-  base_salary: money, payment_day: z.number().int().min(1).max(28),
+  base_salary: money, salary_frequency: z.enum(['weekly', 'monthly']).optional(),
+  payment_day: z.number().int().min(1).max(28),
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
   payment_note: safePaymentReference, starts_on: z.string().date(), benefits,
 });

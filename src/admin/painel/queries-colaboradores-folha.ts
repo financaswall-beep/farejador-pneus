@@ -17,6 +17,7 @@ export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-aju
 export interface MatrizCompensationInput {
   collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
   base_salary: number; payment_day: number; payment_method: 'pix' | 'transferencia' | 'dinheiro' | 'outro';
+  salary_frequency?: 'weekly' | 'monthly';
   payment_note?: string | null; starts_on: string; benefits?: OperationBenefit[];
   environment?: 'prod' | 'test'; actor_label?: string | null;
 }
@@ -26,9 +27,9 @@ export async function saveMatrizCollaboratorCompensation(input: MatrizCompensati
   const r = await dbPool.query(
     `INSERT INTO network.matriz_collaborator_compensation
        (collaborator_id, environment, employment_type, base_salary, payment_day, payment_method,
-        payment_note, starts_on, updated_by, benefits)
+        payment_note, starts_on, updated_by, benefits, salary_frequency)
      SELECT mc.id, mc.environment, $3, $4, $5, $6, $7, $8::date, $9,
-            COALESCE($10::jsonb,'[]'::jsonb)
+            COALESCE($10::jsonb,'[]'::jsonb),COALESCE($11,'monthly')
        FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
      ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET
        employment_type=EXCLUDED.employment_type, base_salary=EXCLUDED.base_salary,
@@ -36,11 +37,12 @@ export async function saveMatrizCollaboratorCompensation(input: MatrizCompensati
        payment_note=EXCLUDED.payment_note,
        benefits=CASE WHEN $10::jsonb IS NULL
          THEN network.matriz_collaborator_compensation.benefits ELSE EXCLUDED.benefits END,
+       salary_frequency=CASE WHEN $11::text IS NULL THEN network.matriz_collaborator_compensation.salary_frequency ELSE EXCLUDED.salary_frequency END,
        updated_by=EXCLUDED.updated_by, updated_at=now()
      RETURNING collaborator_id`,
     [environment, input.collaborator_id, input.employment_type, input.base_salary, input.payment_day,
      input.payment_method, input.payment_note ?? null, input.starts_on, input.actor_label ?? null,
-     input.benefits === undefined ? null : JSON.stringify(input.benefits)],
+     input.benefits === undefined ? null : JSON.stringify(input.benefits), input.salary_frequency ?? null],
   );
   if (!r.rows[0]) throw new Error('collaborator_not_found');
   return { saved: true, collaborator_id: r.rows[0].collaborator_id };
@@ -172,9 +174,10 @@ export async function closeMatrizPayroll(input: {
       const dueDate = payrollDueDate(input.competence, row.payment_day);
       const calculation = {
         competence: input.competence,
-        configured_base_salary: row.base_salary,
+        configured_base_salary: row.monthly_base_salary,
         recurring_benefits: row.benefits,
-        salary_rule: 'full_configured_monthly_amount',
+        salary_rule: row.salary_frequency === 'weekly'
+          ? 'weekly_salary_excluded_from_monthly_payroll' : 'full_configured_monthly_amount',
         commission_event_dates: { sale: 'created_at', delivery: 'delivered_at', trip: 'ended_at' },
         rule: row.commission_kind ? { kind: row.commission_kind, basis: row.commission_basis,
           value: row.commission_value, itemized: row.commission_itemized,

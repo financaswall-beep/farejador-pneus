@@ -26,7 +26,7 @@
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-finance-commission-detail.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team.js?v=20260815-team-finish1"></script>
-  <script defer src="/operacao/caixa-team-remuneration.js?v=20260814-operation-team1"></script>
+  <script defer src="/operacao/caixa-team-remuneration.js?v=20260815-salary-calendar1"></script>
   <script defer src="/operacao/caixa-team-commission.js?v=20260815-commission-calendar1"></script>
   <script defer src="/operacao/caixa-team-permissions.js?v=20260815-team-finish1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
@@ -741,17 +741,21 @@
           <form id="team-remuneration-form" class="team-detail-content hidden">
             <section class="team-person"><b id="team-remuneration-avatar">CO</b><div><strong id="team-remuneration-name">Colaborador</strong><span id="team-remuneration-role">Função</span><small><i></i><em id="team-remuneration-status">Ativo</em></small></div></section>
             <h3>Salário</h3>
+            <section class="team-commission-frequency" aria-label="Frequência de pagamento do salário">
+              <label><input type="radio" name="team-salary-frequency" value="weekly" /><span><b>Semanal</b><small>Valor exato da semana; fecha sábado</small></span></label>
+              <label><input type="radio" name="team-salary-frequency" value="monthly" /><span><b>Mensal</b><small>Pagamento no dia escolhido</small></span></label>
+            </section>
             <section class="team-form-card">
-              <label>Salário mensal<span class="team-input-money">R$ <input id="team-base-salary" type="number" min="0" max="10000000" step="0.01" required /></span></label>
-              <label>Dia do pagamento<span>Todo dia <input id="team-payment-day" type="number" min="1" max="28" step="1" required /></span></label>
+              <label><span id="team-salary-value-label">Salário mensal</span><span class="team-input-money">R$ <input id="team-base-salary" type="number" min="0" max="10000000" step="0.01" required /></span></label>
+              <label id="team-payment-day-row">Dia do pagamento<span>Todo dia <input id="team-payment-day" type="number" min="1" max="28" step="1" required /></span></label>
               <label>Início da vigência<input id="team-compensation-start" type="date" required /></label>
               <label>Vínculo<select id="team-employment-type"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
             </section>
             <p class="team-private-note"><b>🔒</b>Visível somente para o proprietário.</p>
             <h3>Benefícios e adicionais</h3>
             <section class="team-form-card"><div id="team-benefits" class="team-benefits"></div><button id="team-add-benefit" class="team-add-benefit" type="button">＋ Adicionar benefício</button></section>
-            <h3>Resumo mensal</h3>
-            <section class="team-fixed-summary"><p><span>Salário</span><strong id="team-summary-salary">R$ 0,00</strong></p><p><span>Benefícios</span><strong id="team-summary-benefits">R$ 0,00</strong></p><p><b>Total fixo</b><b id="team-summary-fixed">R$ 0,00</b></p><small>Comissões calculadas separadamente</small></section>
+            <h3>Resumo cadastrado</h3>
+            <section class="team-fixed-summary"><p><span id="team-summary-salary-label">Salário mensal</span><strong id="team-summary-salary">R$ 0,00</strong></p><p><span>Benefícios mensais</span><strong id="team-summary-benefits">R$ 0,00</strong></p><p><b id="team-summary-fixed-label">Total fixo mensal</b><b id="team-summary-fixed">R$ 0,00</b></p><small id="team-summary-note">Comissões calculadas separadamente</small></section>
             <p id="team-remuneration-save-error" class="team-save-error" role="alert"></p>
             <button id="team-remuneration-save" class="team-primary" type="submit">Salvar remuneração</button>
             <button id="team-open-commission" class="team-secondary" type="button">Configurar regra de comissão</button>

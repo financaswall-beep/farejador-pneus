@@ -6,6 +6,7 @@ export interface OperationBenefit {
 
 export type OperationCommissionKind = 'percent' | 'fixed';
 export type OperationCommissionSettlementFrequency = 'weekly' | 'monthly';
+export type OperationSalaryPaymentFrequency = 'weekly' | 'monthly';
 export type OperationCommissionBasis = 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip';
 export type OperationCommissionItemGroup = 'tire' | 'service' | 'other';
 export type OperationCommissionItemKind = OperationCommissionKind | 'none';
@@ -25,6 +26,7 @@ export interface OperationTeamMember {
   work_area: string;
   active: boolean;
   base_salary: number;
+  salary_frequency: OperationSalaryPaymentFrequency;
   benefits_total: number;
   payment_day: number | null;
   compensation_starts_on: string | null;
@@ -47,6 +49,7 @@ export interface OperationCompensationPayload {
   member: Pick<OperationTeamMember, 'id' | 'name' | 'username' | 'role' | 'active'>;
   employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
   base_salary: number;
+  salary_frequency: OperationSalaryPaymentFrequency;
   payment_day: number;
   payment_method: 'pix' | 'transferencia' | 'dinheiro' | 'outro';
   starts_on: string;

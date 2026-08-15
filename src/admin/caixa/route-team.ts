@@ -24,7 +24,8 @@ const benefits = z.array(z.object({
 })).max(12);
 const compensation = z.object({
   employment_type: z.enum(['clt', 'mei', 'autonomo', 'outro']),
-  base_salary: money, payment_day: z.number().int().min(1).max(28),
+  base_salary: money, salary_frequency: z.enum(['weekly', 'monthly']).default('monthly'),
+  payment_day: z.number().int().min(1).max(28),
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
   starts_on: z.string().date(), benefits,
 });

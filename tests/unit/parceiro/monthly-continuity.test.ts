@@ -80,6 +80,7 @@ describe('continuidade mensal da Matriz e dos parceiros', () => {
     expect(operationTeam).toContain('finance.run_partner_staff_payroll_seed');
     expect(operationTeam).not.toContain('INSERT INTO finance.partner_expenses');
     expect(scheduler).toContain('run_partner_staff_payroll_seed');
+    expect(scheduler).toContain('run_partner_staff_salary_rollover');
   });
 
   it('recupera mensalidades atrasadas usando historico de termos', () => {

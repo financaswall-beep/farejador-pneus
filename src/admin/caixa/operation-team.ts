@@ -35,7 +35,8 @@ function memberOf(row: Awaited<ReturnType<typeof getMatrizCollaboratorManagement
   return {
     id: row.id, name: row.display_name, username: row.username,
     role: row.job_title || row.job || 'Colaborador', work_area: row.work_area,
-    active: row.active, base_salary: money(row.base_salary),
+    active: row.active, base_salary: money(row.monthly_base_salary),
+    salary_frequency: row.salary_frequency ?? 'monthly',
     benefits_total: money(row.benefits_total), payment_day: row.payment_day,
     compensation_starts_on: row.compensation_starts_on,
     commission_kind: row.commission_kind, commission_basis: row.commission_basis,
@@ -97,16 +98,18 @@ export async function getMatrizOperationCompensation(
   return {
     unit_name: 'Matriz', member: found.member,
     employment_type: (found.source.employment_type as OperationCompensationPayload['employment_type']) || 'outro',
-    base_salary: money(found.source.base_salary), payment_day: found.source.payment_day ?? 5,
+    base_salary: money(found.source.monthly_base_salary),
+    salary_frequency: found.source.salary_frequency ?? 'monthly', payment_day: found.source.payment_day ?? 5,
     payment_method: (found.source.payment_method as OperationCompensationPayload['payment_method']) || 'pix',
     starts_on: found.source.compensation_starts_on || localDate(), benefits,
-    benefits_total: total, fixed_total: money(found.source.base_salary + total),
+    benefits_total: total, fixed_total: money(found.source.monthly_base_salary + total),
   };
 }
 
 export async function saveMatrizOperationCompensation(input: {
   collaborator_id: string; employment_type: OperationCompensationPayload['employment_type'];
-  base_salary: number; payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
+  base_salary: number; salary_frequency: OperationCompensationPayload['salary_frequency'];
+  payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
   starts_on: string; benefits: OperationBenefit[]; actor_label: string;
 }, db: Pool = defaultPool): Promise<OperationCompensationPayload> {
   await saveMatrizCollaboratorCompensation({

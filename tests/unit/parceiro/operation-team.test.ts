@@ -18,7 +18,7 @@ const context: PartnerContext = {
 
 const member = {
   id: 'employee-1', name: 'Wallace', username: 'wallace', active: true,
-  role_name: 'Vendedor', base_salary: '2300.00', payment_day: 5,
+  role_name: 'Vendedor', base_salary: '2300.00', salary_frequency: 'weekly' as const, payment_day: 5,
   starts_on: '2026-08-01',
   benefits: [{ name: 'Vale-transporte', amount: 220, active: true }],
   commission_kind: 'percent' as const, commission_value: '5.00',
@@ -47,14 +47,14 @@ describe('equipe da Operação do parceiro', () => {
   it('monta a remuneração sem expor nem buscar colaborador de outra loja', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [member] })
-      .mockResolvedValueOnce({ rows: [{ employment_type: 'clt', payment_method: 'pix' }] });
+      .mockResolvedValueOnce({ rows: [{ employment_type: 'clt', payment_method: 'pix', salary_frequency: 'weekly' }] });
     const db = { query } as unknown as Pool;
 
     const result = await getPartnerOperationCompensation(context, 'employee-1', db);
 
     expect(query.mock.calls[1]?.[1]).toEqual(['prod', 'unit-partner-1', 'employee-1']);
     expect(result).toMatchObject({
-      employment_type: 'clt', payment_method: 'pix', base_salary: 2300,
+      employment_type: 'clt', payment_method: 'pix', base_salary: 2300, salary_frequency: 'weekly',
       benefits_total: 220, fixed_total: 2520,
     });
   });
