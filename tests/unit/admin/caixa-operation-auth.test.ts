@@ -84,6 +84,40 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(String(query.mock.calls[0]?.[0])).toContain('mc.panel_role IS NOT NULL');
   });
 
+  it('faz a permissÃ£o individual da Matriz prevalecer sobre o cargo legado', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        collaborator_id: 'collab-override', job: 'vendedor', work_area: 'sales', panel_role: null,
+        allow_vendas: false, allow_entregas: true, allow_financeiro: false,
+      }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-override', dbPool);
+
+    expect(workplaces[0]).toMatchObject({
+      modules: { vendas: false, estoque: false, entregas: true, financeiro: false },
+    });
+    expect(String(query.mock.calls[0]?.[0])).toContain('matriz_collaborator_operation_permissions');
+  });
+
+  it('permite que o dono libere o Financeiro simples para funcionÃ¡rio parceiro', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{
+        token_id: 'finance-rio', slug: 'rio-do-ouro', store_name: 'Borracharia Rio do Ouro',
+        role: 'funcionario', display_name: 'Wallace', allow_vendas: false,
+        allow_estoque: false, allow_entregas: false, allow_financeiro: true,
+      }] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-finance', dbPool);
+
+    expect(workplaces[0]).toMatchObject({
+      role: 'funcionario', modules: { vendas: false, estoque: false, entregas: false, financeiro: true },
+    });
+  });
+
   it('mantem o proprietario parceiro no app mesmo quando so o Financeiro esta disponivel', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [] })

@@ -40,6 +40,9 @@ type MatrixRow = {
   job: 'vendedor' | 'entregador' | 'colaborador';
   work_area: string | null;
   panel_role: 'owner' | 'admin' | null;
+  allow_vendas: boolean | null;
+  allow_entregas: boolean | null;
+  allow_financeiro: boolean | null;
 };
 
 type PartnerRow = {
@@ -51,6 +54,7 @@ type PartnerRow = {
   allow_vendas: boolean;
   allow_estoque: boolean;
   allow_entregas: boolean;
+  allow_financeiro: boolean;
 };
 
 /**
@@ -68,14 +72,20 @@ export async function listOperationWorkplaces(
 ): Promise<OperationWorkplace[]> {
   const [matrix, partners] = await Promise.all([
     dbPool.query<MatrixRow>(
-      `SELECT mc.id AS collaborator_id, mc.job, mc.work_area, mc.panel_role
+      `SELECT mc.id AS collaborator_id, mc.job, mc.work_area, mc.panel_role,
+              op.allow_vendas,op.allow_entregas,op.allow_financeiro
          FROM network.matriz_collaborators mc
+         LEFT JOIN network.matriz_collaborator_operation_permissions op
+           ON op.collaborator_id=mc.id AND op.environment=mc.environment
         WHERE mc.environment = $1
           AND mc.person_id = $2
           AND mc.revoked_at IS NULL
           AND (mc.panel_role IS NOT NULL
             OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
-            OR mc.job = 'entregador')
+            OR mc.job = 'entregador'
+            OR COALESCE(op.allow_vendas,false)
+            OR COALESCE(op.allow_entregas,false)
+            OR COALESCE(op.allow_financeiro,false))
         LIMIT 1`,
       [environment, personId],
     ),
@@ -91,6 +101,8 @@ export async function listOperationWorkplaces(
                    ELSE COALESCE(ptp.allow_estoque, pup.allow_estoque, true) END AS allow_estoque,
               CASE WHEN pat.role = 'owner' THEN true
                    ELSE COALESCE(ptp.allow_entregas, pup.allow_entregas, true) END AS allow_entregas
+              ,CASE WHEN pat.role = 'owner' THEN true
+                    ELSE COALESCE(ptp.allow_financeiro, pup.allow_financeiro, false) END AS allow_financeiro
          FROM network.partner_access_tokens pat
          JOIN network.partner_units pu
            ON pu.id = pat.partner_unit_id AND pu.environment = pat.environment
@@ -119,23 +131,26 @@ export async function listOperationWorkplaces(
     const isCourier = matrixRow.job === 'entregador';
     const canSell = matrixRow.job === 'vendedor' && matrixRow.work_area === 'sales';
     const panelRole = matrixRow.panel_role ?? null;
-    workplaces.push({
+    const modules = matrixRow.panel_role === 'owner' ? {
+      vendas: canSell, estoque: false, entregas: isCourier, financeiro: true,
+    } : {
+      vendas: matrixRow.allow_vendas ?? canSell,
+      estoque: false,
+      entregas: matrixRow.allow_entregas ?? isCourier,
+      financeiro: matrixRow.allow_financeiro ?? (panelRole !== null),
+    };
+    if (modules.vendas || modules.entregas || modules.financeiro) workplaces.push({
       id: 'matrix',
       kind: 'matrix',
       name: 'Matriz',
       role: panelRole ?? matrixRow.job,
       collaboratorId: matrixRow.collaborator_id,
-      modules: {
-        vendas: canSell,
-        estoque: false,
-        entregas: isCourier,
-        financeiro: panelRole !== null,
-      },
+      modules,
     });
   }
 
   for (const row of partners.rows) {
-    const canSeeFinance = row.role === 'owner';
+    const canSeeFinance = row.role === 'owner' || row.allow_financeiro === true;
     if (!row.allow_vendas && !row.allow_estoque && !row.allow_entregas && !canSeeFinance) continue;
     workplaces.push({
       id: `partner:${row.slug}`,

@@ -103,12 +103,20 @@ export async function getMatrizOperationCommissionRule(
   if (!found) return null;
   const available = roleBases(found.source.work_area);
   const fallback = available[0] ?? 'revenue';
+  const history = await db.query<{
+    kind: 'percent' | 'fixed'; basis: OperationCommissionBasis;
+    value: string; active: boolean; starts_on: string;
+  }>(`SELECT kind,basis,value::text,active,starts_on::text
+        FROM network.matriz_collaborator_commission_rules
+       WHERE environment=$1 AND collaborator_id=$2
+       ORDER BY starts_on DESC,updated_at DESC LIMIT 24`, [env.FAREJADOR_ENV, collaboratorId]);
   return {
     unit_name: 'Matriz', member: found.member,
     kind: found.source.commission_kind ?? (fallback === 'revenue' ? 'percent' : 'fixed'),
     basis: found.source.commission_basis ?? fallback,
     value: money(found.source.commission_value), active: found.source.commission_active,
     starts_on: found.source.commission_starts_on || localDate(), available_bases: available,
+    history: history.rows.map((row) => ({ ...row, value: money(row.value) })),
   };
 }
 

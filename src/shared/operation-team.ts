@@ -54,6 +54,27 @@ export interface OperationCommissionRulePayload {
   active: boolean;
   starts_on: string;
   available_bases: OperationCommissionBasis[];
+  history: OperationCommissionHistoryItem[];
+}
+
+export interface OperationCommissionHistoryItem {
+  kind: OperationCommissionKind;
+  basis: OperationCommissionBasis;
+  value: number;
+  active: boolean;
+  starts_on: string;
+}
+
+export type OperationPermissionKey =
+  | 'vendas' | 'estoque' | 'pedidos' | 'clientes' | 'entregas'
+  | 'retiradas' | 'batepapo' | 'resumo' | 'financeiro';
+
+export interface OperationPermissionsPayload {
+  unit_name: string;
+  member: Pick<OperationTeamMember, 'id' | 'name' | 'username' | 'role' | 'active'>;
+  permissions: Partial<Record<OperationPermissionKey, boolean>>;
+  available_permissions: OperationPermissionKey[];
+  locked: boolean;
 }
 
 export function money(value: unknown): number {

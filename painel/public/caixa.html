@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#064e3b" />
   <title>Operação da Loja — 2W Pneus</title>
-  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-operation-team1" />
+  <link rel="stylesheet" href="/operacao/caixa.css?v=20260814-operation-permissions1" />
   <script defer src="/operacao/caixa-core.js?v=20260813-financeiro1"></script>
-  <script defer src="/operacao/caixa-modules.js?v=20260814-finance-commissions1"></script>
+  <script defer src="/operacao/caixa-modules.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260813-operacao1"></script>
@@ -18,15 +18,16 @@
   <script defer src="/operacao/caixa-stock.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-receipts.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-sales.js?v=20260813-financeiro1"></script>
+  <script defer src="/operacao/caixa-sales.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-deliveries-matrix.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-deliveries.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-finance.js?v=20260814-finance-commissions1"></script>
   <script defer src="/operacao/caixa-finance-entries.js?v=20260814-finance-movements1"></script>
   <script defer src="/operacao/caixa-finance-commissions.js?v=20260814-finance-commissions1"></script>
-  <script defer src="/operacao/caixa-team.js?v=20260814-operation-team1"></script>
+  <script defer src="/operacao/caixa-team.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-team-remuneration.js?v=20260814-operation-team1"></script>
-  <script defer src="/operacao/caixa-team-commission.js?v=20260814-operation-team1"></script>
+  <script defer src="/operacao/caixa-team-commission.js?v=20260814-operation-team2"></script>
+  <script defer src="/operacao/caixa-team-permissions.js?v=20260814-operation-permissions1"></script>
   <script defer src="/operacao/caixa-profile.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-photo.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa.js?v=20260813-operacao1"></script>
@@ -763,19 +764,52 @@
         <div id="team-commission-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-commission-title">
           <header class="team-toolbar team-toolbar--back">
             <button id="team-commission-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
-            <div><h2 id="team-commission-title">Regra de comissão</h2><p id="team-commission-unit">Unidade</p></div><span class="team-owner">Proprietário</span>
+            <div><h2 id="team-commission-title">Regra de comissão</h2><p id="team-commission-unit">Unidade</p></div><span class="team-owner"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.4-4.2 2.8-6.3 7-6.3s6.6 2.1 7 6.3"/></svg>Proprietário</span>
           </header>
           <div id="team-commission-loading" class="team-message" role="status"><i></i><span>Carregando regra…</span></div>
           <div id="team-commission-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar a regra.</strong><button id="team-commission-retry" type="button">Tentar novamente</button></div>
           <form id="team-commission-form" class="team-detail-content hidden">
             <section class="team-person"><b id="team-commission-avatar">CO</b><div><strong id="team-commission-name">Colaborador</strong><span id="team-commission-role">Função</span><small><i></i><em id="team-commission-status">Ativo</em></small></div></section>
             <h3>Modelo da comissão</h3>
-            <div class="team-rule-options"><label><input type="radio" name="team-commission-kind" value="percent" /><span><b>Porcentagem</b><small>Percentual sobre o valor vendido</small></span></label><label><input type="radio" name="team-commission-kind" value="fixed" /><span><b>Valor fixo</b><small>Um valor por venda, entrega ou viagem</small></span></label><label><input type="radio" name="team-commission-kind" value="none" /><span><b>Sem comissão</b><small>Não gera comissão nas operações</small></span></label></div>
-            <section id="team-rule-fields" class="team-form-card team-rule-fields"><label id="team-commission-value-label">Percentual<span class="team-input-money"><input id="team-commission-value" type="number" min="0" step="0.01" /> <em id="team-commission-unit-symbol">%</em></span></label><label>Base de cálculo<select id="team-commission-basis"></select></label><label>Início da vigência<input id="team-commission-start" type="date" required /></label></section>
-            <p id="team-commission-example" class="team-rule-example">Exemplo: venda de R$ 1.000,00 <strong>Comissão: R$ 0,00</strong></p>
+            <div class="team-rule-options"><label><input type="radio" name="team-commission-kind" value="percent" /><span><b>Porcentagem</b><small>Percentual sobre o valor vendido</small></span></label><label><input type="radio" name="team-commission-kind" value="fixed" /><span><b>Valor fixo</b><small>Um valor definido por venda ou serviço</small></span></label><label><input type="radio" name="team-commission-kind" value="none" /><span><b>Sem comissão</b><small>Não gera comissão nas vendas</small></span></label></div>
+            <div id="team-rule-fields" class="team-rule-fields">
+              <label id="team-commission-value-label" class="team-rule-value">Percentual<span><input id="team-commission-value" type="number" min="0" step="0.01" inputmode="decimal" /><em id="team-commission-unit-symbol">%</em></span></label>
+              <p id="team-commission-example" class="team-rule-example">Exemplo: venda de R$ 1.000,00 <strong>Comissão: R$ 0,00</strong></p>
+              <h3>Onde se aplica</h3>
+              <section class="team-rule-scope" aria-label="Aplicação da regra atual">
+                <label><input type="checkbox" checked disabled /><span>Produtos</span></label>
+                <label><input type="checkbox" checked disabled /><span>Serviços</span></label>
+                <label><input type="checkbox" checked disabled /><span>Outros itens</span></label>
+              </section>
+              <section class="team-form-card team-rule-meta"><label>Base de cálculo<span><select id="team-commission-basis"></select><i aria-hidden="true">›</i></span></label><label>Início da vigência<span><input id="team-commission-start" type="date" required /><i aria-hidden="true">›</i></span></label></section>
+            </div>
             <p class="team-private-note"><b>i</b>A nova regra não altera comissões de vendas anteriores.</p>
+            <button id="team-commission-history-toggle" class="team-secondary team-history-toggle" type="button" aria-expanded="false">Ver histórico de regras</button>
+            <section id="team-commission-history" class="team-rule-history hidden" aria-label="Histórico de regras"></section>
             <p id="team-commission-save-error" class="team-save-error" role="alert"></p>
             <button id="team-commission-save" class="team-primary" type="submit">Salvar regra de comissão</button>
+          </form>
+        </div>
+
+        <div id="team-permissions-panel" class="app-panel team-page team-detail-page hidden" aria-labelledby="team-permissions-title">
+          <header class="team-toolbar team-toolbar--back">
+            <button id="team-permissions-back" type="button" aria-label="Voltar aos colaboradores"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div><h2 id="team-permissions-title">Permissões</h2><p id="team-permissions-unit">Unidade</p></div><span class="team-owner"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.4-4.2 2.8-6.3 7-6.3s6.6 2.1 7 6.3"/></svg>Proprietário</span>
+          </header>
+          <div id="team-permissions-loading" class="team-message" role="status"><i></i><span>Carregando permissões…</span></div>
+          <div id="team-permissions-error" class="team-message team-message--error hidden" role="alert"><strong>Não foi possível carregar as permissões.</strong><button id="team-permissions-retry" type="button">Tentar novamente</button></div>
+          <form id="team-permissions-form" class="team-detail-content hidden">
+            <section class="team-person"><b id="team-permissions-avatar">CO</b><div><strong id="team-permissions-name">Colaborador</strong><span id="team-permissions-role">Função</span><small><i></i><em id="team-permissions-status">Ativo</em></small></div></section>
+            <div class="team-permission-intro"><b aria-hidden="true">✓</b><p><strong>Defina o acesso deste colaborador</strong><span>Ao salvar, o próximo login mostrará somente as áreas liberadas.</span></p></div>
+            <h3>Operação da Loja</h3>
+            <section id="team-permissions-operation" class="team-permission-list"></section>
+            <section id="team-permissions-portal-section" class="hidden"><h3>Portal completo</h3><div id="team-permissions-portal" class="team-permission-list"></div></section>
+            <h3>Gestão</h3>
+            <section id="team-permissions-management" class="team-permission-list"></section>
+            <section class="team-permission-list team-permission-locked"><div><b>Equipe e configurações</b><small>Somente o proprietário pode gerenciar pessoas e acessos.</small></div><span aria-label="Bloqueado">🔒</span></section>
+            <p id="team-permissions-note" class="team-private-note"><b>i</b>Ao alterar permissões, as sessões atuais deste colaborador serão encerradas por segurança.</p>
+            <p id="team-permissions-save-error" class="team-save-error" role="alert"></p>
+            <button id="team-permissions-save" class="team-primary" type="submit">Salvar permissões</button>
           </form>
         </div>
 

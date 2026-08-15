@@ -45,6 +45,7 @@
     if (canModule('team') && window.location.hash === '#equipe') return 'team';
     if (canModule('team') && window.location.hash.startsWith('#equipe/remuneracao/')) return 'team-remuneration';
     if (canModule('team') && window.location.hash.startsWith('#equipe/comissao/')) return 'team-commission';
+    if (canModule('team') && window.location.hash.startsWith('#equipe/permissoes/')) return 'team-permissions';
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';

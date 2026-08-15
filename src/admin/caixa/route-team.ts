@@ -7,6 +7,10 @@ import {
   getMatrizOperationTeam, saveMatrizOperationCommissionRule,
   saveMatrizOperationCompensation,
 } from './operation-team.js';
+import {
+  getMatrizOperationPermissions,
+  saveMatrizOperationPermissions,
+} from './operation-team-permissions.js';
 
 type Gate = (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 type AuthenticatedRequest = FastifyRequest & { caixa?: CaixaAuth };
@@ -35,10 +39,14 @@ const commission = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_rule' });
   }
 });
+const permissions = z.object({
+  vendas: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
+});
 
 function failure(reply: FastifyReply, error: unknown, label: string) {
   const code = error instanceof Error ? error.message : 'team_unavailable';
   if (code === 'collaborator_not_found') return reply.status(404).send({ error: code });
+  if (code === 'owner_permissions_locked') return reply.status(409).send({ error: code });
   if (code === 'invalid_commission_basis') return reply.status(400).send({ error: code });
   logger.error({ err: error }, label);
   return reply.status(503).send({ error: 'team_unavailable' });
@@ -103,5 +111,26 @@ export function registerCaixaTeamRoutes(
         collaborator_id: id.data.collaboratorId, ...body.data, actor_label: auth.displayName,
       }));
     } catch (error) { return failure(reply, error, 'matrix commission rule save failed'); }
+  });
+
+  fastify.get('/api/caixa/equipe/:collaboratorId/permissoes', { preHandler: guards }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const parsed = params.safeParse(request.params ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      const payload = await getMatrizOperationPermissions(parsed.data.collaboratorId);
+      return payload ? reply.status(200).send(payload) : reply.status(404).send({ error: 'collaborator_not_found' });
+    } catch (error) { return failure(reply, error, 'matrix operation permissions unavailable'); }
+  });
+
+  fastify.put('/api/caixa/equipe/:collaboratorId/permissoes', { preHandler: guards }, async (request, reply) => {
+    const id = params.safeParse(request.params ?? {}); const body = permissions.safeParse(request.body ?? {});
+    if (!id.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
+    const auth = (request as AuthenticatedRequest).caixa!;
+    try {
+      return reply.status(200).send(await saveMatrizOperationPermissions(
+        id.data.collaboratorId, body.data, auth.displayName,
+      ));
+    } catch (error) { return failure(reply, error, 'matrix operation permissions save failed'); }
   });
 }

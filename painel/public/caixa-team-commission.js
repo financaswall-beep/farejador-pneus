@@ -10,6 +10,34 @@
     delivery: 'Por entrega concluída', trip: 'Por rota concluída',
   };
 
+  function formatDate(value) {
+    const parts = String(value || '').slice(0, 10).split('-');
+    return parts.length === 3 ? parts.reverse().join('/') : String(value || '');
+  }
+
+  function historyLabel(item) {
+    if (!item.active) return 'Sem comissão';
+    return item.kind === 'percent'
+      ? Number(item.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+      : Caixa.currency.format(Number(item.value || 0)) + ' por ' + String(basisLabels[item.basis] || item.basis).toLowerCase();
+  }
+
+  function renderHistory(items) {
+    const list = document.getElementById('team-commission-history'); list.replaceChildren();
+    if (!items || !items.length) {
+      const empty = document.createElement('p'); empty.className = 'team-empty';
+      empty.textContent = 'Nenhuma alteração anterior registrada.'; list.appendChild(empty); return;
+    }
+    items.forEach(function (item) {
+      const row = document.createElement('article');
+      const title = document.createElement('strong'); title.textContent = historyLabel(item);
+      const date = document.createElement('time'); date.textContent = formatDate(item.starts_on);
+      const detail = document.createElement('small');
+      detail.textContent = item.active ? 'Base: ' + (basisLabels[item.basis] || item.basis) : 'Regra desativada';
+      row.append(title, date, detail); list.appendChild(row);
+    });
+  }
+
   function memberId() {
     const match = window.location.hash.match(/^#equipe\/comissao\/([^/]+)$/);
     if (match) state.memberId = decodeURIComponent(match[1]); return state.memberId || '';
@@ -78,6 +106,10 @@
     const start = document.getElementById('team-commission-start'); start.value = String(data.starts_on).slice(0, 10);
     if (Caixa.isPartner()) start.max = new Date().toISOString().slice(0, 10); else start.removeAttribute('max');
     renderBases(data.kind, data.basis); refreshFields();
+    renderHistory(data.history || []);
+    document.getElementById('team-commission-history').classList.add('hidden');
+    const historyToggle = document.getElementById('team-commission-history-toggle');
+    historyToggle.textContent = 'Ver histórico de regras'; historyToggle.setAttribute('aria-expanded', 'false');
     document.getElementById('team-commission-save-error').textContent = '';
   }
 
@@ -117,10 +149,18 @@
   }
 
   function back() { payload = null; state.memberId = ''; window.location.hash = '#equipe'; Caixa.showTab('team'); }
+  function toggleHistory() {
+    const history = document.getElementById('team-commission-history');
+    const opening = history.classList.contains('hidden'); history.classList.toggle('hidden', !opening);
+    const button = document.getElementById('team-commission-history-toggle');
+    button.textContent = opening ? 'Ocultar histórico de regras' : 'Ver histórico de regras';
+    button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  }
   Object.assign(Caixa, { loadTeamCommission: load });
   document.getElementById('team-commission-form').addEventListener('submit', save);
   document.getElementById('team-commission-retry').addEventListener('click', function () { void load(true); });
   document.getElementById('team-commission-back').addEventListener('click', back);
+  document.getElementById('team-commission-history-toggle').addEventListener('click', toggleHistory);
   document.querySelectorAll('input[name="team-commission-kind"]').forEach(function (radio) { radio.addEventListener('change', refreshFields); });
   document.getElementById('team-commission-value').addEventListener('input', refreshFields);
   document.getElementById('team-commission-basis').addEventListener('change', refreshFields);

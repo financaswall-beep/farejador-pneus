@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../src/persistence/db.js', () => ({ pool: { query: vi.fn() } }));
 
 import {
+  getPartnerOperationCommissionRule,
   getPartnerOperationCompensation,
   getPartnerOperationTeam,
 } from '../../../src/parceiro/operation-team.js';
@@ -56,5 +57,21 @@ describe('equipe da Operação do parceiro', () => {
       employment_type: 'clt', payment_method: 'pix', base_salary: 2300,
       benefits_total: 220, fixed_total: 2520,
     });
+  });
+
+  it('entrega o histórico da comissão da mesma unidade', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [member] })
+      .mockResolvedValueOnce({ rows: [{
+        kind: 'percent', value: '5.00', active: true, starts_on: '2026-08-01',
+      }] });
+    const db = { query } as unknown as Pool;
+
+    const result = await getPartnerOperationCommissionRule(context, 'employee-1', db);
+
+    expect(query.mock.calls[1]?.[1]).toEqual(['prod', 'unit-partner-1', 'employee-1']);
+    expect(result?.history).toEqual([{
+      kind: 'percent', basis: 'revenue', value: 5, active: true, starts_on: '2026-08-01',
+    }]);
   });
 });

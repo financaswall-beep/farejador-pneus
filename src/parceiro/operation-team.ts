@@ -145,11 +145,21 @@ export async function getPartnerOperationCommissionRule(
   ctx: PartnerContext, tokenId: string, db: Queryable = defaultPool,
 ): Promise<OperationCommissionRulePayload | null> {
   const row = await find(ctx, tokenId, db); if (!row) return null;
+  const history = await db.query<{
+    kind: 'percent' | 'fixed'; value: string; active: boolean; starts_on: string;
+  }>(`SELECT kind,value::text,active,starts_on::text
+        FROM network.partner_token_commission_history
+       WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3
+       ORDER BY starts_on DESC,updated_at DESC LIMIT 24`,
+  [ctx.environment, ctx.partnerUnitId, tokenId]);
   return {
     unit_name: ctx.unitName, member: memberOf(row), kind: row.commission_kind ?? 'percent',
     basis: row.commission_kind === 'fixed' ? 'sale' : 'revenue', value: money(row.commission_value),
     active: row.commission_active, starts_on: row.commission_starts_on || localDate(),
     available_bases: ['revenue', 'sale'],
+    history: history.rows.map((item) => ({
+      ...item, value: money(item.value), basis: item.kind === 'fixed' ? 'sale' : 'revenue',
+    })),
   };
 }
 

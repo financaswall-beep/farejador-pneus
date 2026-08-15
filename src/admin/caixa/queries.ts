@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
-import { fakeVerify, hashPassword, hashSessionToken, verifyPassword } from '../../parceiro/password.js';
+import { fakeVerify, hashSessionToken, verifyPassword } from '../../parceiro/password.js';
+
+export { changeCaixaPassword, type ChangeCaixaPasswordResult } from './operation-account.js';
 
 const CAIXA_SESSION_PREFIX = 'cs_';
 const CAIXA_SESSION_TTL_HOURS = 12;
@@ -39,12 +41,19 @@ function modulesForAccess(
   job: 'vendedor' | 'entregador' | 'colaborador',
   workArea: string | null,
   panelRole: 'owner' | 'admin' | null,
+  overrides?: { vendas: boolean | null; entregas: boolean | null; financeiro: boolean | null },
 ): CaixaModules {
-  return {
+  const legacy = {
     vendas: job === 'vendedor' && workArea === 'sales',
-    estoque: false,
     entregas: job === 'entregador',
     financeiro: panelRole !== null,
+  };
+  if (panelRole === 'owner') return { ...legacy, estoque: false, financeiro: true };
+  return {
+    vendas: overrides?.vendas ?? legacy.vendas,
+    estoque: false,
+    entregas: overrides?.entregas ?? legacy.entregas,
+    financeiro: overrides?.financeiro ?? legacy.financeiro,
   };
 }
 
@@ -69,18 +78,27 @@ export async function mintCaixaSessionForPerson(
     job: 'vendedor' | 'entregador' | 'colaborador';
     work_area: string | null;
     panel_role: 'owner' | 'admin' | null;
+    allow_vendas: boolean | null;
+    allow_entregas: boolean | null;
+    allow_financeiro: boolean | null;
   }>(
-    `SELECT mc.display_name, pp.username, mc.job, mc.work_area, mc.panel_role
+    `SELECT mc.display_name, pp.username, mc.job, mc.work_area, mc.panel_role,
+            op.allow_vendas,op.allow_entregas,op.allow_financeiro
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp
          ON pp.id = mc.person_id AND pp.environment = mc.environment
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.collaborator_id=mc.id AND op.environment=mc.environment
       WHERE mc.environment = $1
         AND mc.person_id = $2
         AND mc.id = $3
         AND mc.revoked_at IS NULL
         AND (mc.panel_role IS NOT NULL
           OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
-          OR mc.job = 'entregador')
+          OR mc.job = 'entregador'
+          OR COALESCE(op.allow_vendas,false)
+          OR COALESCE(op.allow_entregas,false)
+          OR COALESCE(op.allow_financeiro,false))
         AND pp.revoked_at IS NULL
       LIMIT 1`,
     [environment, personId, collaboratorId],
@@ -176,22 +194,31 @@ export async function validateCaixaSession(
     job: 'vendedor' | 'entregador' | 'colaborador';
     work_area: string | null;
     panel_role: 'owner' | 'admin' | null;
+    allow_vendas: boolean | null;
+    allow_entregas: boolean | null;
+    allow_financeiro: boolean | null;
   }>(
     `UPDATE network.matriz_staff_sessions s
         SET last_used_at = now()
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp
          ON pp.id = mc.person_id AND pp.environment = mc.environment
+       LEFT JOIN network.matriz_collaborator_operation_permissions op
+         ON op.collaborator_id=mc.id AND op.environment=mc.environment
       WHERE s.session_hash = $1 AND s.environment = $2
         AND s.revoked_at IS NULL AND s.expires_at > now()
         AND mc.person_id = s.person_id AND mc.environment = s.environment
         AND mc.revoked_at IS NULL
         AND (mc.panel_role IS NOT NULL
           OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
-          OR mc.job = 'entregador')
+          OR mc.job = 'entregador'
+          OR COALESCE(op.allow_vendas,false)
+          OR COALESCE(op.allow_entregas,false)
+          OR COALESCE(op.allow_financeiro,false))
         AND pp.revoked_at IS NULL
       RETURNING s.person_id, mc.id AS collaborator_id, mc.display_name, pp.username,
-                mc.job, mc.work_area, mc.panel_role`,
+                mc.job, mc.work_area, mc.panel_role,
+                op.allow_vendas,op.allow_entregas,op.allow_financeiro`,
     [hashSessionToken(sessionToken), environment],
   );
   const row = result.rows[0];
@@ -204,7 +231,11 @@ export async function validateCaixaSession(
     username: row.username,
     job: row.job,
     panelRole,
-    modules: modulesForAccess(row.job, row.work_area ?? null, panelRole),
+    modules: modulesForAccess(row.job, row.work_area ?? null, panelRole, {
+      vendas: row.allow_vendas ?? null,
+      entregas: row.allow_entregas ?? null,
+      financeiro: row.allow_financeiro ?? null,
+    }),
   };
 }
 
@@ -220,75 +251,4 @@ export async function revokeCaixaSession(
       WHERE environment = $1 AND session_hash = $2 AND revoked_at IS NULL`,
     [environment, hashSessionToken(sessionToken)],
   );
-}
-
-export type ChangeCaixaPasswordResult =
-  | 'changed'
-  | 'invalid_current_password'
-  | 'same_password'
-  | 'account_not_found';
-
-/**
- * Troca a senha da pessoa autenticada e encerra todas as sessões de colaborador.
- * O próximo acesso já usa exclusivamente o novo segredo.
- */
-export async function changeCaixaPassword(
-  environment: 'prod' | 'test',
-  personId: string,
-  currentPassword: string,
-  newPassword: string,
-  dbPool: Pool = defaultPool,
-): Promise<ChangeCaixaPasswordResult> {
-  const client = await dbPool.connect();
-  try {
-    await client.query('BEGIN');
-    const person = await client.query<{ password_hash: string | null }>(
-      `SELECT password_hash
-         FROM network.partner_people
-        WHERE id=$2 AND environment=$1 AND revoked_at IS NULL
-        FOR UPDATE`,
-      [environment, personId],
-    );
-    const storedHash = person.rows[0]?.password_hash;
-    if (!storedHash) {
-      await client.query('ROLLBACK');
-      return 'account_not_found';
-    }
-    if (!await verifyPassword(currentPassword, storedHash)) {
-      await client.query('ROLLBACK');
-      return 'invalid_current_password';
-    }
-    if (await verifyPassword(newPassword, storedHash)) {
-      await client.query('ROLLBACK');
-      return 'same_password';
-    }
-
-    const passwordHash = await hashPassword(newPassword);
-    await client.query(
-      `UPDATE network.partner_people
-          SET password_hash=$3,password_set_at=now()
-        WHERE id=$2 AND environment=$1 AND revoked_at IS NULL`,
-      [environment, personId, passwordHash],
-    );
-    // A senha pertence à pessoa: mantém eventuais vínculos de loja coerentes.
-    await client.query(
-      `UPDATE network.partner_access_tokens
-          SET login_password_hash=$3,login_password_set_at=now()
-        WHERE person_id=$2 AND environment=$1 AND revoked_at IS NULL`,
-      [environment, personId, passwordHash],
-    );
-    await client.query(
-      `UPDATE network.matriz_staff_sessions
-          SET revoked_at=now()
-        WHERE person_id=$2 AND environment=$1 AND revoked_at IS NULL`,
-      [environment, personId],
-    );
-    await client.query('COMMIT');
-    return 'changed';
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
-  } finally {
-    client.release();
-  }
 }

@@ -25,6 +25,7 @@ const scriptFiles = [
   'caixa-team.js',
   'caixa-team-remuneration.js',
   'caixa-team-commission.js',
+  'caixa-team-permissions.js',
   'caixa-profile.js',
   'caixa-photo.js',
   'caixa.js',
@@ -248,19 +249,23 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('id="team-panel"');
     expect(html).toContain('id="team-remuneration-panel"');
     expect(html).toContain('id="team-commission-panel"');
+    expect(html).toContain('id="team-permissions-panel"');
     expect(html).toContain('id="nav-team"');
     expect(html).toContain('Novo colaborador');
     expect(html).toContain('Salvar remuneração');
     expect(html).toContain('Salvar regra de comissão');
+    expect(html).toContain('Salvar permissões');
     expect(script).toContain("Caixa.stored(Caixa.keys.role) === 'owner'");
     expect(script).toContain("Caixa.operationPath('equipe', '/api/caixa/equipe')");
     expect(script).toContain("window.location.hash = '#equipe'");
     expect(route).toContain("'/api/caixa/equipe'");
     expect(route).toContain("'/api/caixa/equipe/:collaboratorId/remuneracao'");
     expect(route).toContain("'/api/caixa/equipe/:collaboratorId/comissao'");
+    expect(route).toContain("'/api/caixa/equipe/:collaboratorId/permissoes'");
     expect(route).toContain("error: 'owner_required'");
     expect(css).toContain('.team-member-card');
     expect(css).toContain('.team-rule-options');
+    expect(css).toContain('.team-permission-row');
   });
 
   it('aceita somente vendedor ativo da área de vendas e usa token próprio', () => {

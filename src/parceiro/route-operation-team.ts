@@ -7,6 +7,10 @@ import {
   getPartnerOperationTeam, savePartnerOperationCommissionRule,
   savePartnerOperationCompensation,
 } from './operation-team.js';
+import {
+  getPartnerOperationPermissions,
+  savePartnerOperationPermissions,
+} from './operation-team-permissions.js';
 
 const owner = [requirePartnerAuth, requireOwner];
 const params = z.object({ collaboratorId: z.string().uuid() });
@@ -28,6 +32,11 @@ const commission = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('percent'), basis: z.literal('revenue'), value: money.max(100), active: z.boolean(), starts_on: startsOn }),
   z.object({ kind: z.literal('fixed'), basis: z.literal('sale'), value: money, active: z.boolean(), starts_on: startsOn }),
 ]);
+const permissions = z.object({
+  vendas: z.boolean(), estoque: z.boolean(), pedidos: z.boolean(), clientes: z.boolean(),
+  entregas: z.boolean(), retiradas: z.boolean(), batepapo: z.boolean(),
+  resumo: z.boolean(), financeiro: z.boolean(),
+});
 
 function bad(reply: FastifyReply, error: unknown, label: string) {
   const code = error instanceof Error ? error.message : 'team_unavailable';
@@ -80,5 +89,24 @@ export function registerPartnerOperationTeamRoutes(fastify: FastifyInstance): vo
         getPartnerContext(request), id.data.collaboratorId, body.data,
       ));
     } catch (error) { return bad(reply, error, 'partner commission rule save failed'); }
+  });
+
+  fastify.get('/parceiro/:slug/api/equipe/:collaboratorId/permissoes', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {
+    reply.header('Cache-Control', 'no-store'); const id = params.safeParse(request.params ?? {});
+    if (!id.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      const payload = await getPartnerOperationPermissions(getPartnerContext(request), id.data.collaboratorId);
+      return payload ? reply.status(200).send(payload) : reply.status(404).send({ error: 'collaborator_not_found' });
+    } catch (error) { return bad(reply, error, 'partner operation permissions unavailable'); }
+  });
+
+  fastify.put('/parceiro/:slug/api/equipe/:collaboratorId/permissoes', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {
+    const id = params.safeParse(request.params ?? {}); const body = permissions.safeParse(request.body ?? {});
+    if (!id.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      return reply.status(200).send(await savePartnerOperationPermissions(
+        getPartnerContext(request), id.data.collaboratorId, body.data,
+      ));
+    } catch (error) { return bad(reply, error, 'partner operation permissions save failed'); }
   });
 }

@@ -31,7 +31,8 @@
   function openMember(member, section) {
     state.memberId = member.id;
     window.location.hash = '#equipe/' + section + '/' + encodeURIComponent(member.id);
-    Caixa.showTab(section === 'remuneracao' ? 'team-remuneration' : 'team-commission');
+    const tabs = { remuneracao: 'team-remuneration', comissao: 'team-commission', permissoes: 'team-permissions' };
+    Caixa.showTab(tabs[section] || 'team');
   }
 
   function memberCard(member) {
@@ -62,6 +63,7 @@
     buttons.append(
       action('▤  Remuneração', 'team-outline', function () { openMember(member, 'remuneracao'); }),
       action('%  Comissão', 'team-outline', function () { openMember(member, 'comissao'); }),
+      action('✓  Permissões', 'team-outline team-permission-action', function () { openMember(member, 'permissoes'); }),
     );
     article.append(head, metrics, buttons); return article;
   }
