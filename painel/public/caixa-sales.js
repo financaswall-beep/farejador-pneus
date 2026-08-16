@@ -76,6 +76,7 @@
   }
 
   function showTab(tab) {
+    tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab;
     const cash = tab === 'cash';
     const profile = tab === 'profile';
     const sales = tab === 'sales';

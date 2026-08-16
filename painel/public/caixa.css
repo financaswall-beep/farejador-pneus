@@ -262,11 +262,11 @@ form { display: grid; gap: 16px; }
 .sales-app { min-height: 100%; background: #f9faf8; }
 .sales-header {
   display: flex;
-  min-height: 176px;
+  min-height: 166px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 29px 22px 48px;
+  padding: 29px 22px 43px;
   color: #fff;
   background:
     linear-gradient(110deg, rgba(0,43,31,.86) 0%, rgba(0,76,52,.72) 52%, rgba(0,45,32,.84) 100%),
@@ -433,7 +433,6 @@ form { display: grid; gap: 16px; }
 .receipt-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 
 /* Caixa — catálogo, carrinho e fechamento integrado */
-.sales-app.is-cash .sales-header { min-height: 166px; padding-bottom: 43px; }
 .checkout-panel { min-height: 650px; padding: 16px 14px 20px; }
 .checkout-search { position: relative; }
 .checkout-search > svg { position: absolute; z-index: 1; top: 50%; left: 17px; width: 25px; height: 25px; transform: translateY(-50%); fill: none; stroke: #59645f; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.75; pointer-events: none; }
@@ -524,9 +523,6 @@ form { display: grid; gap: 16px; }
 .sales-empty strong { color: #33433c; font-size: 15px; }
 .sales-empty span { margin-top: 6px; font-size: 12px; }
 
-.sales-app.is-profile .sales-header { min-height: 181px; padding-bottom: 53px; }
-.sales-app.is-profile .operator-button { display: none; }
-.sales-app.is-profile .operator-area { padding-top: 25px; }
 .profile-panel { min-height: 720px; margin-top: 0; padding: 0 15px 108px; overflow: visible; border-radius: 0; text-align: center; box-shadow: none; }
 .profile-avatar {
   display: grid;
@@ -581,7 +577,6 @@ form { display: grid; gap: 16px; }
 .profile-actions .logout-button:hover { background: #fff5f5; }
 
 /* Estoque mobile seguro: consulta + solicitacoes sem escrita no saldo oficial */
-.sales-app.is-stock .sales-header { min-height: 166px; padding-bottom: 43px; }
 .stock-panel { min-height: 690px; padding: 16px 14px 24px; }
 .stock-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
 .stock-action--product { grid-column: 1 / -1; }
@@ -896,7 +891,6 @@ form { display: grid; gap: 16px; }
 .bottom-nav button.active svg { stroke-width: 2; }
 
 /* Central de notificações — pedidos de foto separados dos avisos internos. */
-.sales-app.is-notifications .sales-header { min-height: 151px; padding-bottom: 35px; }
 .sales-app.is-notifications .photo-alert { display: none; }
 .notifications-panel { min-height: 660px; padding: 16px 14px 25px; }
 .notifications-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 16px; }
@@ -943,16 +937,10 @@ form { display: grid; gap: 16px; }
 /* Financeiro simples — base curva pronta; dados reais ficam em HTML por cima. */
 .sales-app.is-finance {
   background:
-    #fff url('/operacao/finance-shell-positive-v3.webp') center top / 100% clamp(398px,100vw,410px) no-repeat;
+    #fff url('/operacao/finance-shell-positive-v3.webp') center 18px / 100% clamp(398px,100vw,410px) no-repeat;
 }
 .sales-app.is-finance.finance-negative {
   background-image: url('/operacao/finance-shell-negative-v3.webp');
-}
-.sales-app.is-finance .sales-header {
-  min-height: 176px;
-  padding-bottom: 48px;
-  background: transparent;
-  box-shadow: none;
 }
 .finance-panel {
   min-height: 680px;
@@ -1213,8 +1201,6 @@ form { display: grid; gap: 16px; }
   .finance-commission-list article > b { grid-column: 2; }
   .finance-commission-row-action { grid-column: 3; grid-row: 1 / span 2; }
 }
-.sales-app.is-finance-detail .sales-header { min-height: 132px; padding-bottom: 22px; }
-
 @media (max-width: 370px) {
   .finance-entries-page { padding-inline: 11px; }
   .finance-entries-toolbar { margin-inline: -11px; padding-inline: 11px; }
@@ -1529,12 +1515,6 @@ form { display: grid; gap: 16px; }
 }
 
 /* Operação da Loja — Minhas vendas (mesmo desenho para Matriz e parceiros). */
-.sales-app.is-sales .sales-header {
-  min-height: 158px;
-  padding-bottom: 38px;
-  background: linear-gradient(115deg,#034a35 0%,#006044 52%,#003d2e 100%);
-}
-.sales-app.is-sales .sales-logo { border: 3px solid rgba(176,220,47,.82); border-radius: 50%; box-shadow: 0 7px 18px rgba(0,20,14,.24); }
 .my-sales-panel { padding: 0 13px 22px; background: #fbfcfa; }
 .my-sales-panel .weekly-summary { margin-top: 0; border-radius: 22px; }
 .my-sales-panel .weekly-week-nav { min-height: 64px; padding: 8px 14px; background: #fff; }
@@ -1599,12 +1579,6 @@ form { display: grid; gap: 16px; }
 .receipt-seller { font-size: 13px; }
 
 /* Operação da Loja — Entregas do parceiro. */
-.sales-app.is-deliveries .sales-header {
-  min-height: 169px;
-  padding-bottom: 43px;
-  background: linear-gradient(115deg,#034a35 0%,#006044 52%,#003d2e 100%);
-}
-.sales-app.is-deliveries .sales-logo { border: 3px solid rgba(176,220,47,.82); border-radius: 50%; box-shadow: 0 7px 18px rgba(0,20,14,.24); }
 .deliveries-panel { padding: 17px 13px 23px; background: #fbfcfa; }
 .deliveries-title { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 3px; }
 .deliveries-title h3 { margin: 0; color: #17231e; font-size: 21px; line-height: 1.1; letter-spacing: -.025em; }
@@ -2260,8 +2234,6 @@ form { display: grid; gap: 16px; }
 .team-permission-locked b { font-size: 14px; }
 .team-permission-locked small { margin-top: 3px; color: #728078; font-size: 11px; line-height: 1.35; }
 .team-permission-locked > span { font-size: 20px; }
-.sales-app.is-team .sales-header,.sales-app.is-team-detail .sales-header { min-height: 132px; padding-bottom: 22px; }
-
 @media (max-width: 390px) {
   .team-page { padding-inline: 10px; }
   .team-detail-heading { grid-template-columns: 40px minmax(0,1fr); }

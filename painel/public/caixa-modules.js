@@ -17,6 +17,39 @@
     return modules()[name] === true;
   }
 
+  const tabModules = Object.freeze({
+    cash: 'vendas',
+    sales: 'vendas',
+    stock: 'estoque',
+    'stock-detail': 'estoque',
+    'stock-receipts': 'estoque',
+    deliveries: 'entregas',
+    finance: 'financeiro',
+    'finance-in': 'financeiro',
+    'finance-out': 'financeiro',
+    'finance-commissions': 'financeiro',
+    'finance-commission-detail': 'financeiro',
+    team: 'team',
+    'team-remuneration': 'team',
+    'team-commission': 'team',
+    'team-permissions': 'team',
+  });
+
+  function firstAllowedTab() {
+    if (canModule('vendas')) return 'cash';
+    if (canModule('estoque')) return 'stock';
+    if (canModule('entregas')) return 'deliveries';
+    if (canModule('financeiro')) return 'finance';
+    if (canModule('team')) return 'team';
+    return 'profile';
+  }
+
+  function authorizedOperationTab(tab) {
+    if (tab === 'profile' || tab === 'notifications') return tab;
+    const requiredModule = tabModules[tab];
+    return requiredModule && canModule(requiredModule) ? tab : firstAllowedTab();
+  }
+
   function syncSessionMetadata(data) {
     if (!data || typeof data !== 'object') return;
     const keys = Caixa.keys;
@@ -63,11 +96,7 @@
     if (canModule('vendas') && window.location.hash === '#vendas') return 'sales';
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';
-    if (canModule('vendas')) return 'cash';
-    if (canModule('estoque')) return 'stock';
-    if (canModule('entregas')) return 'deliveries';
-    if (canModule('financeiro')) return 'finance';
-    return 'profile';
+    return firstAllowedTab();
   }
 
   Object.assign(Caixa, {
@@ -76,5 +105,6 @@
     canModule: canModule,
     applyModuleNavigation: applyModuleNavigation,
     initialOperationTab: initialOperationTab,
+    authorizedOperationTab: authorizedOperationTab,
   });
 }());

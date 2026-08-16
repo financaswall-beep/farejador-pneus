@@ -125,6 +125,11 @@ describe('login mobile da Operação da Loja', () => {
     expect(script).toContain('Caixa.syncSessionMetadata(data)');
     expect(script).toContain('const effective = data.modules || (data.permissions ?');
     expect(script).toContain('storage.setItem(keys.modules, JSON.stringify(effective))');
+    expect(script).toContain("setNavigationVisibility('nav-finance', canModule('financeiro'))");
+    expect(script).toContain('authorizedOperationTab: authorizedOperationTab');
+    expect(script).toContain('tab = Caixa.authorizedOperationTab ? Caixa.authorizedOperationTab(tab) : tab');
+    expect(script).toContain("'finance-commission-detail': 'financeiro'");
+    expect(script).toContain("'team-permissions': 'team'");
   });
 
   it('entrega uma aba de vendas funcional sem usar a API administrativa', () => {
