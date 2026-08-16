@@ -7,13 +7,8 @@
   <title>2W — Portal do Parceiro</title>
   <script>
     (function () {
-      var params = new URLSearchParams(window.location.search);
       var narrow = window.matchMedia('(max-width: 768px)').matches;
       var touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-      if (params.get('modo') === 'painel') {
-        if (narrow && touch) document.documentElement.classList.add('panel-mobile-override');
-        return;
-      }
       if (narrow && touch) window.location.replace('/operacao');
     })();
   </script>

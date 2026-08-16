@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
@@ -69,8 +69,6 @@ import {
   archivePartnerItem,
   unarchivePartnerItem,
   isDismissibleType,
-  savePartnerPushSubscription,
-  deletePartnerPushSubscription,
   getPartnerRetiradas,
   registerPartnerExpense,
   registerPartnerPayable,
@@ -112,11 +110,11 @@ import {
 import { env } from '../shared/config/env.js';
 import { subscribePartnerChat, type PartnerChatEvent } from '../normalization/partner-chat.notify.js';
 import { acquirePartnerSseSlot } from './sse-limit.js';
-import { isAllowedPushEndpoint } from './push-endpoint.js';
 import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
 import { registerPartnerMySalesRoutes } from './route-my-sales.js';
 import { registerPartnerFuncionarioReactivationRoute } from './route-funcionarios.js';
 import { registerPartnerSimpleFinanceRoute } from './route-simple-finance.js';
+import { isLegacyPartnerMobile } from './legacy-mobile.js';
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
 // Extrai o bearer cru (Authorization: Bearer … ou x-partner-token). Usado pra
@@ -493,18 +491,6 @@ const settleReceivableSchema = z.object({
   payment_method: z.string().max(80).nullable().optional(),
 });
 
-// PUSH (PWA, 0109): corpo da inscrição = PushSubscription.toJSON() do navegador
-// ({ endpoint, keys:{p256dh, auth} }; expirationTime é ignorado). Limites de
-// tamanho generosos cobrem FCM/Mozilla sem virar vetor de payload gigante.
-const pushSubscribeSchema = z.object({
-  endpoint: z.string().url().max(2000),
-  keys: z.object({
-    p256dh: z.string().min(1).max(500),
-    auth: z.string().min(1).max(500),
-  }),
-});
-const pushUnsubscribeSchema = z.object({ endpoint: z.string().url().max(2000) });
-
 async function sendStatic(reply: FastifyReply, file: string, type: string) {
   const content = await readFile(path.join(publicDir, file));
   return reply
@@ -522,15 +508,26 @@ function validateSlug(request: PartnerAuthedRequest, reply: FastifyReply): boole
   return true;
 }
 
+function retireLegacyMobile(request: FastifyRequest, reply: FastifyReply): boolean {
+  if (!isLegacyPartnerMobile(request.headers)) return false;
+  void reply
+    .header('Cache-Control', 'no-store')
+    .header('Vary', 'Sec-CH-UA-Mobile, User-Agent')
+    .redirect('/operacao');
+  return true;
+}
+
 export async function registerParceiroRoute(fastify: FastifyInstance): Promise<void> {
   fastify.get('/parceiro/:slug', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
+    if (retireLegacyMobile(request, reply)) return;
     const slug = (request.params as { slug: string }).slug;
     return reply.redirect(`/parceiro/${slug}/`);
   });
 
   fastify.get('/parceiro/:slug/', async (request: PartnerAuthedRequest, reply) => {
     if (!validateSlug(request, reply)) return;
+    if (retireLegacyMobile(request, reply)) return;
     return sendStatic(reply, 'index.html', 'text/html; charset=utf-8');
   });
 
@@ -570,16 +567,10 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     }
   });
 
-  // PWA (0109): service worker + manifest. O sw.js PRECISA ser servido na raiz do
-  // slug pra o escopo do service worker cobrir o painel (/parceiro/<slug>/). Rotas
-  // estáticas explícitas vencem o catch-all :script no router do Fastify. Públicas
-  // de propósito: o SW e o manifest não carregam dado nenhum (a inscrição é que é
-  // autenticada). O conteúdo é estático e idêntico pra todo slug.
+  // Tombstone da PWA aposentada: os aparelhos já instalados ainda consultam esta
+  // URL. O worker servido aqui se auto-remove e leva janelas antigas a /operacao.
   fastify.get('/parceiro/:slug/sw.js', async (_request, reply) =>
     sendStatic(reply, 'sw.js', 'text/javascript; charset=utf-8'),
-  );
-  fastify.get('/parceiro/:slug/manifest.webmanifest', async (_request, reply) =>
-    sendStatic(reply, 'manifest.webmanifest', 'application/manifest+json; charset=utf-8'),
   );
 
   // P1 — Login por usuário+senha (PÚBLICO): handler + throttle em ./route-login.ts.
@@ -1124,45 +1115,6 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       .header('Content-Type', img.mime)
       .header('Cache-Control', 'private, max-age=300')
       .send(img.bytes);
-  });
-
-  // ─── PUSH (PWA, 0109) ──────────────────────────────────────────────────────
-  // Notificação nativa no celular quando cai foto/pedido com o navegador fechado.
-  // Atrás da flag PUSH_NOTIFICATIONS: off responde {enabled:false} e NADA é gravado.
-  // Sem tela específica: qualquer usuário autenticado pode ligar avisos no SEU
-  // aparelho. A inscrição é escopada por unidade na própria query (RLS WITH CHECK).
-
-  // A chave pública VAPID que o front usa pra se inscrever (não é segredo).
-  fastify.get('/parceiro/:slug/api/push/vapid-key', { preHandler: requirePartnerAuth }, async (_request, reply) => {
-    if (!env.PUSH_NOTIFICATIONS || !env.VAPID_PUBLIC_KEY) return reply.status(200).send({ enabled: false });
-    return reply.status(200).send({ enabled: true, key: env.VAPID_PUBLIC_KEY });
-  });
-
-  // O aparelho permitiu os avisos → guarda a inscrição (endpoint + chaves).
-  fastify.post('/parceiro/:slug/api/push/subscribe', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
-    if (!env.PUSH_NOTIFICATIONS) return reply.status(200).send({ enabled: false });
-    const parsed = pushSubscribeSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_subscription' });
-    if (!(await isAllowedPushEndpoint(parsed.data.endpoint))) {
-      return reply.status(400).send({ error: 'invalid_subscription_endpoint' });
-    }
-    const ua = String(request.headers['user-agent'] ?? '').slice(0, 300) || null;
-    await savePartnerPushSubscription(getPartnerContext(request), {
-      endpoint: parsed.data.endpoint,
-      p256dh: parsed.data.keys.p256dh,
-      auth: parsed.data.keys.auth,
-      userAgent: ua,
-    });
-    return reply.status(200).send({ ok: true });
-  });
-
-  // O aparelho desativou os avisos → remove a inscrição.
-  fastify.post('/parceiro/:slug/api/push/unsubscribe', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
-    if (!env.PUSH_NOTIFICATIONS) return reply.status(200).send({ enabled: false });
-    const parsed = pushUnsubscribeSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return reply.status(400).send({ error: 'invalid_subscription' });
-    await deletePartnerPushSubscription(getPartnerContext(request), parsed.data.endpoint);
-    return reply.status(200).send({ ok: true });
   });
 
   // EventSource não envia Authorization. O endpoint autenticado emite um ticket

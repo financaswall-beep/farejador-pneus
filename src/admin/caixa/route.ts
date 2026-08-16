@@ -109,7 +109,9 @@ function checkoutError(error: unknown): { status: number; error: string } {
 
 export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void> {
   const flagGate = async (_request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    if (!env.MATRIZ_CAIXA_PORTAL) await reply.status(404).send({ error: 'not_found' });
+    if (!env.MATRIZ_CAIXA_PORTAL && !env.OPERACAO_LOJA_PORTAL) {
+      await reply.status(404).send({ error: 'not_found' });
+    }
   };
   registerCaixaStaticRoutes(fastify, flagGate);
 

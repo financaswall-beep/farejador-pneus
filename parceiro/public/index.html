@@ -5,9 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Portal Parceiro - Farejador</title>
 
-  <!-- Porta unica: a URL da loja e destino, nao uma segunda tela de login. -->
+  <!-- O painel por slug é web/desktop. No celular, a operação unificada substitui
+       definitivamente a experiência antiga, inclusive para PWA já instalada. -->
   <script>
     (() => {
+      const narrow = window.matchMedia('(max-width: 768px)').matches;
+      const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+      if (narrow && touch) {
+        if ('serviceWorker' in navigator) {
+          void navigator.serviceWorker.getRegistration().then((registration) => registration?.unregister()).catch(() => {});
+        }
+        location.replace('/operacao');
+        return;
+      }
       const slug = location.pathname.split('/').filter(Boolean)[1] || '';
       if (!slug) return;
       let token = '';
@@ -31,13 +41,6 @@
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
   <link rel="preload" as="image" href="./assets/chat-bg.jpg" />
 
-  <!-- PWA (0109): vira "app" na tela inicial + base da notificação nativa. -->
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <meta name="theme-color" content="#047857" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="2W Pneus" />
-  <link rel="apple-touch-icon" href="./assets/icon-apple-180.png" />
 </head>
 
 <body class="bg-gray-50 font-sans text-gray-900" x-data="parceiroApp()" x-init="init()">
@@ -3448,7 +3451,6 @@
 <script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
-<script src="./app.push.js?v=20260619-pushfix"></script>
  <script src="./app.js?v=20260816-paineis-alinhados1"></script>
 </body>
 </html>

@@ -216,8 +216,6 @@ form { display: grid; gap: 16px; }
 .secure-row svg { width: 23px; height: 23px; padding: 4px; border-radius: 50%; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; background: #eaf7ec; }
 .secure-row p { margin: 0; white-space: nowrap; font-size: 11px; }
 .individual-access { margin: 14px 0 0; color: #6e7973; text-align: center; font-size: 11px; }
-.admin-access-link { display: block; margin: 9px auto 0; color: #4f675c; font-size: 12px; font-weight: 720; text-align: center; text-decoration: none; }
-.admin-access-link:hover { color: #064e3b; text-decoration: underline; text-underline-offset: 3px; }
 
 .session-card {
   position: relative;
@@ -1038,9 +1036,7 @@ form { display: grid; gap: 16px; }
 .finance-commissions small { color: #c7e9d6; font-size: 14px; }
 .finance-commissions strong { margin-top: 3px; font-size: 25px; letter-spacing: -.035em; }
 .finance-commissions em { width: fit-content; margin-top: 5px; padding: 3px 9px; border: 1px solid #27c674; border-radius: 12px; color: #bde9ce; font-size: 10px; font-style: normal; }
-.finance-full { display: flex; width: 100%; min-height: 55px; align-items: center; justify-content: center; gap: 18px; margin-top: 15px; border: 1px solid #075d3d; border-radius: 17px; color: #075d3d; background: rgba(255,255,255,.72); font-size: 15px; font-weight: 750; cursor: pointer; }
-.finance-full svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
-.finance-cash-summary button:focus-visible,.finance-pending-list button:focus-visible,.finance-commissions:focus-visible,.finance-full:focus-visible { outline: 3px solid rgba(16,185,129,.25); outline-offset: 2px; }
+.finance-cash-summary button:focus-visible,.finance-pending-list button:focus-visible,.finance-commissions:focus-visible { outline: 3px solid rgba(16,185,129,.25); outline-offset: 2px; }
 
 /* Financeiro simples — detalhe nativo de entradas. */
 .finance-entries-page { min-height: 650px; padding: 0 15px 106px; color: #16251e; background: #f7faf8; }
@@ -1088,8 +1084,6 @@ form { display: grid; gap: 16px; }
 .finance-entry-card > div span { color: #68756e; font-size: 12px; }
 .finance-entry-card > div small { color: #849089; font-size: 11px; }
 .finance-entry-card > b { color: #087246; font-size: 15px; white-space: nowrap; }
-.finance-entries-full { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; border: 1px solid #087246; border-radius: 14px; color: #087246; background: #fff; font-size: 14px; font-weight: 750; cursor: pointer; }
-.finance-entries-full svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .finance-entries-page.is-output .finance-entries-summary { background: linear-gradient(135deg,#d9582f,#982d28); box-shadow: 0 13px 27px rgba(143,42,34,.18); }
 .finance-entries-page.is-output .finance-entries-summary-icon { background: rgba(255,255,255,.12); }
 .finance-entries-page.is-output .finance-entries-summary-icon svg { stroke: #ffe1d8; }

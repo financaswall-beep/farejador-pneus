@@ -207,7 +207,6 @@
   range.addEventListener('change', loadFinanceEntries);
   byId('finance-entries-back').addEventListener('click', closeFinanceEntries);
   byId('finance-entries-retry').addEventListener('click', loadFinanceEntries);
-  byId('finance-entries-full').addEventListener('click', function () { Caixa.openFullFinance(); });
   window.addEventListener('hashchange', function () {
     if (!Caixa.token() || !Caixa.canModule('financeiro')) return;
     const target = Object.keys(modes).find(function (key) { return modes[key].hash === window.location.hash; });
