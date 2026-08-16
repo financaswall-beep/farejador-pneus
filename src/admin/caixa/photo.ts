@@ -7,7 +7,12 @@ export interface CaixaPhotoQueueItem {
   brand: string | null;
   note: string | null;
   customer_name: string | null;
+  status: string;
+  was_late: boolean;
+  has_photo: boolean;
+  photo_count: number;
   expires_at: string;
+  answered_at: string | null;
   created_at: string;
 }
 
@@ -29,13 +34,21 @@ export async function getCaixaPhotoQueue(
 ): Promise<CaixaPhotoQueueItem[]> {
   const result = await dbPool.query<CaixaPhotoQueueItem>(
     `SELECT pr.id,pr.tire_size,pr.brand,pr.note,
-            pr.customer_label AS customer_name,pr.expires_at,pr.created_at
+            pr.customer_label AS customer_name,pr.status,pr.was_late,
+            EXISTS (SELECT 1 FROM commerce.photo_request_blobs b
+                     WHERE b.environment=pr.environment AND b.photo_request_id=pr.id) AS has_photo,
+            (SELECT count(*)::int FROM commerce.photo_request_blobs b
+              WHERE b.environment=pr.environment AND b.photo_request_id=pr.id) AS photo_count,
+            pr.expires_at,pr.answered_at,pr.created_at
        FROM commerce.photo_requests pr
        JOIN core.units u
          ON u.id=pr.unit_id AND u.environment=pr.environment AND u.slug='main'
-      WHERE pr.environment=$1 AND pr.status='pending' AND pr.expires_at>now()
-      ORDER BY pr.created_at
-      LIMIT 20`,
+      WHERE pr.environment=$1 AND (
+        (pr.status='pending' AND pr.expires_at>now())
+        OR (pr.status IN ('answered','sent') AND COALESCE(pr.answered_at,pr.created_at)>now()-interval '2 hours')
+      )
+      ORDER BY pr.created_at DESC
+      LIMIT 50`,
     [environment],
   );
   return result.rows;

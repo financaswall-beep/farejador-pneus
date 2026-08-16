@@ -278,6 +278,16 @@ form { display: grid; gap: 16px; }
 .sales-heading h2 { margin: 0; font-size: 27px; font-weight: 690; line-height: 1; letter-spacing: -.035em; }
 .sales-heading p { margin: 7px 0 0; color: var(--lime); font-size: 18px; font-weight: 650; line-height: 1; }
 .operator-area { display: grid; justify-items: end; gap: 7px; min-width: 0; }
+.operator-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.notifications-button {
+  position: relative; display: grid; width: 43px; height: 43px; flex: 0 0 43px;
+  place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.45);
+  border-radius: 14px; color: #fff; background: rgba(0,36,26,.26); cursor: pointer;
+}
+.notifications-button:hover,.notifications-button.active { background: rgba(255,255,255,.14); }
+.notifications-button:focus-visible { outline: 3px solid rgba(163,230,53,.45); outline-offset: 2px; }
+.notifications-button svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.notifications-button b { position: absolute; top: -7px; right: -6px; display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 5px; border: 2px solid #07543b; border-radius: 999px; color: #fff; background: #0b9a61; font-size: 11px; line-height: 1; }
 .operator-button {
   display: flex;
   max-width: 142px;
@@ -863,21 +873,72 @@ form { display: grid; gap: 16px; }
   position: sticky;
   z-index: 8;
   bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(5,1fr);
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline: 12px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
   min-height: 76px;
-  padding: 6px 20px max(7px,env(safe-area-inset-bottom));
+  padding: 6px 12px max(7px,env(safe-area-inset-bottom));
   border-top: 1px solid #e4e7e5;
   background: rgba(255,255,255,.97);
   box-shadow: 0 -8px 24px rgba(18,40,31,.045);
   backdrop-filter: blur(14px);
 }
-.bottom-nav button { position: relative; display: flex; min-width: 0; align-items: center; justify-content: center; flex-direction: column; gap: 3px; padding: 5px 2px; border: 0; color: #707672; background: transparent; font-size: 10px; cursor: pointer; }
+.bottom-nav::-webkit-scrollbar { display: none; }
+.bottom-nav button { position: relative; display: flex; min-width: 78px; flex: 0 0 78px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; padding: 5px 4px; border: 0; color: #707672; background: transparent; font-size: 10px; cursor: pointer; scroll-snap-align: center; }
 .bottom-nav button::before { content: ""; position: absolute; top: -7px; left: 20%; right: 20%; height: 3px; border-radius: 0 0 3px 3px; background: transparent; }
 .bottom-nav button.active { color: #087246; }
 .bottom-nav button.active::before { background: #087246; }
 .bottom-nav svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.65; }
 .bottom-nav button.active svg { stroke-width: 2; }
+
+/* Central de notificações — pedidos de foto separados dos avisos internos. */
+.sales-app.is-notifications .sales-header { min-height: 151px; padding-bottom: 35px; }
+.sales-app.is-notifications .photo-alert { display: none; }
+.notifications-panel { min-height: 660px; padding: 16px 14px 25px; }
+.notifications-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 16px; }
+.notifications-tabs button { display: flex; min-width: 0; min-height: 52px; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid #0a714c; border-radius: 15px; color: #13583f; background: #fff; font-size: 13px; font-weight: 730; cursor: pointer; }
+.notifications-tabs button.active { color: #fff; background: linear-gradient(145deg,#087d50,#005d3d); box-shadow: 0 7px 17px rgba(3,93,61,.18); }
+.notifications-tabs svg { width: 22px; height: 22px; flex: 0 0 22px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.notifications-tabs span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notifications-tabs b { display: grid; min-width: 23px; height: 23px; flex: 0 0 auto; place-items: center; padding: 0 5px; border-radius: 999px; color: #07583a; background: #eef6f1; font-size: 11px; }
+.notifications-tabs button:not(.active) b { color: #fff; background: #087246; }
+.notifications-view > div { display: grid; gap: 14px; }
+.notification-photo-hero { position: relative; display: grid; min-height: 345px; grid-template-columns: minmax(0,1fr) 112px; grid-template-areas: "now image" "camera image" "title image" "product image" "meta image" "action action"; align-content: start; gap: 5px 12px; padding: 18px; overflow: hidden; border-radius: 20px; color: #fff; background: radial-gradient(circle at 35% 28%,rgba(13,130,84,.36),transparent 45%),linear-gradient(145deg,#075f42,#003d2d); box-shadow: 0 12px 28px rgba(0,59,41,.17); }
+.notification-photo-hero::before { content: ""; position: absolute; inset: 0; opacity: .09; background: url('/operacao/catalog-tire.webp') 10% 40% / 250px auto no-repeat; transform: rotate(-8deg) scale(1.25); }
+.notification-photo-hero > * { position: relative; z-index: 1; }
+.notification-now { grid-area: now; justify-self: start; padding: 7px 10px; border-radius: 9px; color: #fff; background: #f87816; font-size: 12px; }
+.notification-photo-camera { grid-area: camera; display: grid; width: 46px; height: 46px; margin-top: 10px; place-items: center; border: 2px solid rgba(255,255,255,.85); border-radius: 50%; }
+.notification-photo-camera svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.notification-photo-hero h4 { grid-area: title; margin: 7px 0 0; font-size: 20px; line-height: 1.12; }
+.notification-photo-hero > strong { grid-area: product; font-size: 17px; }
+.notification-photo-hero > p { grid-area: meta; margin: 4px 0 10px; color: #d4e7df; font-size: 13px; }
+.notification-photo-hero > img { grid-area: image; align-self: center; width: 112px; height: 145px; border: 2px solid #fff; border-radius: 16px; object-fit: contain; background: #fff; }
+.notification-photo-hero > button { grid-area: action; display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 9px; margin-top: 9px; border: 0; border-radius: 14px; color: #07573a; background: #fff; font-size: 14px; font-weight: 790; cursor: pointer; }
+.notification-photo-hero > button .notification-photo-camera { width: 28px; height: 28px; margin: 0; border: 0; }
+.notification-photo-hero > button .notification-photo-camera svg { width: 24px; height: 24px; }
+.notifications-section-title { margin: 12px 2px 0; color: #252f2a; font-size: 18px; }
+.notifications-list { overflow: hidden; border: 1px solid #dfe6e2; border-radius: 17px; background: #fff; box-shadow: 0 5px 15px rgba(24,49,38,.045); }
+.notification-row { display: grid; width: 100%; min-height: 82px; grid-template-columns: 47px minmax(0,1fr) auto 20px; align-items: center; gap: 10px; padding: 11px 13px; border: 0; border-bottom: 1px solid #e7ece9; color: #1c2923; background: #fff; text-align: left; cursor: pointer; }
+.notification-row:last-child { border-bottom: 0; }
+.notification-row-icon { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 50%; color: #087246; background: #eef7f2; font-size: 22px; font-weight: 800; }
+.notification-row-icon svg,.notification-chevron { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.notification-row > span:nth-child(2) { min-width: 0; }
+.notification-row strong,.notification-row small { display: block; }
+.notification-row strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-row small { margin-top: 5px; overflow: hidden; color: #69746e; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-row > b { padding: 5px 8px; border-radius: 8px; color: #087246; background: #e8f5ed; font-size: 11px; white-space: nowrap; }
+.notification-row > b.attention { color: #c7590e; background: #fff1e6; }
+.notification-row--resolved { background: #f3faf6; }
+.notification-row--resolved > b { color: #587067; background: #e5eee9; }
+.notifications-clear { min-height: 49px; border: 1px solid #087246; border-radius: 13px; color: #087246; background: #fff; font-size: 13px; font-weight: 740; cursor: pointer; }
+.notifications-empty { display: grid; min-height: 270px; place-content: center; justify-items: center; gap: 8px; padding: 30px; color: #68766f; text-align: center; }
+.notifications-empty > span { display: grid; width: 58px; height: 58px; place-items: center; border-radius: 50%; color: #087246; background: #eaf6ef; font-size: 27px; }
+.notifications-empty strong { color: #274137; font-size: 17px; }
+.notifications-empty p { max-width: 270px; margin: 0; font-size: 13px; line-height: 1.5; }
 
 /* Financeiro simples — base curva pronta; dados reais ficam em HTML por cima. */
 .sales-app.is-finance {
@@ -1413,6 +1474,17 @@ form { display: grid; gap: 16px; }
   .sales-heading h2 { font-size: 23px; white-space: nowrap; }
   .sales-heading p { font-size: 16px; line-height: 1.08; }
   .operator-button { max-width: 100px; padding-inline: 8px; }
+  .operator-actions { gap: 6px; }
+  .notifications-button { width: 41px; height: 41px; flex-basis: 41px; }
+}
+
+@media (max-width: 360px) {
+  .operator-button { width: 41px; padding: 0; justify-content: center; }
+  .operator-button span { display: none; }
+  .notification-photo-hero { grid-template-columns: minmax(0,1fr) 92px; padding: 15px; }
+  .notification-photo-hero > img { width: 92px; height: 126px; }
+  .notification-row { grid-template-columns: 43px minmax(0,1fr) 18px; }
+  .notification-row > b { display: none; }
 }
 
 @media (max-width: 370px) {

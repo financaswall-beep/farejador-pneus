@@ -1,16 +1,13 @@
 (function () { 'use strict';
   const Caixa = window.Caixa = window.Caixa || {};
   const keys = {
-    token: '2w_caixa_token',
-    name: '2w_caixa_nome',
-    user: '2w_caixa_usuario',
+    token: '2w_caixa_token', name: '2w_caixa_nome', user: '2w_caixa_usuario',
     scope: '2w_caixa_escopo',
     slug: '2w_caixa_unidade_slug',
     store: '2w_caixa_unidade_nome',
     role: '2w_caixa_papel',
     modules: '2w_caixa_modulos',
-    notifications: '2w_caixa_notificacoes',
-    compact: '2w_caixa_compacto',
+    notifications: '2w_caixa_notificacoes', compact: '2w_caixa_compacto',
   };
   const byId = function (id) { return document.getElementById(id); };
   const elements = {
@@ -50,12 +47,12 @@
     cashPanel: byId('cash-panel'),
     salesPanel: byId('sales-panel'),
     deliveriesPanel: byId('deliveries-panel'),
-    financePanel: byId('finance-panel'), profilePanel: byId('profile-panel'),
+    financePanel: byId('finance-panel'), notificationsPanel: byId('notifications-panel'),
+    profilePanel: byId('profile-panel'),
     salesSearch: byId('sales-search-input'),
     searchClear: byId('sales-search-clear'),
     salesList: byId('sales-list'),
-    salesLoading: byId('sales-loading'),
-    salesError: byId('sales-error'),
+    salesLoading: byId('sales-loading'), salesError: byId('sales-error'),
     salesEmpty: byId('sales-empty'),
     salesResultCount: byId('sales-result-count'),
     weeklySummary: byId('weekly-summary'),
@@ -185,9 +182,10 @@
     elements.loginView.classList.add('hidden');
     elements.sessionView.classList.remove('hidden');
     elements.app.classList.add('is-authenticated');
-    if (isPartner() || (Caixa.canModule && !Caixa.canModule('vendas'))) {
+    if (Caixa.canModule && !Caixa.canModule('vendas')) {
       if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
     } else if (Caixa.startPhotoNotifications) Caixa.startPhotoNotifications();
+    if (Caixa.startSystemNotifications) Caixa.startSystemNotifications();
     if (Caixa.applyModuleNavigation) Caixa.applyModuleNavigation();
     const initialTab = Caixa.initialOperationTab ? Caixa.initialOperationTab() : 'cash';
     Caixa.showTab(initialTab);
@@ -207,6 +205,7 @@
     elements.helpModal.classList.add('hidden');
     elements.app.classList.remove('is-authenticated');
     if (Caixa.stopPhotoNotifications) Caixa.stopPhotoNotifications();
+    if (Caixa.stopSystemNotifications) Caixa.stopSystemNotifications();
     elements.error.textContent = message || '';
   }
 

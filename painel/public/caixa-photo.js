@@ -8,9 +8,9 @@
   const modal = document.getElementById('photo-modal');
   const list = document.getElementById('photo-request-list');
   Object.assign(state, {
-    photoRequests: [], photoLastCount: 0, photoPoll: 0, photoES: null,
+    photoRequests: [], photoResolved: [], photoLastCount: 0, photoPoll: 0, photoES: null,
     photoSseRetry: 0, photoGeneration: 0, photoPreview: null, photoSending: false,
-    photoEnabled: true,
+    photoEnabled: true, photoSelectedId: '',
   });
   let alertAudio = null;
   let audioContext = null;
@@ -71,16 +71,31 @@
     alertButton.querySelector('strong').lastChild.textContent = count === 1 ? ' pedido de foto' : ' pedidos de foto';
     document.title = count ? '(' + count + ') FOTO · ' + originalTitle : originalTitle;
     if (!modal.classList.contains('hidden')) renderModal();
+    if (Caixa.renderNotifications) Caixa.renderNotifications();
+  }
+
+  function queuePath() {
+    return Caixa.isPartner()
+      ? Caixa.operationPath('operacao/pedidos-foto')
+      : '/api/caixa/photo-requests';
+  }
+
+  function uploadPath(itemId) {
+    return Caixa.isPartner()
+      ? Caixa.operationPath('operacao/pedidos-foto/' + encodeURIComponent(itemId) + '/foto')
+      : '/api/caixa/photo-requests/' + encodeURIComponent(itemId) + '/photo';
   }
 
   async function loadPhotoRequests() {
     if (!Caixa.token()) return false;
     try {
-      const response = await Caixa.authenticatedFetch('/api/caixa/photo-requests');
+      const response = await Caixa.authenticatedFetch(queuePath());
       const payload = await Caixa.json(response);
       if (!response.ok) throw new Error(payload.error || 'request_failed');
       state.photoEnabled = payload.enabled !== false;
-      state.photoRequests = Array.isArray(payload.photo_requests) ? payload.photo_requests : [];
+      const items = Array.isArray(payload.photo_requests) ? payload.photo_requests : [];
+      state.photoRequests = items.filter(function (item) { return !item.status || item.status === 'pending'; });
+      state.photoResolved = items.filter(function (item) { return item.status && item.status !== 'pending' && item.has_photo; });
       if (state.photoPreview && !state.photoRequests.some(function (item) {
         return item.id === state.photoPreview.id;
       })) {
@@ -107,7 +122,7 @@
   }
 
   async function startSse(generation) {
-    if (generation !== state.photoGeneration || !Caixa.token() || !window.EventSource) return;
+    if (Caixa.isPartner() || generation !== state.photoGeneration || !Caixa.token() || !window.EventSource) return;
     try {
       const response = await Caixa.authenticatedFetch('/api/caixa/photo-stream-ticket', { method: 'POST' });
       const payload = await Caixa.json(response);
@@ -154,10 +169,12 @@
     state.photoES = null;
     if (state.photoPreview) URL.revokeObjectURL(state.photoPreview.url);
     state.photoPreview = null;
-    state.photoRequests = []; state.photoLastCount = 0;
+    state.photoRequests = []; state.photoResolved = []; state.photoLastCount = 0;
+    state.photoSelectedId = '';
     alertButton.classList.add('hidden');
     modal.classList.add('hidden');
     document.title = originalTitle;
+    if (Caixa.renderNotifications) Caixa.renderNotifications();
   }
 
   async function compressPhoto(file) {
@@ -198,7 +215,7 @@
     if (!preview || preview.id !== item.id || state.photoSending) return;
     state.photoSending = true; renderModal();
     try {
-      const response = await Caixa.authenticatedFetch('/api/caixa/photo-requests/' + item.id + '/photo', {
+      const response = await Caixa.authenticatedFetch(uploadPath(item.id), {
         method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: preview.blob,
       });
       const payload = await Caixa.json(response);
@@ -213,7 +230,10 @@
 
   function renderModal() {
     list.replaceChildren();
-    state.photoRequests.forEach(function (item) {
+    const selected = state.photoSelectedId
+      ? state.photoRequests.filter(function (item) { return item.id === state.photoSelectedId; })
+      : state.photoRequests;
+    selected.forEach(function (item) {
       const card = document.createElement('article'); card.className = 'caixa-photo-card';
       const tag = document.createElement('small'); tag.textContent = '📷 PEDIDO DE FOTO';
       const title = document.createElement('strong'); title.textContent = item.tire_size;
@@ -233,12 +253,21 @@
     });
   }
 
-  function openModal() { modal.classList.remove('hidden'); renderModal(); }
-  function closeModal() { modal.classList.add('hidden'); }
+  function openModal(itemId) {
+    state.photoSelectedId = itemId || '';
+    modal.classList.remove('hidden'); renderModal();
+  }
+  function closeModal() { state.photoSelectedId = ''; modal.classList.add('hidden'); }
   function setPhotoSoundEnabled(enabled) { if (enabled) unlockAudio(); }
 
-  Object.assign(Caixa, { startPhotoNotifications, stopPhotoNotifications, setPhotoSoundEnabled });
-  alertButton.addEventListener('click', openModal);
+  Object.assign(Caixa, {
+    startPhotoNotifications, stopPhotoNotifications, setPhotoSoundEnabled,
+    loadPhotoRequests, openPhotoRequest: openModal,
+  });
+  alertButton.addEventListener('click', function () {
+    if (Caixa.openNotifications) Caixa.openNotifications('photo');
+    else openModal();
+  });
   document.querySelectorAll('[data-close-photo]').forEach(function (button) { button.addEventListener('click', closeModal); });
   document.addEventListener('pointerdown', unlockAudio, { once: true });
 }());

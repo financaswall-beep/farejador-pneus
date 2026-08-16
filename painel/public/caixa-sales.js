@@ -91,6 +91,7 @@
     const teamRemuneration = tab === 'team-remuneration';
     const teamCommission = tab === 'team-commission';
     const teamPermissions = tab === 'team-permissions';
+    const notifications = tab === 'notifications';
     if (financeEntries && Caixa.setFinanceMovementMode) {
       Caixa.setFinanceMovementMode(tab === 'finance-out' ? 'out' : 'in');
     }
@@ -106,6 +107,7 @@
     document.getElementById('team-remuneration-panel').classList.toggle('hidden', !teamRemuneration);
     document.getElementById('team-commission-panel').classList.toggle('hidden', !teamCommission);
     document.getElementById('team-permissions-panel').classList.toggle('hidden', !teamPermissions);
+    elements.notificationsPanel.classList.toggle('hidden', !notifications);
     elements.profilePanel.classList.toggle('hidden', !profile);
     document.getElementById('stock-panel').classList.toggle('hidden', !stock);
     document.getElementById('stock-detail-panel').classList.toggle('hidden', !stockDetail);
@@ -120,12 +122,14 @@
     elements.sessionView.classList.toggle('is-finance-detail', financeEntries || financeCommissions || financeCommissionDetail);
     elements.sessionView.classList.toggle('is-team', team || teamRemuneration || teamCommission || teamPermissions);
     elements.sessionView.classList.toggle('is-team-detail', teamRemuneration || teamCommission || teamPermissions);
+    elements.sessionView.classList.toggle('is-notifications', notifications);
     elements.appHeadingTitle.textContent = profile ? 'Perfil'
       : stockReceipts ? 'Receber compra'
         : stockDetail ? 'Detalhes do produto'
           : stock ? 'Estoque' : deliveries ? 'Entregas'
             : (team || teamRemuneration || teamCommission || teamPermissions) ? 'Equipe'
-              : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro' : cash ? 'Vender' : 'Minhas vendas';
+              : (finance || financeEntries || financeCommissions || financeCommissionDetail) ? 'Financeiro'
+                : notifications ? 'Notificações' : cash ? 'Vender' : 'Minhas vendas';
     document.getElementById('nav-cash').classList.toggle('active', cash);
     document.getElementById('nav-sales').classList.toggle('active', sales);
     document.getElementById('nav-stock').classList.toggle('active', stock || stockDetail || stockReceipts);
@@ -140,6 +144,7 @@
     document.getElementById('nav-finance').toggleAttribute('aria-current', finance || financeEntries || financeCommissions || financeCommissionDetail);
     document.getElementById('nav-team').toggleAttribute('aria-current', team || teamRemuneration || teamCommission || teamPermissions);
     document.getElementById('nav-profile').toggleAttribute('aria-current', profile);
+    document.getElementById('notifications-button').classList.toggle('active', notifications);
     if (!(financeEntries || financeCommissions || financeCommissionDetail)
       && (['#financeiro/entradas', '#financeiro/saidas', '#financeiro/comissoes'].includes(window.location.hash)
         || window.location.hash.startsWith('#financeiro/comissoes/'))) {
@@ -147,6 +152,10 @@
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
     if (!(team || teamRemuneration || teamCommission || teamPermissions) && window.location.hash.startsWith('#equipe')) {
+      const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
+      window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+    }
+    if (!notifications && window.location.hash === '#notificacoes') {
       const nextHash = finance ? '#financeiro' : sales ? '#vendas' : deliveries ? '#entregas' : '';
       window.history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
     }
@@ -158,6 +167,12 @@
     if (teamRemuneration && Caixa.loadTeamRemuneration) void Caixa.loadTeamRemuneration();
     if (teamCommission && Caixa.loadTeamCommission) void Caixa.loadTeamCommission();
     if (teamPermissions && Caixa.loadTeamPermissions) void Caixa.loadTeamPermissions();
+    if (notifications && Caixa.loadSystemNotifications) void Caixa.loadSystemNotifications();
+
+    const activeNavigation = document.querySelector('.bottom-nav button.active');
+    if (activeNavigation) requestAnimationFrame(function () {
+      activeNavigation.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
   }
 
   Object.assign(Caixa, {

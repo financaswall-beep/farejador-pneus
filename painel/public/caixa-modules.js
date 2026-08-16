@@ -47,13 +47,11 @@
     setNavigationVisibility('nav-team', canModule('team'));
     setNavigationVisibility('nav-profile', !canModule('financeiro'));
     const nav = document.querySelector('.bottom-nav');
-    if (nav) {
-      const visible = nav.querySelectorAll('button:not(.hidden)').length;
-      nav.style.gridTemplateColumns = `repeat(${Math.max(visible, 1)},1fr)`;
-    }
+    if (nav) nav.style.removeProperty('grid-template-columns');
   }
 
   function initialOperationTab() {
+    if (window.location.hash === '#notificacoes') return 'notifications';
     if (canModule('financeiro') && window.location.hash === '#financeiro/entradas') return 'finance-in';
     if (canModule('financeiro') && window.location.hash === '#financeiro/saidas') return 'finance-out';
     if (canModule('financeiro') && window.location.hash === '#financeiro/comissoes') return 'finance-commissions';
