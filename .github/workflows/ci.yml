@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # Obra 300: teto de 300 linhas por arquivo de produção (novo >300 = FALHA;
