@@ -71,7 +71,7 @@ describe('webhook Meta messaging', () => {
     const release = vi.fn();
     const connect = vi.fn().mockResolvedValue({ query, release });
     vi.doMock('pg', () => ({
-      Pool: vi.fn(() => ({ connect, on: vi.fn(), end: vi.fn() })),
+      Pool: vi.fn(function Pool() { return { connect, on: vi.fn(), end: vi.fn() }; }),
     }));
     const { metaMessagingWebhookHandler } = await import('../../../src/webhooks/meta-messaging.handler.js');
     const payload = { object: 'page', entry: [] };
@@ -98,7 +98,7 @@ describe('webhook Meta messaging', () => {
   it('rejeita assinatura inválida sem tocar no banco', async () => {
     const connect = vi.fn();
     vi.doMock('pg', () => ({
-      Pool: vi.fn(() => ({ connect, on: vi.fn(), end: vi.fn() })),
+      Pool: vi.fn(function Pool() { return { connect, on: vi.fn(), end: vi.fn() }; }),
     }));
     const { metaMessagingWebhookHandler } = await import('../../../src/webhooks/meta-messaging.handler.js');
     const payload = { object: 'instagram', entry: [] };

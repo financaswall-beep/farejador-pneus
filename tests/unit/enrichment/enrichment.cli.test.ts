@@ -76,14 +76,13 @@ describe('cli runCli', () => {
     }));
 
     vi.doMock('pg', () => ({
-      Pool: vi.fn(() => ({
-        connect: vi.fn().mockResolvedValue({
-          query: queryMock,
-          release: vi.fn(),
-        }),
-        on: vi.fn(),
-        end: vi.fn(),
-      })),
+      Pool: vi.fn(function Pool() {
+        return {
+          connect: vi.fn().mockResolvedValue({ query: queryMock, release: vi.fn() }),
+          on: vi.fn(),
+          end: vi.fn(),
+        };
+      }),
     }));
 
     vi.doMock('../../../src/shared/config/env.js', () => ({

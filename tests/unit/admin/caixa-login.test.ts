@@ -56,8 +56,8 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Seu acesso e sua unidade serão identificados pelo login');
     expect(html).toContain('ENTRAR NA OPERAÇÃO');
     expect(html).toContain('Cada funcionário entra com sua própria conta.');
-    expect(html).toContain('href="/login?modo=painel"');
-    expect(html).toContain('Sou administrador da loja');
+    expect(html).not.toContain('modo=painel');
+    expect(html).not.toContain('Sou administrador da loja');
     expect(html).toContain('Vendas');
     expect(html).toContain('Estoque');
     expect(html).toContain('Entregas');
@@ -220,7 +220,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Resumo do mês');
     expect(html).toContain('Pendências');
     expect(html).toContain('Comissões');
-    expect(html).toContain('Ver financeiro completo');
+    expect(html).not.toContain('Ver financeiro completo');
     expect(html).toContain('id="finance-entries-panel"');
     expect(html).toContain('id="finance-entries-range"');
     expect(html).toContain('Entrou no período');

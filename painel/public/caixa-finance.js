@@ -106,19 +106,10 @@
     }
   }
 
-  function openFullFinance() {
-    if (Caixa.isPartner()) {
-      window.location.href = '/parceiro/' + encodeURIComponent(Caixa.slug()) + '/';
-      return;
-    }
-    window.location.href = '/login?modo=painel';
-  }
-
   periodInput.value = '30d';
   periodLabel.textContent = rangeLabels['30d'];
   periodInput.addEventListener('change', function () { void loadFinance(); });
   byId('finance-retry').addEventListener('click', function () { void loadFinance(); });
-  byId('finance-full').addEventListener('click', openFullFinance);
   document.querySelectorAll('[data-finance-detail]').forEach(function (button) {
     button.addEventListener('click', function () {
       if (button.dataset.financeDetail === 'in' && Caixa.openFinanceEntries) {
@@ -133,9 +124,8 @@
         Caixa.openFinanceCommissions();
         return;
       }
-      openFullFinance();
     });
   });
 
-  Object.assign(Caixa, { loadFinance: loadFinance, openFullFinance: openFullFinance });
+  Object.assign(Caixa, { loadFinance: loadFinance });
 }());

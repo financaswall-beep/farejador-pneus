@@ -7,7 +7,6 @@ async function partnerFile(name: string): Promise<string> {
 }
 
 async function runLoginRouting(options: {
-  search?: string;
   narrow: boolean;
   touch: boolean;
 }): Promise<{ redirect: string | null; classes: string[] }> {
@@ -19,7 +18,6 @@ async function runLoginRouting(options: {
   let redirect: string | null = null;
   const fakeWindow = {
     location: {
-      search: options.search ?? '',
       replace: (value: string) => { redirect = value; },
     },
     matchMedia: (query: string) => ({
@@ -47,8 +45,8 @@ describe('partner global login frontend', () => {
     ]);
 
     expect(html).not.toMatch(/<script[^>]+https?:\/\//i);
-    expect(html).toContain("params.get('modo') === 'painel'");
-    expect(html).toContain("document.documentElement.classList.add('panel-mobile-override')");
+    expect(html).not.toContain("modo') === 'painel'");
+    expect(html).not.toContain('panel-mobile-override');
     expect(html).toContain("window.matchMedia('(max-width: 768px)')");
     expect(html).toContain("window.location.replace('/operacao')");
     expect(html).toContain('Sou funcionário — acessar Operação da Loja');
@@ -70,14 +68,13 @@ describe('partner global login frontend', () => {
     });
   });
 
-  it('mantém o acesso administrativo explícito no celular sem ressuscitar o layout antigo', async () => {
+  it('não permite ressuscitar o painel antigo por query string no celular', async () => {
     await expect(runLoginRouting({
-      search: '?modo=painel',
       narrow: true,
       touch: true,
     })).resolves.toEqual({
-      redirect: null,
-      classes: ['panel-mobile-override'],
+      redirect: '/operacao',
+      classes: [],
     });
   });
 
@@ -95,7 +92,7 @@ describe('partner global login frontend', () => {
     expect(css).toContain('--green-700: #047857');
     expect(css).not.toContain("url('/assets/login-2w-mobile");
     expect(css).not.toContain('@media (max-width: 500px)');
-    expect(css).toContain('html.panel-mobile-override .auth-region');
+    expect(css).not.toContain('panel-mobile-override');
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(routes).toContain("fastify.get('/login.css'");
     expect(routes).toContain("fastify.get('/assets/login-partner-hero-v1.webp'");

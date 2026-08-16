@@ -10,7 +10,6 @@ import { startAgentV2Worker } from '../atendente-v2/worker.js';
 import { startBotOutboxWorker } from '../atendente-v2/outbound-worker.js';
 import { startPhotoRequestExpirer } from '../atendente-v2/photo-requests.js';
 import { startSatisfactionSurveyWorker } from '../atendente-v2/satisfaction.js';
-import { startPartnerPushFanout } from '../parceiro/push.js';
 import { registerSecurityHeaders } from './security-headers.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
 import { costReconciliationOwnershipOk } from '../admin/painel/queries-rede-custos.js';
@@ -36,7 +35,6 @@ let stopBotOutbox: (() => void) | null = null;
 let stopPartnerChatReconciler: (() => void) | null = null;
 let stopPhotoExpirer: (() => void) | null = null;
 let stopSatisfactionSurvey: (() => void) | null = null;
-let stopPartnerPush: (() => void) | null = null;
 let stopMarketingScheduler: (() => void) | null = null;
 let stopMarketingCapi: (() => void) | null = null;
 let stopMetaMessaging: (() => void) | null = null;
@@ -72,9 +70,6 @@ async function start(): Promise<void> {
   stopPhotoExpirer = startPhotoRequestExpirer();
   // Pesquisa de satisfação (0105): dispara nas finalizações + expira. No-op com a flag off.
   stopSatisfactionSurvey = startSatisfactionSurveyWorker();
-  // Push (PWA, 0109): escuta global do partner_chat -> notificação nativa no
-  // celular do borracheiro (foto/pedido com navegador fechado). No-op com a flag off.
-  stopPartnerPush = startPartnerPushFanout();
   stopMarketingScheduler = startMarketingScheduler();
   stopMarketingCapi = startMarketingCapiWorker();
   stopMetaMessaging = startMetaMessagingWorker();
@@ -108,7 +103,6 @@ async function shutdown(signal: string): Promise<void> {
   stopPartnerChatReconciler?.();
   stopPhotoExpirer?.();
   stopSatisfactionSurvey?.();
-  stopPartnerPush?.();
   stopMarketingScheduler?.();
   stopMarketingCapi?.();
   stopMetaMessaging?.();

@@ -154,16 +154,6 @@ input:focus { border-color: var(--green-700); box-shadow: 0 0 0 4px rgba(16,185,
   .benefits li:nth-child(3) { padding-left: 0; border-left: 0; }
 }
 
-@media (max-width: 768px) {
-  html.panel-mobile-override body { background: #eef2ef; }
-  html.panel-mobile-override .login-shell { display: block; min-height: 100svh; overflow: visible; background: #eef2ef; }
-  html.panel-mobile-override .login-shell::after,
-  html.panel-mobile-override .visual-panel { display: none; }
-  html.panel-mobile-override .auth-region { min-height: 100svh; padding: 18px 12px; overflow: visible; }
-  html.panel-mobile-override .card { width: min(100%,500px); padding: 25px 20px; border-radius: 21px; backdrop-filter: none; }
-  html.panel-mobile-override input { font-size: 16px; }
-}
-
 @media (max-height: 760px) and (min-width: 851px) {
   .brand { top: 24px; }
   .hero-copy { bottom: 24px; }
