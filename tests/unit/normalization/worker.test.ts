@@ -67,11 +67,9 @@ describe('worker pollAndNormalize', () => {
     }));
 
     vi.doMock('pg', () => ({
-      Pool: vi.fn(() => ({
-        connect: vi.fn().mockResolvedValue(client),
-        on: vi.fn(),
-        end: vi.fn(),
-      })),
+      Pool: vi.fn(function Pool() {
+        return { connect: vi.fn().mockResolvedValue(client), on: vi.fn(), end: vi.fn() };
+      }),
     }));
 
     return import('../../../src/normalization/worker.js');

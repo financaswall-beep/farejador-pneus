@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-16T07:51:45.940Z",
-  "commitBase": "c0d7913",
-  "total": 95,
+  "geradoEm": "2026-08-16T18:23:00.000Z",
+  "commitBase": "auditoria-encerramento",
+  "total": 92,
   "itens": [
     "call:fetch(`/parceiro/${this.slug}/api/${path}`, { ...options, headers: { ...this.apiHeaders(hasBody), ...(options.headers || {}) }, })",
     "call:fetch(`/parceiro/${this.slug}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), })",
@@ -37,9 +37,6 @@
     "call:this.api('meu-desempenho')",
     "call:this.api('operacao/estoque/solicitacoes')",
     "call:this.api('photo-requests')",
-    "call:this.api('push/subscribe', { method: 'POST', body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }), })",
-    "call:this.api('push/vapid-key')",
-    "call:this.api('push/vapid-key')",
     "call:this.api('vendas', { method: 'POST', body: JSON.stringify(body) })",
     "call:this.api('vendas', { method: 'POST', body: JSON.stringify(body) })",
     "call:this.api('vendas', { method: 'POST', body: JSON.stringify(body), })",

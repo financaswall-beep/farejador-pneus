@@ -24,7 +24,7 @@ describe('getLatestCustomerLocation — validade do pino no banco real', () => {
       DECLARE
         v_month date := date_trunc('month', now() - interval '11 days')::date;
         v_next date := (v_month + interval '1 month')::date;
-        v_name text := 'messages_' || to_char(v_month, 'YYYYMM');
+        v_name text := 'messages_' || to_char(v_month, 'YYYY_MM');
       BEGIN
         EXECUTE format(
           'CREATE TABLE IF NOT EXISTS core.%I PARTITION OF core.messages FOR VALUES FROM (%L) TO (%L)',

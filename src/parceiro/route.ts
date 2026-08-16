@@ -535,6 +535,19 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   fastify.get('/parceiro/:slug/style.css', async (_request, reply) => sendStatic(reply, 'style.css', 'text/css; charset=utf-8'));
   fastify.get('/parceiro/:slug/tailwind.css', async (_request, reply) => sendStatic(reply, 'tailwind.css', 'text/css; charset=utf-8'));
 
+  // Dependencias de interface servidas localmente: o painel nao pode ficar
+  // indisponivel (nem aceitar codigo novo) por falha ou alteracao de um CDN.
+  const vendorScripts = new Set([
+    'alpine-3.14.9.min.js',
+    'lucide-1.17.0.min.js',
+    'chart-4.4.7.umd.min.js',
+  ]);
+  fastify.get('/parceiro/:slug/vendor/:script', async (request, reply) => {
+    const script = path.basename(String((request.params as { script?: string }).script || ''));
+    if (!vendorScripts.has(script)) return reply.status(404).send({ error: 'not_found' });
+    return sendStatic(reply, path.join('vendor', script), 'text/javascript; charset=utf-8');
+  });
+
   // Módulos do painel (obra ≤300: app.format.js, app.charts.resumo.js, ...). Genérico e
   // seguro no espírito da rota de assets: basename mata path traversal e SÓ nomes
   // no formato app.<nome>.js (1+ segmentos: app.charts.resumo.js) saem do disco —

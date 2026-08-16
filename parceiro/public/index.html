@@ -33,9 +33,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script src="https://unpkg.com/lucide@1.17.0"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script defer src="./vendor/alpine-3.14.9.min.js"></script>
+  <script src="./vendor/lucide-1.17.0.min.js"></script>
+  <script src="./vendor/chart-4.4.7.umd.min.js"></script>
 
   <link rel="stylesheet" href="./style.css?v=20260811-recebimento1" />
   <!-- Pre-carrega a textura do chat: senao so baixa ao abrir a 1a conversa (atraso "sai e volta"). -->
@@ -314,24 +314,6 @@
         </div>
       </div>
 
-      <!-- PWA (0109): convite pra ligar o aviso NATIVO do celular (toca com o app
-           fechado). Aparece só quando o aparelho suporta, o servidor tem push ligado,
-           ainda não ativou e o cara não dispensou. Liga com 1 toque (o clique é o
-           gesto que o navegador exige pra pedir permissão). -->
-      <div x-show="pushShouldOfferBanner" x-cloak
-           class="mx-3 mt-3 rounded-xl border border-brand-500 bg-brand-50 text-brand-700 px-4 py-3 flex items-center gap-3">
-        <i data-lucide="bell-ring" class="w-5 h-5 shrink-0"></i>
-        <div class="flex-1 text-sm leading-tight">
-          <strong>Ative os avisos no celular</strong>
-          <div class="text-brand-600">Receba pedido e foto novos mesmo com o app fechado.</div>
-        </div>
-        <button @click="enablePush()" :disabled="pushBusy"
-                class="shrink-0 rounded-lg bg-brand-600 text-white text-sm font-semibold px-3 py-2 disabled:opacity-50">
-          <span x-text="pushBusy ? 'Ativando…' : 'Ativar'"></span>
-        </button>
-        <button @click="dismissPushBanner()" class="shrink-0 text-brand-600 text-xs underline">agora não</button>
-      </div>
-
       <!-- FOTO SOB DEMANDA: banner GLOBAL — o borracheiro pode estar em qualquer
            aba quando o pedido de foto cai. Some dentro do próprio Bate-papo
            (lá os cards já estão à vista). Toca → vai direto pra fila. -->
@@ -376,7 +358,7 @@
             <div><small>Estoque atual</small><strong x-text="canSee('estoque') ? stockTotalUnits + ' un.' : num(resumo?.stock_items) + ' itens'"></strong><span x-text="canSee('estoque') ? stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos') : 'cadastrados'"></span></div>
           </article>
           <article>
-            <span class="mobile-summary-kpi-icon"><i data-lucide="file-dollar-sign"></i></span>
+            <span class="mobile-summary-kpi-icon"><i data-lucide="receipt-text"></i></span>
             <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><span x-text="canSee('financeiro') ? mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências') : 'em aberto'"></span></div>
           </article>
         </div>
@@ -556,7 +538,7 @@
             <div><small>Estoque atual</small><strong x-text="canSee('estoque') ? stockTotalUnits + ' unidades' : num(resumo?.stock_items) + ' itens'"></strong><em x-text="canSee('estoque') ? stockModelsCount + (stockModelsCount === 1 ? ' modelo' : ' modelos') : 'cadastrados'"></em></div>
           </article>
           <article>
-            <span><i data-lucide="file-dollar-sign"></i></span>
+            <span><i data-lucide="receipt-text"></i></span>
             <div><small>A receber</small><strong x-text="money(resumo?.open_receivables_total)"></strong><em x-text="canSee('financeiro') ? mobileSummaryReceivablesOpenCount + (mobileSummaryReceivablesOpenCount === 1 ? ' pendência' : ' pendências') : 'em aberto'"></em></div>
           </article>
         </div>

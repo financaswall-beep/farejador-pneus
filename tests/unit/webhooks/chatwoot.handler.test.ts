@@ -80,11 +80,9 @@ async function loadHandler(clientOrError: MockClient | Error): Promise<{
     })),
   }));
   vi.doMock('pg', () => ({
-    Pool: vi.fn(() => ({
-      connect,
-      on: vi.fn(),
-      end: vi.fn(),
-    })),
+    Pool: vi.fn(function Pool() {
+      return { connect, on: vi.fn(), end: vi.fn() };
+    }),
   }));
 
   const module = await import('../../../src/webhooks/chatwoot.handler');

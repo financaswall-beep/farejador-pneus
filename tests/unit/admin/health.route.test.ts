@@ -37,11 +37,9 @@ async function loadHealthRoute(
   }));
 
   vi.doMock('pg', () => ({
-    Pool: vi.fn(() => ({
-      query: poolMock.query,
-      on: vi.fn(),
-      end: vi.fn(),
-    })),
+    Pool: vi.fn(function Pool() {
+      return { query: poolMock.query, on: vi.fn(), end: vi.fn() };
+    }),
   }));
 
   vi.doMock('../../../src/parceiro/db.js', () => ({ partnerPool: partnerPoolMock }));

@@ -182,7 +182,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const collaboratorId = collaborator.rows[0]!.id;
     await saveCompensation({
-      collaborator_id: collaboratorId, employment_type: 'informal', base_salary: 2300,
+      collaborator_id: collaboratorId, employment_type: 'autonomo', base_salary: 2300,
       payment_day: 5, payment_method: 'pix', starts_on: '2027-01-01', environment: 'test',
     }, db.pool);
     await saveCommission({
@@ -314,7 +314,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     await saveCommission({
       collaborator_id: collaborator.rows[0]!.id, kind: 'fixed', basis: 'sale',
-      value: 15, starts_on: '2027-01-01', environment: 'test',
+      value: 15, starts_on: '2027-02-01', environment: 'test',
     }, db.pool);
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
@@ -326,12 +326,12 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.orders
          (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,created_at)
-       VALUES ('test',$1,$2,150,'confirmed','pickup','2027-01-10T15:00:00Z')
+       VALUES ('test',$1,$2,150,'confirmed','pickup','2027-02-10T15:00:00Z')
        RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id],
     );
 
-    await expect(closePayroll({ competence: '2027-01-01', environment: 'test' }, db.pool))
+    await expect(closePayroll({ competence: '2027-02-01', environment: 'test' }, db.pool))
       .rejects.toThrow('payroll_has_unassigned_events');
 
     await db.pool.query(
@@ -339,7 +339,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       [order.rows[0]!.id, collaborator.rows[0]!.id],
     );
     const closed = await closePayroll({
-      competence: '2027-01-01', environment: 'test',
+      competence: '2027-02-01', environment: 'test',
     }, db.pool);
     const item = await db.pool.query(
       `SELECT commission_amount::text,total_due::text
@@ -408,7 +408,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
   it('ignora pedidos cancelados nas datas de primeira e ultima compra', async () => {
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
-       VALUES ('test',91002,'Cliente com cancelamentos') RETURNING id`,
+       VALUES ('test',91005,'Cliente com cancelamentos') RETURNING id`,
     );
     await db.pool.query(
       `INSERT INTO commerce.orders

@@ -11,8 +11,15 @@ import Fastify from 'fastify';
 import { loggerOptions, logger } from '../shared/logger.js';
 import { partnerPool } from '../parceiro/db.js';
 import { registerParceiroRoute } from '../parceiro/route.js';
+import { registerLoginGlobalRoute } from '../parceiro/login-global.route.js';
+import { registerPartnerOperationStockRoutes } from '../parceiro/route-operation-stock.js';
+import { registerPartnerOperationStockDetailRoutes } from '../parceiro/route-operation-stock-detail.js';
+import { registerPartnerOperationStockUpdateRoutes } from '../parceiro/route-operation-stock-update.js';
+import { registerPartnerOperationPurchaseRoutes } from '../parceiro/route-operation-purchases.js';
+import { registerPartnerOperationDeliveryRoutes } from '../parceiro/route-operation-deliveries.js';
 import { registerPartnerOperationTeamRoutes } from '../parceiro/route-operation-team.js';
 import { registerPartnerOperationNotificationRoutes } from '../parceiro/route-operation-notifications.js';
+import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
 
@@ -35,8 +42,15 @@ fastify.addContentTypeParser(
 
 async function start(): Promise<void> {
   await registerParceiroRoute(fastify);
+  await registerLoginGlobalRoute(fastify);
+  registerPartnerOperationStockRoutes(fastify);
+  registerPartnerOperationStockDetailRoutes(fastify);
+  registerPartnerOperationStockUpdateRoutes(fastify);
+  registerPartnerOperationPurchaseRoutes(fastify);
+  registerPartnerOperationDeliveryRoutes(fastify);
   registerPartnerOperationTeamRoutes(fastify);
   registerPartnerOperationNotificationRoutes(fastify);
+  await registerCaixaRoute(fastify);
   // Hub de tempo real (Fatia 3): no preview tambem, pra testar SSE local
   // apontando pro banco de prod (.env.preview).
   startPartnerChatNotifyHub();

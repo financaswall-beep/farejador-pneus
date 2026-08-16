@@ -37,7 +37,7 @@ describe('continuidade mensal do parceiro', () => {
       `INSERT INTO network.partner_collaborator_compensation
         (environment,partner_unit_id,token_id,employment_type,base_salary,payment_day,
          payment_method,starts_on,benefits,updated_by)
-       VALUES ('test',$1,$2,'informal',2300,5,'pix',$3::date,'[]'::jsonb,'integration-test')`,
+       VALUES ('test',$1,$2,'autonomo',2300,5,'pix',$3::date,'[]'::jsonb,'integration-test')`,
       [fixture.partnerUnitId, fixture.tokenId, competence],
     );
     const sale = await partner.registerPartnerSale(fixture.ctx, {

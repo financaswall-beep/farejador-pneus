@@ -26,11 +26,9 @@ async function loadReplayRoute(poolMock: MockPool): Promise<(fastify: FastifyIns
   }));
 
   vi.doMock('pg', () => ({
-    Pool: vi.fn(() => ({
-      query: poolMock.query,
-      on: vi.fn(),
-      end: vi.fn(),
-    })),
+    Pool: vi.fn(function Pool() {
+      return { query: poolMock.query, on: vi.fn(), end: vi.fn() };
+    }),
   }));
 
   const module = await import('../../../src/admin/replay.route.js');
