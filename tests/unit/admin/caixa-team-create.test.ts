@@ -41,7 +41,7 @@ describe('cadastro de colaborador pela Operação da Loja', () => {
       environment: 'test', display_name: 'Wallace', username: 'wallace.novo',
       password: 'senha-segura-123', job: 'vendedor', job_title: 'Vendedor',
       work_area: 'sales', panel_role: null, actor_label: 'Proprietário',
-      operation_permissions: { vendas: true, entregas: false, financeiro: false },
+      operation_permissions: { vendas: true, estoque: true, entregas: false, financeiro: false },
     }, fakePool(query));
 
     expect(result).toEqual({ id: 'collab-1', username: 'wallace.novo' });

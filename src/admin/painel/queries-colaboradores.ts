@@ -77,6 +77,7 @@ export interface CreateMatrizCollaboratorInput {
   actor_label?: string | null;
   operation_permissions?: {
     vendas: boolean;
+    estoque: boolean;
     entregas: boolean;
     financeiro: boolean;
   };
@@ -110,11 +111,12 @@ export async function createMatrizCollaborator(
     if (input.operation_permissions) {
       await client.query(
         `INSERT INTO network.matriz_collaborator_operation_permissions
-           (collaborator_id, environment, allow_vendas, allow_entregas,
-            allow_financeiro, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+           (collaborator_id, environment, allow_vendas, allow_estoque,
+            allow_entregas, allow_financeiro, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [collab.rows[0]!.id, environment, input.operation_permissions.vendas,
-         input.operation_permissions.entregas, input.operation_permissions.financeiro,
+         input.operation_permissions.estoque, input.operation_permissions.entregas,
+         input.operation_permissions.financeiro,
          input.actor_label ?? null],
       );
     }

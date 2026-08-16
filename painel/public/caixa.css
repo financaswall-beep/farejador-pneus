@@ -1554,10 +1554,13 @@ form { display: grid; gap: 16px; }
 .weekly-grid b { position: absolute; right: calc(100% + 8px); top: 0; min-width: 25px; transform: translateY(-50%); color: #707a75; font-size: 10px; font-weight: 500; text-align: right; }
 .my-sales-panel .weekly-reference span { right: 0; bottom: 3px; left: auto; padding: 0 0 0 5px; text-align: right; }
 .my-sales-panel .weekly-bars { bottom: -37px; gap: 7px; }
-.my-sales-panel .weekly-bar-item { position: relative; grid-template-rows: minmax(0,1fr) 17px 17px; cursor: default; }
+.my-sales-panel .weekly-bar-item { position: relative; grid-template-rows: minmax(0,1fr) 17px 17px; cursor: pointer; }
 .my-sales-panel .weekly-bar-value { position: absolute; z-index: 3; left: 50%; max-width: 45px; transform: translateX(-50%); color: #17231e; font-size: 9px; opacity: 1; }
 .my-sales-panel .weekly-bar-item i { grid-row: 1; width: min(100%,27px); background: linear-gradient(180deg,#2fb66d,#119451); }
 .my-sales-panel .weekly-bar-item.is-best i { background: linear-gradient(180deg,#087b49,#045d38); }
+.my-sales-panel .weekly-bar-item.is-selected i { background: linear-gradient(180deg,#2db47b,#087149); box-shadow: 0 4px 12px rgba(8,113,73,.22); transform: scaleX(1.06); }
+.my-sales-panel .weekly-bar-item.is-selected small,
+.my-sales-panel .weekly-bar-item.is-selected b { color: #087149; font-weight: 730; }
 .my-sales-panel .weekly-bar-item small,.my-sales-panel .weekly-bar-item b { font-size: 11px; }
 .my-sales-panel .weekly-bar-item small { grid-row: 2; align-self: center; color: #28342e; }
 .my-sales-panel .weekly-bar-item b { grid-row: 3; align-self: start; color: #66716b; font-weight: 500; }

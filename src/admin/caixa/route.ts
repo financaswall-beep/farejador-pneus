@@ -27,6 +27,7 @@ import { getMatrizFinanceOutputs } from './finance-outputs.js';
 import { registerCaixaCommissionRoutes } from './route-commissions.js';
 import { registerCaixaTeamRoutes } from './route-team.js';
 import { registerCaixaNotificationRoutes } from './route-notifications.js';
+import { registerCaixaOperationStockRoutes } from './route-operation-stock.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -133,6 +134,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
     if (!auth?.modules[module]) await reply.status(403).send({ error: 'forbidden' });
   };
   const requireVendas = requireCaixaModule('vendas');
+  const requireEstoque = requireCaixaModule('estoque');
   const requireEntregas = requireCaixaModule('entregas');
   const requireFinanceiro = requireCaixaModule('financeiro');
   registerCaixaPhotoRoutes(fastify, flagGate, requireCaixaAuth, requireVendas);
@@ -141,6 +143,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
   registerCaixaCommissionRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaTeamRoutes(fastify, flagGate, requireCaixaAuth, requireFinanceiro);
   registerCaixaNotificationRoutes(fastify, flagGate, requireCaixaAuth);
+  registerCaixaOperationStockRoutes(fastify, flagGate, requireCaixaAuth, requireEstoque);
 
   fastify.get('/api/caixa/me', { preHandler: [flagGate, requireCaixaAuth] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

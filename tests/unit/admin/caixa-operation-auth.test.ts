@@ -97,7 +97,7 @@ describe('resolução segura do local da Operação da Loja', () => {
 
     expect(workplaces[0]).toMatchObject({
       role: 'owner',
-      modules: { vendas: true, estoque: false, entregas: true, financeiro: true },
+      modules: { vendas: true, estoque: true, entregas: true, financeiro: true },
     });
   });
 
@@ -105,7 +105,7 @@ describe('resolução segura do local da Operação da Loja', () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{
         collaborator_id: 'collab-override', job: 'vendedor', work_area: 'sales', panel_role: null,
-        allow_vendas: false, allow_entregas: true, allow_financeiro: false,
+        allow_vendas: false, allow_estoque: false, allow_entregas: true, allow_financeiro: false,
       }] })
       .mockResolvedValueOnce({ rows: [] });
     const dbPool = { query } as unknown as Pool;

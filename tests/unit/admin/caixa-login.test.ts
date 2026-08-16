@@ -10,6 +10,7 @@ const scriptFiles = [
   'caixa-checkout-catalog.js',
   'caixa-checkout.js',
   'caixa-checkout-session.js',
+  'caixa-sales-weekly.js',
   'caixa-sales-view.js',
   'caixa-stock-view.js',
     'caixa-stock-detail.js',
@@ -148,10 +149,13 @@ describe('login mobile da Operação da Loja', () => {
     expect(html).toContain('Minha comissão');
     expect(script).toContain('payload.daily_series');
     expect(script).toContain("new URLSearchParams({ week: String(state.weekOffset) })");
-    expect(script).toContain('if (!sales && state.weekOffset !== 0) state.weekOffset = 0');
+    expect(script).toContain('state.selectedSalesDay = null');
     expect(html).toContain('id="weekly-grid"');
+    expect(html).toContain('id="weekly-clear-day"');
     expect(script).not.toContain('periodButtons');
-    expect(script).not.toContain('selectWeeklyDay');
+    expect(script).toContain('selectSalesDay');
+    expect(script).toContain('item.dataset.salesDay = day.date');
+    expect(script).toContain("localDateKey(sale.created_at) === Caixa.state.selectedSalesDay");
     expect(css).toContain('.weekly-reference');
     expect(css).toContain('.weekly-bar-item.is-selected');
     expect(route).toContain('week: z.coerce.number().int().min(-52).max(0)');

@@ -11,7 +11,8 @@
   <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-checkout-session.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-sales-view.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-sales-weekly.js?v=20260816-sales-day1"></script>
+  <script defer src="/operacao/caixa-sales-view.js?v=20260816-sales-day1"></script>
   <script defer src="/operacao/caixa-stock-view.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-detail.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-edit.js?v=20260813-operacao1"></script>
@@ -266,6 +267,10 @@
               </div>
             </div>
 
+            <button id="weekly-clear-day" class="weekly-clear-day hidden" type="button">
+              Ver a semana completa
+            </button>
+
             <section class="weekly-stats" aria-labelledby="weekly-stats-title">
               <h4 id="weekly-stats-title" class="sr-only">Indicadores da semana</h4>
               <div class="weekly-stats-grid">
@@ -290,7 +295,7 @@
           </section>
 
           <div class="sales-list-heading">
-            <h3>Minhas vendas recentes</h3>
+            <h3 id="sales-list-title">Minhas vendas recentes</h3>
             <span id="sales-result-count"></span>
           </div>
           <div id="sales-loading" class="sales-loading" role="status">

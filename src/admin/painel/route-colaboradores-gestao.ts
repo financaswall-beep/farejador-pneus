@@ -65,7 +65,8 @@ const commissionSchema = z.object({
   }
 });
 const operationPermissions = z.object({
-  vendas: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
+  vendas: z.boolean(), estoque: z.boolean().default(false),
+  entregas: z.boolean(), financeiro: z.boolean(),
 });
 const adjustmentSchema = z.object({
   collaborator_id: z.string().uuid(), competence: month,

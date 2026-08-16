@@ -32,12 +32,28 @@ describe('Estoque seguro na Operação da Loja', () => {
   const receiptBackend = source('src/parceiro/operation-purchase-receipt.ts');
   const receiptRoute = source('src/parceiro/route-operation-purchases.ts');
   const purchaseQueries = source('src/parceiro/queries.ts');
+  const matrixBackend = source('src/admin/caixa/operation-stock.ts');
+  const matrixRoute = source('src/admin/caixa/route-operation-stock.ts');
 
   it('permite que um acesso apenas de estoque permaneça na porta única', () => {
     expect(modules).toContain("if (canModule('vendas')) return 'cash'");
     expect(modules).toContain("canModule('estoque')) return 'stock'");
     expect(login).not.toContain("payload.modules.vendas === false");
     expect(login).not.toContain("payload.permissions.vendas === false");
+  });
+
+  it('expõe à Matriz uma consulta real e somente leitura do galpão', () => {
+    expect(modules).toContain("setNavigationVisibility('nav-stock', canModule('estoque'))");
+    expect(stock).not.toContain("if (!Caixa.isPartner() || !Caixa.canModule");
+    expect(stock).toContain("Caixa.operationPath('operacao/estoque')");
+    expect(stock).toContain("classList.toggle('hidden', !partner)");
+    expect(stockView).toContain("if (!Caixa.isPartner() || !row.is_tracked");
+    expect(matrixRoute).toContain("'/api/caixa/operacao/estoque'");
+    expect(matrixRoute).toContain('requireEstoque');
+    expect(matrixBackend).toContain('FROM commerce.wholesale_stock');
+    expect(matrixBackend).toContain('readonly: true');
+    expect(matrixBackend).not.toContain('unit_cost');
+    expect(matrixBackend).not.toMatch(/UPDATE\s+commerce\.wholesale_stock/);
   });
 
   it('mostra consulta, cadastro sem valores e contagem pendente no mobile', () => {

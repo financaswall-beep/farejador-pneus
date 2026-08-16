@@ -41,17 +41,18 @@ function modulesForAccess(
   job: 'vendedor' | 'entregador' | 'colaborador',
   workArea: string | null,
   panelRole: 'owner' | 'admin' | null,
-  overrides?: { vendas: boolean | null; entregas: boolean | null; financeiro: boolean | null },
+  overrides?: { vendas: boolean | null; estoque: boolean | null; entregas: boolean | null; financeiro: boolean | null },
 ): CaixaModules {
   const legacy = {
     vendas: job === 'vendedor' && workArea === 'sales',
+    estoque: job === 'vendedor' && workArea === 'sales',
     entregas: job === 'entregador',
     financeiro: panelRole !== null,
   };
-  if (panelRole === 'owner') return { vendas: true, estoque: false, entregas: true, financeiro: true };
+  if (panelRole === 'owner') return { vendas: true, estoque: true, entregas: true, financeiro: true };
   return {
     vendas: overrides?.vendas ?? legacy.vendas,
-    estoque: false,
+    estoque: overrides?.estoque ?? legacy.estoque,
     entregas: overrides?.entregas ?? legacy.entregas,
     financeiro: overrides?.financeiro ?? legacy.financeiro,
   };
@@ -79,11 +80,12 @@ export async function mintCaixaSessionForPerson(
     work_area: string | null;
     panel_role: 'owner' | 'admin' | null;
     allow_vendas: boolean | null;
+    allow_estoque: boolean | null;
     allow_entregas: boolean | null;
     allow_financeiro: boolean | null;
   }>(
     `SELECT mc.display_name, pp.username, mc.job, mc.work_area, mc.panel_role,
-            op.allow_vendas,op.allow_entregas,op.allow_financeiro
+            op.allow_vendas,op.allow_estoque,op.allow_entregas,op.allow_financeiro
        FROM network.matriz_collaborators mc
        JOIN network.partner_people pp
          ON pp.id = mc.person_id AND pp.environment = mc.environment
@@ -97,6 +99,7 @@ export async function mintCaixaSessionForPerson(
           OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
           OR mc.job = 'entregador'
           OR COALESCE(op.allow_vendas,false)
+          OR COALESCE(op.allow_estoque,false)
           OR COALESCE(op.allow_entregas,false)
           OR COALESCE(op.allow_financeiro,false))
         AND pp.revoked_at IS NULL
@@ -195,6 +198,7 @@ export async function validateCaixaSession(
     work_area: string | null;
     panel_role: 'owner' | 'admin' | null;
     allow_vendas: boolean | null;
+    allow_estoque: boolean | null;
     allow_entregas: boolean | null;
     allow_financeiro: boolean | null;
   }>(
@@ -213,12 +217,13 @@ export async function validateCaixaSession(
           OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
           OR mc.job = 'entregador'
           OR COALESCE(op.allow_vendas,false)
+          OR COALESCE(op.allow_estoque,false)
           OR COALESCE(op.allow_entregas,false)
           OR COALESCE(op.allow_financeiro,false))
         AND pp.revoked_at IS NULL
       RETURNING s.person_id, mc.id AS collaborator_id, mc.display_name, pp.username,
                 mc.job, mc.work_area, mc.panel_role,
-                op.allow_vendas,op.allow_entregas,op.allow_financeiro`,
+                op.allow_vendas,op.allow_estoque,op.allow_entregas,op.allow_financeiro`,
     [hashSessionToken(sessionToken), environment],
   );
   const row = result.rows[0];
@@ -233,6 +238,7 @@ export async function validateCaixaSession(
     panelRole,
     modules: modulesForAccess(row.job, row.work_area ?? null, panelRole, {
       vendas: row.allow_vendas ?? null,
+      estoque: row.allow_estoque ?? null,
       entregas: row.allow_entregas ?? null,
       financeiro: row.allow_financeiro ?? null,
     }),

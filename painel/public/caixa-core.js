@@ -55,12 +55,14 @@
     salesLoading: byId('sales-loading'), salesError: byId('sales-error'),
     salesEmpty: byId('sales-empty'),
     salesResultCount: byId('sales-result-count'),
+    salesListTitle: byId('sales-list-title'),
     weeklySummary: byId('weekly-summary'),
     weeklyPrev: byId('weekly-prev'),
     weeklyNext: byId('weekly-next'),
     weeklyRange: byId('weekly-range'),
     weeklyWeekState: byId('weekly-week-state'),
     weeklyTotal: byId('weekly-total'),
+    weeklySummaryTitle: byId('weekly-summary-title'),
     weeklyTotalLabel: byId('weekly-total-label'),
     weeklyReference: byId('weekly-reference'),
     weeklyReferenceValue: byId('weekly-reference-value'),
@@ -285,7 +287,6 @@
     createSvg: createSvg,
     showToast: showToast,
   });
-
   let storageReloadTimer = 0;
   window.addEventListener('storage', function (event) {
     if (![keys.token, keys.user, keys.scope, keys.slug].includes(event.key)) return;

@@ -13,7 +13,7 @@ const row = {
   id: '4f8cc2e9-0250-4f42-92ca-ce4fd9cb997a', person_id: 'person-1',
   display_name: 'Wallace', username: 'wallace', job: 'vendedor', job_title: 'Vendedor',
   panel_role: null, active: true, allow_vendas: true,
-  allow_entregas: false, allow_financeiro: false,
+  allow_estoque: true, allow_entregas: false, allow_financeiro: false,
 };
 
 describe('permissÃµes da Matriz na OperaÃ§Ã£o da Loja', () => {
@@ -23,8 +23,8 @@ describe('permissÃµes da Matriz na OperaÃ§Ã£o da Loja', () => {
 
     expect(result).toMatchObject({
       unit_name: 'Matriz', locked: false,
-      permissions: { vendas: true, entregas: false, financeiro: false },
-      available_permissions: ['vendas', 'entregas', 'financeiro'],
+      permissions: { vendas: true, estoque: true, entregas: false, financeiro: false },
+      available_permissions: ['vendas', 'estoque', 'entregas', 'financeiro'],
     });
     expect(String(query.mock.calls[0]?.[0])).toContain('matriz_collaborator_operation_permissions');
   });
@@ -43,10 +43,10 @@ describe('permissÃµes da Matriz na OperaÃ§Ã£o da Loja', () => {
     } as unknown as Pool;
 
     const result = await saveMatrizOperationPermissions(
-      row.id, { vendas: false, entregas: true, financeiro: false }, 'Dono', db,
+      row.id, { vendas: false, estoque: true, entregas: true, financeiro: false }, 'Dono', db,
     );
 
-    expect(result.permissions).toMatchObject({ vendas: false, entregas: true, financeiro: false });
+    expect(result.permissions).toMatchObject({ vendas: false, estoque: true, entregas: true, financeiro: false });
     expect(clientQuery.mock.calls.map((call) => String(call[0])).join('\n'))
       .toContain('UPDATE network.matriz_staff_sessions');
     expect(client.release).toHaveBeenCalledOnce();
@@ -61,7 +61,7 @@ describe('permissÃµes da Matriz na OperaÃ§Ã£o da Loja', () => {
     const db = { connect: vi.fn().mockResolvedValue(client) } as unknown as Pool;
 
     await expect(saveMatrizOperationPermissions(
-      row.id, { vendas: false, entregas: false, financeiro: false }, 'Dono', db,
+      row.id, { vendas: false, estoque: false, entregas: false, financeiro: false }, 'Dono', db,
     )).rejects.toThrow('owner_permissions_locked');
     expect(client.release).toHaveBeenCalledOnce();
   });

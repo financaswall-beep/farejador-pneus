@@ -41,7 +41,7 @@
   function applyModuleNavigation() {
     setNavigationVisibility('nav-cash', canModule('vendas'));
     setNavigationVisibility('nav-sales', canModule('vendas'));
-    setNavigationVisibility('nav-stock', Caixa.isPartner() && canModule('estoque'));
+    setNavigationVisibility('nav-stock', canModule('estoque'));
     setNavigationVisibility('nav-deliveries', canModule('entregas'));
     setNavigationVisibility('nav-finance', canModule('financeiro'));
     setNavigationVisibility('nav-team', canModule('team'));
@@ -64,7 +64,7 @@
     if (canModule('entregas') && window.location.hash === '#entregas') return 'deliveries';
     if (canModule('financeiro') && window.location.hash === '#financeiro') return 'finance';
     if (canModule('vendas')) return 'cash';
-    if (Caixa.isPartner() && canModule('estoque')) return 'stock';
+    if (canModule('estoque')) return 'stock';
     if (canModule('entregas')) return 'deliveries';
     if (canModule('financeiro')) return 'finance';
     return 'profile';

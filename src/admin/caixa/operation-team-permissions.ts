@@ -4,11 +4,12 @@ import { env } from '../../shared/config/env.js';
 import type { OperationPermissionsPayload } from '../../shared/operation-team.js';
 
 type Queryable = Pick<Pool, 'query'>;
-type PermissionInput = { vendas: boolean; entregas: boolean; financeiro: boolean };
+type PermissionInput = { vendas: boolean; estoque: boolean; entregas: boolean; financeiro: boolean };
 type Row = {
   id: string; person_id: string; display_name: string; username: string;
   job: string; job_title: string | null; panel_role: 'owner' | 'admin' | null;
-  active: boolean; allow_vendas: boolean; allow_entregas: boolean; allow_financeiro: boolean;
+  active: boolean; allow_vendas: boolean; allow_estoque: boolean;
+  allow_entregas: boolean; allow_financeiro: boolean;
 };
 
 async function findPermissions(
@@ -21,6 +22,8 @@ async function findPermissions(
             CASE WHEN mc.panel_role='owner'
                  THEN true
                  ELSE COALESCE(op.allow_vendas,mc.job='vendedor' AND mc.work_area='sales') END allow_vendas,
+            CASE WHEN mc.panel_role='owner' THEN true
+                 ELSE COALESCE(op.allow_estoque,mc.job='vendedor' AND mc.work_area='sales') END allow_estoque,
             CASE WHEN mc.panel_role='owner' THEN true
                  ELSE COALESCE(op.allow_entregas,mc.job='entregador') END allow_entregas,
             CASE WHEN mc.panel_role='owner' THEN true
@@ -46,10 +49,11 @@ function payload(row: Row): OperationPermissionsPayload {
     },
     permissions: {
       vendas: row.allow_vendas,
+      estoque: row.allow_estoque,
       entregas: row.allow_entregas,
       financeiro: row.allow_financeiro,
     },
-    available_permissions: ['vendas', 'entregas', 'financeiro'],
+    available_permissions: ['vendas', 'estoque', 'entregas', 'financeiro'],
     locked: row.panel_role === 'owner',
   };
 }
@@ -81,12 +85,14 @@ export async function saveMatrizOperationPermissions(
     if (row.panel_role === 'owner') throw new Error('owner_permissions_locked');
     await client.query(
       `INSERT INTO network.matriz_collaborator_operation_permissions
-         (collaborator_id,environment,allow_vendas,allow_entregas,allow_financeiro,updated_by)
-       VALUES ($1,$2,$3,$4,$5,$6)
+         (collaborator_id,environment,allow_vendas,allow_estoque,allow_entregas,allow_financeiro,updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (collaborator_id) DO UPDATE SET
-         allow_vendas=EXCLUDED.allow_vendas,allow_entregas=EXCLUDED.allow_entregas,
+         allow_vendas=EXCLUDED.allow_vendas,allow_estoque=EXCLUDED.allow_estoque,
+         allow_entregas=EXCLUDED.allow_entregas,
          allow_financeiro=EXCLUDED.allow_financeiro,updated_by=EXCLUDED.updated_by,updated_at=now()`,
-      [collaboratorId, env.FAREJADOR_ENV, input.vendas, input.entregas, input.financeiro, actorLabel],
+      [collaboratorId, env.FAREJADOR_ENV, input.vendas, input.estoque,
+       input.entregas, input.financeiro, actorLabel],
     );
     await client.query(
       `UPDATE network.matriz_staff_sessions SET revoked_at=now()

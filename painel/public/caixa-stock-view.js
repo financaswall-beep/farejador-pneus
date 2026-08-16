@@ -43,7 +43,7 @@
   }
 
   function countButton(row) {
-    if (!row.is_tracked || row.item_type === 'servico') return null;
+    if (!Caixa.isPartner() || !row.is_tracked || row.item_type === 'servico') return null;
     const count = document.createElement('button');
     count.type = 'button';
     count.className = 'stock-card-count';
@@ -95,10 +95,14 @@
   function createStockCard(row) {
     const card = document.createElement('article');
     card.className = 'stock-card';
-    card.dataset.stockDetail = row.stock_id;
-    card.tabIndex = 0;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `Ver detalhes de ${row.tire_size || row.item_name}`);
+    if (Caixa.isPartner()) {
+      card.dataset.stockDetail = row.stock_id;
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `Ver detalhes de ${row.tire_size || row.item_name}`);
+    } else {
+      card.classList.add('stock-card--readonly');
+    }
 
     const visual = document.createElement('div');
     visual.className = 'stock-card-visual' + (row.item_type === 'pneu' ? '' : ' stock-card-visual--icon');

@@ -95,7 +95,10 @@
     if (financeEntries && Caixa.setFinanceMovementMode) {
       Caixa.setFinanceMovementMode(tab === 'finance-out' ? 'out' : 'in');
     }
-    if (!sales && state.weekOffset !== 0) state.weekOffset = 0;
+    if (!sales) {
+      if (state.weekOffset !== 0) state.weekOffset = 0;
+      state.selectedSalesDay = null;
+    }
     elements.cashPanel.classList.toggle('hidden', !cash);
     elements.salesPanel.classList.toggle('hidden', !sales);
     elements.deliveriesPanel.classList.toggle('hidden', !deliveries);
@@ -185,14 +188,21 @@
 
   elements.weeklyPrev.addEventListener('click', function () {
     if (state.weekOffset <= -52) return;
+    state.selectedSalesDay = null;
     state.weekOffset -= 1;
     void loadSales();
   });
   elements.weeklyNext.addEventListener('click', function () {
     if (state.weekOffset >= 0) return;
+    state.selectedSalesDay = null;
     state.weekOffset += 1;
     void loadSales();
   });
+  elements.weeklyBars.addEventListener('click', function (event) {
+    const button = event.target.closest('[data-sales-day]');
+    if (button) Caixa.selectSalesDay(button.dataset.salesDay || '');
+  });
+  elements.weeklyClearDay.addEventListener('click', Caixa.clearSalesDay);
   document.getElementById('sales-retry').addEventListener('click', function () { void loadSales(); });
   document.getElementById('operator-button').addEventListener('click', function () { showTab('profile'); });
   document.getElementById('nav-profile').addEventListener('click', function () { showTab('profile'); });
@@ -202,7 +212,7 @@
     void loadSales();
   });
   document.getElementById('nav-stock').addEventListener('click', function () {
-    if (!Caixa.isPartner() || !Caixa.canModule('estoque')) {
+    if (!Caixa.canModule('estoque')) {
       Caixa.showToast('Estoque não está disponível para este acesso.');
       return;
     }

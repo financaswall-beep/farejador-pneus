@@ -61,12 +61,12 @@ export async function createMatrizOperationMember(input: {
 }, db: Pool = defaultPool): Promise<{ id: string; username: string }> {
   const profile = input.role === 'vendedor'
     ? { job: 'vendedor' as const, job_title: 'Vendedor', work_area: 'sales' as const,
-        permissions: { vendas: true, entregas: false, financeiro: false } }
+        permissions: { vendas: true, estoque: true, entregas: false, financeiro: false } }
     : input.role === 'entregador'
       ? { job: 'entregador' as const, job_title: 'Entregador', work_area: 'delivery' as const,
-          permissions: { vendas: false, entregas: true, financeiro: false } }
+          permissions: { vendas: false, estoque: false, entregas: true, financeiro: false } }
       : { job: 'colaborador' as const, job_title: 'Administrativo', work_area: 'administrative' as const,
-          permissions: { vendas: false, entregas: false, financeiro: false } };
+          permissions: { vendas: false, estoque: false, entregas: false, financeiro: false } };
   return createMatrizCollaborator({
     display_name: input.name, username: input.username, password: input.password,
     job: profile.job, job_title: profile.job_title, work_area: profile.work_area,

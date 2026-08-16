@@ -41,6 +41,7 @@ type MatrixRow = {
   work_area: string | null;
   panel_role: 'owner' | 'admin' | null;
   allow_vendas: boolean | null;
+  allow_estoque: boolean | null;
   allow_entregas: boolean | null;
   allow_financeiro: boolean | null;
 };
@@ -73,7 +74,7 @@ export async function listOperationWorkplaces(
   const [matrix, partners] = await Promise.all([
     dbPool.query<MatrixRow>(
       `SELECT mc.id AS collaborator_id, mc.job, mc.work_area, mc.panel_role,
-              op.allow_vendas,op.allow_entregas,op.allow_financeiro
+              op.allow_vendas,op.allow_estoque,op.allow_entregas,op.allow_financeiro
          FROM network.matriz_collaborators mc
          LEFT JOIN network.matriz_collaborator_operation_permissions op
            ON op.collaborator_id=mc.id AND op.environment=mc.environment
@@ -84,6 +85,7 @@ export async function listOperationWorkplaces(
             OR (mc.job = 'vendedor' AND mc.work_area = 'sales')
             OR mc.job = 'entregador'
             OR COALESCE(op.allow_vendas,false)
+            OR COALESCE(op.allow_estoque,false)
             OR COALESCE(op.allow_entregas,false)
             OR COALESCE(op.allow_financeiro,false))
         LIMIT 1`,
@@ -132,14 +134,14 @@ export async function listOperationWorkplaces(
     const canSell = matrixRow.job === 'vendedor' && matrixRow.work_area === 'sales';
     const panelRole = matrixRow.panel_role ?? null;
     const modules = matrixRow.panel_role === 'owner' ? {
-      vendas: true, estoque: false, entregas: true, financeiro: true,
+      vendas: true, estoque: true, entregas: true, financeiro: true,
     } : {
       vendas: matrixRow.allow_vendas ?? canSell,
-      estoque: false,
+      estoque: matrixRow.allow_estoque ?? canSell,
       entregas: matrixRow.allow_entregas ?? isCourier,
       financeiro: matrixRow.allow_financeiro ?? (panelRole !== null),
     };
-    if (modules.vendas || modules.entregas || modules.financeiro) workplaces.push({
+    if (modules.vendas || modules.estoque || modules.entregas || modules.financeiro) workplaces.push({
       id: 'matrix',
       kind: 'matrix',
       name: 'Matriz',

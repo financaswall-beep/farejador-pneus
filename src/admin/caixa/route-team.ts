@@ -61,7 +61,7 @@ const commission = z.object({
   }
 });
 const permissions = z.object({
-  vendas: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
+  vendas: z.boolean(), estoque: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
 });
 const newMember = z.object({
   name: z.string().trim().min(2).max(120),

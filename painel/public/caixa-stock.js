@@ -31,8 +31,15 @@
     byId('stock-list').classList.add('hidden');
   }
 
+  function syncScope() {
+    const partner = Caixa.isPartner();
+    ['stock-product-open', 'stock-service-open', 'stock-count-open', 'stock-receipts-open']
+      .forEach(function (id) { byId(id).classList.toggle('hidden', !partner); });
+  }
+
   async function loadStock() {
-    if (!Caixa.isPartner() || !Caixa.canModule || !Caixa.canModule('estoque')) return;
+    if (!Caixa.canModule || !Caixa.canModule('estoque')) return;
+    syncScope();
     const request = ++state.request;
     setLoading();
     try {
