@@ -62,8 +62,8 @@ function parceiroApp() {
     revokeConfirmId: null,       // Bloco 1: id do funcionário aguardando confirmação inline de desativar
     // ─── Bloco 2 (2026-06-12): acesso + comissão POR PESSOA do funcionário aberto ───
     funcConfigLoaded: false,     // o config (telas+comissão) do funcionário selecionado carregou?
-    funcPermForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false },
-    funcCommForm: { kind: 'percent', value: 0, active: false }, // kind 'percent'(% por venda) | 'fixed'(R$ por venda)
+    funcPermForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: false, resumo: false, financeiro: false },
+    funcPermLocked: false, funcRemForm: { employment_type: 'clt', base_salary: 0, salary_frequency: 'monthly', payment_day: 5, payment_method: 'pix', starts_on: '', benefits: [] }, funcCommForm: { kind: 'percent', basis: 'revenue', value: 0, active: false, starts_on: '', settlement_frequency: 'monthly', itemized: false, item_rules: { tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 }, other: { kind: 'none', value: 0 } } },
     // ─── Bloco 2 telas #2/#3 (2026-06-12) ───
     selfName: '',                // nome do login atual (chip do topo) — vem de /api/me display_name
     commissionTeam: { rows: [], total_commission: 0 }, // #2 card "Comissão da equipe" (dono, Financeiro)

@@ -132,7 +132,7 @@ export async function listOperationWorkplaces(
     const canSell = matrixRow.job === 'vendedor' && matrixRow.work_area === 'sales';
     const panelRole = matrixRow.panel_role ?? null;
     const modules = matrixRow.panel_role === 'owner' ? {
-      vendas: canSell, estoque: false, entregas: isCourier, financeiro: true,
+      vendas: true, estoque: false, entregas: true, financeiro: true,
     } : {
       vendas: matrixRow.allow_vendas ?? canSell,
       estoque: false,

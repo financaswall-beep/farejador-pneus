@@ -1,5 +1,4 @@
 (function () { 'use strict';
-
   const Caixa = window.Caixa = window.Caixa || {};
   const keys = {
     token: '2w_caixa_token',
@@ -170,6 +169,7 @@
   function showSession(payload, legacyUserName) {
     const data = typeof payload === 'object' && payload !== null
       ? payload : { display_name: payload, username: legacyUserName };
+    if (Caixa.syncSessionMetadata) Caixa.syncSessionMetadata(data);
     const name = data.display_name || stored(keys.name) || 'Operador';
     const unitName = data.store_name || data.unit_name || stored(keys.store) || 'Matriz';
     elements.sessionName.textContent = name;

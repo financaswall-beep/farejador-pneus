@@ -3252,7 +3252,7 @@
                     <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
                       <i data-lucide="info" style="width:13px;height:13px;"></i>
                       Vale só pra <b>esta pessoa</b> — cada funcionário tem o próprio acesso.
-                      <span x-text="'Vê ' + funcPermCount + ' de 9 telas.'"></span>
+                      <span x-text="'Vê ' + funcPermCount + ' de 8 áreas.'"></span>
                     </p>
                     <div class="perm-grid">
                       <button type="button" class="perm-tile" :class="{ on: funcPermForm.vendas }" @click="funcPermForm.vendas = !funcPermForm.vendas">
@@ -3273,9 +3273,6 @@
                       <button type="button" class="perm-tile" :class="{ on: funcPermForm.retiradas }" @click="funcPermForm.retiradas = !funcPermForm.retiradas">
                         <span class="perm-ic"><i data-lucide="store"></i></span><span class="perm-lb">Retiradas</span><span class="perm-ck"><i data-lucide="check"></i></span>
                       </button>
-                      <button type="button" class="perm-tile" :class="{ on: funcPermForm.batepapo }" @click="funcPermForm.batepapo = !funcPermForm.batepapo">
-                        <span class="perm-ic"><i data-lucide="bell"></i></span><span class="perm-lb">Avisos</span><span class="perm-ck"><i data-lucide="check"></i></span>
-                      </button>
                       <button type="button" class="perm-tile" :class="{ on: funcPermForm.resumo }" @click="funcPermForm.resumo = !funcPermForm.resumo">
                         <span class="perm-ic"><i data-lucide="bar-chart-3"></i></span><span class="perm-lb">Resumo</span><span class="perm-ck"><i data-lucide="check"></i></span>
                       </button>
@@ -3284,33 +3281,40 @@
                       </button>
                     </div>
 
-                    <!-- Comissão por pessoa -->
+                    <!-- Remuneração no mesmo modelo da Operação -->
                     <div class="pos-divider"></div>
-                    <h3 style="margin:0 0 2px;">Comissão</h3>
-                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">
-                      <i data-lucide="info" style="width:13px;height:13px;"></i>
-                      Sobre o valor cheio das vendas que <b>esta pessoa finaliza</b> no mês. Vira conta a pagar no Financeiro.
-                    </p>
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
-                      <span style="font-size:13px;font-weight:600;">Pagar comissão a esta pessoa</span>
-                      <button type="button" class="pos-switch" :class="{ on: funcCommForm.active }" @click="funcCommForm.active = !funcCommForm.active" role="switch" :aria-checked="funcCommForm.active" aria-label="Pagar comissão a esta pessoa"></button>
+                    <h3 style="margin:0 0 2px;">Remuneração</h3>
+                    <p style="margin:0 0 10px;font-size:12px;color:var(--pos-muted,#94a3b8);">Salário e benefícios entram juntos na folha, sem expor estes valores ao funcionário.</p>
+                    <div class="pos-stock-side-form">
+                      <label>Vínculo<select x-model="funcRemForm.employment_type"><option value="clt">CLT</option><option value="mei">MEI</option><option value="autonomo">Autônomo</option><option value="outro">Outro</option></select></label>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <label>Salário base<input type="number" min="0" step="0.01" x-model.number="funcRemForm.base_salary"></label>
+                        <label>Pagamento<select x-model="funcRemForm.salary_frequency"><option value="weekly">Semanal</option><option value="monthly">Mensal</option></select></label>
+                      </div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <label>Dia<input type="number" min="1" max="28" x-model.number="funcRemForm.payment_day"></label>
+                        <label>Forma<select x-model="funcRemForm.payment_method"><option value="pix">PIX</option><option value="transferencia">Transferência</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></label>
+                      </div>
+                      <label>Início da vigência<input type="date" x-model="funcRemForm.starts_on"></label>
                     </div>
-                    <div x-show="funcCommForm.active" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;">
-                      <div class="pos-seg" role="group" aria-label="Tipo de comissão">
-                        <button type="button" :class="{ on: funcCommForm.kind === 'fixed' }" @click="funcCommForm.kind = 'fixed'">R$ fixo</button>
-                        <button type="button" :class="{ on: funcCommForm.kind === 'percent' }" @click="funcCommForm.kind = 'percent'">% do valor</button>
-                      </div>
-                      <div style="flex:1;min-width:170px;display:flex;align-items:center;gap:8px;">
-                        <input type="number" min="0" step="0.01" x-model.number="funcCommForm.value"
-                               :placeholder="funcCommForm.kind === 'fixed' ? 'Ex: 10' : 'Ex: 5'" style="flex:1;min-width:0;" />
-                        <span style="white-space:nowrap;font-size:13px;color:var(--pos-muted,#94a3b8);" x-text="funcCommForm.kind === 'fixed' ? 'R$ por venda' : '% por venda'"></span>
-                      </div>
+                    <div style="margin-top:10px;padding:12px;border:1px solid var(--pos-border,#e2e8f0);border-radius:12px;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:13px;">Benefícios e adicionais</b><button type="button" @click="addFuncBenefit()" style="color:var(--pos-accent,#047857);font-weight:700;font-size:12px;">+ Adicionar</button></div>
+                      <template x-for="(benefit,index) in funcRemForm.benefits" :key="index"><div style="display:grid;grid-template-columns:1fr 90px 24px;gap:6px;margin-top:8px;"><input x-model="benefit.name" maxlength="60" placeholder="Benefício"><input type="number" min="0" step="0.01" x-model.number="benefit.amount" placeholder="R$"><button type="button" @click="removeFuncBenefit(index)" style="color:#e11d48;">×</button></div></template>
+                      <small x-show="!funcRemForm.benefits.length" style="display:block;margin-top:6px;color:var(--pos-muted,#94a3b8);">Nenhum benefício cadastrado.</small>
                     </div>
 
-                    <button @click="saveFuncConfig(selectedFuncionario)" :disabled="saving" class="pos-form-submit success" style="margin-top:14px;">
-                      <i data-lucide="shield-check"></i>
-                      <span x-text="isSaving('funcConfig') ? 'Salvando...' : 'Salvar acesso e comissão'"></span>
-                    </button>
+                    <div class="pos-divider"></div>
+                    <h3 style="margin:0 0 2px;">Comissão</h3>
+                    <p style="margin:0 0 8px;font-size:12px;color:var(--pos-muted,#94a3b8);">Use regras diferentes para pneus e serviços pequenos. O pagamento entra na mesma folha do salário.</p>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;"><span style="font-size:13px;font-weight:600;">Gerar comissão</span><button type="button" class="pos-switch" :class="{ on: funcCommForm.active }" @click="funcCommForm.active = !funcCommForm.active" role="switch" :aria-checked="funcCommForm.active"></button></div>
+                    <template x-if="funcCommForm.active"><div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;"><label>Fechamento<select x-model="funcCommForm.settlement_frequency"><option value="weekly">Semanal</option><option value="monthly">Mensal</option></select></label><label>Vigência<input type="date" x-model="funcCommForm.starts_on"></label></div>
+                      <label style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--pos-border,#e2e8f0);padding:10px;border-radius:10px;"><span><b style="display:block;font-size:13px;">Por tipo de item</b><small style="color:var(--pos-muted,#94a3b8);">Pneu, serviço e outros separados</small></span><input type="checkbox" x-model="funcCommForm.itemized"></label>
+                      <div x-show="!funcCommForm.itemized" style="display:grid;grid-template-columns:1fr 120px;gap:8px;margin-top:10px;"><select x-model="funcCommForm.kind"><option value="percent">Percentual</option><option value="fixed">Valor fixo por venda</option></select><input type="number" min="0" step="0.01" x-model.number="funcCommForm.value" placeholder="Valor"></div>
+                      <div x-show="funcCommForm.itemized" style="margin-top:10px;display:grid;gap:7px;"><template x-for="group in [{id:'tire',label:'Pneus'},{id:'service',label:'Serviços'},{id:'other',label:'Outros'}]" :key="group.id"><div style="display:grid;grid-template-columns:72px 1fr 80px;gap:6px;align-items:center;"><b style="font-size:12px;" x-text="group.label"></b><select x-model="funcCommForm.item_rules[group.id].kind"><option value="none">Sem comissão</option><option value="percent">Percentual</option><option x-show="group.id === 'tire'" value="fixed">Fixo</option></select><input x-show="funcCommForm.item_rules[group.id].kind !== 'none'" type="number" min="0" step="0.01" x-model.number="funcCommForm.item_rules[group.id].value" placeholder="Valor"></div></template><small style="color:var(--pos-muted,#94a3b8);">Valor fixo somente em pneus; serviços usam percentual.</small></div>
+                    </div></template>
+
+                    <button @click="saveFuncConfig(selectedFuncionario)" :disabled="saving" class="pos-form-submit success" style="margin-top:14px;"><i data-lucide="shield-check"></i><span x-text="isSaving('funcConfig') ? 'Salvando...' : 'Salvar configuração completa'"></span></button>
                   </div>
                 </template>
 
@@ -3424,7 +3428,7 @@
 <script src="./app.chat.js?v=20260611-onda-c"></script>
 <script src="./app.chat.cliente.js?v=20260731-condicao2"></script>
 <script src="./app.config.js?v=20260812-equipe-ativos1"></script>
-<script src="./app.config.equipe.js?v=20260612-bloco2"></script>
+<script src="./app.config.equipe.js?v=20260816-paineis-alinhados1"></script>
 <script src="./app.comissao.js?v=20260810-resumo-permissao1"></script>
 <script src="./app.estoque.kpis.js?v=20260731-condicao2"></script>
  <script src="./app.estoque.forms.js?v=20260731-condicao2"></script>
@@ -3445,6 +3449,6 @@
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>
 <script src="./app.push.js?v=20260619-pushfix"></script>
- <script src="./app.js?v=20260811-recebimento1"></script>
+ <script src="./app.js?v=20260816-paineis-alinhados1"></script>
 </body>
 </html>

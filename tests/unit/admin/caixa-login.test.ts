@@ -120,6 +120,12 @@ describe('login mobile da Operação da Loja', () => {
     expect(queries).toContain('mintCaixaSessionForPerson');
   });
 
+  it('atualiza o menu com as permissões atuais devolvidas pelo servidor', () => {
+    expect(script).toContain('Caixa.syncSessionMetadata(data)');
+    expect(script).toContain('const effective = data.modules || (data.permissions ?');
+    expect(script).toContain('storage.setItem(keys.modules, JSON.stringify(effective))');
+  });
+
   it('entrega uma aba de vendas funcional sem usar a API administrativa', () => {
     expect(html).toContain('Minhas vendas recentes');
     expect(html).toContain('Somente suas vendas');

@@ -17,6 +17,22 @@
     return modules()[name] === true;
   }
 
+  function syncSessionMetadata(data) {
+    if (!data || typeof data !== 'object') return;
+    const keys = Caixa.keys;
+    const storage = sessionStorage.getItem(keys.token) ? sessionStorage : localStorage;
+    const effective = data.modules || (data.permissions ? {
+      vendas: !!data.permissions.vendas, estoque: !!data.permissions.estoque,
+      entregas: !!data.permissions.entregas, financeiro: !!data.permissions.financeiro,
+    } : null);
+    if (data.display_name) storage.setItem(keys.name, data.display_name);
+    if (data.username) storage.setItem(keys.user, data.username);
+    if (data.role) storage.setItem(keys.role, data.role);
+    if (data.unit_name || data.store_name) storage.setItem(keys.store, data.unit_name || data.store_name);
+    if (data.slug) storage.setItem(keys.slug, data.slug);
+    if (effective) storage.setItem(keys.modules, JSON.stringify(effective));
+  }
+
   function setNavigationVisibility(id, visible) {
     const button = document.getElementById(id);
     if (button) button.classList.toggle('hidden', !visible);
@@ -58,6 +74,7 @@
 
   Object.assign(Caixa, {
     operationModules: modules,
+    syncSessionMetadata: syncSessionMetadata,
     canModule: canModule,
     applyModuleNavigation: applyModuleNavigation,
     initialOperationTab: initialOperationTab,

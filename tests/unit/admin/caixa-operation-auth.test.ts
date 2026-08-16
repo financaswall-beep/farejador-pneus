@@ -84,6 +84,23 @@ describe('resolução segura do local da Operação da Loja', () => {
     expect(String(query.mock.calls[0]?.[0])).toContain('mc.panel_role IS NOT NULL');
   });
 
+  it('entrega ao proprietário da Matriz todos os módulos existentes no app', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{
+        collaborator_id: 'owner-1', job: 'colaborador', work_area: 'administrative', panel_role: 'owner',
+        allow_vendas: false, allow_entregas: false, allow_financeiro: false,
+      }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const dbPool = { query } as unknown as Pool;
+
+    const workplaces = await listOperationWorkplaces('test', 'person-owner', dbPool);
+
+    expect(workplaces[0]).toMatchObject({
+      role: 'owner',
+      modules: { vendas: true, estoque: false, entregas: true, financeiro: true },
+    });
+  });
+
   it('faz a permissÃ£o individual da Matriz prevalecer sobre o cargo legado', async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{

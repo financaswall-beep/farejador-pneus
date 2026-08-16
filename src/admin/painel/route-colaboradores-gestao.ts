@@ -7,9 +7,14 @@ import {
   addMatrizPayrollAdjustment, closeMatrizPayroll, getMatrizCollaboratorManagement,
   payMatrizPayrollItem, removeMatrizPayrollAdjustment,
   reviewMatrizPayrollCausalAdjustment,
-  saveMatrizCollaboratorCommission, saveMatrizCollaboratorCompensation,
+  saveMatrizCollaboratorCompensation,
 } from './queries.js';
 import { operatorLabel } from './route-helpers.js';
+import { saveMatrizOperationCommissionRule } from '../caixa/operation-team.js';
+import {
+  getMatrizOperationPermissions,
+  saveMatrizOperationPermissions,
+} from '../caixa/operation-team-permissions.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
 const money = z.number().finite().min(0).max(10_000_000);
@@ -28,17 +33,39 @@ const compensationSchema = z.object({
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
   payment_note: safePaymentReference, starts_on: z.string().date(), benefits,
 });
+const commissionItemRule = z.object({
+  kind: z.enum(['percent', 'fixed', 'none']), value: money,
+});
+const commissionItemRules = z.object({
+  tire: commissionItemRule,
+  service: commissionItemRule,
+  other: commissionItemRule,
+}).superRefine((rules, ctx) => {
+  if (rules.service.kind === 'fixed' || rules.other.kind === 'fixed'
+      || Object.values(rules).some((rule) => rule.kind === 'percent' && rule.value > 100)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_item_rules' });
+  }
+});
 const commissionSchema = z.object({
   collaborator_id: z.string().uuid(), kind: z.enum(['percent', 'fixed']),
   basis: z.enum(['margin', 'revenue', 'sale', 'delivery', 'trip']),
   value: money, starts_on: z.string().date(), active: z.boolean().default(true),
+  settlement_frequency: z.enum(['weekly', 'monthly']).default('monthly'),
+  itemized: z.boolean().default(false),
+  item_rules: commissionItemRules.default({
+    tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 },
+    other: { kind: 'none', value: 0 },
+  }),
 }).superRefine((v, ctx) => {
-  if (v.kind === 'percent' && (!['margin', 'revenue'].includes(v.basis) || v.value > 100)) {
+  if (!v.itemized && v.kind === 'percent' && (!['margin', 'revenue'].includes(v.basis) || v.value > 100)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_rule' });
   }
-  if (v.kind === 'fixed' && !['sale', 'delivery', 'trip'].includes(v.basis)) {
+  if (!v.itemized && v.kind === 'fixed' && !['sale', 'delivery', 'trip'].includes(v.basis)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_commission_rule' });
   }
+});
+const operationPermissions = z.object({
+  vendas: z.boolean(), entregas: z.boolean(), financeiro: z.boolean(),
 });
 const adjustmentSchema = z.object({
   collaborator_id: z.string().uuid(), competence: month,
@@ -56,13 +83,14 @@ function managementError(reply: any, err: unknown, label: string) {
     'adjustment_not_found_or_period_closed', 'nothing_to_close',
     'payroll_has_unresolved_adjustments', 'payroll_has_unresolved_costs',
     'payroll_has_unassigned_events',
-    'invalid_adjustment_amount',
+    'invalid_adjustment_amount', 'invalid_commission_basis',
   ]);
   if (clientErrors.has(message)) return reply.status(400).send({ error: message });
   if (message === 'collaborator_management_unavailable') {
     return reply.status(409).send({ error: message });
   }
   if (message === 'period_already_closed') return reply.status(409).send({ error: message });
+  if (message === 'owner_permissions_locked') return reply.status(409).send({ error: message });
   if (['idempotency_conflict', 'idempotency_incomplete', 'payroll_payment_conflict'].includes(message)) {
     return reply.status(409).send({ error: message });
   }
@@ -95,8 +123,32 @@ export async function registerPainelColaboradoresGestao(fastify: FastifyInstance
     const parsed = commissionSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     try {
-      return reply.status(200).send(await saveMatrizCollaboratorCommission({ ...parsed.data, actor_label: operatorLabel(request) }));
+      return reply.status(200).send(await saveMatrizOperationCommissionRule({ ...parsed.data, actor_label: operatorLabel(request) }));
     } catch (err) { return managementError(reply, err, 'collaborator commission save failed'); }
+  });
+
+  fastify.get('/admin/api/colaboradores/:collaboratorId/permissoes-operacao', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const parsed = z.object({ collaboratorId: z.string().uuid() }).safeParse(request.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      const payload = await getMatrizOperationPermissions(parsed.data.collaboratorId);
+      return payload ? reply.status(200).send(payload) : reply.status(404).send({ error: 'collaborator_not_found' });
+    } catch (err) { return managementError(reply, err, 'collaborator operation permissions read failed'); }
+  });
+
+  fastify.put('/admin/api/colaboradores/:collaboratorId/permissoes-operacao', {
+    preHandler: requireAdminOwner,
+  }, async (request, reply) => {
+    const id = z.object({ collaboratorId: z.string().uuid() }).safeParse(request.params);
+    const body = operationPermissions.safeParse(request.body);
+    if (!id.success || !body.success) return reply.status(400).send({ error: 'invalid_request' });
+    try {
+      return reply.status(200).send(await saveMatrizOperationPermissions(
+        id.data.collaboratorId, body.data, operatorLabel(request),
+      ));
+    } catch (err) { return managementError(reply, err, 'collaborator operation permissions save failed'); }
   });
 
   fastify.post('/admin/api/colaboradores/ajustes', { preHandler: requireAdminOwner }, async (request, reply) => {

@@ -1,6 +1,6 @@
 {
-  "geradoEm": "2026-08-10T04:47:40.744Z",
-  "total": 229,
+  "geradoEm": "2026-08-16T07:52:01.171Z",
+  "total": 231,
   "rotas": [
     "GET /admin/api/bot/campainha AUTH(1)",
     "GET /admin/api/bot/resiliencia AUTH(1)",
@@ -15,6 +15,7 @@
     "GET /admin/api/clientes-v2/export AUTH(1)",
     "GET /admin/api/clientes/stream AUTH(1)",
     "GET /admin/api/colaboradores AUTH(1)",
+    "GET /admin/api/colaboradores/:collaboratorId/permissoes-operacao AUTH(1)",
     "GET /admin/api/colaboradores/gestao AUTH(1)",
     "GET /admin/api/dashboard/matriz-resumo AUTH(1)",
     "GET /admin/api/dashboard/pedidos AUTH(1)",
@@ -228,6 +229,7 @@
     "POST /admin/api/wholesale/suppliers AUTH(1)",
     "POST /admin/api/wholesale/suppliers/archive AUTH(1)",
     "POST /api/seja-parceiro PUBLICA",
+    "PUT /admin/api/colaboradores/:collaboratorId/permissoes-operacao AUTH(1)",
     "PUT /admin/api/marketing/ad-accounts/:adAccountId/campaigns/:campaignId/scope AUTH(1)",
     "PUT /admin/api/partners/:partnerUnitId/delivery-radius AUTH(1)",
     "PUT /admin/api/partners/:partnerUnitId/network-orders AUTH(1)"

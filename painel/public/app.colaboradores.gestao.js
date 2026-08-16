@@ -42,15 +42,20 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       this.colabPerfilForm = { job_title: c.job_title || '', work_area: c.work_area || 'other' };
       this.colabRemForm = {
         employment_type: c.employment_type || 'clt', base_salary: c.monthly_base_salary || c.base_salary || '',
+        salary_frequency: c.salary_frequency || 'monthly',
         payment_day: c.payment_day || 5, payment_method: c.payment_method || 'pix',
         payment_note: c.payment_note || '', starts_on: c.compensation_starts_on ? String(c.compensation_starts_on).slice(0, 10) : today,
+        benefits: JSON.parse(JSON.stringify(c.benefits || [])),
       };
       this.colabComForm = {
         kind: c.commission_kind || 'percent', basis: c.commission_basis || (c.work_area === 'delivery' ? 'delivery' : 'margin'),
         value: c.commission_value || '', starts_on: c.commission_starts_on ? String(c.commission_starts_on).slice(0, 10) : today,
-        active: c.commission_active !== false,
+        active: c.commission_active !== false, settlement_frequency: c.commission_settlement_frequency || 'monthly',
+        itemized: c.work_area !== 'delivery' && !!c.commission_itemized,
+        item_rules: JSON.parse(JSON.stringify(c.commission_item_rules || { tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 }, other: { kind: 'none', value: 0 } })),
       };
       this.colabAjusteForm = { kind: 'addition', description: '', amount: '' };
+      if (drawer === 'permissoes') this.colabCarregarPermissoes(c);
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     colabCloseDrawer() { this.colabDrawer = null; this.colabSelectedId = null; },
@@ -66,6 +71,10 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
     colabPaymentLabel(value) {
       return ({ pix: 'PIX', transferencia: 'Conta bancária', dinheiro: 'Dinheiro', outro: 'Outro' })[value] || '—';
     },
+    colabAddBenefit() {
+      if (this.colabRemForm.benefits.length < 12) this.colabRemForm.benefits.push({ name: '', amount: '', active: true });
+    },
+    colabRemoveBenefit(index) { this.colabRemForm.benefits.splice(index, 1); },
     colabCommissionLabel(c) {
       if (!c.commission_active || !c.commission_kind) return 'Sem regra';
       const basis = ({ margin: 'margem', revenue: 'faturamento', sale: 'venda', delivery: 'entrega', trip: 'rota' })[c.commission_basis] || '';
@@ -88,6 +97,9 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
         await this.apiPost('/admin/api/colaboradores/remuneracao', {
           collaborator_id: c.id, ...this.colabRemForm, base_salary: amount,
           payment_note: this.colabRemForm.payment_note.trim() || null,
+          benefits: this.colabRemForm.benefits.filter((item) => item.name.trim()).map((item) => ({
+            name: item.name.trim(), amount: this.colabNumber(item.amount), active: item.active !== false,
+          })),
         });
         this.colabMsg = { ok: true, text: `Remuneração de ${c.display_name} salva.` };
         await this.loadColaboradores(); this.colabCloseDrawer();
@@ -105,6 +117,9 @@ window.PAINEL_MODULES.colaboradoresGestao = function () {
       try {
         await this.apiPost('/admin/api/colaboradores/comissao', {
           collaborator_id: c.id, ...this.colabComForm, value: this.colabNumber(this.colabComForm.value),
+          item_rules: Object.fromEntries(Object.entries(this.colabComForm.item_rules).map(([key, rule]) => [key, {
+            kind: rule.kind, value: this.colabNumber(rule.value),
+          }])),
         });
         this.colabMsg = { ok: true, text: `Regra de ${c.display_name} salva.` };
         await this.loadColaboradores(); this.colabCloseDrawer();

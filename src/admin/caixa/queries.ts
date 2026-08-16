@@ -48,7 +48,7 @@ function modulesForAccess(
     entregas: job === 'entregador',
     financeiro: panelRole !== null,
   };
-  if (panelRole === 'owner') return { ...legacy, estoque: false, financeiro: true };
+  if (panelRole === 'owner') return { vendas: true, estoque: false, entregas: true, financeiro: true };
   return {
     vendas: overrides?.vendas ?? legacy.vendas,
     estoque: false,

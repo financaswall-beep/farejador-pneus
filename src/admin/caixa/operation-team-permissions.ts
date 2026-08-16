@@ -19,9 +19,9 @@ async function findPermissions(
     `SELECT mc.id,mc.person_id,mc.display_name,pp.username,mc.job,mc.job_title,
             mc.panel_role,mc.revoked_at IS NULL active,
             CASE WHEN mc.panel_role='owner'
-                 THEN (mc.job='vendedor' AND mc.work_area='sales')
+                 THEN true
                  ELSE COALESCE(op.allow_vendas,mc.job='vendedor' AND mc.work_area='sales') END allow_vendas,
-            CASE WHEN mc.panel_role='owner' THEN mc.job='entregador'
+            CASE WHEN mc.panel_role='owner' THEN true
                  ELSE COALESCE(op.allow_entregas,mc.job='entregador') END allow_entregas,
             CASE WHEN mc.panel_role='owner' THEN true
                  ELSE COALESCE(op.allow_financeiro,mc.panel_role IS NOT NULL) END allow_financeiro
