@@ -2,7 +2,7 @@
 
 **Data da revisão:** 17/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
-**Produção:** backup validado e migrations 0179–0181 aplicadas em 17/08/2026. As migrations 0177–0178 já estavam instaladas. Nenhum deploy foi iniciado por esta auditoria.
+**Produção:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
 ## Como ler o veredito
 
@@ -139,33 +139,34 @@ As guardas e o reparo de dados históricos estão na migration `0180_wholesale_p
 | Migrations | Manifesto íntegro, 182 arquivos, última `0181`, gap histórico 0071 documentado |
 | Regressão completa com PostgreSQL | **231/231 aprovadas**, em 44 arquivos (230 na execução completa e a única expectativa antiga revalidada isoladamente após correção) |
 | Build/provas estáticas | Build e TypeScript aprovados; 232 rotas, 92 contratos e paridade das interfaces aprovados; fiscal de tamanho aprovado |
-| Navegador pós-deploy | Não executado; depende do deploy feito pelo responsável |
-| Produção somente leitura | **PASS** no gate geral depois das migrations; ledger, estoque/financeiro, ingestão, normalização, isolamento e acesso sem divergências. A reconciliação matemática de Vendas encontrou 2 registros históricos de teste, de R$ 0,00, sem itens e sem ledger, descritos na seção 7 |
+| Smoke técnico pós-deploy | **Aprovado**: Coolify importou o SHA esperado; imagem nova construída; rolling update concluído; `/livez`, `/readyz` e `/healthz` responderam 200 com o SHA implantado; painel e módulos de Vendas/Compras responderam 200; mobile antigo do parceiro redirecionou para `/operacao` e o manifesto aposentado respondeu 404 |
+| Navegador autenticado pós-deploy | Pendente: o controle visual do navegador não iniciou no ambiente do Codex. Nenhuma credencial foi contornada; as APIs protegidas recusaram acesso sem sessão normal |
+| Produção somente leitura | **PASS** depois do deploy; ledger, estoque/financeiro, ingestão, normalização, isolamento e acesso sem divergências. Reconciliações do ledger: 0 divergência de valor, 0 órfão e 0 duplicidade. A reconciliação matemática de Vendas manteve apenas 2 registros históricos de teste, de R$ 0,00, sem itens e sem ledger, descritos na seção 7 |
 
 ## 5. Condições obrigatórias antes da autorização
 
 1. [x] Fazer backup restaurável do banco.
 2. [x] Confirmar no banco-alvo quais migrations já foram aplicadas.
 3. [x] Aplicar somente as migrations pendentes, na ordem do manifesto; 0177–0178 já estavam presentes e 0179–0181 foram aplicadas.
-4. [ ] Executar o deploy do SHA publicado pelo responsável.
-5. [ ] Rodar smoke pós-deploy de Bot, Vendas, Compras, Estoque, Catálogo, Financeiro e Logística.
-6. [ ] Repetir a reconciliação financeira, de estoque e matemática em modo somente leitura após o deploy.
-7. [ ] Confirmar que o Coolify realmente importou o SHA esperado e não reutilizou imagem antiga.
+4. [x] Executar o deploy do SHA publicado pelo responsável.
+5. [ ] Concluir o smoke **autenticado e visual** de Bot, Vendas, Compras, Estoque, Catálogo, Financeiro e Logística; o smoke técnico público já foi aprovado.
+6. [x] Repetir a reconciliação financeira, de estoque e matemática em modo somente leitura após o deploy.
+7. [x] Confirmar que o Coolify realmente importou o SHA esperado e não reutilizou imagem antiga.
 
 ## 6. Decisão final
 
-**Decisão técnica atual:** **MIGRATIONS CONCLUÍDAS; AUTORIZADO PARA DEPLOY CONTROLADO; PRODUÇÃO AINDA NÃO HOMOLOGADA.**
-**Motivo:** o código das três seções passou pela regressão completa e as migrations foram aplicadas com backup e auditoria posterior. A homologação final ainda exige deploy, smoke pós-deploy e decisão explícita sobre 2 registros históricos de teste que não têm efeito financeiro ou de estoque, mas impedem o resultado zero absoluto da reconciliação matemática.
+**Decisão técnica atual:** **DEPLOY TÉCNICO APROVADO; PRODUÇÃO AINDA NÃO HOMOLOGADA EM DEFINITIVO.**
+**Motivo:** código, migrations, CI, construção da imagem, saúde do container e reconciliações pós-deploy foram aprovados. A homologação final ainda exige o smoke visual com uma sessão normal de usuário e a decisão explícita sobre 2 registros históricos de teste que não têm efeito financeiro ou de estoque, mas impedem o resultado zero absoluto da reconciliação matemática.
 
 Após cumprir as condições acima, registrar uma opção:
 
 - [ ] **AUTORIZO** a entrada em produção do escopo Bot + Vendas + Compras.
 - [ ] **NÃO AUTORIZO**; há bloqueadores descritos abaixo.
 
-**SHA implantado:** ______________________________
-**Data/hora do smoke:** __________________________
-**Responsável:** __________________________________
-**Observações/bloqueadores:** ______________________
+**SHA implantado:** `d95b146e30de1e1527951370df8b53a3f71e8310`
+**Data/hora do deploy:** 17/08/2026, 14:05–14:06 (America/Sao_Paulo)
+**Responsável pelo deploy:** responsável do sistema, via Coolify
+**Observações/bloqueadores:** smoke técnico aprovado; smoke visual autenticado pendente; 2 registros históricos de teste documentados sem impacto monetário.
 
 ## 7. Continuidade operacional para o próximo agente
 
@@ -175,9 +176,19 @@ Após cumprir as condições acima, registrar uma opção:
 - O backup pré-migration `farejador-prod-pre-0179-0181-20260817-104359.dump` foi validado com 2.484 entradas restauráveis, 4.791.576 bytes e SHA-256 `50893A7A93855BFEC4943373205F9F67B84806CE0A9C83ED9632DBD2F44C002C`.
 - As migrations 0177–0178 já estavam materialmente instaladas. As migrations 0179, 0180 e 0181 passaram em dry-run e foram aplicadas em transações individuais com `COMMIT`.
 - A auditoria geral somente leitura depois das migrations retornou `PASS`: 0 ledger desbalanceado, 0 falha de reconciliação financeira/estoque, 0 mistura de ambiente e 0 falha de ingestão/normalização.
-- Nenhum deploy foi iniciado por esta auditoria.
+- O deploy foi executado pelo responsável no Coolify. A imagem foi construída para o SHA `d95b146e30de1e1527951370df8b53a3f71e8310`; o novo container iniciou e o rolling update terminou sem erro.
 - Arquivos locais de protótipos, scripts avulsos e documentos históricos não fazem parte do pacote de publicação.
-- A etapa atual da ordem oficial é: **deploy → smoke → reconciliação somente leitura → homologação**.
+- O smoke técnico público e a reconciliação somente leitura foram concluídos. A etapa atual é: **smoke visual autenticado → decisão sobre a exceção histórica → homologação**.
+
+### Evidência pós-deploy
+
+- `/livez`, `/readyz` e `/healthz`: HTTP 200 e SHA implantado correto; readiness confirmou banco, schema e conexão do aplicativo de parceiros.
+- `/admin/painel`, módulo novo de marcas de Vendas e módulo de Compras: HTTP 200.
+- Mobile legado dos parceiros: HTTP 302 para `/operacao`; `manifest.webmanifest` aposentado: HTTP 404.
+- Gate geral somente leitura: `PASS`, com 113 eventos processados nas últimas 24 horas, 0 pendência antiga, 0 falha recente e 0 duplicidade de delivery.
+- Ledger: 317 transações, 0 desbalanceada, 0 divergência de ambiente, 0 divergência de valor, 0 órfão e 0 duplicidade.
+- Reconciliação de Vendas: quatro métricas zeradas; somente `retail_realized_without_items=2`, correspondente à exceção histórica já identificada.
+- O aviso do Coolify sobre `NODE_ENV=production` não afetou a entrega: o `Dockerfile` força `NODE_ENV=development` no estágio de build, instala `devDependencies`, executa o build com sucesso e usa produção apenas no estágio final de runtime.
 
 ### Exceção histórica revelada pela auditoria matemática
 
