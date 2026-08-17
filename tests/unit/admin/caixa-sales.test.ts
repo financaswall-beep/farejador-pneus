@@ -80,7 +80,7 @@ describe('consultas da aba Vendas do caixa', () => {
     expect(sql).toContain("u.slug='main'");
     expect(sql).toContain("date_trunc('week'");
     expect(sql).toContain("INTERVAL '7 days'");
-    expect(sql).toContain("o.status<>'cancelled'");
+    expect(sql).toContain("o.status IN ('confirmed','paid','delivered')");
     expect(query.mock.calls[0]?.[1]).toEqual(['prod', -1]);
     expect(query.mock.calls[1]?.[1]).toEqual(['prod', '%Cliente%', -1]);
     expect(query.mock.calls[2]?.[1]).toEqual(['prod', -1]);

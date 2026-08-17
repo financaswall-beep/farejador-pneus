@@ -51,7 +51,10 @@ describe('estoque atomico da venda walk-in da matriz', () => {
       quantity: 2,
     }]);
     expect(plan.costByProduct.get(items[0]!.productId)).toBe(47.5);
-    expect(query.mock.calls.some(([sql]) => String(sql).includes('FOR UPDATE'))).toBe(true);
+    const lock = query.mock.calls.find(([sql]) => String(sql).includes('FOR UPDATE'))!;
+    expect(String(lock[0])).toContain('= ANY($2::text[])');
+    expect(lock[1]).toEqual(['test', ['90-90-12']]);
+    expect(String(lock[0])).not.toMatch(/WHERE environment = \$1\s+ORDER BY/);
   });
 
   it('rejeita produto sem medida', async () => {

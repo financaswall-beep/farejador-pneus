@@ -18,8 +18,7 @@ interface LedgerTruthRow {
   source_monthly: string; ledger_monthly: string;
   source_expenses: string; ledger_expenses: string;
   source_marketing: string; ledger_marketing: string;
-  source_purchases: string; ledger_purchases: string;
-  source_inventory: string; ledger_inventory: string;
+  source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
 }
 const cents = (value: string | number): number => Math.round(Number(value || 0) * 100);
 const money = (value: number): string => (value / 100).toFixed(2);
@@ -104,11 +103,11 @@ export async function getMatrizCentralLedgerFinancialTruth(
            AND source_type='network.commission_refund.payment'),0)
          cash_commission_refund,
        COALESCE((SELECT sum(pending_revenue) FROM retail
-         WHERE status<>'cancelled'),0) pending_revenue,
+         WHERE status IN ('confirmed','paid','delivered')),0) pending_revenue,
        COALESCE((SELECT sum(pending_items) FROM retail
-         WHERE status<>'cancelled'),0)::int pending_items,
+         WHERE status IN ('confirmed','paid','delivered')),0)::int pending_items,
        (SELECT count(*)::int FROM retail
-         WHERE status<>'cancelled' AND pending_items>0) pending_orders,
+         WHERE status IN ('confirmed','paid','delivered') AND pending_items>0) pending_orders,
        COALESCE((SELECT sum(CASE
          WHEN account_class='asset' AND account_code LIKE '%receivable%'
            THEN CASE side WHEN 'debit' THEN amount ELSE -amount END ELSE 0 END)
@@ -149,7 +148,8 @@ export async function getMatrizCentralLedgerFinancialTruth(
          FROM month_ledger WHERE account_class='revenue'
            AND source_type LIKE 'commerce.wholesale_order.%'),0) ledger_wholesale,
        COALESCE((SELECT sum(total_amount) FROM retail,bounds b
-         WHERE created_at>=b.month_ts AND created_at<b.month_end_ts),0)
+         WHERE status IN ('confirmed','paid','delivered','cancelled')
+           AND created_at>=b.month_ts AND created_at<b.month_end_ts),0)
        -COALESCE((SELECT sum(total_amount) FROM retail,bounds b
          WHERE status='cancelled' AND updated_at>=b.month_ts
            AND updated_at<b.month_end_ts),0) source_retail,
@@ -158,7 +158,7 @@ export async function getMatrizCentralLedgerFinancialTruth(
            AND source_type LIKE 'commerce.order.%'),0) ledger_retail,
        COALESCE((SELECT sum(GREATEST(total_amount-item_total,0))
          FROM retail,bounds b WHERE fulfillment_mode='delivery'
-           AND status<>'cancelled' AND created_at>=b.month_ts
+           AND status IN ('confirmed','paid','delivered') AND created_at>=b.month_ts
            AND created_at<b.month_end_ts),0) source_freight,
        COALESCE((SELECT sum(commission_amount) FROM network.commission_entries,bounds b
          WHERE environment=$1 AND realized_at>=b.month_ts

@@ -54,6 +54,18 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
        'reason_required'].includes(err.message)) {
     return { status: 400, error: err.message };
   }
+  if (['purchase_quantity_invalid', 'purchase_unit_cost_invalid',
+       'unit_cost_cent_precision', 'purchase_line_total_too_large',
+       'purchase_total_too_large', 'purchased_at_future', 'paid_at_future',
+       'due_date_before_purchase'].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
+  if (['sale_items_required', 'sale_items_limit', 'sale_quantity_invalid', 'sale_unit_price_invalid',
+       'sale_discount_invalid', 'unit_price_cent_precision', 'discount_cent_precision',
+       'discount_exceeds_line_total', 'sale_line_total_too_large',
+       'sale_total_too_large'].includes(err.message)) {
+    return { status: 400, error: err.message };
+  }
   if (['receipt_not_found', 'receipt_blob_not_found', 'receipt_attempt_not_found']
     .includes(err.message)) {
     return { status: 404, error: 'receipt_not_found' };

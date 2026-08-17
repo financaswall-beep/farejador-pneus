@@ -484,12 +484,12 @@ describe('venda walk-in atomica da Matriz', () => {
     const entry = await addWholesaleStockEntry({
       environment: 'test', measure: fixture.measure, quantity_in: 10, unit_cost: 30,
     }, db.pool);
-    expect(entry).toMatchObject({ quantity_on_hand: 20, unit_cost: '20.00' });
+    expect(entry).toMatchObject({ quantity_on_hand: 20, unit_cost: '20.000000' });
 
     const adjusted = await setWholesaleStock({
       environment: 'test', measure: fixture.measure, quantity_on_hand: 7, unit_cost: 20,
     }, db.pool);
-    expect(adjusted).toMatchObject({ quantity_on_hand: 7, unit_cost: '20.00' });
+    expect(adjusted).toMatchObject({ quantity_on_hand: 7, unit_cost: '20.000000' });
 
     const after = await getMatrizFinanceiroVisao('test', db.pool);
     expect(Number(after.indicadores.capital_parado) - Number(before.indicadores.capital_parado)).toBe(140);

@@ -24,6 +24,28 @@ window.PAINEL_MODULES.format = function () {
       return `${match[3]}/${match[2]}/${match[1]}`;
     },
 
+    atacadoErrText(code) {
+      const map = {
+        buyer_required: 'Escolha ou cadastre o comprador.',
+        items_required: 'Adicione ao menos um pneu.',
+        partner_not_found: 'Parceiro não encontrado.',
+        buyer_not_found: 'Cliente não encontrado.',
+        oversell: 'Estoque insuficiente. A venda não foi registrada; confira o galpão.',
+        tire_condition_required: 'Selecione a condição de cada pneu.',
+        idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
+        buyer_ambiguous: 'Escolha apenas um comprador.',
+        sold_at_future: 'A data da venda não pode estar no futuro.',
+        paid_at_future: 'A data do pagamento não pode estar no futuro.',
+        paid_at_before_sale: 'A data do pagamento não pode ser anterior à venda.',
+        due_date_before_sale: 'O vencimento não pode ser anterior à venda.',
+        unit_price_cent_precision: 'Informe o preço com no máximo duas casas decimais.',
+        sale_line_total_too_large: 'O total de um item ultrapassa o limite aceito.',
+        sale_total_too_large: 'O total da venda ultrapassa o limite aceito.',
+        sale_items_limit: 'A venda tem itens demais para um único lançamento.',
+      };
+      return map[code] || `Não consegui registrar (${code}).`;
+    },
+
     timeAgo(value) {
       if (!value) return '-';
       const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));

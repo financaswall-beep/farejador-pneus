@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { moneyCents } from './stage5-integrity.js';
 
 export type MatrizLedgerAccountClass =
   | 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
@@ -39,7 +40,11 @@ export function matrizLedgerActor(value?: string | null): string {
 export function matrizLedgerAmount(value: string | number, errorCode: string): number {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount < 0) throw new Error(errorCode);
-  return Math.round(amount * 100) / 100;
+  try {
+    return moneyCents(amount) / 100;
+  } catch {
+    throw new Error(errorCode);
+  }
 }
 
 export async function postMatrizLedgerTransaction(

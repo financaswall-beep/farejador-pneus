@@ -14,6 +14,10 @@ import {
 } from './stage5-integrity.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { canonicalPurchaseItems, type PurchaseItemInput } from './purchase-brand.js';
+import { assertWholesalePurchaseMoney } from './purchase-money.js';
+import {
+  getPurchaseCatalogBlockers, type PurchaseCatalogBlocker,
+} from './purchase-catalog-readiness.js';
 
 export interface RegisterWholesalePurchaseInput {
   environment?: 'prod' | 'test';
@@ -38,6 +42,7 @@ export interface RegisterWholesalePurchaseResult {
   items_count: number;
   status: 'pending' | 'confirmed';
   stock_applied: boolean;
+  catalog_blockers: PurchaseCatalogBlocker[];
 }
 
 async function resolveSupplier(
@@ -100,6 +105,7 @@ export async function registerWholesalePurchase(
   dbPool: Pool = defaultPool,
 ): Promise<RegisterWholesalePurchaseResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  assertWholesalePurchaseMoney(input.items ?? []);
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -171,10 +177,11 @@ export async function registerWholesalePurchase(
       paidAt: purchase.rows[0]!.paid_at,
       stockApplied: received, createdBy: input.created_by,
     });
+    const catalogBlockers = await getPurchaseCatalogBlockers(client, environment, items);
     const result = { purchase_id: purchaseId, supplier_id: supplier.id,
       supplier_name: supplier.name, total_amount: total.rows[0]!.total_amount,
       items_count: items.length, status: received ? 'confirmed' as const : 'pending' as const,
-      stock_applied: received };
+      stock_applied: received, catalog_blockers: catalogBlockers };
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_purchase',
       entityTable: 'commerce.wholesale_purchases', entityId: purchaseId,
       eventType: received ? 'created_received' : 'created_pending', actorLabel: input.created_by,
@@ -200,7 +207,8 @@ export interface ConfirmWholesalePurchaseInput {
 export async function confirmWholesalePurchase(
   input: ConfirmWholesalePurchaseInput,
   dbPool: Pool = defaultPool,
-): Promise<{ purchase_id: string; confirmed_at: string; stock_applied: true }> {
+): Promise<{ purchase_id: string; confirmed_at: string; stock_applied: true;
+  catalog_blockers: PurchaseCatalogBlocker[] }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
   const operation = { environment, domain: 'wholesale_purchase.confirm',
@@ -210,6 +218,7 @@ export async function confirmWholesalePurchase(
     await client.query('BEGIN');
     const started = await beginIntegrityOperation<{
       purchase_id: string; confirmed_at: string; stock_applied: true;
+      catalog_blockers: PurchaseCatalogBlocker[];
     }>(client, operation);
     if (started.replayed) {
       await client.query('COMMIT');
@@ -252,8 +261,10 @@ export async function confirmWholesalePurchase(
       stockApplied: false,
       createdBy: purchase.rows[0].created_by,
     }, updated.rows[0]!.stock_applied_at, input.confirmed_by);
+    const catalogBlockers = await getPurchaseCatalogBlockers(client, environment, items.rows);
     const result = integrityResult({ purchase_id: input.purchase_id,
-      confirmed_at: updated.rows[0]!.stock_applied_at, stock_applied: true as const });
+      confirmed_at: updated.rows[0]!.stock_applied_at, stock_applied: true as const,
+      catalog_blockers: catalogBlockers });
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_purchase',
       entityTable: 'commerce.wholesale_purchases', entityId: input.purchase_id,
       eventType: 'stock_received', actorLabel: input.confirmed_by,

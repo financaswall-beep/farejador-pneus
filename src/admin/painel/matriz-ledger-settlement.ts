@@ -128,11 +128,14 @@ async function settleObligation(
   const obligation = await lockObligation(
     client, operation.environment, input.obligation_id!,
   );
-  const balance = Number(obligation.open_amount);
+  const balanceCents = moneyCents(Number(obligation.open_amount));
+  const balance = balanceCents / 100;
   const amount = requestedAmount(input.amount, balance);
-  const remaining = (balance - amount).toFixed(2);
+  const amountCents = moneyCents(amount);
+  const remainingCents = balanceCents - amountCents;
+  const remaining = (remainingCents / 100).toFixed(2);
   const retail = obligation.source_type === 'commerce.order.revenue';
-  const full = moneyCents(Number(remaining)) === 0;
+  const full = remainingCents === 0;
   const method = input.payment_method?.trim();
   if (retail && full && (!method || method.toLowerCase() === 'a receber')) {
     throw new Error('retail_payment_method_required');
@@ -165,7 +168,7 @@ async function settleObligation(
   return integrityResult({
     target_id: obligation.id,
     direction: obligation.account_class === 'asset' ? 'receivable' : 'payable',
-    amount: amount.toFixed(2), remaining_balance: remaining,
+    amount: (amountCents / 100).toFixed(2), remaining_balance: remaining,
     payment_ids: [paymentId], settled_at: paidAt,
   });
 }
@@ -183,7 +186,6 @@ async function marketingBalance(client: PoolClient, environment: Environment): P
   );
   return Number(result.rows[0]!.balance);
 }
-
 async function settleMarketing(
   client: PoolClient,
   operation: ReturnType<typeof settlementOperation>,
@@ -193,7 +195,8 @@ async function settleMarketing(
 ): Promise<MatrizLedgerSettlementResult> {
   const balance = await marketingBalance(client, operation.environment);
   if (balance <= 0) throw new Error('central_obligation_not_open');
-  let pending = requestedAmount(input.amount, balance);
+  const balanceCents = moneyCents(balance);
+  let pendingCents = moneyCents(requestedAmount(input.amount, balance));
   const obligations = await client.query<ObligationRow>(
     `SELECT t.id,t.source_type,t.source_id,e.account_code,e.account_class,
             (e.amount-COALESCE((SELECT sum(CASE WHEN p.payment_kind='settlement'
@@ -209,9 +212,11 @@ async function settleMarketing(
   );
   const paymentIds: string[] = [];
   for (const [index, obligation] of obligations.rows.entries()) {
-    if (moneyCents(pending) === 0) break;
-    const chunk = Math.min(pending, Number(obligation.open_amount));
-    if (chunk <= 0) continue;
+    if (pendingCents === 0) break;
+    const openCents = moneyCents(Number(obligation.open_amount));
+    const chunkCents = Math.min(pendingCents, openCents);
+    if (chunkCents <= 0) continue;
+    const chunk = chunkCents / 100;
     paymentIds.push(await recordPayment(
       client, operation.environment, obligation, chunk, paidAt, actor,
       'finance.matriz_ledger_account.settlement',
@@ -223,17 +228,17 @@ async function settleMarketing(
         note: input.note?.trim() || null,
       },
     ));
-    pending = (moneyCents(pending) - moneyCents(chunk)) / 100;
+    pendingCents -= chunkCents;
   }
-  if (moneyCents(pending) !== 0) throw new Error('marketing_allocation_failed');
-  const amount = requestedAmount(input.amount, balance);
+  if (pendingCents !== 0) throw new Error('marketing_allocation_failed');
+  const amountCents = moneyCents(requestedAmount(input.amount, balance));
   return integrityResult({
     target_id: 'marketing_payable', direction: 'payable',
-    amount: amount.toFixed(2), remaining_balance: (balance - amount).toFixed(2),
+    amount: (amountCents / 100).toFixed(2),
+    remaining_balance: ((balanceCents - amountCents) / 100).toFixed(2),
     payment_ids: paymentIds, settled_at: paidAt,
   });
 }
-
 function settlementOperation(environment: Environment, input: MatrizLedgerSettlementInput) {
   const target = input.obligation_id
     ? { obligation_id: input.obligation_id }
@@ -250,7 +255,6 @@ function settlementOperation(environment: Environment, input: MatrizLedgerSettle
     }),
   };
 }
-
 export async function settleMatrizLedgerOpenItem(
   input: MatrizLedgerSettlementInput,
   dbPool: Pool = defaultPool,

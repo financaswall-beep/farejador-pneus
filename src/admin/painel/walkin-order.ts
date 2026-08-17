@@ -8,6 +8,7 @@ import { applyMatrizWalkinStockSale, prepareMatrizWalkinStock } from './matriz-w
 import { postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
 import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 import { operationFingerprint } from './stage5-integrity.js';
+import { assertRetailSaleMoney } from './sales-money.js';
 
 interface ExistingOrder {
   id: string;
@@ -19,23 +20,13 @@ interface ExistingOrder {
 function calculateTotal(input: RegisterWalkinOrderInput): number {
   if (input.idempotency_key.trim().length < 8) throw new Error('walkin_idempotency_required');
   if (input.items.length === 0) throw new Error('walkin_items_required');
-
-  let total = 0;
-  for (const item of input.items) {
-    const discount = item.discount_amount ?? 0;
-    if (
-      !Number.isInteger(item.quantity) || item.quantity <= 0 ||
-      !Number.isFinite(item.unit_price) || item.unit_price < 0 ||
-      !Number.isFinite(discount) || discount < 0 ||
-      discount > item.quantity * item.unit_price
-    ) {
-      throw new Error('walkin_item_invalid');
-    }
-    total += item.quantity * item.unit_price - discount;
+  try {
+    return assertRetailSaleMoney(input.items) / 100;
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message === 'sale_items_required') throw new Error('walkin_items_required');
+    throw error;
   }
-
-  if (!Number.isFinite(total) || total < 0) throw new Error('walkin_total_invalid');
-  return Math.round((total + Number.EPSILON) * 100) / 100;
 }
 
 /**

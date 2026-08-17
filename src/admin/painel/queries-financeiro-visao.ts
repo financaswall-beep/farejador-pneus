@@ -13,6 +13,7 @@ import { hashPassword } from '../../parceiro/password.js';
 import { getWholesaleResumo, getVarejoResumo } from './queries-galpao.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
 import { getMatrizFinancialRead, type MatrizFinancialRead } from './queries-financeiro-read-switch.js';
+import { moneyCents } from './stage5-integrity.js';
 import {
   getMatrizLedgerOpenItems,
   type FinanceiroPayableItem, type FinanceiroReceivableItem,
@@ -93,7 +94,7 @@ export async function getMatrizFinanceiroVisao(
                JOIN commerce.wholesale_order_items oi
                  ON oi.order_id = o.id AND oi.environment = o.environment
               WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
-                AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+                AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
             [environment],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),
@@ -123,12 +124,12 @@ export async function getMatrizFinanceiroVisao(
               JOIN commerce.wholesale_order_items oi
                 ON oi.order_id = o.id AND oi.environment = o.environment
              WHERE o.environment = $1 AND o.status = 'confirmed'
-               AND o.created_at >= now() - interval '30 days')
+               AND o.sold_at >= now() - interval '30 days')
          + (SELECT COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)
               FROM commerce.orders o
               JOIN core.units u ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'
               JOIN commerce.order_items oi ON oi.order_id = o.id AND oi.environment = o.environment
-             WHERE o.environment = $1 AND o.status <> 'cancelled'
+             WHERE o.environment = $1 AND o.status IN ('confirmed','paid','delivered')
                AND o.created_at >= now() - interval '30 days')
            AS custo`,
         [environment],
@@ -144,7 +145,8 @@ export async function getMatrizFinanceiroVisao(
              SELECT COALESCE(SUM(oi.quantity * oi.unit_price - oi.discount_amount), 0) AS s
                FROM commerce.order_items oi
               WHERE oi.order_id = o.id AND oi.environment = o.environment) itens ON true
-          WHERE o.environment = $1 AND o.status <> 'cancelled' AND o.fulfillment_mode = 'delivery'
+          WHERE o.environment = $1 AND o.status IN ('confirmed','paid','delivered')
+            AND o.fulfillment_mode = 'delivery'
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
         [environment],
       ).then((r) => r.rows[0]!.frete),
@@ -155,33 +157,39 @@ export async function getMatrizFinanceiroVisao(
   // Consolidado do mês (competência): faturou − custo do pneu − despesa ocorrida.
   // Frete entra CHEIO no lucro (não tem custo de pneu; o custo dele — gasolina da
   // rota — já desconta na perna das despesas).
-  const comissaoRealizada = comissaoMes ? Number(comissaoMes) : 0;
-  const freteRecebido = Number(freteMes);
-  const faturamento = Number(atacado.faturamento) + Number(varejo.faturamento) + comissaoRealizada + freteRecebido;
-  const custo = Number(atacado.custo_total) + Number(varejo.custo_total);
-  const despesasMes = despCat ? despCat.reduce((s, c) => s + Number(c.total), 0) : null;
-  const lucroBruto = Number(atacado.lucro_total) + Number(varejo.lucro_total) + comissaoRealizada + freteRecebido;
+  const cents = (value: string | number): number => moneyCents(Number(value));
+  const money = (value: number): string => (value / 100).toFixed(2);
+  const comissaoRealizada = comissaoMes ? cents(comissaoMes) : 0;
+  const freteRecebido = cents(freteMes);
+  const faturamento = cents(atacado.faturamento) + cents(varejo.faturamento)
+    + comissaoRealizada + freteRecebido;
+  const custo = cents(atacado.custo_total) + cents(varejo.custo_total);
+  const despesasMes = despCat
+    ? despCat.reduce((sum, category) => sum + cents(category.total), 0)
+    : null;
+  const lucroBruto = cents(atacado.lucro_total) + cents(varejo.lucro_total)
+    + comissaoRealizada + freteRecebido;
   const lucro = lucroBruto - (despesasMes ?? 0);
   const margemPct = faturamento > 0 ? Math.round((lucro / faturamento) * 1000) / 10 : null;
 
   // Indicadores de dono. Guardas honestas: sem base → null (a UI mostra "—", não chuta).
-  const capitalParado = Number(capital.capital);
+  const capitalParado = cents(capital.capital);
   // Giro na janela móvel de 30 dias (não mês-calendário) → estável no começo do mês.
   // Galpão zerado → null ("—"): "0 dias" é ruído, não informação (auditoria 07-08).
-  const custoJanela = Number(custo30d);
+  const custoJanela = cents(custo30d);
   const giroDias = capitalParado > 0 && custoJanela > 0
     ? Math.round(capitalParado / (custoJanela / 30)) : null;
   // Giro em VEZES (mesma base, inverso × 30): quanto o galpão girou em 30 dias.
   // 480k vendidos ÷ 186k parado = 2,58x. O card da tela nova mostra isto.
   const giroVezes = capitalParado > 0 && custoJanela > 0
     ? Math.round((custoJanela / capitalParado) * 100) / 100 : null;
-  const fatAtacado = Number(atacado.faturamento);
+  const fatAtacado = cents(atacado.faturamento);
   // Mesma base (line_total) nos dois lados + clamp em 100 (nunca > 100% do faturamento).
   const fiadoAbertoPct = fiadoAbertoMes !== null && fatAtacado > 0
-    ? Math.min(100, Math.round((Number(fiadoAbertoMes) / fatAtacado) * 100)) : null;
+    ? Math.min(100, Math.round((cents(fiadoAbertoMes) / fatAtacado) * 100)) : null;
   const margemBrutaFrac = faturamento > 0 ? lucroBruto / faturamento : 0;
   const pontoEquilibrio = despesasMes !== null && despesasMes > 0 && margemBrutaFrac > 0
-    ? Math.round(despesasMes / margemBrutaFrac) : null;
+    ? Math.round((despesasMes / 100) / margemBrutaFrac) : null;
 
   return {
     verdade: verdade.truth,
@@ -195,24 +203,24 @@ export async function getMatrizFinanceiroVisao(
       despesas: Boolean(env.MATRIZ_EXPENSES),
     },
     mes: {
-      faturamento: faturamento.toFixed(2),
-      custo: custo.toFixed(2),
-      despesas: despesasMes !== null ? despesasMes.toFixed(2) : null,
-      lucro: lucro.toFixed(2),
+      faturamento: money(faturamento),
+      custo: money(custo),
+      despesas: despesasMes !== null ? money(despesasMes) : null,
+      lucro: money(lucro),
       margem_pct: margemPct,
       itens_sem_custo: varejo.itens_sem_custo,
       pernas: {
         atacado: { faturamento: atacado.faturamento, lucro: atacado.lucro_total },
         varejo: { faturamento: varejo.faturamento, lucro: varejo.lucro_total },
-        comissao: comissaoMes !== null ? { realizado: Number(comissaoMes).toFixed(2) } : null,
-        frete: { recebido: freteRecebido.toFixed(2) },
+        comissao: comissaoMes !== null ? { realizado: money(comissaoRealizada) } : null,
+        frete: { recebido: money(freteRecebido) },
       },
       despesas_categoria: despCat,
     },
     a_receber: centralAgenda.a_receber,
     a_pagar: centralAgenda.a_pagar,
     indicadores: {
-      capital_parado: capitalParado.toFixed(2),
+      capital_parado: money(capitalParado),
       pneus_galpao: capital.pneus,
       giro_dias: giroDias,
       giro_vezes: giroVezes,

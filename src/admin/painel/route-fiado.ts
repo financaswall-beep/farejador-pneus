@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { cancelWholesaleSale, getWholesaleFinance, listWholesaleSales, settleWholesaleOrderPayment, settleWholesalePurchasePayment } from './queries.js';
@@ -24,7 +24,7 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
   });
 
   // CANCELA uma venda de atacado (0116): confirmed → cancelled + trilha + devolve estoque.
-  fastify.post('/admin/api/wholesale/sales/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/sales/cancel', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = cancelWholesaleSaleSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -57,7 +57,7 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
   });
 
   // Quita um fiado. Replay devolve o resultado original; nova operação após pago dá 404.
-  fastify.post('/admin/api/wholesale/finance/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/finance/settle', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.WHOLESALE_FINANCE) return reply.status(404).send({ error: 'finance_disabled' });
     const parsed = settleWholesaleFinanceSchema.safeParse(request.body);
     if (!parsed.success) {

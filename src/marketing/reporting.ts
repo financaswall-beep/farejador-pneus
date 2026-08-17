@@ -71,7 +71,7 @@ const REALIZED_CTE = `
           AND NOT (po.fulfillment_mode='delivery' AND po.delivery_status<>'delivered')
           AND NOT po.awaiting_pickup)
         OR
-        (po.id IS NULL
+        (po.id IS NULL AND o.status IN ('confirmed','paid','delivered')
           AND NOT (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered'))
       )
   ),

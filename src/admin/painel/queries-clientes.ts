@@ -1,7 +1,6 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
-
 export interface ClientePainelRow {
   id: string;
   source: 'chatwoot' | 'balcao' | 'parceiro' | 'atacado';
@@ -34,7 +33,6 @@ export interface ClientePainelRow {
   partner_id: string | null;
   partner_name: string | null;
 }
-
 export interface ClienteParceiroRow {
   partner_id: string;
   name: string;
@@ -158,14 +156,16 @@ export async function getClientesPainel(
          LEFT JOIN LATERAL (
            SELECT o.id AS order_id, o.total_amount
              FROM commerce.orders o
-            WHERE o.environment = c.environment AND o.source_conversation_id = lc.conversation_id AND o.status <> 'cancelled'
+            WHERE o.environment = c.environment AND o.source_conversation_id = lc.conversation_id
+              AND o.status IN ('confirmed','paid','delivered')
             ORDER BY o.created_at DESC LIMIT 1
          ) lead_order ON true
          LEFT JOIN LATERAL (
            SELECT sum(((oi.unit_price - oi.matriz_unit_cost) * oi.quantity) - oi.discount_amount)
                     FILTER (WHERE oi.matriz_unit_cost IS NOT NULL) AS gross_profit
              FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
-            WHERE ox.contact_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'
+            WHERE ox.contact_id = c.id AND ox.environment = c.environment
+              AND ox.status IN ('confirmed','paid','delivered')
          ) fin ON true
          LEFT JOIN LATERAL (
            SELECT COALESCE(ts.tire_size, p.product_name) AS label
@@ -173,7 +173,8 @@ export async function getClientesPainel(
              JOIN commerce.order_items oi ON oi.order_id = ox.id
              JOIN commerce.products p ON p.id = oi.product_id
              LEFT JOIN commerce.tire_specs ts ON ts.product_id = p.id AND ts.environment = p.environment
-            WHERE ox.contact_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'
+            WHERE ox.contact_id = c.id AND ox.environment = c.environment
+              AND ox.status IN ('confirmed','paid','delivered')
             ORDER BY ox.created_at DESC, oi.created_at DESC LIMIT 1
          ) last_product ON true
         WHERE c.environment = $1 AND c.deleted_at IS NULL
@@ -187,21 +188,23 @@ export async function getClientesPainel(
               c.email, 'nao_classificado' AS kind, false AS is_vip,
               CASE c.source WHEN 'walkin' THEN 'Balcão' WHEN 'chatwoot_manual' THEN 'Chatwoot manual' ELSE 'ERP' END AS origin,
               CASE WHEN COALESCE(max(o.created_at), c.updated_at) >= now() - interval '90 days' THEN 'ativo' ELSE 'inativo' END AS status,
-              count(o.id) FILTER (WHERE o.status <> 'cancelled')::int AS purchases,
-              COALESCE(sum(o.total_amount) FILTER (WHERE o.status <> 'cancelled'), 0)::float8 AS total_spent,
-              COALESCE(avg(o.total_amount) FILTER (WHERE o.status <> 'cancelled'), 0)::float8 AS avg_ticket,
+              count(o.id) FILTER (WHERE o.status IN ('confirmed','paid','delivered'))::int AS purchases,
+              COALESCE(sum(o.total_amount) FILTER (WHERE o.status IN ('confirmed','paid','delivered')), 0)::float8 AS total_spent,
+              COALESCE(avg(o.total_amount) FILTER (WHERE o.status IN ('confirmed','paid','delivered')), 0)::float8 AS avg_ticket,
               COALESCE((SELECT sum(((oi.unit_price - oi.matriz_unit_cost) * oi.quantity) - oi.discount_amount)
                                   FILTER (WHERE oi.matriz_unit_cost IS NOT NULL)
                           FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
-                         WHERE ox.customer_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'), 0)::float8 AS gross_profit,
+                         WHERE ox.customer_id = c.id AND ox.environment = c.environment
+                           AND ox.status IN ('confirmed','paid','delivered')), 0)::float8 AS gross_profit,
               (SELECT COALESCE(ts.tire_size, p.product_name)
                  FROM commerce.orders ox JOIN commerce.order_items oi ON oi.order_id = ox.id
                  JOIN commerce.products p ON p.id = oi.product_id
                  LEFT JOIN commerce.tire_specs ts ON ts.product_id = p.id AND ts.environment = p.environment
-                WHERE ox.customer_id = c.id AND ox.environment = c.environment AND ox.status <> 'cancelled'
+                WHERE ox.customer_id = c.id AND ox.environment = c.environment
+                  AND ox.status IN ('confirmed','paid','delivered')
                 ORDER BY ox.created_at DESC, oi.created_at DESC LIMIT 1) AS last_item,
-              min(o.created_at) FILTER (WHERE o.status <> 'cancelled')::text AS first_purchase_at,
-              max(o.created_at) FILTER (WHERE o.status <> 'cancelled')::text AS last_purchase_at,
+              min(o.created_at) FILTER (WHERE o.status IN ('confirmed','paid','delivered'))::text AS first_purchase_at,
+              max(o.created_at) FILTER (WHERE o.status IN ('confirmed','paid','delivered'))::text AS last_purchase_at,
               COALESCE(max(o.created_at), c.updated_at)::text AS last_interaction_at,
               NULL::text AS lead_stage, NULL::text AS lead_outcome, NULL::text AS lead_lane,
               NULL::text AS lead_conversation_id, NULL::text AS lead_created_at, NULL::text AS lead_last_message_at,
@@ -291,9 +294,7 @@ export async function getClientesPainel(
       [environment],
     ),
   ]);
-
   return {
     rows: [...chatwoot.rows, ...balcao.rows, ...parceiro.rows, ...atacado.rows],
-    partners: partners.rows,
-  };
+    partners: partners.rows };
 }

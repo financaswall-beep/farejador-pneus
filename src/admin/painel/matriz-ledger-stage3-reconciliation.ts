@@ -18,9 +18,7 @@ import { backfillMatrizInventoryAdjustmentPostings } from './matriz-ledger-inven
 import {
   getMatrizStage3LedgerReconciliation, type MatrizStage3Reconciliation,
 } from './matriz-ledger-stage3-report.js';
-
 type Environment = 'prod' | 'test';
-
 async function backfillPurchases(
   client: PoolClient, environment: Environment, limit: number,
 ): Promise<number> {
@@ -59,6 +57,22 @@ async function backfillPurchases(
             AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=p.environment AND t.source_id=p.id::text
                AND t.source_type='commerce.wholesale_purchase.receipt'))
+          OR (p.status='cancelled' AND EXISTS (
+            SELECT 1 FROM finance.matriz_ledger_transactions receipt
+             WHERE receipt.environment=p.environment
+               AND receipt.source_type='commerce.wholesale_purchase.receipt'
+               AND receipt.source_id=p.id::text)
+            AND EXISTS (
+            SELECT 1 FROM finance.matriz_ledger_transactions cancelled
+             WHERE cancelled.environment=p.environment
+               AND cancelled.source_type='commerce.wholesale_purchase.cancel'
+               AND cancelled.source_id=p.id::text
+               AND cancelled.reversal_of_transaction_id IS NOT NULL)
+            AND NOT EXISTS (
+            SELECT 1 FROM finance.matriz_ledger_transactions receipt_cancel
+             WHERE receipt_cancel.environment=p.environment
+               AND receipt_cancel.source_type='commerce.wholesale_purchase.receipt_cancel'
+               AND receipt_cancel.source_id=p.id::text))
         )
       ORDER BY p.purchased_at,p.id LIMIT $2 FOR UPDATE OF p SKIP LOCKED`,
     [environment, limit],
@@ -96,7 +110,6 @@ async function backfillPurchases(
   }
   return rows.rowCount ?? 0;
 }
-
 async function backfillWholesaleSales(
   client: PoolClient, environment: Environment, limit: number,
 ): Promise<number> {
@@ -184,7 +197,6 @@ async function backfillWholesaleSales(
   }
   return rows.rowCount ?? 0;
 }
-
 async function backfillRetailSales(
   client: PoolClient, environment: Environment, limit: number,
 ): Promise<number> {
@@ -256,7 +268,6 @@ async function backfillRetailSales(
   }
   return rows.rowCount ?? 0;
 }
-
 export async function runMatrizStage3LedgerBackfill(
   options: { environment?: Environment; limit?: number } = {},
   dbPool: Pool = defaultPool,

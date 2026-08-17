@@ -65,19 +65,21 @@ const PERIOD_START: Record<CaixaSalesPeriod, string> = {
 
 const paymentRevenueSql = `
   COALESCE(SUM(o.total_amount) FILTER (
-    WHERE o.status<>'cancelled' AND lower(COALESCE(o.payment_method,''))='pix'
+    WHERE o.status IN ('confirmed','paid','delivered')
+      AND lower(COALESCE(o.payment_method,''))='pix'
   ),0)::text AS pix_revenue,
   COALESCE(SUM(o.total_amount) FILTER (
-    WHERE o.status<>'cancelled' AND (
+    WHERE o.status IN ('confirmed','paid','delivered') AND (
       lower(COALESCE(o.payment_method,'')) LIKE '%cart%'
       OR lower(COALESCE(o.payment_method,'')) IN ('credito','crédito','debito','débito')
     )
   ),0)::text AS card_revenue,
   COALESCE(SUM(o.total_amount) FILTER (
-    WHERE o.status<>'cancelled' AND lower(COALESCE(o.payment_method,'')) LIKE '%dinheiro%'
+    WHERE o.status IN ('confirmed','paid','delivered')
+      AND lower(COALESCE(o.payment_method,'')) LIKE '%dinheiro%'
   ),0)::text AS cash_revenue,
   COALESCE(SUM(o.total_amount) FILTER (
-    WHERE o.status<>'cancelled'
+    WHERE o.status IN ('confirmed','paid','delivered')
       AND lower(COALESCE(o.payment_method,''))<>'pix'
       AND lower(COALESCE(o.payment_method,'')) NOT LIKE '%cart%'
       AND lower(COALESCE(o.payment_method,'')) NOT IN ('credito','crédito','debito','débito')
@@ -148,10 +150,10 @@ export async function getCaixaSales(
       cash_revenue: string;
       other_revenue: string;
     }>(
-      `SELECT COUNT(*) FILTER (WHERE o.status<>'cancelled')::int AS sales_count,
-              COALESCE(SUM(o.total_amount) FILTER (WHERE o.status<>'cancelled'),0)::text AS revenue,
-              COALESCE(AVG(o.total_amount) FILTER (WHERE o.status<>'cancelled'),0)::text AS average_ticket,
-              COALESCE(SUM(summary_items.items_quantity) FILTER (WHERE o.status<>'cancelled'),0)::text AS items_quantity,
+      `SELECT COUNT(*) FILTER (WHERE o.status IN ('confirmed','paid','delivered'))::int AS sales_count,
+              COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('confirmed','paid','delivered')),0)::text AS revenue,
+              COALESCE(AVG(o.total_amount) FILTER (WHERE o.status IN ('confirmed','paid','delivered')),0)::text AS average_ticket,
+              COALESCE(SUM(summary_items.items_quantity) FILTER (WHERE o.status IN ('confirmed','paid','delivered')),0)::text AS items_quantity,
               ${paymentRevenueSql}
          ${fromScope}
          LEFT JOIN LATERAL (
@@ -189,7 +191,9 @@ export async function getCaixaSales(
                ON p.id=oi.product_id AND p.environment=oi.environment
             WHERE oi.order_id=o.id AND oi.environment=o.environment
          ) items ON true
-        WHERE o.environment=$1 AND ${timeScope(period, '$3')}
+        WHERE o.environment=$1
+          AND o.status IN ('confirmed','paid','delivered','cancelled')
+          AND ${timeScope(period, '$3')}
           AND ($2::text IS NULL
            OR o.order_number ILIKE $2 ESCAPE '\\'
            OR COALESCE(ct.name,'') ILIKE $2 ESCAPE '\\'

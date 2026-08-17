@@ -1,7 +1,4 @@
-// Relatórios conciliados da tela Compras. Cada fatia carrega de forma independente:
-// uma falha em preços não apaga histórico, fornecedores, estoque ou financeiro.
-window.PAINEL_MODULES = window.PAINEL_MODULES || {};
-window.PAINEL_MODULES.comprasRelatorios = function () {
+window.PAINEL_MODULES = window.PAINEL_MODULES || {}; window.PAINEL_MODULES.comprasRelatorios = function () {
   return {
     async loadCompras() {
       this.ensureCredentials();
@@ -113,6 +110,11 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
       }
     },
     comprasOpenTab(tab) {
+      if (tab === 'nova' && this.adminUser?.role !== 'owner') {
+        this.comprasTab = 'visao';
+        this.compraMsg = { ok: false, text: 'Este perfil acompanha Compras somente para leitura.' };
+        return;
+      }
       this.comprasTab = tab;
       if (tab === 'historico') void this.loadComprasHistory();
       if (tab === 'fornecedores') void this.loadComprasSuppliers();
@@ -271,9 +273,7 @@ window.PAINEL_MODULES.comprasRelatorios = function () {
       this.comprasOpenTab('nova');
     },
     async comprasExportCsv() {
-      const rows = [];
-      let page = 1;
-      let pages = 1;
+      const rows = []; let page = 1; let pages = 1;
       do {
         const report = await this.apiGet('/admin/api/wholesale/purchases/report?'
           + this.comprasHistoryQuery({ page, pageSize: 100 }));

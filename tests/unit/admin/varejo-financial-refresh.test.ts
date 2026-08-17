@@ -21,6 +21,7 @@ describe('atualizacao financeira do varejo', () => {
   it('recarrega o Financeiro depois de cancelar uma venda', async () => {
     const module = varejoModule();
     const context = {
+      adminUser: { role: 'owner' },
       apiPost: vi.fn().mockResolvedValue({ cancelled: true }),
       loadRealData: vi.fn().mockResolvedValue(undefined),
       loadVendasData: vi.fn().mockResolvedValue(undefined),

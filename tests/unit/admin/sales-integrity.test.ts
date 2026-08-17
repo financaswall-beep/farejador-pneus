@@ -57,6 +57,34 @@ describe('integridade intermodular da aba Vendas', () => {
     expect(registerWholesaleSaleSchema.safeParse({
       ...base, payment_status: 'pending', due_date: '2026-08-17',
     }).success).toBe(true);
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    expect(registerWholesaleSaleSchema.safeParse({
+      ...base, sold_at: future,
+    }).error?.issues[0]?.message).toBe('sold_at_future');
+    expect(registerWholesaleSaleSchema.safeParse({
+      ...base, paid_at: future,
+    }).error?.issues[0]?.message).toBe('paid_at_future');
+  });
+
+  it('deixa mutações comerciais da Matriz somente para o proprietário', () => {
+    const pedidos = readFileSync(resolve('src/admin/painel/route-pedidos.ts'), 'utf8');
+    const atacado = readFileSync(resolve('src/admin/painel/route-atacado.ts'), 'utf8');
+    const fiado = readFileSync(resolve('src/admin/painel/route-fiado.ts'), 'utf8');
+    for (const path of [
+      '/admin/api/orders/register-manual', '/admin/api/orders/register-walkin',
+      '/admin/api/orders/:order_id/cancel', '/admin/api/orders/:order_id/retrieve',
+    ]) {
+      expect(pedidos).toContain(`post('${path}', { preHandler: requireAdminOwner }`);
+    }
+    expect(atacado).toContain(
+      "post('/admin/api/wholesale/sales', { preHandler: requireAdminOwner }",
+    );
+    expect(fiado).toContain(
+      "post('/admin/api/wholesale/sales/cancel', { preHandler: requireAdminOwner }",
+    );
+    expect(fiado).toContain(
+      "post('/admin/api/wholesale/finance/settle', { preHandler: requireAdminOwner }",
+    );
   });
 
   it('protege CSV contra fórmula e formata vencimento sem Invalid Date', () => {

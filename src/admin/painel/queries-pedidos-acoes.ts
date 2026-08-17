@@ -25,6 +25,7 @@ import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
 import {
   beginManualOrderIdempotency, recordManualOrderFingerprint,
 } from './manual-order-idempotency.js';
+import { assertRetailSaleMoney } from './sales-money.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -92,6 +93,7 @@ export async function registerManualOrder(
     && !input.payment_due_on) {
     throw new Error('payment_due_on_required');
   }
+  assertRetailSaleMoney(input.items);
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
   let orderId: string;
@@ -101,12 +103,6 @@ export async function registerManualOrder(
     if (idempotency.replayOrderId) {
       await client.query('COMMIT');
       return { order_id: idempotency.replayOrderId };
-    }
-    for (const item of input.items) {
-      const discount = item.discount_amount ?? 0;
-      if (discount > item.quantity * item.unit_price) {
-        throw new Error('discount_exceeds_line_total');
-      }
     }
     await assertCurrentCatalogPrices(client, environment, input.items);
     const contactId = await resolveContactId(client as unknown as Pool, environment, input.conversation_id, input.contact_id);

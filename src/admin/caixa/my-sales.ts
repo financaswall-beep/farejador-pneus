@@ -11,7 +11,7 @@ import {
 type Environment = 'prod' | 'test';
 
 const commissionSql = `CASE
-  WHEN o.status='cancelled' THEN 0
+  WHEN o.status NOT IN ('confirmed','paid','delivered') THEN 0
   WHEN cr.active AND cr.itemized
     THEN finance.matriz_retail_itemized_commission(o.environment,o.id,cr.item_rules)
   WHEN cr.active AND cr.kind='percent' AND cr.basis='margin'
@@ -88,7 +88,8 @@ export async function getCaixaMySales(
            CROSS JOIN bounds
            ${itemLateralSql}
            ${ruleLateralSql}
-          WHERE o.environment=$1 AND o.seller_collaborator_id=$2 AND o.status<>'cancelled'
+          WHERE o.environment=$1 AND o.seller_collaborator_id=$2
+            AND o.status IN ('confirmed','paid','delivered')
             AND o.created_at>=(week_start::timestamp AT TIME ZONE 'America/Sao_Paulo')
             AND o.created_at<((week_start+7)::timestamp AT TIME ZONE 'America/Sao_Paulo')
        )
@@ -120,6 +121,7 @@ export async function getCaixaMySales(
          LEFT JOIN finance.matriz_payroll_items pi
            ON pi.payroll_period_id=pp.id AND pi.collaborator_id=o.seller_collaborator_id
         WHERE o.environment=$1 AND o.seller_collaborator_id=$2
+          AND o.status IN ('confirmed','paid','delivered','cancelled')
           AND o.created_at>=(week_start::timestamp AT TIME ZONE 'America/Sao_Paulo')
           AND o.created_at<((week_start+7)::timestamp AT TIME ZONE 'America/Sao_Paulo')
         ORDER BY o.created_at DESC,o.id DESC LIMIT 40`,

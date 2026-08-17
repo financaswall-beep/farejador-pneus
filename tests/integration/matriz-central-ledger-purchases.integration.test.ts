@@ -183,6 +183,53 @@ describe('Etapa 3 — compras formais no livro central', () => {
     expect(Number(proof.rows[0].balance)).toBe(0);
   });
 
+  it('cancela compra que nasceu em transito e zera estoque, transito e obrigacao', async () => {
+    const f = await fixture();
+    const purchase = await registerPurchase({
+      environment: 'test', supplier_id: f.supplierId,
+      items: [{ measure: f.measure, quantity: 3, unit_cost: 12.34 }],
+      purchased_at: '2026-07-07T14:00:00Z', payment_status: 'pending',
+      due_date: '2026-08-10', receipt_status: 'pending',
+      created_by: 'owner:purchase-transit-cancel', idempotency_key: randomUUID(),
+    }, db.pool);
+    await confirmPurchase({ environment: 'test', purchase_id: purchase.purchase_id,
+      confirmed_by: 'owner:warehouse', idempotency_key: randomUUID() }, db.pool);
+    await cancelPurchase({ environment: 'test', purchase_id: purchase.purchase_id,
+      cancelled_by: 'owner:cancel', reason: 'Fornecedor recolheu a mercadoria',
+      idempotency_key: randomUUID() }, db.pool);
+
+    const balances = await db.pool.query<{ account_code: string; net: string }>(
+      `SELECT e.account_code,
+              sum(CASE WHEN e.side='debit' THEN e.amount ELSE -e.amount END)::text net
+         FROM finance.matriz_ledger_transactions t
+         JOIN finance.matriz_ledger_entries e ON e.transaction_id=t.id
+        WHERE t.environment='test' AND t.source_id=$1
+        GROUP BY e.account_code ORDER BY e.account_code`,
+      [purchase.purchase_id],
+    );
+    expect(balances.rows).toEqual([
+      { account_code: 'accounts_payable', net: '0.00' },
+      { account_code: 'inventory', net: '0.00' },
+      { account_code: 'inventory_in_transit', net: '0.00' },
+    ]);
+    const sources = await db.pool.query<{ source_type: string }>(
+      `SELECT source_type FROM finance.matriz_ledger_transactions
+        WHERE environment='test' AND source_id=$1 ORDER BY source_type`,
+      [purchase.purchase_id],
+    );
+    expect(sources.rows.map((row) => row.source_type)).toEqual([
+      'commerce.wholesale_purchase.accrual',
+      'commerce.wholesale_purchase.cancel',
+      'commerce.wholesale_purchase.receipt',
+      'commerce.wholesale_purchase.receipt_cancel',
+    ]);
+    const stock = await db.pool.query<{ quantity_on_hand: number }>(
+      `SELECT quantity_on_hand FROM commerce.wholesale_stock
+        WHERE environment='test' AND measure=$1`, [f.measure],
+    );
+    expect(stock.rows[0]?.quantity_on_hand).toBe(0);
+  });
+
   it('cancelamento ja pago preserva caixa e cria valor a recuperar', async () => {
     const f = await fixture();
     const purchase = await registerPurchase({

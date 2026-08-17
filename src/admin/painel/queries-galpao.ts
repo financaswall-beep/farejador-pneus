@@ -25,6 +25,8 @@ export interface WholesaleStockRow {
   quantity_reserved: number;
   quantity_available: number;
   unit_cost: number;
+  /** Unidades vendidas nos 30 dias corridos anteriores, calculadas no banco. */
+  sales_30d?: number;
   /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
   min_quantity: number | null;
   notes: string | null;
@@ -40,12 +42,24 @@ export async function listWholesaleStock(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleStockRow[]> {
   const r = await dbPool.query<WholesaleStockRow>(
-    `SELECT ws.measure, ws.brand, ws.tire_condition, ws.quantity_on_hand,
+    `WITH sales_30d AS (
+       SELECT environment,measure,brand,tire_condition,
+              COALESCE(sum(abs(qty_delta)),0)::int AS units
+         FROM commerce.wholesale_stock_movements
+        WHERE source IN ('venda_atacado','varejo') AND qty_delta<0
+          AND created_at>=now()-INTERVAL '30 days'
+        GROUP BY environment,measure,brand,tire_condition
+     )
+     SELECT ws.measure, ws.brand, ws.tire_condition, ws.quantity_on_hand,
             ws.quantity_reserved,
             (ws.quantity_on_hand-ws.quantity_reserved)::int AS quantity_available,
-            ws.unit_cost, ws.min_quantity, ws.notes,
+            ws.unit_cost, COALESCE(s.units,0)::int AS sales_30d,
+            ws.min_quantity, ws.notes,
             ws.updated_at, ws.tire_width_mm, ws.tire_aspect_ratio, ws.tire_rim_diameter
        FROM commerce.wholesale_stock ws
+       LEFT JOIN sales_30d s
+         ON s.environment=ws.environment AND s.measure=ws.measure
+        AND s.brand=ws.brand AND s.tire_condition=ws.tire_condition
       WHERE ws.environment = $1
       ORDER BY ws.measure, ws.brand, ws.tire_condition`,
     [environment],
@@ -133,14 +147,14 @@ export async function addWholesaleStockEntry(
        unit_cost = round(
          (commerce.wholesale_stock.quantity_on_hand * commerce.wholesale_stock.unit_cost
             + EXCLUDED.quantity_on_hand * EXCLUDED.unit_cost)
-         / NULLIF(commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand, 0), 2),
+         / NULLIF(commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand, 0), 6),
        quantity_on_hand  = commerce.wholesale_stock.quantity_on_hand + EXCLUDED.quantity_on_hand,
        tire_width_mm     = EXCLUDED.tire_width_mm,
        tire_aspect_ratio = EXCLUDED.tire_aspect_ratio,
        tire_rim_diameter = EXCLUDED.tire_rim_diameter
        RETURNING measure, brand, tire_condition, quantity_on_hand, quantity_reserved,
                  (quantity_on_hand-quantity_reserved)::int AS quantity_available, unit_cost,
-                 min_quantity, notes, updated_at,
+                 0::int AS sales_30d,min_quantity, notes, updated_at,
                  tire_width_mm, tire_aspect_ratio, tire_rim_diameter`,
     [environment, cat.measure, brand, tireCondition, input.quantity_in, input.unit_cost,
      cat.width, cat.aspect, cat.rim],
@@ -283,8 +297,3 @@ export async function getVarejoResumo(
   );
   return r.rows[0]!;
 }
-
-// ─── ATACADO — FORNECEDORES (0114): o lado de ENTRADA do galpão ───────────────
-// De quem o dono COMPRA o pneu usado. Cada COMPRA registra a origem E alimenta o
-// custo médio do galpão (addWholesaleStockEntry, mesma transação). Dado SÓ da matriz
-// (sem grant pro parceiro). Paga à vista hoje (payment_status default 'paid').

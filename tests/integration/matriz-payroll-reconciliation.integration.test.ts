@@ -466,7 +466,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       `INSERT INTO commerce.orders
          (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
           seller_collaborator_id,created_at)
-       VALUES ('test',$1,$2,200,'open','pickup',$3,'2026-06-10T15:00:00Z') RETURNING id`,
+       VALUES ('test',$1,$2,200,'confirmed','pickup',$3,'2026-06-10T15:00:00Z') RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id, collaboratorId],
     );
 

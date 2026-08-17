@@ -76,7 +76,7 @@ async function reversePurchaseStock(
       problems.push({ measure: item.measure, brand: item.brand,
         tire_condition: item.tire_condition, available: quantity,
         required: item.quantity, reason: 'quantity_consumed' });
-    } else if (Math.abs(cost - Number(item.applied_cost)) > 0.001) {
+    } else if (Math.abs(cost - Number(item.applied_cost)) > 0.000001) {
       problems.push({ measure: item.measure, brand: item.brand,
         tire_condition: item.tire_condition, available: quantity,
         required: item.quantity, reason: 'inventory_cost_changed' });

@@ -3,6 +3,7 @@
 // de topo (transformação mecânica; o gerador prova a reversa). Porta: ./route.js.
 import path from 'node:path';
 import { z } from 'zod';
+import { assertWholesaleSaleMoney } from './sales-money.js';
 
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
@@ -13,6 +14,10 @@ function saoPauloDate(instant: string): string {
   }).formatToParts(new Date(instant));
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function isNotFutureSaoPauloDate(instant: string): boolean {
+  return saoPauloDate(instant) <= saoPauloDate(new Date().toISOString());
 }
 
 export const resolveIntegrityOperationSchema = z.object({
@@ -99,6 +104,14 @@ export const wholesaleItemSchema = z.object({
   quantity: z.number().int().positive().max(100000),
   unit_price: z.number().min(0).max(9999999.99),
 });
+const wholesaleItemsSchema = z.array(wholesaleItemSchema).min(1, 'items_required').max(50, 'sale_items_limit')
+  .superRefine((items, ctx) => {
+    try {
+      assertWholesaleSaleMoney(items);
+    } catch (error) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+    }
+  });
 export const registerWholesaleSaleSchema = z
   .object({
     customer_id: z.string().uuid().nullable().optional(),
@@ -107,7 +120,7 @@ export const registerWholesaleSaleSchema = z
       .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional() })
       .nullable()
       .optional(),
-    items: z.array(wholesaleItemSchema).min(1).max(50),
+    items: wholesaleItemsSchema,
     sold_at: z.string().datetime({ offset: true }).nullable().optional(),
     paid_at: z.string().datetime({ offset: true }).nullable().optional(),
     notes: z.string().max(1000).nullable().optional(),
@@ -130,6 +143,14 @@ export const registerWholesaleSaleSchema = z
     { message: 'due_date_required', path: ['due_date'] },
   )
   .refine(
+    (d) => !d.sold_at || isNotFutureSaoPauloDate(d.sold_at),
+    { message: 'sold_at_future', path: ['sold_at'] },
+  )
+  .refine(
+    (d) => !d.paid_at || isNotFutureSaoPauloDate(d.paid_at),
+    { message: 'paid_at_future', path: ['paid_at'] },
+  )
+  .refine(
     (d) => !d.sold_at || !d.paid_at || new Date(d.paid_at).getTime() >= new Date(d.sold_at).getTime(),
     { message: 'paid_at_before_sale', path: ['paid_at'] },
   )
@@ -141,51 +162,7 @@ export const registerWholesaleSaleSchema = z
 
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
 
-// ATACADO — FORNECEDORES (0114): cadastro + compra (entrada com origem). Admin-only.
-export const registerSupplierSchema = z.object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(), document: z.string().max(30).nullable().optional(), notes: z.string().max(1000).nullable().optional() });
-export const purchaseItemSchema = z.object({
-  measure: z.string().min(1).max(60),
-  brand: z.string().trim().min(1, 'brand_required').max(60),
-  tire_condition: tireConditionSchema,
-  // 'quantidade_inteira' = código que o front traduz (o texto cru do zod vaza inglês).
-  quantity: z.number().int('quantidade_inteira').positive().max(100000),
-  unit_cost: z.number().min(0).max(9999999.99),
-});
-export const registerPurchaseSchema = z
-  .object({
-    supplier_id: z.string().uuid().nullable().optional(),
-    new_supplier: z
-      .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional(),
-        document: z.string().max(30).nullable().optional() })
-      .nullable()
-      .optional(),
-    items: z.array(purchaseItemSchema).min(1).max(50),
-    purchased_at: z.string().datetime({ offset: true }).nullable().optional(),
-    paid_at: z.string().datetime({ offset: true }).nullable().optional(),
-    notes: z.string().max(1000).nullable().optional(),
-    // FINANCEIRO (0115): 'pending' = compra fiada (a pagar ao fornecedor).
-    payment_status: z.enum(['paid', 'pending']).optional(),
-    due_date: z.string().date().nullable().optional(),
-    receipt_status: z.enum(['pending', 'received']).default('received'),
-    idempotency_key: idempotencyKeySchema,
-  })
-  .refine((d) => !!d.supplier_id || !!(d.new_supplier && d.new_supplier.name.trim()), {
-    message: 'supplier_required',
-  })
-  .refine((d) => d.payment_status !== 'pending' || Boolean(d.due_date), {
-    message: 'due_date_required',
-    path: ['due_date'],
-  });
-
-// Cancelar compra: sai sem apagar; motivo obrigatório fica na trilha.
-export const cancelWholesalePurchaseSchema = z.object({ purchase_id: z.string().uuid(), reason: z.string().trim().min(2).max(300), idempotency_key: idempotencyKeySchema });
-
-export const confirmWholesalePurchaseSchema = z.object({ purchase_id: z.string().uuid(), idempotency_key: idempotencyKeySchema });
-
-// ARQUIVAR fornecedor (soft delete): some do form/ranking; compras e dívida ficam.
-export const archiveWholesaleSupplierSchema = z.object({
-  supplier_id: z.string().uuid(),
-});
+export * from './route-schemas-purchases.js';
 
 // FINANCEIRO do atacado (0115): quitar um fiado — venda (a receber) ou compra (a pagar).
 export const settleWholesaleFinanceSchema = z.object({
@@ -196,7 +173,10 @@ export const settleWholesaleFinanceSchema = z.object({
   cash_account: z.string().trim().min(2).max(80).nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
-});
+}).refine(
+  (d) => !d.paid_at || isNotFutureSaoPauloDate(d.paid_at),
+  { message: 'paid_at_future', path: ['paid_at'] },
+);
 
 // DESPESAS da matriz (0120): lançar (à vista × a pagar), quitar e remover (soft).
 export const createMatrizExpenseSchema = z.object({
