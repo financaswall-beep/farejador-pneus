@@ -2,7 +2,7 @@
 
 **Data da revisão:** 17/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
-**Produção:** este documento não registra deploy nem aplicação de migration em produção.
+**Produção:** backup validado e migrations 0179–0181 aplicadas em 17/08/2026. As migrations 0177–0178 já estavam instaladas. Nenhum deploy foi iniciado por esta auditoria.
 
 ## Como ler o veredito
 
@@ -140,22 +140,22 @@ As guardas e o reparo de dados históricos estão na migration `0180_wholesale_p
 | Regressão completa com PostgreSQL | **231/231 aprovadas**, em 44 arquivos (230 na execução completa e a única expectativa antiga revalidada isoladamente após correção) |
 | Build/provas estáticas | Build e TypeScript aprovados; 232 rotas, 92 contratos e paridade das interfaces aprovados; fiscal de tamanho aprovado |
 | Navegador pós-deploy | Não executado; depende do deploy feito pelo responsável |
-| Produção somente leitura | Não executado nesta revisão |
+| Produção somente leitura | **PASS** no gate geral depois das migrations; ledger, estoque/financeiro, ingestão, normalização, isolamento e acesso sem divergências. A reconciliação matemática de Vendas encontrou 2 registros históricos de teste, de R$ 0,00, sem itens e sem ledger, descritos na seção 7 |
 
 ## 5. Condições obrigatórias antes da autorização
 
-1. Fazer backup restaurável do banco.
-2. Confirmar no banco-alvo quais migrations já foram aplicadas.
-3. Aplicar somente as migrations pendentes, na ordem do manifesto; para este escopo, observar 0177, 0178, 0179, 0180 e 0181.
-4. Executar o deploy do SHA publicado pelo responsável.
-5. Rodar smoke pós-deploy de Bot, Vendas, Compras, Estoque, Catálogo, Financeiro e Logística.
-6. Conferir reconciliação financeira e de estoque em modo somente leitura.
-7. Confirmar que o Coolify realmente importou o SHA esperado e não reutilizou imagem antiga.
+1. [x] Fazer backup restaurável do banco.
+2. [x] Confirmar no banco-alvo quais migrations já foram aplicadas.
+3. [x] Aplicar somente as migrations pendentes, na ordem do manifesto; 0177–0178 já estavam presentes e 0179–0181 foram aplicadas.
+4. [ ] Executar o deploy do SHA publicado pelo responsável.
+5. [ ] Rodar smoke pós-deploy de Bot, Vendas, Compras, Estoque, Catálogo, Financeiro e Logística.
+6. [ ] Repetir a reconciliação financeira, de estoque e matemática em modo somente leitura após o deploy.
+7. [ ] Confirmar que o Coolify realmente importou o SHA esperado e não reutilizou imagem antiga.
 
 ## 6. Decisão final
 
-**Decisão técnica atual:** **AUTORIZADO PARA MIGRATIONS E DEPLOY CONTROLADO; PRODUÇÃO AINDA NÃO HOMOLOGADA.**
-**Motivo:** o código das três seções passou pela regressão completa, mas a homologação final do ambiente exige migrations confirmadas no banco-alvo, deploy e smoke pós-deploy. O deploy pertence ao responsável e não foi executado por esta auditoria.
+**Decisão técnica atual:** **MIGRATIONS CONCLUÍDAS; AUTORIZADO PARA DEPLOY CONTROLADO; PRODUÇÃO AINDA NÃO HOMOLOGADA.**
+**Motivo:** o código das três seções passou pela regressão completa e as migrations foram aplicadas com backup e auditoria posterior. A homologação final ainda exige deploy, smoke pós-deploy e decisão explícita sobre 2 registros históricos de teste que não têm efeito financeiro ou de estoque, mas impedem o resultado zero absoluto da reconciliação matemática.
 
 Após cumprir as condições acima, registrar uma opção:
 
@@ -172,9 +172,23 @@ Após cumprir as condições acima, registrar uma opção:
 ### Estado entregue
 
 - As auditorias de Bot, Vendas e Compras estão encerradas em código e em banco descartável.
-- Nenhuma migration foi aplicada em produção e nenhum deploy foi iniciado por esta auditoria.
+- O backup pré-migration `farejador-prod-pre-0179-0181-20260817-104359.dump` foi validado com 2.484 entradas restauráveis, 4.791.576 bytes e SHA-256 `50893A7A93855BFEC4943373205F9F67B84806CE0A9C83ED9632DBD2F44C002C`.
+- As migrations 0177–0178 já estavam materialmente instaladas. As migrations 0179, 0180 e 0181 passaram em dry-run e foram aplicadas em transações individuais com `COMMIT`.
+- A auditoria geral somente leitura depois das migrations retornou `PASS`: 0 ledger desbalanceado, 0 falha de reconciliação financeira/estoque, 0 mistura de ambiente e 0 falha de ingestão/normalização.
+- Nenhum deploy foi iniciado por esta auditoria.
 - Arquivos locais de protótipos, scripts avulsos e documentos históricos não fazem parte do pacote de publicação.
-- A ordem oficial continua sendo: **backup → migrations pendentes → deploy → smoke → reconciliação somente leitura**.
+- A etapa atual da ordem oficial é: **deploy → smoke → reconciliação somente leitura → homologação**.
+
+### Exceção histórica revelada pela auditoria matemática
+
+O gate de Vendas retornou zero em quatro das cinco métricas. A métrica `retail_realized_without_items` retornou 2 por causa de dois registros de 01/08/2026 que já existiam antes das migrations:
+
+- ambos pertencem a contatos com identificação de teste;
+- ambos são entregas manuais de R$ 0,00, sem item, sem ledger e sem efeito em estoque, caixa, comissão ou contas;
+- estão ligados às rotas históricas `ROTA-0074` e `ROTA-0075`;
+- não foram alterados automaticamente, para preservar a trilha logística e evitar uma correção destrutiva sem autorização.
+
+Essa exceção não bloqueia o início do deploy controlado, pois não representa divergência monetária nem regressão criada pela entrega. Ela bloqueia a **homologação final com zero absoluto** até ser formalmente aceita ou corrigida por uma operação de reparo auditável.
 
 ### Pacote de banco
 
