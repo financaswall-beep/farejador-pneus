@@ -10,7 +10,7 @@ WITH (security_invoker = true)
 AS
 WITH conversation_metrics AS (
   SELECT
-    c.environment::text AS environment,
+    c.environment AS environment,
     c.id AS conversation_id,
     c.started_at,
     COALESCE(messages.total_messages, 0)::int AS total_messages,
