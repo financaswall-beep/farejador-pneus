@@ -17,7 +17,7 @@ describe('Redesign das quatro abas da Logistica da Matriz', () => {
 
   it('preserva menu externo, banner e navegacao existentes', () => {
     expect(screen).toContain('/admin/painel/assets/logistica-hero-v2.webp');
-    expect(html).toContain('/admin/painel/app.logistica.js?v=20260813-logistica-cards1');
+    expect(html).toContain('/admin/painel/app.logistica.js?v=20260817-sales-integrity1');
     expect(html).toContain('/admin/painel/app.logistica.resultado.js?v=20260813-logistica-cards1');
     expect(html).toContain('/admin/painel/app.montagem.js?v=20260813-logistica-hotfix1');
     expect(html).not.toContain('app.logistica.periodos.js');
