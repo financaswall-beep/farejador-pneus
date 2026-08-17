@@ -10,6 +10,7 @@ import {
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
+import { salesPeriodWhere, type SalesPeriod } from './queries-galpao.js';
 
 export interface WholesaleSaleRow {
   id: string;
@@ -43,6 +44,35 @@ export async function listWholesaleSales(
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
       WHERE o.environment=$1 ORDER BY o.sold_at DESC LIMIT $2`,
     [environment, limit],
+  );
+  return result.rows;
+}
+
+/** Histórico completo do atacado dentro de uma janela operacional curta.
+ *  Não usa o limite de 15 da lista de vendas recentes. */
+export async function listWholesaleSalesHistory(
+  period: SalesPeriod,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<WholesaleSaleRow[]> {
+  const periodWhere = salesPeriodWhere(period, 'o.sold_at');
+  const result = await dbPool.query<WholesaleSaleRow>(
+    `SELECT o.id,c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,o.total_amount,
+            o.payment_status,o.due_date,o.status,
+            (SELECT count(*) FROM commerce.wholesale_order_items i
+              WHERE i.order_id=o.id AND i.environment=o.environment)::int AS items_count,
+            COALESCE((SELECT json_agg(json_build_object(
+              'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'quantity',i.quantity,'unit_price',i.unit_price)
+              ORDER BY i.measure,i.brand,i.tire_condition)
+              FROM commerce.wholesale_order_items i
+             WHERE i.order_id=o.id AND i.environment=o.environment),'[]'::json) AS items
+       FROM commerce.wholesale_orders o
+       JOIN commerce.wholesale_customers c
+         ON c.id=o.buyer_id AND c.environment=o.environment
+      WHERE o.environment=$1 ${periodWhere}
+      ORDER BY o.sold_at DESC`,
+    [environment],
   );
   return result.rows;
 }

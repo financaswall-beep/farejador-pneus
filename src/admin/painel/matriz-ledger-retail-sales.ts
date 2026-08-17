@@ -18,6 +18,7 @@ interface RetailSaleLedgerState {
   cashRealized: boolean;
   stockDecremented: boolean;
   createdBy: string | null;
+  status: string;
 }
 
 async function getRetailSaleState(
@@ -29,7 +30,7 @@ async function getRetailSaleState(
     customer_id: string | null; total_amount: string; cogs_amount: string;
     occurred_at: string; cash_at: string; payment_method: string | null;
     payment_due_on: string | null;
-    fulfillment_mode: string; cash_realized: boolean;
+    fulfillment_mode: string; cash_realized: boolean; status: string;
     stock_decremented: boolean; created_by: string | null;
   }>(
     `SELECT COALESCE(o.customer_id,o.contact_id) customer_id,o.total_amount,
@@ -37,7 +38,7 @@ async function getRetailSaleState(
               FILTER (WHERE i.matriz_unit_cost IS NOT NULL),0)::numeric(14,2)::text cogs_amount,
             o.created_at occurred_at,
             COALESCE(o.delivered_at,o.closed_at,o.created_at) cash_at,
-            o.payment_method,o.payment_due_on,o.fulfillment_mode,o.closed_by created_by,
+            o.payment_method,o.payment_due_on,o.fulfillment_mode,o.closed_by created_by,o.status,
             (o.payment_method IS NOT NULL
               AND lower(btrim(o.payment_method))<>'a receber'
               AND (
@@ -71,7 +72,7 @@ async function getRetailSaleState(
     paymentMethod: row.payment_method, dueDate: row.payment_due_on,
     fulfillmentMode: row.fulfillment_mode,
     cashRealized: row.cash_realized, stockDecremented: row.stock_decremented,
-    createdBy: row.created_by,
+    createdBy: row.created_by, status: row.status,
   } : null;
 }
 
@@ -148,7 +149,9 @@ export async function postMatrizRetailSaleFacts(
 ): Promise<void> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return;
   const sale = await getRetailSaleState(client, environment, orderId);
-  if (!sale) return;
+  // Pedido ainda aberto/pendente não é faturamento confirmado. O fato nasce
+  // quando a retirada/entrega realmente muda o pedido para um estado realizado.
+  if (!sale || !['confirmed', 'paid', 'delivered'].includes(sale.status)) return;
   await ensureRetailRevenue(client, sale);
   await ensureRetailCogs(client, sale);
 }

@@ -5,6 +5,8 @@ export const orderItemSchema = z.object({
   quantity: z.number().int().positive(),
   unit_price: z.number().nonnegative(),
   discount_amount: z.number().nonnegative().optional(),
+}).refine((item) => (item.discount_amount ?? 0) <= item.quantity * item.unit_price, {
+  message: 'discount_exceeds_line_total', path: ['discount_amount'],
 });
 
 // S6 da auditoria 2026-05-21: pedido de entrega exige endereco.
@@ -16,7 +18,6 @@ export const deliveryAddressRefineOpts = {
 };
 
 export const registerManualOrderSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   contact_id: z.string().uuid().optional(),
   conversation_id: z.string().uuid(),
   draft_id: z.string().uuid().nullable().optional(),
@@ -35,7 +36,6 @@ export const registerManualOrderSchema = z.object({
   });
 
 export const registerWalkinOrderSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   customer_name: z.string().min(1).max(200).nullable().optional(),
   customer_phone: z.string().min(1).max(40).nullable().optional(),
   unit_id: z.string().uuid().nullable().optional(),

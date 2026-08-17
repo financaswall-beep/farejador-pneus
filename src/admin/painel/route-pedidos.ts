@@ -22,6 +22,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     try {
       const result = await registerManualOrder({
         ...parsed.data,
+        environment: env.FAREJADOR_ENV,
         actor_label: operatorLabel(request),
         seller_collaborator_id: getAdminContext(request).collaboratorId,
       });
@@ -42,6 +43,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     try {
       const result = await registerWalkinOrder({
         ...parsed.data,
+        environment: env.FAREJADOR_ENV,
         actor_label: operatorLabel(request),
         seller_collaborator_id: getAdminContext(request).collaboratorId,
       });

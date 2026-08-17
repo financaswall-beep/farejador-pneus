@@ -403,6 +403,18 @@ describe('venda walk-in atomica da Matriz', () => {
     expect(state.rows[0]).toEqual({ quantity: 3, decrements: 1 });
   });
 
+  it('recusa reaproveitar a chave walk-in com um payload diferente', async () => {
+    const fixture = await createProduct({ quantity: 3, cost: 40 });
+    const idempotencyKey = key('retry-conflito');
+    const input = saleInput(fixture.productId, idempotencyKey);
+    await registerWalkinOrder(input, db.pool);
+
+    await expect(registerWalkinOrder({
+      ...input, customer_name: 'Outro cliente na mesma chave',
+    }, db.pool)).rejects.toThrow('walkin_idempotency_conflict');
+    expect(await countOrders([idempotencyKey])).toBe(1);
+  });
+
   it('duplo clique concorrente gera um pedido e uma baixa', async () => {
     const fixture = await createProduct({ quantity: 1, cost: 40 });
     const idempotencyKey = key('duplo-clique');

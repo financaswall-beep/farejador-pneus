@@ -11,6 +11,7 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { buildMatrizStockIndex, matrizStockForMeasure } from '../../shared/matriz-stock-source.js';
+import { salesPeriodWhere, type SalesPeriod } from './queries-galpao.js';
 
 export type SourceTagChatwoot = 'chatwoot_com_bot' | 'chatwoot_sem_bot';
 export type SourceTagWalkin = 'walkin_balcao' | 'walkin_telefone' | 'walkin_outro';
@@ -95,6 +96,38 @@ export async function getPainelPedidos(limit?: number, dbPool: Pool = defaultPoo
      ORDER BY pr.created_at DESC
      LIMIT $2`,
     [env.FAREJADOR_ENV, clampLimit(limit)],
+  );
+  return result.rows;
+}
+
+/** Fonte completa do Histórico de Vendas para o período solicitado.
+ *  É separada do dashboard recente para não impor um limite silencioso à exportação. */
+export async function getPainelPedidosSalesHistory(
+  period: SalesPeriod,
+  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool,
+): Promise<unknown[]> {
+  const periodWhere = salesPeriodWhere(period, 'pr.created_at');
+  const result = await dbPool.query(
+    `SELECT pr.*, live.delivery_status AS matriz_delivery_status, live.retrieved_at,
+            EXISTS (SELECT 1 FROM audit.events a
+                     WHERE a.environment=live.environment AND a.entity_id=live.id
+                       AND a.event_type='matriz_galpao_reserved') AS has_stock_reservation,
+            COALESCE(amounts.items_amount,0) AS items_amount,
+            CASE WHEN pr.fulfillment_mode='delivery'
+                 THEN GREATEST(pr.total_amount-COALESCE(amounts.items_amount,0),0)
+                 ELSE 0 END AS freight_amount
+       FROM dashboard.pedidos_recentes pr
+       JOIN commerce.orders live
+         ON live.id=pr.order_id AND live.environment=pr.environment
+       LEFT JOIN LATERAL (
+         SELECT SUM(oi.quantity*oi.unit_price-oi.discount_amount) AS items_amount
+           FROM commerce.order_items oi
+          WHERE oi.environment=pr.environment AND oi.order_id=pr.order_id
+       ) amounts ON true
+      WHERE pr.environment=$1 AND pr.unit_slug='main' ${periodWhere}
+      ORDER BY pr.created_at DESC`,
+    [environment],
   );
   return result.rows;
 }

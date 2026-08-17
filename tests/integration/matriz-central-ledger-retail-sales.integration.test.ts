@@ -145,14 +145,18 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
        VALUES ('test',$1,1,$2,'open',now()) RETURNING id`,
       [800_000 + sequence, contact.rows[0]!.id],
     );
-    const sale = await registerManual({
+    const manualInput = {
       environment: 'test', contact_id: contact.rows[0]!.id,
       conversation_id: conversation.rows[0]!.id, unit_id: mainUnitId,
       items: [{ product_id: f.productId, quantity: 2, unit_price: 70 }],
       payment_method: 'pix', fulfillment_mode: 'pickup',
       actor_label: 'owner:manual', idempotency_key: `manual-ledger-${Date.now()}-${sequence}`,
       source_tag: 'chatwoot_sem_bot',
-    }, db.pool);
+    } as const;
+    const sale = await registerManual(manualInput, db.pool);
+    expect((await registerManual(manualInput, db.pool)).order_id).toBe(sale.order_id);
+    await expect(registerManual({ ...manualInput, payment_method: 'dinheiro' }, db.pool))
+      .rejects.toThrow('manual_order_idempotency_conflict');
 
     const proof = await db.pool.query(
       `SELECT

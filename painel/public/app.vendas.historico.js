@@ -167,7 +167,11 @@ window.PAINEL_MODULES.vendasHistorico = function () {
     },
 
     vendasHistoricoCsvCell(value) {
-      return `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const raw = String(value ?? '');
+      // Excel/LibreOffice executam células iniciadas por estes caracteres como
+      // fórmulas, mesmo dentro de aspas CSV. O apóstrofo força texto literal.
+      const safe = /^[\t\r ]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
     },
 
     vendasHistoricoExportar() {

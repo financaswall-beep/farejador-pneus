@@ -240,12 +240,13 @@ export async function registerWholesaleSale(
     const short: Array<{ measure: string; brand: string; tire_condition: TireCondition;
       available: number; requested: number }> = [];
     for (const [key, variant] of [...requested].sort(([a], [b]) => a.localeCompare(b))) {
-      const stock = await client.query<{ quantity_on_hand: number; unit_cost: string }>(
-        `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
+      const stock = await client.query<{ quantity_on_hand: number; quantity_reserved: number; unit_cost: string }>(
+        `SELECT quantity_on_hand,quantity_reserved,unit_cost FROM commerce.wholesale_stock
           WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4
           FOR UPDATE`,
         [environment, variant.measure, variant.brand, variant.tire_condition]);
-      const available = Number(stock.rows[0]?.quantity_on_hand ?? 0);
+      const available = Number(stock.rows[0]?.quantity_on_hand ?? 0)
+        - Number(stock.rows[0]?.quantity_reserved ?? 0);
       if (available < variant.quantity) short.push({
         measure: variant.measure, brand: variant.brand,
         tire_condition: variant.tire_condition,

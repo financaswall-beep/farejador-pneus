@@ -26,8 +26,8 @@ function salePool(sellerReady: boolean): { pool: Pool; query: ReturnType<typeof 
     }
     if (sql.includes('information_schema.columns')) return { rows: [{ ready: sellerReady }] };
     if (sql.includes('INSERT INTO commerce.wholesale_orders')) return { rows: [{ id: 'order-1' }] };
-    if (sql.includes('SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock')) {
-      return { rows: [{ quantity_on_hand: '10', unit_cost: '20' }] };
+    if (sql.includes('SELECT quantity_on_hand,quantity_reserved,unit_cost FROM commerce.wholesale_stock')) {
+      return { rows: [{ quantity_on_hand: '10', quantity_reserved: '0', unit_cost: '20' }] };
     }
     if (sql.includes('INSERT INTO commerce.wholesale_order_items')) return { rows: [] };
     if (sql.includes("set_config('app.galpao_source'")) return { rows: [] };

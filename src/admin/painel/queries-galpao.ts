@@ -170,16 +170,19 @@ export async function deleteWholesaleStock(
 // ─── ATACADO (Fase 3): resumo de custo + lucro ───────────────────────────────
 export type SalesPeriod = 'today' | '7d' | '30d' | 'mes' | 'tudo';
 
-function salesPeriodWhere(period: SalesPeriod): string {
+export function salesPeriodWhere(period: SalesPeriod, column = 'o.created_at'): string {
   if (period === 'tudo') return '';
   if (period === 'today') {
-    return `AND o.created_at >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')`;
+    return `AND ${column} >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
+            AND ${column} < ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') + INTERVAL '1 day') AT TIME ZONE 'America/Sao_Paulo')`;
   }
   if (period === '7d' || period === '30d') {
     const days = period === '7d' ? 6 : 29;
-    return `AND o.created_at >= ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '${days} days') AT TIME ZONE 'America/Sao_Paulo')`;
+    return `AND ${column} >= ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') - INTERVAL '${days} days') AT TIME ZONE 'America/Sao_Paulo')
+            AND ${column} < ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') + INTERVAL '1 day') AT TIME ZONE 'America/Sao_Paulo')`;
   }
-  return `AND o.created_at >= (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')`;
+  return `AND ${column} >= (date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
+          AND ${column} < ((date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo') + INTERVAL '1 month') AT TIME ZONE 'America/Sao_Paulo')`;
 }
 
 export interface WholesaleResumoRow {
@@ -198,7 +201,9 @@ export async function getWholesaleResumo(
   dbPool: Pool = defaultPool,
   period: SalesPeriod = 'tudo',
 ): Promise<WholesaleResumoRow> {
-  const periodWhere = salesPeriodWhere(period);
+  // A competência comercial do atacado é a data real da venda, não a data em
+  // que o registro foi digitado no painel.
+  const periodWhere = salesPeriodWhere(period, 'o.sold_at');
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
        COALESCE(SUM(oi.line_total) FILTER (WHERE o.status = 'confirmed'), 0)              AS faturamento,
@@ -245,17 +250,17 @@ export async function getVarejoResumo(
   const periodWhere = salesPeriodWhere(period);
   const r = await dbPool.query<VarejoResumoRow>(
     `SELECT
-       COALESCE(SUM(x.item_total) FILTER (WHERE x.status <> 'cancelled'),0) AS faturamento,
-       COALESCE(SUM(x.total_amount) FILTER (WHERE x.status <> 'cancelled'),0) AS faturamento_total,
+       COALESCE(SUM(x.item_total) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS faturamento,
+       COALESCE(SUM(x.total_amount) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS faturamento_total,
        COALESCE(SUM(GREATEST(x.total_amount-x.item_total,0))
-         FILTER (WHERE x.status <> 'cancelled' AND x.fulfillment_mode='delivery'),0) AS frete_total,
-       COALESCE(SUM(x.known_revenue) FILTER (WHERE x.status <> 'cancelled'),0) AS receita_custo_conhecido,
-       COALESCE(SUM(x.pending_revenue) FILTER (WHERE x.status <> 'cancelled'),0) AS receita_custo_pendente,
-       COALESCE(SUM(x.known_cost) FILTER (WHERE x.status <> 'cancelled'),0) AS custo_total,
-       COALESCE(SUM(x.known_revenue-x.known_cost) FILTER (WHERE x.status <> 'cancelled'),0) AS lucro_total,
-       COUNT(*) FILTER (WHERE x.status <> 'cancelled')::int AS vendas_count,
-       COALESCE(SUM(x.pending_items) FILTER (WHERE x.status <> 'cancelled'),0)::int AS itens_sem_custo,
-       COUNT(*) FILTER (WHERE x.status <> 'cancelled' AND x.pending_items>0)::int AS pedidos_custo_pendente,
+         FILTER (WHERE x.status IN ('confirmed','paid','delivered') AND x.fulfillment_mode='delivery'),0) AS frete_total,
+       COALESCE(SUM(x.known_revenue) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS receita_custo_conhecido,
+       COALESCE(SUM(x.pending_revenue) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS receita_custo_pendente,
+       COALESCE(SUM(x.known_cost) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS custo_total,
+       COALESCE(SUM(x.known_revenue-x.known_cost) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0) AS lucro_total,
+       COUNT(*) FILTER (WHERE x.status IN ('confirmed','paid','delivered'))::int AS vendas_count,
+       COALESCE(SUM(x.pending_items) FILTER (WHERE x.status IN ('confirmed','paid','delivered')),0)::int AS itens_sem_custo,
+       COUNT(*) FILTER (WHERE x.status IN ('confirmed','paid','delivered') AND x.pending_items>0)::int AS pedidos_custo_pendente,
        COUNT(*) FILTER (WHERE x.status = 'cancelled')::int AS cancelled_count,
        COUNT(*) FILTER (WHERE x.status IN ('open','pending'))::int AS pending_count
       FROM (

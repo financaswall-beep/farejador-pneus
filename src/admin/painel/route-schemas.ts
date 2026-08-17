@@ -7,6 +7,14 @@ import { z } from 'zod';
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
 
+function saoPauloDate(instant: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(instant));
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 export const resolveIntegrityOperationSchema = z.object({
   domain: z.enum([
     'wholesale_sale.create',
@@ -114,8 +122,21 @@ export const registerWholesaleSaleSchema = z
     { message: 'buyer_required' },
   )
   .refine(
+    (d) => [d.customer_id, d.partner_id, d.new_customer?.name?.trim()].filter(Boolean).length === 1,
+    { message: 'buyer_ambiguous' },
+  )
+  .refine(
     (d) => d.payment_status !== 'pending' || Boolean(d.due_date),
     { message: 'due_date_required', path: ['due_date'] },
+  )
+  .refine(
+    (d) => !d.sold_at || !d.paid_at || new Date(d.paid_at).getTime() >= new Date(d.sold_at).getTime(),
+    { message: 'paid_at_before_sale', path: ['paid_at'] },
+  )
+  .refine(
+    (d) => !d.sold_at || !d.due_date
+      || d.due_date >= saoPauloDate(d.sold_at),
+    { message: 'due_date_before_sale', path: ['due_date'] },
   );
 
 // ATACADO (Fase 2): estoque do galpão por MEDIDA (gestão + autocomplete). Admin-only.
