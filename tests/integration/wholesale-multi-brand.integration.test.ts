@@ -102,8 +102,8 @@ describe('estoque do galpão por medida, marca e condição', () => {
         ORDER BY brand`,
     );
     expect(before.rows).toEqual([
-      { brand: 'Metzeler', quantity_on_hand: 3, unit_cost: '120.00' },
-      { brand: 'Pirelli', quantity_on_hand: 2, unit_cost: '100.00' },
+      { brand: 'Metzeler', quantity_on_hand: 3, unit_cost: '120.000000' },
+      { brand: 'Pirelli', quantity_on_hand: 2, unit_cost: '100.000000' },
     ]);
 
     const prices = await priceReport({ period: 'all' }, 'test', db.pool) as Array<{
@@ -249,9 +249,9 @@ describe('estoque do galpão por medida, marca e condição', () => {
         ORDER BY tire_condition`,
     );
     expect(variants.rows).toEqual([
-      { tire_condition: 'meia_vida', quantity_on_hand: 2, unit_cost: '100.00' },
-      { tire_condition: 'novo', quantity_on_hand: 15, unit_cost: '106.67' },
-      { tire_condition: 'remold', quantity_on_hand: 4, unit_cost: '70.00' },
+      { tire_condition: 'meia_vida', quantity_on_hand: 2, unit_cost: '100.000000' },
+      { tire_condition: 'novo', quantity_on_hand: 15, unit_cost: '106.666667' },
+      { tire_condition: 'remold', quantity_on_hand: 4, unit_cost: '70.000000' },
     ]);
 
     const created = [];
@@ -392,7 +392,7 @@ describe('estoque do galpão por medida, marca e condição', () => {
       transferred_quantity: 2,
       source_quantity: 2,
       target_quantity: 17,
-      target_unit_cost: 102.36,
+      target_unit_cost: 102.352941,
     });
     expect(await transferCondition({
       measure: '90/90-18',
@@ -468,7 +468,7 @@ describe('estoque do galpão por medida, marca e condição', () => {
       id: inserted.rows[0]!.id,
       brand: 'Rinaldi',
       quantity_on_hand: 10,
-      unit_cost: '55.40',
+      unit_cost: '55.400000',
       min_quantity: 2,
       notes: 'entrada antiga sem marca',
     }]);

@@ -5,7 +5,6 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
   const variantKey = (measure, brand, condition) =>
     `${clean(measure)}\u0000${brandKey(brand)}\u0000${clean(condition)}`;
-
   return {
     stockVariantKey(rowOrMeasure, brand, condition) {
       return typeof rowOrMeasure === 'object' && rowOrMeasure
@@ -85,11 +84,13 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
         && brandKey(this.galpaoFilme.brand) === brandKey(row.brand)
         && clean(this.galpaoFilme.tire_condition) === clean(row.tire_condition);
     },
-
     repoKey(row) {
       return variantKey(row?.measure, row?.brand, row?.tire_condition);
     },
     repoGiro(row) {
+      if (row?.sales_30d != null) return Math.max(0, Number(row.sales_30d) || 0);
+      // Compatibilidade apenas com previews antigos. A aplicacao real sempre
+      // recebe sales_30d calculado no banco, sem depender dos ultimos 50 movimentos.
       const sources = new Set(['venda_atacado', 'varejo']);
       const key = this.repoKey(row);
       return (this.galpaoFilme.rows || []).reduce((total, movement) => {
@@ -179,6 +180,10 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
         .sort((a, b) => Number(a.avg_cost) - Number(b.avg_cost))[0] || null;
     },
     repoAbrirCompra(rows) {
+      if (this.adminUser?.role !== 'owner') {
+        this.stockMsg = { ok: false, text: 'Somente o proprietário pode abrir uma compra.' };
+        return;
+      }
       const items = (rows || [])
         .filter((row) => row?.measure && row?.brand
           && Number(row.suggested_quantity || this.repoQuantidade(row)) > 0)

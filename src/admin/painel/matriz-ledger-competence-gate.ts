@@ -78,6 +78,7 @@ export async function getMatrizLedgerCompetenceGate(
            JOIN core.units u ON u.environment=o.environment AND u.id=o.unit_id
             AND u.slug='main'
           WHERE o.environment=$1 AND o.partner_order_id IS NULL
+            AND o.status IN ('confirmed','paid','delivered','cancelled')
             AND o.created_at>=m.month_ts AND o.created_at<m.month_end_ts),0)
          -COALESCE((SELECT sum(o.total_amount) FROM commerce.orders o
            JOIN core.units u ON u.environment=o.environment AND u.id=o.unit_id

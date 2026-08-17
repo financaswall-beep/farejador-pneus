@@ -59,7 +59,8 @@ const metricsSql = `WITH retail_orders AS (
   SELECT DISTINCT ON (l.identity_id,o.id) l.identity_id,o.id order_id,o.total_amount amount,o.created_at occurred_at,
          COALESCE(x.profit,0) profit,COALESCE(x.pending,0)::int pending
     FROM commerce.customer_identity_links l
-    JOIN commerce.orders o ON o.environment=l.environment AND o.status<>'cancelled'
+    JOIN commerce.orders o ON o.environment=l.environment
+     AND o.status IN ('confirmed','paid','delivered')
      AND ((l.source_type='chatwoot_contact' AND o.contact_id=l.source_id)
        OR (l.source_type='walkin_customer' AND o.customer_id=l.source_id))
     LEFT JOIN LATERAL (

@@ -89,13 +89,17 @@ export async function prepareMatrizWalkinStock(
 
   const lines: MatrizWalkinStockPlan['lines'] = [];
   if (requestedByKey.size === 0) return { lines, costByProduct };
+  const requestedMeasureKeys = [...new Set(
+    [...requestedByKey.values()].map((variant) => variant.key),
+  )];
   const stock = await client.query<StockRow>(
     `SELECT measure, brand, tire_condition, quantity_on_hand, quantity_reserved, unit_cost
-       FROM commerce.wholesale_stock
+      FROM commerce.wholesale_stock
       WHERE environment = $1
-      ORDER BY measure
+        AND commerce.wholesale_measure_key(measure) = ANY($2::text[])
+      ORDER BY measure, brand, tire_condition
       FOR UPDATE`,
-    [environment],
+    [environment, requestedMeasureKeys],
   );
   const stockIndex = buildMatrizStockIndex(stock.rows);
   for (const [variantKey, variant] of requestedByKey) {

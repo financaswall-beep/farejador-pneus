@@ -42,7 +42,7 @@ export async function getCaixaWeeklySeries(
              FROM commerce.order_items oi
             WHERE oi.order_id=o.id AND oi.environment=o.environment
          ) items ON true
-        WHERE o.environment=$1 AND o.status<>'cancelled'
+        WHERE o.environment=$1 AND o.status IN ('confirmed','paid','delivered')
           AND o.created_at>=(bounds.week_start::timestamp AT TIME ZONE 'America/Sao_Paulo')
           AND o.created_at<((bounds.week_start + 7)::timestamp AT TIME ZONE 'America/Sao_Paulo')
      )

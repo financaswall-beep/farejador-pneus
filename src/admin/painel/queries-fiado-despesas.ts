@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import { hasMatrizPayrollSchema } from './payroll-schema.js';
+import { moneyCents } from './stage5-integrity.js';
 
 export interface WholesaleFinanceOpenRow {
   id: string;
@@ -45,7 +46,8 @@ export async function getWholesaleFinance(
       WHERE p.environment=$1 AND p.status<>'cancelled' AND p.payment_status='pending'
       ORDER BY (p.due_date IS NULL),p.due_date,p.purchased_at`, [environment]);
   const sum = (rows: WholesaleFinanceOpenRow[]) =>
-    rows.reduce((total, row) => total + Number(row.total_amount), 0).toFixed(2);
+    (rows.reduce((total, row) => total + moneyCents(Number(row.total_amount)), 0) / 100)
+      .toFixed(2);
   return {
     a_receber_total: sum(receivables.rows), a_receber_count: receivables.rows.length,
     a_receber_vencidos: receivables.rows.filter((row) => row.overdue).length,

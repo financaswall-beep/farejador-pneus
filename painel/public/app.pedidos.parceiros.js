@@ -13,6 +13,9 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       walkin_idempotency_conflict: 'Os dados dessa venda mudaram durante o envio. Feche, abra novamente e confira antes de finalizar.',
       catalog_price_missing: 'Esse pneu está sem preço oficial. Defina o valor no Catálogo antes de vender.',
       catalog_price_changed: 'O preço mudou no Catálogo. A lista foi atualizada; confira o novo valor antes de confirmar.',
+      unit_price_cent_precision: 'O preço precisa ter no máximo duas casas decimais.',
+      sale_line_total_too_large: 'O total de um item ultrapassa o limite aceito.',
+      sale_total_too_large: 'O total da venda ultrapassa o limite aceito.',
     };
     const known = Object.keys(messages).find((key) => code.includes(key));
     return known ? messages[known] : 'Não consegui registrar a venda. Confira os dados e tente novamente.';
@@ -21,6 +24,10 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
   return {
     async submitManualOrder() {
       if (this.orderSubmitting) return;
+      if (this.adminUser?.role !== 'owner') {
+        this.orderError = 'Somente o proprietário pode registrar vendas pelo painel administrativo.';
+        return;
+      }
       if (!this.saleForm.product_id) {
         this.orderError = 'Escolha um produto do catalogo.';
         return;

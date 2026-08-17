@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { archiveWholesaleSupplier, cancelWholesalePurchase, confirmWholesalePurchase, getWholesalePriceReport, getWholesalePurchaseReport, getWholesaleSupplierInsights, getWholesaleSupplierMeasureBreakdown, getWholesaleSupplierRanking, listWholesalePurchases, listWholesaleSuppliers, registerWholesalePurchase, registerWholesaleSupplier } from './queries.js';
@@ -31,7 +31,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
   });
 
   // Cadastra um fornecedor (nome + telefone).
-  fastify.post('/admin/api/wholesale/suppliers', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/suppliers', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerSupplierSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -95,7 +95,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
   });
 
   // Registra compra: recebida alimenta o galpão na transação; pendente não toca estoque.
-  fastify.post('/admin/api/wholesale/purchases', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/purchases', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerPurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -111,7 +111,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
   });
 
   // Confirma recebimento pendente; a entrada no galpao acontece uma unica vez.
-  fastify.post('/admin/api/wholesale/purchases/confirm', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/purchases/confirm', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = confirmWholesalePurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -134,7 +134,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
 
   // Cancela com trilha. Recebida só reverte se saldo e custo ainda coincidirem
   // exatamente com o movimento original; pendente não toca estoque.
-  fastify.post('/admin/api/wholesale/purchases/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/purchases/cancel', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = cancelWholesalePurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -162,7 +162,7 @@ export async function registerPainelFornecedores(fastify: FastifyInstance): Prom
   });
 
   // ARQUIVA um fornecedor (soft delete): some do form/ranking; compras e dívida ficam.
-  fastify.post('/admin/api/wholesale/suppliers/archive', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/suppliers/archive', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = archiveWholesaleSupplierSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });

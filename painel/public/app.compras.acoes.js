@@ -25,6 +25,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       };
     },
     compraOpenAction(purchase, kind) {
+      if (this.adminUser?.role !== 'owner') return;
       let reason = '';
       if (kind === 'cancel') {
         const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-cancel', purchase.id);
@@ -41,6 +42,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       this.compraOpenAction(purchase, 'cancel');
     },
     fornecedorOpenCreate() {
+      if (this.adminUser?.role !== 'owner') return;
       this.fornecedorForm = { name: '', phone: '', document: '', notes: '' };
       this.compraDialog = {
         open: true, kind: 'supplier-create', purchase: null, supplier: null, reason: '', error: '',
@@ -48,6 +50,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       this.$nextTick(() => this.$refs.fornecedorDialogName?.focus());
     },
     fornecedorOpenArchive(supplier) {
+      if (this.adminUser?.role !== 'owner') return;
       this.compraDialog = {
         open: true, kind: 'supplier-archive', purchase: null, supplier, reason: '', error: '',
       };
@@ -102,6 +105,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       return labels[this.compraDialog.kind] || 'Confirmar';
     },
     async confirmarCompraDialog() {
+      if (this.adminUser?.role !== 'owner') return;
       const kind = this.compraDialog.kind;
       this.compraDialog.error = '';
       if (kind === 'review-create') {
@@ -116,16 +120,19 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       if (kind === 'supplier-archive') return this.fornecedorArchive();
     },
     async compraExecuteConfirm() {
+      if (this.adminUser?.role !== 'owner') return;
       const purchase = this.compraDialog.purchase;
       const operation = window.PAINEL_INTEGRITY.operation('wholesale-purchase-confirm', purchase.id);
       this.compraActionSaving = true;
       try {
-        await this.apiPost('/admin/api/wholesale/purchases/confirm', {
+        const result = await this.apiPost('/admin/api/wholesale/purchases/confirm', {
           purchase_id: purchase.id, idempotency_key: operation.key,
         });
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-confirm', purchase.id);
         this.compraCloseDialog(true);
-        this.compraMsg = { ok: true, text: 'Recebimento confirmado. Galpão, custo médio e filme foram atualizados.' };
+        const catalogoTxt = result.catalog_blockers?.length
+          ? ` ${result.catalog_blockers.length} variante(s) ainda precisam de produto ou preço no Catálogo antes da venda.` : '';
+        this.compraMsg = { ok: true, text: `Recebimento confirmado. Galpão, custo médio e filme foram atualizados.${catalogoTxt}` };
         await Promise.allSettled([this.loadCompras(), this.loadFinanceiro(), this.loadSino()]);
       } catch (err) {
         this.compraDialog.error = `Não consegui confirmar o recebimento (${err.message}).`;
@@ -134,6 +141,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     async compraExecuteCancel() {
+      if (this.adminUser?.role !== 'owner') return;
       const purchase = this.compraDialog.purchase;
       const reason = this.compraDialog.reason.trim();
       if (reason.length < 2) {
@@ -164,6 +172,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     async fornecedorCreate() {
+      if (this.adminUser?.role !== 'owner') return;
       if (!this.fornecedorForm.name.trim()) {
         this.compraDialog.error = 'Informe o nome do fornecedor.';
         return;
@@ -189,6 +198,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     async fornecedorArchive() {
+      if (this.adminUser?.role !== 'owner') return;
       const supplier = this.compraDialog.supplier;
       this.compraActionSaving = true;
       try {
@@ -206,6 +216,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     async atacadoCancelSale(v) {
+      if (this.adminUser?.role !== 'owner') return;
       const pago = v.payment_status === 'paid';
       const aviso = pago ? '\n\n⚠️ A venda consta como paga; o Financeiro criará uma devolução ao cliente em aberto.'
         : '\n\nEla sai do ranking, do resumo e do a receber.';
@@ -243,6 +254,7 @@ window.PAINEL_MODULES.comprasAcoes = function () {
       }
     },
     async financeSettle(kind, row) {
+      if (this.adminUser?.role !== 'owner') return;
       const label = kind === 'sale' ? `receber de ${row.counterparty}` : `pagar para ${row.counterparty}`;
       if (!window.confirm(`Quitar ${this.formatCurrency(Number(row.total_amount))} (${label})?`)) return;
       const scope = `wholesale-${kind}-payment`;

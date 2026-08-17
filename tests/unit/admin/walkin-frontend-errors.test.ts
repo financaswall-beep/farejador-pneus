@@ -14,6 +14,7 @@ function pedidosModule() {
 async function submitWalkinWithError(code: string) {
   const module = pedidosModule();
   const context = {
+    adminUser: { role: 'owner' },
     orderSubmitting: false,
     orderError: null as string | null,
     modalConv: null,
@@ -60,6 +61,7 @@ describe('mensagens da venda de balcão da matriz', () => {
   it('atualiza o Financeiro depois de registrar a venda', async () => {
     const module = pedidosModule();
     const context = {
+      adminUser: { role: 'owner' },
       orderSubmitting: false,
       orderError: null as string | null,
       modalConv: null,

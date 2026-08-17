@@ -257,7 +257,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
     const stock = await db.pool.query(
       `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
         WHERE environment='test' AND measure=$1`, [f.measure]);
-    expect(stock.rows[0]).toEqual({ quantity_on_hand: 2, unit_cost: '12.34' });
+    expect(stock.rows[0]).toEqual({ quantity_on_hand: 2, unit_cost: '12.340000' });
   });
 
   it('mantem compra em transito no dinheiro sem coloca-la no estoque', async () => {
@@ -266,7 +266,8 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
     const beforeNotifications = await getNotifications('test', db.pool);
     const pending = await registerPurchase({ environment: 'test', supplier_id: f.supplierId,
       created_by: 'etapa5-dinheiro-pendente', receipt_status: 'pending',
-      payment_status: 'pending', due_date: '2020-01-01', idempotency_key: randomUUID(),
+      purchased_at: '2019-12-01T12:00:00-03:00', payment_status: 'pending',
+      due_date: '2020-01-01', idempotency_key: randomUUID(),
       items: [{ measure: f.measure, quantity: 2, unit_cost: 12.34 }] }, db.pool);
 
     const finance = await getFinance('test', db.pool);
@@ -322,7 +323,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
     expect((await db.pool.query(
       `SELECT quantity_on_hand,unit_cost FROM commerce.wholesale_stock
         WHERE environment='test' AND measure=$1`, [exact.measure])).rows[0])
-      .toEqual({ quantity_on_hand: 5, unit_cost: '10.00' });
+      .toEqual({ quantity_on_hand: 5, unit_cost: '10.000000' });
 
     const consumed = await fixture({ quantity: 2, cost: 10 });
     const unsafe = await registerPurchase({ environment: 'test', supplier_id: consumed.supplierId,
@@ -339,7 +340,7 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
          FROM commerce.wholesale_purchases p
          JOIN commerce.wholesale_stock s ON s.environment=p.environment AND s.measure=$2
         WHERE p.id=$1`, [unsafe.purchase_id, consumed.measure]);
-    expect(unchanged.rows[0]).toEqual({ status: 'confirmed', quantity_on_hand: 4, unit_cost: '16.00' });
+    expect(unchanged.rows[0]).toEqual({ status: 'confirmed', quantity_on_hand: 4, unit_cost: '16.000000' });
   });
 
   it('não aplica estoque ao cancelar pendência', async () => {

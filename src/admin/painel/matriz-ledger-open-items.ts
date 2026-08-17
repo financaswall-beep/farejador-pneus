@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { moneyCents } from './stage5-integrity.js';
 
 export type FinanceiroSettlementMode =
   | 'wholesale_sale' | 'retail_sale' | 'commission' | 'monthly_fee'
@@ -67,12 +68,17 @@ const RECEIVABLE_ACCOUNTS = new Set([
 ]);
 
 function moneyTotal(items: Array<{ valor: string }>): string {
-  return items.reduce((sum, item) => sum + Number(item.valor), 0).toFixed(2);
+  const cents = items.reduce((sum, item) => sum + moneyCents(Number(item.valor)), 0);
+  return (cents / 100).toFixed(2);
+}
+
+function money(value: string | number): string {
+  return (moneyCents(Number(value)) / 100).toFixed(2);
 }
 
 function receivable(row: OpenRow): FinanceiroReceivableItem {
   const base = {
-    id: row.source_id, valor: Number(row.balance).toFixed(2),
+    id: row.source_id, valor: money(row.balance),
     due_date: row.due_date, overdue: row.overdue,
     obligation_id: row.obligation_id, account_code: row.account_code,
   };
@@ -100,7 +106,7 @@ function receivable(row: OpenRow): FinanceiroReceivableItem {
 
 function payable(row: OpenRow): FinanceiroPayableItem {
   const base = {
-    id: row.source_id, valor: Number(row.balance).toFixed(2),
+    id: row.source_id, valor: money(row.balance),
     due_date: row.due_date, overdue: row.overdue,
     obligation_id: row.obligation_id, account_code: row.account_code,
   };
@@ -130,7 +136,7 @@ function sortAgenda<T extends { overdue: boolean; due_date: string | null; valor
   items.sort((a, b) => Number(b.overdue) - Number(a.overdue)
     || Number(Boolean(a.due_date)) - Number(Boolean(b.due_date))
     || String(a.due_date ?? '').localeCompare(String(b.due_date ?? ''))
-    || Number(b.valor) - Number(a.valor));
+    || moneyCents(Number(b.valor)) - moneyCents(Number(a.valor)));
 }
 
 export async function getMatrizLedgerOpenItems(
@@ -193,11 +199,12 @@ export async function getMatrizLedgerOpenItems(
       const id = row.partner_id ?? row.source_id;
       const current = commissions.get(id);
       if (current) {
-        current.valor = (Number(current.valor) + Number(row.balance)).toFixed(2);
+        current.valor = ((moneyCents(Number(current.valor))
+          + moneyCents(Number(row.balance))) / 100).toFixed(2);
         current.count = (current.count ?? 0) + 1;
       } else commissions.set(id, {
         tipo: 'comissao', id, nome: row.partner_name ?? row.description,
-        valor: Number(row.balance).toFixed(2), due_date: null, overdue: false,
+        valor: money(row.balance), due_date: null, overdue: false,
         phone: row.partner_phone, count: 1, settlement_mode: 'commission',
       });
     } else if (RECEIVABLE_ACCOUNTS.has(row.account_code)) recebiveis.push(receivable(row));
@@ -213,7 +220,7 @@ export async function getMatrizLedgerOpenItems(
   );
   if (Number(marketing.rows[0]!.balance) > 0) pagaveis.push({
     tipo: 'marketing', id: 'marketing_payable', nome: 'Marketing · Meta Ads',
-    categoria: 'marketing', valor: Number(marketing.rows[0]!.balance).toFixed(2),
+    categoria: 'marketing', valor: money(marketing.rows[0]!.balance),
     due_date: null, overdue: false, account_code: 'marketing_payable',
     settlement_mode: 'central_account',
   });

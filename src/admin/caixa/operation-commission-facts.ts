@@ -14,12 +14,12 @@ export const matrizCommissionFactsSql = `WITH retail AS (
        WHERE oi.environment=o.environment AND oi.order_id=o.id
     ) items ON true
    WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
-     AND o.status<>'cancelled'
+     AND o.status IN ('confirmed','paid','delivered')
      AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
      AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), wholesale AS (
   SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
-         'Atacado #'||right(o.id::text,6) reference,o.created_at occurred_at,
+         'Atacado #'||right(o.id::text,6) reference,o.sold_at occurred_at,
          NULL::text payment_method,o.total_amount gross_amount,
          COALESCE(items.margin,0) margin,COALESCE(items.items_without_cost,0) items_without_cost,
          'sale'::text event_type,'wholesale'::text sale_channel,o.id source_id
@@ -32,8 +32,8 @@ export const matrizCommissionFactsSql = `WITH retail AS (
     ) items ON true
    WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
      AND o.status='confirmed'
-     AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
-     AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
+     AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
+     AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), delivery_events AS (
   SELECT t.courier_collaborator_id collaborator_id,o.id::text id,
          'Entrega #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,

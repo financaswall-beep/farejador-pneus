@@ -115,20 +115,20 @@ export async function getLegacyMatrizFinancialTruth(
         WHERE p.environment=$1 GROUP BY p.id
      )
      SELECT
-       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) retail_header,
-       COALESCE((SELECT SUM(item_total) FROM retail,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) retail_items,
-       COALESCE((SELECT SUM(known_revenue) FROM retail,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) retail_known,
-       COALESCE((SELECT SUM(pending_revenue) FROM retail,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) retail_pending,
-       COALESCE((SELECT SUM(known_cost) FROM retail,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) retail_cost,
+       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered') AND created_at>=month_start AND created_at<month_end),0) retail_header,
+       COALESCE((SELECT SUM(item_total) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered') AND created_at>=month_start AND created_at<month_end),0) retail_items,
+       COALESCE((SELECT SUM(known_revenue) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered') AND created_at>=month_start AND created_at<month_end),0) retail_known,
+       COALESCE((SELECT SUM(pending_revenue) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered') AND created_at>=month_start AND created_at<month_end),0) retail_pending,
+       COALESCE((SELECT SUM(known_cost) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered') AND created_at>=month_start AND created_at<month_end),0) retail_cost,
        COALESCE((SELECT SUM(GREATEST(total_amount-item_total,0)) FROM retail,bounds
-                  WHERE status<>'cancelled' AND fulfillment_mode='delivery'
+                  WHERE status IN ('confirmed','paid','delivered') AND fulfillment_mode='delivery'
                     AND created_at>=month_start AND created_at<month_end),0) retail_freight,
-       COALESCE((SELECT SUM(pending_revenue) FROM retail WHERE status<>'cancelled'),0) pending_all,
-       COALESCE((SELECT SUM(pending_items) FROM retail WHERE status<>'cancelled'),0)::int pending_items,
-       (SELECT COUNT(*) FROM retail WHERE status<>'cancelled' AND pending_items>0)::int pending_orders,
-       COALESCE((SELECT SUM(total_amount) FROM wholesale,bounds WHERE status='confirmed' AND created_at>=month_start AND created_at<month_end),0) wholesale_header,
-       COALESCE((SELECT SUM(item_total) FROM wholesale,bounds WHERE status='confirmed' AND created_at>=month_start AND created_at<month_end),0) wholesale_items,
-       COALESCE((SELECT SUM(known_cost) FROM wholesale,bounds WHERE status='confirmed' AND created_at>=month_start AND created_at<month_end),0) wholesale_cost,
+       COALESCE((SELECT SUM(pending_revenue) FROM retail WHERE status IN ('confirmed','paid','delivered')),0) pending_all,
+       COALESCE((SELECT SUM(pending_items) FROM retail WHERE status IN ('confirmed','paid','delivered')),0)::int pending_items,
+       (SELECT COUNT(*) FROM retail WHERE status IN ('confirmed','paid','delivered') AND pending_items>0)::int pending_orders,
+       COALESCE((SELECT SUM(total_amount) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_header,
+       COALESCE((SELECT SUM(item_total) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_items,
+       COALESCE((SELECT SUM(known_cost) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_cost,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries,bounds
                   WHERE environment=$1 AND realized_at>=month_start
                     AND realized_at<month_end),0) commission_revenue,
@@ -147,7 +147,7 @@ export async function getLegacyMatrizFinancialTruth(
                     AND occurred_at>=month_start AND occurred_at<month_end),0) inventory_loss,
        COALESCE((SELECT SUM(total_amount) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) purchases_header,
        COALESCE((SELECT SUM(item_total) FROM purchases,bounds WHERE status<>'cancelled' AND created_at>=month_start AND created_at<month_end),0) purchases_items,
-       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status<>'cancelled'
+       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered')
                   AND payment_method IS NOT NULL AND lower(trim(payment_method))<>'a receber'
                   AND ((fulfillment_mode='delivery' AND delivery_status='delivered'
                         AND COALESCE(delivered_at,closed_at,created_at)>=month_start
@@ -171,12 +171,12 @@ export async function getLegacyMatrizFinancialTruth(
                   AND deleted_at IS NULL AND payment_status='paid'
                   AND COALESCE(paid_at,occurred_at)>=month_start
                   AND COALESCE(paid_at,occurred_at)<month_end),0) cash_expenses,
-       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status<>'cancelled'
+       COALESCE((SELECT SUM(total_amount) FROM retail,bounds WHERE status IN ('confirmed','paid','delivered')
                   AND created_at>=month_start AND created_at<month_end
                   AND lower(trim(COALESCE(payment_method,'')))<>'a receber'
                   AND NOT (payment_method IS NOT NULL AND ((fulfillment_mode='delivery' AND delivery_status='delivered')
                     OR (fulfillment_mode<>'delivery' AND status IN ('confirmed','paid','delivered'))))),0) retail_payment_pending,
-       COALESCE((SELECT SUM(total_amount) FROM retail WHERE status<>'cancelled' AND lower(trim(COALESCE(payment_method,'')))='a receber'),0) receivable_retail,
+       COALESCE((SELECT SUM(total_amount) FROM retail WHERE status IN ('confirmed','paid','delivered') AND lower(trim(COALESCE(payment_method,'')))='a receber'),0) receivable_retail,
        COALESCE((SELECT SUM(total_amount) FROM wholesale WHERE status='confirmed' AND payment_status='pending'),0) receivable_wholesale,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries WHERE environment=$1 AND status='open'),0) receivable_commission,
        COALESCE((SELECT SUM(total_amount) FROM purchases WHERE status<>'cancelled' AND payment_status='pending'),0) payable_purchases,

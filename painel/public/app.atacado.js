@@ -139,9 +139,12 @@ window.PAINEL_MODULES.atacado = function () { return {
       if (this.atacadoForm.items.length > 1) this.atacadoForm.items.splice(i, 1);
     },
     atacadoFormTotal() {
-      return this.atacadoForm.items.reduce(
-        (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0,
-      );
+      const cents = this.atacadoForm.items.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const unitCents = Math.round((Number(item.unit_price) || 0) * 100);
+        return sum + quantity * unitCents;
+      }, 0);
+      return cents / 100;
     },
     atacadoResumoKpis() {
       const vendas = Number(this.atacadoResumo?.vendas_count || 0);
@@ -218,9 +221,17 @@ window.PAINEL_MODULES.atacado = function () { return {
       return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
     },
     async atacadoSubmit() {
+      if (this.adminUser?.role !== 'owner') {
+        this.atacadoMsg = { ok: false, text: 'Somente o proprietário pode registrar vendas pelo painel administrativo.' };
+        return;
+      }
       const f = this.atacadoForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       const soldDate = f.sold_at || this.finHoje();
+      if (soldDate > this.finHoje()) {
+        this.atacadoMsg = { ok: false, text: 'A data da venda não pode estar no futuro.' };
+        return;
+      }
       body.sold_at = new Date(`${soldDate}T12:00:00-03:00`).toISOString();
       if (f.buyerKey === 'new') {
         if (!f.newName.trim()) { this.atacadoMsg = { ok: false, text: 'Diga o nome do novo cliente.' }; return; }
@@ -258,6 +269,10 @@ window.PAINEL_MODULES.atacado = function () { return {
       } else {
         body.payment_status = 'paid';
         const paidDate = f.payment_date || soldDate;
+        if (paidDate > this.finHoje()) {
+          this.atacadoMsg = { ok: false, text: 'A data do pagamento não pode estar no futuro.' };
+          return;
+        }
         body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
       }
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-sale-create', 'form').key;
@@ -280,21 +295,6 @@ window.PAINEL_MODULES.atacado = function () { return {
       } finally {
         this.atacadoSaving = false;
       }
-    },
-    atacadoErrText(code) {
-      const map = {
-        buyer_required: 'Escolha ou cadastre o comprador.',
-        items_required: 'Adicione ao menos um pneu.',
-        partner_not_found: 'Parceiro não encontrado.',
-        buyer_not_found: 'Cliente não encontrado.',
-        oversell: 'Estoque insuficiente. A venda não foi registrada; confira o galpão.',
-        tire_condition_required: 'Selecione a condição de cada pneu.',
-        idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
-        buyer_ambiguous: 'Escolha apenas um comprador.',
-        paid_at_before_sale: 'A data do pagamento não pode ser anterior à venda.',
-        due_date_before_sale: 'O vencimento não pode ser anterior à venda.',
-      };
-      return map[code] || `Não consegui registrar (${code}).`;
     },
   };
 };

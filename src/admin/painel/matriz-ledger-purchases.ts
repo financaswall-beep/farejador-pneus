@@ -177,6 +177,33 @@ export async function postWholesalePurchaseCancellation(
   const originalId = await ensureWholesalePurchaseAccrual(client, purchase);
   if (!originalId) return null;
   if (purchase.paymentStatus === 'pending') {
+    // Se a compra nasceu em transito e depois foi recebida, ha duas operacoes
+    // a desfazer: primeiro o recebimento (estoque -> transito), depois a
+    // aquisicao (transito -> contas a pagar). Estornar apenas a aquisicao
+    // deixava inventory positivo e inventory_in_transit negativo.
+    if (purchase.stockApplied) {
+      const receipt = await client.query<{ id: string }>(
+        `SELECT id FROM finance.matriz_ledger_transactions
+          WHERE environment=$1
+            AND source_type='commerce.wholesale_purchase.receipt'
+            AND source_id=$2`,
+        [purchase.environment, purchase.purchaseId],
+      );
+      if (receipt.rows[0]) {
+        await client.query(
+          `SELECT finance.reverse_matriz_ledger_transaction(
+             $1::env_t,$2,'commerce.wholesale_purchase.receipt_cancel',$3,
+             ($4::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date,
+             $5,$6,NULL,$7::jsonb
+           )`,
+          [
+            purchase.environment, receipt.rows[0].id, purchase.purchaseId, cancelledAt,
+            'Estorno do recebimento de compra cancelada', matrizLedgerActor(cancelledBy),
+            JSON.stringify({ purchase_id: purchase.purchaseId, reason }),
+          ],
+        );
+      }
+    }
     const reversed = await client.query<{ id: string }>(
       `SELECT finance.reverse_matriz_ledger_transaction(
          $1::env_t,$2,'commerce.wholesale_purchase.cancel',$3,

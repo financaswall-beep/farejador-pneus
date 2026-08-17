@@ -138,13 +138,13 @@ describe('Etapa 4 — verdade financeira da Matriz', () => {
 
     const truth = await getTruth('test', db.pool);
     expect(truth.competencia).toMatchObject({
-      receita_total: '519.40', receita_custo_conhecido: '419.29',
-      receita_custo_pendente: '100.11', custo_conhecido: '190.35',
-      despesas: '27.09', lucro_confirmado: '201.85', status: 'custo_pendente',
+      receita_total: '486.07', receita_custo_conhecido: '385.96',
+      receita_custo_pendente: '100.11', custo_conhecido: '180.35',
+      despesas: '27.09', lucro_confirmado: '178.52', status: 'custo_pendente',
     });
     expect(truth.caixa).toMatchObject({
       entradas_registradas: '430.52', saidas_registradas: '100.10',
-      movimento_liquido: '330.42', recebimento_pendente: '33.33',
+      movimento_liquido: '330.42', recebimento_pendente: '0.00',
     });
     expect(truth.posicao).toMatchObject({ a_receber: '55.55', a_pagar: '37.10' });
     expect(truth.conciliacao.custo_pendente).toMatchObject({ receita: '100.11', itens: 1, pedidos: 1 });

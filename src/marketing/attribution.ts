@@ -80,7 +80,7 @@ async function loadRealizedOrders(client: PoolClient): Promise<{
              AND NOT (po.fulfillment_mode='delivery' AND po.delivery_status<>'delivered')
              AND NOT po.awaiting_pickup)
            OR
-           (po.id IS NULL
+           (po.id IS NULL AND o.status IN ('confirmed','paid','delivered')
              AND NOT (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered'))
          )
      )
@@ -102,7 +102,7 @@ async function loadRealizedOrders(client: PoolClient): Promise<{
             AND NOT (po.fulfillment_mode='delivery' AND po.delivery_status<>'delivered')
             AND NOT po.awaiting_pickup)
           OR
-          (po.id IS NULL
+          (po.id IS NULL AND o.status IN ('confirmed','paid','delivered')
             AND NOT (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered'))
         )`,
     [env.FAREJADOR_ENV],
@@ -133,8 +133,9 @@ async function revokeInvalidAttributions(client: PoolClient): Promise<number> {
               (po.status='cancelled' OR po.deleted_at IS NOT NULL
                OR (po.fulfillment_mode='delivery' AND po.delivery_status<>'delivered')
                OR po.awaiting_pickup))
-          OR (po.id IS NULL AND o.fulfillment_mode='delivery'
-              AND o.delivery_status<>'delivered')
+          OR (po.id IS NULL AND (
+              o.status NOT IN ('confirmed','paid','delivered')
+              OR (o.fulfillment_mode='delivery' AND o.delivery_status<>'delivered')))
         )
       FOR UPDATE OF a`,
     [env.FAREJADOR_ENV],

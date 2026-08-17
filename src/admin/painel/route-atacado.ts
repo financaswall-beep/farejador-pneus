@@ -61,7 +61,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
   });
 
   // Registrar uma venda de atacado (comprador + pneus + preço digitado).
-  fastify.post('/admin/api/wholesale/sales', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/sales', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerWholesaleSaleSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });

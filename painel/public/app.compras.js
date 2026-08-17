@@ -2,12 +2,14 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.compras = function () {
   return {
     compraAddItem() {
+      if (this.adminUser?.role !== 'owner') return;
       this.compraForm.items.push({
         measure: '', brand: '', tire_condition: '', quantity: 1, unit_cost: '',
       });
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
     compraRemoveItem(i) {
+      if (this.adminUser?.role !== 'owner') return;
       if (this.compraForm.items.length > 1) this.compraForm.items.splice(i, 1);
     },
     compraFormTotal() {
@@ -27,8 +29,6 @@ window.PAINEL_MODULES.compras = function () {
         return { label: `parado (${s.days_since_last}d)`, cls: 'bg-rose-50 text-rose-600' };
       return { label: 'ativo', cls: 'bg-emerald-50 text-emerald-700' };
     },
-    // ── INSIGHTS de fornecedor (0114) — lê só das compras já registradas ──
-    // #4 Dependência: % das compras (R$) que vem do MAIOR fornecedor. >60% acende alerta.
     fornecedorDependencia() {
       const tot = this.fornecedorRanking.reduce((s, f) => s + Number(f.total_spent || 0), 0);
       if (tot <= 0) return null;
@@ -38,8 +38,6 @@ window.PAINEL_MODULES.compras = function () {
       }
       return { pct: Math.round((Number(topRow.total_spent || 0) / tot) * 100), name: topRow.name };
     },
-    // #1 + #2: agrupa por VARIANTE; dentro de cada uma já vem do mais barato
-    // pro mais caro (o banco ordena), então o 1º fornecedor é o "mais barato".
     breakdownByMeasure() {
       const groups = [];
       const byKey = {};
@@ -59,6 +57,10 @@ window.PAINEL_MODULES.compras = function () {
       return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR');
     },
     compraBuildSubmission() {
+      if (this.adminUser?.role !== 'owner') {
+        this.compraMsg = { ok: false, text: 'Somente o proprietário pode registrar compras.' };
+        return null;
+      }
       const f = this.compraForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       const purchasedDate = f.purchased_at || this.finHoje();
@@ -97,9 +99,6 @@ window.PAINEL_MODULES.compras = function () {
         this.compraMsg = { ok: false, text: 'Selecione a condição de cada pneu.' };
         return null;
       }
-      // Auditoria 07-06: linha PREENCHIDA mas inválida (sem medida / sem quantidade) era
-      // descartada em silêncio — a tela mostrava um total e registrava outro. Linha 100%
-      // vazia (sobrou do "+ Adicionar pneu") segue ignorada sem pergunta.
       const descartadas = f.items.filter((it) => {
         const valida = it.measure && it.measure.trim() && Number(it.quantity) > 0;
         if (valida) return false;
@@ -109,7 +108,6 @@ window.PAINEL_MODULES.compras = function () {
           || Number(it.quantity) !== 1;
       });
       body.items = items;
-      // FINANCEIRO (0115): compra fiada só com o financeiro ligado (flag).
       if (this.atacadoFinance && f.payment_status === 'pending') {
         if (!f.due_date) {
           this.compraMsg = { ok: false, text: 'Informe o vencimento da compra a prazo.' };
@@ -147,14 +145,15 @@ window.PAINEL_MODULES.compras = function () {
       await this.compraPersist(submission.body);
     },
     async compraPersist(body) {
-
       this.compraSaving = true;
       this.compraMsg = null;
       try {
         const result = await this.apiPost('/admin/api/wholesale/purchases', body);
         const fiadoTxt = body.payment_status === 'pending' ? ' (A PRAZO)' : '';
         const estoqueTxt = result.stock_applied ? ' O galpão já recebeu.' : ' Aguardando recebimento; o galpão não mudou.';
-        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}` };
+        const catalogoTxt = result.catalog_blockers?.length
+          ? ` Atenção: ${result.catalog_blockers.length} variante(s) precisam de produto ou preço no Catálogo antes da venda.` : '';
+        this.compraMsg = { ok: true, text: `Compra registrada de ${result.supplier_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.${estoqueTxt}${catalogoTxt}` };
         window.PAINEL_INTEGRITY.complete('wholesale-purchase-create', 'form');
         this.compraForm = {
           supplierKey: '', newName: '', newPhone: '', newDocument: '', notes: '',
@@ -181,12 +180,15 @@ window.PAINEL_MODULES.compras = function () {
         tire_condition_required: 'Selecione a condição de cada pneu.',
         supplier_duplicate: 'Esse fornecedor já está cadastrado (nome, documento ou telefone equivalente). Escolha a ficha existente.',
         idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
+        unit_cost_cent_precision: 'Informe o custo com no máximo duas casas decimais.',
+        purchase_line_total_too_large: 'O total de um item ultrapassa o limite aceito.',
+        purchase_total_too_large: 'O total da compra ultrapassa o limite aceito.',
+        purchased_at_future: 'A data da compra não pode estar no futuro.',
+        paid_at_future: 'A data do pagamento não pode estar no futuro.',
+        due_date_before_purchase: 'O vencimento não pode ser anterior à data da compra.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },
-
-    // ── MATRIZ — DESPESAS GERAIS (0120): lançar / quitar / remover ──
-    // ── FINANCEIRO da matriz — tela própria: visão consolidada (Onda 1) + despesas (0120) ──
     async loadFinanceiro() {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
@@ -201,7 +203,6 @@ window.PAINEL_MODULES.compras = function () {
         }),
         this.loadDespesas(),
       ]);
-      // Mantém somente o último snapshot CENTRAL; nunca consulta nem exibe o cálculo legado.
       this.financeiroVisao = visao ?? this.financeiroVisao;
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
@@ -228,8 +229,6 @@ window.PAINEL_MODULES.compras = function () {
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
       }
     },
-    // ── Sub-aba CONTAS A PAGAR (07-13): DERIVADO de a_pagar.itens (fornecedor +
-    // despesa a pagar). Zero API/contrato novo — só classifica/agrupa pra EXIBIR. ──
     pagarDias(due) {
       if (!due) return null; // sem vencimento → fora do calendário e dos baldes de data
       const hoje = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -294,6 +293,5 @@ window.PAINEL_MODULES.compras = function () {
         pct: grand > 0 ? Math.round((total / grand) * 1000) / 10 : 0 })).sort((a, b) => b.total - a.total);
       return { cards, calendario: cal, categorias };
     },
-    // ── LOGÍSTICA da matriz (0121): entregas + rota do dia ──
   };
 };

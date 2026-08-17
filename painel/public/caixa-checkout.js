@@ -193,9 +193,9 @@
     if (code === 'walkin_cost_missing') return 'O custo deste pneu ainda não foi apurado no estoque.';
     if (code === 'walkin_stock_ambiguous') return 'O estoque deste item precisa ser conferido antes da venda.';
     if (code === 'walkin_product_not_sellable') return 'Um item não está mais disponível para venda.';
+    if (code === 'sale_line_total_too_large' || code === 'sale_total_too_large') return 'O total da venda ultrapassa o limite aceito.';
     return 'Não foi possível concluir. Nenhuma baixa foi feita; tente novamente.';
   }
-
   async function confirmSale() {
     if (checkout.busy || checkout.cart.size === 0) return;
     const saleSession = Caixa.sessionFingerprint();

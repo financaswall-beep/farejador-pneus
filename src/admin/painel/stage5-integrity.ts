@@ -25,7 +25,17 @@ export function operationFingerprint(payload: unknown): string {
 }
 
 export function moneyCents(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100);
+  if (!Number.isFinite(value)) throw new Error('money_invalid');
+  // Converte pelo decimal exibido, sem depender do arredondamento binario do
+  // IEEE-754 (ex.: 2.135 * 100 pode virar 213.499999...). O banco usa
+  // arredondamento decimal; esta funcao precisa produzir o mesmo centavo.
+  const sign = value < 0 ? -1 : 1;
+  const [whole, fraction = ''] = Math.abs(value).toFixed(10).split('.');
+  const padded = fraction.padEnd(3, '0');
+  const cents = Number(whole) * 100 + Number(padded.slice(0, 2));
+  const rounded = cents + (Number(padded[2]) >= 5 ? 1 : 0);
+  if (!Number.isSafeInteger(rounded)) throw new Error('money_out_of_range');
+  return sign * rounded;
 }
 
 /** O primeiro retorno e o replay persistido precisam ter o mesmo formato.

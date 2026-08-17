@@ -6,7 +6,7 @@ import {
 } from '../../../src/admin/painel/stage5-integrity.js';
 import {
   createMatrizExpenseSchema, registerPurchaseSchema, registerWholesaleSaleSchema,
-  resolveIntegrityOperationSchema,
+  resolveIntegrityOperationSchema, settleWholesaleFinanceSchema,
 } from '../../../src/admin/painel/route-schemas.js';
 
 const operation = {
@@ -29,7 +29,35 @@ describe('fundação de integridade da Etapa 5', () => {
 
   it('arredonda valores para centavos de forma estável', () => {
     expect(moneyCents(10.005)).toBe(1001);
+    expect(moneyCents(2.135)).toBe(214);
+    expect(moneyCents(-2.135)).toBe(-214);
     expect(moneyCents(0.1 + 0.2)).toBe(30);
+  });
+
+  it('protege centavos, limites e datas factuais de compras', () => {
+    const base = { new_supplier: { name: 'Fornecedor' }, idempotency_key: 'purchase-math-key',
+      items: [{ measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida' as const,
+        quantity: 1, unit_cost: 5 }] };
+    expect(registerPurchaseSchema.safeParse({ ...base,
+      items: [{ ...base.items[0], unit_cost: 2.135 }] }).error?.issues[0]?.message)
+      .toBe('unit_cost_cent_precision');
+    expect(registerPurchaseSchema.safeParse({ ...base,
+      items: [{ ...base.items[0], quantity: 100_000, unit_cost: 9_999_999.99 }] })
+      .error?.issues[0]?.message).toBe('purchase_line_total_too_large');
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    expect(registerPurchaseSchema.safeParse({ ...base, purchased_at: future })
+      .error?.issues[0]?.message).toBe('purchased_at_future');
+    expect(registerPurchaseSchema.safeParse({ ...base, paid_at: future })
+      .error?.issues[0]?.message).toBe('paid_at_future');
+    expect(registerPurchaseSchema.safeParse({ ...base,
+      purchased_at: '2026-08-10T12:00:00-03:00', payment_status: 'pending',
+      due_date: '2026-08-09' }).error?.issues[0]?.message).toBe('due_date_before_purchase');
+    expect(registerPurchaseSchema.safeParse({ ...base,
+      purchased_at: '2026-08-10T12:00:00-03:00', payment_status: 'pending',
+      due_date: '2026-09-10' }).success).toBe(true);
+    expect(settleWholesaleFinanceSchema.safeParse({ kind: 'purchase',
+      id: '00000000-0000-4000-8000-000000000001', paid_at: future,
+      idempotency_key: 'purchase-pay-key' }).error?.issues[0]?.message).toBe('paid_at_future');
   });
 
   it('normaliza Date no primeiro retorno para ficar idêntico ao replay JSON', () => {

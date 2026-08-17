@@ -17,6 +17,7 @@ import {
   requireTireCondition,
   type TireCondition,
 } from '../../shared/tire-condition.js';
+import { assertWholesaleSaleMoney } from './sales-money.js';
 
 export interface WholesaleBuyerRow {
   customer_id: string | null;
@@ -195,11 +196,12 @@ export async function registerWholesaleSale(
   input: RegisterWholesaleSaleInput,
   dbPool: Pool = defaultPool,
 ): Promise<RegisterWholesaleSaleResult> {
+  const rawItems = input.items ?? [];
+  assertWholesaleSaleMoney(rawItems);
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
-    const rawItems = input.items ?? [];
     const fingerprint = operationFingerprint({
       customer_id: input.customer_id ?? null, partner_id: input.partner_id ?? null,
       new_customer: input.new_customer ? { name: input.new_customer.name.trim(),

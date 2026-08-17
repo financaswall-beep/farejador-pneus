@@ -84,6 +84,20 @@ describe('integridade intermodular da aba Vendas da Matriz', () => {
        VALUES ('test',$1,10,'confirmed','paid',now(),now()-interval '1 minute','teste')`,
       [buyerId],
     )).rejects.toThrow();
+
+    await expect(db.pool.query(
+      `INSERT INTO commerce.wholesale_orders
+         (environment,buyer_id,total_amount,status,payment_status,sold_at,created_by)
+       VALUES ('test',$1,10,'confirmed','paid',now()+interval '2 days','teste')`,
+      [buyerId],
+    )).rejects.toThrow('sold_at_future');
+
+    await expect(db.pool.query(
+      `INSERT INTO commerce.wholesale_orders
+         (environment,buyer_id,total_amount,status,payment_status,sold_at,paid_at,created_by)
+       VALUES ('test',$1,10,'confirmed','paid',now(),now()+interval '2 days','teste')`,
+      [buyerId],
+    )).rejects.toThrow('paid_at_future');
   });
 
   it('resumos contam só venda confirmada, logística reconhece balcão e históricos não truncam', async () => {
@@ -163,5 +177,54 @@ describe('integridade intermodular da aba Vendas da Matriz', () => {
     expect((await listWholesaleSalesHistory('30d', 'test', db.pool)).length)
       .toBeGreaterThanOrEqual(21);
     expect(await getWholesaleResumo('test', db.pool, '30d')).toMatchObject({ faturamento: '123.00' });
+  });
+
+  it('trava só a medida vendida e mantém o restante do galpão disponível', async () => {
+    const suffix = Date.now();
+    const requestedMeasure = `210/50-${suffix % 40 + 10}`;
+    const unrelatedMeasure = `220/55-${suffix % 40 + 10}`;
+    const requestedProductId = (await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.products
+         (environment,product_code,product_name,product_type,brand,tire_condition)
+       VALUES ('test',$1,'Pneu lock direcionado','tire','Sem marca','meia_vida')
+       RETURNING id`, [`LOCK-${suffix}`],
+    )).rows[0]!.id;
+    await db.pool.query(
+      `INSERT INTO commerce.tire_specs(environment,product_id,tire_size)
+       VALUES ('test',$1,$2)`, [requestedProductId, requestedMeasure],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock
+         (environment,measure,brand,tire_condition,quantity_on_hand,unit_cost)
+       VALUES ('test',$1,'Sem marca','meia_vida',5,40),
+              ('test',$2,'Sem marca','meia_vida',5,40)`,
+      [requestedMeasure, unrelatedMeasure],
+    );
+
+    const locker = await db.pool.connect();
+    const observer = await db.pool.connect();
+    try {
+      await locker.query('BEGIN');
+      const { prepareMatrizWalkinStock } =
+        await import('../../src/admin/painel/matriz-walkin-stock.js');
+      await prepareMatrizWalkinStock(locker, 'test', [
+        { productId: requestedProductId, quantity: 1 },
+      ]);
+
+      await observer.query("SET lock_timeout='300ms'");
+      await expect(observer.query(
+        `UPDATE commerce.wholesale_stock SET notes=COALESCE(notes,'')
+          WHERE environment='test' AND measure=$1`, [unrelatedMeasure],
+      )).resolves.toMatchObject({ rowCount: 1 });
+      await expect(observer.query(
+        `UPDATE commerce.wholesale_stock SET notes=COALESCE(notes,'')
+          WHERE environment='test' AND measure=$1`, [requestedMeasure],
+      )).rejects.toThrow(/lock timeout/i);
+    } finally {
+      await locker.query('ROLLBACK');
+      await observer.query('RESET lock_timeout');
+      locker.release();
+      observer.release();
+    }
   });
 });

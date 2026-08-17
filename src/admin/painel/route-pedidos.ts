@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { getAdminContext, requireAdminAuth } from '../auth.js';
+import { getAdminContext, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import {
@@ -13,7 +13,7 @@ import { mapWriteError, operatorLabel } from './route-helpers.js';
 import { cancelBodySchema, cancelParamsSchema, registerManualOrderSchema, registerWalkinOrderSchema } from './route-schemas.js';
 
 export async function registerPainelPedidos(fastify: FastifyInstance): Promise<void> {
-  fastify.post('/admin/api/orders/register-manual', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/orders/register-manual', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerManualOrderSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -34,7 +34,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/admin/api/orders/register-walkin', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/orders/register-walkin', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = registerWalkinOrderSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -55,7 +55,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/admin/api/orders/:order_id/cancel', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/orders/:order_id/cancel', { preHandler: requireAdminOwner }, async (request, reply) => {
     const params = cancelParamsSchema.safeParse(request.params);
     const body = cancelBodySchema.safeParse(request.body);
     if (!params.success || !body.success) {
@@ -75,7 +75,7 @@ export async function registerPainelPedidos(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.post('/admin/api/orders/:order_id/retrieve', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/orders/:order_id/retrieve', { preHandler: requireAdminOwner }, async (request, reply) => {
     const params = cancelParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'invalid_request' });
     try {

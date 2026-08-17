@@ -132,7 +132,7 @@ export async function transferWholesaleStockCondition(
            (commerce.wholesale_stock.quantity_on_hand*commerce.wholesale_stock.unit_cost
              + EXCLUDED.quantity_on_hand*EXCLUDED.unit_cost)
            / NULLIF(commerce.wholesale_stock.quantity_on_hand
-             + EXCLUDED.quantity_on_hand,0),2),
+             + EXCLUDED.quantity_on_hand,0),6),
          quantity_on_hand=commerce.wholesale_stock.quantity_on_hand
            + EXCLUDED.quantity_on_hand
        RETURNING id,quantity_on_hand,unit_cost::text`,

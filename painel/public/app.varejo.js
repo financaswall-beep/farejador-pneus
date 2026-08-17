@@ -81,7 +81,8 @@ window.PAINEL_MODULES.varejo = function () {
       return this.vendasVarejo().filter((p) => this.vendaNoPeriodo(p.createdAt));
     },
     vendasVarejoAtivas() {
-      return this.vendasVarejoPeriodo().filter((p) => p.status !== 'Cancelado');
+      return this.vendasVarejoPeriodo().filter((p) =>
+        !['Cancelado', 'Aberto', 'Pendente'].includes(p.status));
     },
     vendasVarejoTotal() {
       return this.vendasVarejoAtivas().reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
@@ -243,6 +244,7 @@ window.PAINEL_MODULES.varejo = function () {
 
     abrirNovaVenda(tipo) {
       this.vendaMenuOpen = false;
+      if (this.adminUser?.role !== 'owner') return;
       if (tipo === 'atacado') {
         this.vendasTab = 'atacado';
         void this.loadAtacadoVendas();
@@ -251,6 +253,7 @@ window.PAINEL_MODULES.varejo = function () {
       this.openWalkinModal();
     },
     async cancelarVarejo(row) {
+      if (this.adminUser?.role !== 'owner') return;
       if (!row?.id || row.status === 'Cancelado') return;
       const reason = window.prompt('Motivo do cancelamento da venda:');
       if (reason === null) return;
@@ -267,6 +270,7 @@ window.PAINEL_MODULES.varejo = function () {
       }
     },
     async retirarVarejo(row) {
+      if (this.adminUser?.role !== 'owner') return;
       if (!row?.canCompletePickup || !window.confirm('Confirmar que o cliente retirou e recebeu este pedido?')) return;
       try {
         await this.apiPost(`/admin/api/orders/${row.id}/retrieve`, {});

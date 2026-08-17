@@ -15,12 +15,12 @@ function moduleState() {
     {
       measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
       quantity_on_hand: 50,
-      unit_cost: 17, min_quantity: 60,
+      unit_cost: 17, min_quantity: 60, sales_30d: 5,
     },
     {
       measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
       quantity_on_hand: 15,
-      unit_cost: 12, min_quantity: 20,
+      unit_cost: 12, min_quantity: 20, sales_30d: 2,
     },
   ];
   return {
@@ -45,6 +45,7 @@ function moduleState() {
     custoBusca: '',
     custoOrdem: 'capital',
     fornecedorBreakdown: [],
+    adminUser: { role: 'owner' },
     stockPrecisaRepor: (row: { min_quantity: number; quantity_on_hand: number }) =>
       row.quantity_on_hand <= row.min_quantity,
     comprasOpenTab: vi.fn(),
@@ -106,6 +107,9 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
     const metzeler = state.atacadoStock[1];
     expect(state.repoGiro(pirelli)).toBe(5);
     expect(state.repoGiro(metzeler)).toBe(2);
+    state.galpaoFilme.rows.push({ measure: '90/90-18', brand: 'Pirelli',
+      tire_condition: 'meia_vida', source: 'venda_atacado', qty_delta: -999 });
+    expect(state.repoGiro(pirelli)).toBe(5);
 
     state.repoDefinirQuantidade(pirelli, 11);
     state.repoDefinirQuantidade(metzeler, 7);

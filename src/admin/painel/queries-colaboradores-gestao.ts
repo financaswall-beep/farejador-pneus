@@ -78,7 +78,7 @@ export async function getMatrizCollaboratorManagement(
         ORDER BY (mc.revoked_at IS NULL) DESC, mc.display_name`, [environment, competence]),
     () => db.query<any>(
        `WITH retail AS (
-         -- Venda conta na competencia de created_at. Cancelada antes do
+         -- Varejo conta na competencia de created_at. Cancelada antes do
          -- fechamento sai da apuracao; salario nao tem rateio por dia.
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
                 o.id AS source_id, 'retail'::text AS sale_channel,
@@ -95,13 +95,13 @@ export async function getMatrizCollaboratorManagement(
                FROM commerce.order_items oi WHERE oi.order_id=o.id AND oi.environment=o.environment
            ) items ON true
           WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
-            AND o.status <> 'cancelled'
+            AND o.status IN ('confirmed','paid','delivered')
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
             AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), wholesale AS (
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
                 o.id AS source_id, 'wholesale'::text AS sale_channel,
-                (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
+                (o.sold_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
                 1::int AS sales_count, o.total_amount AS revenue, items.margin,
                 0::int AS items_without_cost, 0::int AS deliveries_count, 0::int AS trips_count,
                 0::numeric AS distance_km, NULL::boolean AS on_time
@@ -111,8 +111,8 @@ export async function getMatrizCollaboratorManagement(
                FROM commerce.wholesale_order_items oi WHERE oi.order_id=o.id AND oi.environment=o.environment
            ) items ON true
           WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL AND o.status='confirmed'
-            AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
-            AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
+            AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
+            AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), trip_events AS (
          SELECT t.courier_collaborator_id AS id, 'trip'::text AS event_type,
                 t.id AS source_id, NULL::text AS sale_channel,

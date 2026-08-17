@@ -145,7 +145,7 @@ describe('login mobile da Operação da Loja', () => {
     expect(script).toContain("'/recibo'");
     expect(script).not.toContain('/admin/api/');
     expect(salesQueries).toContain("u.slug='main'");
-    expect(salesQueries).toContain("o.status<>'cancelled'");
+    expect(salesQueries).toContain("o.status IN ('confirmed','paid','delivered')");
     expect(html).toContain('id="weekly-summary"');
     expect(html).toContain('id="weekly-bars"');
     expect(html).toContain('id="weekly-prev"');

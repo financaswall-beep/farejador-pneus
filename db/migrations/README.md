@@ -104,6 +104,18 @@ os cards da aba Bot em instalações criadas do zero.
 pedido precisam compartilhar ambiente, o contato precisa pertencer à conversa,
 desconto não pode superar a linha e datas financeiras do atacado mantêm ordem válida.
 
+`0179_matriz_sales_final_guards.sql` impede venda ou recebimento do atacado em data
+futura e indexa a medida normalizada para a venda de varejo travar somente o estoque
+envolvido, sem bloquear todas as linhas do galpão.
+
+`0180_wholesale_purchase_audit_guards.sql` fecha as auditorias funcional e matemática
+de Compras: custo médio com seis casas, datas factuais protegidas, reparo do estorno
+trânsito→estoque e uma nova chave no gate de reconciliação para impedir regressão.
+
+`0181_matriz_sales_math_audit.sql` fecha a auditoria matemática formal de Vendas:
+valida centavos e limites também na função SQL, exclui pedidos abertos dos números
+realizados e fornece uma reconciliação de cabeçalho, itens e frete para o smoke.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`
