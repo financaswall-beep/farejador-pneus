@@ -160,6 +160,16 @@ async function main(): Promise<void> {
     check('B5 escalou aparece na campainha com motivo', !!esc && String(esc.motivo).includes('atendente'),
       esc ? `motivo="${esc.motivo}"` : 'não apareceu');
 
+    // População da Visão: os agregadores só contam conversas efetivamente aceitas/
+    // entregues pelo Bot V2. conv2 alimenta funil/perda; conv3 prova sem_regiao.
+    await client.query(
+      `INSERT INTO agent.turns (environment, conversation_id, trigger_message_id, agent_version, context_hash, status)
+       VALUES ($1::env_t, $2, $3, 'v2', 'prova-conv2', 'sent_api_ack')`, [ENV, conv2, msg2]);
+    const msg3 = await novaMsg(conv3, 4, 1, 'vocês entregam aqui?');
+    await client.query(
+      `INSERT INTO agent.turns (environment, conversation_id, trigger_message_id, agent_version, context_hash, status)
+       VALUES ($1::env_t, $2, $3, 'v2', 'prova-conv3', 'sent_api_ack')`, [ENV, conv3, msg3]);
+
     // ── seeds da visão: Maricá chamou 2× (conv1 pediu; conv2 faltou) ──
     await novoFact(conv1, 'municipio_entrega', 'Maricá');
     await novoFact(conv1, 'pedido_criado', true);
@@ -242,9 +252,10 @@ async function main(): Promise<void> {
 
     // ── B20 (redesign 07-12): respondidas_bot_48h vem do SERVIDOR com régua
     //    FIXA de 48h — o turn delivered do B3 (conv1) é a ÚNICA conversa nova
-    //    respondida → delta exato +1, independente do período selecionado. ──
-    check('B20 cards.respondidas_bot_48h: turn delivered vira +1 conversa (delta)',
-      Number(depois.cards?.respondidas_bot_48h) === a.respondidas48h + 1,
+    //    respondida → conv1 delivered + conv2/conv3 sent_api_ack = delta exato +3,
+    //    independente do período selecionado. ──
+    check('B20 cards.respondidas_bot_48h: 3 conversas respondidas entram no resumo (delta)',
+      Number(depois.cards?.respondidas_bot_48h) === a.respondidas48h + 3,
       `antes=${a.respondidas48h} depois=${depois.cards?.respondidas_bot_48h}`);
 
     console.log(fails === 0 ? '\n[VERDE] 20/20 — tela do Bot (fatias 1+2) provada.' : `\n[VERMELHO] ${fails} check(s) falharam.`);

@@ -3,9 +3,9 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.varejo = function () {
   return {
-    applyPedidos(rows) {
+    mapPedidos(rows) {
       const deliveryLabels = { pending: 'Em separação', dispatched: 'Saiu pra entrega', delivered: 'Entregue', failed: 'Entrega falhou' };
-      this.pedidos = (rows || []).map((row) => {
+      return (rows || []).map((row) => {
         const isPartner = !!row.is_partner;
         const cancelled = row.status === 'cancelled' || row.partner_status === 'cancelled';
         let status, statusClass, dotClass;
@@ -53,6 +53,9 @@ window.PAINEL_MODULES.varejo = function () {
           dotClass,
         };
       });
+    },
+    applyPedidos(rows) {
+      this.pedidos = this.mapPedidos(rows);
     },
 
     vendasInicioPeriodo() {
@@ -205,7 +208,9 @@ window.PAINEL_MODULES.varejo = function () {
     },
 
     vendasHistorico() {
-      const varejo = this.vendasVarejoPeriodo().map((p) => ({
+      const historicoPedidos = this.vendasHistoricoPedidos.length
+        ? this.vendasHistoricoPedidos : this.vendasVarejoPeriodo();
+      const varejo = historicoPedidos.map((p) => ({
         key: `v:${p.id}`, id: p.id, canal: 'Varejo', canalId: 'varejo', createdAt: p.createdAt,
         data: p.data, cliente: p.cliente, itens: p.itens, itensCount: p.itensCount, pagto: p.pagto,
         telefone: p.telefone,
@@ -213,8 +218,9 @@ window.PAINEL_MODULES.varejo = function () {
         itemsAmount: p.itemsAmount, freightAmount: p.freightAmount,
         cancelavel: p.status !== 'Cancelado', varejo: p,
       }));
-      const atacado = this.atacadoVendas
-        .filter((v) => this.vendaNoPeriodo(v.sold_at))
+      const historicoAtacado = this.vendasHistoricoAtacado.length
+        ? this.vendasHistoricoAtacado : this.atacadoVendas.filter((v) => this.vendaNoPeriodo(v.sold_at));
+      const atacado = historicoAtacado
         .map((v) => {
           const cancelled = v.status === 'cancelled';
           const qty = (v.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
@@ -234,29 +240,6 @@ window.PAINEL_MODULES.varejo = function () {
     // vendasHistoricoFiltrado mora em app.vendas.historico.js (versão com status/
     // pagamento/ordem). A cópia antiga daqui SAIU (07-14): era sombreada na montagem
     // e virava armadilha — quem mexesse nela não via efeito nenhum.
-
-    async loadVarejoResumo() {
-      this.ensureCredentials();
-      if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
-      try {
-        this.varejoResumo = (await this.apiGet('/admin/api/varejo/resumo?period=' + this.vendasPeriodo)) || null;
-      } catch (err) {
-        this.varejoResumo = null;
-      }
-    },
-    async loadVendasData() {
-      await Promise.allSettled([this.loadVarejoResumo(), this.loadAtacadoVendas(), this.loadVendasMarcas(), this.logisticaLoaded ? Promise.resolve() : this.loadLogistica()]);
-      this.$nextTick(() => window.lucide && window.lucide.createIcons());
-    },
-    async setVendasPeriodo(period) {
-      if (this.vendasPeriodo === period) return;
-      this.vendasPeriodo = period;
-      this.varejoPeriodo = period;
-      this.atacadoPeriodo = period;
-      await this.loadVendasData();
-    },
-    async setVarejoPeriodo(period) { await this.setVendasPeriodo(period); },
-    async setAtacadoPeriodo(period) { await this.setVendasPeriodo(period); },
 
     abrirNovaVenda(tipo) {
       this.vendaMenuOpen = false;
@@ -291,7 +274,7 @@ window.PAINEL_MODULES.varejo = function () {
           this.loadRealData(), this.loadVendasData(), this.loadFinanceiro(),
         ]);
       } catch (err) {
-        window.alert(`NÃ£o consegui concluir a retirada: ${err instanceof Error ? err.message : String(err)}`);
+        window.alert(`Não consegui concluir a retirada: ${err instanceof Error ? err.message : String(err)}`);
       }
     },
   };

@@ -42,8 +42,8 @@ describe('applyWholesaleStockDecrement — baixa estrita do estoque do galpão',
   it('recusa a baixa sem saldo em vez de zerar artificialmente', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('UPDATE commerce.wholesale_stock')) return { rows: [] };
-      if (sql.includes('SELECT quantity_on_hand FROM commerce.wholesale_stock')) {
-        return { rows: [{ quantity_on_hand: 2 }] };
+      if (sql.includes('SELECT quantity_on_hand,quantity_reserved FROM commerce.wholesale_stock')) {
+        return { rows: [{ quantity_on_hand: 2, quantity_reserved: 0 }] };
       }
       return { rows: [] };
     });

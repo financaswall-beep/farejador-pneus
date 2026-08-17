@@ -95,6 +95,15 @@ Ordem de execução:
 acompanhar a confirmação `delivered` do outbox, evita reprocessamento posterior e
 recupera os artefatos SQL ausentes.
 
+`0177_bot_daily_metrics_fresh_schema.sql` cria `analytics.v_daily_metrics`
+diretamente das tabelas greenfield atuais. Remove a dependência operacional da view
+histórica `analytics.v_conversation_summary`, mantém isolamento `prod/test` e restaura
+os cards da aba Bot em instalações criadas do zero.
+
+`0178_matriz_sales_integrity.sql` fecha a integridade causal de Vendas: unidade e
+pedido precisam compartilhar ambiente, o contato precisa pertencer à conversa,
+desconto não pode superar a linha e datas financeiras do atacado mantêm ordem válida.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

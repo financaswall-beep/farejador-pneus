@@ -22,6 +22,9 @@ import {
   postMatrizRetailSaleFacts,
 } from './matriz-ledger-retail-sales.js';
 import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
+import {
+  beginManualOrderIdempotency, recordManualOrderFingerprint,
+} from './manual-order-idempotency.js';
 
 async function resolveContactId(
   dbPool: Pick<Pool, 'query'>,
@@ -29,8 +32,6 @@ async function resolveContactId(
   conversationId: string,
   contactId?: string,
 ): Promise<string> {
-  if (contactId) return contactId;
-
   const result = await dbPool.query<{ contact_id: string | null }>(
     `SELECT contact_id
      FROM core.conversations
@@ -41,6 +42,9 @@ async function resolveContactId(
   const resolved = result.rows[0]?.contact_id;
   if (!resolved) {
     throw new Error('conversation_contact_not_found');
+  }
+  if (contactId && contactId !== resolved) {
+    throw new Error('conversation_contact_mismatch');
   }
 
   return resolved;
@@ -93,8 +97,27 @@ export async function registerManualOrder(
   let orderId: string;
   try {
     await client.query('BEGIN');
+    const idempotency = await beginManualOrderIdempotency(client, environment, input);
+    if (idempotency.replayOrderId) {
+      await client.query('COMMIT');
+      return { order_id: idempotency.replayOrderId };
+    }
+    for (const item of input.items) {
+      const discount = item.discount_amount ?? 0;
+      if (discount > item.quantity * item.unit_price) {
+        throw new Error('discount_exceeds_line_total');
+      }
+    }
     await assertCurrentCatalogPrices(client, environment, input.items);
     const contactId = await resolveContactId(client as unknown as Pool, environment, input.conversation_id, input.contact_id);
+    if (input.unit_id) {
+      const unit = await client.query(
+        `SELECT 1 FROM core.units
+          WHERE id=$1 AND environment=$2 AND is_active FOR SHARE`,
+        [input.unit_id, environment],
+      );
+      if (!unit.rows[0]) throw new Error('manual_order_unit_not_found');
+    }
     const result = await client.query<{ order_id: string }>(
       `SELECT commerce.register_manual_order(
          $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12
@@ -104,6 +127,8 @@ export async function registerManualOrder(
        input.delivery_address ?? null, input.actor_label, input.idempotency_key, input.source_tag ?? null],
     );
     orderId = result.rows[0]!.order_id;
+    await recordManualOrderFingerprint(client, environment, orderId, input,
+      idempotency.fingerprint);
     // Durante rolling deploy, código novo ainda precisa conviver com o schema
     // anterior. Só toca a coluna nova quando a venda realmente usa vencimento.
     if (input.payment_due_on) {

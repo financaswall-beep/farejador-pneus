@@ -1,7 +1,8 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_STOCK_PREVIEW = {
   enabled() {
-    return /(?:^|[?&])mock=1(?:&|$)/.test(window.location?.search || '');
+    const local = ['localhost', '127.0.0.1', '::1'].includes(window.location?.hostname || '');
+    return local && /(?:^|[?&])mock=1(?:&|$)/.test(window.location?.search || '');
   },
   rows: [
     { measure: '215/75 R17.5', brand: 'Roadmax', quantity_on_hand: 42, min_quantity: 18, unit_cost: 748.90, notes: 'Linha pesada · giro alto' },
@@ -40,8 +41,7 @@ window.PAINEL_STOCK_PREVIEW = {
     ],
   },
 };
-window.PAINEL_MODULES.atacado = function () {
-  return {
+window.PAINEL_MODULES.atacado = function () { return {
     atacadoBuyerKey(b) {
       return b.customer_id ? `c:${b.customer_id}` : `p:${b.partner_id}`;
     },
@@ -59,14 +59,9 @@ window.PAINEL_MODULES.atacado = function () {
         ['vendas', this.apiGet('/admin/api/wholesale/sales')],
       ];
       try {
-        const settled = await Promise.allSettled(jobs.map(([, request]) => request));
-        settled.forEach((result, index) => {
+        const values = await Promise.all(jobs.map(([, request]) => request));
+        values.forEach((value, index) => {
           const key = jobs[index][0];
-          if (result.status === 'rejected') {
-            console.warn(`vendas atacado ${key} falhou:`, result.reason?.message || result.reason);
-            return;
-          }
-          const value = result.value;
           if (key === 'buyers') this.atacadoBuyers = value.rows || [];
           if (key === 'ranking') this.atacadoRanking = value.rows || [];
           if (key === 'measures') this.atacadoMeasures = value.rows || [];
@@ -79,6 +74,9 @@ window.PAINEL_MODULES.atacado = function () {
           this.atacadoStock = window.PAINEL_STOCK_PREVIEW.rows.map((row) => ({ ...row }));
           this.atacadoMeasures = window.PAINEL_STOCK_PREVIEW.rows.map((row) => ({ ...row }));
         }
+      } catch (error) {
+        this.vendasDataError = 'Não foi possível atualizar o atacado. Os dados anteriores foram preservados.';
+        throw error;
       } finally {
         this.atacadoLoading = false;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
@@ -205,7 +203,7 @@ window.PAINEL_MODULES.atacado = function () {
         `• ${it.quantity}x ${it.measure} — ${this.formatCurrency(Number(it.unit_price))} cada`);
       const pagamento = v.payment_status === 'paid'
         ? 'Pago ✓'
-        : 'Fiado' + (v.due_date ? ` — vence ${new Date(v.due_date + 'T12:00:00').toLocaleDateString('pt-BR')}` : '');
+        : 'Fiado' + (v.due_date ? ` — vence ${this.atacadoDateOnly(v.due_date)}` : '');
       const msg = [
         `🧾 Recibo — 2W Pneus (${isNaN(data.getTime()) ? '' : data.toLocaleDateString('pt-BR')})`,
         `Cliente: ${v.buyer_name}`,
@@ -264,7 +262,6 @@ window.PAINEL_MODULES.atacado = function () {
       }
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-sale-create', 'form').key;
       body.idempotency_key = f.idempotency_key;
-
       this.atacadoSaving = true;
       this.atacadoMsg = null;
       try {
@@ -293,6 +290,9 @@ window.PAINEL_MODULES.atacado = function () {
         oversell: 'Estoque insuficiente. A venda não foi registrada; confira o galpão.',
         tire_condition_required: 'Selecione a condição de cada pneu.',
         idempotency_conflict: 'Os dados mudaram durante o envio. Recarregue e confira antes de tentar novamente.',
+        buyer_ambiguous: 'Escolha apenas um comprador.',
+        paid_at_before_sale: 'A data do pagamento não pode ser anterior à venda.',
+        due_date_before_sale: 'O vencimento não pode ser anterior à venda.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },

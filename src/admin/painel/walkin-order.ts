@@ -7,11 +7,13 @@ import { hasMatrizSellerColumn } from './payroll-schema.js';
 import { applyMatrizWalkinStockSale, prepareMatrizWalkinStock } from './matriz-walkin-stock.js';
 import { postMatrizRetailSaleFacts } from './matriz-ledger-retail-sales.js';
 import { assertCurrentCatalogPrices } from '../../shared/catalog-pricing.js';
+import { operationFingerprint } from './stage5-integrity.js';
 
 interface ExistingOrder {
   id: string;
   environment: 'prod' | 'test';
   source: string;
+  request_fingerprint: string | null;
 }
 
 function calculateTotal(input: RegisterWalkinOrderInput): number {
@@ -24,7 +26,8 @@ function calculateTotal(input: RegisterWalkinOrderInput): number {
     if (
       !Number.isInteger(item.quantity) || item.quantity <= 0 ||
       !Number.isFinite(item.unit_price) || item.unit_price < 0 ||
-      !Number.isFinite(discount) || discount < 0
+      !Number.isFinite(discount) || discount < 0 ||
+      discount > item.quantity * item.unit_price
     ) {
       throw new Error('walkin_item_invalid');
     }
@@ -50,6 +53,20 @@ export async function registerWalkinOrder(
   const environment = input.environment ?? env.FAREJADOR_ENV;
   const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
   const total = calculateTotal(input);
+  const requestFingerprint = operationFingerprint({
+    customer_name: input.customer_name?.trim() || null,
+    customer_phone: normalizedPhone,
+    unit_id: input.unit_id ?? null,
+    items: input.items.map((item) => ({
+      product_id: item.product_id, quantity: item.quantity,
+      unit_price: item.unit_price, discount_amount: item.discount_amount ?? 0,
+    })),
+    payment_method: input.payment_method,
+    payment_due_on: input.payment_due_on ?? null,
+    fulfillment_mode: input.fulfillment_mode,
+    delivery_address: input.delivery_address?.trim() || null,
+    source_tag: input.source_tag,
+  });
   const client = await dbPool.connect();
 
   try {
@@ -63,15 +80,23 @@ export async function registerWalkinOrder(
     );
 
     const existing = await client.query<ExistingOrder>(
-      `SELECT id, environment::text AS environment, source
-         FROM commerce.orders
-        WHERE idempotency_key = $1
+      `SELECT o.id, o.environment::text AS environment, o.source,
+              (SELECT a.payload_after->>'request_fingerprint'
+                 FROM audit.events a
+                WHERE a.environment=o.environment AND a.entity_id=o.id
+                  AND a.event_type='walkin_order_created'
+                ORDER BY a.created_at DESC LIMIT 1) AS request_fingerprint
+         FROM commerce.orders o
+        WHERE o.idempotency_key = $1
         LIMIT 1`,
       [input.idempotency_key],
     );
     if (existing.rows[0]) {
       const row = existing.rows[0];
       if (row.environment !== environment || row.source !== input.source_tag) {
+        throw new Error('walkin_idempotency_conflict');
+      }
+      if (row.request_fingerprint && row.request_fingerprint !== requestFingerprint) {
         throw new Error('walkin_idempotency_conflict');
       }
       await client.query('COMMIT');
@@ -193,6 +218,7 @@ export async function registerWalkinOrder(
         customer_name: input.customer_name ?? null,
         customer_phone: normalizedPhone,
         source_tag: input.source_tag,
+        request_fingerprint: requestFingerprint,
         payment_method: input.payment_method,
         payment_due_on: input.payment_due_on ?? null,
         fulfillment_mode: input.fulfillment_mode,

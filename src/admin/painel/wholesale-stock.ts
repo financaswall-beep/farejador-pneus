@@ -66,14 +66,15 @@ export async function applyWholesaleStockDecrement(
       [environment, measure, brand, condition, qty],
     );
     if (!changed.rows[0]) {
-      const current = await client.query<{ quantity_on_hand: number }>(
-        `SELECT quantity_on_hand FROM commerce.wholesale_stock
+      const current = await client.query<{ quantity_on_hand: number; quantity_reserved: number }>(
+        `SELECT quantity_on_hand,quantity_reserved FROM commerce.wholesale_stock
           WHERE environment=$1 AND measure=$2 AND brand=$3 AND tire_condition=$4`,
         [environment, measure, brand, condition],
       );
       throw new Error('oversell:' + JSON.stringify([{
         measure, brand, tire_condition: condition,
-        available: Number(current.rows[0]?.quantity_on_hand ?? 0), requested: qty,
+        available: Number(current.rows[0]?.quantity_on_hand ?? 0)
+          - Number(current.rows[0]?.quantity_reserved ?? 0), requested: qty,
       }]));
     }
   }

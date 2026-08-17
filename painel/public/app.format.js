@@ -18,6 +18,12 @@ window.PAINEL_MODULES.format = function () {
       });
     },
 
+    atacadoDateOnly(value) {
+      const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return 'data inválida';
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    },
+
     timeAgo(value) {
       if (!value) return '-';
       const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -65,21 +71,21 @@ window.PAINEL_MODULES.format = function () {
 
     saleStockError() {
       const product = this.selectedProduct();
-      if (!product) return 'Escolha um produto do catÃ¡logo.';
+      if (!product) return 'Escolha um produto do catálogo.';
       const messages = {
-        walkin_measure_not_found: 'Esse pneu nÃ£o estÃ¡ cadastrado no estoque do galpÃ£o.',
-        walkin_cost_missing: 'Essa medida estÃ¡ sem custo no galpÃ£o. Cadastre o custo antes de vender.',
-        walkin_stock_insufficient: 'Essa medida estÃ¡ sem saldo no galpÃ£o.',
-        walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpÃ£o. Corrija o estoque antes de vender.',
+        walkin_measure_not_found: 'Esse pneu não está cadastrado no estoque do galpão.',
+        walkin_cost_missing: 'Essa medida está sem custo no galpão. Cadastre o custo antes de vender.',
+        walkin_stock_insufficient: 'Essa medida está sem saldo no galpão.',
+        walkin_stock_ambiguous: 'Essa medida tem mais de um cadastro no galpão. Corrija o estoque antes de vender.',
         catalog_price_missing: 'Esse pneu está sem preço oficial. Defina o valor no Catálogo antes de vender.',
       };
       if (!product.walkin_sellable) {
-        return messages[product.walkin_block_reason] || 'Esse produto nÃ£o pode ser vendido agora.';
+        return messages[product.walkin_block_reason] || 'Esse produto não pode ser vendido agora.';
       }
       const requested = Number(this.saleForm.quantity || 0);
       const available = Number(product.total_stock_available ?? product.official_quantity_on_hand ?? 0);
-      if (!Number.isInteger(requested) || requested <= 0) return 'Informe uma quantidade vÃ¡lida.';
-      if (requested > available) return `SÃ³ tem ${available} dessa medida no galpÃ£o.`;
+      if (!Number.isInteger(requested) || requested <= 0) return 'Informe uma quantidade válida.';
+      if (requested > available) return `Só tem ${available} dessa medida no galpão.`;
       return null;
     },
 

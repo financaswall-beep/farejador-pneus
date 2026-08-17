@@ -180,6 +180,7 @@ window.PAINEL_MODULES.core = function () {
         if (rede.status === 'fulfilled') this.applyRede(rede.value.rows);
         if (resumo.status === 'fulfilled') this.applyMatrizResumo(resumo.value);
         if (pedidos.status === 'fulfilled') this.applyPedidos(pedidos.value.rows);
+        if (this.currentPage === 'vendas') await this.loadVendasData();
         if ([rede, resumo, pedidos].some((r) => r.status === 'fulfilled')) {
           this.apiStatus = 'real';
           this.apiError = null;

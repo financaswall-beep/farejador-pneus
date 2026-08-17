@@ -2,98 +2,21 @@
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import type { MatrizDeliveryRow, MatrizLogistica, MatrizTripRow } from './queries-logistica-types.js';
+export type { MatrizDeliveryRow, MatrizLogistica, MatrizTripRow } from './queries-logistica-types.js';
 export const MAIN_DELIVERY_GUARD = `
   o.fulfillment_mode = 'delivery'
   AND EXISTS (SELECT 1 FROM core.units u
                WHERE u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main')`;
-export interface MatrizDeliveryRow {
-  order_id: string; order_number: string | null;
-  customer_name: string | null; customer_phone: string | null;
-  delivery_address: string | null; total_amount: string;
-  payment_method: string | null;
-  status: string;
-  delivery_status: 'pending' | 'dispatched' | 'delivered' | 'failed';
-  delivery_courier: string | null;
-  /** 0125: motivo do não-entregue REPORTADO pelo portal (failed sem cancelar =
-   *  aguardando o dono confirmar ou recolocar). NULL fora desse limbo. */
-  delivery_failure_reason: string | null;
-  trip_id: string | null;
-  created_at: string; dispatched_at: string | null; delivered_at: string | null;
-  /** Data EFETIVA de entrega prevista (YYYY-MM-DD): a remarcada, ou o padrão D+1
-   *  (created_at+1, fuso SP) quando nunca foi remarcada. */
-  scheduled_date: string;
-  /** A data remarcada crua (NULL = usando o padrão D+1). Só pra UI saber se o dono
-   *  já mexeu na data. */
-  scheduled_raw: string | null;
-  items: Array<{ quantity: number; label: string }>;
-}
-export interface MatrizTripRow {
-  id: string; trip_number: string; courier_name: string;
-  /** Número amigável (0129): ROTA-0001, ... — o que o dono fala/audita. */
-  status: 'open' | 'closed';
-  km_start: string | null; km_end: string | null; fuel_spent: string | null;
-  fuel_expense_id: string | null; fuel_spent_without_approved_expense: boolean;
-  financial_status: 'pending' | 'divergent' | 'reconciled';
-  approved_fuel_amount: string; notes: string | null;
-  started_at: string; ended_at: string | null;
-  deliveries_count: number; orders_total: string; remaining_count: number;
-  /** "A rota se pagou?" — SÓ das entregas DELIVERED da rota (failed/cancelada fora).
-   *  Régua do lucro = a MESMA do varejo 0117 (custo congelado; item sem custo fica
-   *  fora do lucro e é CONTADO pra UI avisar — nunca chuta). Frete = total_amount −
-   *  itens (o bot embute o frete no total; walk-in sem frete → 0, nunca negativo). */
-  resumo: {
-    entregues: number; nao_entregues: number;
-    faturamento_total: number; frete_total: number; faturamento_pneus: number;
-    custo_pneus: number; lucro_pneus: number; itens_sem_custo: number;
-  };
-  /** Σ despesas vivas amarradas à rota (fechamento ∪ comprovantes lidos — o IN
-   *  dedup cobre o linked_existing; deleted_at IS NULL = dono apagou, rota reflete). */
-  despesas_total: string;
-  /** Pedidos entregues que formam o resultado. Valores de custo continuam
-   *  parciais quando algum item não tinha snapshot — a UI sinaliza, nunca estima. */
-  pedidos_resultado: Array<{
-    order_id: string; order_number: string | null; customer_name: string | null;
-    total: number; faturamento_pneus: number; custo_pneus: number;
-    frete: number; margem_antes_rota: number; itens_sem_custo: number;
-  }>;
-  /** Despesas únicas realmente vinculadas à rota. O mesmo expense pode ser
-   *  lastreado por mais de um comprovante; DISTINCT evita dupla contagem. */
-  despesas: Array<{
-    id: string; category: string; description: string | null;
-    amount: number; occurred_at: string;
-    source: 'comprovante' | 'fechamento';
-    receipt_id: string | null; receipt_summary: string | null;
-  }>;
-  receipts: Array<{
-    id: string; ai_summary: string | null; ai_expense_id: string | null;
-    ai_status: 'pending' | 'parsed' | 'unreadable' | 'skipped';
-    workflow_status: 'uploaded' | 'processing' | 'review_required' | 'linked' | 'rejected' | 'legacy_linked';
-    expense_category: string | null; expense_amount: number | null; expense_removed: boolean;
-    latest_attempt: Record<string, unknown> | null; decision: Record<string, unknown> | null;
-    created_at: string;
-  }>;
-  detached_reports: Array<{
-    order_id: string; delivery_failure_reason: string | null; detached_at: string;
-  }>;
-}
-export interface MatrizLogistica {
-  abertas: MatrizDeliveryRow[];
-  /** O LIMBO do portal (0125): o entregador REPORTOU não-entregue (failed) e o pedido
-   *  ainda NÃO foi cancelado — o dono decide: recolocar na fila ou confirmar (cancela
-   *  e o galpão volta). Bloco próprio da tela (auditoria 07-08 — antes se perdia nas
-   *  finalizadas sem motivo nem botão). */
-  reportadas: MatrizDeliveryRow[];
-  finalizadas: MatrizDeliveryRow[];
-  rotas_abertas: MatrizTripRow[];
-  rotas_recentes: MatrizTripRow[];
-}
 /** A tela Logística num GET: entregas da main (abertas + últimas finalizadas) + rotas. */
 export async function getMatrizLogistica(
   environment: 'prod' | 'test' = env.FAREJADOR_ENV,
   dbPool: Pool = defaultPool,
 ): Promise<MatrizLogistica> {
   const deliverySelect = `
-    SELECT o.id AS order_id, o.order_number, c.name AS customer_name, c.phone_e164 AS customer_phone,
+    SELECT o.id AS order_id, o.order_number,
+           COALESCE(c.name,cu.name) AS customer_name,
+           COALESCE(c.phone_e164,cu.phone_e164) AS customer_phone,
            o.delivery_address, o.total_amount::text, o.payment_method, o.status, o.delivery_status,
            o.delivery_courier, o.delivery_failure_reason, o.trip_id, o.created_at, o.dispatched_at, o.delivered_at,
            o.scheduled_delivery_date::text AS scheduled_raw,
@@ -106,6 +29,8 @@ export async function getMatrizLogistica(
                       WHERE oi.order_id = o.id AND oi.environment = o.environment), '[]'::jsonb) AS items
       FROM commerce.orders o
       LEFT JOIN core.contacts c ON c.id = o.contact_id
+      LEFT JOIN commerce.customers cu
+        ON cu.id = o.customer_id AND cu.environment = o.environment
      WHERE o.environment = $1 AND ${MAIN_DELIVERY_GUARD}`;
 
   const tripSelect = `
@@ -182,7 +107,8 @@ export async function getMatrizLogistica(
                        'margem_antes_rota', GREATEST(x.total_amount - x.itens_valor, 0) + x.lucro_valor,
                        'itens_sem_custo', x.itens_sem_custo)
                        ORDER BY x.delivered_at DESC, x.order_number DESC)
-              FROM (SELECT o4.id AS order_id, o4.order_number, c4.name AS customer_name,
+              FROM (SELECT o4.id AS order_id, o4.order_number,
+                           COALESCE(c4.name,cu4.name) AS customer_name,
                            o4.total_amount, o4.delivered_at,
                            COALESCE(SUM(oi4.quantity * oi4.unit_price - oi4.discount_amount), 0) AS itens_valor,
                            COALESCE(SUM(CASE WHEN oi4.matriz_unit_cost IS NOT NULL
@@ -195,9 +121,12 @@ export async function getMatrizLogistica(
                       JOIN commerce.order_items oi4
                         ON oi4.order_id = o4.id AND oi4.environment = o4.environment
                       LEFT JOIN core.contacts c4 ON c4.id = o4.contact_id
+                      LEFT JOIN commerce.customers cu4
+                        ON cu4.id=o4.customer_id AND cu4.environment=o4.environment
                      WHERE o4.trip_id = t.id AND o4.environment = t.environment
                        AND o4.delivery_status = 'delivered' AND o4.status <> 'cancelled'
-                     GROUP BY o4.id, o4.order_number, c4.name, o4.total_amount, o4.delivered_at) x), '[]'::jsonb) AS pedidos_resultado,
+                     GROUP BY o4.id, o4.order_number, c4.name, cu4.name,
+                              o4.total_amount, o4.delivered_at) x), '[]'::jsonb) AS pedidos_resultado,
            (SELECT COALESCE(SUM(e.amount), 0)::text
               FROM commerce.matriz_expenses e
              WHERE e.environment = t.environment AND e.deleted_at IS NULL

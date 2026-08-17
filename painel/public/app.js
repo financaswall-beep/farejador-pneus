@@ -66,6 +66,7 @@ function painelApp() {
     vendasHistoricoSomenteCancelaveis: false,
     vendasHistoricoSomenteComRecibo: false,
     vendasHistoricoPagina: 1,
+    vendasHistoricoPedidos: [], vendasHistoricoAtacado: [], vendasDataError: null,
     vendasHistoricoPorPagina: 20,
     vendasBusca: '',
     vendaHistoricoSelecionada: null,
@@ -248,7 +249,6 @@ function painelApp() {
       { id: 'mes',     label: 'Último mês' },
       { id: 'ano',     label: 'Último ano' },
     ],
-
     // Resumo (cockpit do dono) = bot/tráfego (applyMatrizResumo) + cobrança (applyRede).
     // SINO (2026-07-06): payload do servidor + assinaturas lidas (localStorage).
     // `notificacoes` virou GETTER derivado no módulo app.sino.js — não é mais estado.

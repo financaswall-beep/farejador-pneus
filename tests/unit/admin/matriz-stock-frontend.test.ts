@@ -17,7 +17,7 @@ describe('estoque oficial no navegador da matriz', () => {
       selectedProduct: module.selectedProduct,
     };
     expect(module.saleStockError.call(context)).toBe(
-      'Essa medida estÃ¡ sem custo no galpÃ£o. Cadastre o custo antes de vender.',
+      'Essa medida está sem custo no galpão. Cadastre o custo antes de vender.',
     );
   });
 
@@ -28,7 +28,7 @@ describe('estoque oficial no navegador da matriz', () => {
       saleForm: { product_id: 'p1', quantity: 3 },
       selectedProduct: module.selectedProduct,
     };
-    expect(module.saleStockError.call(context)).toBe('SÃ³ tem 2 dessa medida no galpÃ£o.');
+    expect(module.saleStockError.call(context)).toBe('Só tem 2 dessa medida no galpão.');
   });
 
   it('carrega a conciliacao somente leitura pelo endpoint dedicado', async () => {

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { getCommissionLedger, getSalesBrandRanking, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
+import { getCommissionLedger, getPainelPedidosSalesHistory, getSalesBrandRanking, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, listWholesaleSalesHistory, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
 
@@ -108,6 +108,20 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
     const parsed = financePeriodQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
     return reply.status(200).send(await getSalesBrandRanking(parsed.data.period));
+  });
+
+  // Histórico comercial completo no recorte escolhido. As listas resumidas do
+  // dashboard continuam pequenas; exportação e paginação nunca perdem linhas.
+  fastify.get('/admin/api/sales/history-data', { preHandler: requireAdminAuth }, async (request, reply) => {
+    const parsed = financePeriodQuerySchema.safeParse(request.query);
+    if (!parsed.success || parsed.data.period === 'tudo') {
+      return reply.status(400).send({ error: 'invalid_query' });
+    }
+    const [varejo, atacado] = await Promise.all([
+      getPainelPedidosSalesHistory(parsed.data.period),
+      listWholesaleSalesHistory(parsed.data.period),
+    ]);
+    return reply.status(200).send({ ...dashboardPayload([]), varejo, atacado });
   });
 
   // ── REDE — COMISSÕES COMO LANÇAMENTO (0118, flag NETWORK_COMMISSION_LEDGER) ──

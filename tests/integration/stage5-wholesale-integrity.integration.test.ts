@@ -362,7 +362,8 @@ describe('Etapa 5 — integridade de atacado, compras e financeiro', () => {
   it('repete pagamentos/despesas e preserva ambiente, operador e motivo', async () => {
     const f = await fixture({ quantity: 2, cost: 5 });
     const sale = await registerSale({ environment: 'test', customer_id: f.buyerId,
-      created_by: 'etapa5-financeiro', payment_status: 'pending', due_date: '2026-08-01',
+      created_by: 'etapa5-financeiro', payment_status: 'pending',
+      sold_at: '2026-07-01T12:00:00-03:00', due_date: '2026-08-01',
       items: [{ measure: f.measure, quantity: 1, unit_price: 10.01 }],
       idempotency_key: randomUUID() }, db.pool);
     const payOptions = { idempotency_key: randomUUID(), actor_label: 'Operador Etapa 5' };

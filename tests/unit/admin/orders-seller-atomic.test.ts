@@ -25,11 +25,14 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
   it('faz rollback do pedido quando o vendedor nao existe', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [] };
+      if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('FROM commerce.orders o')) return { rows: [] };
       if (sql.includes('FROM commerce.matriz_current_prices')) return {
         rows: [{ product_id: input.items[0].product_id, price_amount: '100', price_type: 'regular', currency: 'BRL' }],
       };
       if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
       if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
       if (sql.includes('information_schema.columns')) return { rows: [{ ready: true }] };
       if (sql.includes('UPDATE commerce.orders')) return { rows: [] };
       throw new Error(`consulta inesperada: ${sql}`);
@@ -46,11 +49,14 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
   it('confirma pedido e vendedor na mesma transacao', async () => {
     const query = vi.fn(async (sql: string) => {
       if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('FROM commerce.orders o')) return { rows: [] };
       if (sql.includes('FROM commerce.matriz_current_prices')) return {
         rows: [{ product_id: input.items[0].product_id, price_amount: '100', price_type: 'regular', currency: 'BRL' }],
       };
       if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
       if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
       if (sql.includes('information_schema.columns')) return { rows: [{ ready: true }] };
       if (sql.includes('UPDATE commerce.orders')) return { rows: [{ id: 'order-1' }] };
       throw new Error(`consulta inesperada: ${sql}`);
@@ -66,11 +72,14 @@ describe('atribuicao atomica do vendedor ao pedido', () => {
   it('mantem a venda viva durante deploy anterior a migration 0133', async () => {
     const query = vi.fn(async (sql: string) => {
       if (['BEGIN', 'COMMIT'].includes(sql)) return { rows: [] };
+      if (sql.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (sql.includes('FROM commerce.orders o')) return { rows: [] };
       if (sql.includes('FROM commerce.matriz_current_prices')) return {
         rows: [{ product_id: input.items[0].product_id, price_amount: '100', price_type: 'regular', currency: 'BRL' }],
       };
       if (sql.includes('FROM core.conversations')) return { rows: [{ contact_id: 'contact-1' }] };
       if (sql.includes('commerce.register_manual_order')) return { rows: [{ order_id: 'order-1' }] };
+      if (sql.includes('INSERT INTO audit.events')) return { rows: [] };
       if (sql.includes('information_schema.columns')) return { rows: [{ ready: false }] };
       throw new Error(`consulta inesperada: ${sql}`);
     });

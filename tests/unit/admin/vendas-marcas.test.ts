@@ -99,7 +99,7 @@ describe('ranking de marcas em Vendas', () => {
     expect(commercialVision).not.toContain('catalogoBrandLogo(marca.brand)');
     expect(commercialVision).not.toContain('bg-gradient');
     expect(commercialVision).not.toContain('shadow');
-    expect(html).toContain('app.vendas.marcas.js?v=20260731-vendas-marcas1');
+    expect(html).toContain('app.vendas.marcas.js?v=20260817-sales-integrity1');
     expect(montagem).toContain('window.PAINEL_MODULES.vendasMarcas');
     expect(staticRoutes).toContain("'app.vendas.marcas.js'");
   });

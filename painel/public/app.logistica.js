@@ -2,7 +2,7 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.logistica = function () {
   return {
-    async loadLogistica() {
+    async loadLogistica(options = {}) {
       this.ensureCredentials();
       if (!this.adminAuthenticated || !location.pathname.startsWith('/admin/painel')) return;
       try {
@@ -16,6 +16,7 @@ window.PAINEL_MODULES.logistica = function () {
       } catch (err) {
         // Erro de REDE não apaga a tela (mantém o dado anterior; lição da Onda 1).
         console.warn('logistica load falhou:', err.message);
+        if (options.propagate) throw err;
       } finally {
         this.logisticaLoaded = true;
         this.$nextTick(() => window.lucide && window.lucide.createIcons());
