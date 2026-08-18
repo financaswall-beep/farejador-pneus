@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createPartnerFixture } from './helpers/partner-fixtures.js';
-import { startPostgres, stopPostgres, type IntegrationDb } from './helpers/postgres.js';
+import {
+  buildRestrictedConnectionString,
+  startPostgres,
+  stopPostgres,
+  type IntegrationDb,
+} from './helpers/postgres.js';
 
 describe('transferência de estoque Matriz → parceiro', () => {
   let db: IntegrationDb;
@@ -17,6 +22,9 @@ describe('transferência de estoque Matriz → parceiro', () => {
   let settleSale: typeof import(
     '../../src/admin/painel/queries-financeiro-integridade.js'
   ).settleWholesaleOrderPayment;
+  let receivePurchase: typeof import(
+    '../../src/parceiro/operation-purchase-receipt.js'
+  ).receiveOperationPurchase;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -25,8 +33,10 @@ describe('transferência de estoque Matriz → parceiro', () => {
       WHOLESALE_STOCK_DECREMENT: 'true', WHOLESALE_FINANCE: 'true',
       MATRIZ_CENTRAL_LEDGER: 'true',
     });
-    vi.resetModules();
     db = await startPostgres();
+    process.env.DATABASE_URL = db.connectionString;
+    process.env.PARTNER_DATABASE_URL = buildRestrictedConnectionString(db.connectionString);
+    vi.resetModules();
     ({ registerWholesaleSale: registerSale }
       = await import('../../src/admin/painel/queries-atacado-vendas.js'));
     ({ settlePartnerArrival: settleArrival }
@@ -35,6 +45,8 @@ describe('transferência de estoque Matriz → parceiro', () => {
       = await import('../../src/admin/painel/queries-partner-cargo.js'));
     ({ settleWholesaleOrderPayment: settleSale }
       = await import('../../src/admin/painel/queries-financeiro-integridade.js'));
+    ({ receiveOperationPurchase: receivePurchase }
+      = await import('../../src/parceiro/operation-purchase-receipt.js'));
   }, 180_000);
 
   afterAll(async () => {
@@ -266,6 +278,40 @@ describe('transferência de estoque Matriz → parceiro', () => {
       status:'confirmed',payment_status:'paid',paid:true,settled_total_amount:'200.00',
       purchase_payment_status:'paid_now',purchase_total:'200.00',
       payable_status:'paid',payable_amount:'200.00',
+    });
+
+    const purchaseId = String(sale.linked_partner_purchase_id);
+    const purchaseItem = await db.pool.query<{ id: string; confirmed_quantity: number }>(
+      `SELECT id,confirmed_quantity
+         FROM commerce.partner_purchase_items
+        WHERE environment='test' AND purchase_id=$1`,
+      [purchaseId],
+    );
+    await expect(receivePurchase(partner.ctx, 'Parceiro teste', purchaseId, {
+      idempotency_key:randomUUID(),
+      items:[{
+        item_id:purchaseItem.rows[0]!.id,
+        received_quantity:Number(purchaseItem.rows[0]!.confirmed_quantity),
+      }],
+    })).resolves.toMatchObject({ received:true,received_units:2 });
+
+    const received = await db.pool.query(
+      `SELECT purchase.receipt_status,sale.partner_transfer_status,
+              stock.quantity_on_hand
+         FROM commerce.partner_purchases purchase
+         JOIN commerce.wholesale_orders sale
+           ON sale.environment=purchase.environment
+          AND sale.id=purchase.source_wholesale_order_id
+         JOIN commerce.partner_stock_levels stock
+           ON stock.environment=purchase.environment
+          AND stock.unit_id=purchase.unit_id
+          AND stock.tire_size=$2 AND stock.brand=$3
+          AND stock.supplier_name=purchase.supplier_name
+        WHERE purchase.environment='test' AND purchase.id=$1`,
+      [purchaseId,measure,brand],
+    );
+    expect(received.rows[0]).toEqual({
+      receipt_status:'received',partner_transfer_status:'received',quantity_on_hand:2,
     });
     const ledger = await db.pool.query(
       `SELECT source_type,amount::text,(cash_on IS NOT NULL) AS cash
