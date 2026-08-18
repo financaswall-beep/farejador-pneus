@@ -18,6 +18,18 @@ window.PAINEL_MODULES.format = function () {
       });
     },
 
+    businessTodaySaoPaulo(now = new Date()) {
+      return new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'America/Sao_Paulo',
+      }).format(now);
+    },
+
+    businessFactInstant(date, today = this.businessTodaySaoPaulo(), nowIso = new Date().toISOString()) {
+      if (date > today) throw new Error('business_date_future');
+      if (date === today) return nowIso;
+      return new Date(`${date}T12:00:00-03:00`).toISOString();
+    },
+
     atacadoDateOnly(value) {
       const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (!match) return 'data inválida';

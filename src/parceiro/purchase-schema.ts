@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
 
 export const centMoneySchema = z.number().nonnegative().max(99_999_999.99).refine(
   (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
@@ -39,15 +40,6 @@ export function partnerPurchaseTotalCents(
   return total;
 }
 
-function saoPauloDate(value: Date): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(value);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
-
 export const partnerPurchaseSchema = z.object({
   supplier_name: z.string().max(160).nullable().optional(),
   purchased_at: z.string().datetime().nullable().optional(),
@@ -78,13 +70,13 @@ export const partnerPurchaseSchema = z.object({
     });
   }
   const purchasedAt = data.purchased_at ? new Date(data.purchased_at) : new Date();
-  if (purchasedAt.getTime() > Date.now() + 5 * 60_000) {
+  if (!isNotFutureBusinessDate(purchasedAt)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom, message: 'partner_purchased_at_future',
       path: ['purchased_at'],
     });
   }
-  const purchasedOn = saoPauloDate(purchasedAt);
+  const purchasedOn = businessDateSaoPaulo(purchasedAt);
   if (data.payment_status === 'payable' && data.payable_due_date
       && data.payable_due_date < purchasedOn) {
     ctx.addIssue({

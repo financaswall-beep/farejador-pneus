@@ -64,7 +64,7 @@ window.PAINEL_MODULES.compras = function () {
       const f = this.compraForm;
       const body = { items: [], notes: f.notes ? f.notes.trim() : null };
       const purchasedDate = f.purchased_at || this.finHoje();
-      body.purchased_at = new Date(`${purchasedDate}T12:00:00-03:00`).toISOString();
+      body.purchased_at = this.businessFactInstant(purchasedDate);
       if (f.supplierKey === 'new') {
         if (!f.newName.trim()) {
           this.compraMsg = { ok: false, text: 'Diga o nome do novo fornecedor.' };
@@ -118,7 +118,7 @@ window.PAINEL_MODULES.compras = function () {
       } else {
         body.payment_status = 'paid';
         const paidDate = f.payment_date || purchasedDate;
-        body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
+        body.paid_at = this.businessFactInstant(paidDate);
       }
       body.receipt_status = f.receipt_status;
       f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-purchase-create', 'form').key;

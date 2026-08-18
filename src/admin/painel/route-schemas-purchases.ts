@@ -1,20 +1,11 @@
 import { z } from 'zod';
+import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { assertWholesalePurchaseMoney, hasCentPrecision } from './purchase-money.js';
 
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
 
-function saoPauloDate(instant: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date(instant));
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
-
-function isNotFutureSaoPauloDate(instant: string): boolean {
-  return saoPauloDate(instant) <= saoPauloDate(new Date().toISOString());
-}
+const saoPauloDate = businessDateSaoPaulo;
 
 export const registerSupplierSchema = z.object({
   name: z.string().min(1).max(200),
@@ -54,10 +45,10 @@ export const registerPurchaseSchema = z.object({
   (d) => d.payment_status !== 'pending' || Boolean(d.due_date),
   { message: 'due_date_required', path: ['due_date'] },
 ).refine(
-  (d) => !d.purchased_at || isNotFutureSaoPauloDate(d.purchased_at),
+  (d) => !d.purchased_at || isNotFutureBusinessDate(d.purchased_at),
   { message: 'purchased_at_future', path: ['purchased_at'] },
 ).refine(
-  (d) => !d.paid_at || isNotFutureSaoPauloDate(d.paid_at),
+  (d) => !d.paid_at || isNotFutureBusinessDate(d.paid_at),
   { message: 'paid_at_future', path: ['paid_at'] },
 ).refine(
   (d) => !d.purchased_at || !d.due_date || d.due_date >= saoPauloDate(d.purchased_at),

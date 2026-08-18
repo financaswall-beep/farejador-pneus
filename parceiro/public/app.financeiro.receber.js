@@ -40,7 +40,7 @@ window.PARCEIRO_MODULES.financeiroReceber = () => ({
 
         const wasReceived = this.receivableForm.status === 'received';
         const receivedAt = this.receivableForm.status === 'received'
-          ? (this.receivableForm.received_at ? new Date(`${this.receivableForm.received_at}T12:00:00`).toISOString() : new Date().toISOString())
+          ? (this.receivableForm.received_at ? this.businessFactInstant(this.receivableForm.received_at) : new Date().toISOString())
           : null;
         await this.api('contas-a-receber', {
           method: 'POST',

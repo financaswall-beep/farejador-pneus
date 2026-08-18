@@ -31,6 +31,9 @@ import { pool } from '../persistence/db.js';
 import { logger } from '../shared/logger.js';
 import { ChatwootApiClient } from '../admin/chatwoot-api.client.js';
 import { normalizeBrazilianPhone } from '../shared/phone.js';
+import {
+  assertNotFutureBusinessDay, normalizeBusinessFactInstant,
+} from '../shared/business-time.js';
 import { resolvePartnerPermissions, PARTNER_SCREENS, type PartnerContext, type PartnerPermissions } from './auth.js';
 import type { PartnerCommissionConfig } from './commission.js';
 import {
@@ -872,7 +875,9 @@ export async function settlePartnerReceivableInstallment(
   input: SettlePartnerReceivableInstallmentInput,
 ): Promise<{ installment_id: string; received: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const receivedAt = input.received_at ?? new Date().toISOString();
+    const receivedAt = normalizeBusinessFactInstant(
+      input.received_at, new Date(), 'received_at_future',
+    ) ?? new Date().toISOString();
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_receivable_installments
        SET status = 'received',
@@ -1869,6 +1874,9 @@ export async function registerPartnerPurchase(
     if (paymentStatus === 'payable' && !input.payable_due_date) {
       throw new Error('payable_due_date_required_when_payment_status_payable');
     }
+    const purchasedAt = normalizeBusinessFactInstant(
+      input.purchased_at, new Date(), 'partner_purchased_at_future',
+    );
     const purchase = await client.query<{ id: string }>(
       `INSERT INTO commerce.partner_purchases (
          environment, unit_id, supplier_name, purchased_at, total_amount,
@@ -1883,7 +1891,7 @@ export async function registerPartnerPurchase(
         ctx.environment,
         ctx.unitId,
         input.supplier_name ?? null,
-        input.purchased_at ?? null,
+        purchasedAt ?? null,
         total,
         paymentStatus === 'payable' ? 'A pagar' : input.payment_method ?? null,
         input.notes ?? null,
@@ -2221,6 +2229,9 @@ export async function registerPartnerExpense(
   input: RegisterPartnerExpenseInput,
 ): Promise<{ expense_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const expenseDate = assertNotFutureBusinessDay(
+      input.expense_date, new Date(), 'expense_date_future',
+    );
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_expenses (
          environment, unit_id, expense_date, category, description, amount,
@@ -2237,7 +2248,7 @@ export async function registerPartnerExpense(
       [
         ctx.environment,
         ctx.unitId,
-        input.expense_date ?? null,
+        expenseDate ?? null,
         input.category,
         input.description,
         input.amount,
@@ -2265,7 +2276,7 @@ export async function registerPartnerExpense(
           category: input.category,
           description: input.description,
           amount: input.amount,
-          expense_date: input.expense_date,
+          expense_date: expenseDate,
         }),
       ],
     );
@@ -2420,7 +2431,9 @@ async function _settlePartnerPayableWithClient(
   input: SettlePartnerPayableInput,
 ): Promise<{ payable_id: string; paid: boolean }> {
     await assertPayableNotManagedByMatrix(client, ctx, payableId);
-    const paidAt = input.paid_at ?? new Date().toISOString();
+    const paidAt = normalizeBusinessFactInstant(
+      input.paid_at, new Date(), 'paid_at_future',
+    ) ?? new Date().toISOString();
     const result = await client.query<{
       id: string;
       description: string;
@@ -2697,6 +2710,11 @@ export async function registerPartnerReceivable(
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     await assertPartnerReceivableCustomerScope(client, ctx, input.customer_id ?? null);
     const status = input.status ?? 'open';
+    const receivedAt = status === 'received'
+      ? normalizeBusinessFactInstant(
+        input.received_at, new Date(), 'received_at_future',
+      ) ?? new Date().toISOString()
+      : null;
     const result = await client.query<{ id: string }>(
       `INSERT INTO finance.partner_receivables (
          environment, unit_id, customer_id, customer_name, description, source_tag, amount,
@@ -2716,7 +2734,7 @@ export async function registerPartnerReceivable(
         input.amount,
         status === 'open' ? input.due_date ?? null : null,
         status,
-        status === 'received' ? input.received_at ?? null : null,
+        receivedAt,
         input.payment_method ?? null,
         normalizeText(input.notes),
         `partner:${ctx.slug}`,
@@ -2744,7 +2762,7 @@ export async function registerPartnerReceivable(
           amount: input.amount,
           due_date: input.due_date,
           status,
-          received_at: status === 'received' ? input.received_at : null,
+          received_at: receivedAt,
         }),
       ],
     );
@@ -2759,7 +2777,9 @@ export async function settlePartnerReceivable(
   input: SettlePartnerReceivableInput,
 ): Promise<{ receivable_id: string; received: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const receivedAt = input.received_at ?? new Date().toISOString();
+    const receivedAt = normalizeBusinessFactInstant(
+      input.received_at, new Date(), 'received_at_future',
+    ) ?? new Date().toISOString();
     const result = await client.query<{ id: string; description: string; amount: string }>(
       `UPDATE finance.partner_receivables
        SET status = 'received',

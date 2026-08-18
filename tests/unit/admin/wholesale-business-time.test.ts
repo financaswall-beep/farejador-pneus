@@ -11,10 +11,10 @@ describe('horário automático da venda de atacado', () => {
       .toBe(now.toISOString());
   });
 
-  it('não mascara dia futuro nem altera dia passado', () => {
+  it('recusa dia futuro e não altera dia passado', () => {
     const now = new Date('2026-08-18T03:06:29.919Z');
-    expect(normalizeSameDayFutureInstant('2026-08-19T15:00:00.000Z', now))
-      .toBe('2026-08-19T15:00:00.000Z');
+    expect(() => normalizeSameDayFutureInstant('2026-08-19T15:00:00.000Z', now))
+      .toThrow('business_date_future');
     expect(normalizeSameDayFutureInstant('2026-08-17T15:00:00.000Z', now))
       .toBe('2026-08-17T15:00:00.000Z');
   });
@@ -22,18 +22,25 @@ describe('horário automático da venda de atacado', () => {
   it('a tela usa agora para hoje e meio-dia somente para datas anteriores', () => {
     const sandbox = { window: { PAINEL_MODULES: {} } };
     vm.runInNewContext(
+      readFileSync(resolve('painel/public/app.format.js'), 'utf8'),
+      sandbox,
+    );
+    vm.runInNewContext(
       readFileSync(resolve('painel/public/app.atacado.transfer.js'), 'utf8'),
       sandbox,
     );
-    const module = (sandbox.window.PAINEL_MODULES as Record<string, () => Record<string, unknown>>)
-      .atacadoTransfer();
+    const modules = sandbox.window.PAINEL_MODULES as Record<string, () => Record<string, unknown>>;
+    const module = { ...modules.format(), ...modules.atacadoTransfer() };
     const instant = module.atacadoBusinessInstant as (
       date: string, today: string, nowIso: string,
     ) => string;
-    expect(instant('2026-08-18', '2026-08-18', '2026-08-18T03:06:29.919Z'))
+    expect(instant.call(module, '2026-08-18', '2026-08-18', '2026-08-18T03:06:29.919Z'))
       .toBe('2026-08-18T03:06:29.919Z');
-    expect(instant('2026-08-17', '2026-08-18', '2026-08-18T03:06:29.919Z'))
+    expect(instant.call(module, '2026-08-17', '2026-08-18', '2026-08-18T03:06:29.919Z'))
       .toBe('2026-08-17T15:00:00.000Z');
+    expect(() => instant.call(
+      module, '2026-08-19', '2026-08-18', '2026-08-18T03:06:29.919Z',
+    )).toThrow('business_date_future');
   });
 });
 

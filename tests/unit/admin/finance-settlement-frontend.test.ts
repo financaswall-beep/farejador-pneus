@@ -13,11 +13,18 @@ function loadModule() {
     URLSearchParams,
   };
   vm.runInNewContext(
+    readFileSync('painel/public/app.format.js', 'utf8'),
+    sandbox,
+  );
+  vm.runInNewContext(
     readFileSync('painel/public/app.financeiro.baixas.js', 'utf8'),
     sandbox,
   );
   return {
-    module: sandbox.window.PAINEL_MODULES.financeiroBaixas(),
+    module: {
+      ...sandbox.window.PAINEL_MODULES.format(),
+      ...sandbox.window.PAINEL_MODULES.financeiroBaixas(),
+    },
     integrity,
   };
 }

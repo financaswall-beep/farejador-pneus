@@ -104,11 +104,11 @@ window.PAINEL_MODULES.financeiroDespesas = function () {
         };
         const occurredDate = this.despesaForm.occurred_at || this.finHoje();
         const paymentDate = this.despesaForm.payment_date || occurredDate;
-        body.occurred_at = new Date(`${occurredDate}T12:00:00-03:00`).toISOString();
+        body.occurred_at = this.businessFactInstant(occurredDate);
         body.document_date = this.despesaForm.document_date || occurredDate;
         body.competence_month = `${this.despesaForm.competence_month || occurredDate.slice(0, 7)}-01`;
         if (body.payment_status === 'paid') {
-          body.paid_at = new Date(`${paymentDate}T12:00:00-03:00`).toISOString();
+          body.paid_at = this.businessFactInstant(paymentDate);
         }
         this.despesaForm.idempotency_key = this.despesaForm.idempotency_key
           || window.PAINEL_INTEGRITY.operation('matriz-expense-create', 'form').key;

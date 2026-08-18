@@ -1,14 +1,13 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 import {
   matrizLedgerActor, postMatrizLedgerTransaction,
   type MatrizLedgerAccountClass,
 } from './matriz-ledger-posting.js';
-import {
-  beginIntegrityOperation, completeIntegrityOperation, integrityResult,
-  moneyCents, operationFingerprint, recordIntegrityEvent,
-} from './stage5-integrity.js';
+import { beginIntegrityOperation, completeIntegrityOperation, integrityResult,
+  moneyCents, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
 type Environment = 'prod' | 'test';
 type Target = { obligation_id: string; account_code?: never }
   | { obligation_id?: never; account_code: 'marketing_payable' };
@@ -272,7 +271,7 @@ export async function settleMatrizLedgerOpenItem(
       await client.query('COMMIT');
       return started.result;
     }
-    const paidAt = input.paid_at ?? new Date().toISOString();
+    const paidAt = normalizeBusinessFactInstant(input.paid_at, new Date(), 'paid_at_future') ?? new Date().toISOString();
     const actor = matrizLedgerActor(input.actor_label);
     const result = input.obligation_id
       ? await settleObligation(client, operation, input, paidAt, actor)

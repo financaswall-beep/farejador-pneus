@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   partnerPurchaseSchema, partnerPurchaseTotalCents, sixDecimalCostSchema,
 } from '../../../src/parceiro/purchase-schema.js';
@@ -12,6 +12,8 @@ const purchase = {
     quantity: 3, unit_cost: 100.25, sale_price: 149.9,
   }],
 };
+
+afterEach(() => vi.useRealTimers());
 
 describe('contrato monetário da compra do parceiro', () => {
   it('aceita somente valores representáveis em centavos', () => {
@@ -58,5 +60,16 @@ describe('contrato monetário da compra do parceiro', () => {
       ...purchase, payment_status: 'payable', purchased_at: '2026-08-17T12:00:00.000Z',
       payable_due_date: '2026-08-16',
     }).success).toBe(false);
+  });
+
+  it('à meia-noite aceita o meio-dia do mesmo dia comercial', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-18T03:06:29.919Z'));
+    expect(partnerPurchaseSchema.safeParse({
+      ...purchase, purchased_at: '2026-08-18T15:00:00.000Z',
+    }).success).toBe(true);
+    expect(partnerPurchaseSchema.safeParse({
+      ...purchase, purchased_at: '2026-08-19T03:00:00.000Z',
+    }).error?.issues[0]?.message).toBe('partner_purchased_at_future');
   });
 });

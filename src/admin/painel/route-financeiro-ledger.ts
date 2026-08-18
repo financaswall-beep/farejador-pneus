@@ -12,16 +12,20 @@ import { settleCommissionEntries } from './queries-comissoes-acoes.js';
 import { settleCommissionRefund } from './queries-comissoes-estornos.js';
 import { settleMatrizPartnerMonthlyFee } from './queries-mensalidades.js';
 import { mapWriteError, operatorLabel } from './route-helpers.js';
+import { isNotFutureBusinessDate } from '../../shared/business-time.js';
+
+const paidAtSchema = z.string().datetime({ offset: true })
+  .refine(isNotFutureBusinessDate, 'paid_at_future');
 
 const paymentDetailsSchema = z.object({
-  paid_at: z.string().datetime({ offset: true }).optional(),
+  paid_at: paidAtSchema.optional(),
   payment_method: z.string().trim().min(2).max(40).optional(),
   cash_account: z.string().trim().min(2).max(80).optional(),
   note: z.string().trim().max(500).optional(),
 });
 
 const requiredPaymentDetailsSchema = z.object({
-  paid_at: z.string().datetime({ offset: true }),
+  paid_at: paidAtSchema,
   payment_method: z.string().trim().min(2).max(40),
   cash_account: z.string().trim().min(2).max(80),
   note: z.string().trim().max(500).optional(),

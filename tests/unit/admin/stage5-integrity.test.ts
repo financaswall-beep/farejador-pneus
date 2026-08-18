@@ -60,6 +60,22 @@ describe('fundação de integridade da Etapa 5', () => {
       idempotency_key: 'purchase-pay-key' }).error?.issues[0]?.message).toBe('paid_at_future');
   });
 
+  it('bloqueia fatos futuros da despesa, mas permite vencimento parcelado futuro', () => {
+    const tomorrow = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const futureInstant = tomorrow.toISOString();
+    const futureDay = futureInstant.slice(0, 10);
+    const base = { category: 'outros', amount: 100,
+      idempotency_key: 'expense-business-time-key' };
+    expect(createMatrizExpenseSchema.safeParse({ ...base, occurred_at: futureInstant })
+      .error?.issues[0]?.message).toBe('occurred_at_future');
+    expect(createMatrizExpenseSchema.safeParse({ ...base, paid_at: futureInstant })
+      .error?.issues[0]?.message).toBe('paid_at_future');
+    expect(createMatrizExpenseSchema.safeParse({ ...base, document_date: futureDay })
+      .error?.issues[0]?.message).toBe('document_date_future');
+    expect(createMatrizExpenseSchema.safeParse({ ...base,
+      payment_status: 'pending', due_date: futureDay }).success).toBe(true);
+  });
+
   it('normaliza Date no primeiro retorno para ficar idêntico ao replay JSON', () => {
     expect(integrityResult({ paid_at: new Date('2026-07-16T12:00:00Z') }))
       .toEqual({ paid_at: '2026-07-16T12:00:00.000Z' });

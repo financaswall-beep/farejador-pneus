@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 import {
   matrizLedgerActor, matrizLedgerAmount, postMatrizLedgerTransaction,
 } from './matriz-ledger-posting.js';
@@ -172,6 +173,9 @@ export async function settleMatrizPartnerMonthlyFee(
   dbPool: Pool = defaultPool,
 ): Promise<{ fee_id: string; settled_at: string }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  const settledAt = normalizeBusinessFactInstant(
+    input.settled_at, new Date(), 'settled_at_future',
+  );
   const operation = {
     environment, domain: 'network.monthly_fee.settle',
     idempotencyKey: input.idempotency_key,
@@ -199,7 +203,7 @@ export async function settleMatrizPartnerMonthlyFee(
         WHERE environment=$1 AND id=$2 AND status='open'
         RETURNING settled_at`,
       [environment, input.fee_id, input.actor_label, input.idempotency_key,
-       input.settled_at ?? null],
+       settledAt ?? null],
     );
     if (!paid.rows[0]) throw new Error('monthly_fee_not_found');
     await syncMonthlyFee(

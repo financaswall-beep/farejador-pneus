@@ -41,14 +41,14 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260810-chaverede1"></script>
-<script src="/admin/painel/app.format.js?v=20260817-arrival-adjustment1"></script>
+<script src="/admin/painel/app.format.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
 <script src="/admin/painel/app.atacado.js?v=20260817-arrival-adjustment1"></script>
-<script src="/admin/painel/app.atacado.transfer.js?v=20260818-same-day-time1"></script>
-<script src="/admin/painel/app.compras.js?v=20260731-condicao2"></script>
+<script src="/admin/painel/app.atacado.transfer.js?v=20260818-business-time1"></script>
+<script src="/admin/painel/app.compras.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.acoes.js?v=20260817-arrival-adjustment1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260817-sales-integrity1"></script>
@@ -69,9 +69,9 @@
 <script src="/admin/painel/app.marketing.journeys.js?v=20260726-marketing-meta2"></script>
 <script src="/admin/painel/app.marketing.integrations.js?v=20260731-marketing-scope1"></script>
 <script src="/admin/painel/app.financeiro.js?v=20260727-financeiro-visao1"></script>
-<script src="/admin/painel/app.financeiro.baixas.js?v=20260727-financeiro-visao1"></script>
+<script src="/admin/painel/app.financeiro.baixas.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.financeiro.indicadores.js?v=20260727-ledger-agenda1"></script>
-<script src="/admin/painel/app.financeiro.despesas.js?v=20260716-etapa5"></script>
+<script src="/admin/painel/app.financeiro.despesas.js?v=20260818-business-time1"></script>
 <script src="/admin/painel/app.galpao.contagem.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.galpao.ajuste.js?v=20260727-stock-adjustment1"></script>
 <script src="/admin/painel/app.galpao.multibrand.js?v=20260731-condicao2"></script>
@@ -5552,10 +5552,10 @@
           </label>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data da despesa</span><input x-model="despesaForm.occurred_at" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
-          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data do documento</span><input x-model="despesaForm.document_date" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
-          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Competência</span><input x-model="despesaForm.competence_month" type="month" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
-          <label class="block" x-show="despesaForm.payment_status === 'paid'"><span class="text-xs text-gray-500 mb-1 block">Data do pagamento</span><input x-model="despesaForm.payment_date" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data da despesa</span><input x-model="despesaForm.occurred_at" :max="finHoje()" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Data do documento</span><input x-model="despesaForm.document_date" :max="finHoje()" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block"><span class="text-xs text-gray-500 mb-1 block">Competência</span><input x-model="despesaForm.competence_month" :max="finMesAtual()" type="month" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
+          <label class="block" x-show="despesaForm.payment_status === 'paid'"><span class="text-xs text-gray-500 mb-1 block">Data do pagamento</span><input x-model="despesaForm.payment_date" :max="finHoje()" type="date" class="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-sm"></label>
         </div>
         <div class="flex flex-wrap items-end gap-3 mt-3">
           <label class="block" x-show="despesaForm.payment_status === 'pending'">
@@ -5693,7 +5693,7 @@
           <div class="px-6 py-5 space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Valor da baixa</span><input type="text" inputmode="decimal" x-model="finBaixaModal.amount" :readonly="!finPermiteParcial(finBaixaModal.item || {})" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-semibold num read-only:bg-gray-50"></label>
-              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Data efetiva</span><input type="date" x-model="finBaixaModal.payment_date" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
+              <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Data efetiva</span><input type="date" x-model="finBaixaModal.payment_date" :max="finHoje()" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm"></label>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label><span class="block text-xs font-medium text-gray-600 mb-1.5">Forma</span><select x-model="finBaixaModal.payment_method" class="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option><option value="transferencia">Transferência</option><option value="boleto">Boleto</option><option value="outro">Outro</option></select></label>
