@@ -23,6 +23,7 @@ import {
   resolveWholesalePartnerUnit,
 } from './wholesale-partner-bridge.js';
 import { resolveAdditionBuyer, resolveWholesaleBuyer } from './queries-atacado-sale-buyer.js';
+import { normalizeSameDayFutureInstant } from './wholesale-business-time.js';
 
 interface SaleItemInput {
   measure: string;
@@ -130,6 +131,12 @@ export async function registerWholesaleSale(
   const rawItems = input.items ?? [];
   assertWholesaleSaleMoney(rawItems);
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  const requestNow = new Date();
+  const writeInput: RegisterWholesaleSaleInput = {
+    ...input,
+    sold_at: normalizeSameDayFutureInstant(input.sold_at, requestNow),
+    paid_at: normalizeSameDayFutureInstant(input.paid_at, requestNow),
+  };
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -173,7 +180,7 @@ export async function registerWholesaleSale(
       client, environment, buyer.partner_id, requestedPartnerUnitId,
     );
     const orderId = await insertSaleHeader(
-      client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, input,
+      client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, writeInput,
     );
     const requested = new Map<string, {
       measure: string; brand: string; tire_condition: TireCondition; quantity: number;

@@ -1,6 +1,10 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.atacadoTransfer = function () {
   return {
+    atacadoBusinessInstant(date, today = this.finHoje(), nowIso = new Date().toISOString()) {
+      if (date === today) return nowIso;
+      return new Date(`${date}T12:00:00-03:00`).toISOString();
+    },
     atacadoBuyerUnits() {
       const units = this.atacadoBuyerSelecionado()?.partner_units;
       return Array.isArray(units) ? units : [];
@@ -143,7 +147,8 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         this.atacadoMsg = { ok: false, text: 'A data da venda não pode estar no futuro.' };
         return;
       }
-      body.sold_at = new Date(`${soldDate}T12:00:00-03:00`).toISOString();
+      const requestNow = new Date().toISOString();
+      body.sold_at = this.atacadoBusinessInstant(soldDate, this.finHoje(), requestNow);
       if (f.parent_order_id) {
         body.parent_order_id = f.parent_order_id;
       } else if (f.buyerKey === 'new') {
@@ -196,7 +201,11 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
           this.atacadoMsg = { ok: false, text: 'A data do pagamento não pode estar no futuro.' };
           return;
         }
-        body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
+        body.paid_at = this.atacadoBusinessInstant(
+          paidDate,
+          this.finHoje(),
+          paidDate === soldDate ? body.sold_at : requestNow,
+        );
       }
       const integrityScope = f.parent_order_id ? `addition:${f.parent_order_id}` : 'form';
       f.idempotency_key = f.idempotency_key
