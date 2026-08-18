@@ -33,7 +33,8 @@ describe('ponte de estoque Matriz → parceiro', () => {
       if (sql.includes('SELECT o.id AS order_id')) return { rows: [{
         order_id: 'order-1', partner_unit_id: 'pu-1', unit_id: 'unit-1',
         sold_at: '2026-08-17T15:00:00.000Z', total_amount: '250.00',
-        payment_status: 'pending', due_date: '2026-08-25', parent_order_id: null,
+        payment_status: 'pending', partner_payment_terms: 'credit',
+        due_date: '2026-08-25', parent_order_id: null,
       }] };
       if (sql.includes('INSERT INTO commerce.partner_purchases')) {
         return { rows: [{ id: 'purchase-1' }] };
@@ -52,9 +53,38 @@ describe('ponte de estoque Matriz → parceiro', () => {
     expect(header[1]).toEqual([
       'test', 'order-1', 'matrix:Wallace', 'matrix-wholesale:order-1',
     ]);
-    expect(String(header[0])).toContain("CASE WHEN o.payment_status='pending' THEN 'payable'");
+    expect(String(header[0])).toContain("'payable'");
     expect(query.mock.calls.some(([sql]) => String(sql)
       .includes('INSERT INTO finance.partner_payables'))).toBe(true);
+  });
+
+  it('mantém a compra à vista aberta até o acerto na chegada', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT o.id AS order_id')) return { rows: [{
+        order_id: 'order-cash', partner_unit_id: 'pu-1', unit_id: 'unit-1',
+        sold_at: '2026-08-18T02:00:00.000Z', total_amount: '135.02',
+        payment_status: 'pending', partner_payment_terms: 'cash_on_arrival',
+        due_date: null, parent_order_id: null,
+      }] };
+      if (sql.includes('INSERT INTO commerce.partner_purchases')) {
+        return { rows: [{ id: 'purchase-cash' }] };
+      }
+      if (sql.includes('INSERT INTO commerce.partner_purchase_items')) {
+        return { rows: [], rowCount: 2 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+
+    await createLinkedPartnerPurchase(client(query), 'test', 'order-cash', 'Wallace');
+
+    const purchaseSql = String(query.mock.calls.find(([sql]) => String(sql)
+      .includes('INSERT INTO commerce.partner_purchases'))![0]);
+    expect(purchaseSql).toContain("THEN 'À vista no acerto'");
+    expect(purchaseSql).toContain("'payable'");
+    const payable = query.mock.calls.find(([sql]) => String(sql)
+      .includes('INSERT INTO finance.partner_payables'))!;
+    expect(payable[1]).toContain('2026-08-18T02:00:00.000Z');
+    expect(String(payable[0])).toContain("'open'");
   });
 
   it('não deixa cancelar depois que a unidade confirmou o recebimento', async () => {
@@ -71,5 +101,30 @@ describe('ponte de estoque Matriz → parceiro', () => {
     await expect(settleLinkedPartnerPayable(
       client(query), 'test', 'order-1', '2026-08-17T15:00:00.000Z', 'Wallace',
     )).resolves.toBeNull();
+  });
+
+  it('quita junto a conta e a compra espelhada depois do acerto fiado', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT p.id AS purchase_id')) {
+        return { rows: [{ purchase_id: 'purchase-1', unit_id: 'unit-1' }] };
+      }
+      if (sql.includes('SELECT id AS payable_id')) {
+        return { rows: [{ payable_id: 'payable-1' }] };
+      }
+      if (sql.includes('UPDATE finance.partner_payables')) {
+        return { rows: [{ id: 'payable-1' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+
+    await expect(settleLinkedPartnerPayable(
+      client(query), 'test', 'order-1', '2026-08-18T15:00:00.000Z',
+      'Wallace', 'pix',
+    )).resolves.toBe('payable-1');
+
+    const purchaseUpdate = query.mock.calls.find(([sql]) => String(sql)
+      .includes('UPDATE commerce.partner_purchases'))!;
+    expect(String(purchaseUpdate[0])).toContain("payment_status='paid_now'");
+    expect(purchaseUpdate[1]).toEqual(['test', 'purchase-1', 'pix']);
   });
 });

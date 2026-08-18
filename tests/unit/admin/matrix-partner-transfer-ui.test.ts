@@ -21,6 +21,9 @@ describe('interface da transferência Matriz → parceiro', () => {
     expect(receipt).toContain('item.expected_quantity');
     expect(receipt).toContain('matrix_shipment_requires_arrival_adjustment');
     expect(html).toContain('Acertar pneu por pneu');
+    expect(html).toContain('À vista será confirmado somente depois do acerto');
+    expect(html).toContain('Pendente · em trânsito');
     expect(app).toContain('cargo_additions');
+    expect(app).toContain('será confirmado no acerto da chegada');
   });
 });

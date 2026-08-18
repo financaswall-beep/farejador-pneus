@@ -1,7 +1,7 @@
 {
   "geradoEm": "2026-08-18T01:35:47.005Z",
   "commitBase": "dd64a35",
-  "total": 1053,
+  "total": 1056,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -44,6 +44,7 @@
     "atacadoArrival": "value:object",
     "atacadoArrivalRefused": "function",
     "atacadoArrivalTotal": "function",
+    "atacadoBusinessInstant": "function",
     "atacadoBuyerChanged": "function",
     "atacadoBuyerInitials": "function",
     "atacadoBuyerKey": "function",
@@ -119,6 +120,8 @@
     "botTab": "value:string",
     "botVisao": "value:null",
     "breakdownByMeasure": "function",
+    "businessFactInstant": "function",
+    "businessTodaySaoPaulo": "function",
     "cancelarVarejo": "function",
     "catalogoApplyMargin": "function",
     "catalogoBrandCorrectionCanSave": "function",

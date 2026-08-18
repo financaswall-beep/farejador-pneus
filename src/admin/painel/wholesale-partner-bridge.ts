@@ -49,11 +49,12 @@ export async function createLinkedPartnerPurchase(
     sold_at: string;
     total_amount: string;
     payment_status: 'paid' | 'pending';
+    partner_payment_terms: 'cash_on_arrival' | 'credit';
     due_date: string | null;
     parent_order_id: string | null;
   }>(
     `SELECT o.id AS order_id,o.partner_unit_id,pu.unit_id,o.sold_at,o.total_amount,
-            o.payment_status,o.due_date,o.parent_order_id
+            o.payment_status,o.partner_payment_terms,o.due_date,o.parent_order_id
        FROM commerce.wholesale_orders o
        LEFT JOIN network.partner_units pu
          ON pu.environment=o.environment AND pu.id=o.partner_unit_id
@@ -72,14 +73,15 @@ export async function createLinkedPartnerPurchase(
        notes,created_by,idempotency_key,payment_status,payable_due_date,
        receipt_status,source_wholesale_order_id
      )
-     SELECT o.environment,pu.unit_id,'Matriz 2W Pneus',o.sold_at,o.total_amount,
-            CASE WHEN o.payment_status='pending' THEN 'A pagar à Matriz' ELSE 'Pago à Matriz' END,
+      SELECT o.environment,pu.unit_id,'Matriz 2W Pneus',o.sold_at,o.total_amount,
+             CASE WHEN o.partner_payment_terms='cash_on_arrival'
+                  THEN 'À vista no acerto' ELSE 'A pagar à Matriz' END,
             CASE WHEN o.parent_order_id IS NOT NULL
                  THEN 'Acréscimo da venda da Matriz '||o.parent_order_id::text
                  ELSE 'Venda da Matriz '||o.id::text END,
             $3,$4,
-            CASE WHEN o.payment_status='pending' THEN 'payable' ELSE 'paid_now' END,
-            CASE WHEN o.payment_status='pending' THEN o.due_date ELSE NULL END,
+             'payable',COALESCE(o.due_date,
+               (o.sold_at AT TIME ZONE 'America/Sao_Paulo')::date),
             'pending',o.id
        FROM commerce.wholesale_orders o
        JOIN network.partner_units pu
@@ -108,23 +110,23 @@ export async function createLinkedPartnerPurchase(
   );
   if (!inserted.rowCount) throw new Error('linked_partner_purchase_items_missing');
 
-  if (order.payment_status === 'pending') {
-    await client.query(
-      `INSERT INTO finance.partner_payables (
-         environment,unit_id,counterparty_name,description,category,amount,
-         due_date,status,notes,created_by,idempotency_key,source_purchase_id
-       ) VALUES (
-         $1,$2,'Matriz 2W Pneus',$3,'supplier',$4,$5::date,'open',$6,$7,$8,$9
-       )`,
-      [
-        environment, order.unit_id,
-        `Compra da Matriz ${order.order_id.slice(0, 8)}`,
-        order.total_amount, order.due_date,
-        `Gerada automaticamente pela venda de atacado ${order.order_id}`,
-        `matrix:${actorLabel}`, `purchase:${purchaseId}:payable`, purchaseId,
-      ],
-    );
-  }
+  await client.query(
+    `INSERT INTO finance.partner_payables (
+       environment,unit_id,counterparty_name,description,category,amount,
+       due_date,status,notes,created_by,idempotency_key,source_purchase_id
+     ) VALUES (
+       $1,$2,'Matriz 2W Pneus',$3,'supplier',$4,
+       COALESCE($5::date,($6::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date),
+       'open',$7,$8,$9,$10
+     )`,
+    [
+      environment, order.unit_id,
+      `Compra da Matriz ${order.order_id.slice(0, 8)}`,
+      order.total_amount, order.due_date, order.sold_at,
+      `Gerada automaticamente pela venda de atacado ${order.order_id}`,
+      `matrix:${actorLabel}`, `purchase:${purchaseId}:payable`, purchaseId,
+    ],
+  );
 
   await client.query(
     `INSERT INTO audit.events (
@@ -237,6 +239,13 @@ export async function settleLinkedPartnerPayable(
     [environment, payable.rows[0].payable_id, paidAt, paymentMethod?.trim() || null],
   );
   if (!paid.rows[0]) throw new Error('matrix_partner_payable_not_open');
+  await client.query(
+    `UPDATE commerce.partner_purchases
+        SET payment_status='paid_now',payable_due_date=NULL,
+            payment_method=COALESCE($3,payment_method)
+      WHERE environment=$1 AND id=$2 AND payment_status='payable'`,
+    [environment, row.purchase_id, paymentMethod?.trim() || null],
+  );
   await client.query(
     `INSERT INTO audit.events (
        environment,domain,entity_table,entity_id,event_type,actor_label,payload_after

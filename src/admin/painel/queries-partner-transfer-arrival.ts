@@ -11,7 +11,6 @@ import {
 } from './sales-money.js';
 
 type Environment = 'prod' | 'test';
-
 export interface PartnerArrivalAdjustmentInput {
   order_id: string;
   items: Array<{ order_item_id: string; accepted_quantity: number }>;
@@ -31,6 +30,10 @@ interface ArrivalOrderItem {
   unit_cost: string;
 }
 
+interface ArrivalOrderLock {
+  purchase_id: string; payment_status: 'paid' | 'pending';
+  partner_payment_terms: 'cash_on_arrival' | 'credit';
+}
 function uniqueIds(rows: Array<{ order_item_id?: string; cargo_lot_id?: string }>, key: 'order_item_id' | 'cargo_lot_id'): boolean {
   const values = rows.map((row) => row[key]).filter(Boolean);
   return new Set(values).size === values.length;
@@ -40,16 +43,14 @@ async function lockArrivalOrder(
   client: PoolClient,
   environment: Environment,
   orderId: string,
-): Promise<{ purchase_id: string; payment_status: 'paid' | 'pending' }> {
-  const result = await client.query<{
-    purchase_id: string; payment_status: 'paid' | 'pending';
-  }>(
-    `SELECT p.id AS purchase_id,o.payment_status
+): Promise<ArrivalOrderLock> {
+  const result = await client.query<ArrivalOrderLock>(
+    `SELECT p.id AS purchase_id,o.payment_status,o.partner_payment_terms
        FROM commerce.wholesale_orders o
        JOIN commerce.partner_purchases p
          ON p.environment=o.environment AND p.source_wholesale_order_id=o.id
         AND p.deleted_at IS NULL
-      WHERE o.environment=$1 AND o.id=$2 AND o.status='confirmed'
+      WHERE o.environment=$1 AND o.id=$2 AND o.status='pending'
         AND o.partner_unit_id IS NOT NULL AND o.partner_transfer_status='in_transit'
         AND p.receipt_status='pending'
       FOR UPDATE OF o,p`,
@@ -174,6 +175,7 @@ export async function settlePartnerArrival(
       return started.result;
     }
     const order = await lockArrivalOrder(client, environment, input.order_id);
+    const settledAt = new Date().toISOString();
     await client.query(`SELECT set_config('app.matrix_partner_bridge','on',true),
                                set_config('app.matrix_partner_arrival','on',true)`);
     const items = await client.query<ArrivalOrderItem>(
@@ -235,32 +237,48 @@ export async function settlePartnerArrival(
     }
     await client.query(
       `UPDATE commerce.wholesale_orders
-          SET settled_total_amount=$3,partner_transfer_status='settled'
+          SET settled_total_amount=$3,partner_transfer_status='settled',status='confirmed',
+              payment_status=CASE WHEN partner_payment_terms='cash_on_arrival'
+                                  THEN 'paid' ELSE 'pending' END,
+              paid_at=CASE WHEN partner_payment_terms='cash_on_arrival'
+                           THEN $4::timestamptz ELSE NULL END
         WHERE environment=$1 AND id=$2`,
-      [environment, input.order_id, total.rows[0]!.total_amount],
+      [environment, input.order_id, total.rows[0]!.total_amount, settledAt],
     );
     await client.query(
-      `UPDATE commerce.partner_purchases SET total_amount=$3
+      `UPDATE commerce.partner_purchases
+          SET total_amount=$3,
+              payment_status=CASE WHEN $4='cash_on_arrival' THEN 'paid_now' ELSE 'payable' END,
+              payable_due_date=CASE WHEN $4='cash_on_arrival' THEN NULL ELSE payable_due_date END,
+              payment_method=CASE WHEN $4='cash_on_arrival'
+                                  THEN 'Pago à Matriz no acerto' ELSE payment_method END
         WHERE environment=$1 AND id=$2`,
-      [environment, order.purchase_id, total.rows[0]!.total_amount],
+      [environment, order.purchase_id, total.rows[0]!.total_amount,
+        order.partner_payment_terms],
     );
-    if (order.payment_status === 'pending') {
-      const payable = await client.query(
-        `UPDATE finance.partner_payables
-            SET amount=$3,status=CASE WHEN $3::numeric=0 THEN 'cancelled' ELSE 'open' END,
-                updated_at=now()
-          WHERE environment=$1 AND source_purchase_id=$2 AND deleted_at IS NULL
-            AND status='open'`,
-        [environment, order.purchase_id, total.rows[0]!.total_amount],
-      );
-      if (!payable.rowCount) throw new Error('matrix_partner_payable_not_open');
-    }
+    const payable = await client.query(
+      `UPDATE finance.partner_payables
+          SET amount=$3,
+              status=CASE WHEN $3::numeric=0 THEN 'cancelled'
+                          WHEN $4='cash_on_arrival' THEN 'paid' ELSE 'open' END,
+              paid_at=CASE WHEN $3::numeric>0 AND $4='cash_on_arrival'
+                           THEN $5::timestamptz ELSE NULL END,
+              payment_method=CASE WHEN $4='cash_on_arrival'
+                                  THEN 'acerto_na_chegada' ELSE payment_method END,
+              updated_at=now()
+        WHERE environment=$1 AND source_purchase_id=$2 AND deleted_at IS NULL
+          AND status='open'`,
+      [environment, order.purchase_id, total.rows[0]!.total_amount,
+        order.partner_payment_terms, settledAt],
+    );
+    if (!payable.rowCount) throw new Error('matrix_partner_payable_not_open');
     await postPartnerArrivalLedgerAdjustment(
-      client, environment, input.order_id, input.actor_label,
+      client, environment, input.order_id, input.actor_label, settledAt,
     );
     const result = {
       order_id: input.order_id, purchase_id: order.purchase_id,
       partner_transfer_status: 'settled', total_amount: total.rows[0]!.total_amount,
+      payment_status: order.partner_payment_terms === 'cash_on_arrival' ? 'paid' : 'pending',
       accepted_units: total.rows[0]!.accepted_units,
       rejected_cargo: rejectedCargo, allocated_cargo: allocated,
     };

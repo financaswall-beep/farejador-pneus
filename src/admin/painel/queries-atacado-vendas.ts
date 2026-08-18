@@ -22,6 +22,7 @@ import {
   createLinkedPartnerPurchase,
   resolveWholesalePartnerUnit,
 } from './wholesale-partner-bridge.js';
+import { postPartnerTransferDispatchLedger } from './partner-transfer-arrival-ledger.js';
 import { resolveAdditionBuyer, resolveWholesaleBuyer } from './queries-atacado-sale-buyer.js';
 import { normalizeSameDayFutureInstant } from './wholesale-business-time.js';
 
@@ -60,6 +61,9 @@ export interface RegisterWholesaleSaleResult {
   parent_order_id: string | null;
   partner_unit_id: string | null;
   linked_partner_purchase_id: string | null;
+  status: 'pending' | 'confirmed';
+  payment_status: 'pending' | 'paid';
+  partner_payment_terms: 'cash_on_arrival' | 'credit' | null;
 }
 
 async function canonicalSaleItems(
@@ -96,30 +100,38 @@ async function insertSaleHeader(
   partnerUnitId: string | null,
   input: RegisterWholesaleSaleInput,
 ): Promise<string> {
-  const pending = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+  const partnerTransfer = partnerUnitId !== null;
+  const requestedCredit = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
+  const pending = partnerTransfer || requestedCredit;
+  const paymentTerms = partnerTransfer
+    ? (requestedCredit ? 'credit' : 'cash_on_arrival') : null;
   const values = [environment, buyerId, input.sold_at ?? null, input.created_by,
-    input.notes ?? null, pending ? 'pending' : 'paid', pending ? (input.due_date ?? null) : null,
+    input.notes ?? null, pending ? 'pending' : 'paid',
+    requestedCredit ? (input.due_date ?? null) : null,
     env.WHOLESALE_FINANCE && !pending
       ? input.paid_at ?? input.sold_at ?? new Date().toISOString() : null,
     input.seller_collaborator_id ?? null];
   const sellerReady = await hasMatrizSellerColumn(client, 'wholesale_orders');
   const sellerSql = sellerReady
     ? `,seller_collaborator_id,parent_order_id,partner_unit_id,
-         dispatched_total_amount,partner_transfer_status)
+         dispatched_total_amount,partner_transfer_status,status,partner_payment_terms)
        VALUES ($1::env_t,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz,
        (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1::env_t AND revoked_at IS NULL),
        $10::uuid,$11::uuid,CASE WHEN $11::uuid IS NULL THEN NULL ELSE 0 END,
-       CASE WHEN $11::uuid IS NULL THEN NULL ELSE 'in_transit' END)`
-    : `,parent_order_id,partner_unit_id,dispatched_total_amount,partner_transfer_status)
+       CASE WHEN $11::uuid IS NULL THEN NULL ELSE 'in_transit' END,$12,$13)`
+    : `,parent_order_id,partner_unit_id,dispatched_total_amount,partner_transfer_status,
+         status,partner_payment_terms)
        VALUES ($1,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz,
        $9::uuid,$10::uuid,CASE WHEN $10::uuid IS NULL THEN NULL ELSE 0 END,
-       CASE WHEN $10::uuid IS NULL THEN NULL ELSE 'in_transit' END)`;
+       CASE WHEN $10::uuid IS NULL THEN NULL ELSE 'in_transit' END,$11,$12)`;
   const result = await client.query<{ id: string }>(
     `INSERT INTO commerce.wholesale_orders
        (environment,buyer_id,sold_at,total_amount,created_by,notes,payment_status,due_date,paid_at${sellerSql}
      RETURNING id`, sellerReady
-      ? [...values, input.parent_order_id ?? null, partnerUnitId]
-      : [...values.slice(0, 8), input.parent_order_id ?? null, partnerUnitId],
+      ? [...values, input.parent_order_id ?? null, partnerUnitId,
+        partnerTransfer ? 'pending' : 'confirmed', paymentTerms]
+      : [...values.slice(0, 8), input.parent_order_id ?? null, partnerUnitId,
+        partnerTransfer ? 'pending' : 'confirmed', paymentTerms],
   );
   return result.rows[0]!.id;
 }
@@ -236,19 +248,31 @@ export async function registerWholesaleSale(
       ? await createLinkedPartnerPurchase(client, environment, orderId, input.created_by)
       : null;
     if (env.MATRIZ_CENTRAL_LEDGER) {
-      const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
-      await ensureWholesaleSaleRevenue(client, ledgerState);
-      await ensureWholesaleSaleCogs(client, ledgerState);
+      if (partnerUnit) {
+        await postPartnerTransferDispatchLedger(
+          client, environment, orderId, input.created_by,
+        );
+      } else {
+        const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
+        await ensureWholesaleSaleRevenue(client, ledgerState);
+        await ensureWholesaleSaleCogs(client, ledgerState);
+      }
     }
     const result = { order_id: orderId, buyer_id: buyer.id, buyer_name: buyer.name,
       total_amount: total.rows[0]!.total_amount, items_count: items.length,
       parent_order_id: input.parent_order_id ?? null,
       partner_unit_id: partnerUnit?.partner_unit_id ?? null,
-      linked_partner_purchase_id: linkedPurchase?.purchase_id ?? null };
+      linked_partner_purchase_id: linkedPurchase?.purchase_id ?? null,
+      status: partnerUnit ? 'pending' as const : 'confirmed' as const,
+      payment_status: partnerUnit || writeInput.payment_status === 'pending'
+        ? 'pending' as const : 'paid' as const,
+      partner_payment_terms: partnerUnit
+        ? (writeInput.payment_status === 'pending' ? 'credit' as const : 'cash_on_arrival' as const)
+        : null };
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_sale',
       entityTable: 'commerce.wholesale_orders', entityId: orderId, eventType: 'created',
       actorLabel: input.created_by, idempotencyKey: operation.idempotencyKey,
-      after: { ...result, payment_status: input.payment_status ?? 'paid' } });
+      after: result });
     await completeIntegrityOperation(client, operation, 'commerce.wholesale_orders', orderId, result);
     await client.query('COMMIT');
     return result;
