@@ -33,7 +33,8 @@ window.PARCEIRO_MODULES.estoqueKpis = () => ({
     },
 
     get stockLowItems() {
-      return this.estoque.filter((item) => ['low_stock', 'out_of_stock'].includes(item.stock_status));
+      return this.estoque.filter((item) =>
+        ['low_stock', 'out_of_stock', 'reserved'].includes(item.stock_status));
     },
 
     get stockOriginSplit() {
@@ -97,10 +98,11 @@ window.PARCEIRO_MODULES.estoqueKpis = () => ({
         if (week) week[key] += amount;
       };
       for (const purchase of this.compras) {
-        if (purchase.status === 'cancelled') continue;
+        if (purchase.status === 'cancelled' || purchase.receipt_status !== 'received') continue;
         const items = Array.isArray(purchase.items) ? purchase.items : [];
-        const qty = items.reduce((sum, item) => sum + this.num(item.quantity), 0);
-        addToWeek(purchase.purchased_at || purchase.created_at, 'entradas', qty);
+        const qty = items.reduce((sum, item) =>
+          sum + this.num(item.received_quantity ?? item.quantity), 0);
+        addToWeek(purchase.received_at || purchase.purchased_at || purchase.created_at, 'entradas', qty);
       }
       if (!this.compras.length) {
         for (const item of this.estoque) {
@@ -120,11 +122,14 @@ window.PARCEIRO_MODULES.estoqueKpis = () => ({
 
     get purchasedUnitsMonth() {
       return this.compras.reduce((sum, purchase) => {
-        if (purchase.status === 'cancelled') return sum;
-        // Só compras do mês corrente (antes somava todas de sempre).
-        if (!this.isCurrentMonth(purchase.purchased_at || purchase.created_at)) return sum;
+        if (purchase.status === 'cancelled' || purchase.receipt_status !== 'received') return sum;
+        // A entrada física pertence ao mês do recebimento, não ao pedido de compra.
+        if (!this.isCurrentMonth(
+          purchase.received_at || purchase.purchased_at || purchase.created_at,
+        )) return sum;
         const items = Array.isArray(purchase.items) ? purchase.items : [];
-        return sum + items.reduce((itemSum, item) => itemSum + this.num(item.quantity), 0);
+        return sum + items.reduce((itemSum, item) =>
+          itemSum + this.num(item.received_quantity ?? item.quantity), 0);
       }, 0);
     },
 

@@ -11,6 +11,7 @@ import { registerPainelStatic } from './route-static.js';
 import { registerPainelDashboard } from './route-dashboard.js';
 import { registerPainelIntegrity } from './route-integrity.js';
 import { registerPainelAtacado } from './route-atacado.js';
+import { registerPainelPartnerTransfer } from './route-partner-transfer.js';
 import { registerPainelGalpao } from './route-galpao.js';
 import { registerPainelFornecedores } from './route-fornecedores.js';
 import { registerPainelFiado } from './route-fiado.js';
@@ -33,6 +34,7 @@ export async function registerPainelRoute(fastify: FastifyInstance): Promise<voi
   await registerPainelDashboard(fastify); // dashboard: pedidos/produtos/rede/matriz-resumo (linhas 395-437 pré-obra)
   await registerPainelIntegrity(fastify); // Etapa 5: recupera operação após reload/resposta perdida
   await registerPainelAtacado(fastify); // atacado: venda/ranking/medidas/resumos + comissões/termos (linhas 438-542 pré-obra)
+  await registerPainelPartnerTransfer(fastify); // acerto por pneu na chegada + carga em transito
   await registerPainelGalpao(fastify); // estoque do galpão (entrada/definir/remover) (linhas 543-599 pré-obra)
   await registerPainelFornecedores(fastify); // fornecedores + compras (linhas 600-654 pré-obra)
   await registerPainelFiado(fastify); // fiado do atacado + últimas vendas + cancelar (linhas 655-719 pré-obra)

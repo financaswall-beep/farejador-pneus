@@ -86,7 +86,7 @@ function painelApp() {
     atacadoStaleDays: 30,
     atacadoForm: {
       buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
-      payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
+      payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '', parent_order_id: '', receiving_unit_id: '',
       items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: '' }],
     },
     // ── ATACADO (Fase 2): estoque do galpão por medida ──
@@ -182,7 +182,7 @@ function painelApp() {
     uploadingReceipt: false,
     receiptUrls: {}, // miniaturas autenticadas (fetch com token → blob URL; <img> puro leva 401)
     // CANCELAR venda (0116): últimas vendas (vivas e canceladas) — de onde se cancela.
-    atacadoVendas: [],
+    atacadoVendas: [], atacadoCargo: [], atacadoArrival: { open: false, order: null, items: [], cargo: [], saving: false, error: null },
     measureBox: { key: null, hits: [] }, // autocomplete de medida: qual campo abriu + sugestões
     // ── ATACADO — FORNECEDORES (0114): de quem o dono compra (entrada do galpão) ──
     fornecedores: [],

@@ -107,10 +107,14 @@ export async function getMatrizCollaboratorManagement(
                 0::numeric AS distance_km, NULL::boolean AS on_time
            FROM commerce.wholesale_orders o
            LEFT JOIN LATERAL (
-             SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*oi.quantity),0) AS margin
+             SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*CASE
+                      WHEN o.partner_transfer_status IN ('settled','received')
+                        THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END),0) AS margin
                FROM commerce.wholesale_order_items oi WHERE oi.order_id=o.id AND oi.environment=o.environment
            ) items ON true
           WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL AND o.status='confirmed'
+            AND (o.partner_transfer_status IS NULL
+              OR o.partner_transfer_status IN ('settled','received'))
             AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
             AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), trip_events AS (

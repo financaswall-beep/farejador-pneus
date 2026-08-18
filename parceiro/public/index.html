@@ -1529,11 +1529,11 @@
                 <article class="stock-purchase-card">
                   <span class="stock-purchase-icon"><i data-lucide="package-open"></i></span>
                   <div>
-                    <small x-text="'Compra #' + purchase.id.slice(0, 8).toUpperCase()"></small>
+                    <small x-text="(purchase.source_wholesale_order_id ? 'Envio da Matriz · ' : '') + 'Compra #' + purchase.id.slice(0, 8).toUpperCase()"></small>
                     <strong x-text="purchase.supplier_name || 'Fornecedor não informado'"></strong>
                     <p><span x-text="purchase.items.length + (purchase.items.length === 1 ? ' produto' : ' produtos')"></span><span x-text="purchaseExpectedUnits(purchase) + ' unidades esperadas'"></span></p>
                     <template x-for="item in purchase.items" :key="item.item_id || item.item_name">
-                      <em x-text="(item.tire_size || item.item_name) + ' · ' + item.quantity + ' un.'"></em>
+                      <em x-text="(item.tire_size || item.item_name) + ' · ' + (item.confirmed_quantity ?? item.quantity) + ' un.'"></em>
                     </template>
                   </div>
                   <aside><b>Aguardando equipe</b><strong x-text="money(purchase.total_amount)"></strong><small x-text="formatDateTime(purchase.created_at)"></small></aside>
@@ -2307,10 +2307,10 @@
                 <h4>Contas a pagar recentes</h4>
                 <template x-for="item in payablesDetail.slice(0, 5)" :key="item.id">
                   <div class="pos-money-row negative">
-                    <span><b x-text="item.title || 'Fornecedor'"></b><small x-text="formatDate(item.date)"></small></span>
+                    <span><b x-text="item.title || 'Fornecedor'"></b><small x-text="item.raw?.managed_by_matrix ? 'Baixa sincronizada pela Matriz' : formatDate(item.date)"></small></span>
                     <div class="pos-money-side">
                       <strong x-text="money(item.amount)"></strong>
-                      <div class="pos-money-actions">
+                      <div class="pos-money-actions" x-show="!item.raw?.managed_by_matrix">
                         <button @click="editPayable(item.raw)">Editar</button>
                         <button class="success" @click="settlePayable(item.source_id)" :disabled="isSaving('payable-pay-' + item.source_id)">Pagar</button>
                         <button class="danger" @click="cancelPayable(item.source_id)" :disabled="isSaving('payable-cancel-' + item.source_id)">Excluir</button>
@@ -3423,7 +3423,7 @@
 <script src="./app.pdv.clientes.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.score.js?v=20260611-onda-c"></script>
-<script src="./app.financeiro.compras.js?v=20260811-recebimento1"></script>
+<script src="./app.financeiro.compras.js?v=20260817-arrival-adjustment1"></script>
 <script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
  <script src="./app.core.js?v=20260810-aprovacao1"></script>

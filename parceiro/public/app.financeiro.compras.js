@@ -14,7 +14,8 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
     purchaseModalOpen: false,
 
     get purchasesPendingReceipt() {
-      return (this.compras || []).filter((purchase) => purchase.receipt_status === 'pending');
+      return (this.compras || []).filter((purchase) => purchase.receipt_status === 'pending'
+        && (!purchase.source_wholesale_order_id || purchase.matrix_arrival_settled));
     },
 
     get purchasesRecentlyReceived() {
@@ -22,7 +23,8 @@ window.PARCEIRO_MODULES.financeiroCompras = () => ({
     },
 
     purchaseExpectedUnits(purchase) {
-      return (purchase?.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      return (purchase?.items || []).reduce((sum, item) => sum
+        + Number(item.confirmed_quantity ?? item.quantity ?? 0), 0);
     },
 
     purchaseReceivedUnits(purchase) {

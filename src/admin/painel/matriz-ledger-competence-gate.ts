@@ -65,10 +65,12 @@ export async function getMatrizLedgerCompetenceGate(
        ('despesas'),('marketing'),('compras'),('estoque')
      ), source_values AS (
        SELECT m.competence,'atacado' origin,
-         COALESCE((SELECT sum(total_amount) FROM commerce.wholesale_orders
+         COALESCE((SELECT sum(COALESCE(settled_total_amount,total_amount)) FROM commerce.wholesale_orders
            WHERE environment=$1 AND sold_at>=m.month_ts
-             AND sold_at<m.month_end_ts),0)
-         -COALESCE((SELECT sum(total_amount) FROM commerce.wholesale_orders
+             AND sold_at<m.month_end_ts
+             AND (partner_transfer_status IS NULL
+               OR partner_transfer_status IN ('settled','received'))),0)
+         -COALESCE((SELECT sum(COALESCE(settled_total_amount,total_amount)) FROM commerce.wholesale_orders
            WHERE environment=$1 AND status='cancelled'
              AND cancelled_at>=m.month_ts AND cancelled_at<m.month_end_ts),0) value
          FROM months m

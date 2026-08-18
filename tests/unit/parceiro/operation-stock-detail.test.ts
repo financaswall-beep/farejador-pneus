@@ -42,11 +42,16 @@ describe('histórico operacional de um item do estoque', () => {
     });
   });
 
-  it('alinha o item recebido com a movimentação da mesma posição', () => {
+  it('alinha o item recebido pelo item_id mesmo quando um item anterior recebeu zero', () => {
     const movement = normalizeOperationStockMovement(event('stock_increment_purchase', {
       purchase_id: 'purchase-0284',
-      moves: [{ stock_id: stockId, new_qty: 12 }],
-      items: [{ quantity: 5 }],
+      moves: [{
+        stock_id: stockId, item_id: 'item-b', received_quantity: 5, new_qty: 12,
+      }],
+      items: [
+        { item_id: 'item-a', expected_quantity: 8, received_quantity: 0 },
+        { item_id: 'item-b', expected_quantity: 5, received_quantity: 5 },
+      ],
     }), stockId);
 
     expect(movement).toMatchObject({

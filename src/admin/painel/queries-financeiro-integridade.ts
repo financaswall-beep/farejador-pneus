@@ -7,6 +7,7 @@ import {
   beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
+import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
 
 export interface MatrizWriteOptions {
   idempotency_key: string;
@@ -43,7 +44,10 @@ async function settleWholesalePayment(
       await client.query('COMMIT');
       return started.result;
     }
-    const activeStatus = sale ? `status='confirmed'` : `status<>'cancelled'`;
+    const activeStatus = sale
+      ? `status='confirmed' AND (partner_transfer_status IS NULL
+          OR partner_transfer_status IN ('settled','received'))`
+      : `status<>'cancelled'`;
     const current = await client.query<{ payment_status: string; total_amount: string }>(
       `SELECT payment_status,total_amount FROM ${table}
         WHERE id=$1 AND environment=$2 AND ${activeStatus} FOR UPDATE`, [entityId, environment]);
@@ -65,6 +69,10 @@ async function settleWholesalePayment(
     const result = integrityResult(paid.rows[0]!);
     if (saleLedger) await postWholesaleSalePayment(
       client, saleLedger, result.paid_at, options.actor_label, options);
+    if (sale) await settleLinkedPartnerPayable(
+      client, environment, entityId, result.paid_at,
+      options.actor_label ?? 'financeiro-matriz', options.payment_method,
+    );
     if (purchaseLedger) await postWholesalePurchasePayment(
       client, purchaseLedger, result.paid_at, options.actor_label, options);
     await recordIntegrityEvent(client, { environment,

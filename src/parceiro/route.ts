@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
 import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
+import {
+  centMoneySchema, partnerPurchaseSchema, sixDecimalCostSchema,
+} from './purchase-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
@@ -42,6 +45,7 @@ import {
   PartialStockReversalError,
   StockBelowReservedError,
   StockReservedCannotDeleteError,
+  StockPositiveCannotDeleteError,
   getPartnerChatConversations,
   getPartnerChatMessages,
   getPartnerChatCustomer,
@@ -241,8 +245,8 @@ const stockSchema = z.object({
   supplier_name: z.string().max(160).nullable().optional(),
   quantity_on_hand: z.number().int().nonnegative().nullable().optional(),
   minimum_quantity: z.number().int().nonnegative().nullable().optional(),
-  average_cost: z.number().nonnegative().nullable().optional(),
-  sale_price: z.number().nonnegative().nullable().optional(),
+  average_cost: sixDecimalCostSchema.nullable().optional(),
+  sale_price: centMoneySchema.nullable().optional(),
   // Campos do refit da tela de estoque (migration 0073).
   tire_condition: z.enum(['meia_vida', 'novo', 'remold']).nullable().optional(),
   shelf_location: z.string().max(60).nullable().optional(),
@@ -388,35 +392,6 @@ const chatSendBodySchema = z.object({
 const chatLinkCustomerBodySchema = z.object({
   customer_id: z.string().uuid(),
 });
-
-const purchaseSchema = z.object({
-  supplier_name: z.string().max(160).nullable().optional(),
-  purchased_at: z.string().datetime().nullable().optional(),
-  payment_method: z.string().max(80).nullable().optional(),
-  payment_status: z.enum(['paid_now', 'payable']).nullable().optional(),
-  payable_due_date: z.string().date().nullable().optional(),
-  notes: z.string().max(1000).nullable().optional(),
-  idempotency_key: z.string().min(8).nullable().optional(),
-  items: z.array(z.object({
-    product_id: z.string().uuid().nullable().optional(),
-    item_name: z.string().min(1).max(240),
-    tire_size: z.string().max(80).nullable().optional(),
-    tire_width_mm: z.number().int().min(1).max(999).nullable().optional(),
-    tire_aspect_ratio: z.number().int().min(1).max(999).nullable().optional(),
-    tire_rim_diameter: z.number().int().min(1).max(30).nullable().optional(),
-    brand: z.string().max(120).nullable().optional(),
-    tire_condition: z.enum(['meia_vida', 'novo', 'remold']),
-    quantity: z.number().int().positive(),
-    unit_cost: z.number().nonnegative(),
-    sale_price: z.number().nonnegative().nullable().optional(),
-  })).min(1),
-}).refine(
-  (data) => data.payment_status !== 'payable' || (data.payable_due_date && data.payable_due_date.trim().length > 0),
-  {
-    message: 'payable_due_date obrigatorio quando payment_status=payable',
-    path: ['payable_due_date'],
-  },
-);
 
 const expenseSchema = z.object({
   expense_date: z.string().date().nullable().optional(),
@@ -1426,12 +1401,20 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
           stock_id: err.stock_id,
         });
       }
+      if (err instanceof StockPositiveCannotDeleteError) {
+        return reply.status(409).send({
+          error: err.code,
+          message: 'Este item ainda possui saldo. Zere o saldo com um ajuste auditado antes de inativar.',
+          stock_id: err.stock_id,
+          quantity_on_hand: err.quantity_on_hand,
+        });
+      }
       throw err;
     }
   });
 
   fastify.post('/parceiro/:slug/api/compras', { preHandler: ownerOnly }, async (request: PartnerAuthedRequest, reply) => {
-    const parsed = purchaseSchema.safeParse(request.body);
+    const parsed = partnerPurchaseSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const path = issue?.path?.join('.') || 'body';
@@ -1449,6 +1432,12 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       if (!result.deleted) return reply.status(404).send({ error: 'purchase_not_found' });
       return reply.status(200).send(result);
     } catch (err) {
+      if (err instanceof Error && err.message === 'matrix_linked_purchase_managed_by_matrix') {
+        return reply.status(409).send({
+          error: err.message,
+          message: 'Esta entrada veio de uma venda da Matriz e deve ser cancelada pela Matriz.',
+        });
+      }
       // Fix pos-Codex (#3): compra com payable pago vinculado nao pode ser apagada
       if (err instanceof PaidPurchaseLockedError) {
         return reply.status(409).send({
@@ -1518,9 +1507,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${path}: ${issue?.message ?? 'invalid'}` });
     }
 
-    const result = await updatePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
-    if (!result.updated) return reply.status(404).send({ error: 'payable_not_found_or_closed' });
-    return reply.status(200).send(result);
+    try {
+      const result = await updatePartnerPayable(getPartnerContext(request), params.data.payableId, parsed.data);
+      if (!result.updated) return reply.status(404).send({ error: 'payable_not_found_or_closed' });
+      return reply.status(200).send(result);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'matrix_linked_payable_managed_by_matrix') {
+        return reply.status(409).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/contas-a-pagar/:payableId/pagar', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {
@@ -1542,6 +1538,9 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       if (err instanceof DuplicateExpenseError) {
         return reply.status(409).send({ error: err.code, duplicates: err.duplicates });
       }
+      if (err instanceof Error && err.message === 'matrix_linked_payable_managed_by_matrix') {
+        return reply.status(409).send({ error: err.message });
+      }
       throw err;
     }
   });
@@ -1550,9 +1549,16 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     const parsed = payableParamsSchema.safeParse(request.params);
     if (!parsed.success) return reply.status(404).send({ error: 'payable_not_found' });
 
-    const result = await cancelPartnerPayable(getPartnerContext(request), parsed.data.payableId);
-    if (!result.cancelled) return reply.status(404).send({ error: 'payable_not_found' });
-    return reply.status(200).send(result);
+    try {
+      const result = await cancelPartnerPayable(getPartnerContext(request), parsed.data.payableId);
+      if (!result.cancelled) return reply.status(404).send({ error: 'payable_not_found' });
+      return reply.status(200).send(result);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'matrix_linked_payable_managed_by_matrix') {
+        return reply.status(409).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   fastify.post('/parceiro/:slug/api/contas-a-receber', { preHandler: financeiroScreen }, async (request: PartnerAuthedRequest, reply) => {

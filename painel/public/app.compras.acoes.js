@@ -217,6 +217,14 @@ window.PAINEL_MODULES.comprasAcoes = function () {
     },
     async atacadoCancelSale(v) {
       if (this.adminUser?.role !== 'owner') return;
+      if (v.partner_transfer_status === 'in_transit') {
+        await this.atacadoOpenArrival(v);
+        return;
+      }
+      if (v.partner_transfer_status) {
+        window.alert('Esta remessa já foi acertada com o parceiro e não pode usar o cancelamento comum. Faça uma devolução física registrada.');
+        return;
+      }
       const pago = v.payment_status === 'paid';
       const aviso = pago ? '\n\n⚠️ A venda consta como paga; o Financeiro criará uma devolução ao cliente em aberto.'
         : '\n\nEla sai do ranking, do resumo e do a receber.';

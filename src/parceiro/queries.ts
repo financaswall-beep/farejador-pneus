@@ -37,6 +37,9 @@ import {
   requireTireCondition,
   type TireCondition,
 } from '../shared/tire-condition.js';
+import { moneyCents } from '../shared/catalog-pricing.js';
+import { reversePurchaseStockCost } from './partner-stock-cost.js';
+import { partnerPurchaseTotalCents } from './purchase-schema.js';
 export type { PartnerCommissionConfig } from './commission.js';
 export {
   getPartnerCommissionTeam,
@@ -122,7 +125,7 @@ export interface RegisterPartnerPurchaseInput {
   payment_status?: 'paid_now' | 'payable' | null;
   payable_due_date?: string | null;
   notes?: string | null;
-  idempotency_key?: string | null;
+  idempotency_key: string;
   items: Array<{
     product_id?: string | null;
     item_name: string;
@@ -234,7 +237,7 @@ export class PaidPurchaseLockedError extends Error {
 
 export class PartialStockReversalError extends Error {
   readonly code = 'stock_reversal_incomplete';
-  readonly failed_items: Array<{ item_name: string; quantity: number }>;
+  readonly failed_items: Array<{ item_name: string; quantity: number; reason?: string }>;
   constructor(failedItems: PartialStockReversalError['failed_items']) {
     super('stock_reversal_incomplete');
     this.failed_items = failedItems;
@@ -257,6 +260,17 @@ export class StockReservedCannotDeleteError extends Error {
   constructor(stockId: string) {
     super('stock_reserved_cannot_delete');
     this.stock_id = stockId;
+  }
+}
+
+export class StockPositiveCannotDeleteError extends Error {
+  readonly code = 'stock_positive_cannot_delete';
+  readonly stock_id: string;
+  readonly quantity_on_hand: number;
+  constructor(stockId: string, quantityOnHand: number) {
+    super('stock_positive_cannot_delete');
+    this.stock_id = stockId;
+    this.quantity_on_hand = quantityOnHand;
   }
 }
 
@@ -742,17 +756,24 @@ export async function getPartnerCompras(ctx: PartnerContext, opts: PartnerListOp
       `SELECT pp.id, pp.supplier_name, pp.purchased_at, pp.total_amount,
               pp.payment_method, pp.notes, pp.created_at,
               pp.payment_status, pp.payable_due_date, pp.receipt_status,
-              pp.received_at, pp.received_by_label,
+              pp.received_at, pp.received_by_label,pp.source_wholesale_order_id,
+              CASE WHEN pp.source_wholesale_order_id IS NULL THEN true ELSE NOT EXISTS (
+                SELECT 1 FROM commerce.partner_purchase_items pending_matrix_item
+                 WHERE pending_matrix_item.environment=pp.environment
+                   AND pending_matrix_item.purchase_id=pp.id
+                   AND pending_matrix_item.confirmed_quantity IS NULL
+              ) END AS matrix_arrival_settled,
               COALESCE(jsonb_agg(jsonb_build_object(
                 'item_id', ppi.id,
                 'item_name', ppi.item_name,
                 'quantity', ppi.quantity,
+                'confirmed_quantity', ppi.confirmed_quantity,
                 'received_quantity', ppi.received_quantity,
                 'unit_cost', ppi.unit_cost,
                 'tire_size', ppi.tire_size,
                 'brand', ppi.brand,
                 'tire_condition', ppi.tire_condition,
-                'subtotal', (ppi.quantity * ppi.unit_cost)
+                'subtotal', (COALESCE(ppi.confirmed_quantity,ppi.quantity) * ppi.unit_cost)
               ) ORDER BY ppi.created_at) FILTER (WHERE ppi.id IS NOT NULL), '[]'::jsonb) AS items
        FROM commerce.partner_purchases pp
        LEFT JOIN commerce.partner_purchase_items ppi
@@ -774,14 +795,31 @@ export async function getPartnerCompras(ctx: PartnerContext, opts: PartnerListOp
 export async function getPartnerPayables(ctx: PartnerContext, opts: PartnerListOpts = {}): Promise<unknown[]> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const result = await client.query(
-      `SELECT id, counterparty_name, description, category, amount, due_date,
-              status, paid_at, payment_method, notes, created_at, source_purchase_id
-       FROM finance.partner_payables
-       WHERE environment = $1 AND unit_id = $2 AND deleted_at IS NULL
+      `SELECT payable.id,payable.counterparty_name,payable.description,payable.category,
+              payable.amount,payable.due_date,payable.status,payable.paid_at,
+              payable.payment_method,payable.notes,payable.created_at,payable.source_purchase_id,
+              EXISTS (SELECT 1 FROM commerce.partner_purchases purchase
+                WHERE purchase.environment=payable.environment
+                  AND purchase.id=payable.source_purchase_id
+                  AND purchase.source_wholesale_order_id IS NOT NULL) AS managed_by_matrix
+       FROM finance.partner_payables payable
+       WHERE payable.environment = $1 AND payable.unit_id = $2 AND payable.deleted_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM commerce.partner_purchases matrix_purchase
+            WHERE matrix_purchase.environment=payable.environment
+              AND matrix_purchase.id=payable.source_purchase_id
+              AND matrix_purchase.source_wholesale_order_id IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM commerce.partner_purchase_items pending_item
+                 WHERE pending_item.environment=matrix_purchase.environment
+                   AND pending_item.purchase_id=matrix_purchase.id
+                   AND pending_item.confirmed_quantity IS NULL
+              )
+         )
          AND ($3 OR NOT EXISTS (
            SELECT 1 FROM commerce.partner_dismissed_items d
             WHERE d.environment = $1 AND d.unit_id = $2
-              AND d.item_type = 'payable' AND d.item_id = id::text))
+              AND d.item_type = 'payable' AND d.item_id = payable.id::text))
        ORDER BY
          CASE status WHEN 'open' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END,
          due_date ASC NULLS LAST,
@@ -1774,6 +1812,11 @@ export async function deletePartnerStock(
     if (Number(stock.rows[0]!.quantity_reserved ?? 0) > 0) {
       throw new StockReservedCannotDeleteError(stockId);
     }
+    if (Number(stock.rows[0]!.quantity_on_hand ?? 0) > 0) {
+      throw new StockPositiveCannotDeleteError(
+        stockId, Number(stock.rows[0]!.quantity_on_hand),
+      );
+    }
 
     const result = await client.query<{ id: string }>(
       `UPDATE commerce.partner_stock_levels
@@ -1819,7 +1862,9 @@ export async function registerPartnerPurchase(
   input: RegisterPartnerPurchaseInput,
 ): Promise<{ purchase_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
-    const total = input.items.reduce((sum, item) => sum + item.quantity * item.unit_cost, 0);
+    if (input.idempotency_key.trim().length < 8) throw new Error('purchase_idempotency_key_invalid');
+    const totalCents = partnerPurchaseTotalCents(input.items);
+    const total = totalCents / 100;
     const paymentStatus = input.payment_status === 'payable' ? 'payable' : 'paid_now';
     if (paymentStatus === 'payable' && !input.payable_due_date) {
       throw new Error('payable_due_date_required_when_payment_status_payable');
@@ -1830,7 +1875,8 @@ export async function registerPartnerPurchase(
          payment_method, notes, created_by, idempotency_key,
          payment_status, payable_due_date, receipt_status
        ) VALUES ($1, $2, $3, COALESCE($4::timestamptz, now()), $5, $6, $7, $8, $9, $10, $11::date, 'pending')
-       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       ON CONFLICT (environment, unit_id, idempotency_key)
+       WHERE idempotency_key IS NOT NULL
        DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
        RETURNING id`,
       [
@@ -1865,10 +1911,12 @@ export async function registerPartnerPurchase(
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           ctx.environment, purchaseId, item.product_id ?? null, item.item_name,
-          item.quantity, item.unit_cost, requireTireCondition(item.tire_condition),
+          item.quantity, moneyCents(item.unit_cost) / 100,
+          requireTireCondition(item.tire_condition),
           normalizeText(item.tire_size), item.tire_width_mm ?? null,
           item.tire_aspect_ratio ?? null, item.tire_rim_diameter ?? null,
-          normalizeText(item.brand), item.sale_price ?? null,
+          normalizeText(item.brand), item.sale_price == null
+            ? null : moneyCents(item.sale_price) / 100,
         ],
       );
       }
@@ -1947,12 +1995,22 @@ export async function registerPartnerPurchase(
 export async function deletePartnerPurchase(
   ctx: PartnerContext,
   purchaseId: string,
-): Promise<{ purchase_id: string; deleted: boolean; stock_moves: Array<{ stock_id: string; new_qty: number; new_status: string }> }> {
+): Promise<{
+  purchase_id: string;
+  deleted: boolean;
+  stock_moves: Array<{
+    stock_id: string; item_id: string; quantity_delta: number;
+    previous_qty: number; new_qty: number;
+    previous_average_cost: string | null; new_average_cost: string;
+    reversed_value: string; rounding_residual: string; new_status: string;
+  }>;
+}> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     const purchaseRow = await client.query<{
       id: string; supplier_name: string | null; receipt_status: 'pending' | 'received';
+      source_wholesale_order_id: string | null;
     }>(
-      `SELECT id, supplier_name, receipt_status
+      `SELECT id,supplier_name,receipt_status,source_wholesale_order_id
        FROM commerce.partner_purchases
        WHERE id = $1 AND environment = $2 AND unit_id = $3 AND deleted_at IS NULL
        FOR UPDATE`,
@@ -1961,6 +2019,9 @@ export async function deletePartnerPurchase(
 
     if (purchaseRow.rowCount !== 1) {
       return { purchase_id: purchaseId, deleted: false, stock_moves: [] };
+    }
+    if (purchaseRow.rows[0]!.source_wholesale_order_id) {
+      throw new Error('matrix_linked_purchase_managed_by_matrix');
     }
 
     // Fix pos-Codex (#3): bloqueia delete se houver payable vinculado JA PAGO.
@@ -1982,64 +2043,110 @@ export async function deletePartnerPurchase(
 
     const supplierName = normalizeText(purchaseRow.rows[0]!.supplier_name);
     const items = await client.query<{
-      product_id: string | null; item_name: string; quantity: number; received_quantity: number | null;
+      id: string; product_id: string | null; item_name: string; quantity: number;
+      unit_cost: string; received_quantity: number | null; received_stock_id: string | null;
       tire_size: string | null; brand: string | null; tire_condition: TireCondition | null;
     }>(
-      `SELECT product_id, item_name, quantity, received_quantity, tire_size, brand, tire_condition
+      `SELECT id,product_id,item_name,quantity,unit_cost::text,received_quantity,
+              received_stock_id,tire_size,brand,tire_condition
        FROM commerce.partner_purchase_items
-       WHERE purchase_id = $1 AND environment = $2`,
+       WHERE purchase_id = $1 AND environment = $2
+       ORDER BY created_at DESC,id DESC`,
       [purchaseId, ctx.environment],
     );
 
-    const moves: Array<{ stock_id: string; new_qty: number; new_status: string }> = [];
-    const failedReversals: Array<{ item_name: string; quantity: number }> = [];
+    const moves: Array<{
+      stock_id: string; item_id: string; quantity_delta: number;
+      previous_qty: number; new_qty: number;
+      previous_average_cost: string | null; new_average_cost: string;
+      reversed_value: string; rounding_residual: string; new_status: string;
+    }> = [];
+    const failedReversals: Array<{ item_name: string; quantity: number; reason?: string }> = [];
     for (const item of purchaseRow.rows[0]!.receipt_status === 'received' ? items.rows : []) {
       const reversedQuantity = Number(item.received_quantity ?? item.quantity);
       if (reversedQuantity === 0) continue;
-      const moved = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
-        `WITH target AS (
-           SELECT id
+      const target = await client.query<{
+        stock_id: string; quantity_on_hand: number; quantity_reserved: number;
+        average_cost: string | null;
+      }>(
+        `SELECT id AS stock_id,quantity_on_hand,quantity_reserved,average_cost::text
            FROM commerce.partner_stock_levels
-           WHERE environment = $1
-             AND unit_id = $2
-             AND lower(item_name) = lower($3)
-             AND supplier_name IS NOT DISTINCT FROM $4
-             AND tire_condition IS NOT DISTINCT FROM $5
-             AND ($6::text IS NULL OR lower(trim(COALESCE(tire_size,''))) = lower(trim($6)))
-             AND ($7::text IS NULL OR lower(trim(COALESCE(brand,''))) = lower(trim($7)))
-             AND deleted_at IS NULL
-             AND is_tracked
-             AND quantity_on_hand >= $8
-           ORDER BY updated_at DESC
-           LIMIT 1
-           FOR UPDATE
-         )
-         UPDATE commerce.partner_stock_levels ps
-         SET quantity_on_hand = ps.quantity_on_hand - $8,
-             -- A5: estorno de compra recalcula status pelo helper. Se o disponível
-             -- voltar a <= 0 com reserva aberta, o item volta corretamente a 'reserved'.
-             stock_status = commerce.partner_stock_status(
-               ps.quantity_on_hand - $8, ps.quantity_reserved, ps.minimum_quantity, ps.is_tracked),
-             updated_by = $9,
-             updated_at = now()
-         FROM target
-         WHERE ps.id = target.id
-         RETURNING ps.id AS stock_id, ps.quantity_on_hand AS new_qty, ps.stock_status AS new_status`,
+          WHERE environment=$1 AND unit_id=$2
+            AND (
+              ($3::uuid IS NOT NULL AND id=$3::uuid)
+              OR ($3::uuid IS NULL
+                AND lower(trim(item_name))=lower(trim($4))
+                AND lower(trim(COALESCE(supplier_name,'')))=
+                    lower(trim(COALESCE($5::text,'')))
+                AND tire_condition IS NOT DISTINCT FROM $6
+                AND lower(trim(COALESCE(tire_size,'')))=
+                    lower(trim(COALESCE($7::text,'')))
+                AND lower(trim(COALESCE(brand,'')))=
+                    lower(trim(COALESCE($8::text,'')))
+              )
+            )
+            AND deleted_at IS NULL AND is_tracked AND quantity_on_hand IS NOT NULL
+          ORDER BY CASE WHEN id=$3::uuid THEN 0 ELSE 1 END,updated_at DESC
+          LIMIT 1 FOR UPDATE`,
         [
-          ctx.environment, ctx.unitId, item.item_name, supplierName,
-          item.tire_condition, normalizeText(item.tire_size), normalizeText(item.brand),
-          reversedQuantity, `partner:${ctx.slug}`,
+          ctx.environment, ctx.unitId, item.received_stock_id, item.item_name,
+          supplierName, item.tire_condition, normalizeText(item.tire_size),
+          normalizeText(item.brand),
         ],
       );
-      if (moved.rowCount && moved.rowCount > 0) {
-        moves.push(moved.rows[0]!);
-      } else {
-        // Fix pos-Codex (#4 mini-trava): se nao achou stock pra estornar este item,
-        // registra. Se sobrar item sem estorno, ABORTA o delete inteiro abaixo
-        // (rollback automatico via throw). Etapa 7 vai resolver com FK direta
-        // partner_purchase_items -> partner_stock_levels.
-        failedReversals.push({ item_name: item.item_name, quantity: reversedQuantity });
+      const stock = target.rows[0];
+      if (!stock) {
+        failedReversals.push({
+          item_name: item.item_name, quantity: reversedQuantity,
+          reason: item.received_stock_id ? 'received_stock_missing' : 'legacy_stock_not_found',
+        });
+        continue;
       }
+      if (Number(stock.quantity_on_hand) - reversedQuantity < Number(stock.quantity_reserved)) {
+        failedReversals.push({
+          item_name: item.item_name, quantity: reversedQuantity,
+          reason: 'stock_reserved_or_consumed',
+        });
+        continue;
+      }
+      let reversal;
+      try {
+        reversal = reversePurchaseStockCost({
+          current_quantity: Number(stock.quantity_on_hand),
+          current_average_cost: stock.average_cost,
+          reversed_quantity: reversedQuantity,
+          purchase_unit_cost: item.unit_cost,
+        });
+      } catch (error) {
+        failedReversals.push({
+          item_name: item.item_name, quantity: reversedQuantity,
+          reason: error instanceof Error ? error.message : 'stock_cost_reversal_failed',
+        });
+        continue;
+      }
+      const moved = await client.query<{
+        stock_id: string; new_qty: number; new_average_cost: string; new_status: string;
+      }>(
+        `UPDATE commerce.partner_stock_levels
+            SET quantity_on_hand=$4,average_cost=$5,
+                stock_status=commerce.partner_stock_status(
+                  $4,quantity_reserved,minimum_quantity,is_tracked),
+                updated_by=$6,updated_at=now()
+          WHERE id=$1 AND environment=$2 AND unit_id=$3
+          RETURNING id AS stock_id,quantity_on_hand AS new_qty,
+                    average_cost::text AS new_average_cost,stock_status AS new_status`,
+        [
+          stock.stock_id, ctx.environment, ctx.unitId, reversal.next_quantity,
+          reversal.next_average_cost, `partner:${ctx.slug}`,
+        ],
+      );
+      moves.push({
+        ...moved.rows[0]!, item_id: item.id, quantity_delta: -reversedQuantity,
+        previous_qty: Number(stock.quantity_on_hand),
+        previous_average_cost: stock.average_cost,
+        reversed_value: reversal.reversed_value,
+        rounding_residual: reversal.rounding_residual,
+      });
     }
 
     if (failedReversals.length > 0) {
@@ -2287,12 +2394,32 @@ export async function registerPartnerPayable(
 // registerPartnerPayable quando o payable ja vem com status='paid'
 // (evita abrir nova transacao - a conta recem-criada poderia nao estar
 // visivel ainda em outra connection).
+async function assertPayableNotManagedByMatrix(
+  client: PoolClient,
+  ctx: PartnerContext,
+  payableId: string,
+): Promise<void> {
+  const linked = await client.query(
+    `SELECT 1
+       FROM finance.partner_payables payable
+       JOIN commerce.partner_purchases purchase
+         ON purchase.environment=payable.environment
+        AND purchase.id=payable.source_purchase_id
+      WHERE payable.environment=$1 AND payable.unit_id=$2 AND payable.id=$3
+        AND purchase.source_wholesale_order_id IS NOT NULL
+      LIMIT 1`,
+    [ctx.environment, ctx.unitId, payableId],
+  );
+  if (linked.rows[0]) throw new Error('matrix_linked_payable_managed_by_matrix');
+}
+
 async function _settlePartnerPayableWithClient(
   client: PoolClient,
   ctx: PartnerContext,
   payableId: string,
   input: SettlePartnerPayableInput,
 ): Promise<{ payable_id: string; paid: boolean }> {
+    await assertPayableNotManagedByMatrix(client, ctx, payableId);
     const paidAt = input.paid_at ?? new Date().toISOString();
     const result = await client.query<{
       id: string;
@@ -2438,6 +2565,7 @@ export async function updatePartnerPayable(
   input: UpdatePartnerPayableInput,
 ): Promise<{ payable_id: string; updated: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await assertPayableNotManagedByMatrix(client, ctx, payableId);
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_payables
        SET counterparty_name = $4,
@@ -2497,6 +2625,7 @@ export async function cancelPartnerPayable(
   payableId: string,
 ): Promise<{ payable_id: string; cancelled: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    await assertPayableNotManagedByMatrix(client, ctx, payableId);
     const result = await client.query<{ id: string; description: string; amount: string }>(
       `UPDATE finance.partner_payables
        SET status = 'cancelled',

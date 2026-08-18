@@ -116,6 +116,16 @@ trânsito→estoque e uma nova chave no gate de reconciliação para impedir reg
 valida centavos e limites também na função SQL, exclui pedidos abertos dos números
 realizados e fornece uma reconciliação de cabeçalho, itens e frete para o smoke.
 
+`0182_stock_end_to_end_integrity.sql` fecha a integridade ponta a ponta do estoque,
+incluindo vínculo exato de recebimento, custo médio, totais e filme físico.
+
+`0183_matrix_partner_stock_transfer.sql` liga transacionalmente a saída da Matriz ao
+documento pendente de compra e recebimento da unidade parceira.
+
+`0184_partner_arrival_item_adjustments.sql` permite o acerto por quantidade na chegada,
+mantém pneus recusados como carga em trânsito, redireciona-os sem nova baixa e só os
+devolve ao saldo da Matriz quando o retorno físico ao galpão é registrado.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

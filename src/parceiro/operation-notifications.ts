@@ -32,7 +32,8 @@ export async function getPartnerOperationNotifications(
         `SELECT
            (SELECT count(*)::int FROM commerce.partner_stock_levels s
              WHERE s.environment=$1 AND s.unit_id=$2 AND s.deleted_at IS NULL
-               AND s.is_tracked AND s.stock_status IN ('low_stock','out_of_stock')) AS low_stock,
+               AND s.is_tracked
+               AND s.stock_status IN ('low_stock','out_of_stock','reserved')) AS low_stock,
            (SELECT count(*)::int FROM commerce.partner_item_registration_requests r
              WHERE r.environment=$1 AND r.unit_id=$2 AND r.status='pending') AS pending_registrations,
            (SELECT count(*)::int FROM commerce.partner_stock_count_requests r

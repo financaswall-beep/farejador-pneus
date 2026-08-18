@@ -89,11 +89,15 @@ export async function getMatrizFinanceiroVisao(
       // estourava o % (500%). Agora numerador e denominador batem; clamp em 100 no cálculo.
       env.WHOLESALE_FINANCE
         ? dbPool.query<{ aberto: string }>(
-            `SELECT COALESCE(SUM(oi.line_total), 0) AS aberto
+            `SELECT COALESCE(SUM(oi.unit_price*CASE
+                       WHEN o.partner_transfer_status IN ('settled','received')
+                         THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END), 0) AS aberto
                FROM commerce.wholesale_orders o
                JOIN commerce.wholesale_order_items oi
                  ON oi.order_id = o.id AND oi.environment = o.environment
               WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
+                AND (o.partner_transfer_status IS NULL
+                  OR o.partner_transfer_status IN ('settled','received'))
                 AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
             [environment],
           ).then((r) => r.rows[0]!.aberto)
@@ -119,11 +123,15 @@ export async function getMatrizFinanceiroVisao(
       // é o padrão de mercado. Atacado (unit_cost congelado) + varejo da main (matriz_unit_cost).
       dbPool.query<{ custo: string }>(
         `SELECT
-           (SELECT COALESCE(SUM(oi.unit_cost * oi.quantity), 0)
+           (SELECT COALESCE(SUM(oi.unit_cost * CASE
+                       WHEN o.partner_transfer_status IN ('settled','received')
+                         THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END), 0)
               FROM commerce.wholesale_orders o
               JOIN commerce.wholesale_order_items oi
                 ON oi.order_id = o.id AND oi.environment = o.environment
              WHERE o.environment = $1 AND o.status = 'confirmed'
+               AND (o.partner_transfer_status IS NULL
+                 OR o.partner_transfer_status IN ('settled','received'))
                AND o.sold_at >= now() - interval '30 days')
          + (SELECT COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)
               FROM commerce.orders o

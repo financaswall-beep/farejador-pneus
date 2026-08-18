@@ -15,7 +15,7 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
     '../../src/admin/painel/queries-galpao-movimentos.js'
   ).setWholesaleStockComRotulo;
   let removeStock: typeof import(
-    '../../src/admin/painel/queries-galpao-movimentos.js'
+    '../../src/admin/painel/queries-galpao-removal.js'
   ).deleteWholesaleStockComRotulo;
   let applyPhysicalCount: typeof import(
     '../../src/admin/painel/queries-stock-physical-count.js'
@@ -33,8 +33,10 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       addWholesaleStockEntryComRotulo: addEntry,
       applyGalpaoBaixaManual: applyDecrement,
       setWholesaleStockComRotulo: setStock,
-      deleteWholesaleStockComRotulo: removeStock,
     } = await import('../../src/admin/painel/queries-galpao-movimentos.js'));
+    ({ deleteWholesaleStockComRotulo: removeStock } = await import(
+      '../../src/admin/painel/queries-galpao-removal.js'
+    ));
     ({ applyMatrizPhysicalStockCount: applyPhysicalCount } = await import(
       '../../src/admin/painel/queries-stock-physical-count.js'
     ));
@@ -152,7 +154,11 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       reason: 'definicao inicial do teste',
       actor_label: 'owner:inventory',
     }, db.pool);
-    await removeStock(measure, 'Sem marca', 'meia_vida', 'test', db.pool);
+    await removeStock({
+      environment: 'test', measure, brand: 'Sem marca', tire_condition: 'meia_vida',
+      reason: 'remoção integral do teste de ledger',
+      idempotency_key: randomUUID(), actor_label: 'owner:inventory',
+    }, db.pool);
 
     const proof = await db.pool.query(
       `SELECT a.source,a.direction,t.transaction_kind,

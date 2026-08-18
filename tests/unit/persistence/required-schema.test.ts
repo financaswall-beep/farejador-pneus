@@ -23,11 +23,22 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='receipt_status'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='received_quantity'`);
     expect(REQUIRED_SCHEMA_SQL).toContain('partner_purchases_receipt_idempotency_uniq');
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='received_stock_id'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain('numeric_scale=6');
+    expect(REQUIRED_SCHEMA_SQL).toContain('partner_stock_natural_key_uniq');
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='partner_unit_id'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='source_wholesale_order_id'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='source_wholesale_order_item_id'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain('partner_purchases_source_wholesale_order_uniq');
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='partner_transfer_status'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='accepted_quantity'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='confirmed_quantity'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.matrix_partner_cargo_lots')`);
   });
 
-  it('recusa iniciar antes da migration 0169', async () => {
+  it('recusa iniciar antes da migration 0184', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0169_partner_purchase_receiving');
+      .rejects.toThrow('required_schema_missing:0184_partner_arrival_item_adjustments');
   });
 });

@@ -75,6 +75,12 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
       if (err instanceof Error && err.message.startsWith('oversell:')) {
         return reply.status(409).send({ error: 'oversell', items: JSON.parse(err.message.slice(9)) });
       }
+      if (err instanceof Error && [
+        'partner_unit_not_found', 'partner_unit_required', 'partner_unit_not_allowed',
+        'wholesale_parent_order_not_open_root', 'wholesale_addition_partner_unit_mismatch',
+      ].includes(err.message)) {
+        return reply.status(409).send({ error: err.message });
+      }
       const mapped = mapWriteError(err);
       logger.error({ err, status: mapped.status }, 'painel wholesale sale failed');
       return reply.status(mapped.status).send({ error: mapped.error });

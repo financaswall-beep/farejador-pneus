@@ -90,15 +90,16 @@ export async function applyWholesaleStockReturn(
   items: StockItem[],
   enabled: boolean,
   ref?: string,
+  source = 'cancelamento_venda',
 ): Promise<void> {
   if (!enabled) return;
   const variants = aggregateItems(items);
   if (variants.size === 0) return;
 
   await client.query(
-    `SELECT set_config('app.galpao_source', 'cancelamento_venda', true),
+    `SELECT set_config('app.galpao_source', $2, true),
             set_config('app.galpao_ref', COALESCE($1, ''), true)`,
-    [ref ?? null],
+    [ref ?? null, source],
   );
   for (const { measure, brand, tire_condition: condition, quantity: qty } of [...variants.values()]
     .sort((a, b) => `${a.measure}\u0000${a.brand}\u0000${a.tire_condition}`

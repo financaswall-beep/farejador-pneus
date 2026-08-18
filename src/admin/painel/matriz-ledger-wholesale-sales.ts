@@ -28,14 +28,17 @@ export async function getWholesaleSaleLedgerState(
     payment_status: 'paid' | 'pending'; due_date: string | null;
     paid_at: string | null; created_by: string | null;
   }>(
-    `SELECT o.buyer_id,o.total_amount,o.sold_at,o.payment_status,o.due_date,
+    `SELECT o.buyer_id,COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
+            o.sold_at,o.payment_status,o.due_date,
             o.paid_at,o.created_by,
-            COALESCE(sum(i.quantity*i.unit_cost),0)::numeric(14,2)::text cogs_amount
+            COALESCE(sum((CASE WHEN o.partner_transfer_status IN ('settled','received')
+              THEN i.accepted_quantity ELSE i.quantity END)*i.unit_cost),0)::numeric(14,2)::text cogs_amount
        FROM commerce.wholesale_orders o
        LEFT JOIN commerce.wholesale_order_items i
          ON i.environment=o.environment AND i.order_id=o.id
       WHERE o.environment=$1 AND o.id=$2
-      GROUP BY o.id,o.buyer_id,o.total_amount,o.sold_at,o.payment_status,
+      GROUP BY o.id,o.buyer_id,o.total_amount,o.settled_total_amount,
+               o.partner_transfer_status,o.sold_at,o.payment_status,
                o.due_date,o.paid_at,o.created_by`,
     [environment, orderId],
   );

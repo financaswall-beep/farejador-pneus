@@ -11,13 +11,17 @@ const variantSchema = {
 export const setWholesaleStockSchema = z.object({
   ...variantSchema,
   quantity_on_hand: z.number().int().min(0).max(1_000_000),
-  unit_cost: z.number().min(0).max(9_999_999.99).optional(),
+  unit_cost: z.number().min(0).max(9_999_999.99),
   min_quantity: z.number().int().min(0).max(1_000_000).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   reason: z.string().trim().min(2).max(300).optional(),
 });
 
-export const removeWholesaleStockSchema = z.object(variantSchema);
+export const removeWholesaleStockSchema = z.object({
+  ...variantSchema,
+  reason: z.string().trim().min(2).max(300),
+  idempotency_key: idempotencyKeySchema,
+});
 
 export const transferWholesaleStockConditionSchema = z.object({
   measure: variantSchema.measure,

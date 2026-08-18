@@ -38,6 +38,7 @@ describe('avisos internos da Operação do parceiro', () => {
       'partner-deliveries-delayed', 'partner-payables-overdue',
     ]);
     expect(mocks.query).toHaveBeenCalledTimes(3);
+    expect(String(mocks.query.mock.calls[0]?.[0])).toContain("'reserved'");
     for (const call of mocks.query.mock.calls) {
       expect(call[1]).toEqual(['test', 'unit-a']);
     }

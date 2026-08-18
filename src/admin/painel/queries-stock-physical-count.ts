@@ -7,6 +7,7 @@ import {
 } from './stage5-integrity.js';
 import { setGalpaoMovContext } from './queries-galpao-movimentos.js';
 import { postMatrizInventoryAdjustmentsByMovementRef } from './matriz-ledger-inventory.js';
+import { canonicalCatalogBrand } from './catalog-brand.js';
 import {
   requireTireCondition,
   type TireCondition,
@@ -18,6 +19,7 @@ interface StockCountRow {
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number;
+  quantity_reserved: number;
   unit_cost: string | null;
 }
 
@@ -53,7 +55,7 @@ export async function applyMatrizPhysicalStockCount(
   if (!input.rows.length) throw new Error('physical_count_rows_required');
   const normalized = input.rows.map((row) => ({
     measure: row.measure.trim(),
-    brand: row.brand?.trim() || 'Sem marca',
+    brand: canonicalCatalogBrand(row.brand) ?? 'Sem marca',
     tire_condition: requireTireCondition(row.tire_condition),
     counted_quantity: row.counted_quantity,
   })).sort((a, b) => `${a.measure}\u0000${a.brand}\u0000${a.tire_condition}`
@@ -83,7 +85,7 @@ export async function applyMatrizPhysicalStockCount(
       return started.result;
     }
     const current = await client.query<StockCountRow>(
-      `SELECT id,measure,brand,tire_condition,quantity_on_hand,unit_cost::text
+      `SELECT id,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost::text
          FROM commerce.wholesale_stock
         WHERE environment=$1
           AND (measure,brand,tire_condition) IN (
@@ -102,6 +104,17 @@ export async function applyMatrizPhysicalStockCount(
     const byVariant = new Map(current.rows.map((row) => [
       `${row.measure}\u0000${row.brand}\u0000${row.tire_condition}`, row,
     ]));
+    for (const counted of normalized) {
+      const before = byVariant.get(
+        `${counted.measure}\u0000${counted.brand}\u0000${counted.tire_condition}`,
+      )!;
+      if (counted.counted_quantity < Number(before.quantity_reserved)) {
+        throw new Error(
+          `physical_count_below_reserved:${counted.measure}:${counted.brand}`
+          + `:${counted.tire_condition}:${before.quantity_reserved}`,
+        );
+      }
+    }
     // O trigger financeiro 0147 reconhece `definir` como contagem de inventário.
     // Mantemos esse contrato histórico para que código novo funcione antes e depois
     // do deploy, diferenciando a operação pelo motivo e pelo evento de auditoria.

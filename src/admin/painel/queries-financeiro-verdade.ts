@@ -101,12 +101,16 @@ export async function getLegacyMatrizFinancialTruth(
         WHERE o.environment=$1
         GROUP BY o.id
      ), wholesale AS (
-       SELECT o.id,o.created_at,o.total_amount,o.status,o.payment_status,o.paid_at,o.sold_at,o.created_by,
-              COALESCE(SUM(i.line_total),0) item_total,
-              COALESCE(SUM(i.unit_cost*i.quantity),0) known_cost
+       SELECT o.id,o.created_at,COALESCE(o.settled_total_amount,o.total_amount) total_amount,
+              o.status,o.payment_status,o.paid_at,o.sold_at,o.created_by,
+              COALESCE(SUM(i.unit_price*CASE WHEN o.partner_transfer_status IN ('settled','received')
+                THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END),0) item_total,
+              COALESCE(SUM(i.unit_cost*CASE WHEN o.partner_transfer_status IN ('settled','received')
+                THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END),0) known_cost
          FROM commerce.wholesale_orders o
          JOIN commerce.wholesale_order_items i ON i.order_id=o.id AND i.environment=o.environment
-        WHERE o.environment=$1 GROUP BY o.id
+        WHERE o.environment=$1 AND (o.partner_transfer_status IS NULL
+          OR o.partner_transfer_status IN ('settled','received')) GROUP BY o.id
      ), purchases AS (
        SELECT p.id,p.created_at,p.total_amount,p.status,p.payment_status,p.paid_at,p.purchased_at,p.created_by,
               COALESCE(SUM(i.line_total),0) item_total
