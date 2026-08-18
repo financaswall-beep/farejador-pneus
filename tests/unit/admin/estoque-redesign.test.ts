@@ -57,7 +57,7 @@ describe('Estoque — lista com painel da medida', () => {
     expect(stockHtml).toContain('stockBaixaOpen(selectedRow)');
     expect(stockHtml).toContain('filmeDaMedida(selectedRow.measure, selectedRow.brand, selectedRow.tire_condition)');
     expect(stockHtml).toContain('stockRemove(selectedRow)');
-    expect(galpao).toContain('Remover ${measure} · ${brand} do estoque do galpão?');
+    expect(galpao).toContain('Remover ${measure} · ${brand}? O saldo será baixado e conciliado no Financeiro.');
     expect(stockHtml).toContain('Entrada recalcula o custo médio ponderado');
   });
 

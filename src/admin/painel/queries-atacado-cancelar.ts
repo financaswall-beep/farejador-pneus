@@ -11,9 +11,22 @@ import {
 } from './stage5-integrity.js';
 import type { TireCondition } from '../../shared/tire-condition.js';
 import { salesPeriodWhere, type SalesPeriod } from './queries-galpao.js';
+import { cancelLinkedPartnerPurchase } from './wholesale-partner-bridge.js';
 
 export interface WholesaleSaleRow {
   id: string;
+  buyer_id: string;
+  partner_id: string | null;
+  partner_unit_id: string | null;
+  partner_unit_name: string | null;
+  parent_order_id: string | null;
+  partner_transfer_status: 'in_transit' | 'settled' | 'received' | null;
+  dispatched_total_amount: string | null;
+  settled_total_amount: string | null;
+  partner_purchase_id: string | null;
+  partner_receipt_status: 'pending' | 'received' | null;
+  expected_units: number | null;
+  received_units: number | null;
   buyer_name: string;
   buyer_phone: string | null;
   sold_at: string;
@@ -23,7 +36,9 @@ export interface WholesaleSaleRow {
   status: string;
   items_count: number;
   items: Array<{ measure: string; brand: string | null; tire_condition: TireCondition;
-    quantity: number; unit_price: string }>;
+    quantity: number; dispatched_quantity: number; accepted_quantity: number | null;
+    source_cargo_lot_id: string | null;
+    unit_price: string }>;
 }
 
 export async function listWholesaleSales(
@@ -32,16 +47,37 @@ export async function listWholesaleSales(
   limit = 15,
 ): Promise<WholesaleSaleRow[]> {
   const result = await dbPool.query<WholesaleSaleRow>(
-    `SELECT o.id,c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,o.total_amount,
+    `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
+            o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
+            o.settled_total_amount,linked.partner_purchase_id,linked.partner_receipt_status,
+            linked.expected_units,linked.received_units,
+            c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
+            COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
             o.payment_status,o.due_date,o.status,
             (SELECT count(*) FROM commerce.wholesale_order_items i WHERE i.order_id=o.id)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
-              'quantity',i.quantity,'unit_price',i.unit_price)
+              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'quantity',CASE WHEN o.partner_transfer_status IN ('settled','received')
+                THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END,
+              'dispatched_quantity',i.quantity,'accepted_quantity',i.accepted_quantity,
+              'source_cargo_lot_id',i.source_cargo_lot_id,'unit_price',i.unit_price)
               ORDER BY i.measure,i.brand,i.tire_condition)
               FROM commerce.wholesale_order_items i WHERE i.order_id=o.id),'[]'::json) AS items
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
+       LEFT JOIN network.partner_units pu
+         ON pu.environment=o.environment AND pu.id=o.partner_unit_id
+       LEFT JOIN LATERAL (
+         SELECT p.id AS partner_purchase_id,p.receipt_status AS partner_receipt_status,
+                COALESCE(sum(COALESCE(i.confirmed_quantity,i.quantity)),0)::int AS expected_units,
+                COALESCE(sum(i.received_quantity),0)::int AS received_units
+           FROM commerce.partner_purchases p
+           LEFT JOIN commerce.partner_purchase_items i
+             ON i.environment=p.environment AND i.purchase_id=p.id
+          WHERE p.environment=o.environment AND p.source_wholesale_order_id=o.id
+            AND p.deleted_at IS NULL
+          GROUP BY p.id,p.receipt_status
+       ) linked ON true
       WHERE o.environment=$1 ORDER BY o.sold_at DESC LIMIT $2`,
     [environment, limit],
   );
@@ -57,19 +93,40 @@ export async function listWholesaleSalesHistory(
 ): Promise<WholesaleSaleRow[]> {
   const periodWhere = salesPeriodWhere(period, 'o.sold_at');
   const result = await dbPool.query<WholesaleSaleRow>(
-    `SELECT o.id,c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,o.total_amount,
+    `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
+            o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
+            o.settled_total_amount,linked.partner_purchase_id,linked.partner_receipt_status,
+            linked.expected_units,linked.received_units,
+            c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
+            COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
             o.payment_status,o.due_date,o.status,
             (SELECT count(*) FROM commerce.wholesale_order_items i
               WHERE i.order_id=o.id AND i.environment=o.environment)::int AS items_count,
             COALESCE((SELECT json_agg(json_build_object(
-              'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
-              'quantity',i.quantity,'unit_price',i.unit_price)
+              'id',i.id,'measure',i.measure,'brand',i.brand,'tire_condition',i.tire_condition,
+              'quantity',CASE WHEN o.partner_transfer_status IN ('settled','received')
+                THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END,
+              'dispatched_quantity',i.quantity,'accepted_quantity',i.accepted_quantity,
+              'source_cargo_lot_id',i.source_cargo_lot_id,'unit_price',i.unit_price)
               ORDER BY i.measure,i.brand,i.tire_condition)
               FROM commerce.wholesale_order_items i
              WHERE i.order_id=o.id AND i.environment=o.environment),'[]'::json) AS items
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c
          ON c.id=o.buyer_id AND c.environment=o.environment
+       LEFT JOIN network.partner_units pu
+         ON pu.environment=o.environment AND pu.id=o.partner_unit_id
+       LEFT JOIN LATERAL (
+         SELECT p.id AS partner_purchase_id,p.receipt_status AS partner_receipt_status,
+                COALESCE(sum(COALESCE(i.confirmed_quantity,i.quantity)),0)::int AS expected_units,
+                COALESCE(sum(i.received_quantity),0)::int AS received_units
+           FROM commerce.partner_purchases p
+           LEFT JOIN commerce.partner_purchase_items i
+             ON i.environment=p.environment AND i.purchase_id=p.id
+          WHERE p.environment=o.environment AND p.source_wholesale_order_id=o.id
+            AND p.deleted_at IS NULL
+          GROUP BY p.id,p.receipt_status
+       ) linked ON true
       WHERE o.environment=$1 ${periodWhere}
       ORDER BY o.sold_at DESC`,
     [environment],
@@ -122,11 +179,26 @@ export async function cancelWholesaleSale(
       return started.result;
     }
 
-    const current = await client.query<{ status: string; payment_status: string }>(
-      `SELECT status,payment_status FROM commerce.wholesale_orders
+    const current = await client.query<{
+      status: string; payment_status: string; partner_transfer_status: string | null;
+    }>(
+      `SELECT status,payment_status,partner_transfer_status FROM commerce.wholesale_orders
         WHERE id=$1 AND environment=$2 FOR UPDATE`, [input.order_id, environment]);
     if (!current.rows[0]) throw new Error('sale_not_found');
     if (current.rows[0].status !== 'confirmed') throw new Error('sale_already_cancelled');
+    if (current.rows[0].partner_transfer_status) {
+      throw new Error('matrix_partner_transfer_requires_arrival_adjustment');
+    }
+    const activeAdditions = await client.query<{ id: string }>(
+      `SELECT id FROM commerce.wholesale_orders
+        WHERE environment=$1 AND parent_order_id=$2 AND status='confirmed'
+        ORDER BY sold_at,id LIMIT 1 FOR UPDATE`,
+      [environment, input.order_id],
+    );
+    if (activeAdditions.rows[0]) throw new Error('sale_has_active_additions');
+    await cancelLinkedPartnerPurchase(
+      client, environment, input.order_id, input.cancelled_by, reason,
+    );
     const ledgerState = env.MATRIZ_CENTRAL_LEDGER
       ? await getWholesaleSaleLedgerState(client, environment, input.order_id) : null;
 

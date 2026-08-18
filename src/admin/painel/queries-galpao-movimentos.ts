@@ -10,7 +10,7 @@ import type { Pool, PoolClient } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import {
-  addWholesaleStockEntry, deleteWholesaleStock, setWholesaleStock, type WholesaleStockRow,
+  addWholesaleStockEntry, setWholesaleStock, type WholesaleStockRow,
 } from './queries-galpao.js';
 import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
@@ -90,11 +90,11 @@ export async function setWholesaleStockComRotulo(
       [environment, catalogMeasure.measure, brand, tireCondition],
     );
     const before = current.rows[0];
-    const nextCostCents = Math.round(Number(input.unit_cost ?? 0) * 100);
-    const currentCostCents = Math.round(Number(before?.unit_cost ?? 0) * 100);
+    const nextCostMicros = Math.round(Number(input.unit_cost) * 1_000_000);
+    const currentCostMicros = Math.round(Number(before?.unit_cost ?? 0) * 1_000_000);
     const valueChanged = !before
       || Number(before.quantity_on_hand) !== input.quantity_on_hand
-      || currentCostCents !== nextCostCents;
+      || currentCostMicros !== nextCostMicros;
     if (valueChanged && reason.length < 2) throw new Error('reason_required');
 
     await setGalpaoMovContext(client, {
@@ -177,23 +177,6 @@ export async function addWholesaleStockEntryComRotulo(
   }
 }
 
-export async function deleteWholesaleStockComRotulo(
-  measure: string,
-  brand: string,
-  tireCondition: TireCondition | string,
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<void> {
-  const movementRef = randomUUID();
-  return comRotulo(dbPool, { source: 'remocao', nature: 'inventory_writeoff',
-    reason: 'medida removida manualmente', ref: movementRef }, async (client) => {
-    await deleteWholesaleStock(measure, brand, tireCondition, environment, client);
-    await postMatrizInventoryAdjustmentsByMovementRef(
-      client, environment, movementRef, 'system:stock-removal',
-    );
-  });
-}
-
 /** BAIXA MANUAL com motivo (quebra/perda/uso interno) — o ajuste honesto que faltava:
  *  antes, pneu quebrado virava "Definir" silencioso. RECUSA baixar mais do que tem
  *  (baixa_maior_que_estoque) — aqui NÃO é venda, não há dinheiro a proteger, então a
@@ -257,14 +240,15 @@ export async function applyGalpaoBaixaManual(
       return result;
     }
     // 0 linhas: medida não existe OU saldo insuficiente — dizer QUAL (erro honesto)
-    const cur = await client.query<{ quantity_on_hand: number }>(
-      `SELECT quantity_on_hand FROM commerce.wholesale_stock
+    const cur = await client.query<{ quantity_on_hand: number; quantity_available: number }>(
+      `SELECT quantity_on_hand,(quantity_on_hand-quantity_reserved)::int AS quantity_available
+         FROM commerce.wholesale_stock
         WHERE environment = $1 AND measure = $2 AND brand = $3
           AND tire_condition=$4`,
       [environment, measure, brand, tireCondition],
     );
     if (!cur.rows[0]) throw new Error('measure_not_found');
-    throw new Error('baixa_maior_que_estoque:' + cur.rows[0].quantity_on_hand);
+    throw new Error('baixa_maior_que_estoque:' + cur.rows[0].quantity_available);
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;

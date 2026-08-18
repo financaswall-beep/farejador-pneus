@@ -86,11 +86,14 @@ const metricsSql = `WITH retail_orders AS (
     ) x ON true
    WHERE l.environment=$1 AND l.identity_id=ANY($2::uuid[]) AND l.source_type='partner_customer' AND l.ended_at IS NULL
 ), wholesale_orders AS (
-  SELECT l.identity_id,wo.id order_id,wo.total_amount amount,wo.sold_at occurred_at,
-         COALESCE(sum(wi.line_profit) FILTER(WHERE wi.line_profit IS NOT NULL),0) profit,
+  SELECT l.identity_id,wo.id order_id,COALESCE(wo.settled_total_amount,wo.total_amount) amount,wo.sold_at occurred_at,
+         COALESCE(sum((wi.unit_price-wi.unit_cost)*CASE
+           WHEN wo.partner_transfer_status IN ('settled','received')
+             THEN COALESCE(wi.accepted_quantity,0) ELSE wi.quantity END),0) profit,
          count(*) FILTER(WHERE wi.line_profit IS NULL)::int pending
     FROM commerce.customer_identity_links l
     JOIN commerce.wholesale_orders wo ON wo.environment=l.environment AND wo.buyer_id=l.source_id AND wo.status='confirmed'
+      AND (wo.partner_transfer_status IS NULL OR wo.partner_transfer_status IN ('settled','received'))
     LEFT JOIN commerce.wholesale_order_items wi ON wi.order_id=wo.id
    WHERE l.environment=$1 AND l.identity_id=ANY($2::uuid[]) AND l.source_type='wholesale_customer' AND l.ended_at IS NULL
    GROUP BY l.identity_id,wo.id

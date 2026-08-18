@@ -17,9 +17,12 @@
  *   npx tsx --env-file=.env.pooler scripts/prova-estoque-movimentos-test.ts
  */
 process.env.WHOLESALE_STOCK_DECREMENT = 'true'; // baixa/devolução do atacado ligadas (espelha prod)
+process.env.MATRIZ_CENTRAL_LEDGER = 'false'; // a prova limpa seus ajustes; não cria livro central
 
 const ENV = 'test' as const;
 const MEASURE = '93/93-93'; // descartável (94 sino, 95 logistica, 96 vendas, 97 visao, 98 fiado)
+const BRAND = 'Sem marca';
+const CONDITION = 'meia_vida' as const;
 
 async function main(): Promise<void> {
   const { randomUUID } = await import('node:crypto');
@@ -74,6 +77,15 @@ async function main(): Promise<void> {
        SELECT id FROM commerce.wholesale_suppliers WHERE environment=$1 AND name='PROVA-FILME-FORN')`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_suppliers WHERE environment=$1 AND name='PROVA-FILME-FORN'`, [ENV]);
     await client.query(`DELETE FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    await client.query(`ALTER TABLE finance.matriz_inventory_adjustments
+      DISABLE TRIGGER matriz_inventory_adjustment_immutable`);
+    try {
+      await client.query(`DELETE FROM finance.matriz_inventory_adjustments
+        WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
+    } finally {
+      await client.query(`ALTER TABLE finance.matriz_inventory_adjustments
+        ENABLE TRIGGER matriz_inventory_adjustment_immutable`);
+    }
     await client.query(`DELETE FROM commerce.wholesale_stock_movements WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
     await client.query(`DELETE FROM commerce.tire_specs WHERE environment=$1 AND product_id IN (
        SELECT id FROM commerce.products WHERE environment=$1 AND product_code LIKE 'PROVA-FILME-%')`, [ENV]);
@@ -98,24 +110,33 @@ async function main(): Promise<void> {
     check('setup: catálogo 93/93-93', true);
 
     // ── M1: Definir (insert) → filme op=insert source='definir' ──
-    await setWholesaleStockComRotulo({ measure: MEASURE, quantity_on_hand: 10, unit_cost: 20, environment: ENV }, pool);
+    await setWholesaleStockComRotulo({ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+      quantity_on_hand: 10, unit_cost: 20, reason: 'abertura da prova',
+      actor_label: 'prova-filme', environment: ENV }, pool);
     let m = await topo();
     check('M1 Definir novo → insert/definir 0→10', !!m && m.op === 'insert' && m.source === 'definir'
       && m.qty_before === 0 && m.qty_after === 10, JSON.stringify(m ?? null));
 
     // ── M2: Definir de novo (mudou qty) → update/definir 10→8 ──
-    await setWholesaleStockComRotulo({ measure: MEASURE, quantity_on_hand: 8, unit_cost: 20, environment: ENV }, pool);
+    await setWholesaleStockComRotulo({ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+      quantity_on_hand: 8, unit_cost: 20, reason: 'ajuste da prova',
+      actor_label: 'prova-filme', environment: ENV }, pool);
     m = await topo();
     check('M2 Definir mudança → update/definir 10→8 (delta -2)', !!m && m.op === 'update' && m.source === 'definir'
       && m.qty_before === 10 && m.qty_after === 8 && m.qty_delta === -2, JSON.stringify(m ?? null));
 
     // ── M3: update SÓ de notes/mínimo → NÃO é movimento (filme não cresce) ──
     const antesM3 = (await filme()).length;
-    await setWholesaleStockComRotulo({ measure: MEASURE, quantity_on_hand: 8, unit_cost: 20, min_quantity: 3, notes: 'só nota', environment: ENV }, pool);
+    await setWholesaleStockComRotulo({ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+      quantity_on_hand: 8, unit_cost: 20, min_quantity: 3, notes: 'só nota',
+      actor_label: 'prova-filme', environment: ENV }, pool);
     check('M3 mexer só em mínimo/notes NÃO grava movimento', (await filme()).length === antesM3);
 
     // ── M4: + Entrada → source='entrada', custo médio no filme (8@20 + 8@40 → 16@30) ──
-    await addWholesaleStockEntryComRotulo({ measure: MEASURE, quantity_in: 8, unit_cost: 40, environment: ENV }, pool);
+    await addWholesaleStockEntryComRotulo({ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+      quantity_in: 8, unit_cost: 40, entry_nature: 'inventory_found',
+      reason: 'entrada da prova', actor_label: 'prova-filme',
+      idempotency_key: operationKey(), environment: ENV }, pool);
     m = await topo();
     check('M4 Entrada → entrada 8→16, custo 20→30 no filme', !!m && m.source === 'entrada'
       && m.qty_before === 8 && m.qty_after === 16 && Number(m.cost_before) === 20 && Number(m.cost_after) === 30,
@@ -124,7 +145,8 @@ async function main(): Promise<void> {
     // ── M5: venda de ATACADO → source='venda_atacado' ref=order_id (16→13) ──
     const venda = await registerWholesaleSale(
       { new_customer: { name: 'PROVA-FILME-BORRACHEIRO', phone: null },
-        items: [{ measure: MEASURE, quantity: 3, unit_price: 60 }],
+        items: [{ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+          quantity: 3, unit_price: 60 }],
         created_by: 'prova-filme', environment: ENV, idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M5 venda de atacado → venda_atacado 16→13 ref=order', !!m && m.source === 'venda_atacado'
@@ -141,7 +163,8 @@ async function main(): Promise<void> {
     // ── M7: COMPRA de fornecedor → source='compra' ref=purchase reason=fornecedor (16→20) ──
     const compra = await registerWholesalePurchase(
       { new_supplier: { name: 'PROVA-FILME-FORN', phone: null },
-        items: [{ measure: MEASURE, quantity: 4, unit_cost: 25 }],
+        items: [{ measure: MEASURE, brand: BRAND, tire_condition: CONDITION,
+          quantity: 4, unit_cost: 25 }],
         created_by: 'prova-filme', environment: ENV, idempotency_key: operationKey() }, pool);
     m = await topo();
     check('M7 compra → compra 16→20 ref=purchase reason=fornecedor', !!m && m.source === 'compra'
@@ -175,7 +198,10 @@ async function main(): Promise<void> {
       && m.qty_before === 14 && m.qty_after === 16 && m.ref === varejoOrderId, JSON.stringify(m ?? null));
 
     // ── M11: BAIXA MANUAL com motivo → source='baixa_manual' reason gravado (16→13) ──
-    const b = await applyGalpaoBaixaManual({ measure: MEASURE, quantity: 3, reason: 'quebra: furou na desmontagem', environment: ENV }, pool);
+    const b = await applyGalpaoBaixaManual({ measure: MEASURE, brand: BRAND,
+      tire_condition: CONDITION, quantity: 3, reason: 'quebra: furou na desmontagem',
+      nature: 'breakage', actor_label: 'prova-filme',
+      idempotency_key: operationKey(), environment: ENV }, pool);
     m = await topo();
     check('M11 baixa manual → baixa_manual 16→13 com motivo', b.quantity_on_hand === 13 && !!m
       && m.source === 'baixa_manual' && m.reason === 'quebra: furou na desmontagem' && m.qty_delta === -3,
@@ -185,7 +211,10 @@ async function main(): Promise<void> {
     const antesM12 = (await filme()).length;
     let e12 = '';
     try {
-      await applyGalpaoBaixaManual({ measure: MEASURE, quantity: 99, reason: 'quebra', environment: ENV }, pool);
+      await applyGalpaoBaixaManual({ measure: MEASURE, brand: BRAND,
+        tire_condition: CONDITION, quantity: 99, reason: 'quebra',
+        nature: 'breakage', actor_label: 'prova-filme',
+        idempotency_key: operationKey(), environment: ENV }, pool);
     } catch (err) { e12 = err instanceof Error ? err.message : String(err); }
     const saldo12 = await client.query<{ q: number }>(
       `SELECT quantity_on_hand q FROM commerce.wholesale_stock WHERE environment=$1 AND measure=$2`, [ENV, MEASURE]);
@@ -195,7 +224,10 @@ async function main(): Promise<void> {
     // ── M13: baixa sem motivo → reason_required ──
     let e13 = '';
     try {
-      await applyGalpaoBaixaManual({ measure: MEASURE, quantity: 1, reason: ' ', environment: ENV }, pool);
+      await applyGalpaoBaixaManual({ measure: MEASURE, brand: BRAND,
+        tire_condition: CONDITION, quantity: 1, reason: ' ',
+        nature: 'breakage', actor_label: 'prova-filme',
+        idempotency_key: operationKey(), environment: ENV }, pool);
     } catch (err) { e13 = err instanceof Error ? err.message : String(err); }
     check('M13 baixa sem motivo → reason_required', e13 === 'reason_required', e13);
 
@@ -213,7 +245,9 @@ async function main(): Promise<void> {
     check('M15 Σ deltas do filme == saldo do galpão (12)', soma === 12, `Σ=${soma}`);
 
     // ── M16: REMOVER a medida → op=delete source='remocao' (12→0) ──
-    await deleteWholesaleStockComRotulo(MEASURE, ENV, pool);
+    await deleteWholesaleStockComRotulo({ measure: MEASURE, brand: BRAND,
+      tire_condition: CONDITION, reason: 'fim da prova', actor_label: 'prova-filme',
+      idempotency_key: operationKey(), environment: ENV }, pool);
     m = await topo();
     check('M16 remover medida → delete/remocao 12→0', !!m && m.op === 'delete' && m.source === 'remocao'
       && m.qty_before === 12 && m.qty_after === 0, JSON.stringify(m ?? null));

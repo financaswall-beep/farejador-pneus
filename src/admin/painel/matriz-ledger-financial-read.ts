@@ -20,11 +20,9 @@ interface LedgerTruthRow {
   source_marketing: string; ledger_marketing: string;
   source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
 }
-const cents = (value: string | number): number => Math.round(Number(value || 0) * 100);
-const money = (value: number): string => (value / 100).toFixed(2);
-export async function getMatrizCentralLedgerFinancialTruth(
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV, dbPool: Pool = defaultPool,
-): Promise<MatrizFinancialTruth> {
+const cents = (value: string | number): number => Math.round(Number(value || 0) * 100); const money = (value: number): string => (value / 100).toFixed(2);
+export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' | 'test' = env.FAREJADOR_ENV,
+  dbPool: Pool = defaultPool): Promise<MatrizFinancialTruth> {
   const result = await dbPool.query<LedgerTruthRow>(
      `WITH bounds AS (
        SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date month_start,
@@ -137,10 +135,12 @@ export async function getMatrizCentralLedgerFinancialTruth(
           WHERE environment=$1
             AND lower(created_by||' '||description)~'(test|teste|prova|demo)'))::int
          suspected_test_rows,
-       COALESCE((SELECT sum(o.total_amount) FROM commerce.wholesale_orders o,bounds b
+       COALESCE((SELECT sum(COALESCE(o.settled_total_amount,o.total_amount)) FROM commerce.wholesale_orders o,bounds b
          WHERE o.environment=$1 AND o.sold_at>=b.month_ts
-           AND o.sold_at<b.month_end_ts),0)
-       -COALESCE((SELECT sum(o.total_amount) FROM commerce.wholesale_orders o,bounds b
+           AND o.sold_at<b.month_end_ts
+           AND (o.partner_transfer_status IS NULL
+             OR o.partner_transfer_status IN ('settled','received'))),0)
+       -COALESCE((SELECT sum(COALESCE(o.settled_total_amount,o.total_amount)) FROM commerce.wholesale_orders o,bounds b
          WHERE o.environment=$1 AND o.status='cancelled'
            AND o.cancelled_at>=b.month_ts AND o.cancelled_at<b.month_end_ts),0)
          source_wholesale,

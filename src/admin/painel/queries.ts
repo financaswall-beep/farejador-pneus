@@ -26,9 +26,13 @@ export * from './queries-pedidos-acoes.js'; // registrar pedido manual/walk-in +
 export * from './queries-parceiros.js'; // criação transacional de parceiro
 export * from './queries-parceiros-rede.js'; // 0165: chave "recebe pedidos da Rede" (só sistema)
 export * from './queries-candidaturas.js'; // candidatura atômica/idempotente (Etapa 6)
-export * from './queries-atacado-vendas.js'; // venda de atacado: compradores, ranking, registerWholesaleSale
+export * from './queries-atacado-buyers.js'; // compradores e ranking do atacado
+export * from './queries-atacado-vendas.js'; // registro transacional da venda de atacado
+export * from './queries-partner-transfer-arrival.js'; // acerto por pneu e carga em transito
+export * from './queries-partner-cargo.js'; // carga recusada e retorno fisico
 export * from './queries-galpao.js'; // estoque do galpão por medida + resumos do atacado e do varejo
 export * from './queries-galpao-movimentos.js'; // filme do galpão (0128): rótulo, baixa manual c/ motivo, leitura
+export * from './queries-galpao-removal.js'; // remoção auditada da variante + conciliação financeira
 export * from './queries-galpao-filme.js';
 export * from './queries-galpao-medidas.js';
 export * from './queries-fornecedores.js'; // fornecedores + compras do galpão (registerWholesalePurchase)

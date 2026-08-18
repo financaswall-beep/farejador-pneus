@@ -653,7 +653,8 @@ export async function getPartnerStockMap(
   const partner = await resolveUnitForMunicipio(client, environment, municipio);
   if (!partner) return map;
   const r = await client.query<{ product_id: string; disponivel: string }>(
-    `SELECT product_id, (quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
+    `SELECT product_id,
+            max(quantity_on_hand - COALESCE(quantity_reserved, 0))::text AS disponivel
      FROM commerce.partner_stock_levels
      WHERE environment = $1
        AND unit_id = $2
@@ -662,10 +663,13 @@ export async function getPartnerStockMap(
        AND deleted_at IS NULL
        AND is_tracked = true
        AND quantity_on_hand IS NOT NULL
-       AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0`,
+       AND (quantity_on_hand - COALESCE(quantity_reserved, 0)) > 0
+     GROUP BY product_id`,
     [environment, partner.unitId],
   );
-  for (const row of r.rows) map.set(row.product_id, Number(row.disponivel));
+  for (const row of r.rows) {
+    map.set(row.product_id, Math.max(map.get(row.product_id) ?? 0, Number(row.disponivel)));
+  }
   return map;
 }
 

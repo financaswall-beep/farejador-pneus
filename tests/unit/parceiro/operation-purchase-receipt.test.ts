@@ -42,6 +42,7 @@ const purchaseItem = {
   brand: 'Maggion',
   sale_price: '199.90',
   tire_condition: 'novo',
+  confirmed_quantity: null,
 };
 
 beforeEach(() => {
@@ -83,7 +84,8 @@ describe('recebimento de compra pela Operação da Loja', () => {
       .mockResolvedValueOnce({});
     mocks.applyStock.mockResolvedValueOnce({
       stock_id: 'stock-a', item_id: purchaseItem.id,
-      received_quantity: 4, new_qty: 9, new_status: 'in_stock',
+      received_quantity: 4, previous_qty: 5, previous_average_cost: '100.000000',
+      new_qty: 9, new_average_cost: '108.888889', new_status: 'in_stock',
     });
 
     await expect(receiveOperationPurchase(ctx, 'Wallace', 'purchase-a', {
@@ -97,6 +99,8 @@ describe('recebimento de compra pela Operação da Loja', () => {
     expect(mocks.applyStock).toHaveBeenCalledOnce();
     const sql = mocks.query.mock.calls.map((call) => String(call[0])).join('\n');
     expect(sql).toContain('SET received_quantity=$4');
+    expect(sql).toContain('received_stock_id=$5');
+    expect(sql).toContain('received_stock_average_cost_after=$9');
     expect(sql).toContain("SET receipt_status='received'");
     expect(sql).toContain('receipt_idempotency_key=$6');
     expect(sql).toContain("'stock_increment_purchase'");
@@ -129,6 +133,43 @@ describe('recebimento de compra pela Operação da Loja', () => {
       items: [{ item_id: '20000000-0000-4000-8000-000000000002', received_quantity: 4 }],
     })).rejects.toMatchObject<Partial<OperationPurchaseReceiptError>>({
       code: 'purchase_items_mismatch', status: 409,
+    });
+    expect(mocks.applyStock).not.toHaveBeenCalled();
+  });
+
+  it('explica o conflito quando o saldo antigo não possui custo', async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{
+        id: 'purchase-a', supplier_name: 'Distribuidora', receipt_status: 'pending',
+        receipt_idempotency_key: null, received_at: null,
+      }] })
+      .mockResolvedValueOnce({ rows: [purchaseItem] });
+    mocks.applyStock.mockRejectedValueOnce(new Error('purchase_receipt_existing_cost_missing'));
+
+    await expect(receiveOperationPurchase(ctx, 'Wallace', 'purchase-a', {
+      idempotency_key: 'receipt-missing-cost',
+      items: [{ item_id: purchaseItem.id, received_quantity: 4 }],
+    })).rejects.toMatchObject<Partial<OperationPurchaseReceiptError>>({
+      code: 'purchase_receipt_existing_cost_missing', status: 409,
+      details: { item_id: purchaseItem.id },
+    });
+  });
+
+  it('recebe exatamente a quantidade acertada pela Matriz', async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{
+        id: 'purchase-a', supplier_name: 'Matriz 2W Pneus', receipt_status: 'pending',
+        receipt_idempotency_key: null, received_at: null,
+        source_wholesale_order_id: '30000000-0000-4000-8000-000000000003',
+      }] })
+      .mockResolvedValueOnce({ rows: [{ ...purchaseItem, confirmed_quantity: 3 }] });
+
+    await expect(receiveOperationPurchase(ctx, 'Wallace', 'purchase-a', {
+      idempotency_key: 'receipt-over-dispatch',
+      items: [{ item_id: purchaseItem.id, received_quantity: 4 }],
+    })).rejects.toMatchObject<Partial<OperationPurchaseReceiptError>>({
+      code: 'matrix_shipment_requires_arrival_adjustment', status: 409,
+      details: { item_id: purchaseItem.id, confirmed: 3, received: 4 },
     });
     expect(mocks.applyStock).not.toHaveBeenCalled();
   });

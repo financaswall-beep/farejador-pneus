@@ -1,12 +1,9 @@
-// Estoque do galpão por variante (medida + marca + condição): busca, custo médio e entrada.
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpao = function () {
   return {
     measureBlur() {
-      // delay pra o clique numa sugestão (mousedown) acontecer antes de fechar
       setTimeout(() => { this.measureBox = { key: null, hits: [] }; }, 150);
     },
-    // Texto amigável dos erros do cadastro do galpão (Fase 4: medida fora do catálogo).
     stockErrText(code, acao) {
       const map = {
         measure_not_in_catalog: 'Essa medida não está no catálogo. Confira (ex.: 90/90-18) ou peça pra adicionar ao catálogo.',
@@ -21,7 +18,6 @@ window.PAINEL_MODULES.galpao = function () {
       };
       return map[code] || `Não consegui ${acao === 'entrada' ? 'registrar a entrada' : 'salvar'} (${code}).`;
     },
-    // 0126: badge "repor" da tabela — mínimo definido e qtd chegou nele (zero tem cor própria).
     stockPrecisaRepor(row) {
       return row.min_quantity != null
         && Number(row.quantity_available ?? row.quantity_on_hand) <= Number(row.min_quantity);
@@ -114,16 +110,30 @@ window.PAINEL_MODULES.galpao = function () {
     async stockRemove(row) {
       const measure = row.measure;
       const brand = row.brand || 'Sem marca';
-      if (!window.confirm(`Remover ${measure} · ${brand} do estoque do galpão?`)) return;
+      const reason = window.prompt(
+        `Explique por que ${measure} · ${brand} deve ser removido do estoque:`,
+        '',
+      );
+      if (reason == null) return;
+      if (reason.trim().length < 2) {
+        this.stockMsg = { ok: false, text: 'Informe um motivo para remover a variante.' };
+        return;
+      }
+      if (!window.confirm(`Remover ${measure} · ${brand}? O saldo será baixado e conciliado no Financeiro.`)) return;
       try {
+        const operation = window.PAINEL_INTEGRITY.operation('stock-remove', this.stockVariantKey(row));
         await this.apiPost('/admin/api/wholesale/stock/remove', {
           measure, brand, tire_condition: row.tire_condition,
+          reason: reason.trim(), idempotency_key: operation.key,
         });
+        window.PAINEL_INTEGRITY.complete('stock-remove', this.stockVariantKey(row));
         await this.loadAtacado();
         void this.loadStockReconciliation();
         void this.loadGalpaoFilme(); // a remoção entra no filme
       } catch (err) {
-        this.stockMsg = { ok: false, text: `Não consegui remover (${err.message}).` };
+        this.stockMsg = { ok: false, text: err.message === 'stock_has_reservations'
+          ? 'Não é possível remover: há unidades reservadas para pedidos em aberto.'
+          : `Não consegui remover (${err.message}).` };
       }
     },
     // ── Auditoria 07-07: busca + "repor primeiro" — a lista que a tabela renderiza ──
@@ -138,7 +148,7 @@ window.PAINEL_MODULES.galpao = function () {
         || String(r.brand || '').toLowerCase().includes(q)
         || String(r.tire_condition || '').toLowerCase().includes(q)
         || (qd !== '' && digits(r.measure).includes(qd)));
-      const peso = (r) => (Number(r.quantity_on_hand) === 0 ? 0 : (this.stockPrecisaRepor(r) ? 1 : 2));
+      const peso = (r) => (this.measureAvailable(r) === 0 ? 0 : (this.stockPrecisaRepor(r) ? 1 : 2));
       return [...rows].sort((a, b) => peso(a) - peso(b) || a.measure.localeCompare(b.measure));
     },
     // Resumo do topo: pneus no galpão, capital parado (Σ qty × custo médio — a MESMA conta
@@ -150,7 +160,7 @@ window.PAINEL_MODULES.galpao = function () {
         const q = Number(r.quantity_on_hand) || 0;
         pneus += q;
         capital += q * (Number(r.unit_cost) || 0);
-        if (q === 0) zeradas++;
+        if (this.measureAvailable(r) === 0) zeradas++;
         else if (this.stockPrecisaRepor(r)) repor++;
       }
       return { pneus, capital, zeradas, repor };

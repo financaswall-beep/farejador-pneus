@@ -268,6 +268,50 @@ describe('Portal Parceiro — custo histórico da venda', () => {
       evidence: 'NF fixture 123' });
   });
 
+  it('cancela compra recebida retirando unidades e valor do custo médio', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 10 });
+    const purchase = await q.registerPartnerPurchase(f.ctx, {
+      supplier_name: null, payment_method: 'pix',
+      payment_status: 'paid_now', idempotency_key: `reverse-purchase-${randomUUID()}`,
+      items: [{
+        item_name: f.stockItemName, tire_size: '90/90-18', brand: 'Michelin',
+        tire_condition: 'meia_vida', quantity: 10, unit_cost: 120, sale_price: 150,
+      }],
+    });
+    await receivePurchase(f.ctx, purchase.purchase_id);
+    await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Venda entre compra e estorno',
+      items: [{ partner_stock_id: f.stockId, quantity: 5, unit_price: 150 }],
+      payment_method: 'pix', fulfillment_mode: 'pickup', source_tag: 'porta',
+      idempotency_key: `reverse-sale-${randomUUID()}`,
+    });
+
+    const result = await q.deletePartnerPurchase(f.ctx, purchase.purchase_id);
+    expect(result.deleted).toBe(true);
+    expect(result.stock_moves[0]).toMatchObject({
+      stock_id: f.stockId, quantity_delta: -10,
+      previous_qty: 15, new_qty: 5,
+      previous_average_cost: '100.000000', new_average_cost: '60.000000',
+      reversed_value: '1200.000000', rounding_residual: '0.000000',
+    });
+    const stock = await db.pool.query<{
+      quantity_on_hand: number; average_cost: string;
+    }>(
+      `SELECT quantity_on_hand,average_cost::text
+         FROM commerce.partner_stock_levels WHERE id=$1`,
+      [f.stockId],
+    );
+    expect(stock.rows[0]).toEqual({ quantity_on_hand: 5, average_cost: '60.000000' });
+    const event = await db.pool.query<{ payload_after: Record<string, unknown> }>(
+      `SELECT payload_after FROM audit.events
+        WHERE environment='test' AND event_type='stock_decrement_purchase_cancel'
+          AND payload_after->>'purchase_id'=$1`,
+      [purchase.purchase_id],
+    );
+    expect(event.rows[0]?.payload_after).toMatchObject({ purchase_id: purchase.purchase_id });
+  });
+
   it('impede alteração direta do snapshot depois da venda', async () => {
     const q = await importQueries();
     const f = await createPartnerFixture(db.pool);
@@ -330,9 +374,9 @@ describe('Portal Parceiro - variantes por condicao', () => {
     expect(variants.rows.map(({ tire_condition, quantity_on_hand, average_cost }) => ({
       tire_condition, quantity_on_hand, average_cost,
     }))).toEqual([
-      { tire_condition: 'meia_vida', quantity_on_hand: 3, average_cost: '80.00' },
-      { tire_condition: 'novo', quantity_on_hand: 15, average_cost: '106.67' },
-      { tire_condition: 'remold', quantity_on_hand: 4, average_cost: '70.00' },
+      { tire_condition: 'meia_vida', quantity_on_hand: 3, average_cost: '80.000000' },
+      { tire_condition: 'novo', quantity_on_hand: 15, average_cost: '106.666667' },
+      { tire_condition: 'remold', quantity_on_hand: 4, average_cost: '70.000000' },
     ]);
 
     const newStock = variants.rows.find((row) => row.tire_condition === 'novo')!;

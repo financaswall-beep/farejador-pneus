@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { PartnerContext } from './auth.js';
 import type { TireCondition } from '../shared/tire-condition.js';
+import { addPurchaseStockCost } from './partner-stock-cost.js';
 
 export interface PurchaseReceiptItem {
   id: string;
@@ -15,13 +16,17 @@ export interface PurchaseReceiptItem {
   brand: string | null;
   sale_price: string | number | null;
   tire_condition: TireCondition | null;
+  confirmed_quantity?: number | null;
 }
 
 export interface PurchaseReceiptMove {
   stock_id: string;
   item_id: string;
   received_quantity: number;
+  previous_qty: number;
+  previous_average_cost: string | null;
   new_qty: number;
+  new_average_cost: string;
   new_status: string;
 }
 
@@ -70,13 +75,15 @@ async function incrementStock(
   actor: string,
 ): Promise<PurchaseReceiptMove> {
   const previousQuantity = Number(row.quantity_on_hand ?? 0);
-  const previousCost = Number(row.average_cost ?? 0);
-  const unitCost = Number(item.unit_cost);
-  const nextQuantity = previousQuantity + receivedQuantity;
-  const nextCost = nextQuantity > 0
-    ? ((previousCost * previousQuantity) + (unitCost * receivedQuantity)) / nextQuantity
-    : unitCost;
-  const updated = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
+  const next = addPurchaseStockCost({
+    current_quantity: previousQuantity,
+    current_average_cost: row.average_cost,
+    received_quantity: receivedQuantity,
+    purchase_unit_cost: item.unit_cost,
+  });
+  const updated = await client.query<{
+    stock_id: string; new_qty: number; new_average_cost: string; new_status: string;
+  }>(
     `UPDATE commerce.partner_stock_levels
         SET quantity_on_hand=COALESCE(quantity_on_hand,0)+$4,
             average_cost=$5,
@@ -87,11 +94,16 @@ async function incrementStock(
               COALESCE(quantity_on_hand,0)+$4, quantity_reserved, minimum_quantity, true),
             updated_by=$8, updated_at=now()
       WHERE id=$1 AND environment=$2 AND unit_id=$3
-      RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
-    [row.stock_id, ctx.environment, ctx.unitId, receivedQuantity, nextCost,
+      RETURNING id AS stock_id, quantity_on_hand AS new_qty,
+                average_cost::text AS new_average_cost, stock_status AS new_status`,
+    [row.stock_id, ctx.environment, ctx.unitId, receivedQuantity, next.next_average_cost,
       item.sale_price, item.product_id, actor],
   );
-  return { ...updated.rows[0]!, item_id: item.id, received_quantity: receivedQuantity };
+  return {
+    ...updated.rows[0]!, item_id: item.id, received_quantity: receivedQuantity,
+    previous_qty: previousQuantity,
+    previous_average_cost: row.average_cost,
+  };
 }
 
 export async function applyPurchaseReceiptStock(
@@ -111,7 +123,9 @@ export async function applyPurchaseReceiptStock(
   const existing = await findStock(client, ctx, item, normalizedSupplier);
   if (existing) return incrementStock(client, ctx, existing, item, receivedQuantity, actor);
 
-  const inserted = await client.query<{ stock_id: string; new_qty: number; new_status: string }>(
+  const inserted = await client.query<{
+    stock_id: string; new_qty: number; new_average_cost: string; new_status: string;
+  }>(
     `INSERT INTO commerce.partner_stock_levels (
        environment, unit_id, product_id, item_name, tire_size,
        tire_width_mm, tire_aspect_ratio, tire_rim_diameter, brand, supplier_name,
@@ -121,14 +135,18 @@ export async function applyPurchaseReceiptStock(
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
        true,commerce.partner_stock_status($11,0,NULL,true),$15
      ) ON CONFLICT DO NOTHING
-     RETURNING id AS stock_id, quantity_on_hand AS new_qty, stock_status AS new_status`,
+     RETURNING id AS stock_id, quantity_on_hand AS new_qty,
+               average_cost::text AS new_average_cost, stock_status AS new_status`,
     [ctx.environment, ctx.unitId, item.product_id, item.item_name.trim(), clean(item.tire_size),
       item.tire_width_mm, item.tire_aspect_ratio, item.tire_rim_diameter, clean(item.brand),
       normalizedSupplier, receivedQuantity, Number(item.unit_cost), item.sale_price,
       item.tire_condition, actor],
   );
   if (inserted.rows[0]) {
-    return { ...inserted.rows[0], item_id: item.id, received_quantity: receivedQuantity };
+    return {
+      ...inserted.rows[0], item_id: item.id, received_quantity: receivedQuantity,
+      previous_qty: 0, previous_average_cost: null,
+    };
   }
 
   const raced = await findStock(client, ctx, item, normalizedSupplier);

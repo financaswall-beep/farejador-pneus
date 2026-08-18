@@ -57,6 +57,7 @@ window.PAINEL_MODULES.atacado = function () { return {
         ['resumo', this.apiGet('/admin/api/wholesale/resumo?period=' + this.vendasPeriodo)],
         ['finance', this.apiGet('/admin/api/wholesale/finance')],
         ['vendas', this.apiGet('/admin/api/wholesale/sales')],
+        ['cargo', this.apiGet('/admin/api/wholesale/cargo')],
       ];
       try {
         const values = await Promise.all(jobs.map(([, request]) => request));
@@ -69,6 +70,7 @@ window.PAINEL_MODULES.atacado = function () { return {
           if (key === 'resumo') this.atacadoResumo = value || null;
           if (key === 'finance') this.atacadoFinance = value && value.enabled ? value : null;
           if (key === 'vendas') this.atacadoVendas = value.rows || [];
+          if (key === 'cargo') this.atacadoCargo = (value.data || []).map((row) => ({ ...row, return_reason: '' }));
         });
         if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
           this.atacadoStock = window.PAINEL_STOCK_PREVIEW.rows.map((row) => ({ ...row }));
@@ -98,6 +100,7 @@ window.PAINEL_MODULES.atacado = function () { return {
         ['breakdown', this.apiGet('/admin/api/wholesale/suppliers/breakdown')],
         ['finance', this.apiGet('/admin/api/wholesale/finance')],
         ['sales', this.apiGet('/admin/api/wholesale/sales')],
+        ['cargo', this.apiGet('/admin/api/wholesale/cargo')],
       ];
       try {
         const settled = await Promise.allSettled(jobs.map(([, request]) => request));
@@ -119,6 +122,7 @@ window.PAINEL_MODULES.atacado = function () { return {
           if (key === 'breakdown') this.fornecedorBreakdown = value.rows || [];
           if (key === 'finance') this.atacadoFinance = value && value.enabled ? value : null;
           if (key === 'sales') this.atacadoVendas = value.rows || [];
+          if (key === 'cargo') this.atacadoCargo = (value.data || []).map((row) => ({ ...row, return_reason: '' }));
         });
         if (window.PAINEL_STOCK_PREVIEW?.enabled()) {
           this.atacadoStock = window.PAINEL_STOCK_PREVIEW.rows.map((row) => ({ ...row }));
@@ -168,13 +172,16 @@ window.PAINEL_MODULES.atacado = function () { return {
     },
     atacadoVendaItens(v) {
       const items = v?.items || [];
-      const quantidade = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      const quantidade = items.reduce((sum, item) => sum
+        + Number(item.accepted_quantity ?? item.quantity ?? 0), 0);
       return `${quantidade} pneu(s) · ${items.map((item) => item.measure).filter(Boolean).join(', ') || 'sem medida'}`;
     },
     atacadoMedidasMaisVendidas() {
       const totais = new Map();
       this.atacadoVendasPeriodo().filter((v) => v.status === 'confirmed').forEach((v) => (v.items || []).forEach((item) => {
-        totais.set(item.measure, (totais.get(item.measure) || 0) + Number(item.quantity || 0));
+        if (v.partner_transfer_status === 'in_transit') return;
+        totais.set(item.measure, (totais.get(item.measure) || 0)
+          + Number(item.accepted_quantity ?? item.quantity ?? 0));
       }));
       const rows = [...totais].map(([medida, quantidade]) => ({ medida, quantidade })).sort((a, b) => b.quantidade - a.quantidade).slice(0, 5);
       const max = rows[0]?.quantidade || 1;
@@ -198,12 +205,13 @@ window.PAINEL_MODULES.atacado = function () { return {
     },
     reciboWhatsLink(v) {
       if (!v) return null;
+      if (v.partner_transfer_status === 'in_transit') return null;
       const digits = String(v.buyer_phone || '').replace(/\D/g, '');
       if (!digits || v.status !== 'confirmed') return null;
       const tel = digits.startsWith('55') ? digits : '55' + digits;
       const data = new Date(v.sold_at);
       const linhas = (v.items || []).map((it) =>
-        `• ${it.quantity}x ${it.measure} — ${this.formatCurrency(Number(it.unit_price))} cada`);
+        `• ${it.accepted_quantity ?? it.quantity}x ${it.measure} — ${this.formatCurrency(Number(it.unit_price))} cada`);
       const pagamento = v.payment_status === 'paid'
         ? 'Pago ✓'
         : 'Fiado' + (v.due_date ? ` — vence ${this.atacadoDateOnly(v.due_date)}` : '');
@@ -219,82 +227,6 @@ window.PAINEL_MODULES.atacado = function () { return {
         'Qualquer coisa é só chamar. Obrigado pela parceria! 🤝',
       ].join('\n');
       return 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
-    },
-    async atacadoSubmit() {
-      if (this.adminUser?.role !== 'owner') {
-        this.atacadoMsg = { ok: false, text: 'Somente o proprietário pode registrar vendas pelo painel administrativo.' };
-        return;
-      }
-      const f = this.atacadoForm;
-      const body = { items: [], notes: f.notes ? f.notes.trim() : null };
-      const soldDate = f.sold_at || this.finHoje();
-      if (soldDate > this.finHoje()) {
-        this.atacadoMsg = { ok: false, text: 'A data da venda não pode estar no futuro.' };
-        return;
-      }
-      body.sold_at = new Date(`${soldDate}T12:00:00-03:00`).toISOString();
-      if (f.buyerKey === 'new') {
-        if (!f.newName.trim()) { this.atacadoMsg = { ok: false, text: 'Diga o nome do novo cliente.' }; return; }
-        body.new_customer = { name: f.newName.trim(), phone: f.newPhone.trim() || null };
-      } else if (f.buyerKey.startsWith('c:')) {
-        body.customer_id = f.buyerKey.slice(2);
-      } else if (f.buyerKey.startsWith('p:')) {
-        body.partner_id = f.buyerKey.slice(2);
-      } else {
-        this.atacadoMsg = { ok: false, text: 'Escolha o borracheiro.' }; return;
-      }
-      const items = f.items
-        .filter((it) => it.measure && it.measure.trim() && Number(it.quantity) > 0)
-        .map((it) => ({
-          measure: it.measure.trim(),
-          brand: it.brand && it.brand.trim() ? it.brand.trim() : null,
-          tire_condition: it.tire_condition || null,
-          quantity: Number(it.quantity),
-          unit_price: Number(it.unit_price) || 0,
-        }));
-      if (items.length === 0) { this.atacadoMsg = { ok: false, text: 'Adicione ao menos um pneu (medida e quantidade).' }; return; }
-      if (items.some((item) => !item.brand)) { this.atacadoMsg = { ok: false, text: 'Informe a marca de cada pneu.' }; return; }
-      if (items.some((item) => !item.tire_condition)) {
-        this.atacadoMsg = { ok: false, text: 'Selecione a condição de cada pneu.' };
-        return;
-      }
-      body.items = items;
-      if (this.atacadoFinance && f.payment_status === 'pending') {
-        if (!f.due_date) {
-          this.atacadoMsg = { ok: false, text: 'Informe o vencimento da venda fiada.' };
-          return;
-        }
-        body.payment_status = 'pending';
-        body.due_date = f.due_date;
-      } else {
-        body.payment_status = 'paid';
-        const paidDate = f.payment_date || soldDate;
-        if (paidDate > this.finHoje()) {
-          this.atacadoMsg = { ok: false, text: 'A data do pagamento não pode estar no futuro.' };
-          return;
-        }
-        body.paid_at = new Date(`${paidDate}T12:00:00-03:00`).toISOString();
-      }
-      f.idempotency_key = f.idempotency_key || window.PAINEL_INTEGRITY.operation('wholesale-sale-create', 'form').key;
-      body.idempotency_key = f.idempotency_key;
-      this.atacadoSaving = true;
-      this.atacadoMsg = null;
-      try {
-        const result = await this.apiPost('/admin/api/wholesale/sales', body);
-        const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
-        this.atacadoMsg = { ok: true, text: `Venda registrada pra ${result.buyer_name} — ${this.formatCurrency(Number(result.total_amount))}${fiadoTxt}.` };
-        window.PAINEL_INTEGRITY.complete('wholesale-sale-create', 'form');
-        this.atacadoForm = {
-          buyerKey: '', newName: '', newPhone: '', notes: '', sold_at: '',
-          payment_status: 'paid', payment_date: '', due_date: '', idempotency_key: '',
-          items: [{ measure: '', brand: '', tire_condition: '', quantity: 1, unit_price: '' }],
-        };
-        await this.loadAtacadoVendas();
-      } catch (err) {
-        this.atacadoMsg = { ok: false, text: this.atacadoErrText(err.message) };
-      } finally {
-        this.atacadoSaving = false;
-      }
     },
   };
 };

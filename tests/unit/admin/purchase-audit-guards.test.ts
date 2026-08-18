@@ -28,7 +28,10 @@ describe('guardas finais das auditorias de Compras', () => {
     const backend = source('src/admin/painel/queries-galpao.ts');
     const frontend = source('painel/public/app.galpao.multibrand.js');
     expect(backend).toContain("created_at>=now()-INTERVAL '30 days'");
-    expect(backend).toContain("source IN ('venda_atacado','varejo')");
+    for (const sourceName of [
+      'venda_atacado', 'varejo', 'cancelamento_venda', 'cancelamento_varejo',
+    ]) expect(backend).toContain(`'${sourceName}'`);
+    expect(backend).toContain('GREATEST(0,-COALESCE(sum(qty_delta),0))');
     expect(frontend).toContain("row?.sales_30d != null");
   });
 

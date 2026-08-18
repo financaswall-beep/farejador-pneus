@@ -51,10 +51,12 @@ export async function getMatrizOperationStock(
     quantity_reserved: Number(row.quantity_reserved),
     quantity_available: Number(row.quantity_available),
     minimum_quantity: row.min_quantity == null ? null : Number(row.min_quantity),
-    stock_status: Number(row.quantity_available) <= 0
+    stock_status: Number(row.quantity_on_hand) <= 0
       ? 'out_of_stock'
+      : (Number(row.quantity_available) <= 0
+        ? 'reserved'
       : (row.min_quantity != null && Number(row.quantity_available) <= Number(row.min_quantity)
-        ? 'low_stock' : (Number(row.quantity_reserved) > 0 ? 'reserved' : 'in_stock')),
+        ? 'low_stock' : 'in_stock')),
     tire_condition: row.tire_condition,
     shelf_location: null,
     tire_position: null,

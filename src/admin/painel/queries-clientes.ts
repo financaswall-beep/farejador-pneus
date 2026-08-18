@@ -27,17 +27,11 @@ export interface ClientePainelRow {
   lead_created_at: string | null;
   lead_last_message_at: string | null;
   lead_waiting_on: 'equipe' | 'cliente' | 'nenhum' | null;
-  lead_location: string | null;
-  lead_quote_amount: number | null;
-  lead_order_amount: number | null;
-  partner_id: string | null;
-  partner_name: string | null;
+  lead_location: string | null; lead_quote_amount: number | null;
+  lead_order_amount: number | null; partner_id: string | null; partner_name: string | null;
 }
 export interface ClienteParceiroRow {
-  partner_id: string;
-  name: string;
-  phone: string | null;
-  document_number: string | null;
+  partner_id: string; name: string; phone: string | null; document_number: string | null;
   status: string;
   commercial_model: string;
   linked_buyer_id: string | null;
@@ -258,12 +252,17 @@ export async function getClientesPainel(
               CASE WHEN s.last_purchase_at IS NULL OR s.last_purchase_at >= now() - interval '90 days' THEN 'ativo' ELSE 'inativo' END AS status,
               s.orders_count::int AS purchases, s.total_bought::float8 AS total_spent,
               CASE WHEN s.orders_count > 0 THEN (s.total_bought / s.orders_count)::float8 ELSE 0 END AS avg_ticket,
-              COALESCE((SELECT sum(woi.line_profit) FROM commerce.wholesale_orders wo
+              COALESCE((SELECT sum((woi.unit_price-woi.unit_cost)*CASE
+                           WHEN wo.partner_transfer_status IN ('settled','received')
+                             THEN COALESCE(woi.accepted_quantity,0) ELSE woi.quantity END)
+                         FROM commerce.wholesale_orders wo
                          JOIN commerce.wholesale_order_items woi ON woi.order_id = wo.id
-                        WHERE wo.buyer_id = s.buyer_id AND wo.environment = s.environment AND wo.status = 'confirmed'), 0)::float8 AS gross_profit,
+                        WHERE wo.buyer_id = s.buyer_id AND wo.environment = s.environment AND wo.status = 'confirmed'
+                          AND (wo.partner_transfer_status IS NULL OR wo.partner_transfer_status IN ('settled','received'))), 0)::float8 AS gross_profit,
               (SELECT woi.measure FROM commerce.wholesale_orders wo
                 JOIN commerce.wholesale_order_items woi ON woi.order_id = wo.id
                WHERE wo.buyer_id = s.buyer_id AND wo.environment = s.environment AND wo.status = 'confirmed'
+                 AND (wo.partner_transfer_status IS NULL OR wo.partner_transfer_status IN ('settled','received'))
                ORDER BY wo.sold_at DESC, woi.created_at DESC LIMIT 1) AS last_item,
               NULL::text AS first_purchase_at, s.last_purchase_at::text AS last_purchase_at,
               COALESCE(s.last_purchase_at, wc.updated_at)::text AS last_interaction_at,

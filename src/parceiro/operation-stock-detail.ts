@@ -55,8 +55,14 @@ export function normalizeOperationStockMovement(
   const moveIndex = moves.findIndex((item) => item.stock_id === stockId);
   const move = moveIndex >= 0 ? moves[moveIndex]! : {};
   const items = Array.isArray(payload.items) ? payload.items.map(object) : [];
-  const item = moveIndex >= 0 ? (items[moveIndex] ?? {}) : {};
-  const quantity = number(payload.quantity ?? item.quantity);
+  const moveItemId = typeof move.item_id === 'string' ? move.item_id : null;
+  const item = moveItemId
+    ? (items.find((candidate) => candidate.item_id === moveItemId) ?? {})
+    : (moveIndex >= 0 ? (items[moveIndex] ?? {}) : {});
+  const quantity = number(
+    payload.quantity ?? move.received_quantity ?? move.quantity
+      ?? item.received_quantity ?? item.quantity,
+  );
   const directDelta = number(move.delta);
   const reservedDelta = number(move.reserved_delta);
   let kind: OperationStockMovement['kind'];

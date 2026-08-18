@@ -1,20 +1,14 @@
 window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.galpaoMultibrand = function () {
   const clean = (value) => String(value || '').trim();
-  const brandKey = (value) => clean(value).normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const variantKey = (measure, brand, condition) =>
-    `${clean(measure)}\u0000${brandKey(brand)}\u0000${clean(condition)}`;
+  const brandKey = (value) => clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const variantKey = (measure, brand, condition) => `${clean(measure)}\u0000${brandKey(brand)}\u0000${clean(condition)}`;
   return {
     stockVariantKey(rowOrMeasure, brand, condition) {
-      return typeof rowOrMeasure === 'object' && rowOrMeasure
-        ? variantKey(rowOrMeasure.measure, rowOrMeasure.brand, rowOrMeasure.tire_condition)
-        : variantKey(rowOrMeasure, brand, condition);
+      return typeof rowOrMeasure === 'object' && rowOrMeasure ? variantKey(rowOrMeasure.measure, rowOrMeasure.brand, rowOrMeasure.tire_condition) : variantKey(rowOrMeasure, brand, condition);
     },
     stockVariant(measure, brand, condition) {
-      const wantedMeasure = clean(measure);
-      const wantedBrand = brandKey(brand);
-      const wantedCondition = clean(condition);
+      const wantedMeasure = clean(measure), wantedBrand = brandKey(brand), wantedCondition = clean(condition);
       if (!wantedMeasure || !wantedBrand || !wantedCondition) return null;
       return this.atacadoMeasures.find((row) =>
         clean(row.measure) === wantedMeasure && brandKey(row.brand) === wantedBrand
@@ -23,6 +17,12 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     measureOnHand(measure, brand, condition) {
       const row = this.stockVariant(measure, brand, condition);
       return row?.quantity_on_hand == null ? null : Number(row.quantity_on_hand);
+    },
+    measureAvailable(rowOrMeasure, brand, condition) {
+      const row = typeof rowOrMeasure === 'object' && rowOrMeasure ? rowOrMeasure : this.stockVariant(rowOrMeasure, brand, condition);
+      if (!row || row.quantity_on_hand == null) return null;
+      if (row.quantity_available != null) return Math.max(0, Number(row.quantity_available) || 0);
+      return Math.max(0, (Number(row.quantity_on_hand) || 0) - (Number(row.quantity_reserved) || 0));
     },
     measureCost(measure, brand, condition) {
       const row = this.stockVariant(measure, brand, condition);
@@ -39,7 +39,8 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       const queryDigits = digits(raw);
       const isSale = String(key || '').startsWith('v');
       let candidates = this.atacadoMeasures.filter((row) => {
-        if (!raw) return !isSale || Number(row.quantity_on_hand) > 0;
+        if (isSale && this.measureAvailable(row) <= 0) return false;
+        if (!raw) return true;
         const measure = String(row.measure || '').toLowerCase();
         return measure.includes(raw)
           || (queryDigits !== '' && digits(measure).includes(queryDigits));
@@ -100,7 +101,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       }, 0);
     },
     repoSugestao(row) {
-      const balance = Math.max(0, Number(row.quantity_on_hand) || 0);
+      const balance = this.measureAvailable(row) ?? 0;
       const minimum = row.min_quantity == null ? 0 : Math.max(0, Number(row.min_quantity) || 0);
       return Math.max(1, minimum - balance);
     },
@@ -114,10 +115,10 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     },
     repoRows() {
       return [...this.atacadoStock]
-        .filter((row) => Number(row.quantity_on_hand) === 0 || this.stockPrecisaRepor(row))
+        .filter((row) => this.measureAvailable(row) === 0 || this.stockPrecisaRepor(row))
         .sort((a, b) => {
-          const priorityA = Number(a.quantity_on_hand) === 0 ? 0 : 1;
-          const priorityB = Number(b.quantity_on_hand) === 0 ? 0 : 1;
+          const priorityA = this.measureAvailable(a) === 0 ? 0 : 1;
+          const priorityB = this.measureAvailable(b) === 0 ? 0 : 1;
           return priorityA - priorityB || this.repoGiro(b) - this.repoGiro(a)
             || this.repoKey(a).localeCompare(this.repoKey(b));
         });
@@ -133,10 +134,10 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
           || (searchDigits && digits(row.measure).includes(searchDigits)));
       }
       if (this.repoFiltro === 'zeradas') {
-        rows = rows.filter((row) => Number(row.quantity_on_hand) === 0);
+        rows = rows.filter((row) => this.measureAvailable(row) === 0);
       } else if (this.repoFiltro === 'abaixo') {
         rows = rows.filter((row) =>
-          Number(row.quantity_on_hand) > 0 && this.stockPrecisaRepor(row));
+          this.measureAvailable(row) > 0 && this.stockPrecisaRepor(row));
       } else if (this.repoFiltro === 'giro') {
         rows = [...rows].sort((a, b) => this.repoGiro(b) - this.repoGiro(a)
           || this.repoKey(a).localeCompare(this.repoKey(b)));
@@ -146,7 +147,7 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     repoCobertura(row) {
       const sales = this.repoGiro(row);
       if (sales <= 0) return null;
-      const projected = Math.max(0, Number(row.quantity_on_hand) || 0) + this.repoQuantidade(row);
+      const projected = (this.measureAvailable(row) ?? 0) + this.repoQuantidade(row);
       return Math.max(1, Math.round(projected / (sales / 30)));
     },
     repoPlano() {
@@ -168,8 +169,8 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
     repoInsights() {
       const rows = this.repoRows();
       return {
-        zeradas: rows.filter((row) => Number(row.quantity_on_hand) === 0).length,
-        abaixo: rows.filter((row) => Number(row.quantity_on_hand) > 0).length,
+        zeradas: rows.filter((row) => this.measureAvailable(row) === 0).length,
+        abaixo: rows.filter((row) => this.measureAvailable(row) > 0).length,
         giro: rows.filter((row) => this.repoGiro(row) > 0).length,
       };
     },
@@ -212,7 +213,6 @@ window.PAINEL_MODULES.galpaoMultibrand = function () {
       this.comprasOpenTab('nova');
       this.$nextTick(() => window.lucide && window.lucide.createIcons());
     },
-
     custoCapital(row) {
       if (row?.capital != null) return Math.max(0, Number(row.capital) || 0);
       return Math.max(0, Number(row?.quantity_on_hand) || 0)

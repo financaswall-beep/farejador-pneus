@@ -48,10 +48,14 @@ export async function getMatrizNotificacoes(
 
        (SELECT count(*)::int FROM commerce.wholesale_orders w
          WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
+           AND (w.partner_transfer_status IS NULL
+             OR w.partner_transfer_status IN ('settled','received'))
            AND w.due_date IS NOT NULL
            AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_count,
-       (SELECT COALESCE(sum(w.total_amount), 0)::text FROM commerce.wholesale_orders w
+       (SELECT COALESCE(sum(COALESCE(w.settled_total_amount,w.total_amount)), 0)::text FROM commerce.wholesale_orders w
          WHERE w.environment = $1 AND w.status = 'confirmed' AND w.payment_status = 'pending'
+           AND (w.partner_transfer_status IS NULL
+             OR w.partner_transfer_status IN ('settled','received'))
            AND w.due_date IS NOT NULL
            AND w.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS fiado_total,
 

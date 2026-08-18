@@ -120,6 +120,8 @@ export const registerWholesaleSaleSchema = z
       .object({ name: z.string().min(1).max(200), phone: z.string().max(40).nullable().optional() })
       .nullable()
       .optional(),
+    parent_order_id: z.string().uuid().nullable().optional(),
+    partner_unit_id: z.string().uuid().nullable().optional(),
     items: wholesaleItemsSchema,
     sold_at: z.string().datetime({ offset: true }).nullable().optional(),
     paid_at: z.string().datetime({ offset: true }).nullable().optional(),
@@ -131,11 +133,14 @@ export const registerWholesaleSaleSchema = z
     due_date: z.string().date().nullable().optional(),
   })
   .refine(
-    (d) => !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
+    (d) => Boolean(d.parent_order_id)
+      || !!d.customer_id || !!d.partner_id || !!(d.new_customer && d.new_customer.name.trim()),
     { message: 'buyer_required' },
   )
   .refine(
-    (d) => [d.customer_id, d.partner_id, d.new_customer?.name?.trim()].filter(Boolean).length === 1,
+    (d) => Boolean(d.parent_order_id)
+      ? [d.customer_id, d.partner_id, d.new_customer?.name?.trim()].filter(Boolean).length === 0
+      : [d.customer_id, d.partner_id, d.new_customer?.name?.trim()].filter(Boolean).length === 1,
     { message: 'buyer_ambiguous' },
   )
   .refine(

@@ -42,6 +42,18 @@ window.PAINEL_MODULES.format = function () {
         sale_line_total_too_large: 'O total de um item ultrapassa o limite aceito.',
         sale_total_too_large: 'O total da venda ultrapassa o limite aceito.',
         sale_items_limit: 'A venda tem itens demais para um único lançamento.',
+        partner_unit_required: 'Este parceiro tem mais de uma unidade. Escolha qual receberá os pneus.',
+        partner_unit_not_found: 'A unidade parceira não está ativa ou não foi encontrada.',
+        partner_unit_not_allowed: 'Este comprador não é uma unidade parceira.',
+        wholesale_parent_order_not_open_root: 'O pedido original não está disponível para receber acréscimos.',
+        wholesale_addition_partner_unit_mismatch: 'O acréscimo precisa ir para a mesma unidade do pedido original.',
+        matrix_partner_transfer_not_in_transit: 'Esta carga já foi acertada ou ainda não está disponível para acerto.',
+        matrix_partner_arrival_items_mismatch: 'A lista de pneus mudou. Recarregue a venda antes de confirmar.',
+        matrix_partner_arrival_quantity_invalid: 'A quantidade aceita precisa ficar entre zero e a quantidade enviada.',
+        matrix_partner_cargo_not_found: 'Esta carga já foi usada ou retornou ao galpão.',
+        matrix_partner_cargo_insufficient: 'A carga não tem mais essa quantidade disponível.',
+        matrix_partner_arrival_total_mismatch: 'Os valores do acerto não fecharam. Recarregue e confira antes de confirmar.',
+        matrix_partner_original_ledger_missing: 'O lançamento financeiro original da saída não foi encontrado.',
       };
       return map[code] || `Não consegui registrar (${code}).`;
     },

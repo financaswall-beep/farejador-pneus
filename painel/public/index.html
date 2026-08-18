@@ -41,15 +41,16 @@
 <script src="/admin/painel/app.unidade.kpis.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.venda.modal.js?v=20260716-stock-source1"></script>
 <script src="/admin/painel/app.api.js?v=20260810-chaverede1"></script>
-<script src="/admin/painel/app.format.js?v=20260817-sales-integrity1"></script>
+<script src="/admin/painel/app.format.js?v=20260817-arrival-adjustment1"></script>
 <script src="/admin/painel/app.varejo.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.marcas.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.vendas.historico.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.comissoes.js?v=20260705-obra300"></script>
-<script src="/admin/painel/app.atacado.js?v=20260817-sales-integrity1"></script>
+<script src="/admin/painel/app.atacado.js?v=20260817-arrival-adjustment1"></script>
+<script src="/admin/painel/app.atacado.transfer.js?v=20260817-arrival-adjustment1"></script>
 <script src="/admin/painel/app.compras.js?v=20260731-condicao2"></script>
 <script src="/admin/painel/app.compras.relatorios.js?v=20260731-condicao2"></script>
-<script src="/admin/painel/app.compras.acoes.js?v=20260723-compras2"></script>
+<script src="/admin/painel/app.compras.acoes.js?v=20260817-arrival-adjustment1"></script>
 <script src="/admin/painel/app.logistica.js?v=20260817-sales-integrity1"></script>
 <script src="/admin/painel/app.logistica.resultado.js?v=20260813-logistica-cards1"></script>
 <script src="/admin/painel/app.logistica.comprovantes.js?v=20260717-comprovantes1"></script>
@@ -86,7 +87,7 @@
 <script src="/admin/painel/app.charts.saude.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.charts.unidade.js?v=20260723-rede-fix1"></script>
 <script src="/admin/painel/app.montagem.js?v=20260813-logistica-hotfix1"></script>
-<script src="/admin/painel/app.js?v=20260817-sales-integrity1"></script>
+<script src="/admin/painel/app.js?v=20260817-arrival-adjustment1"></script>
 <script defer src="/admin/painel/vendor/alpine-3.14.9.min.js"></script>
 <link rel="stylesheet" href="/admin/painel/style.css?v=20260701-oversell" />
 
@@ -2440,11 +2441,13 @@
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-          <div x-show="adminUser?.role === 'owner'" class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
-            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold">Nova venda de atacado</h3><p class="text-xs text-gray-400 mt-1">Venda para borracheiro ou parceiro</p></div>
+          <div id="atacado-sale-form" x-show="adminUser?.role === 'owner'" class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
+            <div class="px-5 py-4 border-b border-gray-100"><h3 class="text-base font-semibold" x-text="atacadoForm.parent_order_id ? 'Acréscimo ao pedido de atacado' : 'Nova venda de atacado'"></h3><p class="text-xs text-gray-400 mt-1" x-text="atacadoForm.parent_order_id ? 'Os pneus extras saem agora como complemento vinculado ao pedido original.' : 'Venda para borracheiro ou parceiro'"></p></div>
             <div class="p-5 space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-end"><label class="block"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Comprador</span><select x-model="atacadoForm.buyerKey" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white"><option value="">Selecione o comprador…</option><option value="new">+ Novo comprador</option><template x-for="b in atacadoBuyers" :key="b.customer_id || b.partner_id"><option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option></template></select></label><button @click="atacadoForm.buyerKey = 'new'" class="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50"><i data-lucide="user-plus" class="w-4 h-4"></i>Novo comprador</button></div>
-              <div x-show="atacadoForm.buyerKey === 'new'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl"><label><span class="text-xs text-gray-500 mb-1 block">Nome</span><input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label><label><span class="text-xs text-gray-500 mb-1 block">Telefone</span><input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label></div>
+              <div x-show="atacadoForm.parent_order_id" class="flex items-start justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800"><span><b>Pedido original:</b> <span class="num" x-text="String(atacadoForm.parent_order_id || '').slice(0, 8)"></span>. O acréscimo terá estoque e financeiro próprios, sem reescrever o lançamento anterior.</span><button @click="atacadoStopAddition()" class="shrink-0 font-medium underline">Cancelar acréscimo</button></div>
+              <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-end"><label class="block"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Comprador</span><select x-model="atacadoForm.buyerKey" @change="atacadoBuyerChanged()" :disabled="Boolean(atacadoForm.parent_order_id)" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white disabled:bg-gray-100"><option value="">Selecione o comprador…</option><option value="new">+ Novo comprador</option><template x-for="b in atacadoBuyers" :key="b.customer_id || b.partner_id"><option :value="atacadoBuyerKey(b)" x-text="b.name + (b.is_partner ? ' · parceiro' : '')"></option></template></select></label><button x-show="!atacadoForm.parent_order_id" @click="atacadoForm.buyerKey = 'new'; atacadoBuyerChanged()" class="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium hover:bg-emerald-50"><i data-lucide="user-plus" class="w-4 h-4"></i>Novo comprador</button></div>
+              <div x-show="atacadoForm.buyerKey === 'new' && !atacadoForm.parent_order_id" class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-emerald-50/50 border border-emerald-100 rounded-xl"><label><span class="text-xs text-gray-500 mb-1 block">Nome</span><input x-model="atacadoForm.newName" type="text" placeholder="Nome do borracheiro" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label><label><span class="text-xs text-gray-500 mb-1 block">Telefone</span><input x-model="atacadoForm.newPhone" type="text" placeholder="Telefone (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"></label></div>
+              <label x-show="atacadoBuyerSelecionado()?.is_partner" class="block"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Unidade parceira que receberá</span><select x-model="atacadoForm.receiving_unit_id" :disabled="Boolean(atacadoForm.parent_order_id && atacadoForm.receiving_unit_id)" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white disabled:bg-gray-100"><option value="">Selecione a unidade…</option><template x-for="unit in atacadoBuyerUnits()" :key="unit.partner_unit_id"><option :value="unit.partner_unit_id" x-text="unit.display_name"></option></template></select><span class="mt-1 block text-[11px] text-gray-400">Ao registrar, o recebimento aparecerá automaticamente no estoque desta unidade.</span></label>
 
               <div class="border border-gray-200 rounded-xl overflow-visible">
                 <div class="hidden lg:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500"><div class="col-span-3">Medida</div><div class="col-span-2">Marca</div><div class="col-span-2">Condição</div><div class="col-span-1 text-center">Estoque</div><div class="col-span-1 text-center">Qtd.</div><div class="col-span-2">Preço unitário</div><div class="col-span-1 text-right">Subtotal</div></div>
@@ -2464,7 +2467,7 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3"><div x-show="atacadoFinance"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Pagamento</span><div class="inline-flex rounded-lg border border-gray-200 overflow-hidden"><button @click="atacadoForm.payment_status = 'paid'; atacadoForm.due_date = ''" class="px-5 py-2 text-sm font-medium" :class="atacadoForm.payment_status === 'paid' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">À vista</button><button @click="atacadoForm.payment_status = 'pending'; atacadoForm.payment_date = ''" class="px-5 py-2 text-sm font-medium border-l border-gray-200" :class="atacadoForm.payment_status === 'pending' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-600'">Fiado</button></div></div><label x-show="atacadoFinance && atacadoForm.payment_status === 'pending'"><span class="text-xs font-medium text-gray-500 mb-1.5 block">Vencimento</span><input x-model="atacadoForm.due_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><div x-show="!atacadoFinance" class="text-sm text-gray-500 flex items-center gap-2"><i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>Venda registrada como recebida à vista</div></div>
               <input x-model="atacadoForm.notes" type="text" placeholder="Observação da venda (opcional)" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
             </div>
-            <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p class="text-xs text-gray-400">Total do pedido</p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoFormTotal())"></p></div><button @click="atacadoSubmit()" :disabled="atacadoSaving" class="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50"><span x-show="!atacadoSaving">Registrar venda</span><span x-show="atacadoSaving">Salvando…</span></button></div>
+            <div class="px-5 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"><div><p class="text-xs text-gray-400" x-text="atacadoForm.parent_order_id ? 'Total do acréscimo' : 'Total do pedido'"></p><p class="text-2xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoFormTotal())"></p></div><button @click="atacadoSubmit()" :disabled="atacadoSaving" class="px-6 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium disabled:opacity-50"><span x-show="!atacadoSaving" x-text="atacadoForm.parent_order_id ? 'Registrar acréscimo' : 'Registrar venda'"></span><span x-show="atacadoSaving">Salvando…</span></button></div>
             <div x-show="atacadoMsg" class="mx-5 mb-4 mt-3 text-sm px-3 py-2 rounded-lg" :class="atacadoMsg?.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'" x-text="atacadoMsg?.text"></div>
           </div>
 
@@ -2487,7 +2490,30 @@
           <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm"><h3 class="text-base font-semibold">Medidas mais vendidas</h3><p class="text-xs text-gray-400 mt-1 mb-4">Nas vendas recentes do atacado</p><div class="space-y-3"><template x-for="row in atacadoMedidasMaisVendidas()" :key="row.medida"><div class="grid grid-cols-[100px_minmax(100px,1fr)_55px] gap-3 items-center"><span class="text-sm font-medium" x-text="row.medida"></span><div class="h-2.5 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-700 rounded-full" :style="'width:' + row.pct + '%'"></div></div><span class="text-xs text-gray-500 text-right num" x-text="row.quantidade + ' un'"></span></div></template><p x-show="!atacadoMedidasMaisVendidas().length" class="py-8 text-center text-sm text-gray-400">As medidas aparecem depois das primeiras vendas.</p></div></div>
         </div>
 
-        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure + (item.brand ? ' · ' + item.brand : '') + ' · ' + catalogoConditionLabel(item.tire_condition)"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center gap-3"><button x-show="adminUser?.role === 'owner' && vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
+        <div x-show="vendaAtacadoSelecionada" x-cloak @keydown.escape.window="vendaAtacadoSelecionada = null" class="fixed inset-0 z-50 flex items-center justify-center p-4"><div class="absolute inset-0 bg-black/30" @click="vendaAtacadoSelecionada = null"></div><div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden"><div class="px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Detalhes da venda de atacado</h3><p class="text-xs text-gray-400 mt-1" x-text="vendaData(vendaAtacadoSelecionada)"></p></div><button @click="vendaAtacadoSelecionada = null" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div><div class="p-6 space-y-4"><div><p class="text-xs text-gray-400">Comprador</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.buyer_name"></p><p x-show="vendaAtacadoSelecionada?.partner_unit_name" class="mt-1 text-xs text-emerald-700" x-text="'Recebimento: ' + vendaAtacadoSelecionada?.partner_unit_name"></p></div><div><p class="text-xs text-gray-400 mb-2">Itens</p><div class="space-y-2"><template x-for="(item, itemIndex) in (vendaAtacadoSelecionada?.items || [])" :key="itemIndex"><div class="flex items-center justify-between text-sm border-b border-gray-100 pb-2"><span x-text="item.quantity + '× ' + item.measure + (item.brand ? ' · ' + item.brand : '') + ' · ' + catalogoConditionLabel(item.tire_condition)"></span><span class="font-medium" x-text="formatCurrency(Number(item.unit_price)) + ' cada'"></span></div></template></div></div><div class="grid grid-cols-2 gap-4"><div><p class="text-xs text-gray-400">Pagamento</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.payment_status === 'pending' ? 'Fiado' : 'Pago'"></p></div><div><p class="text-xs text-gray-400">Status</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.status === 'cancelled' ? 'Cancelada' : 'Confirmada'"></p></div><div x-show="vendaAtacadoSelecionada?.partner_receipt_status"><p class="text-xs text-gray-400">Parceiro</p><p class="font-semibold mt-1" x-text="vendaAtacadoSelecionada?.partner_receipt_status === 'received' ? 'Recebimento confirmado' : 'Aguardando recebimento'"></p></div><div x-show="vendaAtacadoSelecionada?.parent_order_id"><p class="text-xs text-gray-400">Tipo</p><p class="font-semibold mt-1">Acréscimo</p></div></div><div class="pt-4 border-t border-gray-100 flex items-center justify-between"><span class="text-sm text-gray-500">Total da venda</span><span class="text-2xl font-bold num" x-text="formatCurrency(Number(vendaAtacadoSelecionada?.total_amount || 0))"></span></div></div><div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-3"><button x-show="adminUser?.role === 'owner' && vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoStartAddition(vendaAtacadoSelecionada)" class="px-3 py-2 rounded-lg border border-blue-300 text-blue-700 text-sm font-medium">Adicionar pneus</button><button x-show="adminUser?.role === 'owner' && vendaAtacadoSelecionada?.status === 'confirmed'" @click="atacadoCancelSale(vendaAtacadoSelecionada); vendaAtacadoSelecionada = null" class="text-sm font-medium text-rose-600 hover:underline">Cancelar venda</button><a x-show="reciboWhatsLink(vendaAtacadoSelecionada)" :href="reciboWhatsLink(vendaAtacadoSelecionada)" target="_blank" rel="noopener" class="ml-auto px-4 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Enviar recibo</a><button @click="vendaAtacadoSelecionada = null" class="px-4 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium">Fechar</button></div></div></div>
+        <div x-show="atacadoVendas.some((v) => v.partner_transfer_status === 'in_transit')" class="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm">
+          <div class="flex items-start justify-between gap-4"><div><h3 class="font-semibold text-amber-900">Cargas aguardando acerto na chegada</h3><p class="text-xs text-amber-700 mt-1">Confirme pneu por pneu o que ficou e o que foi recusado.</p></div><i data-lucide="truck" class="w-5 h-5 text-amber-700"></i></div>
+          <div class="mt-4 grid gap-2"><template x-for="v in atacadoVendas.filter((row) => row.partner_transfer_status === 'in_transit')" :key="v.id"><div class="flex flex-wrap items-center gap-3 rounded-lg bg-white border border-amber-200 px-4 py-3"><div class="flex-1 min-w-[190px]"><p class="text-sm font-semibold" x-text="v.buyer_name"></p><p class="text-xs text-gray-500" x-text="atacadoVendaItens(v) + ' · enviado em ' + vendaData(v)"></p></div><button x-show="adminUser?.role === 'owner'" @click="atacadoOpenArrival(v)" class="px-3 py-2 rounded-lg bg-amber-700 text-white text-sm font-medium">Acertar pneu por pneu</button></div></template></div>
+        </div>
+
+        <div x-show="atacadoCargo.length" class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div><h3 class="font-semibold">Pneus recusados ainda no carro</h3><p class="text-xs text-gray-500 mt-1">Podem ir para outro parceiro. Só clique em “Voltou ao galpão” depois do retorno físico.</p></div>
+          <div class="mt-4 grid gap-3"><template x-for="lot in atacadoCargo" :key="lot.id"><div class="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_90px_minmax(220px,1fr)_auto] items-end gap-3 rounded-lg border border-gray-200 p-3"><div><p class="text-sm font-semibold" x-text="lot.measure + ' · ' + lot.brand + ' · ' + catalogoConditionLabel(lot.tire_condition)"></p><p class="text-xs text-gray-500" x-text="'Recusado por ' + lot.source_buyer_name"></p></div><div><p class="text-xs text-gray-400">No carro</p><p class="font-bold num" x-text="lot.quantity_available + ' un'"></p></div><label><span class="text-xs text-gray-500">Motivo do retorno</span><input x-model="lot.return_reason" type="text" placeholder="Ex.: carro voltou à Matriz" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></label><button x-show="adminUser?.role === 'owner'" @click="atacadoReturnCargo(lot)" class="px-3 py-2 rounded-lg border border-emerald-700 text-emerald-800 text-sm font-medium">Voltou ao galpão</button></div></template></div>
+        </div>
+
+        <div x-show="atacadoArrival.open" x-cloak @keydown.escape.window="atacadoArrival.open = false" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-black/40" @click="atacadoArrival.open = false"></div>
+          <div class="relative bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white z-10 px-6 py-5 border-b border-gray-100 flex items-start justify-between"><div><h3 class="text-lg font-semibold">Acerto da chegada</h3><p class="text-xs text-gray-500 mt-1" x-text="atacadoArrival.order?.buyer_name + ' · informe quantos pneus ficaram'"></p></div><button @click="atacadoArrival.open = false" class="p-2 rounded-lg hover:bg-gray-100"><i data-lucide="x" class="w-4 h-4"></i></button></div>
+            <div class="p-6 space-y-6">
+              <section><h4 class="text-sm font-semibold">Pneus enviados neste pedido</h4><p class="text-xs text-gray-500 mt-1 mb-3">Para recusar só um pneu de uma linha com 10, informe 9 em “Ficou”.</p><div class="space-y-2"><template x-for="item in atacadoArrival.items" :key="item.id"><div class="grid grid-cols-1 sm:grid-cols-[minmax(180px,1fr)_80px_110px_80px] items-center gap-3 rounded-lg border border-gray-200 p-3"><div><p class="text-sm font-semibold" x-text="item.measure + ' · ' + item.brand"></p><p class="text-xs text-gray-500" x-text="catalogoConditionLabel(item.tire_condition) + ' · ' + formatCurrency(Number(item.unit_price)) + ' cada'"></p></div><div class="text-left sm:text-center"><p class="text-xs text-gray-400">Enviado</p><p class="font-semibold num" x-text="item.quantity"></p></div><label><span class="text-xs text-gray-500">Ficou</span><input x-model.number="item.accepted_quantity" :max="item.quantity" min="0" step="1" type="number" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm num"></label><div class="text-left sm:text-center"><p class="text-xs text-gray-400">Recusou</p><p class="font-semibold text-rose-600 num" x-text="Math.max(0, Number(item.quantity) - Number(item.accepted_quantity || 0))"></p></div></div></template></div></section>
+              <section x-show="atacadoArrival.cargo.length"><h4 class="text-sm font-semibold">Incluir pneus que já estão no carro</h4><p class="text-xs text-gray-500 mt-1 mb-3">São recusas de outros parceiros. Usá-los aqui não baixa o estoque da Matriz novamente.</p><div class="space-y-2"><template x-for="lot in atacadoArrival.cargo" :key="lot.id"><div class="grid grid-cols-1 sm:grid-cols-[minmax(180px,1fr)_90px_130px] items-end gap-3 rounded-lg border border-blue-200 bg-blue-50/40 p-3"><div><p class="text-sm font-semibold" x-text="lot.measure + ' · ' + lot.brand"></p><p class="text-xs text-gray-500" x-text="lot.quantity_available + ' disponível(is) · veio de ' + lot.source_buyer_name"></p></div><label><span class="text-xs text-gray-500">Incluir</span><input x-model.number="lot.take_quantity" :max="lot.quantity_available" min="0" step="1" type="number" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm num"></label><label><span class="text-xs text-gray-500">Preço cada</span><input x-model.number="lot.unit_price" min="0" step="0.01" type="number" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm num"></label></div></template></div></section>
+              <div class="rounded-xl bg-gray-50 border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3"><div><p class="text-xs text-gray-500">Resumo final</p><p class="text-sm"><span class="font-semibold text-rose-600" x-text="atacadoArrivalRefused() + ' recusado(s)'"></span> ficam como carga em trânsito</p></div><div class="text-right"><p class="text-xs text-gray-500">Valor somente do que ficou</p><p class="text-xl font-bold text-emerald-800 num" x-text="formatCurrency(atacadoArrivalTotal())"></p></div></div>
+              <p x-show="atacadoArrival.error" class="text-sm rounded-lg bg-rose-50 text-rose-700 px-3 py-2" x-text="atacadoArrival.error"></p>
+            </div>
+            <div class="sticky bottom-0 bg-white px-6 py-4 border-t border-gray-100 flex justify-end gap-3"><button @click="atacadoArrival.open = false" class="px-4 py-2 rounded-lg border border-gray-300 text-sm">Cancelar</button><button @click="atacadoSubmitArrival()" :disabled="atacadoArrival.saving" class="px-5 py-2 rounded-lg bg-emerald-700 text-white text-sm font-medium disabled:opacity-50" x-text="atacadoArrival.saving ? 'Confirmando…' : 'Confirmar acerto'"></button></div>
+          </div>
+        </div>
       </div>
 
       <!-- HISTÓRICO COMERCIAL UNIFICADO -->
@@ -2999,7 +3025,7 @@
             <button @click="stockTab = 'conciliacao'; loadStockReconciliation()" class="px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                     :class="stockTab === 'conciliacao' ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-gray-500 hover:text-gray-800'">Conciliação</button>
           </nav>
-          <div class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
+          <div x-show="adminUser?.role === 'owner'" class="mb-3 flex flex-wrap items-center gap-2 xl:mb-0">
             <button @click="stockTab = 'visao'; stockOperacao = 'entrada'; stockMsg = null; stockForm = { measure: '', brand: '', tire_condition: '', quantity_on_hand: '', unit_cost: '', min_quantity: '', notes: '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                     class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-sm">
               <i data-lucide="plus" class="w-4 h-4"></i> Registrar entrada
@@ -3042,7 +3068,7 @@
       <!-- VISÃO GERAL -->
       <div x-show="stockTab === 'visao'" x-cloak class="space-y-5">
         <!-- Ações existentes ficam recolhidas; os endpoints e os bindings são os mesmos. -->
-        <div x-show="stockOperacao" x-cloak class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div x-show="stockOperacao && adminUser?.role === 'owner'" x-cloak class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <div class="flex items-start justify-between gap-4 mb-4">
             <div>
               <h3 class="text-base font-semibold" x-text="stockOperacao === 'entrada' ? 'Registrar entrada' : 'Ajustar estoque'"></h3>
@@ -3124,7 +3150,7 @@
         </div>
 
         <!-- BAIXA MANUAL: preserva o motivo e o registro no filme. -->
-        <div x-show="stockBaixaForm.measure" x-cloak class="border border-emerald-200 bg-emerald-50 rounded-xl p-4">
+        <div x-show="stockBaixaForm.measure && adminUser?.role === 'owner'" x-cloak class="border border-emerald-200 bg-emerald-50 rounded-xl p-4">
           <div class="flex flex-col xl:flex-row xl:items-end gap-3">
             <div class="xl:w-56"><p class="text-sm font-semibold text-emerald-950">Baixar <span x-text="stockBaixaForm.measure"></span></p><p class="text-xs text-emerald-700 mt-1">A saída ficará registrada no histórico.</p></div>
             <label class="block"><span class="block text-xs font-medium text-emerald-800 mb-1.5">Quantidade</span><input id="galpao-baixa-qtd" x-model.number="stockBaixaForm.quantity" type="number" min="1" placeholder="0" class="w-28 border border-emerald-300 rounded-lg px-3 py-2 text-sm bg-white"></label>
@@ -3134,7 +3160,7 @@
           </div>
         </div>
 
-        <div x-show="stockConditionCorrection.open" x-cloak
+        <div x-show="stockConditionCorrection.open && adminUser?.role === 'owner'" x-cloak
              class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
             <div class="xl:w-64">
@@ -3189,9 +3215,9 @@
             visibleRows() {
               return stockRowsView().filter((row) =>
                 stockFiltro === 'todos' ||
-                (stockFiltro === 'zerados' && Number(row.quantity_on_hand) === 0) ||
-                (stockFiltro === 'repor' && Number(row.quantity_on_hand) > 0 && stockPrecisaRepor(row)) ||
-                (stockFiltro === 'em_dia' && Number(row.quantity_on_hand) > 0 && !stockPrecisaRepor(row))
+                (stockFiltro === 'zerados' && measureAvailable(row) === 0) ||
+                (stockFiltro === 'repor' && measureAvailable(row) > 0 && stockPrecisaRepor(row)) ||
+                (stockFiltro === 'em_dia' && measureAvailable(row) > 0 && !stockPrecisaRepor(row))
               );
             },
             get selectedRow() {
@@ -3265,15 +3291,15 @@
                           </div>
                         </div>
                       </td>
-                      <td class="px-4 py-3.5 text-center font-semibold num" :class="Number(row.quantity_on_hand) === 0 ? 'text-emerald-950' : 'text-emerald-800'" x-text="row.quantity_on_hand"></td>
+                      <td class="px-4 py-3.5 text-center font-semibold num" :class="measureAvailable(row) === 0 ? 'text-emerald-950' : 'text-emerald-800'"><span x-text="measureAvailable(row)"></span><small x-show="Number(row.quantity_reserved || 0) > 0" class="block text-[10px] font-normal text-gray-400" x-text="`${row.quantity_on_hand} físico · ${row.quantity_reserved} reservado`"></small></td>
                       <td class="px-4 py-3.5 text-center text-gray-500 num" x-text="row.min_quantity == null ? '—' : row.min_quantity"></td>
                       <td class="px-4 py-3.5 text-right text-gray-600 num" x-text="formatCurrency(Number(row.unit_cost || 0))"></td>
                       <td class="px-4 py-3.5 text-right font-medium num" x-text="formatCurrency(Number(row.quantity_on_hand || 0) * Number(row.unit_cost || 0))"></td>
                       <td class="px-5 py-3.5 text-center">
                         <div class="flex items-center justify-center gap-2">
                           <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                                :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(row) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
-                                x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span>
+                                :class="measureAvailable(row) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(row) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
+                                x-text="measureAvailable(row) === 0 ? (Number(row.quantity_reserved || 0) > 0 ? 'Reservado' : 'Zerado') : (stockPrecisaRepor(row) ? 'Repor' : 'Em dia')"></span>
                           <i x-show="selectedRow && stockVariantKey(selectedRow) === stockVariantKey(row)" data-lucide="chevron-right" class="h-4 w-4 text-emerald-800"></i>
                         </div>
                       </td>
@@ -3298,17 +3324,17 @@
                         <div>
                           <h3 id="painel-medida-heading" class="text-2xl font-semibold tracking-tight" x-text="selectedRow.measure"></h3>
                           <p class="mt-0.5 text-xs font-medium text-emerald-700" x-text="`${selectedRow.brand || 'Marca não informada'} · ${catalogoConditionLabel(selectedRow.tire_condition)}`"></p>
-                          <p class="mt-1 text-xs text-gray-500"><span class="font-semibold text-emerald-800 num" x-text="selectedRow.quantity_on_hand"></span> em estoque <span class="mx-1">·</span> mínimo <span class="num" x-text="selectedRow.min_quantity == null ? '—' : selectedRow.min_quantity"></span></p>
+                          <p class="mt-1 text-xs text-gray-500"><span class="font-semibold text-emerald-800 num" x-text="measureAvailable(selectedRow)"></span> disponível <span x-show="Number(selectedRow.quantity_reserved || 0) > 0" x-text="`(${selectedRow.quantity_on_hand} físico; ${selectedRow.quantity_reserved} reservado)`"></span> <span class="mx-1">·</span> mínimo <span class="num" x-text="selectedRow.min_quantity == null ? '—' : selectedRow.min_quantity"></span></p>
                         </div>
                       </div>
                     </div>
                     <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                          :class="Number(selectedRow.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(selectedRow) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
-                          x-text="Number(selectedRow.quantity_on_hand) === 0 ? 'Zerado' : (stockPrecisaRepor(selectedRow) ? 'Repor' : 'Em dia')"></span>
+                          :class="measureAvailable(selectedRow) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : (stockPrecisaRepor(selectedRow) ? 'border border-emerald-500/50 bg-emerald-50 text-emerald-800' : 'bg-emerald-100 text-emerald-800')"
+                          x-text="measureAvailable(selectedRow) === 0 ? (Number(selectedRow.quantity_reserved || 0) > 0 ? 'Reservado' : 'Zerado') : (stockPrecisaRepor(selectedRow) ? 'Repor' : 'Em dia')"></span>
                   </div>
                   <div class="mt-4 h-2 overflow-hidden rounded-full bg-gray-100">
                     <div class="h-full rounded-full bg-emerald-700 transition-all"
-                         :style="'width:' + Math.min(100, selectedRow.min_quantity == null || Number(selectedRow.min_quantity) === 0 ? 100 : (Number(selectedRow.quantity_on_hand) / Number(selectedRow.min_quantity)) * 100) + '%'"></div>
+                         :style="'width:' + Math.min(100, selectedRow.min_quantity == null || Number(selectedRow.min_quantity) === 0 ? 100 : (measureAvailable(selectedRow) / Number(selectedRow.min_quantity)) * 100) + '%'"></div>
                   </div>
                 </div>
 
@@ -3332,23 +3358,23 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-2 border-b border-gray-100 p-4 sm:grid-cols-2 2xl:grid-cols-1">
-                  <button @click="stockForm = { measure: selectedRow.measure, brand: selectedRow.brand || '', tire_condition: selectedRow.tire_condition || '', quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                  <button x-show="adminUser?.role === 'owner'" @click="stockForm = { measure: selectedRow.measure, brand: selectedRow.brand || '', tire_condition: selectedRow.tire_condition || '', quantity_on_hand: '', unit_cost: selectedRow.unit_cost ?? '', min_quantity: selectedRow.min_quantity ?? '', notes: selectedRow.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                           class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-medium text-white hover:bg-emerald-800">
                     <i data-lucide="plus" class="h-4 w-4"></i> Registrar entrada
                   </button>
-                  <button @click="stockEdit(selectedRow); stockOperacao = 'ajuste'; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
+                  <button x-show="adminUser?.role === 'owner'" @click="stockEdit(selectedRow); stockOperacao = 'ajuste'; $nextTick(() => document.getElementById('estoque-medida')?.focus())"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-700 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="sliders-horizontal" class="h-4 w-4"></i> Ajustar saldo e custo
                   </button>
-                  <button @click="stockBaixaOpen(selectedRow)"
+                  <button x-show="adminUser?.role === 'owner'" @click="stockBaixaOpen(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/70 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="arrow-down-to-line" class="h-4 w-4"></i> Baixa manual
                   </button>
-                  <button @click="stockConditionCorrectionOpen(selectedRow)"
+                  <button x-show="adminUser?.role === 'owner'" @click="stockConditionCorrectionOpen(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="replace" class="h-4 w-4"></i> Corrigir condição
                   </button>
-                  <button @click="catalogoBrandCorrectionFromStock(selectedRow)"
+                  <button x-show="adminUser?.role === 'owner'" @click="catalogoBrandCorrectionFromStock(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 px-3 py-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50">
                     <i data-lucide="tags" class="h-4 w-4"></i> Corrigir marca
                   </button>
@@ -3356,11 +3382,11 @@
                           class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     <i data-lucide="history" class="h-4 w-4"></i> Ver histórico
                   </button>
-                  <button @click="stockRemove(selectedRow)"
+                  <button x-show="adminUser?.role === 'owner'" @click="stockRemove(selectedRow)"
                           class="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 sm:col-span-2 2xl:col-span-1">
                     <i data-lucide="trash-2" class="h-4 w-4"></i> Remover variante
                   </button>
-                  <p class="text-center text-[11px] text-gray-400 sm:col-span-2 2xl:col-span-1">Entrada recalcula o custo médio ponderado; ajuste também define o mínimo.</p>
+                  <p x-show="adminUser?.role === 'owner'" class="text-center text-[11px] text-gray-400 sm:col-span-2 2xl:col-span-1">Entrada recalcula o custo médio ponderado; ajuste também define o mínimo.</p>
                 </div>
 
                 <div class="border-b border-gray-100 p-4">
@@ -3389,11 +3415,11 @@
                 <div class="p-4">
                   <div class="mb-2 flex items-center justify-between gap-3"><h4 class="text-sm font-semibold">Prioridades</h4><button @click="stockTab = 'reposicao'" class="text-[11px] font-medium text-emerald-800 hover:underline">Ver todas na aba Reposição</button></div>
                   <div class="divide-y divide-gray-100">
-                    <template x-for="row in stockRowsView().filter((item) => Number(item.quantity_on_hand) === 0 || stockPrecisaRepor(item)).filter((item) => stockVariantKey(item) !== stockVariantKey(selectedRow)).slice(0, 2)" :key="'prioridade-painel-' + stockVariantKey(row)">
+                    <template x-for="row in stockRowsView().filter((item) => measureAvailable(item) === 0 || stockPrecisaRepor(item)).filter((item) => stockVariantKey(item) !== stockVariantKey(selectedRow)).slice(0, 2)" :key="'prioridade-painel-' + stockVariantKey(row)">
                       <div class="flex items-center gap-3 py-2.5">
                         <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-dashed border-emerald-800/40 text-emerald-900"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
-                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.brand"></span> · <span x-text="catalogoConditionLabel(row.tire_condition)"></span> · <span x-text="row.quantity_on_hand"></span> em estoque · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
-                        <button @click="stockForm = { measure: row.measure, brand: row.brand || '', tire_condition: row.tire_condition || '', quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
+                        <div class="min-w-0 flex-1"><p class="text-xs font-semibold" x-text="row.measure"></p><p class="mt-0.5 text-[10px] text-gray-400"><span x-text="row.brand"></span> · <span x-text="catalogoConditionLabel(row.tire_condition)"></span> · <span x-text="measureAvailable(row)"></span> disponível · mínimo <span x-text="row.min_quantity == null ? '—' : row.min_quantity"></span></p></div>
+                        <button x-show="adminUser?.role === 'owner'" @click="stockForm = { measure: row.measure, brand: row.brand || '', tire_condition: row.tire_condition || '', quantity_on_hand: '', unit_cost: row.unit_cost ?? '', min_quantity: row.min_quantity ?? '', notes: row.notes || '', entry_nature: 'inventory_found', entry_reason: '', idempotency_key: '', original_quantity_on_hand: null, original_unit_cost: null }; stockOperacao = 'entrada'; stockMsg = null; $nextTick(() => document.getElementById('estoque-medida')?.focus())" class="rounded-lg border border-emerald-600 px-2.5 py-1.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-50">Repor</button>
                       </div>
                     </template>
                     <div x-show="stockResumo().repor === 0 && stockResumo().zeradas === 0" class="py-4 text-center text-xs text-emerald-700">Todas as medidas estão dentro do mínimo.</div>
@@ -3797,11 +3823,11 @@
                         <p class="truncate text-base font-semibold tracking-tight text-slate-950" x-text="row.measure"></p>
                         <p class="mt-0.5 truncate text-xs font-medium text-emerald-700" x-text="row.brand"></p>
                         <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              :class="Number(row.quantity_on_hand) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'"
-                              x-text="Number(row.quantity_on_hand) === 0 ? 'Zerado · crítico' : 'Abaixo do mínimo'"></span>
+                              :class="measureAvailable(row) === 0 ? 'border border-dashed border-emerald-900/50 bg-white text-emerald-950' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'"
+                              x-text="measureAvailable(row) === 0 ? (Number(row.quantity_reserved || 0) > 0 ? 'Todo reservado · crítico' : 'Zerado · crítico') : 'Abaixo do mínimo'"></span>
                       </div>
                     </div>
-                    <div class="text-center"><p class="text-2xl font-semibold tabular-nums" :class="Number(row.quantity_on_hand) === 0 ? 'text-emerald-950' : 'text-slate-900'" x-text="row.quantity_on_hand"></p><p class="text-[10px] text-slate-400">pneus</p></div>
+                    <div class="text-center"><p class="text-2xl font-semibold tabular-nums" :class="measureAvailable(row) === 0 ? 'text-emerald-950' : 'text-slate-900'" x-text="measureAvailable(row)"></p><p class="text-[10px] text-slate-400">disponíveis</p></div>
                     <div class="text-center"><p class="text-lg font-semibold tabular-nums text-slate-800" x-text="row.min_quantity == null ? '—' : row.min_quantity"></p><p class="text-[10px] text-slate-400">pneus</p></div>
                     <div class="text-center"><p class="text-lg font-semibold tabular-nums text-emerald-800" x-text="repoQuantidade(row)"></p><p class="text-[10px] text-slate-400">pneus</p></div>
                     <div>
@@ -3811,7 +3837,7 @@
                       </div>
                     </div>
                     <p class="text-right text-sm font-medium tabular-nums text-slate-700" x-text="formatCurrency(Number(row.unit_cost || 0))"></p>
-                    <button @click="repoAbrirCompra([{ ...row, suggested_quantity: repoQuantidade(row) }])"
+                    <button x-show="adminUser?.role === 'owner'" @click="repoAbrirCompra([{ ...row, suggested_quantity: repoQuantidade(row) }])"
                             class="justify-self-end rounded-lg bg-emerald-800 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-900">
                       Adicionar à compra
                     </button>
@@ -3882,7 +3908,7 @@
             </div>
 
             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-1 min-[1500px]:grid-cols-2">
-              <button @click="repoAbrirCompra(repoPlano())"
+              <button x-show="adminUser?.role === 'owner'" @click="repoAbrirCompra(repoPlano())"
                       :disabled="repoPlano().length === 0"
                       class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-40">
                 <i data-lucide="shopping-cart" class="h-4 w-4"></i> Criar nova compra

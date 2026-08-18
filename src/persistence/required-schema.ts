@@ -82,12 +82,62 @@ export const REQUIRED_SCHEMA_SQL = `
          AND column_name='received_quantity'
     )
     AND to_regclass('commerce.partner_purchases_receipt_idempotency_uniq') IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
+         AND table_name='partner_purchase_items'
+         AND column_name='received_stock_id'
+    )
+    AND EXISTS (
+      SELECT 1
+        FROM information_schema.columns
+       WHERE table_schema='commerce'
+         AND table_name='partner_stock_levels'
+         AND column_name='average_cost'
+         AND numeric_scale=6
+    )
+    AND to_regclass('commerce.partner_stock_natural_key_uniq') IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='wholesale_orders'
+         AND column_name='partner_unit_id'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_purchases'
+         AND column_name='source_wholesale_order_id'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_purchase_items'
+         AND column_name='source_wholesale_order_item_id'
+    )
+    AND to_regclass('commerce.partner_purchases_source_wholesale_order_uniq') IS NOT NULL
+    AND to_regclass('commerce.partner_purchase_items_source_wholesale_item_uniq') IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='wholesale_orders'
+         AND column_name='partner_transfer_status'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='wholesale_order_items'
+         AND column_name='accepted_quantity'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_purchase_items'
+         AND column_name='confirmed_quantity'
+    )
+    AND to_regclass('commerce.matrix_partner_cargo_lots') IS NOT NULL
+    AND to_regclass('commerce.matrix_partner_cargo_events') IS NOT NULL
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0169. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0184. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0169_partner_purchase_receiving');
+    throw new Error('required_schema_missing:0184_partner_arrival_item_adjustments');
   }
 }

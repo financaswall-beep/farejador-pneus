@@ -18,53 +18,11 @@ import {
   type TireCondition,
 } from '../../shared/tire-condition.js';
 import { assertWholesaleSaleMoney } from './sales-money.js';
-
-export interface WholesaleBuyerRow {
-  customer_id: string | null;
-  partner_id: string | null;
-  name: string;
-  phone: string | null;
-  is_partner: boolean;
-}
-
-export async function listWholesaleBuyers(
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<WholesaleBuyerRow[]> {
-  const result = await dbPool.query<WholesaleBuyerRow>(
-    `SELECT id AS customer_id, partner_id, name, phone, (partner_id IS NOT NULL) AS is_partner
-       FROM commerce.wholesale_customers
-      WHERE environment=$1 AND deleted_at IS NULL
-     UNION ALL
-     SELECT NULL::uuid, p.id, p.trade_name, p.whatsapp_phone, true
-       FROM network.partners p
-      WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.status='active'
-        AND NOT EXISTS (SELECT 1 FROM commerce.wholesale_customers c
-          WHERE c.environment=p.environment AND c.partner_id=p.id AND c.deleted_at IS NULL)
-     ORDER BY name`,
-    [environment],
-  );
-  return result.rows;
-}
-
-export async function getWholesaleRanking(
-  environment: 'prod' | 'test' = env.FAREJADOR_ENV,
-  dbPool: Pool = defaultPool,
-): Promise<unknown[]> {
-  const result = await dbPool.query(
-    `SELECT buyer_id,partner_id,name,phone,is_partner,orders_count,total_bought,last_purchase_at,days_since_last
-       FROM commerce.wholesale_buyer_summary WHERE environment=$1
-     UNION ALL
-     SELECT NULL::uuid,p.id,p.trade_name,p.whatsapp_phone,true,0,0::numeric,NULL::timestamptz,NULL::int
-       FROM network.partners p
-      WHERE p.environment=$1 AND p.deleted_at IS NULL AND p.status='active'
-        AND NOT EXISTS (SELECT 1 FROM commerce.wholesale_customers c
-          WHERE c.environment=p.environment AND c.partner_id=p.id AND c.deleted_at IS NULL)
-     ORDER BY total_bought DESC,last_purchase_at DESC NULLS LAST,name`,
-    [environment],
-  );
-  return result.rows;
-}
+import {
+  createLinkedPartnerPurchase,
+  resolveWholesalePartnerUnit,
+} from './wholesale-partner-bridge.js';
+import { resolveAdditionBuyer, resolveWholesaleBuyer } from './queries-atacado-sale-buyer.js';
 
 interface SaleItemInput {
   measure: string;
@@ -88,6 +46,8 @@ export interface RegisterWholesaleSaleInput {
   payment_status?: 'paid' | 'pending';
   due_date?: string | null;
   idempotency_key: string;
+  parent_order_id?: string | null;
+  partner_unit_id?: string | null;
 }
 
 export interface RegisterWholesaleSaleResult {
@@ -96,6 +56,9 @@ export interface RegisterWholesaleSaleResult {
   buyer_name: string;
   total_amount: string;
   items_count: number;
+  parent_order_id: string | null;
+  partner_unit_id: string | null;
+  linked_partner_purchase_id: string | null;
 }
 
 async function canonicalSaleItems(
@@ -125,52 +88,11 @@ async function canonicalSaleItems(
   });
 }
 
-async function resolveBuyer(
-  client: PoolClient,
-  environment: 'prod' | 'test',
-  input: RegisterWholesaleSaleInput,
-): Promise<{ id: string; name: string }> {
-  if (input.customer_id) {
-    const found = await client.query<{ id: string; name: string }>(
-      `SELECT id,name FROM commerce.wholesale_customers
-        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL`,
-      [input.customer_id, environment],
-    );
-    if (!found.rows[0]) throw new Error('buyer_not_found');
-    return found.rows[0];
-  }
-  if (input.partner_id) {
-    const partner = await client.query<{ trade_name: string; whatsapp_phone: string | null }>(
-      `SELECT trade_name,whatsapp_phone FROM network.partners
-        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL AND status='active' FOR SHARE`,
-      [input.partner_id, environment],
-    );
-    if (!partner.rows[0]) throw new Error('partner_not_found');
-    const buyer = await client.query<{ id: string; name: string }>(
-      `INSERT INTO commerce.wholesale_customers (environment,partner_id,name,phone)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT (environment,partner_id) WHERE partner_id IS NOT NULL AND deleted_at IS NULL
-       DO UPDATE SET updated_at=commerce.wholesale_customers.updated_at
-       RETURNING id,name`,
-      [environment, input.partner_id, partner.rows[0].trade_name, partner.rows[0].whatsapp_phone],
-    );
-    return buyer.rows[0]!;
-  }
-  const name = input.new_customer?.name.trim();
-  if (!name) throw new Error('buyer_required');
-  const buyer = await client.query<{ id: string; name: string }>(
-    `INSERT INTO commerce.wholesale_customers (environment,name,phone)
-     VALUES ($1,$2,$3) RETURNING id,name`,
-    [environment, name, input.new_customer?.phone
-      ? normalizeBrazilianPhone(input.new_customer.phone) : null],
-  );
-  return buyer.rows[0]!;
-}
-
 async function insertSaleHeader(
   client: PoolClient,
   environment: 'prod' | 'test',
   buyerId: string,
+  partnerUnitId: string | null,
   input: RegisterWholesaleSaleInput,
 ): Promise<string> {
   const pending = env.WHOLESALE_FINANCE && input.payment_status === 'pending';
@@ -181,13 +103,22 @@ async function insertSaleHeader(
     input.seller_collaborator_id ?? null];
   const sellerReady = await hasMatrizSellerColumn(client, 'wholesale_orders');
   const sellerSql = sellerReady
-    ? `,seller_collaborator_id) VALUES ($1::env_t,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz,
-       (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1::env_t AND revoked_at IS NULL))`
-    : `) VALUES ($1,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz)`;
+    ? `,seller_collaborator_id,parent_order_id,partner_unit_id,
+         dispatched_total_amount,partner_transfer_status)
+       VALUES ($1::env_t,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz,
+       (SELECT id FROM network.matriz_collaborators WHERE id=$9 AND environment=$1::env_t AND revoked_at IS NULL),
+       $10::uuid,$11::uuid,CASE WHEN $11::uuid IS NULL THEN NULL ELSE 0 END,
+       CASE WHEN $11::uuid IS NULL THEN NULL ELSE 'in_transit' END)`
+    : `,parent_order_id,partner_unit_id,dispatched_total_amount,partner_transfer_status)
+       VALUES ($1,$2,COALESCE($3::timestamptz,now()),0,$4,$5,$6,$7::date,$8::timestamptz,
+       $9::uuid,$10::uuid,CASE WHEN $10::uuid IS NULL THEN NULL ELSE 0 END,
+       CASE WHEN $10::uuid IS NULL THEN NULL ELSE 'in_transit' END)`;
   const result = await client.query<{ id: string }>(
     `INSERT INTO commerce.wholesale_orders
        (environment,buyer_id,sold_at,total_amount,created_by,notes,payment_status,due_date,paid_at${sellerSql}
-     RETURNING id`, sellerReady ? values : values.slice(0, 8),
+     RETURNING id`, sellerReady
+      ? [...values, input.parent_order_id ?? null, partnerUnitId]
+      : [...values.slice(0, 8), input.parent_order_id ?? null, partnerUnitId],
   );
   return result.rows[0]!.id;
 }
@@ -210,6 +141,8 @@ export async function registerWholesaleSale(
       notes: input.notes?.trim() || null,
       payment_status: input.payment_status ?? 'paid', due_date: input.due_date ?? null,
       seller_collaborator_id: input.seller_collaborator_id ?? null,
+      parent_order_id: input.parent_order_id ?? null,
+      partner_unit_id: input.partner_unit_id ?? null,
       items: rawItems.map((item) => ({ measure: item.measure.trim(), brand: item.brand ?? null,
         tire_condition: item.tire_condition,
         quantity: item.quantity, unit_price_cents: moneyCents(item.unit_price) })),
@@ -223,8 +156,25 @@ export async function registerWholesaleSale(
     }
 
     const items = await canonicalSaleItems(client, environment, rawItems);
-    const buyer = await resolveBuyer(client, environment, input);
-    const orderId = await insertSaleHeader(client, environment, buyer.id, input);
+    let buyer: { id: string; name: string; partner_id: string | null };
+    let requestedPartnerUnitId = input.partner_unit_id ?? null;
+    if (input.parent_order_id) {
+      const parent = await resolveAdditionBuyer(client, environment, input.parent_order_id);
+      buyer = { id: parent.id, name: parent.name, partner_id: parent.partner_id };
+      if (parent.partner_unit_id && requestedPartnerUnitId
+          && parent.partner_unit_id !== requestedPartnerUnitId) {
+        throw new Error('wholesale_addition_partner_unit_mismatch');
+      }
+      requestedPartnerUnitId = parent.partner_unit_id ?? requestedPartnerUnitId;
+    } else {
+      buyer = await resolveWholesaleBuyer(client, environment, input);
+    }
+    const partnerUnit = await resolveWholesalePartnerUnit(
+      client, environment, buyer.partner_id, requestedPartnerUnitId,
+    );
+    const orderId = await insertSaleHeader(
+      client, environment, buyer.id, partnerUnit?.partner_unit_id ?? null, input,
+    );
     const requested = new Map<string, {
       measure: string; brand: string; tire_condition: TireCondition; quantity: number;
     }>();
@@ -271,15 +221,23 @@ export async function registerWholesaleSale(
     await applyWholesaleStockDecrement(client, environment, items, true, orderId);
     const total = await client.query<{ total_amount: string }>(
       `UPDATE commerce.wholesale_orders SET total_amount=COALESCE(
-         (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0)
+         (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0),
+         dispatched_total_amount=CASE WHEN partner_unit_id IS NULL THEN NULL ELSE COALESCE(
+           (SELECT sum(line_total) FROM commerce.wholesale_order_items WHERE order_id=$1),0) END
        WHERE id=$1 RETURNING total_amount`, [orderId]);
+    const linkedPurchase = partnerUnit
+      ? await createLinkedPartnerPurchase(client, environment, orderId, input.created_by)
+      : null;
     if (env.MATRIZ_CENTRAL_LEDGER) {
       const ledgerState = await getWholesaleSaleLedgerState(client, environment, orderId);
       await ensureWholesaleSaleRevenue(client, ledgerState);
       await ensureWholesaleSaleCogs(client, ledgerState);
     }
     const result = { order_id: orderId, buyer_id: buyer.id, buyer_name: buyer.name,
-      total_amount: total.rows[0]!.total_amount, items_count: items.length };
+      total_amount: total.rows[0]!.total_amount, items_count: items.length,
+      parent_order_id: input.parent_order_id ?? null,
+      partner_unit_id: partnerUnit?.partner_unit_id ?? null,
+      linked_partner_purchase_id: linkedPurchase?.purchase_id ?? null };
     await recordIntegrityEvent(client, { environment, domain: 'wholesale_sale',
       entityTable: 'commerce.wholesale_orders', entityId: orderId, eventType: 'created',
       actorLabel: input.created_by, idempotencyKey: operation.idempotencyKey,

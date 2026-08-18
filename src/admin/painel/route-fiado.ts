@@ -45,6 +45,13 @@ export async function registerPainelFiado(fastify: FastifyInstance): Promise<voi
       if (err instanceof Error && err.message === 'sale_already_cancelled') {
         return reply.status(409).send({ error: 'sale_already_cancelled' });
       }
+      if (err instanceof Error && [
+        'sale_has_active_additions', 'partner_receipt_already_confirmed',
+        'matrix_partner_sale_paid_locked', 'matrix_partner_payable_not_open',
+        'matrix_partner_transfer_requires_arrival_adjustment',
+      ].includes(err.message)) {
+        return reply.status(409).send({ error: err.message });
+      }
       if (err instanceof Error && err.message.startsWith('sale_stock_history_missing:')) {
         let items: Array<{ measure: string; quantity: number }> = [];
         try { items = JSON.parse(err.message.slice('sale_stock_history_missing:'.length)); } catch { /* vazio */ }

@@ -63,7 +63,7 @@ export async function buildPortabilityPackage(
         CASE WHEN po.fulfillment_mode='delivery' THEN po.delivered_at ELSE COALESCE(po.retrieved_at,po.created_at) END
         FROM commerce.partner_orders po JOIN partner_orders p ON p.id=po.id
       UNION
-      SELECT 'wholesale',wo.id,wo.total_amount,wo.status,wo.sold_at
+      SELECT 'wholesale',wo.id,COALESCE(wo.settled_total_amount,wo.total_amount),wo.status,wo.sold_at
         FROM links l JOIN commerce.wholesale_orders wo ON l.source_type='wholesale_customer'
           AND wo.environment=l.environment AND wo.buyer_id=l.source_id)
       SELECT source,id::text,total_amount::text,status,occurred_at::text FROM transactions ORDER BY occurred_at,id`,[environment,identityId]),

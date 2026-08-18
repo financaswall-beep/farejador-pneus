@@ -73,13 +73,17 @@ export async function getSalesBrandRanking(
         GROUP BY p.brand
        UNION ALL
        SELECT i.brand,'atacado'::text AS channel,
-              SUM(i.quantity)::numeric AS units,
-              SUM(i.line_total)::numeric AS revenue
+              SUM(CASE WHEN o.partner_transfer_status IN ('settled','received')
+                    THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END)::numeric AS units,
+              SUM(i.unit_price*CASE WHEN o.partner_transfer_status IN ('settled','received')
+                    THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END)::numeric AS revenue
          FROM commerce.wholesale_orders o
          JOIN commerce.wholesale_order_items i
            ON i.order_id=o.id AND i.environment=o.environment
         CROSS JOIN bounds b
         WHERE o.environment=$1 AND o.status='confirmed'
+          AND (o.partner_transfer_status IS NULL
+            OR o.partner_transfer_status IN ('settled','received'))
           AND i.brand IS NOT NULL AND btrim(i.brand)<>''
           AND lower(btrim(i.brand))<>'sem marca'
           AND (b.starts_at IS NULL OR o.sold_at>=b.starts_at)

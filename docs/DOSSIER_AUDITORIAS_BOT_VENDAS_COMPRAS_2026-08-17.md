@@ -1,8 +1,10 @@
-# Dossiê de autorização — Bot, Vendas e Compras
+# Dossiê de autorização — Bot, Vendas, Compras e Estoque
 
 **Data da revisão:** 17/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
-**Produção:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
+**Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
+
+**Pacote atual de Estoque:** auditoria, correções, ponte Matriz → parceiro e acerto individual na chegada concluídos em código; migrations `0182`–`0184` ainda não aplicadas; novo código ainda não implantado.
 
 ## Como ler o veredito
 
@@ -155,6 +157,8 @@ As guardas e o reparo de dados históricos estão na migration `0180_wholesale_p
 
 ## 6. Decisão final
 
+> Esta decisão registra o deploy anterior de Bot + Vendas + Compras. Para a decisão atual que inclui Estoque, prevalece a seção 8.
+
 **Decisão técnica atual:** **DEPLOY TÉCNICO APROVADO; PRODUÇÃO AINDA NÃO HOMOLOGADA EM DEFINITIVO.**
 **Motivo:** código, migrations, CI, construção da imagem, saúde do container e reconciliações pós-deploy foram aprovados. A homologação final ainda exige o smoke visual com uma sessão normal de usuário e a decisão explícita sobre 2 registros históricos de teste que não têm efeito financeiro ou de estoque, mas impedem o resultado zero absoluto da reconciliação matemática.
 
@@ -210,6 +214,9 @@ Aplicar somente o que estiver pendente no banco-alvo e sempre na ordem do manife
 3. `0179_matriz_sales_final_guards.sql`
 4. `0180_wholesale_purchase_audit_guards.sql`
 5. `0181_matriz_sales_math_audit.sql`
+6. `0182_stock_end_to_end_integrity.sql` — pendente para o pacote de Estoque
+7. `0183_matrix_partner_stock_transfer.sql` — pendente para a venda/remessa da Matriz ao parceiro
+8. `0184_partner_arrival_item_adjustments.sql` — pendente para o acerto individual, carga em trânsito e redirecionamento
 
 Não reaplicar migration já registrada sem antes conferir o mecanismo de histórico do ambiente. Em rollback do aplicativo, preservar as migrations: 0179–0181 são guardas aditivas/compatíveis e desfazê-las retiraria proteções de dados.
 
@@ -244,4 +251,69 @@ npm run check:migrations
 npm run prova-painel
 ```
 
-Resultados desta entrega: build e TypeScript aprovados; 1.147/1.147 testes unitários; 231/231 integrações válidas; 182 migrations verificadas; 232 rotas, 92 contratos e fiscal de tamanho aprovados.
+Resultados da entrega já implantada: build e TypeScript aprovados; 1.147/1.147 testes unitários; 231/231 integrações válidas; 182 migrations verificadas; 232 rotas, 92 contratos e fiscal de tamanho aprovados.
+
+## 8. Adendo — auditoria integral do Estoque
+
+O relatório detalhado está em `docs/AUDITORIA_ESTOQUE_PONTA_A_PONTA_2026-08-17.md`.
+
+### Relações fechadas
+
+- Matriz: galpão oficial, filme, Vendas de varejo/atacado, Compras, Financeiro, Logística, Catálogo, Bot e Demanda.
+- Parceiros: estoque local, venda, reserva, compra pendente, recebimento pelo app Operação, cancelamento e custo congelado.
+- Banco: ambiente, unidade, RLS, identidade da variante, idempotência, datas, total da compra, reservas, custo médio e trilha imutável.
+
+### Correções centrais
+
+- Saldo disponível substituiu saldo físico nos pontos de decisão de venda, reposição e status.
+- Cancelamento da compra do parceiro passou a reverter quantidade **e** custo médio.
+- Item recebido passou a guardar a ficha exata de estoque e snapshots antes/depois; o banco bloqueia vínculo com outra loja.
+- Cabeçalho de compra passou a fechar com a soma dos itens em centavos no servidor e no banco.
+- Inativação com saldo/reserva, compra futura e contagem abaixo da reserva passaram a ser recusadas.
+- Remoção e ajuste do galpão passaram a exigir dono, motivo, auditoria, idempotência e conciliação financeira.
+- A migration `0182` reconstrói somente as duas aberturas da Matriz comprovadas matematicamente.
+- A migration `0183` transforma a venda de atacado da Matriz para um parceiro em uma remessa pendente no app da loja, na mesma transação.
+- Um pedido que já saiu pode receber acréscimos sem reescrever a venda original: cada extra fica ligado ao pedido raiz, baixa a Matriz ao ser registrado e tem recebimento e financeiro próprios.
+- Documento originado na Matriz não pode ser editado, excluído ou quitado manualmente pelo parceiro; o app da loja confirma somente a quantidade física recebida.
+- Cancelar um extra ainda pendente devolve suas unidades à Matriz e cancela compra/conta espelhadas; pedido recebido ou pago bloqueia devolução automática duplicada.
+- A migration `0184` permite aceitar ou recusar quantidades por linha na chegada; retirar 1 de uma linha com 10 não cancela os outros 9.
+- O pneu recusado continua como carga em trânsito e não reaparece no saldo da Matriz antes do retorno físico.
+- A carga recusada pode ser incluída no pedido de outro parceiro sem baixar a Matriz novamente; origem, custo e quantidade ficam auditados.
+- Venda, compra espelhada, conta a pagar, relatórios e comissão usam somente as quantidades aceitas.
+- O parceiro só recebe depois do acerto da Matriz e deve confirmar exatamente as quantidades finais.
+
+### Evidência atual
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.194/1.194**, 234 arquivos |
+| Build e TypeScript | Aprovados |
+| Migration `0182` | Dry-run aprovado em `test` e `prod`, ambos com rollback |
+| Prova matemática `0182` | **15/15** em PostgreSQL real, com rollback |
+| Migration/ponte `0183` | **17/17** em PostgreSQL real: venda, extra, recebimento, finanças, cancelamento e conservação; rollback |
+| Migration/acerto `0184` | PostgreSQL real: 31 pneus conservados, recusa individual, redirecionamento, retorno físico, financeiro e rollback aprovados |
+| Regressão direcionada `0183` | **43/43** |
+| Filme da Matriz | M1–M17 aprovado; limpeza posterior confirmada |
+| Manifesto | 185 migrations, última `0184`, gap 0071 documentado |
+| Painéis/contratos | 582 propriedades do parceiro, 1.053 da Matriz, 92 contratos e 236 rotas |
+| Produção somente leitura | Sem negativo, reserva inválida, custo ausente, identidade duplicada ou ledger desbalanceado |
+
+A suíte Testcontainers completa desta revisão ficou pendente porque o backend do Docker Desktop local não criou o pipe do engine. Os caminhos críticos de Estoque foram substituídos por provas transacionais no PostgreSQL real; essa limitação não está sendo escondida nem contada como teste aprovado.
+
+### Decisão consolidada atual
+
+**Bot + Vendas + Compras:** entrega anterior implantada e tecnicamente aprovada, ainda sujeita ao smoke visual autenticado já documentado.
+
+**Estoque:** **APROVADO EM CÓDIGO E MATEMÁTICA; AINDA NÃO AUTORIZADO EM PRODUÇÃO.**
+
+Pendências obrigatórias do Estoque:
+
+1. [ ] Backup restaurável imediatamente antes da migration.
+2. [ ] Publicar o código auditado e registrar o SHA definitivo.
+3. [ ] Aplicar, nesta ordem, `0182_stock_end_to_end_integrity.sql`, `0183_matrix_partner_stock_transfer.sql` e `0184_partner_arrival_item_adjustments.sql`, antes do aplicativo novo.
+4. [ ] Fazer o deploy do mesmo SHA no Coolify.
+5. [ ] Executar smoke autenticado de Estoque, Vendas, Compras, Financeiro, Logística, Catálogo e app Operação, incluindo recusa de apenas um pneu, inclusão de carga de outro parceiro, retorno físico e recebimento exato.
+6. [ ] Repetir a reconciliação somente leitura e exigir zero divergência.
+
+- [ ] **AUTORIZO** a entrada em produção do escopo Bot + Vendas + Compras + Estoque.
+- [ ] **NÃO AUTORIZO**; registrar o bloqueador observado.

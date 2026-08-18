@@ -52,6 +52,9 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
       if (code === 'physical_count_measure_not_found') {
         return reply.status(409).send({ error: code });
       }
+      if (code.startsWith('physical_count_below_reserved:')) {
+        return reply.status(409).send({ error: code });
+      }
       const mapped = mapWriteError(error);
       logger.error({ error, status: mapped.status }, 'physical stock count failed');
       return reply.status(mapped.status).send({ error: mapped.error });
@@ -59,7 +62,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
   });
 
   // ENTRADA de compra: soma a quantidade e recalcula o custo MÉDIO ponderado da medida.
-  fastify.post('/admin/api/wholesale/stock/entry', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/stock/entry', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = entryWholesaleStockSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -77,7 +80,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
   });
 
   // Define a quantidade de uma medida (upsert por medida).
-  fastify.post('/admin/api/wholesale/stock', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/stock', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = setWholesaleStockSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
@@ -95,15 +98,16 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
   });
 
   // Remove uma medida do estoque do galpão.
-  fastify.post('/admin/api/wholesale/stock/remove', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/stock/remove', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = removeWholesaleStockSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }
     try {
-      await deleteWholesaleStockComRotulo(
-        parsed.data.measure, parsed.data.brand, parsed.data.tire_condition,
-      );
+      await deleteWholesaleStockComRotulo({
+        ...parsed.data,
+        actor_label: operatorLabel(request),
+      });
       return reply.status(200).send({ ok: true });
     } catch (err) {
       const mapped = mapWriteError(err);
@@ -182,7 +186,7 @@ export async function registerPainelGalpao(fastify: FastifyInstance): Promise<vo
   });
 
   // BAIXA MANUAL com motivo (0128): quebra/perda/uso — recusa acima do saldo (não é venda).
-  fastify.post('/admin/api/wholesale/stock/baixa', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/wholesale/stock/baixa', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = baixaWholesaleStockSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });

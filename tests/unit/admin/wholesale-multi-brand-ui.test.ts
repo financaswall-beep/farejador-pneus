@@ -14,12 +14,12 @@ function moduleState() {
   const stock = [
     {
       measure: '90/90-18', brand: 'Pirelli', tire_condition: 'meia_vida',
-      quantity_on_hand: 50,
+      quantity_on_hand: 50, quantity_reserved: 0, quantity_available: 50,
       unit_cost: 17, min_quantity: 60, sales_30d: 5,
     },
     {
       measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
-      quantity_on_hand: 15,
+      quantity_on_hand: 15, quantity_reserved: 0, quantity_available: 15,
       unit_cost: 12, min_quantity: 20, sales_30d: 2,
     },
   ];
@@ -46,8 +46,9 @@ function moduleState() {
     custoOrdem: 'capital',
     fornecedorBreakdown: [],
     adminUser: { role: 'owner' },
-    stockPrecisaRepor: (row: { min_quantity: number; quantity_on_hand: number }) =>
-      row.quantity_on_hand <= row.min_quantity,
+    stockPrecisaRepor: (row: { min_quantity: number; quantity_on_hand: number;
+      quantity_available?: number }) =>
+      Number(row.quantity_available ?? row.quantity_on_hand) <= row.min_quantity,
     comprasOpenTab: vi.fn(),
     $nextTick: (callback: () => void) => callback(),
   };
@@ -126,6 +127,22 @@ describe('Painel do galpão com duas marcas na mesma medida', () => {
       { measure: '90/90-18', brand: 'Metzeler', tire_condition: 'meia_vida',
         quantity: 7, unit_cost: '' },
     ]);
+  });
+
+  it('usa o disponível nas vendas e na reposição quando há reserva', () => {
+    const state = moduleState();
+    const pirelli = state.atacadoStock[0];
+    Object.assign(pirelli, {
+      quantity_on_hand: 10, quantity_reserved: 8, quantity_available: 2,
+      min_quantity: 5,
+    });
+    expect(state.repoSugestao(pirelli)).toBe(3);
+    expect(state.repoCobertura(pirelli)).toBe(30);
+
+    Object.assign(pirelli, { quantity_reserved: 10, quantity_available: 0 });
+    state.measureFind('90/90', 'venda0');
+    expect(state.measureBox.hits.map((row: { brand: string }) => row.brand))
+      .toEqual(['Metzeler']);
   });
 
   it('considera medida e marca ao decidir qual histórico pertence à seleção', () => {

@@ -49,7 +49,7 @@
       content.append(
         node('strong', purchaseReference(purchase.purchase_id)),
         node('span', purchase.supplier_name || 'Fornecedor não informado'),
-        node('small', `${purchase.items.length} ${purchase.items.length === 1 ? 'produto' : 'produtos'} · ${expectedUnits(purchase)} unidades`),
+        node('small', `${purchase.items.length} ${purchase.items.length === 1 ? 'produto' : 'produtos'} · ${expectedUnits(purchase)} unidades${purchase.source_wholesale_order_id ? ' · enviado pela Matriz' : ''}`),
       );
       const side = node('span', null, 'stock-receipt-card-side');
       side.append(node('b', 'Conferir'), svg(['m9 18 6-6-6-6']));
@@ -118,7 +118,7 @@
     const input = document.createElement('input');
     input.type = 'number';
     input.min = '0';
-    input.max = '999999';
+    input.max = item.matrix_linked ? String(item.expected_quantity) : '999999';
     input.inputMode = 'numeric';
     input.value = String(item.received_quantity);
     input.dataset.receiptInput = String(index);
@@ -138,7 +138,8 @@
     state.selected = {
       ...purchase,
       items: purchase.items.map(function (item) {
-        return { ...item, received_quantity: Number(item.expected_quantity || 0) };
+        return { ...item, received_quantity: Number(item.expected_quantity || 0),
+          matrix_linked: Boolean(purchase.source_wholesale_order_id) };
       }),
     };
     state.key = Caixa.stockIdempotencyKey('receipt');
@@ -200,7 +201,11 @@
       const code = failure instanceof Error ? failure.message : '';
       byId('stock-receipt-submit-error').textContent = code === 'purchase_already_received'
         ? 'Esta compra já foi recebida por outra pessoa.'
-        : 'Não foi possível confirmar. Tente novamente.';
+        : (code === 'matrix_shipment_requires_arrival_adjustment'
+          ? 'A quantidade precisa ser exatamente a acertada pela Matriz. Peça ao dono para corrigir primeiro o acerto da chegada.'
+        : (code === 'purchase_receipt_existing_cost_missing'
+          ? 'Este item tem saldo antigo sem custo. Peça ao dono para corrigir o custo antes de receber.'
+          : 'Não foi possível confirmar. Tente novamente.'));
       button.disabled = !byId('stock-receipt-confirm-check').checked;
     }
   }
@@ -220,14 +225,19 @@
     if (!button || !state.selected) return;
     const index = Number(button.dataset.receiptIndex);
     const item = state.selected.items[index];
-    item.received_quantity = Math.max(0, Number(item.received_quantity) + Number(button.dataset.receiptDelta));
+    const maximum = item.matrix_linked ? Number(item.expected_quantity) : 999999;
+    item.received_quantity = Math.max(0, Math.min(maximum,
+      Number(item.received_quantity) + Number(button.dataset.receiptDelta)));
     byId('stock-receipt-items').querySelector(`[data-receipt-input="${index}"]`).value = item.received_quantity;
     refreshTotals();
   });
   byId('stock-receipt-items').addEventListener('input', function (event) {
     if (!event.target.matches('[data-receipt-input]') || !state.selected) return;
     const index = Number(event.target.dataset.receiptInput);
-    state.selected.items[index].received_quantity = Math.max(0, Math.min(999999, Number(event.target.value || 0)));
+    const item = state.selected.items[index];
+    const maximum = item.matrix_linked ? Number(item.expected_quantity) : 999999;
+    item.received_quantity = Math.max(0, Math.min(maximum, Number(event.target.value || 0)));
+    event.target.value = String(item.received_quantity);
     refreshTotals();
   });
   byId('stock-receipt-confirm-check').addEventListener('change', function (event) {

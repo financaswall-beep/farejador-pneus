@@ -30,12 +30,16 @@ export async function getWholesaleFinance(
   dbPool: Pool = defaultPool,
 ): Promise<WholesaleFinanceResumo> {
   const receivables = await dbPool.query<WholesaleFinanceOpenRow>(
-    `SELECT o.id,c.name AS counterparty,c.phone,o.total_amount,o.sold_at AS registered_at,
+    `SELECT o.id,c.name AS counterparty,c.phone,
+            COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
+            o.sold_at AS registered_at,
             o.due_date,(o.due_date IS NOT NULL
               AND o.due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c ON c.id=o.buyer_id AND c.environment=o.environment
       WHERE o.environment=$1 AND o.status='confirmed' AND o.payment_status='pending'
+        AND (o.partner_transfer_status IS NULL
+          OR o.partner_transfer_status IN ('settled','received'))
       ORDER BY (o.due_date IS NULL),o.due_date,o.sold_at`, [environment]);
   const payables = await dbPool.query<WholesaleFinanceOpenRow>(
     `SELECT p.id,s.name AS counterparty,s.phone,p.total_amount,p.purchased_at AS registered_at,

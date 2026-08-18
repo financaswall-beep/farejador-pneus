@@ -1,5 +1,4 @@
 // Obra 300 (2026-07-05): fatia do banco da MATRIZ — estoque do galpão por medida + resumos do atacado e do varejo.
-// VERBATIM das linhas 1225-1447 do queries.ts pré-obra (commit 2628748).
 // Porta de entrada continua sendo ./queries.js (barrel) — importadores não mudam.
 import type { Pool, PoolClient } from 'pg';
 import { randomBytes } from 'node:crypto';
@@ -11,23 +10,17 @@ import { resolveMeasureInCatalog } from './wholesale-catalog.js';
 import { applyMatrizGalpaoDecrement, applyMatrizGalpaoReturn, applyMatrizRetailCostSnapshot } from '../../atendente-v2/wholesale-stock-read.js';
 import { hashPassword } from '../../parceiro/password.js';
 import { canonicalCatalogBrand } from './catalog-brand.js';
-import {
-  requireTireCondition,
-  type TireCondition,
-} from '../../shared/tire-condition.js';
+import { requireTireCondition, type TireCondition } from '../../shared/tire-condition.js';
 
 export interface WholesaleStockRow {
   measure: string;
-  /** Marca que, junto da medida, identifica saldo e custo independentes. */
   brand: string;
   tire_condition: TireCondition;
   quantity_on_hand: number;
   quantity_reserved: number;
   quantity_available: number;
   unit_cost: number;
-  /** Unidades vendidas nos 30 dias corridos anteriores, calculadas no banco. */
   sales_30d?: number;
-  /** 0126: estoque mínimo da medida. NULL = sem mínimo (não alerta). qty <= min => "repor". */
   min_quantity: number | null;
   notes: string | null;
   updated_at: string;
@@ -44,9 +37,11 @@ export async function listWholesaleStock(
   const r = await dbPool.query<WholesaleStockRow>(
     `WITH sales_30d AS (
        SELECT environment,measure,brand,tire_condition,
-              COALESCE(sum(abs(qty_delta)),0)::int AS units
+              GREATEST(0,-COALESCE(sum(qty_delta),0))::int AS units
          FROM commerce.wholesale_stock_movements
-        WHERE source IN ('venda_atacado','varejo') AND qty_delta<0
+        WHERE source IN (
+          'venda_atacado','varejo','cancelamento_venda','cancelamento_varejo'
+        )
           AND created_at>=now()-INTERVAL '30 days'
         GROUP BY environment,measure,brand,tire_condition
      )
@@ -67,12 +62,10 @@ export async function listWholesaleStock(
   return r.rows;
 }
 
-/** Define quantidade + custo unitário + mínimo de uma variante (medida + marca + condição).
- *  min_quantity: null LIMPA o mínimo (campo vazio no form = sem alerta); o form
- *  "Definir" sempre manda o valor completo — não há merge parcial. */
+/** Define saldo, custo e mínimo da variante; null limpa o mínimo. */
 export async function setWholesaleStock(
   input: { measure: string; brand?: string | null; tire_condition: TireCondition | string;
-    quantity_on_hand: number; unit_cost?: number; min_quantity?: number | null;
+    quantity_on_hand: number; unit_cost: number; min_quantity?: number | null;
     notes?: string | null; actor_label?: string | null; environment?: 'prod' | 'test' },
   dbPool: Pool | PoolClient = defaultPool,
 ): Promise<WholesaleStockRow> {
@@ -82,13 +75,12 @@ export async function setWholesaleStock(
   if (!Number.isInteger(input.quantity_on_hand) || input.quantity_on_hand < 0) {
     throw new Error('quantity_invalid');
   }
-  const unitCost = input.unit_cost ?? 0;
+  const unitCost = input.unit_cost;
   if (!(unitCost >= 0)) throw new Error('cost_invalid');
   const minQuantity = input.min_quantity ?? null;
   if (minQuantity !== null && (!Number.isInteger(minQuantity) || minQuantity < 0)) {
     throw new Error('min_invalid');
   }
-  // Fase 4: casa com o catálogo → grava o formato OFICIAL + os números; recusa fantasma.
   const cat = await resolveMeasureInCatalog(dbPool, environment, raw);
   if (!cat) throw new Error('measure_not_in_catalog');
   const brand = canonicalCatalogBrand(input.brand) ?? 'Sem marca';
@@ -118,10 +110,7 @@ export async function setWholesaleStock(
   return r.rows[0]!;
 }
 
-/** ENTRADA de compra (custo médio): soma quantity_in ao estoque da medida e recalcula o
- *  CUSTO MÉDIO PONDERADO — novo = (qty_atual*custo_atual + qty_in*custo_in)/(qty_atual+qty_in).
- *  É como "a contabilidade bate" comprando a precos diferentes. Atômico no ON CONFLICT
- *  (usa os valores ANTIGOS da linha no DO UPDATE). Primeira entrada = grava o custo direto. */
+/** Entrada com custo médio ponderado, atômica no ON CONFLICT. */
 export async function addWholesaleStockEntry(
   input: { measure: string; brand?: string | null; tire_condition: TireCondition | string;
     quantity_in: number; unit_cost: number; actor_label?: string | null;
@@ -220,10 +209,21 @@ export async function getWholesaleResumo(
   const periodWhere = salesPeriodWhere(period, 'o.sold_at');
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
-       COALESCE(SUM(oi.line_total) FILTER (WHERE o.status = 'confirmed'), 0)              AS faturamento,
-       COALESCE(SUM(oi.unit_cost * oi.quantity) FILTER (WHERE o.status = 'confirmed'), 0) AS custo_total,
-       COALESCE(SUM(oi.line_profit) FILTER (WHERE o.status = 'confirmed'), 0)             AS lucro_total,
-       COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'confirmed')::int                    AS vendas_count,
+       COALESCE(SUM(oi.unit_price * CASE WHEN o.partner_transfer_status IS NULL
+           THEN oi.quantity ELSE oi.accepted_quantity END)
+         FILTER (WHERE o.status='confirmed' AND (o.partner_transfer_status IS NULL
+           OR o.partner_transfer_status IN ('settled','received'))),0) AS faturamento,
+       COALESCE(SUM(oi.unit_cost * CASE WHEN o.partner_transfer_status IS NULL
+           THEN oi.quantity ELSE oi.accepted_quantity END)
+         FILTER (WHERE o.status='confirmed' AND (o.partner_transfer_status IS NULL
+           OR o.partner_transfer_status IN ('settled','received'))),0) AS custo_total,
+       COALESCE(SUM((oi.unit_price-oi.unit_cost) * CASE WHEN o.partner_transfer_status IS NULL
+           THEN oi.quantity ELSE oi.accepted_quantity END)
+         FILTER (WHERE o.status='confirmed' AND (o.partner_transfer_status IS NULL
+           OR o.partner_transfer_status IN ('settled','received'))),0) AS lucro_total,
+       COUNT(DISTINCT o.id) FILTER (WHERE o.status='confirmed'
+         AND (o.partner_transfer_status IS NULL
+           OR o.partner_transfer_status IN ('settled','received')))::int AS vendas_count,
        COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'cancelled')::int                    AS cancelled_count
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_order_items oi

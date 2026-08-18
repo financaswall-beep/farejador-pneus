@@ -20,18 +20,22 @@ export const matrizCommissionFactsSql = `WITH retail AS (
 ), wholesale AS (
   SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
          'Atacado #'||right(o.id::text,6) reference,o.sold_at occurred_at,
-         NULL::text payment_method,o.total_amount gross_amount,
+         NULL::text payment_method,COALESCE(o.settled_total_amount,o.total_amount) gross_amount,
          COALESCE(items.margin,0) margin,COALESCE(items.items_without_cost,0) items_without_cost,
          'sale'::text event_type,'wholesale'::text sale_channel,o.id source_id
     FROM commerce.wholesale_orders o
     LEFT JOIN LATERAL (
-      SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*oi.quantity),0) margin,
+      SELECT COALESCE(sum((oi.unit_price-oi.unit_cost)*CASE
+               WHEN o.partner_transfer_status IN ('settled','received')
+                 THEN COALESCE(oi.accepted_quantity,0) ELSE oi.quantity END),0) margin,
              count(*) FILTER (WHERE oi.unit_cost IS NULL)::int items_without_cost
         FROM commerce.wholesale_order_items oi
        WHERE oi.environment=o.environment AND oi.order_id=o.id
     ) items ON true
    WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL
      AND o.status='confirmed'
+     AND (o.partner_transfer_status IS NULL
+       OR o.partner_transfer_status IN ('settled','received'))
      AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
      AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), delivery_events AS (
