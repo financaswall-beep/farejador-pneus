@@ -176,8 +176,9 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Vendedor Semanal','vendedor','Vendedor','sales') RETURNING id`,
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Semanal','vendedor','Vendedor','sales',
+               '2026-01-01T12:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     const collaboratorId = collaborator.rows[0]!.id;
