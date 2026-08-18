@@ -183,11 +183,11 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     const collaboratorId = collaborator.rows[0]!.id;
     await saveCompensation({
       collaborator_id: collaboratorId, employment_type: 'autonomo', base_salary: 2300,
-      payment_day: 5, payment_method: 'pix', starts_on: '2027-01-01', environment: 'test',
+      payment_day: 5, payment_method: 'pix', starts_on: '2026-01-01', environment: 'test',
     }, db.pool);
     await saveCommission({
       collaborator_id: collaboratorId, kind: 'fixed', basis: 'sale', value: 20,
-      starts_on: '2027-01-01', settlement_frequency: 'weekly', environment: 'test',
+      starts_on: '2026-01-01', settlement_frequency: 'weekly', environment: 'test',
     }, db.pool);
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
@@ -202,7 +202,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       `INSERT INTO commerce.orders
          (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
           seller_collaborator_id,created_at)
-       VALUES ('test',$1,$2,200,'confirmed','pickup',$3,'2027-01-05T15:00:00Z')`,
+       VALUES ('test',$1,$2,200,'confirmed','pickup',$3,'2026-01-05T15:00:00Z')`,
       [contact.rows[0]!.id, unit.rows[0]!.id, collaboratorId],
     );
 
@@ -210,7 +210,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       const client = await db.pool.connect();
       try {
         await client.query('BEGIN');
-        const result = await closeWeeklyCommission(client, new Date('2027-01-11T15:00:00Z'));
+        const result = await closeWeeklyCommission(client, new Date('2026-01-12T15:00:00Z'));
         await client.query('COMMIT');
         return result;
       } catch (error) {
@@ -229,11 +229,11 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       [collaboratorId],
     );
     expect(weekly.rows[0]).toMatchObject({
-      period_start: '2027-01-03', period_end: '2027-01-09',
+      period_start: '2026-01-04', period_end: '2026-01-10',
       commission_amount: '20.00', payment_status: 'pending', expense_amount: '20.00',
     });
 
-    const closed = await closePayroll({ competence: '2027-01-01', environment: 'test' }, db.pool);
+    const closed = await closePayroll({ competence: '2026-01-01', environment: 'test' }, db.pool);
     const salary = await db.pool.query(
       `SELECT base_salary::text,commission_amount::text,total_due::text
          FROM finance.matriz_payroll_items
@@ -309,12 +309,12 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       `INSERT INTO network.matriz_collaborators
          (environment,person_id,display_name,job,job_title,work_area,created_at)
        VALUES ('test',$1,'Vendedor Atribuicao','vendedor','Vendedor','sales',
-               '2026-12-01T12:00:00Z') RETURNING id`,
+               '2026-01-01T12:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     await saveCommission({
       collaborator_id: collaborator.rows[0]!.id, kind: 'fixed', basis: 'sale',
-      value: 15, starts_on: '2027-02-01', environment: 'test',
+      value: 15, starts_on: '2026-02-01', environment: 'test',
     }, db.pool);
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
@@ -326,12 +326,12 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.orders
          (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,created_at)
-       VALUES ('test',$1,$2,150,'confirmed','pickup','2027-02-10T15:00:00Z')
+       VALUES ('test',$1,$2,150,'confirmed','pickup','2026-02-10T15:00:00Z')
        RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id],
     );
 
-    await expect(closePayroll({ competence: '2027-02-01', environment: 'test' }, db.pool))
+    await expect(closePayroll({ competence: '2026-02-01', environment: 'test' }, db.pool))
       .rejects.toThrow('payroll_has_unassigned_events');
 
     await db.pool.query(
@@ -339,7 +339,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       [order.rows[0]!.id, collaborator.rows[0]!.id],
     );
     const closed = await closePayroll({
-      competence: '2027-02-01', environment: 'test',
+      competence: '2026-02-01', environment: 'test',
     }, db.pool);
     const item = await db.pool.query(
       `SELECT commission_amount::text,total_due::text
@@ -437,44 +437,47 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const person = await db.pool.query<{ id: string }>(
       `INSERT INTO network.partner_people (environment,username)
-       VALUES ('test','vendedor.causal') RETURNING id`,
+       VALUES ('prod','vendedor.causal') RETURNING id`,
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
          (environment,person_id,display_name,job,job_title,work_area,created_at)
-       VALUES ('test',$1,'Vendedor Causal','vendedor','Vendedor','sales',
+       VALUES ('prod',$1,'Vendedor Causal','vendedor','Vendedor','sales',
                '2026-05-01T12:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     const collaboratorId = collaborator.rows[0]!.id;
     await saveCompensation({
       collaborator_id: collaboratorId, employment_type: 'clt', base_salary: 100,
-      payment_day: 5, payment_method: 'pix', starts_on: '2026-06-01', environment: 'test',
+      payment_day: 5, payment_method: 'pix', starts_on: '2026-06-01', environment: 'prod',
     }, db.pool);
     await saveCommission({
       collaborator_id: collaboratorId, kind: 'fixed', basis: 'sale', value: 10,
-      starts_on: '2026-06-01', environment: 'test',
+      starts_on: '2026-06-01', environment: 'prod',
     }, db.pool);
     const contact = await db.pool.query<{ id: string }>(
       `INSERT INTO core.contacts (environment,chatwoot_contact_id,name)
-       VALUES ('test',91003,'Cliente causal') RETURNING id`,
+       VALUES ('prod',91003,'Cliente causal') RETURNING id`,
     );
     const unit = await db.pool.query<{ id: string }>(
-      `SELECT id FROM core.units WHERE environment='test' AND slug='main'`,
+      `INSERT INTO core.units (environment,slug,name)
+       VALUES ('prod','main','Matriz causal prod')
+       ON CONFLICT (environment,slug) DO UPDATE SET name=core.units.name
+       RETURNING id`,
     );
     const order = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.orders
          (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
           seller_collaborator_id,created_at)
-       VALUES ('test',$1,$2,200,'confirmed','pickup',$3,'2026-06-10T15:00:00Z') RETURNING id`,
+       VALUES ('prod',$1,$2,200,'confirmed','pickup',$3,'2026-06-10T15:00:00Z') RETURNING id`,
       [contact.rows[0]!.id, unit.rows[0]!.id, collaboratorId],
     );
 
-    const october = await closePayroll({ competence: '2026-06-01', environment: 'test' }, db.pool);
+    const originalPayroll = await closePayroll({ competence: '2026-06-01', environment: 'prod' }, db.pool);
     const frozenBefore = await db.pool.query<{ id: string; snapshot: string }>(
       `SELECT id,to_jsonb(i)::text snapshot FROM finance.matriz_payroll_items i
         WHERE payroll_period_id=$1 AND collaborator_id=$2`,
-      [october.period_id, collaboratorId],
+      [originalPayroll.period_id, collaboratorId],
     );
     expect(JSON.parse(frozenBefore.rows[0]!.snapshot)).toMatchObject({
       base_salary: 100, commission_amount: 10, total_due: 110,
@@ -494,9 +497,11 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       [order.rows[0]!.id],
     );
     expect(adjustment.rows).toHaveLength(1);
+    const adjustmentCompetence = adjustment.rows[0]!.competence;
     expect(adjustment.rows[0]).toMatchObject({
       amount: '10.00', kind: 'deduction', source_type: 'retail_sale_cancellation',
-      source_id: order.rows[0]!.id, causal_status: 'ready', competence: '2026-10-01',
+      source_id: order.rows[0]!.id, causal_status: 'ready',
+      competence: adjustmentCompetence,
     });
     await expect(db.pool.query(
       `UPDATE finance.matriz_payroll_adjustments SET amount=11 WHERE id=$1`,
@@ -514,24 +519,26 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
         (environment,collaborator_id,competence,kind,description,amount,created_by,
          source_type,source_id,source_event_at,original_payroll_item_id,
          frozen_calculation,causal_status,idempotency_key)
-       VALUES ('test',$1,'2026-10-01','deduction','Estorno causal sob revisão',NULL,
-         'causal-test','retail_sale_cancellation',gen_random_uuid(),now(),$2,
-         '{"reason":"unknown_legacy_value"}'::jsonb,'needs_review','causal-review-stage10-test')
+       VALUES ('prod',$1,$3::date,'deduction','Estorno causal sob revisão',NULL,
+          'causal-test','retail_sale_cancellation',gen_random_uuid(),now(),$2,
+          '{"reason":"unknown_legacy_value"}'::jsonb,'needs_review','causal-review-stage10-prod')
        RETURNING id`,
-      [collaboratorId, frozenBefore.rows[0]!.id],
+      [collaboratorId, frozenBefore.rows[0]!.id, adjustmentCompetence],
     );
-    await expect(closePayroll({ competence: '2026-10-01', environment: 'test' }, db.pool))
+    await expect(closePayroll({ competence: adjustmentCompetence, environment: 'prod' }, db.pool))
       .rejects.toThrow('payroll_has_unresolved_adjustments');
     await reviewAdjustment({
-      id: unresolved.rows[0]!.id, amount: 7, actor_label: 'owner-stage10', environment: 'test',
+      id: unresolved.rows[0]!.id, amount: 7, actor_label: 'owner-stage10', environment: 'prod',
     }, db.pool);
 
-    const november = await closePayroll({ competence: '2026-10-01', environment: 'test' }, db.pool);
+    const correctedPayroll = await closePayroll({
+      competence: adjustmentCompetence, environment: 'prod',
+    }, db.pool);
     const corrected = await db.pool.query(
       `SELECT base_salary::text,commission_amount::text,deductions::text,total_due::text
          FROM finance.matriz_payroll_items
         WHERE payroll_period_id=$1 AND collaborator_id=$2`,
-      [november.period_id, collaboratorId],
+      [correctedPayroll.period_id, collaboratorId],
     );
     expect(corrected.rows[0]).toEqual({
       base_salary: '100.00', commission_amount: '0.00',
