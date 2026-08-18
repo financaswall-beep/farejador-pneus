@@ -8,6 +8,7 @@ import {
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
 import { settleLinkedPartnerPayable } from './wholesale-partner-bridge.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 
 export interface MatrizWriteOptions {
   idempotency_key: string;
@@ -57,7 +58,9 @@ async function settleWholesalePayment(
       ? await getWholesaleSaleLedgerState(client, environment, entityId) : null;
     const purchaseLedger = env.MATRIZ_CENTRAL_LEDGER && !sale
       ? await getWholesalePurchaseLedgerState(client, environment, entityId) : null;
-    const paidAt = options.paid_at ?? new Date().toISOString();
+    const paidAt = normalizeBusinessFactInstant(
+      options.paid_at, new Date(), 'paid_at_future',
+    ) ?? new Date().toISOString();
     const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE ${table} SET payment_status='paid',paid_at=$3::timestamptz
         ${sale ? ',payment_method=COALESCE($4,payment_method)' : ''}

@@ -9,6 +9,7 @@ import {
   centMoneySchema, partnerPurchaseSchema, sixDecimalCostSchema,
 } from './purchase-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
+import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
 import { dispatchPhotoToCustomer } from '../atendente-v2/photo-requests.js';
 // Login por usuário+senha: mora em ./route-login.ts (teto congelado da obra 300);
@@ -394,13 +395,18 @@ const chatLinkCustomerBodySchema = z.object({
 });
 
 const expenseSchema = z.object({
-  expense_date: z.string().date().nullable().optional(),
+  expense_date: z.string().date().refine(
+    (value) => value <= businessDateSaoPaulo(new Date()), 'expense_date_future',
+  ).nullable().optional(),
   category: z.enum(['employee_payment', 'rent', 'utilities', 'maintenance', 'delivery', 'tax', 'supplier_payment', 'other']),
   description: z.string().min(1).max(300),
   amount: z.number().nonnegative(),
   payment_method: z.string().max(80).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
 });
+
+const partnerFactDatetime = (message: string) => z.string().datetime()
+  .refine(isNotFutureBusinessDate, message);
 
 const payableSchema = z.object({
   counterparty_name: z.string().max(200).nullable().optional(),
@@ -409,7 +415,7 @@ const payableSchema = z.object({
   amount: z.number().nonnegative(),
   due_date: z.string().date().nullable().optional(),
   status: z.enum(['open', 'paid']).nullable().optional(),
-  paid_at: z.string().datetime().nullable().optional(),
+  paid_at: partnerFactDatetime('paid_at_future').nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
@@ -437,7 +443,7 @@ const receivableSchema = z.object({
   amount: z.number().nonnegative(),
   due_date: z.string().date().nullable().optional(),
   status: z.enum(['open', 'received']).nullable().optional(),
-  received_at: z.string().datetime().nullable().optional(),
+  received_at: partnerFactDatetime('received_at_future').nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
@@ -456,13 +462,13 @@ const receivableUpdateSchema = receivableSchema
   });
 
 const settlePayableSchema = z.object({
-  paid_at: z.string().datetime().nullable().optional(),
+  paid_at: partnerFactDatetime('paid_at_future').nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
   force_duplicate: z.boolean().optional(),
 });
 
 const settleReceivableSchema = z.object({
-  received_at: z.string().datetime().nullable().optional(),
+  received_at: partnerFactDatetime('received_at_future').nullable().optional(),
   payment_method: z.string().max(80).nullable().optional(),
 });
 

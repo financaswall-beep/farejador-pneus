@@ -2182,7 +2182,7 @@
                     <input type="date" x-model="payableForm.due_date" />
                   </label>
                   <label x-show="payableForm.status === 'paid'">Data pagamento
-                    <input type="date" x-model="payableForm.paid_at" />
+                    <input type="date" x-model="payableForm.paid_at" :max="businessTodaySaoPaulo()" />
                   </label>
                   <label x-show="payableForm.status === 'paid'">Forma
                     <select x-model="payableForm.payment_method">
@@ -2259,7 +2259,7 @@
                     <input type="date" x-model="receivableForm.due_date" />
                   </label>
                   <label x-show="receivableForm.status === 'received'">Data receb.
-                    <input type="date" x-model="receivableForm.received_at" />
+                    <input type="date" x-model="receivableForm.received_at" :max="businessTodaySaoPaulo()" />
                   </label>
                   <label x-show="receivableForm.status === 'received'">Forma
                     <select x-model="receivableForm.payment_method">
@@ -3405,7 +3405,7 @@
     <span x-text="statusMessage"></span>
   </div>
 
-<script src="./app.format.js?v=20260611-onda-c"></script>
+<script src="./app.format.js?v=20260818-business-time1"></script>
 <script src="./app.labels.js?v=20260731-condicao2"></script>
 <script src="./app.charts.resumo.js?v=20260611-onda-c"></script>
 <script src="./app.charts.pdv.js?v=20260805-matriz-light1"></script>
@@ -3424,8 +3424,8 @@
 <script src="./app.financeiro.kpis.js?v=20260731-condicao2"></script>
 <script src="./app.financeiro.score.js?v=20260611-onda-c"></script>
 <script src="./app.financeiro.compras.js?v=20260817-arrival-adjustment1"></script>
-<script src="./app.financeiro.contas.js?v=20260611-onda-c"></script>
-<script src="./app.financeiro.receber.js?v=20260611-onda-c"></script>
+<script src="./app.financeiro.contas.js?v=20260818-business-time1"></script>
+<script src="./app.financeiro.receber.js?v=20260818-business-time1"></script>
  <script src="./app.core.js?v=20260810-aprovacao1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
 <script src="./app.resumo.js?v=20260810-resumo-web1"></script>

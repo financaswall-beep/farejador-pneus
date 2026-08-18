@@ -15,6 +15,7 @@ import {
 import { canonicalCatalogBrand } from './catalog-brand.js';
 import { canonicalPurchaseItems, type PurchaseItemInput } from './purchase-brand.js';
 import { assertWholesalePurchaseMoney } from './purchase-money.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 import {
   getPurchaseCatalogBlockers, type PurchaseCatalogBlocker,
 } from './purchase-catalog-readiness.js';
@@ -106,6 +107,11 @@ export async function registerWholesalePurchase(
 ): Promise<RegisterWholesalePurchaseResult> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
   assertWholesalePurchaseMoney(input.items ?? []);
+  const requestNow = new Date();
+  const purchasedAt = normalizeBusinessFactInstant(
+    input.purchased_at, requestNow, 'purchased_at_future',
+  );
+  const paidAt = normalizeBusinessFactInstant(input.paid_at, requestNow, 'paid_at_future');
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
@@ -141,10 +147,10 @@ export async function registerWholesalePurchase(
          stock_applied_at,stock_applied_by,created_by,notes,payment_status,due_date,paid_at)
        VALUES ($1,$2,COALESCE($3::timestamptz,now()),0,'pending',false,NULL,NULL,$4,$5,$6,$7::date,$8::timestamptz)
        RETURNING id,purchased_at,paid_at`,
-      [environment, supplier.id, input.purchased_at ?? null, input.created_by, input.notes ?? null,
+      [environment, supplier.id, purchasedAt ?? null, input.created_by, input.notes ?? null,
        pendingPayment ? 'pending' : 'paid', pendingPayment ? (input.due_date ?? null) : null,
        env.WHOLESALE_FINANCE && !pendingPayment
-         ? input.paid_at ?? input.purchased_at ?? new Date().toISOString() : null]);
+         ? paidAt ?? purchasedAt ?? requestNow.toISOString() : null]);
     const purchaseId = purchase.rows[0]!.id;
     for (const item of items) {
       await client.query(

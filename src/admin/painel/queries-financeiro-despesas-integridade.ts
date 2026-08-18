@@ -5,6 +5,9 @@ import { ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState, postMatrizExpe
 import type { MatrizWriteOptions } from './queries-financeiro-integridade.js';
 import type { MatrizExpenseRow } from './queries-fiado-despesas.js';
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult, moneyCents, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
+import {
+  assertNotFutureBusinessDay, normalizeBusinessFactInstant,
+} from '../../shared/business-time.js';
 
 export interface CreateMatrizExpenseInput {
   category: string;
@@ -40,6 +43,17 @@ export async function insertMatrizExpenseInTransaction(
   client: PoolClient,
   input: MatrizExpenseTransactionInput,
 ): Promise<MatrizExpenseRow> {
+  const requestNow = new Date();
+  const occurredAt = normalizeBusinessFactInstant(
+    input.occurred_at, requestNow, 'occurred_at_future',
+  );
+  const paidAt = normalizeBusinessFactInstant(input.paid_at, requestNow, 'paid_at_future');
+  const documentDate = assertNotFutureBusinessDay(
+    input.document_date, requestNow, 'document_date_future',
+  );
+  const competenceMonth = assertNotFutureBusinessDay(
+    input.competence_month, requestNow, 'competence_month_future',
+  );
   const created = await client.query<MatrizExpenseRow>(
     `INSERT INTO commerce.matriz_expenses
       (environment,category,description,amount,payment_status,due_date,paid_at,
@@ -55,9 +69,9 @@ export async function insertMatrizExpenseInTransaction(
         AND due_date<(now() AT TIME ZONE 'America/Sao_Paulo')::date) AS overdue`,
     [input.environment, input.category, input.description?.trim() || null, input.amount,
      input.payment_status, input.payment_status === 'pending' ? input.due_date ?? null : null,
-     input.payment_status === 'paid' ? input.paid_at ?? null : null,
-     input.occurred_at ?? null, input.document_date ?? null,
-     input.competence_month ?? null, input.created_by ?? null],
+     input.payment_status === 'paid' ? paidAt ?? null : null,
+     occurredAt ?? null, documentDate ?? null,
+     competenceMonth ?? null, input.created_by ?? null],
   );
   if (!created.rows[0]) throw new Error('category_invalid');
   const expense = created.rows[0];
@@ -67,7 +81,7 @@ export async function insertMatrizExpenseInTransaction(
     amount: expense.amount, occurredAt: expense.occurred_at,
     paymentStatus: expense.payment_status, dueDate: expense.due_date,
     paidAt: expense.paid_at, createdBy: input.created_by ?? null,
-    competenceMonth: input.competence_month, documentDate: input.document_date,
+    competenceMonth, documentDate,
   });
   return expense;
 }
@@ -163,7 +177,9 @@ export async function settleMatrizExpense(
     if (payroll.rows[0] && payroll.rows[0].payment_status !== 'pending') {
       throw new Error('payroll_payment_conflict');
     }
-    const paidAt = options.paid_at ?? new Date().toISOString();
+    const paidAt = normalizeBusinessFactInstant(
+      options.paid_at, new Date(), 'paid_at_future',
+    ) ?? new Date().toISOString();
     const paid = await client.query<{ id: string; paid_at: string }>(
       `UPDATE commerce.matriz_expenses SET payment_status='paid',paid_at=$3::timestamptz
         WHERE id=$1 AND environment=$2 RETURNING id,paid_at`,

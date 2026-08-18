@@ -2,8 +2,7 @@ window.PAINEL_MODULES = window.PAINEL_MODULES || {};
 window.PAINEL_MODULES.atacadoTransfer = function () {
   return {
     atacadoBusinessInstant(date, today = this.finHoje(), nowIso = new Date().toISOString()) {
-      if (date === today) return nowIso;
-      return new Date(`${date}T12:00:00-03:00`).toISOString();
+      return this.businessFactInstant(date, today, nowIso);
     },
     atacadoBuyerUnits() {
       const units = this.atacadoBuyerSelecionado()?.partner_units;

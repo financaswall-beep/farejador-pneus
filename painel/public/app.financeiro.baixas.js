@@ -91,7 +91,7 @@ window.PAINEL_MODULES.financeiroBaixas = function () {
           target_id: item.id,
           ...target,
           amount: this.finPermiteParcial(item) ? amount : undefined,
-          paid_at: new Date(`${modal.payment_date}T12:00:00-03:00`).toISOString(),
+          paid_at: this.businessFactInstant(modal.payment_date),
           payment_method: String(modal.payment_method).trim(),
           cash_account: String(modal.cash_account || '').trim() || undefined,
           note: String(modal.note || '').trim() || undefined,

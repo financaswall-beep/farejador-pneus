@@ -1,10 +1,10 @@
 # Dossiê de autorização — Bot, Vendas, Compras e Estoque
 
-**Data da revisão:** 17/08/2026
+**Data da revisão:** 18/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
-**Pacote atual de Estoque:** auditoria, correções, ponte Matriz → parceiro e acerto individual na chegada concluídos em código; migrations `0182`–`0184` ainda não aplicadas; novo código ainda não implantado.
+**Pacote atual de datas:** Estoque foi implantado no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`; migrations `0182`–`0185` estão no banco. A padronização sistêmica de horário descrita no adendo 9 está aprovada em código e dry-run, mas a migration `0186` ainda não foi aplicada e o código ainda não foi publicado/implantado.
 
 ## Como ler o veredito
 
@@ -317,3 +317,55 @@ Pendências obrigatórias do Estoque:
 
 - [ ] **AUTORIZO** a entrada em produção do escopo Bot + Vendas + Compras + Estoque.
 - [ ] **NÃO AUTORIZO**; registrar o bloqueador observado.
+
+## 9. Adendo — dia comercial único da Matriz e dos parceiros
+
+### Causa e regra adotada
+
+Campos de calendário da interface representavam um **dia**, mas algumas telas os convertiam
+para meio-dia. Nas primeiras horas do dia, esse meio-dia ainda estava algumas horas no futuro e
+uma proteção baseada no relógio podia recusar uma operação legítima de hoje.
+
+A regra passou a ser única em `America/Sao_Paulo`:
+
+- venda, compra, despesa, documento, pagamento, recebimento e baixa representam fatos já
+  ocorridos; aceitam hoje ou passado e recusam um dia realmente futuro;
+- quando a tela escolhe **hoje**, o sistema grava o instante real do envio, não o meio-dia;
+- vencimento, conta futura e parcela futura continuam permitidos;
+- nenhuma data de vencimento recebeu a trava de “máximo hoje”.
+
+### Cobertura
+
+- Matriz: atacado, compras, despesas, baixas do Financeiro, comissões, estornos,
+  mensalidades, folha e ledger.
+- Parceiro: compra direta via API, despesas, contas a pagar, contas a receber, recebimento de
+  parcela e respectivas baixas.
+- Banco: 11 triggers novos protegem fatos da Matriz e do parceiro; as guardas anteriores de
+  vendas, compras e remessas foram preservadas.
+- Interface: limites visuais foram adicionados somente aos campos factuais; vencimentos não
+  foram limitados.
+
+### Evidência em 18/08/2026
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.207/1.207**, 238 arquivos |
+| Casos direcionados iniciais | **36/36** |
+| Build e TypeScript | Aprovados |
+| Fiscal de tamanho | Aprovado |
+| Manifesto | 187 migrations; última `0186`; gap histórico 0071 documentado |
+| Migration `0186` no schema real | Dry-run aprovado com rollback; nenhuma alteração permaneceu |
+| PostgreSQL descartável local | Não executado: Docker Desktop sem engine disponível |
+
+### Decisão deste adendo
+
+**APROVADO EM CÓDIGO E EM DRY-RUN DE BANCO. AINDA NÃO IMPLANTADO.**
+
+Ordem segura:
+
+1. publicar somente o pacote versionado e registrar o SHA;
+2. fazer backup do banco;
+3. aplicar `0186_system_business_fact_dates.sql`;
+4. o responsável fazer o deploy do mesmo SHA no Coolify;
+5. executar smoke à meia-noite ou com relógio controlado: venda/compra/despesa/baixa de hoje
+   deve passar; pagamento de amanhã deve falhar; vencimento/parcela de amanhã deve passar.

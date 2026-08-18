@@ -89,7 +89,7 @@ describe('seguranca de inicializacao do painel', () => {
     const html = readFileSync('painel/public/index.html', 'utf8');
 
     expect(html).toContain('app.atacado.js?v=20260817-arrival-adjustment1');
-    expect(html).toContain('app.atacado.transfer.js?v=20260818-same-day-time1');
+    expect(html).toContain('app.atacado.transfer.js?v=20260818-business-time1');
     expect(html).toContain('app.compras.relatorios.js?v=20260731-condicao2');
     expect(html).toContain('app.compras.acoes.js?v=20260817-arrival-adjustment1');
     expect(html).toContain('app.core.js?v=20260817-sales-integrity1');

@@ -57,7 +57,9 @@ export function mapWriteError(err: unknown): { status: number; error: string } {
   if (['purchase_quantity_invalid', 'purchase_unit_cost_invalid',
        'unit_cost_cent_precision', 'purchase_line_total_too_large',
        'purchase_total_too_large', 'purchased_at_future', 'paid_at_future',
-       'due_date_before_purchase'].includes(err.message)) {
+       'occurred_at_future', 'document_date_future', 'competence_month_future',
+       'received_at_future', 'settled_at_future', 'refunded_at_future',
+       'business_date_future', 'due_date_before_purchase'].includes(err.message)) {
     return { status: 400, error: err.message };
   }
   if (['sale_items_required', 'sale_items_limit', 'sale_quantity_invalid', 'sale_unit_price_invalid',

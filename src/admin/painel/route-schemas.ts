@@ -3,22 +3,16 @@
 // de topo (transformação mecânica; o gerador prova a reversa). Porta: ./route.js.
 import path from 'node:path';
 import { z } from 'zod';
+import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { assertWholesaleSaleMoney } from './sales-money.js';
 
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
 
-function saoPauloDate(instant: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date(instant));
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
-
-function isNotFutureSaoPauloDate(instant: string): boolean {
-  return saoPauloDate(instant) <= saoPauloDate(new Date().toISOString());
-}
+const saoPauloDate = businessDateSaoPaulo;
+const nonFutureBusinessDatetime = (message: string) => z.string()
+  .datetime({ offset: true })
+  .refine(isNotFutureBusinessDate, message);
 
 export const resolveIntegrityOperationSchema = z.object({
   domain: z.enum([
@@ -148,11 +142,11 @@ export const registerWholesaleSaleSchema = z
     { message: 'due_date_required', path: ['due_date'] },
   )
   .refine(
-    (d) => !d.sold_at || isNotFutureSaoPauloDate(d.sold_at),
+    (d) => !d.sold_at || isNotFutureBusinessDate(d.sold_at),
     { message: 'sold_at_future', path: ['sold_at'] },
   )
   .refine(
-    (d) => !d.paid_at || isNotFutureSaoPauloDate(d.paid_at),
+    (d) => !d.paid_at || isNotFutureBusinessDate(d.paid_at),
     { message: 'paid_at_future', path: ['paid_at'] },
   )
   .refine(
@@ -179,7 +173,7 @@ export const settleWholesaleFinanceSchema = z.object({
   note: z.string().trim().max(500).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
 }).refine(
-  (d) => !d.paid_at || isNotFutureSaoPauloDate(d.paid_at),
+  (d) => !d.paid_at || isNotFutureBusinessDate(d.paid_at),
   { message: 'paid_at_future', path: ['paid_at'] },
 );
 
@@ -192,8 +186,8 @@ export const createMatrizExpenseSchema = z.object({
   amount: z.number().positive(),
   payment_status: z.enum(['paid', 'pending']).optional(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  paid_at: z.string().datetime({ offset: true }).nullable().optional(),
-  occurred_at: z.string().datetime({ offset: true }).nullable().optional(),
+  paid_at: nonFutureBusinessDatetime('paid_at_future').nullable().optional(),
+  occurred_at: nonFutureBusinessDatetime('occurred_at_future').nullable().optional(),
   document_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   competence_month: z.string().regex(/^\d{4}-\d{2}-01$/).nullable().optional(),
   idempotency_key: idempotencyKeySchema,
@@ -201,11 +195,18 @@ export const createMatrizExpenseSchema = z.object({
   if (body.payment_status === 'pending' && !body.due_date) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['due_date'], message: 'due_date_required' });
   }
+  const today = businessDateSaoPaulo(new Date());
+  if (body.document_date && body.document_date > today) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['document_date'], message: 'document_date_future' });
+  }
+  if (body.competence_month && body.competence_month > `${today.slice(0, 7)}-01`) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['competence_month'], message: 'competence_month_future' });
+  }
 });
 
 export const matrizExpenseIdSchema = z.object({
   id: z.string().uuid(),
-  paid_at: z.string().datetime({ offset: true }).optional(),
+  paid_at: nonFutureBusinessDatetime('paid_at_future').optional(),
   payment_method: z.string().trim().min(2).max(40).nullable().optional(),
   cash_account: z.string().trim().min(2).max(80).nullable().optional(),
   note: z.string().trim().max(500).nullable().optional(),

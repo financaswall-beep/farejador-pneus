@@ -6,6 +6,7 @@ import {
   operationFingerprint,recordIntegrityEvent,
 } from './stage5-integrity.js';
 import { syncMatrizCommissionLedgerEntry } from './matriz-ledger-commissions.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 
 export interface SettleCommissionInput {
   partner_id: string;
@@ -24,6 +25,9 @@ export async function settleCommissionEntries(
   dbPool: Pool = defaultPool,
 ): Promise<{ settled_count: number; settled_total: string; replayed?: boolean }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  const settledAt = normalizeBusinessFactInstant(
+    input.settled_at, new Date(), 'settled_at_future',
+  );
   const operation = { environment,domain: 'commission.settle',
     idempotencyKey: input.idempotency_key,
     fingerprint: operationFingerprint({
@@ -51,7 +55,7 @@ export async function settleCommissionEntries(
               settled_by=$3,settlement_operation_key=$4
         WHERE environment=$1 AND partner_id=$2 AND status='open'
       RETURNING id,partner_order_id,commission_amount`,
-      [environment,input.partner_id,input.settled_by,input.idempotency_key,input.settled_at ?? null],
+      [environment,input.partner_id,input.settled_by,input.idempotency_key,settledAt ?? null],
     );
     if (rows.rowCount === 0) throw new Error('nothing_open');
     for (const row of rows.rows) {
@@ -74,7 +78,7 @@ export async function settleCommissionEntries(
       idempotencyKey: input.idempotency_key,before: { status: 'open' },
       after: {
         ...result, reason: input.reason,
-        settled_at: input.settled_at ?? null,
+        settled_at: settledAt ?? null,
         payment_method: input.payment_method?.trim() || null,
         cash_account: input.cash_account?.trim() || null,
         note: input.note?.trim() || null,

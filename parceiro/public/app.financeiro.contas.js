@@ -40,7 +40,7 @@ window.PARCEIRO_MODULES.financeiroContas = () => ({
 
         const wasPaid = this.payableForm.status === 'paid';
         const paidAt = this.payableForm.status === 'paid'
-          ? (this.payableForm.paid_at ? new Date(`${this.payableForm.paid_at}T12:00:00`).toISOString() : new Date().toISOString())
+          ? (this.payableForm.paid_at ? this.businessFactInstant(this.payableForm.paid_at) : new Date().toISOString())
           : null;
         await this.api('contas-a-pagar', {
           method: 'POST',

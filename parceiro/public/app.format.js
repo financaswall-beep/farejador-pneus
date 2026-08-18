@@ -140,6 +140,16 @@ window.PARCEIRO_MODULES.format = () => ({
       }).format(new Date(value));
     },
 
+    businessTodaySaoPaulo(now = new Date()) {
+      return this.dateKeySaoPaulo(now);
+    },
+
+    businessFactInstant(date, today = this.businessTodaySaoPaulo(), nowIso = new Date().toISOString()) {
+      if (date > today) throw new Error('business_date_future');
+      if (date === today) return nowIso;
+      return new Date(`${date}T12:00:00-03:00`).toISOString();
+    },
+
     // Compara em America/Sao_Paulo para alinhar com a view SQL
     // (network.partner_unit_summary usa date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')).
     // Sem isso, nas primeiras horas do dia 1 o navegador (em outro fuso)

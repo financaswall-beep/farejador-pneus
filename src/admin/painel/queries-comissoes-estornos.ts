@@ -6,6 +6,7 @@ import {
   operationFingerprint, recordIntegrityEvent,
 } from './stage5-integrity.js';
 import { syncMatrizCommissionLedgerEntry } from './matriz-ledger-commissions.js';
+import { normalizeBusinessFactInstant } from '../../shared/business-time.js';
 
 export interface SettleCommissionRefundInput {
   reversal_id: string;
@@ -28,6 +29,9 @@ export async function settleCommissionRefund(
   const reason = input.reason.trim().slice(0, 500);
   if (!actorLabel) throw new Error('actor_required');
   if (reason.length < 2) throw new Error('reason_required');
+  const refundedAt = normalizeBusinessFactInstant(
+    input.refunded_at, new Date(), 'refunded_at_future',
+  );
   const operation = {
     environment,
     domain: 'commission.refund',
@@ -68,7 +72,7 @@ export async function settleCommissionRefund(
         WHERE environment=$1 AND id=$2 AND refund_status='pending'
         RETURNING refunded_at`,
       [environment, input.reversal_id, actorLabel, operation.idempotencyKey, reason,
-       input.refunded_at ?? null],
+       refundedAt ?? null],
     );
     if (!paid.rows[0]) throw new Error('commission_refund_not_pending');
     const result = integrityResult({

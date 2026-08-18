@@ -134,8 +134,8 @@ export async function registerWholesaleSale(
   const requestNow = new Date();
   const writeInput: RegisterWholesaleSaleInput = {
     ...input,
-    sold_at: normalizeSameDayFutureInstant(input.sold_at, requestNow),
-    paid_at: normalizeSameDayFutureInstant(input.paid_at, requestNow),
+    sold_at: normalizeSameDayFutureInstant(input.sold_at, requestNow, 'sold_at_future'),
+    paid_at: normalizeSameDayFutureInstant(input.paid_at, requestNow, 'paid_at_future'),
   };
   const client = await dbPool.connect();
   try {
