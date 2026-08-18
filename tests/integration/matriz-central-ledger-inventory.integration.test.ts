@@ -154,7 +154,11 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       reason: 'definicao inicial do teste',
       actor_label: 'owner:inventory',
     }, db.pool);
-    await removeStock(measure, 'Sem marca', 'meia_vida', 'test', db.pool);
+    await removeStock({
+      environment: 'test', measure, brand: 'Sem marca', tire_condition: 'meia_vida',
+      reason: 'remoção integral do teste de ledger',
+      idempotency_key: randomUUID(), actor_label: 'owner:inventory',
+    }, db.pool);
 
     const proof = await db.pool.query(
       `SELECT a.source,a.direction,t.transaction_kind,
