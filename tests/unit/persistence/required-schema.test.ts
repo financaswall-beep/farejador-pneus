@@ -31,14 +31,16 @@ describe('schema mínimo exigido no boot', () => {
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='source_wholesale_order_item_id'`);
     expect(REQUIRED_SCHEMA_SQL).toContain('partner_purchases_source_wholesale_order_uniq');
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='partner_transfer_status'`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='partner_payment_terms'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='accepted_quantity'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`column_name='confirmed_quantity'`);
     expect(REQUIRED_SCHEMA_SQL).toContain(`to_regclass('commerce.matrix_partner_cargo_lots')`);
+    expect(REQUIRED_SCHEMA_SQL).toContain(`tgname='matrix_partner_arrival_order_guard'`);
   });
 
-  it('recusa iniciar antes da migration 0184', async () => {
+  it('recusa iniciar antes da migration 0187', async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ ready: false }] });
     await expect(assertRequiredSchema({ query } as unknown as Pool))
-      .rejects.toThrow('required_schema_missing:0184_partner_arrival_item_adjustments');
+      .rejects.toThrow('required_schema_missing:0187_partner_arrival_financial_settlement');
   });
 });

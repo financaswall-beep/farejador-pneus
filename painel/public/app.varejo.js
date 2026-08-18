@@ -228,12 +228,18 @@ window.PAINEL_MODULES.varejo = function () {
           return {
             key: `a:${v.id}`, id: v.id, canal: 'Atacado', canalId: 'atacado', createdAt: v.sold_at,
             data: this.vendaData(v), cliente: v.buyer_name, itens: `${qty} pneu(s)`, itensCount: qty,
-            pagto: v.payment_status === 'pending' ? 'Fiado' : 'Pago',
+            pagto: v.partner_transfer_status === 'in_transit'
+              ? 'Aguardando acerto'
+              : (v.payment_status === 'pending' ? 'Fiado' : 'Pago'),
             total: this.formatCurrency(Number(v.total_amount || 0)), totalAmount: Number(v.total_amount || 0),
             itemsAmount: Number(v.total_amount || 0), freightAmount: 0,
-            status: cancelled ? 'Cancelada' : 'Confirmada',
-            statusClass: cancelled ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700',
-            cancelavel: !cancelled, recibo: this.reciboWhatsLink(v), atacado: v,
+            status: cancelled ? 'Cancelada'
+              : (v.partner_transfer_status === 'in_transit' ? 'Pendente · em trânsito' : 'Confirmada'),
+            statusClass: cancelled ? 'bg-rose-50 text-rose-700'
+              : (v.partner_transfer_status === 'in_transit'
+                ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'),
+            cancelavel: !cancelled && !v.partner_transfer_status,
+            recibo: this.reciboWhatsLink(v), atacado: v,
           };
         });
       return [...varejo, ...atacado].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

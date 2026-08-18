@@ -75,22 +75,35 @@ describe('transferência de estoque Matriz → parceiro', () => {
 
     expect(original).toMatchObject({
       partner_unit_id:partner.partnerUnitId,parent_order_id:null,
+      status:'pending',payment_status:'pending',partner_payment_terms:'credit',
     });
     expect(original.linked_partner_purchase_id).toBeTruthy();
     const mirrored = await db.pool.query(
       `SELECT stock.quantity_on_hand,p.receipt_status,p.total_amount::text,
-              item.quantity,item.unit_cost::text,payable.status
+              p.payment_status AS purchase_payment_status,
+              item.quantity,item.unit_cost::text,payable.status,
+              sale.status AS sale_status,sale.payment_status AS sale_payment_status
          FROM commerce.wholesale_stock stock
          JOIN commerce.partner_purchases p ON p.id=$3
          JOIN commerce.partner_purchase_items item ON item.purchase_id=p.id
          JOIN finance.partner_payables payable ON payable.source_purchase_id=p.id
+         JOIN commerce.wholesale_orders sale ON sale.id=p.source_wholesale_order_id
         WHERE stock.environment='test' AND stock.measure=$1 AND stock.brand=$2`,
       [measure,brand,original.linked_partner_purchase_id],
     );
     expect(mirrored.rows[0]).toMatchObject({
       quantity_on_hand:18,receipt_status:'pending',total_amount:'300.00',
-      quantity:2,unit_cost:'150.00',status:'open',
+      purchase_payment_status:'payable',quantity:2,unit_cost:'150.00',status:'open',
+      sale_status:'pending',sale_payment_status:'pending',
     });
+    const beforeArrivalLedger = await db.pool.query(
+      `SELECT source_type,amount::text FROM finance.matriz_ledger_transactions
+        WHERE environment='test' AND source_id=$1 ORDER BY source_type`,
+      [original.order_id],
+    );
+    expect(beforeArrivalLedger.rows).toEqual([{
+      source_type:'commerce.wholesale_order.partner_dispatch',amount:'200.00',
+    }]);
     const originalItem = await db.pool.query<{ id: string }>(
       `SELECT id FROM commerce.wholesale_order_items WHERE order_id=$1`, [original.order_id],
     );
@@ -99,6 +112,25 @@ describe('transferência de estoque Matriz → parceiro', () => {
       idempotency_key:randomUUID(),
       items:[{ order_item_id:originalItem.rows[0]!.id,accepted_quantity:2 }],
     }, db.pool);
+    const afterArrival = await db.pool.query(
+      `SELECT status,payment_status,partner_transfer_status,settled_total_amount::text
+         FROM commerce.wholesale_orders WHERE environment='test' AND id=$1`,
+      [original.order_id],
+    );
+    expect(afterArrival.rows[0]).toEqual({
+      status:'confirmed',payment_status:'pending',partner_transfer_status:'settled',
+      settled_total_amount:'300.00',
+    });
+    const afterArrivalLedger = await db.pool.query(
+      `SELECT source_type,amount::text FROM finance.matriz_ledger_transactions
+        WHERE environment='test' AND source_id=$1 ORDER BY source_type`,
+      [original.order_id],
+    );
+    expect(afterArrivalLedger.rows).toEqual([
+      { source_type:'commerce.wholesale_order.arrival_cogs',amount:'200.00' },
+      { source_type:'commerce.wholesale_order.arrival_revenue',amount:'300.00' },
+      { source_type:'commerce.wholesale_order.partner_dispatch',amount:'200.00' },
+    ]);
 
     const addition = await registerSale({
       environment:'test',parent_order_id:original.order_id,
@@ -143,7 +175,8 @@ describe('transferência de estoque Matriz → parceiro', () => {
       idempotency_key:randomUUID(),actor_label:'owner:test',payment_method:'pix',
     });
     const paid = await db.pool.query(
-      `SELECT sale.payment_status,payable.status AS payable_status
+      `SELECT sale.payment_status,purchase.payment_status AS purchase_payment_status,
+              payable.status AS payable_status
          FROM commerce.wholesale_orders sale
          JOIN commerce.partner_purchases purchase
            ON purchase.source_wholesale_order_id=sale.id
@@ -151,6 +184,99 @@ describe('transferência de estoque Matriz → parceiro', () => {
         WHERE sale.environment='test' AND sale.id=$1`,
       [original.order_id],
     );
-    expect(paid.rows[0]).toEqual({ payment_status:'paid',payable_status:'paid' });
+    expect(paid.rows[0]).toEqual({
+      payment_status:'paid',purchase_payment_status:'paid_now',payable_status:'paid',
+    });
+  }, 60_000);
+
+  it('só reconhece a venda à vista pelos pneus aceitos na chegada', async () => {
+    const partner = await createPartnerFixture(db.pool, { slugSuffix: 'cash-arrival-0187' });
+    const measure = '83/83-17';
+    const brand = 'Marca Acerto à Vista';
+    const product = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.products(
+         environment,product_code,product_name,product_type,brand,tire_condition
+       ) VALUES ('test',$1,'Pneu acerto à vista','tire',$2,'meia_vida') RETURNING id`,
+      [`CASH-ARRIVAL-${randomUUID()}`, brand],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.tire_specs(
+         environment,product_id,tire_size,width_mm,aspect_ratio,rim_diameter
+       ) VALUES ('test',$1,$2,83,83,17)`,
+      [product.rows[0]!.id, measure],
+    );
+    await db.pool.query(
+      `INSERT INTO commerce.wholesale_stock(
+         environment,measure,brand,tire_condition,quantity_on_hand,quantity_reserved,unit_cost
+       ) VALUES ('test',$1,$2,'meia_vida',10,0,80)`,
+      [measure, brand],
+    );
+
+    const sale = await registerSale({
+      environment:'test',partner_id:partner.partnerId,
+      partner_unit_id:partner.partnerUnitId,
+      items:[{ measure,brand,tire_condition:'meia_vida',quantity:3,unit_price:100 }],
+      payment_status:'paid',created_by:'owner:test',idempotency_key:randomUUID(),
+    }, db.pool);
+    expect(sale).toMatchObject({
+      status:'pending',payment_status:'pending',partner_payment_terms:'cash_on_arrival',
+    });
+    const pending = await db.pool.query(
+      `SELECT sale.status,sale.payment_status,sale.paid_at,
+              purchase.payment_status AS purchase_payment_status,
+              payable.status AS payable_status
+         FROM commerce.wholesale_orders sale
+         JOIN commerce.partner_purchases purchase
+           ON purchase.source_wholesale_order_id=sale.id
+         JOIN finance.partner_payables payable ON payable.source_purchase_id=purchase.id
+        WHERE sale.environment='test' AND sale.id=$1`,
+      [sale.order_id],
+    );
+    expect(pending.rows[0]).toEqual({
+      status:'pending',payment_status:'pending',paid_at:null,
+      purchase_payment_status:'payable',payable_status:'open',
+    });
+
+    const item = await db.pool.query<{ id: string }>(
+      `SELECT id FROM commerce.wholesale_order_items WHERE order_id=$1`, [sale.order_id],
+    );
+    const arrival = await settleArrival({
+      environment:'test',order_id:sale.order_id,actor_label:'owner:test',
+      idempotency_key:randomUUID(),
+      items:[{ order_item_id:item.rows[0]!.id,accepted_quantity:2 }],
+    }, db.pool);
+    expect(arrival).toMatchObject({
+      payment_status:'paid',total_amount:'200.00',accepted_units:2,
+    });
+
+    const final = await db.pool.query(
+      `SELECT sale.status,sale.payment_status,(sale.paid_at IS NOT NULL) AS paid,
+              sale.settled_total_amount::text,
+              purchase.payment_status AS purchase_payment_status,
+              purchase.total_amount::text AS purchase_total,
+              payable.status AS payable_status,payable.amount::text AS payable_amount
+         FROM commerce.wholesale_orders sale
+         JOIN commerce.partner_purchases purchase
+           ON purchase.source_wholesale_order_id=sale.id
+         JOIN finance.partner_payables payable ON payable.source_purchase_id=purchase.id
+        WHERE sale.environment='test' AND sale.id=$1`,
+      [sale.order_id],
+    );
+    expect(final.rows[0]).toEqual({
+      status:'confirmed',payment_status:'paid',paid:true,settled_total_amount:'200.00',
+      purchase_payment_status:'paid_now',purchase_total:'200.00',
+      payable_status:'paid',payable_amount:'200.00',
+    });
+    const ledger = await db.pool.query(
+      `SELECT source_type,amount::text,(cash_on IS NOT NULL) AS cash
+         FROM finance.matriz_ledger_transactions
+        WHERE environment='test' AND source_id=$1 ORDER BY source_type`,
+      [sale.order_id],
+    );
+    expect(ledger.rows).toEqual([
+      { source_type:'commerce.wholesale_order.arrival_cogs',amount:'160.00',cash:false },
+      { source_type:'commerce.wholesale_order.arrival_revenue',amount:'200.00',cash:true },
+      { source_type:'commerce.wholesale_order.partner_dispatch',amount:'240.00',cash:false },
+    ]);
   }, 60_000);
 });

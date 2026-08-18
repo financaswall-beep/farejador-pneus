@@ -122,6 +122,11 @@ export const REQUIRED_SCHEMA_SQL = `
     )
     AND EXISTS (
       SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='wholesale_orders'
+         AND column_name='partner_payment_terms'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
        WHERE table_schema='commerce' AND table_name='wholesale_order_items'
          AND column_name='accepted_quantity'
     )
@@ -132,12 +137,18 @@ export const REQUIRED_SCHEMA_SQL = `
     )
     AND to_regclass('commerce.matrix_partner_cargo_lots') IS NOT NULL
     AND to_regclass('commerce.matrix_partner_cargo_events') IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM pg_trigger
+       WHERE tgrelid='commerce.wholesale_orders'::regclass
+         AND tgname='matrix_partner_arrival_order_guard'
+         AND NOT tgisinternal
+    )
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0184. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0187. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0184_partner_arrival_item_adjustments');
+    throw new Error('required_schema_missing:0187_partner_arrival_financial_settlement');
   }
 }

@@ -56,7 +56,9 @@ export async function resolveAdditionBuyer(
        FROM commerce.wholesale_orders o
        JOIN commerce.wholesale_customers c
          ON c.environment=o.environment AND c.id=o.buyer_id AND c.deleted_at IS NULL
-      WHERE o.environment=$1 AND o.id=$2 AND o.status='confirmed'
+      WHERE o.environment=$1 AND o.id=$2
+        AND (o.status='confirmed'
+          OR (o.status='pending' AND o.partner_transfer_status='in_transit'))
         AND o.parent_order_id IS NULL
       FOR UPDATE OF o,c`,
     [environment, parentOrderId],

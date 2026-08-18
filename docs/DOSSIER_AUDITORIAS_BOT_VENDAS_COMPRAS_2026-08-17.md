@@ -369,3 +369,60 @@ Ordem segura:
 4. o responsável fazer o deploy do mesmo SHA no Coolify;
 5. executar smoke à meia-noite ou com relógio controlado: venda/compra/despesa/baixa de hoje
    deve passar; pagamento de amanhã deve falhar; vencimento/parcela de amanhã deve passar.
+
+## 10. Adendo — acerto financeiro da carga somente na chegada
+
+### Regra operacional consolidada
+
+Uma carga destinada a parceiro não é uma venda concluída quando sai da Matriz. A opção
+**à vista** informa como o parceiro pagará, mas o caixa só é reconhecido depois do acerto
+físico. Até lá, venda, compra espelhada e pagamento permanecem pendentes.
+
+Na chegada:
+
+- cada linha registra quantos pneus foram aceitos;
+- somente pneus aceitos compõem o valor final da venda, receita, custo e pagamento;
+- pneus recusados continuam como estoque em trânsito, disponíveis para redirecionamento
+  controlado ou retorno físico à Matriz;
+- à vista reconhece caixa no acerto; fiado reconhece conta a receber apenas pelo total aceito;
+- compra e conta a pagar do parceiro seguem exatamente o mesmo total e estado;
+- o histórico financeiro é imutável: lançamentos antigos prematuros são estornados, não apagados.
+
+### Correção da carga aberta anterior
+
+A migration `0187_partner_arrival_financial_settlement.sql` identifica cargas ainda em
+trânsito criadas pelo fluxo anterior. Para essas cargas, ela:
+
+1. estorna receita e custo reconhecidos cedo demais;
+2. reclassifica o custo físico para `inventory_in_transit`;
+3. muda a venda para pendente e limpa a baixa prematura;
+4. deixa compra e conta do parceiro abertas até o acerto;
+5. instala constraints e triggers que impedem regressão por tela, API ou SQL direto.
+
+### Evidência em 18/08/2026
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.212/1.212**, 239 arquivos |
+| Casos direcionados do acerto | **14/14** |
+| TypeScript, build e JavaScript | Aprovados |
+| Paridade dos painéis | 584 propriedades do parceiro e 1.056 da Matriz; aprovadas |
+| Contratos e rotas | 92 contratos e 236 rotas; aprovados |
+| Fiscal de tamanho | Aprovado |
+| Manifesto | 188 migrations; última `0187`; gap histórico 0071 documentado |
+| Migration `0187` no banco real | Dry-run integral aprovado com rollback |
+| PostgreSQL descartável local | Não executado: Docker Desktop sem engine; cenário permanece no CI |
+
+### Decisão deste adendo
+
+**APROVADO EM CÓDIGO E EM DRY-RUN DE BANCO; AGUARDA CI, PUBLICAÇÃO E APLICAÇÃO DA
+MIGRATION ANTES DO PRÓXIMO DEPLOY.**
+
+Ordem segura:
+
+1. CI executar o cenário à vista com recusa parcial e o cenário fiado;
+2. publicar o SHA aprovado;
+3. aplicar `0187_partner_arrival_financial_settlement.sql`;
+4. confirmar que a carga aberta ficou pendente e sem receita/caixa líquidos;
+5. o responsável fazer o deploy do mesmo SHA;
+6. executar o acerto pneu por pneu e o smoke financeiro pós-deploy.

@@ -21,6 +21,7 @@ export interface WholesaleSaleRow {
   partner_unit_name: string | null;
   parent_order_id: string | null;
   partner_transfer_status: 'in_transit' | 'settled' | 'received' | null;
+  partner_payment_terms: 'cash_on_arrival' | 'credit' | null;
   dispatched_total_amount: string | null;
   settled_total_amount: string | null;
   partner_purchase_id: string | null;
@@ -49,7 +50,8 @@ export async function listWholesaleSales(
   const result = await dbPool.query<WholesaleSaleRow>(
     `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
             o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
-            o.settled_total_amount,linked.partner_purchase_id,linked.partner_receipt_status,
+            o.settled_total_amount,o.partner_payment_terms,
+            linked.partner_purchase_id,linked.partner_receipt_status,
             linked.expected_units,linked.received_units,
             c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
             COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
@@ -95,7 +97,8 @@ export async function listWholesaleSalesHistory(
   const result = await dbPool.query<WholesaleSaleRow>(
     `SELECT o.id,o.buyer_id,c.partner_id,o.partner_unit_id,pu.display_name AS partner_unit_name,
             o.parent_order_id,o.partner_transfer_status,o.dispatched_total_amount,
-            o.settled_total_amount,linked.partner_purchase_id,linked.partner_receipt_status,
+            o.settled_total_amount,o.partner_payment_terms,
+            linked.partner_purchase_id,linked.partner_receipt_status,
             linked.expected_units,linked.received_units,
             c.name AS buyer_name,c.phone AS buyer_phone,o.sold_at,
             COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,

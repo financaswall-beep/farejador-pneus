@@ -13,7 +13,7 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
       this.atacadoForm.receiving_unit_id = units.length === 1 ? units[0].partner_unit_id : '';
     },
     atacadoStartAddition(v) {
-      if (!v || v.status !== 'confirmed') return;
+      if (!v || (v.status !== 'confirmed' && v.partner_transfer_status !== 'in_transit')) return;
       const rootId = v.parent_order_id || v.id;
       const root = this.atacadoVendas.find((row) => row.id === rootId) || v;
       this.atacadoForm = {
@@ -195,16 +195,18 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
         body.due_date = f.due_date;
       } else {
         body.payment_status = 'paid';
-        const paidDate = f.payment_date || soldDate;
-        if (paidDate > this.finHoje()) {
-          this.atacadoMsg = { ok: false, text: 'A data do pagamento não pode estar no futuro.' };
-          return;
+        if (!body.partner_unit_id) {
+          const paidDate = f.payment_date || soldDate;
+          if (paidDate > this.finHoje()) {
+            this.atacadoMsg = { ok: false, text: 'A data do pagamento não pode estar no futuro.' };
+            return;
+          }
+          body.paid_at = this.atacadoBusinessInstant(
+            paidDate,
+            this.finHoje(),
+            paidDate === soldDate ? body.sold_at : requestNow,
+          );
         }
-        body.paid_at = this.atacadoBusinessInstant(
-          paidDate,
-          this.finHoje(),
-          paidDate === soldDate ? body.sold_at : requestNow,
-        );
       }
       const integrityScope = f.parent_order_id ? `addition:${f.parent_order_id}` : 'form';
       f.idempotency_key = f.idempotency_key
@@ -214,7 +216,9 @@ window.PAINEL_MODULES.atacadoTransfer = function () {
       this.atacadoMsg = null;
       try {
         const result = await this.apiPost('/admin/api/wholesale/sales', body);
-        const fiadoTxt = body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '';
+        const fiadoTxt = result.partner_unit_id
+          ? ' (PENDENTE — será confirmado no acerto da chegada)'
+          : (body.payment_status === 'pending' ? ' (FIADO — foi pro a receber)' : '');
         const additionText = result.parent_order_id ? 'Acréscimo registrado' : 'Venda registrada';
         const receiptText = result.linked_partner_purchase_id
           ? ' A entrada já apareceu para o parceiro confirmar o recebimento.' : '';

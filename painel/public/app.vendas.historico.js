@@ -89,7 +89,7 @@ window.PAINEL_MODULES.vendasHistorico = function () {
     vendasHistoricoResumo() {
       const rows = this.vendasHistoricoFiltrado();
       const canceladas = rows.filter((row) => this.vendasHistoricoStatusId(row) === 'cancelada');
-      const efetivadas = rows.filter((row) => this.vendasHistoricoStatusId(row) !== 'cancelada');
+      const efetivadas = rows.filter((row) => this.vendasHistoricoStatusId(row) === 'confirmada');
       const total = efetivadas.reduce((sum, row) => sum + Number(row.totalAmount || 0), 0);
       return {
         registros: rows.length,

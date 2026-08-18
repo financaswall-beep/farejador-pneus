@@ -126,6 +126,14 @@ documento pendente de compra e recebimento da unidade parceira.
 mantém pneus recusados como carga em trânsito, redireciona-os sem nova baixa e só os
 devolve ao saldo da Matriz quando o retorno físico ao galpão é registrado.
 
+`0185_partner_purchase_business_date.sql` e `0186_system_business_fact_dates.sql`
+padronizam fatos operacionais no dia comercial de São Paulo sem bloquear vencimentos
+e parcelas futuras.
+
+`0187_partner_arrival_financial_settlement.sql` separa expedição de venda: a carga ao
+parceiro permanece pendente e apenas os pneus aceitos na chegada viram receita, custo,
+caixa ou conta a receber. `À vista` passa a significar pagamento no acerto da chegada.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`

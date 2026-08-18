@@ -1,7 +1,7 @@
 {
   "geradoEm": "2026-08-16T18:22:00.000Z",
   "commitBase": "auditoria-encerramento",
-  "total": 582,
+  "total": 584,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -22,6 +22,8 @@
     "audioUnlocked": "value:boolean",
     "authed": "value:boolean",
     "avgTicket": "getter",
+    "businessFactInstant": "function",
+    "businessTodaySaoPaulo": "function",
     "canSee": "function",
     "cancelOpenId": "value:null",
     "cancelPayable": "function",
