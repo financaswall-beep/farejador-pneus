@@ -121,7 +121,7 @@ describe('Etapa 5 V2 — RLS enforcement com role farejador_partner_app', () => 
 
     await db.pool.query(
       `INSERT INTO commerce.partner_purchases (environment, unit_id, supplier_name, total_amount)
-       VALUES ('test', $1, 'Fornecedor B', 500)`,
+       VALUES ('test', $1, 'Fornecedor B', 0)`,
       [b.unitId],
     );
 

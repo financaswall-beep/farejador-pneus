@@ -83,7 +83,7 @@ export async function getMatrizCollaboratorManagement(
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
                 o.id AS source_id, 'retail'::text AS sale_channel,
                 (o.created_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
-                1::int AS sales_count, COALESCE(o.settled_total_amount,o.total_amount) AS revenue, items.margin,
+                1::int AS sales_count, o.total_amount AS revenue, items.margin,
                 items.items_without_cost, 0::int AS deliveries_count, 0::int AS trips_count,
                 0::numeric AS distance_km, NULL::boolean AS on_time
            FROM commerce.orders o

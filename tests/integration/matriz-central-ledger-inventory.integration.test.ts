@@ -15,7 +15,7 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
     '../../src/admin/painel/queries-galpao-movimentos.js'
   ).setWholesaleStockComRotulo;
   let removeStock: typeof import(
-    '../../src/admin/painel/queries-galpao-movimentos.js'
+    '../../src/admin/painel/queries-galpao-removal.js'
   ).deleteWholesaleStockComRotulo;
   let applyPhysicalCount: typeof import(
     '../../src/admin/painel/queries-stock-physical-count.js'
@@ -33,8 +33,10 @@ describe('Etapa 3 — ajustes de estoque no livro central', () => {
       addWholesaleStockEntryComRotulo: addEntry,
       applyGalpaoBaixaManual: applyDecrement,
       setWholesaleStockComRotulo: setStock,
-      deleteWholesaleStockComRotulo: removeStock,
     } = await import('../../src/admin/painel/queries-galpao-movimentos.js'));
+    ({ deleteWholesaleStockComRotulo: removeStock } = await import(
+      '../../src/admin/painel/queries-galpao-removal.js'
+    ));
     ({ applyMatrizPhysicalStockCount: applyPhysicalCount } = await import(
       '../../src/admin/painel/queries-stock-physical-count.js'
     ));
