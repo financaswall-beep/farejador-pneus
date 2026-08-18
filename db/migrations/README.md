@@ -134,6 +134,10 @@ e parcelas futuras.
 parceiro permanece pendente e apenas os pneus aceitos na chegada viram receita, custo,
 caixa ou conta a receber. `À vista` passa a significar pagamento no acerto da chegada.
 
+`0188_partner_receipt_confirmation_guard.sql` permite que o parceiro conclua o
+recebimento já acertado pela Matriz, sem abrir permissão para alterar quantidade,
+valor, venda ou pagamento.
+
 ## Convenções
 
 - Toda tabela tem coluna `environment` (prod/test) via domínio `env_t`
