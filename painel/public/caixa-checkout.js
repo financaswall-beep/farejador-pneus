@@ -41,6 +41,8 @@
   };
   const catalogView = Caixa.createCheckoutCatalogView(checkout, ui, changeQuantity);
   const productTitle = catalogView.productTitle, renderCatalog = catalogView.renderCatalog, setCatalogState = catalogView.setCatalogState;
+  const pricing = Caixa.createCheckoutPricing(checkout, ui, productTitle, renderCart);
+  const cartTotals = pricing.cartTotals, reviewRow = pricing.reviewRow, updateReviewSummary = pricing.updateReviewSummary;
 
   async function loadCatalog() {
     if (!Caixa.token()) return;
@@ -83,20 +85,16 @@
       return;
     }
     if (next === 0) checkout.cart.delete(product.product_id);
-    else checkout.cart.set(product.product_id, { product: product, quantity: next });
+    else if (current === 0) checkout.cart.set(product.product_id, {
+      product: product,
+      quantity: next,
+      referencePrice: Number(product.price_amount),
+      negotiatedPrice: Number(product.price_amount),
+    });
+    else checkout.cart.get(product.product_id).quantity = next;
     checkout.idempotencyKey = null;
     renderCatalog(checkout.products);
     renderCart();
-  }
-
-  function cartTotals() {
-    let quantity = 0;
-    let total = 0;
-    checkout.cart.forEach(function (line) {
-      quantity += line.quantity;
-      total += Number(line.product.price_amount || 0) * line.quantity;
-    });
-    return { quantity: quantity, total: Math.round(total * 100) / 100 };
   }
 
   function renderCart() {
@@ -110,7 +108,7 @@
       ? 'Carrinho vazio'
       : totals.quantity + (totals.quantity === 1 ? ' item' : ' itens');
     ui.total.textContent = Caixa.currency.format(totals.total);
-    ui.reviewButton.disabled = totals.quantity === 0 || checkout.busy;
+    ui.reviewButton.disabled = totals.quantity === 0 || !totals.valid || checkout.busy;
   }
 
   function paymentLabel(value) {
@@ -129,20 +127,6 @@
 
   function closeCustomer() {
     elements.customerModal.classList.add('hidden');
-  }
-
-  function reviewRow(line) {
-    const row = document.createElement('div');
-    const copy = document.createElement('span');
-    const name = document.createElement('strong');
-    name.textContent = line.quantity + '× ' + productTitle(line.product);
-    const description = document.createElement('small');
-    description.textContent = line.product.product_name;
-    copy.append(name, description);
-    const amount = document.createElement('b');
-    amount.textContent = Caixa.currency.format(Number(line.product.price_amount || 0) * line.quantity);
-    row.append(copy, amount);
-    return row;
   }
 
   function openReview() {
@@ -170,9 +154,11 @@
     const label = document.createElement('span');
     label.textContent = 'Total da venda';
     const amount = document.createElement('strong');
+    amount.dataset.checkoutReviewTotal = 'true';
     amount.textContent = Caixa.currency.format(cartTotals().total);
     total.append(label, amount);
     ui.reviewContent.append(items, meta, total);
+    updateReviewSummary();
     elements.checkoutReviewModal.classList.remove('hidden');
   }
 
@@ -189,6 +175,8 @@
     if (code === 'caixa_finance_not_ready') return 'Financeiro central indisponível. Nada foi vendido e o estoque não foi alterado.';
     if (code === 'walkin_stock_insufficient') return 'O estoque mudou e não há quantidade suficiente. Revise o carrinho.';
     if (code === 'catalog_price_changed') return 'O preço mudou. Atualizamos o catálogo para você revisar.';
+    if (code === 'partner_sale_price_changed') return 'O preço oficial mudou. Atualizamos os produtos para você revisar.';
+    if (code === 'partner_sale_price_missing') return 'Um item ficou sem preço oficial e não pode ser vendido.';
     if (code === 'catalog_price_missing') return 'Um item ficou sem preço e não pode ser vendido.';
     if (code === 'walkin_cost_missing') return 'O custo deste pneu ainda não foi apurado no estoque.';
     if (code === 'walkin_stock_ambiguous') return 'O estoque deste item precisa ser conferido antes da venda.';
@@ -197,7 +185,7 @@
     return 'Não foi possível concluir. Nenhuma baixa foi feita; tente novamente.';
   }
   async function confirmSale() {
-    if (checkout.busy || checkout.cart.size === 0) return;
+    if (checkout.busy || checkout.cart.size === 0 || !cartTotals().valid) return;
     const saleSession = Caixa.sessionFingerprint();
     if (Caixa.checkoutSessionChanged(saleSession)) {
       Caixa.resetCheckout(); Caixa.showToast('A conta mudou. O carrinho anterior foi limpo.'); return;

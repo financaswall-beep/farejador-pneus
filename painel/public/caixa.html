@@ -8,13 +8,15 @@
   <link rel="stylesheet" href="/operacao/caixa.css?v=20260816-permissions-header1" />
   <script defer src="/operacao/caixa-core.js?v=20260816-paineis-alinhados1"></script>
   <script defer src="/operacao/caixa-modules.js?v=20260816-permissions-header1"></script>
-  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-checkout.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-checkout-session.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-checkout-catalog.js?v=20260820-negociacao1"></script>
+  <script defer src="/operacao/caixa-checkout-pricing.js?v=20260820-negociacao1"></script>
+  <script defer src="/operacao/caixa-checkout.js?v=20260820-negociacao1"></script>
+  <script defer src="/operacao/caixa-checkout-session.js?v=20260820-negociacao1"></script>
   <script defer src="/operacao/caixa-sales-weekly.js?v=20260816-sales-day1"></script>
   <script defer src="/operacao/caixa-sales-view.js?v=20260816-sales-day1"></script>
-  <script defer src="/operacao/caixa-stock-view.js?v=20260813-operacao1"></script>
-  <script defer src="/operacao/caixa-stock-detail.js?v=20260813-operacao1"></script>
+  <script defer src="/operacao/caixa-stock-view.js?v=20260820-preco-oficial1"></script>
+  <script defer src="/operacao/caixa-stock-detail.js?v=20260820-preco-oficial1"></script>
+  <script defer src="/operacao/caixa-stock-price.js?v=20260820-preco-oficial1"></script>
   <script defer src="/operacao/caixa-stock-edit.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock.js?v=20260813-operacao1"></script>
   <script defer src="/operacao/caixa-stock-count.js?v=20260813-operacao1"></script>
@@ -490,6 +492,10 @@
               <button id="stock-detail-edit" type="button" title="Editar dados operacionais do cadastro">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20ZM13.5 7l3.5 3.5"/></svg>
                 <span>Editar cadastro<small>Vai para aprovação</small></span>
+              </button>
+              <button id="stock-detail-price-edit" class="hidden" type="button" title="Alterar o preço oficial de venda">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v18m4-14H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H7"/></svg>
+                <span>Alterar preço<small>Somente proprietário</small></span>
               </button>
             </div>
 
@@ -1062,6 +1068,29 @@
             <label>Código interno<input id="stock-edit-sku" maxlength="80" /></label>
             <p id="stock-edit-error" class="account-modal-error" role="alert"></p>
             <button id="stock-edit-submit" class="account-modal-primary" type="submit">Enviar alterações para aprovação</button>
+          </form>
+        </article>
+      </div>
+
+      <div id="stock-price-modal" class="account-modal hidden" role="dialog" aria-modal="true" aria-labelledby="stock-price-title">
+        <button class="account-modal-backdrop" type="button" data-close-stock-price aria-label="Fechar alteração de preço"></button>
+        <article class="account-modal-sheet stock-modal-sheet stock-price-sheet">
+          <header>
+            <div><p id="stock-price-unit">Preço oficial</p><h2 id="stock-price-title">Alterar preço de venda</h2></div>
+            <button type="button" data-close-stock-price aria-label="Fechar">×</button>
+          </header>
+          <form id="stock-price-form" novalidate>
+            <div class="stock-form-notice">
+              <strong id="stock-price-product">Produto selecionado</strong>
+              <span>Somente o proprietário pode mudar este valor. O novo preço será usado pelo caixa apenas nas próximas vendas; vendas antigas não mudam.</span>
+            </div>
+            <label>Preço atual<div id="stock-price-current" class="stock-price-current">Não definido</div></label>
+            <label>Novo preço de venda
+              <span class="stock-price-input"><b>R$</b><input id="stock-price-value" type="text" inputmode="decimal" maxlength="18" autocomplete="off" placeholder="0,00" required /></span>
+            </label>
+            <label>Motivo da alteração<textarea id="stock-price-reason" maxlength="500" rows="3" placeholder="Ex.: ajuste da tabela comercial" required></textarea></label>
+            <p id="stock-price-error" class="account-modal-error" role="alert"></p>
+            <button id="stock-price-submit" class="account-modal-primary" type="submit">Salvar novo preço oficial</button>
           </form>
         </article>
       </div>

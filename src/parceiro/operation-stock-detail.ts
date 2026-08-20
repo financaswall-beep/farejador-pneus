@@ -4,6 +4,7 @@ import type { PartnerContext } from './auth.js';
 const HISTORY_EVENTS = [
   'partner_item_registration_approved',
   'partner_stock_update_approved',
+  'partner_stock_sale_price_changed',
   'partner_stock_count_approved',
   'stock_decrement_purchase_cancel',
   'stock_decrement_sale',
@@ -24,7 +25,7 @@ type AuditEvent = {
 export type OperationStockMovement = {
   id: string;
   kind: 'purchase' | 'purchase_cancel' | 'sale' | 'sale_cancel' | 'count'
-    | 'registration' | 'update' | 'reservation' | 'reservation_release';
+    | 'registration' | 'update' | 'price' | 'reservation' | 'reservation_release';
   reference_id: string | null;
   quantity_delta: number | null;
   actor_label: string | null;
@@ -82,6 +83,7 @@ export function normalizeOperationStockMovement(
     }
     case 'partner_item_registration_approved': kind = 'registration'; delta = number(payload.quantity_on_hand); break;
     case 'partner_stock_update_approved': kind = 'update'; delta = null; break;
+    case 'partner_stock_sale_price_changed': kind = 'price'; delta = null; break;
     case 'stock_item_created': kind = 'registration'; delta = number(payload.quantity_on_hand); break;
     case 'stock_item_updated': kind = 'update'; delta = null; break;
     case 'stock_reserved': kind = 'reservation'; delta = reservedDelta == null ? null : -reservedDelta; break;

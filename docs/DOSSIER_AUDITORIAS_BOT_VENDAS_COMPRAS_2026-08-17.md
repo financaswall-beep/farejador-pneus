@@ -1,6 +1,6 @@
 # Dossiê de autorização — Bot, Vendas, Compras e Estoque
 
-**Data da revisão:** 18/08/2026
+**Data da revisão:** 20/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
@@ -426,3 +426,82 @@ Ordem segura:
 4. confirmar que a carga aberta ficou pendente e sem receita/caixa líquidos;
 5. o responsável fazer o deploy do mesmo SHA;
 6. executar o acerto pneu por pneu e o smoke financeiro pós-deploy.
+
+## 11. Adendo — preço oficial do dono e preço negociado no caixa
+
+### Regra consolidada
+
+O sistema passou a separar duas verdades que antes ocupavam o mesmo campo lógico:
+
+- **preço oficial:** tabela comercial usada como referência nas próximas vendas; somente o
+  proprietário pode alterá-la;
+- **preço negociado:** valor efetivamente combinado pelo vendedor com o cliente para uma
+  linha daquela venda; pode ser menor ou maior que o oficial e não muda o Catálogo.
+
+O funcionário com acesso a Vendas pode negociar no fechamento. A permissão de alterar o
+preço oficial é conferida novamente no servidor; esconder o botão na tela não é a proteção.
+
+### Relações revalidadas nas auditorias existentes
+
+| Auditoria | Efeito comprovado |
+|---|---|
+| Bot da Matriz | Continua lendo `commerce.matriz_current_prices`, a mesma fonte alterada pelo dono da Matriz; negociação de uma venda não muda resposta futura do Bot |
+| Compras | Quantidade, custo de aquisição, custo médio e contas a pagar não usam o preço negociado da venda; nenhuma fórmula de Compras foi alterada |
+| Estoque da Matriz | Alterar preço oficial não altera saldo, reserva, custo médio nem filme de movimentos |
+| Estoque do parceiro | Alteração grava somente `sale_price`, exige dono, unidade e item válidos e produz `partner_stock_sale_price_changed`; saldo e custo ficam intactos |
+| Vendas | Cada item congela `reference_unit_price` e grava em `unit_price` o valor realmente cobrado; preço zero, negativo, com milésimos ou referência antiga é recusado |
+| Financeiro e comissão | Receita, caixa/recebível, total do pedido, resultado e comissão continuam derivados do valor efetivamente vendido, não do preço oficial |
+| Histórico | Comprovante mostra oficial e negociado quando diferem; vendas antigas não são reprecificadas |
+| Concorrência | O fechamento trava os preços oficiais envolvidos e serializa alteração de tabela e venda, evitando mistura de versões |
+
+No parceiro, o Bot comercial central permanece deliberadamente separado do `sale_price`
+local da loja, conforme decisão arquitetural anterior. A alteração local muda o caixa da
+unidade, não a tabela central da rede.
+
+### Banco e compatibilidade
+
+A migration `0189_checkout_price_negotiation.sql` adiciona
+`reference_unit_price NUMERIC(10,2) NOT NULL` a `commerce.order_items` e
+`commerce.partner_order_items`. Linhas históricas recebem o próprio `unit_price` como
+referência, pois não existe prova confiável do preço oficial vigente no passado. Triggers
+mantêm compatibilidade com Bot, Compras e rotinas SQL antigas que ainda inserem itens sem a
+nova coluna.
+
+O readiness exige as duas colunas. Portanto, a migration deve ser aplicada **antes** do
+deploy; se o schema estiver antigo, a versão nova não se declara pronta.
+
+### Evidência em 20/08/2026
+
+| Bateria | Resultado |
+|---|---|
+| TypeScript | Aprovado |
+| Unitários completos | **1.221/1.221**, 241 arquivos |
+| Integração completa | **237/237**, 46 arquivos; 232 passaram na execução longa e o arquivo interrompido pelo worker foi coberto na repetição dos seis candidatos, 30/30 |
+| Provas direcionadas Matriz + parceiro | **40/40** em PostgreSQL 17 descartável |
+| Migration `0189` no banco de teste | Dry-run integral aprovado com rollback |
+| Manifesto | 190 migrations; última `0189`; gap histórico 0071 documentado |
+| Fiscal de tamanho | Aprovado |
+
+Casos matemáticos explícitos:
+
+- Matriz: preço oficial R$ 120,00, preço negociado R$ 110,00, duas unidades = venda e
+  receita de **R$ 220,00**, custo de **R$ 80,00** e referência histórica preservada em
+  R$ 120,00;
+- parceiro: preço oficial R$ 150,00, preço negociado R$ 135,00, três unidades = pedido de
+  **R$ 405,00**, saldo 10 → 7 e referência histórica preservada em R$ 150,00;
+- testes unitários cobrem também preço acima do oficial, preço oficial alterado durante o
+  fechamento, centavos, zero, milésimos, item de outra unidade e idempotência.
+
+### Decisão deste adendo
+
+**APROVADO EM CÓDIGO, SEGURANÇA, INTEGRAÇÃO E MATEMÁTICA. AINDA NÃO IMPLANTADO.**
+
+Ordem segura:
+
+1. publicar o SHA aprovado;
+2. fazer backup;
+3. aplicar `0189_checkout_price_negotiation.sql`;
+4. o responsável fazer o deploy do mesmo SHA no Coolify;
+5. smoke autenticado: dono altera preço oficial; funcionário recebe 403 nessa mesma API;
+6. vendedor fecha uma venda com desconto e outra com acréscimo; conferir comprovante,
+   estoque, Financeiro, comissão e Bot da Matriz.

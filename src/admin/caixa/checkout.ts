@@ -31,7 +31,12 @@ export interface CreateCaixaSaleInput {
   customer_phone?: string | null;
   payment_method: CaixaPaymentMethod;
   idempotency_key: string;
-  items: Array<{ product_id: string; quantity: number }>;
+  items: Array<{
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    reference_unit_price?: number;
+  }>;
 }
 
 interface CatalogRow {
@@ -140,8 +145,8 @@ export async function getCaixaCatalog(
 }
 
 /**
- * Porta de escrita do PDV. O navegador envia somente produto e quantidade;
- * preço, vendedor, unidade, origem e rótulo financeiro são resolvidos aqui.
+ * Porta de escrita do PDV. O navegador envia o preço negociado, mas o servidor
+ * resolve e trava o preço oficial, vendedor, unidade, origem e rótulo financeiro.
  */
 export async function createCaixaSale(
   environment: 'prod' | 'test',
@@ -154,11 +159,16 @@ export async function createCaixaSale(
     throw new Error('caixa_finance_not_ready');
   }
 
-  const quantities = new Map<string, number>();
+  const requested = new Map<string, { quantity: number; unitPrice: number; referencePrice?: number }>();
   for (const item of input.items) {
-    quantities.set(item.product_id, (quantities.get(item.product_id) ?? 0) + item.quantity);
+    if (requested.has(item.product_id)) throw new Error('walkin_item_duplicate');
+    requested.set(item.product_id, {
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      referencePrice: item.reference_unit_price,
+    });
   }
-  const productIds = [...quantities.keys()];
+  const productIds = [...requested.keys()];
   const products = await dbPool.query<{ id: string; product_type: string }>(
     `SELECT id,product_type
        FROM commerce.products
@@ -174,10 +184,16 @@ export async function createCaixaSale(
   const items = productIds.map((productId) => {
     const price = prices.get(productId);
     if (!price) throw new Error('catalog_price_missing');
+    const line = requested.get(productId)!;
+    if (line.referencePrice !== undefined
+      && Math.round(line.referencePrice * 100) !== Math.round(price.price_amount * 100)) {
+      throw new Error('catalog_price_changed');
+    }
     return {
       product_id: productId,
-      quantity: quantities.get(productId)!,
-      unit_price: price.price_amount,
+      quantity: line.quantity,
+      unit_price: line.unitPrice,
+      reference_unit_price: price.price_amount,
       discount_amount: 0,
     };
   });

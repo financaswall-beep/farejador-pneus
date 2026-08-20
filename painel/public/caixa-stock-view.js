@@ -42,6 +42,24 @@
     return badge;
   }
 
+  function matrixPrice(row) {
+    if (Caixa.isPartner()) return null;
+    const box = document.createElement('div');
+    box.className = 'stock-card-price';
+    box.appendChild(text('small', 'Preço oficial'));
+    box.appendChild(text('b', row.sale_price == null ? 'Não definido' : Caixa.currency.format(Number(row.sale_price))));
+    if (Caixa.stored(Caixa.keys.role) === 'owner' && row.product_id) {
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.textContent = 'Alterar'; edit.dataset.stockPrice = row.stock_id;
+      edit.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (Caixa.openStockPrice) Caixa.openStockPrice(row);
+      });
+      box.appendChild(edit);
+    }
+    return box;
+  }
+
   function countButton(row) {
     if (!Caixa.isPartner() || !row.is_tracked || row.item_type === 'servico') return null;
     const count = document.createElement('button');
@@ -71,6 +89,8 @@
     actions.className = 'stock-card-side';
     actions.appendChild(text('strong', row.brand || 'Sem marca', 'stock-card-brand'));
     actions.appendChild(stockBadge(row));
+    const price = matrixPrice(row);
+    if (price) actions.appendChild(price);
     const count = countButton(row);
     if (count) actions.appendChild(count);
 
@@ -160,7 +180,7 @@
   }
 
   byId('stock-list').addEventListener('click', function (event) {
-    if (event.target.closest('[data-stock-count]')) return;
+    if (event.target.closest('[data-stock-count],[data-stock-price]')) return;
     const card = event.target.closest('[data-stock-detail]');
     if (card) Caixa.openStockDetail(card.dataset.stockDetail || '', card);
   });

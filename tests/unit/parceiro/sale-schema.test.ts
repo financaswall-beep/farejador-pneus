@@ -12,10 +12,13 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 // Re-implementacao minima do refine, identica ao route.ts
+const centMoneySchema = z.number().finite().nonnegative()
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7);
 const orderItemSchema = z.object({
   partner_stock_id: z.string().uuid(),
   quantity: z.number().int().positive(),
-  unit_price: z.number().nonnegative(),
+  unit_price: centMoneySchema.refine((value) => value > 0),
+  reference_unit_price: centMoneySchema.refine((value) => value > 0).optional(),
 });
 
 const saleSchema = z.object({
@@ -36,6 +39,7 @@ const validItem = {
   partner_stock_id: '00000000-0000-0000-0000-000000000001',
   quantity: 1,
   unit_price: 100,
+  reference_unit_price: 120,
 };
 
 describe('saleSchema — refine delivery_address (S6)', () => {
@@ -95,5 +99,13 @@ describe('saleSchema — refine delivery_address (S6)', () => {
       idempotency_key: 'abcdefgh12',
     });
     expect(r.success).toBe(false);
+  });
+
+  it('aceita preço negociado abaixo ou acima do oficial e recusa zero/milésimos', () => {
+    for (const unitPrice of [90, 130]) {
+      expect(orderItemSchema.safeParse({ ...validItem, unit_price: unitPrice }).success).toBe(true);
+    }
+    expect(orderItemSchema.safeParse({ ...validItem, unit_price: 0 }).success).toBe(false);
+    expect(orderItemSchema.safeParse({ ...validItem, unit_price: 99.999 }).success).toBe(false);
   });
 });

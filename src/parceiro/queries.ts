@@ -41,6 +41,7 @@ import {
   type TireCondition,
 } from '../shared/tire-condition.js';
 import { moneyCents } from '../shared/catalog-pricing.js';
+import { lockAndValidatePartnerSalePrices } from './partner-sale-pricing.js';
 import { reversePurchaseStockCost } from './partner-stock-cost.js';
 import { partnerPurchaseTotalCents } from './purchase-schema.js';
 export type { PartnerCommissionConfig } from './commission.js';
@@ -58,6 +59,7 @@ export interface PartnerOrderItemInput {
   partner_stock_id: string;
   quantity: number;
   unit_price: number;
+  reference_unit_price?: number;
   discount_amount?: number;
 }
 
@@ -926,6 +928,8 @@ export async function registerPartnerSale(
   }
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     try {
+      await lockAndValidatePartnerSalePrices(client, ctx, input.items);
+
       const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
       const normalizedCpf = normalizeCpf(input.customer_cpf);
       let customerId = input.customer_id ?? null;

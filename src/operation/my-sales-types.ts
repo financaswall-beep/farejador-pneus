@@ -41,6 +41,7 @@ export interface OperationSaleDetail extends OperationSaleListItem {
   items: Array<{
     product_name: string;
     quantity: number;
+    reference_unit_price: number;
     unit_price: number;
     discount_amount: number;
     line_total: number;

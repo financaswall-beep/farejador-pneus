@@ -34,6 +34,9 @@ describe('Estoque seguro na Operação da Loja', () => {
   const purchaseQueries = source('src/parceiro/queries.ts');
   const matrixBackend = source('src/admin/caixa/operation-stock.ts');
   const matrixRoute = source('src/admin/caixa/route-operation-stock.ts');
+  const priceUi = source('painel/public/caixa-stock-price.js');
+  const partnerPriceRoute = source('src/parceiro/route-operation-stock-price.ts');
+  const partnerPriceBackend = source('src/parceiro/operation-stock-price.ts');
 
   it('permite que um acesso apenas de estoque permaneça na porta única', () => {
     expect(modules).toContain("if (canModule('vendas')) return 'cash'");
@@ -187,6 +190,21 @@ describe('Estoque seguro na Operação da Loja', () => {
     expect(legacyRoute).toContain("fastify.get('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }");
     expect(legacyRoute).toContain("fastify.post('/parceiro/:slug/api/estoque', { preHandler: ownerOnly }");
     expect(legacyRoute).toContain("fastify.delete('/parceiro/:slug/api/estoque/:stockId', { preHandler: ownerOnly }");
+  });
+
+  it('deixa o preço oficial somente para o dono sem liberar alteração de saldo ou custo', () => {
+    expect(html).toContain('id="stock-price-modal"');
+    expect(html).toContain('Somente o proprietário pode mudar este valor');
+    expect(priceUi).toContain("Caixa.stored(Caixa.keys.role) === 'owner'");
+    expect(priceUi).toContain("operacao/estoque/${encodeURIComponent(state.row.stock_id)}/preco");
+    expect(matrixRoute).toContain("'/api/caixa/operacao/estoque/:stockId/preco'");
+    expect(matrixRoute).toContain('requireOwner');
+    expect(matrixBackend).toContain('setCatalogPrice');
+    expect(matrixBackend).not.toMatch(/UPDATE\s+commerce\.wholesale_stock/);
+    expect(partnerPriceRoute).toContain('preHandler: [requirePartnerAuth, requireOwner]');
+    expect(partnerPriceBackend).toContain("'partner_stock_sale_price_changed'");
+    expect(partnerPriceBackend).not.toMatch(/quantity_on_hand\s*=/);
+    expect(partnerPriceBackend).not.toMatch(/average_cost\s*=/);
   });
 
   it('recebe compra com quantidades, sem revelar valores ao funcionário', () => {

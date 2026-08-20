@@ -48,6 +48,7 @@
       count: [{ d: 'M8 4h8M9 2h6v4H9zM5 4h14v17H5zM8 12l2 2 5-5' }],
       registration: [{ d: 'm4 7 8-4 8 4-8 4-8-4ZM4 7v10l8 4 8-4V7M18 14v6m-3-3h6' }],
       update: [{ d: 'm4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z' }],
+      price: [{ d: 'M12 3v18m4-14H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H7' }],
       reservation: [{ d: 'M6 4h12v16H6zM9 9h6m-6 4h6' }],
       reservation_release: [{ d: 'M6 4h12v16H6zM9 12h6' }],
     };
@@ -70,6 +71,7 @@
       sale_cancel: `Cancelamento da venda${suffix}`,
       count: row.quantity_delta === 0 ? 'Contagem conferida' : 'Ajuste de contagem aprovado',
       registration: 'Cadastro aprovado', update: 'Cadastro atualizado',
+      price: 'Preço oficial atualizado',
       reservation: `Reserva da venda${suffix}`, reservation_release: `Reserva liberada${suffix}`,
     }[row.kind] || 'Movimentação de estoque';
   }
@@ -93,7 +95,11 @@
   }
 
   function movementQuantity(row) {
-    if (row.quantity_delta == null) return row.kind === 'update' ? 'Dados alterados' : 'Cadastro';
+    if (row.quantity_delta == null) {
+      if (row.kind === 'update') return 'Dados alterados';
+      if (row.kind === 'price') return 'Preço registrado';
+      return 'Cadastro';
+    }
     const amount = Number(row.quantity_delta);
     if (amount === 0) return 'Sem diferença';
     const absolute = Math.abs(amount);
@@ -142,6 +148,7 @@
     byId('stock-detail-available').textContent = quantity(row.quantity_available);
     byId('stock-detail-minimum').textContent = row.minimum_quantity == null ? 'Estoque mínimo não informado' : `Estoque mínimo: ${row.minimum_quantity}`;
     byId('stock-detail-price').textContent = row.sale_price == null ? 'Não definido' : Caixa.currency.format(Number(row.sale_price));
+    byId('stock-detail-price-edit').classList.toggle('hidden', Caixa.stored(Caixa.keys.role) !== 'owner');
     byId('stock-detail-count').classList.toggle('hidden', service || !row.is_tracked);
     const edit = byId('stock-detail-edit');
     edit.disabled = Boolean(row.update_pending);
@@ -208,6 +215,9 @@
   });
   byId('stock-detail-edit').addEventListener('click', function () {
     if (state.stock && Caixa.openStockEdit) Caixa.openStockEdit(state.stock);
+  });
+  byId('stock-detail-price-edit').addEventListener('click', function () {
+    if (state.stock && Caixa.openStockPrice) Caixa.openStockPrice(state.stock);
   });
   byId('stock-detail-history-expand').addEventListener('click', function () { state.expanded = !state.expanded; renderHistory(); });
   byId('stock-detail-history-more').addEventListener('click', function () { void load(state.page + 1); });
