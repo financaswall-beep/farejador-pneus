@@ -238,3 +238,26 @@ Após a sequência da seção 8, o responsável pode registrar:
 
 - [ ] **AUTORIZO** Estoque em produção.
 - [ ] **NÃO AUTORIZO**; registrar o bloqueador observado no smoke ou na reconciliação.
+
+## 10. Adendo de 20/08/2026 — preço sem alterar saldo ou custo
+
+O app Operação agora permite que o proprietário altere o preço oficial. A mudança foi
+tratada como dado comercial, não como movimento físico:
+
+- Matriz: atualiza o histórico do Catálogo e não executa `UPDATE` em
+  `commerce.wholesale_stock`;
+- parceiro: atualiza somente `commerce.partner_stock_levels.sale_price`, com trava por
+  ambiente/unidade, perfil de dono e evento de auditoria;
+- funcionário pode informar um preço negociado no frente de caixa, mas não consegue mudar
+  o preço oficial pela API;
+- quantidade, reserva, custo médio, custo histórico, Compras e filme de estoque não mudam;
+- a venda guarda separadamente preço oficial e preço cobrado, permitindo conferir a
+  diferença sem reprecificar o passado.
+
+As provas em PostgreSQL 17 confirmaram Matriz e parceiro, desconto e acréscimo, baixa da
+quantidade exata, receita pelo preço negociado e custo pelo snapshot. A regressão consolidada
+do dossiê fechou 1.221 unitários e 237 integrações. A migration `0189` passou em dry-run com
+rollback e deve ser aplicada antes do código, pois o readiness novo recusa schema antigo.
+
+**Veredito deste adendo:** **APROVADO EM CÓDIGO E MATEMÁTICA; AGUARDA MIGRATION, DEPLOY E
+SMOKE AUTENTICADO.**

@@ -80,7 +80,10 @@ describe('checkout integrado do Frente de Caixa', () => {
       customer_phone: null,
       payment_method: 'pix',
       idempotency_key: 'caixa-12345678',
-      items: [{ product_id: productId, quantity: 2 }],
+      items: [{
+        product_id: productId, quantity: 2,
+        unit_price: 119.9, reference_unit_price: 129.9,
+      }],
     }, pool);
 
     expect(result).toEqual({ order_id: 'order-1' });
@@ -91,7 +94,35 @@ describe('checkout integrado do Frente de Caixa', () => {
       payment_method: 'pix',
       fulfillment_mode: 'pickup',
       source_tag: 'walkin_balcao',
-      items: [{ product_id: productId, quantity: 2, unit_price: 129.9, discount_amount: 0 }],
+      items: [{
+        product_id: productId, quantity: 2,
+        unit_price: 119.9, reference_unit_price: 129.9, discount_amount: 0,
+      }],
     }), pool);
+  });
+
+  it('recusa referência antiga, mas permite desconto ou acréscimo no preço da venda', async () => {
+    const productId = '44444444-4444-4444-8444-444444444444';
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM commerce.products') && !sql.includes('matriz_current_prices')) {
+        return { rows: [{ id: productId, product_type: 'service' }] };
+      }
+      if (sql.includes('FROM commerce.matriz_current_prices')) return { rows: [{
+        product_id: productId, price_amount: '100.00', price_type: 'matriz', currency: 'BRL',
+      }] };
+      throw new Error(`consulta inesperada: ${sql}`);
+    });
+    const input = {
+      customer_name: null, customer_phone: null, payment_method: 'pix' as const,
+      idempotency_key: 'caixa-price-stale',
+      items: [{ product_id: productId, quantity: 1, unit_price: 115, reference_unit_price: 99 }],
+    };
+
+    await expect(createCaixaSale('test', {
+      personId: 'person-1', collaboratorId: 'seller-1', displayName: 'Ana', username: 'ana',
+    }, input, { query } as unknown as Pool)).rejects.toThrow('catalog_price_changed');
+    expect(mocks.registerWalkinOrder).not.toHaveBeenCalledWith(
+      expect.objectContaining({ idempotency_key: 'caixa-price-stale' }), expect.anything(),
+    );
   });
 });

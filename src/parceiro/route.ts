@@ -188,8 +188,9 @@ const receivableInstallmentParamsSchema = paramsSchema.extend({
 const orderItemSchema = z.object({
   partner_stock_id: z.string().uuid(),
   quantity: z.number().int().positive(),
-  unit_price: z.number().nonnegative(),
-  discount_amount: z.number().nonnegative().optional(),
+  unit_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive'),
+  reference_unit_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive').optional(),
+  discount_amount: centMoneySchema.optional(),
 });
 
 const saleSchema = z.object({
@@ -1270,6 +1271,11 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
           error: err.code,
           message: 'Venda parcelada nao e suportada.',
         });
+      }
+      if (err instanceof Error && [
+        'partner_sale_price_missing', 'partner_sale_price_changed',
+      ].includes(err.message)) {
+        return reply.status(409).send({ error: err.message });
       }
       // BUG #2: erros de regra de negocio (estoque insuficiente, item inativado) viram
       // 422 com mensagem clara em vez de 500 internal_server_error.

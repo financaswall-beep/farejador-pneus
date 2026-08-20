@@ -181,7 +181,12 @@
       payment_method: checkout.payment,
       idempotency_key: checkout.idempotencyKey,
       items: lines.map(function (line) {
-        return { product_id: line.product.product_id, quantity: line.quantity };
+        return {
+          product_id: line.product.product_id,
+          quantity: line.quantity,
+          unit_price: Number(line.negotiatedPrice),
+          reference_unit_price: Number(line.referencePrice),
+        };
       }),
     };
     const payment = { pix: 'Pix', cartao: 'Cartão', dinheiro: 'Dinheiro' }[checkout.payment] || 'Pix';
@@ -190,7 +195,8 @@
       customer_phone: checkout.customerPhone || null,
       items: lines.map(function (line) {
         return { partner_stock_id: line.product.partner_stock_id, quantity: line.quantity,
-          unit_price: Number(line.product.price_amount || 0) };
+          unit_price: Number(line.negotiatedPrice),
+          reference_unit_price: Number(line.referencePrice) };
       }),
       payment_method: payment,
       payment_status: 'received',

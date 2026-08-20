@@ -143,12 +143,22 @@ export const REQUIRED_SCHEMA_SQL = `
          AND tgname='matrix_partner_arrival_order_guard'
          AND NOT tgisinternal
     )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='order_items'
+         AND column_name='reference_unit_price' AND is_nullable='NO'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='partner_order_items'
+         AND column_name='reference_unit_price' AND is_nullable='NO'
+    )
     AS ready`;
 
-/** Impede o processo novo de operar sobre um banco anterior à migration 0187. */
+/** Impede o processo novo de operar sobre um banco anterior à migration 0189. */
 export async function assertRequiredSchema(db: Queryable): Promise<void> {
   const result = await db.query<{ ready: boolean }>(REQUIRED_SCHEMA_SQL);
   if (result.rows[0]?.ready !== true) {
-    throw new Error('required_schema_missing:0187_partner_arrival_financial_settlement');
+    throw new Error('required_schema_missing:0189_checkout_price_negotiation');
   }
 }

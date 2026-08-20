@@ -229,7 +229,10 @@ describe('venda walk-in atomica da Matriz', () => {
     }, {
       customer_name: 'Cliente Caixa', customer_phone: null,
       payment_method: 'pix', idempotency_key: idempotencyKey,
-      items: [{ product_id: fixture.productId, quantity: 2 }],
+      items: [{
+        product_id: fixture.productId, quantity: 2,
+        unit_price: 110, reference_unit_price: 120,
+      }],
     }, db.pool);
 
     const state = await db.pool.query<{
@@ -250,8 +253,19 @@ describe('venda walk-in atomica da Matriz', () => {
       [sale.order_id, fixture.measure],
     );
     expect(state.rows[0]).toEqual({
-      status: 'confirmed', payment_method: 'pix', total_amount: '240.00',
+      status: 'confirmed', payment_method: 'pix', total_amount: '220.00',
       quantity_on_hand: 1, revenue_rows: 1, cogs_rows: 1,
+    });
+
+    const itemPrice = await db.pool.query<{
+      unit_price: string; reference_unit_price: string;
+    }>(
+      `SELECT unit_price::text,reference_unit_price::text
+         FROM commerce.order_items WHERE environment='test' AND order_id=$1`,
+      [sale.order_id],
+    );
+    expect(itemPrice.rows[0]).toEqual({
+      unit_price: '110.00', reference_unit_price: '120.00',
     });
 
     const lines = await db.pool.query<{ account_code: string; side: string; amount: string }>(
@@ -265,8 +279,8 @@ describe('venda walk-in atomica da Matriz', () => {
     expect(lines.rows).toEqual([
       { account_code: 'cost_of_goods_sold', side: 'debit', amount: '80.00' },
       { account_code: 'inventory', side: 'credit', amount: '80.00' },
-      { account_code: 'cash', side: 'debit', amount: '240.00' },
-      { account_code: 'sales_revenue', side: 'credit', amount: '240.00' },
+      { account_code: 'cash', side: 'debit', amount: '220.00' },
+      { account_code: 'sales_revenue', side: 'credit', amount: '220.00' },
     ]);
   });
 

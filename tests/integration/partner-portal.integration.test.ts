@@ -96,7 +96,8 @@ describe('Portal Parceiro — venda baixa estoque', () => {
       items: [{
         partner_stock_id: f.stockId,
         quantity: 3,
-        unit_price: 150,
+        unit_price: 135,
+        reference_unit_price: 150,
       }],
       payment_method: 'pix',
       fulfillment_mode: 'pickup',
@@ -106,6 +107,19 @@ describe('Portal Parceiro — venda baixa estoque', () => {
 
     expect(result.order_id).toBeTruthy();
     expect(await getStockQty(db.pool, f.stockId)).toBe(7);
+    const prices = await db.pool.query<{
+      total_amount: string; unit_price: string; reference_unit_price: string;
+    }>(
+      `SELECT po.total_amount::text,oi.unit_price::text,oi.reference_unit_price::text
+         FROM commerce.partner_orders po
+         JOIN commerce.partner_order_items oi
+           ON oi.order_id=po.id AND oi.environment=po.environment
+        WHERE po.id=$1`,
+      [result.order_id],
+    );
+    expect(prices.rows[0]).toEqual({
+      total_amount: '405.00', unit_price: '135.00', reference_unit_price: '150.00',
+    });
   });
 
   it('emite 2 eventos audit: partner_order_created + stock_decrement_sale (BUG #5 da 0042)', async () => {

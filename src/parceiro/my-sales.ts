@@ -142,7 +142,8 @@ export async function getPartnerMySaleDetail(
             COALESCE((SELECT jsonb_agg(jsonb_build_object(
               'product_name',CASE WHEN oi.brand IS NOT NULL AND oi.tire_size IS NOT NULL
                 THEN btrim(oi.brand||' '||oi.tire_size) ELSE oi.item_name END,
-              'quantity',oi.quantity,'unit_price',oi.unit_price,
+              'quantity',oi.quantity,'reference_unit_price',oi.reference_unit_price,
+              'unit_price',oi.unit_price,
               'discount_amount',oi.discount_amount,
               'line_total',oi.quantity*oi.unit_price-oi.discount_amount,
               'image_url',NULL
@@ -169,6 +170,7 @@ export async function getPartnerMySaleDetail(
     items: (row.items_json ?? []).map((item: any) => ({
       product_name: item.product_name,
       quantity: Number(item.quantity),
+      reference_unit_price: Number(item.reference_unit_price),
       unit_price: Number(item.unit_price),
       discount_amount: Number(item.discount_amount),
       line_total: Number(item.line_total),

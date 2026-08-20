@@ -491,10 +491,18 @@ form { display: grid; gap: 16px; }
 .checkout-review-content { padding: 18px 20px 0; }
 .checkout-review-items { display: grid; gap: 10px; padding-bottom: 15px; border-bottom: 1px dashed #d9dedb; }
 .checkout-review-items > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.checkout-review-items > .checkout-review-line { display: grid; grid-template-columns: minmax(0,1fr) 132px auto; align-items: end; padding: 9px 0; }
 .checkout-review-items span { display: grid; min-width: 0; gap: 3px; }
 .checkout-review-items strong { overflow: hidden; color: #25342d; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .checkout-review-items small { overflow: hidden; color: #7b837f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .checkout-review-items b { flex: 0 0 auto; color: #174d38; font-size: 12px; }
+.checkout-review-items .checkout-reference-price { color: #087246; font-weight: 650; }
+.checkout-negotiated-price { display: grid; gap: 4px; color: #526159; font-size: 9px; font-weight: 650; }
+.checkout-negotiated-price > span { display: flex; overflow: hidden; gap: 0; border: 1px solid #9eb8aa; border-radius: 9px; background: #fff; }
+.checkout-negotiated-price b { display: flex; align-items: center; padding: 0 7px; border-right: 1px solid #dce4df; color: #637169; }
+.checkout-negotiated-price input { width: 82px; min-width: 0; padding: 8px; border: 0; outline: 0; color: #153c2c; background: transparent; font-size: 12px; font-weight: 750; }
+.checkout-negotiated-price input.invalid { color: #b4233d; background: #fff1f3; }
+.checkout-negotiated-total { min-width: 82px; padding-bottom: 9px; color: #174d38; font-size: 12px; text-align: right; }
 .checkout-review-meta { display: grid; gap: 8px; margin: 14px 0; }
 .checkout-review-meta > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .checkout-review-meta dt { color: #7b837f; font-size: 10px; }
@@ -507,6 +515,10 @@ form { display: grid; gap: 16px; }
 .checkout-review-actions button { height: 48px; border: 1px solid #cbd5d0; border-radius: 12px; color: #35483f; background: #fff; font-size: 11px; font-weight: 680; cursor: pointer; }
 .checkout-review-actions button:last-child { border-color: #087246; color: #fff; background: #087246; }
 .checkout-review-actions button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 560px) {
+  .checkout-review-items > .checkout-review-line { grid-template-columns: minmax(0,1fr) 126px; }
+  .checkout-negotiated-total { grid-column: 1 / -1; min-width: 0; padding: 0; text-align: right; }
+}
 
 .sales-loading { display: grid; min-height: 255px; place-content: center; justify-items: center; color: #6a746e; }
 .sales-loading span { display: inline-block; width: 7px; height: 7px; margin: 0 2px; border-radius: 50%; background: #0c8055; animation: sales-pulse 1.1s infinite ease-in-out; }
@@ -620,6 +632,10 @@ form { display: grid; gap: 16px; }
 .stock-card-condition { display: inline-flex; width: fit-content; min-height: 27px; align-items: center; margin-top: 2px; padding: 0 10px; border-radius: 9px; color: #fff; background: #087246; font-size: 10px; font-weight: 760; }
 .stock-card-condition--unknown { color: #5f6964; background: #eef2f0; }
 .stock-card-side { display: grid; min-width: 94px; align-content: start; gap: 8px; }
+.stock-card-price { display: grid; justify-items: end; gap: 2px; color: #174d38; }
+.stock-card-price small { color: #7b837f; font-size: 9px; }
+.stock-card-price b { font-size: 12px; }
+.stock-card-price button { padding: 4px 8px; border: 1px solid #0a7b53; border-radius: 8px; color: #087246; background: #fff; font-size: 9px; font-weight: 750; cursor: pointer; }
 .stock-card-brand { display: flex; min-height: 21px; align-items: center; overflow: hidden; color: #17211d; font-size: 14px; font-weight: 800; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .stock-card-kicker { width: 100%; overflow: hidden; color: #66716b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .stock-card-content--generic > strong { width: 100%; margin-top: 3px; overflow: hidden; color: #17211d; font-size: 15px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
@@ -636,6 +652,13 @@ form { display: grid; gap: 16px; }
 .stock-form-notice { display: grid; gap: 4px; padding: 12px 13px; border: 1px solid #cee7d7; border-radius: 12px; color: #145a3d; background: #f0f9f3; }
 .stock-form-notice strong { font-size: 11px; }
 .stock-form-notice span { color: #62736a; font-size: 9px; line-height: 1.4; }
+.stock-price-current { display: flex; min-height: 48px; align-items: center; padding: 0 13px; border: 1px solid #dce4df; border-radius: 12px; color: #526159; background: #f5f7f6; font-weight: 700; }
+.stock-price-input { display: flex; overflow: hidden; border: 1px solid #0a7b53; border-radius: 12px; background: #fff; }
+.stock-price-input:focus-within { box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
+.stock-price-input b { display: flex; align-items: center; padding: 0 12px; border-right: 1px solid #dce4df; color: #637169; font-size: 12px; }
+.stock-price-input input { min-width: 0; flex: 1; border: 0 !important; box-shadow: none !important; font-size: 18px !important; font-weight: 750; }
+.stock-price-sheet textarea { width: 100%; resize: vertical; padding: 12px 13px; border: 1px solid #cfd8d3; border-radius: 12px; outline: 0; color: #17251f; font: inherit; }
+.stock-price-sheet textarea:focus { border-color: #0a7b53; box-shadow: 0 0 0 4px rgba(16,185,129,.11); }
 .stock-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
 .stock-form-grid--3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .sales-app.is-stock-detail .sales-header { display: none; }

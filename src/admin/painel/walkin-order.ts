@@ -50,7 +50,9 @@ export async function registerWalkinOrder(
     unit_id: input.unit_id ?? null,
     items: input.items.map((item) => ({
       product_id: item.product_id, quantity: item.quantity,
-      unit_price: item.unit_price, discount_amount: item.discount_amount ?? 0,
+      unit_price: item.unit_price,
+      reference_unit_price: item.reference_unit_price ?? item.unit_price,
+      discount_amount: item.discount_amount ?? 0,
     })),
     payment_method: input.payment_method,
     payment_due_on: input.payment_due_on ?? null,
@@ -106,7 +108,10 @@ export async function registerWalkinOrder(
     );
     const unitId = unit.rows[0]?.id;
     if (!unitId) throw new Error('walkin_unit_not_found');
-    await assertCurrentCatalogPrices(client, environment, input.items);
+    await assertCurrentCatalogPrices(client, environment, input.items.map((item) => ({
+      product_id: item.product_id,
+      unit_price: item.reference_unit_price ?? item.unit_price,
+    })));
 
     if (input.seller_collaborator_id) {
       if (!await hasMatrizSellerColumn(client, 'orders')) {
@@ -171,11 +176,12 @@ export async function registerWalkinOrder(
       await client.query(
         `INSERT INTO commerce.order_items (
            environment, order_id, product_id, quantity, unit_price, discount_amount,
-           matriz_unit_cost
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           matriz_unit_cost, reference_unit_price
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           environment, orderId, item.product_id, item.quantity, item.unit_price,
           item.discount_amount ?? 0, snapshotCost,
+          item.reference_unit_price ?? item.unit_price,
         ],
       );
     }

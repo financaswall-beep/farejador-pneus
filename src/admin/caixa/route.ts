@@ -28,6 +28,7 @@ import { registerCaixaCommissionRoutes } from './route-commissions.js';
 import { registerCaixaTeamRoutes } from './route-team.js';
 import { registerCaixaNotificationRoutes } from './route-notifications.js';
 import { registerCaixaOperationStockRoutes } from './route-operation-stock.js';
+import { createCaixaSaleSchema } from './sale-schema.js';
 
 const LOGIN_WINDOW_MS = 5 * 60 * 1000;
 
@@ -40,20 +41,6 @@ const salesQuerySchema = z.object({
 const catalogQuerySchema = z.object({
   search: z.string().trim().max(80).default(''),
   type: z.enum(['all', 'tire', 'service']).default('all'),
-});
-
-const createSaleSchema = z.object({
-  customer_name: z.string().trim().min(1).max(200).nullable().optional(),
-  customer_phone: z.string().trim().min(1).max(40).nullable().optional(),
-  payment_method: z.enum(['pix', 'cartao', 'dinheiro']),
-  idempotency_key: z.string().trim().min(8).max(120),
-  items: z.array(z.object({
-    product_id: z.string().uuid(),
-    quantity: z.number().int().positive().max(50),
-  })).min(1).max(30),
-}).refine((data) => data.items.reduce((sum, item) => sum + item.quantity, 0) <= 100, {
-  message: 'sale_quantity_limit',
-  path: ['items'],
 });
 
 const receiptParamsSchema = z.object({ orderId: z.string().uuid() });
@@ -100,7 +87,8 @@ function checkoutError(error: unknown): { status: number; error: string } {
   }
   if ([
     'walkin_items_required', 'walkin_idempotency_required', 'walkin_item_invalid',
-    'walkin_total_invalid', 'sale_quantity_limit',
+    'walkin_total_invalid', 'walkin_item_duplicate', 'sale_quantity_limit',
+    'sale_unit_price_invalid', 'unit_price_cent_precision',
   ].includes(error.message)) {
     return { status: 400, error: error.message };
   }
@@ -227,7 +215,7 @@ export async function registerCaixaRoute(fastify: FastifyInstance): Promise<void
 
   fastify.post('/api/caixa/vendas', { preHandler: [flagGate, requireCaixaAuth, requireVendas] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
-    const parsed = createSaleSchema.safeParse(request.body ?? {});
+    const parsed = createCaixaSaleSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid_body' });
     }

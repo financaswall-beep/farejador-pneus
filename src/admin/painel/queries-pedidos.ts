@@ -26,6 +26,7 @@ export interface RegisterManualOrderInput {
     product_id: string;
     quantity: number;
     unit_price: number;
+    reference_unit_price?: number;
     discount_amount?: number;
   }>;
   payment_method: string | null;
@@ -47,6 +48,7 @@ export interface RegisterWalkinOrderInput {
     product_id: string;
     quantity: number;
     unit_price: number;
+    reference_unit_price?: number;
     discount_amount?: number;
   }>;
   payment_method: string | null;

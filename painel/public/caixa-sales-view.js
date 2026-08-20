@@ -180,7 +180,11 @@
       const name = document.createElement('b');
       name.textContent = item.quantity + '× ' + item.product_name;
       const unit = document.createElement('small');
-      unit.textContent = Caixa.currency.format(Number(item.unit_price || 0)) + ' cada';
+      const soldPrice = Number(item.unit_price || 0);
+      const referencePrice = Number(item.reference_unit_price || soldPrice);
+      unit.textContent = Math.abs(referencePrice - soldPrice) >= 0.005
+        ? 'Oficial ' + Caixa.currency.format(referencePrice) + ' · negociado ' + Caixa.currency.format(soldPrice) + ' cada'
+        : Caixa.currency.format(soldPrice) + ' cada';
       copy.append(name, unit);
       const value = document.createElement('strong');
       value.textContent = Caixa.currency.format(Number(item.line_total || 0));

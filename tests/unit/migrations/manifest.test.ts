@@ -29,8 +29,8 @@ describe('manifesto de migrations', () => {
     const result = auditMigrationManifest(resolve(process.cwd()));
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.files).toBe(189);
-    expect(result.latest).toBe('0188_partner_receipt_confirmation_guard.sql');
+    expect(result.files).toBe(190);
+    expect(result.latest).toBe('0189_checkout_price_negotiation.sql');
     expect(result.documentedGaps).toEqual(['0071']);
   });
 });

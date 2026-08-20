@@ -43,5 +43,6 @@ describe('Minhas vendas da Matriz', () => {
       'test', 'collaborator-ana', '22222222-2222-4222-8222-222222222222',
     ]);
     expect(String(query.mock.calls[0]?.[0])).toContain('o.seller_collaborator_id=$2');
+    expect(String(query.mock.calls[0]?.[0])).toContain('reference_unit_price');
   });
 });
