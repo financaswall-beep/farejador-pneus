@@ -20,9 +20,10 @@ describe('painel de clientes', () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{ id: 'chatwoot:1', source: 'chatwoot' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'balcao:1', source: 'balcao' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'parceiro:1', source: 'parceiro', is_vip: true }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'parceiro:1', source: 'parceiro', purchases: 3, is_vip: false }] })
       .mockResolvedValueOnce({ rows: [{ id: 'atacado:1', source: 'atacado', kind: 'borracharia' }] })
-      .mockResolvedValueOnce({ rows: [{ partner_id: 'p1', name: 'Parceiro 1' }] });
+      .mockResolvedValueOnce({ rows: [{ partner_id: 'p1', name: 'Parceiro 1' }] })
+      .mockResolvedValueOnce({ rows: [] });
     const pool = { query } as unknown as Pool;
 
     const result = await getClientesPainel('test', pool);
@@ -30,7 +31,7 @@ describe('painel de clientes', () => {
     expect(result.rows.map((row) => row.source)).toEqual(['chatwoot', 'balcao', 'parceiro', 'atacado']);
     expect(result.rows[2]?.is_vip).toBe(true);
     expect(result.partners).toHaveLength(1);
-    expect(query).toHaveBeenCalledTimes(5);
+    expect(query).toHaveBeenCalledTimes(6);
     for (const call of query.mock.calls) expect(call[1]).toEqual(['test']);
 
     const sql = query.mock.calls.map((call) => String(call[0])).join('\n');
@@ -39,6 +40,8 @@ describe('painel de clientes', () => {
     expect(sql).toContain('commerce.partner_customers');
     expect(sql).toContain('commerce.wholesale_buyer_summary');
     expect(sql).toContain('network.partners');
+    expect(sql).toContain('ops.customer_lead_board_state');
+    expect(sql).toContain("NOT po.awaiting_pickup");
     expect(sql).toContain('latest_conversation');
     expect(sql).toContain("THEN 'convertido'");
     expect(sql).toContain("current_status = 'resolved'");

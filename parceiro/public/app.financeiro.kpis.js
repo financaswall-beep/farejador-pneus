@@ -36,6 +36,7 @@ window.PARCEIRO_MODULES.financeiroKpis = () => ({
     isPhysicalExitSale(sale) {
       if (!sale || sale.status === 'cancelled') return false;
       if (sale.fulfillment_mode === 'delivery') return sale.delivery_status === 'delivered';
+      if (sale.fulfillment_mode === 'pickup' && sale.awaiting_pickup) return false;
       return true;
     },
 

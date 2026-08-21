@@ -778,3 +778,24 @@ no run `32489173112` e incorporada à `main` no SHA funcional
 `007f224c10b4923223990b55ed1e8dfcc15bb46b`. A PR documental `#69` pode avançar o HEAD
 sem mudar o runtime; o Coolify deve importar o HEAD atual da `main`, que precisa conter esse
 SHA funcional. O deploy ainda não foi iniciado.
+
+## 16. Auditoria em andamento — Clientes da Matriz e parceiro
+
+Clientes foi cruzado com Chatwoot, Bot, Conversas, Vendas, Estoque, Logística, Financeiro,
+Marketing, Rede e o cadastro/PDV do parceiro. Foram corrigidos o nome genérico `John Doe`, a
+regra divergente de VIP, compras ainda não realizadas entrando no histórico do cliente,
+movimentação do Kanban, arquivamento recuperável, corte silencioso de cards e indicadores de
+atividade inconsistentes.
+
+O critério único de VIP passa a ser três compras realizadas. `Convertido` continua dependente
+de venda verdadeira; nenhuma movimentação manual cria receita, baixa estoque ou melhora
+conversão artificialmente. Arquivar só limpa a fila e mantém todo o histórico. As ações são
+transacionais, idempotentes, versionadas e auditadas pela migration aditiva `0196`.
+
+**Situação:** código, build, unitários dirigidos, segurança estática, paridade e navegador
+local aprovados. Com o Docker restabelecido, as 2 suítes específicas de Clientes passaram
+4/4 cenários e a regressão PostgreSQL completa passou 264/264 testes em 50 arquivos. A
+`0196` foi aplicada no banco-alvo depois de backup validado, dry-run e reconciliação; não
+restou linha inválida, cruzada ou de teste. Clientes está aprovada para publicação; restam
+o deploy manual pelo responsável e o smoke pós-deploy. Relatório:
+`docs/AUDITORIA_CLIENTES_PONTA_A_PONTA_2026-08-21.md`.

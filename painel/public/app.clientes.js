@@ -60,6 +60,7 @@ window.PAINEL_MODULES.clientes = function () {
     },
     setClientesTab(tab) {
       this.clientesTab = tab;
+      if (tab === 'leads') this.clientesMostrarArquivados = false;
       this.limparClientesFiltros();
       this.clientesPeriodo = tab === 'leads' ? '30' : (tab === 'recompra' || tab === 'parceiros' ? 'todos' : '90');
       const first = tab === 'leads'
@@ -117,10 +118,10 @@ window.PAINEL_MODULES.clientes = function () {
     },
     clientesLeadsResumo() {
       const lanes = ['novo', 'atendimento', 'orcamento', 'perdido', 'convertido'];
-      const todos = lanes.flatMap((lane) => this.clientesLeads(lane));
+      const todos = lanes.flatMap((lane) => this.clientesLeads(lane, false));
       const convertidos = todos.filter((c) => this.clienteLeadLane(c) === 'convertido').length;
       const semResposta = todos.filter((c) => c.lead_waiting_on === 'equipe' && (this.clienteDias(c.lead_last_message_at) ?? 0) >= 3).length;
-      return { novos: this.clientesLeads('novo').length, orcamentos: this.clientesLeads('orcamento').length, semResposta, conversao: todos.length ? (convertidos / todos.length) * 100 : 0 };
+      return { novos: this.clientesLeads('novo', false).length, orcamentos: this.clientesLeads('orcamento', false).length, semResposta, conversao: todos.length ? (convertidos / todos.length) * 100 : 0 };
     },
     clientesCompradoresResumo() {
       const rows = this.clientes.filter((c) => Number(c.purchases || 0) > 0);
@@ -185,9 +186,10 @@ window.PAINEL_MODULES.clientes = function () {
       if (stage) return 'atendimento';
       return 'novo';
     },
-    clientesLeads(lane) {
+    clientesLeads(lane, showArchived = this.clientesMostrarArquivados) {
       return this.clientesFiltrados()
         .filter((c) => c.source === 'chatwoot' && c.lead_conversation_id)
+        .filter((c) => Boolean(c.lead_archived) === Boolean(showArchived))
         .filter((c) => this.clienteLeadLane(c) === lane)
         .sort((a, b) => {
           const pa = a.lead_waiting_on === 'equipe' ? 0 : 1;

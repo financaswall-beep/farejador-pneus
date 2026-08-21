@@ -63,6 +63,7 @@
 <script src="/admin/painel/app.bot.js?v=20260802-horarios1"></script>
 <script src="/admin/painel/app.bot.mapa.js?v=20260706-bot1"></script>
 <script src="/admin/painel/app.clientes.js?v=20260718-etapa9"></script>
+<script src="/admin/painel/app.clientes.kanban.js?v=20260821-clientes-auditoria1"></script>
 <script src="/admin/painel/app.clientes.identity.js?v=20260718-etapa9"></script>
 <script src="/admin/painel/app.marketing.js?v=20260726-marketing-detail1"></script>
 <script src="/admin/painel/app.marketing.campaigns.js?v=20260731-marketing-scope1"></script>
@@ -6997,7 +6998,7 @@
         <section x-show="clientesTab==='todos'">
           <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
             <div class="bg-white border border-gray-200 rounded-lg p-4"><p class="text-xs text-gray-500">Clientes ativos</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesResumo().ativos"></p><p class="text-[10px] text-emerald-700 mt-1">atividade nos últimos 90 dias</p></div>
-            <div class="bg-white border border-gray-200 rounded-lg p-4"><p class="text-xs text-gray-500">VIPs</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesResumo().vip"></p><p class="text-[10px] text-gray-400 mt-1">classificação existente no banco</p></div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4"><p class="text-xs text-gray-500">VIPs</p><p class="text-2xl font-semibold mt-1.5 text-amber-700" x-text="clientesResumo().vip"></p><p class="text-[10px] text-gray-400 mt-1">★ automático após 3 compras realizadas</p></div>
             <div class="bg-white border border-gray-200 rounded-lg p-4"><p class="text-xs text-gray-500">Borracharias clientes</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesResumo().borracharias"></p><p class="text-[10px] text-gray-400 mt-1">atacado e classificação comercial</p></div>
             <div class="bg-white border border-gray-200 rounded-lg p-4"><p class="text-xs text-gray-500">Pessoa física</p><p class="text-2xl font-semibold mt-1.5" x-text="clientesResumo().pessoas"></p><p class="text-[10px] text-gray-400 mt-1">somente quando identificada</p></div>
           </div>
@@ -7034,6 +7035,7 @@
             <select x-model="clientesClasse" class="h-9 border rounded-md px-3 text-xs"><option value="todos">Classe: Todas</option><option value="vip">VIP</option><option value="normal">Normal</option></select>
             <select x-model="clientesPeriodo" class="h-9 border rounded-md px-3 text-xs"><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="todos">Todo período</option></select>
             <span class="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'"><span class="w-1.5 h-1.5 rounded-full" :class="clientesLiveStatus==='ao_vivo'?'bg-emerald-500':'bg-amber-500'"></span><span x-text="clientesLiveStatus==='ao_vivo'?'Ao vivo':'Reconectando'"></span></span>
+            <button @click="clienteLeadAlternarArquivados()" class="h-9 px-3 rounded-md border text-xs inline-flex items-center gap-2" :class="clientesMostrarArquivados?'border-amber-400 bg-amber-50 text-amber-800':'border-gray-200 text-gray-600'"><i data-lucide="archive" class="w-3.5 h-3.5"></i><span x-text="clientesMostrarArquivados?'Voltar aos ativos':'Arquivados ('+clientesLeadArquivadosTotal()+')'"></span></button>
             <button @click="loadClientes()" class="h-9 px-4 rounded-md bg-emerald-700 text-white text-xs inline-flex items-center gap-2"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>Atualizar</button>
           </div>
           <div class="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
@@ -7046,12 +7048,13 @@
                   {id:'perdido',label:'Perdidos',tone:'bg-rose-600 text-white',panel:'bg-rose-100 border-rose-300',card:'bg-rose-50 border-rose-300 hover:border-rose-500'},
                   {id:'convertido',label:'Convertidos',tone:'bg-emerald-700 text-white',panel:'bg-emerald-100 border-emerald-300',card:'bg-emerald-50 border-emerald-300 hover:border-emerald-600'}
                 ]" :key="'kanban-'+lane.id">
-                  <div class="border rounded-lg p-2.5 min-h-[470px]" :class="lane.panel">
+                  <div class="border rounded-lg p-2.5 min-h-[470px]" :class="lane.panel" @dragover.prevent @drop.prevent="clienteLeadDrop(lane.id)">
                     <div class="flex items-center justify-between mb-2.5"><p class="text-xs font-semibold" x-text="lane.label"></p><span class="text-[10px] px-2 py-0.5 rounded-full" :class="lane.tone" x-text="clientesLeads(lane.id).length"></span></div>
                     <div class="space-y-2">
-                      <template x-for="c in clientesLeads(lane.id).slice(0,30)" :key="'lead-'+c.id">
-                        <button @click="selecionarCliente(c)" class="w-full border rounded-md p-3 text-left shadow-sm transition-colors" :class="lane.card">
-                          <div class="flex justify-between gap-2"><p class="text-xs font-semibold truncate" x-text="c.name"></p><span x-show="c.is_vip" class="text-[9px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">VIP</span></div>
+                      <template x-for="c in clientesLeadsVisiveis(lane.id)" :key="'lead-'+c.id">
+                        <button @click="selecionarCliente(c)" :draggable="clienteLeadPodeMover(c)" @dragstart="clienteLeadDragStart(c,$event)" @dragend="clienteLeadDragEnd()" class="w-full border rounded-md p-3 text-left shadow-sm transition-colors" :class="[lane.card,clienteLeadArrastandoId===c.id?'opacity-50':'']">
+                          <div class="flex justify-between gap-2"><p class="text-xs font-semibold truncate" x-text="c.name"></p><span x-show="c.is_vip" class="text-[9px] bg-amber-100 text-amber-800 rounded px-1.5 py-0.5">★ VIP</span></div>
+                          <p x-show="c.name_needs_review" class="mt-1 text-[9px] font-medium text-amber-700">Nome pendente no Chatwoot</p>
                           <p class="text-[10px] text-gray-500 mt-0.5" x-text="clienteTipoLabel(c.kind)"></p>
                           <p class="text-[10px] mt-2 truncate" x-show="c.last_item"><span class="text-gray-400">Interesse: </span><span class="font-medium" x-text="c.last_item"></span></p>
                           <p class="text-[10px] mt-1 truncate" x-show="c.lead_location"><span class="text-gray-400">Local: </span><span x-text="c.lead_location"></span></p>
@@ -7061,6 +7064,7 @@
                           <p class="text-[9px] mt-2 font-medium" :class="c.lead_waiting_on==='equipe'?'text-rose-700':(lane.id==='convertido'?'text-emerald-800':'text-gray-500')" x-text="clienteLeadEspera(c)"></p>
                         </button>
                       </template>
+                      <button x-show="clientesLeads(lane.id).length>clientesLeadsVisiveis(lane.id).length" @click="clientesLeadMostrarMais(lane.id)" class="w-full py-2 text-[10px] font-medium text-emerald-800">Mostrar mais</button>
                       <p x-show="!clientesLeads(lane.id).length" class="text-[10px] text-gray-400 text-center py-8">Nenhum lead</p>
                     </div>
                   </div>
@@ -7081,9 +7085,12 @@
                 <div class="flex justify-between" x-show="clienteLeadSelecionado()?.lead_order_amount"><dt class="text-gray-500">Pedido</dt><dd class="font-semibold text-emerald-800" x-text="formatCurrency(clienteLeadSelecionado()?.lead_order_amount)"></dd></div>
               </dl>
               <p class="text-[10px] text-gray-400 mt-4 mb-2">Próxima ação sugerida</p>
+              <label x-show="!clienteLeadSelecionado()?.lead_archived && clienteLeadLane(clienteLeadSelecionado())!=='convertido'" class="block mb-2"><span class="block text-[10px] text-gray-400 mb-1">Mover para</span><select :value="clienteLeadLane(clienteLeadSelecionado())" @change="alterarClienteLeadLane(clienteLeadSelecionado(),$event.target.value)" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 border rounded-md px-3 text-xs"><option value="novo">Novo</option><option value="atendimento">Em atendimento</option><option value="orcamento">Orçamento enviado</option><option value="perdido">Perdido</option></select></label>
               <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado())" class="w-full h-9 bg-emerald-700 text-white rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4 bg-white rounded-full">Continuar conversa</button>
               <button x-show="!['perdido','convertido'].includes(clienteLeadLane(clienteLeadSelecionado()))" @click="abrirWhatsAppCliente(clienteLeadSelecionado(),clienteOfertaMensagem(clienteLeadSelecionado()))" class="w-full h-9 border border-emerald-700 text-emerald-800 rounded-md text-xs mb-2 inline-flex items-center justify-center gap-2"><img src="/assets/brands/whatsapp.svg" alt="" class="w-4 h-4">Enviar oferta</button>
               <button @click="abrirHistoricoCliente(clienteLeadSelecionado())" class="w-full text-xs text-emerald-800 py-2">Ver histórico do lead</button>
+              <button x-show="!clienteLeadSelecionado()?.lead_archived" @click="arquivarClienteLead(clienteLeadSelecionado())" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 mt-2 border border-gray-300 text-gray-600 rounded-md text-xs inline-flex items-center justify-center gap-2"><i data-lucide="archive" class="w-3.5 h-3.5"></i>Arquivar card</button>
+              <button x-show="clienteLeadSelecionado()?.lead_archived" @click="restaurarClienteLead(clienteLeadSelecionado())" :disabled="clienteLeadSalvandoId===clienteLeadSelecionado()?.id" class="w-full h-9 mt-2 bg-amber-600 text-white rounded-md text-xs inline-flex items-center justify-center gap-2"><i data-lucide="archive-restore" class="w-3.5 h-3.5"></i>Restaurar card</button>
             </aside>
           </div>
         </section>
