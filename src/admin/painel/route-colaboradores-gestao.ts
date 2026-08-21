@@ -17,7 +17,10 @@ import {
 } from '../caixa/operation-team-permissions.js';
 
 const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/);
-const money = z.number().finite().min(0).max(10_000_000);
+const money = z.number().finite().min(0).max(10_000_000)
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+    'money_cent_precision');
+const positiveMoney = money.refine((value) => value > 0, 'amount_must_be_positive');
 const benefits = z.array(z.object({
   name: z.string().trim().min(2).max(60), amount: money, active: z.boolean().default(true),
 })).max(12).optional();
@@ -71,10 +74,10 @@ const operationPermissions = z.object({
 const adjustmentSchema = z.object({
   collaborator_id: z.string().uuid(), competence: month,
   kind: z.enum(['addition', 'deduction']), description: z.string().trim().min(2).max(120),
-  amount: money.positive(),
+  amount: positiveMoney,
 });
 const causalAdjustmentReviewSchema = z.object({
-  id: z.string().uuid(), amount: money.positive(),
+  id: z.string().uuid(), amount: positiveMoney,
 });
 
 function managementError(reply: any, err: unknown, label: string) {
@@ -84,6 +87,7 @@ function managementError(reply: any, err: unknown, label: string) {
     'adjustment_not_found_or_period_closed', 'nothing_to_close',
     'payroll_has_unresolved_adjustments', 'payroll_has_unresolved_costs',
     'payroll_has_unassigned_events',
+    'payroll_competence_not_finished',
     'invalid_adjustment_amount', 'invalid_commission_basis',
   ]);
   if (clientErrors.has(message)) return reply.status(400).send({ error: message });

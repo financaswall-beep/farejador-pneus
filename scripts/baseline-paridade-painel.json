@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-21T04:41:07.629Z",
-  "commitBase": "correcoes-logistica-2026-08-21",
-  "total": 585,
+  "geradoEm": "2026-08-21T07:22:16.137Z",
+  "commitBase": "c0d7913",
+  "total": 586,
   "propriedades": {
     "_chatNearBottom": "function",
     "_persistStockQuantity": "function",
@@ -195,6 +195,7 @@
     "formatPhoneDisplay": "function",
     "funcCommForm": "value:object",
     "funcConfigLoaded": "value:boolean",
+    "funcJobRole": "value:string",
     "funcPermCount": "getter",
     "funcPermForm": "value:object",
     "funcPermLocked": "value:boolean",

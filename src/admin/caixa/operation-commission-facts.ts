@@ -100,4 +100,6 @@ export const matrizCommissionFactsSql = `WITH retail AS (
          AND r.starts_on <= (s.occurred_at AT TIME ZONE 'America/Sao_Paulo')::date
        ORDER BY r.starts_on DESC LIMIT 1
     ) rule ON true
+   WHERE finance.matriz_collaborator_employed_on(
+     $1,s.collaborator_id,(s.occurred_at AT TIME ZONE 'America/Sao_Paulo')::date)
 )`;

@@ -18,7 +18,8 @@ const context: PartnerContext = {
 
 const member = {
   id: 'employee-1', name: 'Wallace', username: 'wallace', active: true,
-  role_name: 'Vendedor', base_salary: '2300.00', salary_frequency: 'weekly' as const, payment_day: 5,
+  role_name: 'Vendedor', job_role: 'vendedor' as const,
+  base_salary: '2300.00', salary_frequency: 'weekly' as const, payment_day: 5,
   starts_on: '2026-08-01',
   benefits: [{ name: 'Vale-transporte', amount: 220, active: true }],
   commission_kind: 'percent' as const, commission_value: '5.00',

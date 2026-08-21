@@ -49,7 +49,13 @@ import {
 import { reversePurchaseStockCost } from './partner-stock-cost.js';
 import { partnerPurchaseTotalCents } from './purchase-schema.js';
 import { DeliveryAlreadyFinalizedError } from './delivery-return.js';
+import {
+  assertStrongNewPassword, isUsernameConflict, PartnerUsernameConflictError,
+  type CreatedFuncionario, type PartnerTokenRow,
+} from './partner-staff-account.js';
 export { DeliveryAlreadyFinalizedError, DeliveryReturnNotAwaitingError, confirmPartnerDeliveryReturn } from './delivery-return.js';
+export { PartnerUsernameConflictError } from './partner-staff-account.js';
+export type { CreatedFuncionario, PartnerTokenRow } from './partner-staff-account.js';
 export type { PartnerCommissionConfig } from './commission.js';
 export {
   getPartnerCommissionTeam,
@@ -3216,36 +3222,6 @@ export async function markPartnerChatRead(
 //     trava fora) o próprio login de dono por esta tela.
 // ─────────────────────────────────────────────────────────────────────────
 
-export interface PartnerTokenRow {
-  id: string;
-  label: string | null;
-  username: string | null;
-  role: string;
-  created_at: string;
-  last_used_at: string | null;
-  revoked_at: string | null;
-}
-
-export interface CreatedFuncionario {
-  id: string;
-  label: string | null;
-  username: string;
-  created_at: string;
-}
-
-/** Login (usuário) já em uso nesta unidade — 23505 no índice único de username. */
-export class PartnerUsernameConflictError extends Error {
-  readonly code = 'username_taken';
-  constructor() {
-    super('username_taken');
-  }
-}
-
-function isUsernameConflict(err: unknown): boolean {
-  return (err as { code?: string })?.code === '23505'
-    && String((err as { constraint?: string })?.constraint ?? '').includes('username');
-}
-
 /**
  * Cria um login de funcionário (usuário+senha) pra unidade do dono. O funcionário
  * NUNCA toca em token: recebe usuário+senha do dono e entra pela tela de login.
@@ -3259,7 +3235,9 @@ export async function createPartnerFuncionario(
   password: string,
   initialPermissions?: PartnerPermissions,
   dbPool: Pool = pool,
+  jobRole: 'vendedor' | 'estoque' | 'entregador' | 'colaborador' = 'colaborador',
 ): Promise<CreatedFuncionario> {
+  assertStrongNewPassword(password);
   const fillerToken = randomBytes(32).toString('hex');
   const cleanLabel = label && label.trim() ? label.trim().slice(0, 120) : null;
   const cleanUsername = username.trim();
@@ -3279,14 +3257,17 @@ export async function createPartnerFuncionario(
     const res = await client.query<{ id: string; created_at: string }>(
       `INSERT INTO network.partner_access_tokens
          (environment, partner_unit_id, token_hash, label, created_by, role,
-          login_username, login_password_hash, login_password_set_at, person_id)
+          login_username, login_password_hash, login_password_set_at, person_id,job_role)
        VALUES ($1, $2, network.hash_partner_token($3), $4, $5, 'funcionario',
-               $6, $7, now(), $8)
+               $6, $7, now(), $8,$9)
        RETURNING id, created_at`,
-      [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash, person.rows[0]!.id],
+      [ctx.environment, ctx.partnerUnitId, fillerToken, cleanLabel, `owner:${ctx.slug}`, cleanUsername, passwordHash, person.rows[0]!.id, jobRole],
     );
-    if (initialPermissions) {
-      await client.query(
+    const permissions = initialPermissions ?? {
+      vendas: false, estoque: false, pedidos: false, clientes: false,
+      entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
+    };
+    await client.query(
         `INSERT INTO network.partner_token_permissions
            (token_id, environment, partner_unit_id,
             allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
@@ -3294,13 +3275,12 @@ export async function createPartnerFuncionario(
             allow_financeiro, updated_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [res.rows[0]!.id, ctx.environment, ctx.partnerUnitId,
-         initialPermissions.vendas, initialPermissions.estoque,
-         initialPermissions.pedidos, initialPermissions.clientes,
-         initialPermissions.entregas, initialPermissions.retiradas,
-         initialPermissions.batepapo, initialPermissions.resumo,
-         initialPermissions.financeiro, `owner:${ctx.slug}`],
+         permissions.vendas, permissions.estoque,
+         permissions.pedidos, permissions.clientes,
+         permissions.entregas, permissions.retiradas,
+         permissions.batepapo, permissions.resumo,
+         permissions.financeiro, `owner:${ctx.slug}`],
       );
-    }
     await client.query('COMMIT');
     const row = res.rows[0]!;
     return { id: row.id, label: cleanLabel, username: cleanUsername, created_at: row.created_at };
@@ -3319,6 +3299,7 @@ export async function resetPartnerFuncionarioPassword(
   tokenId: string,
   newPassword: string,
 ): Promise<{ reset: boolean }> {
+  assertStrongNewPassword(newPassword);
   const passwordHash = await hashPassword(newPassword);
   const client = await pool.connect();
   try {
@@ -3362,7 +3343,7 @@ export async function resetPartnerFuncionarioPassword(
 /** Lista os logins de funcionário da unidade do dono (com o usuário; sem hash de senha). */
 export async function listPartnerFuncionarios(ctx: PartnerContext): Promise<PartnerTokenRow[]> {
   const res = await pool.query<PartnerTokenRow>(
-    `SELECT id, label, login_username AS username, role, created_at, last_used_at, revoked_at
+    `SELECT id, label, login_username AS username, role,job_role, created_at, last_used_at, revoked_at
        FROM network.partner_access_tokens
       WHERE environment = $1 AND partner_unit_id = $2 AND role = 'funcionario'
       ORDER BY revoked_at IS NOT NULL, created_at DESC`,
@@ -3376,17 +3357,19 @@ export async function revokePartnerFuncionario(
   ctx: PartnerContext,
   tokenId: string,
 ): Promise<{ revoked: boolean }> {
-  const res = await pool.query(
-    `UPDATE network.partner_access_tokens
-        SET revoked_at = now()
-      WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
-        AND role = 'funcionario' AND revoked_at IS NULL`,
-    [tokenId, ctx.environment, ctx.partnerUnitId],
-  );
-  // Revogar o token já mata as sessões dele (validate_partner_session exige
-  // pat.revoked_at IS NULL), mas marcamos as sessões também por higiene.
-  if ((res.rowCount ?? 0) > 0) {
-    await pool.query(
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const res = await client.query<{ person_id: string | null }>(
+      `UPDATE network.partner_access_tokens
+          SET revoked_at = now()
+        WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
+          AND role = 'funcionario' AND revoked_at IS NULL
+        RETURNING person_id`,
+      [tokenId, ctx.environment, ctx.partnerUnitId],
+    );
+    if ((res.rowCount ?? 0) > 0) {
+      await client.query(
       `UPDATE network.partner_sessions
           SET revoked_at = now()
         WHERE token_id = $1 AND environment = $2 AND revoked_at IS NULL`,
@@ -3394,19 +3377,31 @@ export async function revokePartnerFuncionario(
     );
     // Porta única (0095): se era o ÚLTIMO vínculo ativo da pessoa, revoga a conta
     // também — libera o username (funcionário demitido não prende o nome pra sempre).
-    await pool.query(
+      await client.query(
       `UPDATE network.partner_people pp
           SET revoked_at = now()
-        WHERE pp.id = (SELECT person_id FROM network.partner_access_tokens WHERE id = $1)
+        WHERE pp.id = $1
           AND pp.revoked_at IS NULL
           AND NOT EXISTS (
             SELECT 1 FROM network.partner_access_tokens t
              WHERE t.person_id = pp.id AND t.revoked_at IS NULL
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM network.matriz_collaborators mc
+             WHERE mc.person_id=pp.id AND mc.environment=pp.environment
+               AND mc.revoked_at IS NULL
           )`,
-      [tokenId],
-    );
+        [res.rows[0]?.person_id ?? null],
+      );
+    }
+    await client.query('COMMIT');
+    return { revoked: (res.rowCount ?? 0) > 0 };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
   }
-  return { revoked: (res.rowCount ?? 0) > 0 };
 }
 
 /** Reativa um funcionário revogado, preservando o mesmo vínculo e seu histórico. */
@@ -3477,8 +3472,12 @@ export class FuncionarioNotFoundError extends Error {
 }
 
 /** Confirma que o token é um funcionário ATIVO da unidade do dono. Senão, 404 lógico. */
-async function assertUnitFuncionario(ctx: PartnerContext, tokenId: string): Promise<void> {
-  const res = await pool.query(
+type AdminQueryable = Pick<Pool, 'query'>;
+
+async function assertUnitFuncionario(
+  ctx: PartnerContext, tokenId: string, db: AdminQueryable = pool,
+): Promise<void> {
+  const res = await db.query(
     `SELECT 1 FROM network.partner_access_tokens
       WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
         AND role = 'funcionario' AND revoked_at IS NULL`,
@@ -3496,17 +3495,18 @@ export async function upsertPartnerTokenPermissions(
   ctx: PartnerContext,
   tokenId: string,
   input: PartnerPermissionsInput,
+  db: AdminQueryable = pool,
 ): Promise<PartnerPermissions> {
-  await assertUnitFuncionario(ctx, tokenId);
+  await assertUnitFuncionario(ctx, tokenId, db);
   const resolved: PartnerPermissions = {
-    vendas: true, estoque: true, pedidos: true, clientes: true,
-    entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false,
+    vendas: false, estoque: false, pedidos: false, clientes: false,
+    entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
   };
   for (const screen of PARTNER_SCREENS) {
     const v = input[screen];
     if (typeof v === 'boolean') resolved[screen] = v;
   }
-  await pool.query(
+  await db.query(
     `INSERT INTO network.partner_token_permissions
        (token_id, environment, partner_unit_id,
         allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
@@ -3538,8 +3538,10 @@ export async function upsertPartnerTokenPermissions(
  * Lê as telas EFETIVAS de UM funcionário (pro drawer do dono), mesma cadeia de
  * resolvePartnerPermissions: per-token (0100) → por loja (0087) → defaults. Owner-only.
  */
-export async function getPartnerTokenPermissions(ctx: PartnerContext, tokenId: string): Promise<PartnerPermissions> {
-  await assertUnitFuncionario(ctx, tokenId);
+export async function getPartnerTokenPermissions(
+  ctx: PartnerContext, tokenId: string, db: AdminQueryable = pool,
+): Promise<PartnerPermissions> {
+  await assertUnitFuncionario(ctx, tokenId, db);
   const cols = `allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
                 allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro`;
   type Row = {
@@ -3552,19 +3554,14 @@ export async function getPartnerTokenPermissions(ctx: PartnerContext, tokenId: s
     clientes: r.allow_clientes, entregas: r.allow_entregas, retiradas: r.allow_retiradas,
     batepapo: r.allow_batepapo, resumo: r.allow_resumo, financeiro: r.allow_financeiro,
   });
-  const perToken = await pool.query<Row>(
+  const perToken = await db.query<Row>(
     `SELECT ${cols} FROM network.partner_token_permissions WHERE token_id = $1 AND environment = $2`,
     [tokenId, ctx.environment],
   );
   if (perToken.rows[0]) return mapRow(perToken.rows[0]);
-  const perUnit = await pool.query<Row>(
-    `SELECT ${cols} FROM network.partner_unit_permissions WHERE partner_unit_id = $1 AND environment = $2`,
-    [ctx.partnerUnitId, ctx.environment],
-  );
-  if (perUnit.rows[0]) return mapRow(perUnit.rows[0]);
   return {
-    vendas: true, estoque: true, pedidos: true, clientes: true,
-    entregas: true, retiradas: true, batepapo: true, resumo: false, financeiro: false,
+    vendas: false, estoque: false, pedidos: false, clientes: false,
+    entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false,
   };
 }
 
@@ -3710,6 +3707,7 @@ export async function setOwnPartnerCredentials(
   password: string,
   allowOverwrite: boolean,
 ): Promise<PartnerSessionResult> {
+  assertStrongNewPassword(password);
   const passwordHash = await hashPassword(password);
   const cleanUsername = username.trim();
   const client = await pool.connect();

@@ -40,8 +40,15 @@ export async function closeMatrizWeeklySalaries(
        ) cfg ON true
       WHERE mc.environment=$1 AND cfg.salary_frequency='weekly' AND cfg.base_salary>0
         AND week_start::date+6<$2::date
-        AND mc.created_at<(week_start::date+7)
-        AND (mc.revoked_at IS NULL OR mc.revoked_at>=week_start::date)
+        AND finance.matriz_collaborator_employed_in_competence(
+          mc.environment,mc.id,date_trunc('month',week_start::date)::date)
+        AND EXISTS (
+          SELECT 1 FROM network.matriz_collaborator_employment_periods ep
+           WHERE ep.environment=mc.environment AND ep.collaborator_id=mc.id
+             AND (ep.started_at AT TIME ZONE 'America/Sao_Paulo')::date<=week_start::date+6
+             AND (ep.ended_at IS NULL
+               OR (ep.ended_at AT TIME ZONE 'America/Sao_Paulo')::date>=week_start::date)
+        )
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_salary_periods p
           WHERE p.environment=mc.environment AND p.collaborator_id=mc.id
             AND p.period_start=week_start::date)

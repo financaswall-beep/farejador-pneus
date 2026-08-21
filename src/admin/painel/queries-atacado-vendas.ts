@@ -146,7 +146,12 @@ export async function registerWholesaleSale(
   const requestNow = new Date();
   const writeInput: RegisterWholesaleSaleInput = {
     ...input,
-    sold_at: normalizeSameDayFutureInstant(input.sold_at, requestNow, 'sold_at_future'),
+    // Cabeçalho e pagamento à vista precisam compartilhar o mesmo instante.
+    // Deixar sold_at para o now() do PostgreSQL e gerar paid_at no Node podia
+    // produzir paid_at alguns milissegundos antes da venda e violar a causalidade.
+    sold_at: normalizeSameDayFutureInstant(
+      input.sold_at ?? requestNow.toISOString(), requestNow, 'sold_at_future',
+    ),
     paid_at: normalizeSameDayFutureInstant(input.paid_at, requestNow, 'paid_at_future'),
   };
   const client = await dbPool.connect();

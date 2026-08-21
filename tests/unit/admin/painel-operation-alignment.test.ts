@@ -30,7 +30,8 @@ describe('alinhamento dos painéis administrativos com a Operação da Loja', ()
     expect(partnerUi).toContain('`equipe/${f.id}/permissoes`');
     expect(partnerUi).toContain('`equipe/${f.id}/remuneracao`');
     expect(partnerUi).toContain('`equipe/${f.id}/comissao`');
-    expect(partnerUi).toContain('batepapo: false');
+    expect(partnerUi).toContain('`equipe/${f.id}/configuracao`');
+    expect(partnerUi).toContain('batepapo: !!this.funcPermForm.batepapo');
     expect(partnerHtml).toContain('Salário base');
     expect(partnerHtml).toContain('Fechamento');
     expect(partnerHtml).toContain('Por tipo de item');

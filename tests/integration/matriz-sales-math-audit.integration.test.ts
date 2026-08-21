@@ -50,8 +50,10 @@ describe('auditoria matemática formal de Vendas da Matriz', () => {
     )).rows[0]!.id;
     sellerId = (await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Vendedor Matemática','vendedor','Vendedor','sales')
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Matemática','vendedor','Vendedor','sales',
+         ((date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')-interval '2 months')
+           AT TIME ZONE 'America/Sao_Paulo'))
        RETURNING id`, [personId],
     )).rows[0]!.id;
   }, 180_000);
@@ -184,6 +186,44 @@ describe('auditoria matemática formal de Vendas da Matriz', () => {
     const truth = await getLegacyMatrizFinancialTruth('test', db.pool);
     expect(truth.conciliacao.origens.find((row) => row.origem === 'atacado')?.origem_total)
       .toBe('0.00');
+  });
+
+  it('arredonda a comissão por venda antes de somar o mês', async () => {
+    const month = await db.pool.query<{ start_on: string; end_on: string }>(
+      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text start_on,
+              (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')+interval '1 month')::date::text end_on`,
+    );
+    await db.pool.query(
+      `INSERT INTO network.matriz_collaborator_commission_rules
+        (environment,collaborator_id,kind,basis,value,active,starts_on,updated_by)
+       VALUES ('test',$1,'percent','revenue',10,true,$2::date,'rounding-test')
+       ON CONFLICT (collaborator_id,starts_on) DO UPDATE SET value=EXCLUDED.value`,
+      [sellerId, month.rows[0]!.start_on],
+    );
+    const orders = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders
+        (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,
+         seller_collaborator_id,idempotency_key,source)
+       VALUES ('test',$1,$2,0.05,'confirmed','pickup',$3,$4,'walkin_balcao'),
+              ('test',$1,$2,0.05,'confirmed','pickup',$3,$5,'walkin_balcao')
+       RETURNING id`,
+      [contactId, unitId, sellerId, `round-a-${randomUUID()}`, `round-b-${randomUUID()}`],
+    );
+    for (const order of orders.rows) {
+      await db.pool.query(
+        `INSERT INTO commerce.order_items
+          (environment,order_id,product_id,quantity,unit_price,discount_amount)
+         VALUES ('test',$1,$2,1,0.05,0)`, [order.id, productId],
+      );
+    }
+    const facts = await db.pool.query<{ commission_amount: string }>(
+      `${commissionSql}
+       SELECT commission_amount::text FROM ruled
+        WHERE source_id=ANY($4::uuid[]) ORDER BY source_id`,
+      ['test', month.rows[0]!.start_on, month.rows[0]!.end_on,
+       orders.rows.map((row) => row.id)],
+    );
+    expect(facts.rows).toEqual([{ commission_amount: '0.01' }, { commission_amount: '0.01' }]);
   });
 
   it('reconciliação acusa divergência de cabeçalho e volta a zero após rollback', async () => {

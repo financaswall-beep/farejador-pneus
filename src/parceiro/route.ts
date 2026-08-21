@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { requirePartnerAuth, requireOwner, requireScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
+import { requirePartnerAuth, requireOwner, requireScreen, requireAnyScreen, getPartnerContext, resolvePartnerPermissions, type PartnerAuthedRequest } from './auth.js';
 import { isSessionToken } from './password.js';
 import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
 import {
@@ -110,7 +110,6 @@ import {
   getPartnerTokenPermissions,
   upsertPartnerTokenPermissions,
   getPartnerTokenCommission,
-  upsertPartnerTokenCommission,
   getPartnerCommissionTeam,
   getPartnerSelfIdentity,
   FuncionarioNotFoundError,
@@ -123,6 +122,7 @@ import { consumePartnerSseTicket, mintPartnerSseTicket } from './sse-ticket.js';
 import { registerPartnerMySalesRoutes } from './route-my-sales.js';
 import { registerPartnerFuncionarioReactivationRoute } from './route-funcionarios.js';
 import { registerPartnerSimpleFinanceRoute } from './route-simple-finance.js';
+import { savePartnerOperationCommissionRule } from './operation-team.js';
 import { isLegacyPartnerMobile } from './legacy-mobile.js';
 const publicDir = path.join(process.cwd(), 'parceiro', 'public');
 
@@ -248,20 +248,21 @@ const chatConversationParamsSchema = paramsSchema.extend({
 });
 
 // Etapa 4c: criar/revogar login de funcionário
-// P1: credenciais de login. Usuário 3-60 (letras/números/. _ -); senha 6-200.
+// Login legado continua aceitando 6; toda senha nova exige pelo menos 12.
 const usernameField = z.string().trim().min(3).max(60).regex(/^[a-zA-Z0-9._-]+$/, 'usuario_invalido');
-const passwordField = z.string().min(6).max(200);
+const loginPasswordField = z.string().min(6).max(200);
+const newPasswordField = z.string().min(12).max(200);
 
 const funcionarioSchema = z.object({
   label: z.string().trim().max(120).nullable().optional(),
   username: usernameField,
-  password: passwordField,
+  password: newPasswordField,
 });
 const funcionarioParamsSchema = paramsSchema.extend({
   tokenId: z.string().uuid(),
 });
 const resetSenhaSchema = z.object({
-  password: passwordField,
+  password: newPasswordField,
 });
 // Comissão por pessoa (Bloco 2, 0100): % ou valor fixo. O servidor normaliza
 // (value<0 vira 0; kind fora da lista vira 'percent'). active=false desliga.
@@ -279,13 +280,18 @@ const comissaoSchema = z.object({
 // Login por usuário+senha (público — é a porta de entrada).
 const loginSchema = z.object({
   username: usernameField,
-  password: passwordField,
+  password: loginPasswordField,
 });
 // Primeiro acesso do dono: define o próprio usuário+senha (autenticado pelo token cru).
 const setCredentialsSchema = z.object({
   username: usernameField,
-  password: passwordField,
+  password: newPasswordField,
 });
+
+async function requireDismissibleScreen(request: PartnerAuthedRequest, reply: FastifyReply): Promise<void> {
+  const tipo = (request.params as { tipo?: string }).tipo;
+  await requireScreen(tipo === 'order' ? 'vendas' : 'financeiro')(request, reply);
+}
 
 // ─── Configurações da Loja (Fase 1) ───
 // Dados da loja: nome de exibição obrigatório; endereço estruturado + horário (texto livre).
@@ -681,7 +687,21 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       return reply.status(400).send({ error: `${issue?.path?.join('.') || 'body'}: ${issue?.message ?? 'invalid'}` });
     }
     try {
-      const commission = await upsertPartnerTokenCommission(getPartnerContext(request), params.data.tokenId, body.data);
+      const commission = await savePartnerOperationCommissionRule(
+        getPartnerContext(request), params.data.tokenId, {
+          kind: body.data.kind,
+          basis: body.data.kind === 'fixed' ? 'sale' : 'revenue',
+          value: body.data.value,
+          active: body.data.active,
+          starts_on: businessDateSaoPaulo(new Date()),
+          itemized: false,
+          item_rules: {
+            tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 },
+            other: { kind: 'none', value: 0 },
+          },
+          settlement_frequency: 'monthly',
+        },
+      );
       return reply.status(200).send({ commission });
     } catch (err) {
       if (err instanceof FuncionarioNotFoundError) return reply.status(404).send({ error: 'funcionario_not_found' });
@@ -826,8 +846,8 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ rows: await getPartnerCustomers(getPartnerContext(request)) });
   });
 
-  // clientes/buscar: usado pelo PDV e pelo chat (apoio). Segue requirePartnerAuth.
-  fastify.get('/parceiro/:slug/api/clientes/buscar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  // Busca expõe dados pessoais: exige uma tela que realmente consome clientes.
+  fastify.get('/parceiro/:slug/api/clientes/buscar', { preHandler: [requirePartnerAuth, requireAnyScreen('vendas', 'clientes', 'batepapo')] }, async (request: PartnerAuthedRequest, reply) => {
     const parsed = customerSearchSchema.safeParse(request.query);
     if (!parsed.success) return reply.status(200).send({ rows: [] });
     return reply.status(200).send({ rows: await searchPartnerCustomers(getPartnerContext(request), parsed.data.q) });
@@ -1161,15 +1181,14 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
 
   // Arquivar / desarquivar (0108): "tirar da tela" qualquer item SEM apagar do banco.
   // Escopado por ctx.unitId (RLS WITH CHECK). :tipo na allowlist; :id qualquer string curta.
-  // requirePartnerAuth (não é "tela": dono e funcionário arrumam a própria fila).
-  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/arquivar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/arquivar', { preHandler: [requirePartnerAuth, requireDismissibleScreen] }, async (request: PartnerAuthedRequest, reply) => {
     const { tipo, id } = request.params as { tipo?: string; id?: string };
     if (!tipo || !isDismissibleType(tipo) || !id || id.length > 64) return reply.status(400).send({ error: 'invalid_item' });
     await archivePartnerItem(getPartnerContext(request), tipo, id);
     return reply.status(200).send({ ok: true });
   });
 
-  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/desarquivar', { preHandler: requirePartnerAuth }, async (request: PartnerAuthedRequest, reply) => {
+  fastify.post('/parceiro/:slug/api/itens/:tipo/:id/desarquivar', { preHandler: [requirePartnerAuth, requireDismissibleScreen] }, async (request: PartnerAuthedRequest, reply) => {
     const { tipo, id } = request.params as { tipo?: string; id?: string };
     if (!tipo || !isDismissibleType(tipo) || !id || id.length > 64) return reply.status(400).send({ error: 'invalid_item' });
     await unarchivePartnerItem(getPartnerContext(request), tipo, id);

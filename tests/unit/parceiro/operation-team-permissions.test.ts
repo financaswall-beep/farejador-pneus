@@ -33,7 +33,7 @@ describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () =
   it('usa o perfil individual existente e mantÃ©m o escopo da unidade', async () => {
     vi.mocked(getPartnerTokenPermissions).mockResolvedValue(permissions);
     const query = vi.fn().mockResolvedValue({ rows: [{
-      id: 'employee-1', name: 'Wallace', username: 'wallace', active: true,
+      id: 'employee-1', name: 'Wallace', username: 'wallace', active: true, job_role: 'vendedor',
     }] });
 
     const result = await getPartnerOperationPermissions(context, 'employee-1', { query } as unknown as Pool);
@@ -42,24 +42,24 @@ describe('permissÃµes do colaborador parceiro na OperaÃ§Ã£o da Loja', () =
       'prod', 'unit-partner-1', 'employee-1',
     ]);
     expect(result).toMatchObject({ unit_name: 'Borracharia Rio do Ouro', permissions, locked: false });
-    expect(result?.available_permissions).toHaveLength(8);
-    expect(result?.available_permissions).not.toContain('batepapo');
+    expect(result?.available_permissions).toHaveLength(9);
+    expect(result?.available_permissions).toContain('batepapo');
   });
 
   it('salva e revoga somente as sessÃµes do colaborador alterado', async () => {
     vi.mocked(upsertPartnerTokenPermissions).mockResolvedValue({ ...permissions, financeiro: true });
     const query = vi.fn()
       .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ rows: [{ id: 'employee-1', name: 'Wallace', username: 'wallace', active: true }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'employee-1', name: 'Wallace', username: 'wallace', active: true, job_role: 'vendedor' }] });
     const db = { query } as unknown as Pool;
 
     const result = await savePartnerOperationPermissions(
       context, 'employee-1', { ...permissions, financeiro: true }, db,
     );
 
-    expect(upsertPartnerTokenPermissions).toHaveBeenCalledWith(context, 'employee-1', {
-      ...permissions, financeiro: true, batepapo: false,
-    });
+    expect(upsertPartnerTokenPermissions).toHaveBeenCalledWith(
+      context, 'employee-1', { ...permissions, financeiro: true }, db,
+    );
     expect(String(query.mock.calls[0]?.[0])).toContain('UPDATE network.partner_sessions');
     expect(query.mock.calls[0]?.[1]).toEqual(['prod', 'employee-1']);
     expect(result.permissions.financeiro).toBe(true);

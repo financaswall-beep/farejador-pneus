@@ -84,16 +84,17 @@
     const article = document.createElement('article');
     const icon = document.createElement('span');
     icon.className = 'finance-commission-sale-icon';
-    icon.textContent = paymentLabel(row.payment_method).slice(0, 1);
+    const adjustment = row.entry_type === 'adjustment';
+    icon.textContent = adjustment ? 'A' : paymentLabel(row.payment_method).slice(0, 1);
     const copy = document.createElement('div');
     const title = document.createElement('strong');
     const meta = document.createElement('small');
-    title.textContent = row.reference || 'Venda';
+    title.textContent = row.reference || (adjustment ? 'Ajuste' : 'Venda');
     const date = new Intl.DateTimeFormat('pt-BR', {
       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
       timeZone: 'America/Sao_Paulo',
     }).format(new Date(row.occurred_at));
-    meta.textContent = date + ' · ' + paymentLabel(row.payment_method);
+    meta.textContent = date + (adjustment ? ' · ajuste/reversão' : ' · ' + paymentLabel(row.payment_method));
     copy.append(title, meta);
     const values = document.createElement('div');
     const sale = document.createElement('span');
@@ -102,7 +103,8 @@
     sale.textContent = Caixa.currency.format(Number(row.gross_amount || 0));
     commission.textContent = Caixa.currency.format(Number(row.commission_amount || 0));
     appliedRule.className = 'finance-commission-sale-rule';
-    appliedRule.textContent = row.commission_itemized ? 'por tipo de item' : 'regra da venda';
+    appliedRule.textContent = adjustment ? 'ajuste conciliado'
+      : (row.commission_itemized ? 'por tipo de item' : 'regra da venda');
     values.append(sale, commission, appliedRule); article.append(icon, copy, values);
     return article;
   }
@@ -126,7 +128,7 @@
     if (!sales.length) {
       const empty = document.createElement('p');
       empty.className = 'finance-commission-empty';
-      empty.textContent = 'Nenhuma venda com comissão neste período.';
+      empty.textContent = 'Nenhuma venda ou ajuste de comissão neste período.';
       list.appendChild(empty);
     } else sales.forEach(function (sale) { list.appendChild(saleRow(sale)); });
     renderPayment(row); setState('ready');

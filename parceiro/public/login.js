@@ -169,7 +169,7 @@
     var username = (document.getElementById('first-username').value || '').trim();
     var password = document.getElementById('first-password').value || '';
     if (!/^[a-z0-9-]{2,80}$/.test(slug)) { setErro('Informe o endereço da loja, como borracharia-rio-do-ouro.'); return; }
-    if (!code || !username || password.length < 6) { setErro('Preencha o código, o usuário e uma senha de pelo menos 6 caracteres.'); return; }
+    if (!code || !username || password.length < 12) { setErro('Preencha o código, o usuário e uma senha de pelo menos 12 caracteres.'); return; }
 
     btnCriar.disabled = true;
     try {

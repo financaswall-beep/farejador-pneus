@@ -46,19 +46,19 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const period = await db.pool.query<{ id: string }>(
       `INSERT INTO finance.matriz_payroll_periods (environment,competence)
-       VALUES ('test','2026-07-01') RETURNING id`,
+       VALUES ('test','2025-12-01') RETURNING id`,
     );
     const expense = await db.pool.query<{ id: string }>(
       `INSERT INTO commerce.matriz_expenses
          (environment,category,description,amount,occurred_at,payment_status,due_date)
-       VALUES ('test','funcionario','Folha 07/2026 - Ana Secretaria',2500,'2026-07-01','pending','2026-08-05')
+       VALUES ('test','funcionario','Folha 12/2025 - Ana Secretaria',2500,'2025-12-01','pending','2026-01-05')
        RETURNING id`,
     );
     const item = await db.pool.query<{ id: string }>(
       `INSERT INTO finance.matriz_payroll_items
          (environment,payroll_period_id,collaborator_id,job_title,employment_type,
           base_salary,commission_amount,additions,deductions,total_due,due_date,source_expense_id)
-       VALUES ('test',$1,$2,'Secretária','clt',2500,0,0,0,2500,'2026-08-05',$3) RETURNING id`,
+       VALUES ('test',$1,$2,'Secretária','clt',2500,0,0,0,2500,'2026-01-05',$3) RETURNING id`,
       [period.rows[0]!.id, collaborator.rows[0]!.id, expense.rows[0]!.id],
     );
 
@@ -87,8 +87,8 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Vendedor Historico','vendedor','Vendedor','sales') RETURNING id`,
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Vendedor Historico','vendedor','Vendedor','sales','2026-07-01T00:00:00Z') RETURNING id`,
       [person.rows[0]!.id],
     );
     const collaboratorId = collaborator.rows[0]!.id;
@@ -142,9 +142,9 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     expect(versions.rows[0]).toEqual({ compensation: 2, commission: 2 });
 
-    const closed = await closePayroll({ competence: '2026-08-01', environment: 'test' }, db.pool);
+    const closed = await closePayroll({ competence: '2026-07-01', environment: 'test' }, db.pool);
     expect(closed.items).toBe(1);
-    expect(await closePayroll({ competence: '2026-08-01', environment: 'test' }, db.pool))
+    expect(await closePayroll({ competence: '2026-07-01', environment: 'test' }, db.pool))
       .toEqual(closed);
     const payroll = await db.pool.query(
       `SELECT i.id,i.total_due,i.payment_status,e.amount,e.payment_status expense_status
@@ -153,10 +153,10 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
         WHERE i.payroll_period_id=$1`, [closed.period_id],
     );
     expect(payroll.rows[0]).toMatchObject({
-      total_due: '6200.00', payment_status: 'pending', amount: '6200.00', expense_status: 'pending',
+      total_due: '6230.00', payment_status: 'pending', amount: '6230.00', expense_status: 'pending',
     });
     const paymentInput = { item_id: payroll.rows[0].id, environment: 'test' as const,
-      actor_label: 'dono-teste', idempotency_key: 'payroll-etapa5-2026-08' };
+       actor_label: 'dono-teste', idempotency_key: 'payroll-etapa5-2026-07' };
     const firstPayment = await payPayrollItem(paymentInput, db.pool);
     expect(await payPayrollItem(paymentInput, db.pool)).toEqual(firstPayment);
     const paid = await db.pool.query(
@@ -167,6 +167,57 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
         WHERE i.id=$1`, [payroll.rows[0].id],
     );
     expect(paid.rows[0]).toEqual({ payment_status: 'paid', status: 'paid', expense_status: 'paid' });
+  });
+
+  it('carrega para o mês seguinte o desconto que excede a remuneração', async () => {
+    const person = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.partner_people(environment,username)
+       VALUES ('test','desconto.carregado') RETURNING id`,
+    );
+    const collaborator = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Desconto Carregado','colaborador','Auxiliar','other',
+               '2025-09-01T00:00:00Z') RETURNING id`, [person.rows[0]!.id],
+    );
+    await saveCompensation({
+      collaborator_id: collaborator.rows[0]!.id, employment_type: 'clt', base_salary: 50,
+      payment_day: 5, payment_method: 'pix', starts_on: '2025-09-01', environment: 'test',
+    }, db.pool);
+    await addAdjustment({
+      collaborator_id: collaborator.rows[0]!.id, competence: '2025-09-01',
+      kind: 'deduction', description: 'adiantamento maior que a folha', amount: 80,
+      environment: 'test', actor_label: 'owner-vitest',
+    }, db.pool);
+
+    const september = await closePayroll({ competence: '2025-09-01', environment: 'test' }, db.pool);
+    const first = await db.pool.query(
+      `SELECT deductions::text,total_due::text,payment_status
+         FROM finance.matriz_payroll_items WHERE payroll_period_id=$1`, [september.period_id],
+    );
+    expect(first.rows[0]).toEqual({ deductions: '50.00', total_due: '0.00', payment_status: 'paid' });
+
+    const octoberPreview = await getManagement('2025-10-01', 'test', db.pool);
+    expect(octoberPreview.collaborators.find((row) => row.id === collaborator.rows[0]!.id))
+      .toMatchObject({ deductions: 30, total_due: 20 });
+    const october = await closePayroll({ competence: '2025-10-01', environment: 'test' }, db.pool);
+    const second = await db.pool.query(
+      `SELECT deductions::text,total_due::text FROM finance.matriz_payroll_items
+        WHERE payroll_period_id=$1`, [october.period_id],
+    );
+    expect(second.rows[0]).toEqual({ deductions: '30.00', total_due: '20.00' });
+  });
+
+  it('recusa o fechamento do mês corrente na aplicação e no banco', async () => {
+    const current = await db.pool.query<{ competence: string }>(
+      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text competence`,
+    );
+    await expect(closePayroll({ competence: current.rows[0]!.competence, environment: 'test' }, db.pool))
+      .rejects.toThrow('payroll_competence_not_finished');
+    await expect(db.pool.query(
+      `INSERT INTO finance.matriz_payroll_periods(environment,competence)
+       VALUES ('test',$1::date)`, [current.rows[0]!.competence],
+    )).rejects.toThrow('payroll_competence_not_finished');
   });
 
   it('fecha comissão semanal da Matriz e mantém salário na folha mensal', async () => {
@@ -364,7 +415,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
     );
     const prodPeriod = await db.pool.query<{ id: string }>(
       `INSERT INTO finance.matriz_payroll_periods (environment,competence)
-       VALUES ('prod','2026-09-01') RETURNING id`,
+       VALUES ('prod','2025-11-01') RETURNING id`,
     );
     await expect(db.pool.query(
       `INSERT INTO finance.matriz_payroll_items
@@ -376,7 +427,7 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
 
     const testPeriod = await db.pool.query<{ id: string }>(
       `INSERT INTO finance.matriz_payroll_periods (environment,competence)
-       VALUES ('test','2026-09-01') RETURNING id`,
+       VALUES ('test','2025-11-01') RETURNING id`,
     );
     await expect(db.pool.query(
       `INSERT INTO finance.matriz_payroll_items
@@ -527,23 +578,14 @@ describe('0133/0135 — colaboradores e conciliação da folha', () => {
       [collaboratorId, frozenBefore.rows[0]!.id, adjustmentCompetence],
     );
     await expect(closePayroll({ competence: adjustmentCompetence, environment: 'prod' }, db.pool))
-      .rejects.toThrow('payroll_has_unresolved_adjustments');
+      .rejects.toThrow('payroll_competence_not_finished');
     await reviewAdjustment({
       id: unresolved.rows[0]!.id, amount: 7, actor_label: 'owner-stage10', environment: 'prod',
     }, db.pool);
 
-    const correctedPayroll = await closePayroll({
-      competence: adjustmentCompetence, environment: 'prod',
-    }, db.pool);
-    const corrected = await db.pool.query(
-      `SELECT base_salary::text,commission_amount::text,deductions::text,total_due::text
-         FROM finance.matriz_payroll_items
-        WHERE payroll_period_id=$1 AND collaborator_id=$2`,
-      [correctedPayroll.period_id, collaboratorId],
-    );
-    expect(corrected.rows[0]).toEqual({
-      base_salary: '100.00', commission_amount: '0.00',
-      deductions: '17.00', total_due: '83.00',
+    const corrected = await getManagement(adjustmentCompetence, 'prod', db.pool);
+    expect(corrected.collaborators.find((row) => row.id === collaboratorId)).toMatchObject({
+      base_salary: 100, commission_amount: 0, deductions: 17, total_due: 83,
     });
     const networkAfter = await db.pool.query<{ snapshot: string }>(
       `SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.id),'[]'::jsonb)::text snapshot

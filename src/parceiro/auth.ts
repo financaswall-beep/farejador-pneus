@@ -21,17 +21,15 @@ export type PartnerScreen = (typeof PARTNER_SCREENS)[number];
 
 export type PartnerPermissions = Record<PartnerScreen, boolean>;
 
-// Defaults da Etapa 4 (= comportamento de hoje): operacional ON; dinheiro OFF.
-// LINHA AUSENTE em partner_unit_permissions ⇒ estes valores. Igual aos DEFAULTs
-// das colunas da 0087, mas resolvidos no código pra não depender da linha existir.
+// Menor privilegio: perfil ausente ou ilegivel nao concede nenhuma tela.
 const EMPLOYEE_DEFAULT_PERMISSIONS: PartnerPermissions = {
-  vendas: true,
-  estoque: true,
-  pedidos: true,
-  clientes: true,
-  entregas: true,
-  retiradas: true,
-  batepapo: true,
+  vendas: false,
+  estoque: false,
+  pedidos: false,
+  clientes: false,
+  entregas: false,
+  retiradas: false,
+  batepapo: false,
   resumo: false,
   financeiro: false,
 };
@@ -218,10 +216,8 @@ export async function requireOwner(request: PartnerAuthedRequest, reply: Fastify
  * Resolve as permissões EFETIVAS de tela do contexto (PLANO §2.3, gate §5.5).
  *
  *   - owner        → todas as 9 telas true (resolvido no código, sem ler tabela).
- *   - funcionário  → POR PESSOA (0100): lê network.partner_token_permissions do
- *                    vínculo (token_id) → SENÃO partner_unit_permissions da loja
- *                    (0087, retrocompat) → SENÃO defaults da Etapa 4 (operacional ON,
- *                    Resumo/Financeiro OFF). SEM linha per-token = comportamento de hoje.
+ *   - funcionário  → lê apenas network.partner_token_permissions do vínculo.
+ *                    Linha ausente ou erro = tudo negado (fail closed).
  *
  * 🔒 FAIL-SAFE (gate §5.3): qualquer erro ao LER o perfil → menor privilégio.
  * Aqui isso significa cair nos defaults da Etapa 4 (NÃO concede dinheiro;
@@ -270,20 +266,10 @@ export async function resolvePartnerPermissions(context: PartnerContext): Promis
     );
     if (perToken.rows[0]) return permissionRowToPermissions(perToken.rows[0]);
 
-    // (2) Retrocompat: perfil POR LOJA (0087). Vínculo ainda sem perfil próprio.
-    const perUnit = await pool.query<PermissionRow>(
-      `SELECT allow_vendas, allow_estoque, allow_pedidos, allow_clientes,
-              allow_entregas, allow_retiradas, allow_batepapo, allow_resumo, allow_financeiro
-         FROM network.partner_unit_permissions
-        WHERE partner_unit_id = $1 AND environment = $2`,
-      [context.partnerUnitId, context.environment],
-    );
-    if (perUnit.rows[0]) return permissionRowToPermissions(perUnit.rows[0]);
-
-    // (3) Nenhum perfil ⇒ defaults da Etapa 4 (= comportamento de hoje).
+    // Ausencia de perfil nunca vira autorizacao implicita.
     return { ...EMPLOYEE_DEFAULT_PERMISSIONS };
   } catch (err) {
-    // Fail-safe: erro de leitura → menor privilégio (defaults; dinheiro NEGADO).
+    // Fail-safe: erro de leitura → nenhuma tela.
     logger.error({ err, tokenId: context.tokenId, partnerUnitId: context.partnerUnitId }, 'resolvePartnerPermissions_failed_denying_money');
     return { ...EMPLOYEE_DEFAULT_PERMISSIONS };
   }
@@ -318,6 +304,21 @@ export function requireScreen(screen: PartnerScreen) {
     if (!permissions[screen]) {
       void reply.status(403).send({ error: 'partner_forbidden_screen', screen });
       return;
+    }
+  };
+}
+
+export function requireAnyScreen(...screens: PartnerScreen[]) {
+  return async function requireAnyScreenGuard(request: PartnerAuthedRequest, reply: FastifyReply): Promise<void> {
+    const context = request.partnerContext;
+    if (!context) {
+      void reply.status(401).send({ error: 'partner_unauthorized' });
+      return;
+    }
+    if (context.role === 'owner') return;
+    const permissions = await resolvePartnerPermissions(context);
+    if (!screens.some((screen) => permissions[screen])) {
+      void reply.status(403).send({ error: 'partner_forbidden_screen', screens });
     }
   };
 }

@@ -1,10 +1,10 @@
-# Dossiê de autorização — Bot, Vendas, Compras, Estoque e Financeiro
+# Dossiê de autorização — Bot, Vendas, Compras, Estoque, Financeiro, Logística e Equipe
 
-**Data da revisão:** 20/08/2026
-**Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
+**Data da revisão:** 21/08/2026
+**Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro e Equipe.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
-**Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. O runtime correspondente ao pacote financeiro ainda aguarda o próximo deploy.
+**Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. As migrations de Equipe `0192` e `0193` foram aplicadas e reconciliadas em 21/08/2026, antes do deploy do runtime correspondente.
 
 **Atualização de continuidade em 20/08/2026:** o repositório está em `main` no SHA
 `2064f1a`. A migration `0189_checkout_price_negotiation.sql` foi confirmada
@@ -656,3 +656,44 @@ já foi aplicada materialmente após backup validado e o código foi incorporado
 PR `#63`; a documentação foi consolidada pela PR `#64` e o CI final da `main` passou. O
 deploy manual e o smoke autenticado pós-deploy continuam obrigatórios; este adendo não
 declara o runtime novo já implantado.
+
+## 14. Auditoria concluída — Equipe do parceiro e Colaboradores da Matriz
+
+A auditoria cruzou cadastro, função, nove permissões, senha e sessão, admissão, demissão,
+reativação, remuneração, benefícios, comissão, ajustes, folha e seus efeitos em Vendas,
+Estoque, Logística e Financeiro, tanto na Matriz quanto no parceiro.
+
+Os defeitos confirmados foram corrigidos: permissão ausente agora fecha todo o acesso;
+Avisos não é mais descartado; função é explícita; a configuração completa é atômica;
+senhas novas exigem 12 caracteres; revogar um vínculo não derruba outra relação ativa da
+pessoa; períodos de emprego preservam demissão e recontratação; fatos só remuneram quem
+estava empregado na data; comissão arredonda por evento; ajustes/estornos aparecem no
+detalhe; folha atual/futura não fecha; desconto é limitado ao bruto e o restante passa para
+o mês seguinte; saldo zero fecha sem despesa fictícia.
+
+Na regressão cruzada apareceu ainda um defeito do atacado: venda à vista sem horário podia
+ter pagamento gerado milissegundos antes da venda. Os dois fatos agora compartilham o mesmo
+instante, preservando a causalidade exigida pelo banco.
+
+| Bateria pós-correção | Resultado |
+|---|---|
+| Unitários completos | **1.238/1.238**, 247 arquivos |
+| Integração completa | **254/254**, 46 arquivos |
+| Direcionados de Equipe, folha, login e matemática | **22/22** |
+| Integridade do atacado após correção temporal | **12/12** |
+| TypeScript, build e fiscal | aprovados |
+| Painéis e contratos | 586 propriedades do parceiro, 1.061 da Matriz, 91 chamadas e 236 rotas aprovadas |
+| Migrations | **194 verificadas**; novas `0192` e `0193` carregadas em PostgreSQL limpo |
+
+O comando oficial de integração agora executa os 46 arquivos em quatro processos
+sequenciais (12/12/12/10). A renovação evita a queda tardia do worker por acúmulo de
+recursos; a bateria, os bancos descartáveis e as asserções permanecem os mesmos.
+
+**Veredito:** Equipe/Colaboradores aprovada em código, banco descartável, banco de
+produção, integração, matemática, segurança e regressão cruzada. As migrations `0192` e
+`0193` foram aplicadas em uma única transação depois de backup validado e ensaio com
+`ROLLBACK`. A reconciliação específica passou em 13/13 controles; a auditoria geral de
+produção também retornou `PASS`, inclusive ledger e RLS. Restam publicar o código, fazer o
+deploy manual e executar o smoke autenticado na Matriz e no parceiro.
+
+Relatório reproduzível: `docs/AUDITORIA_EQUIPE_PONTA_A_PONTA_2026-08-21.md`.

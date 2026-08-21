@@ -56,12 +56,13 @@ function parceiroApp() {
     // conservador (tudo false) até resolver — o menu só aparece depois do /api/me.
     permissions: { vendas: false, estoque: false, pedidos: false, clientes: false, entregas: false, retiradas: false, batepapo: false, resumo: false, financeiro: false },
     funcionarios: [],            // Etapa 4c: logins de funcionário (só o dono carrega)
-    funcionarioForm: { label: '', username: '', password: '' },
+    funcionarioForm: { label: '', username: '', password: '', role: 'vendedor' },
     selectedFuncionario: null,   // Bloco 1: funcionário aberto no painel da Equipe (null = mostra "adicionar")
     resetSenhaValue: '',         // Bloco 1: senha nova digitada no painel (sem prompt do navegador)
     revokeConfirmId: null,       // Bloco 1: id do funcionário aguardando confirmação inline de desativar
     // ─── Bloco 2 (2026-06-12): acesso + comissão POR PESSOA do funcionário aberto ───
     funcConfigLoaded: false,     // o config (telas+comissão) do funcionário selecionado carregou?
+    funcJobRole: 'colaborador',
     funcPermForm: { vendas: true, estoque: true, pedidos: true, clientes: true, entregas: true, retiradas: true, batepapo: false, resumo: false, financeiro: false },
     funcPermLocked: false, funcRemForm: { employment_type: 'clt', base_salary: 0, salary_frequency: 'monthly', payment_day: 5, payment_method: 'pix', starts_on: '', benefits: [] }, funcCommForm: { kind: 'percent', basis: 'revenue', value: 0, active: false, starts_on: '', settlement_frequency: 'monthly', itemized: false, item_rules: { tire: { kind: 'none', value: 0 }, service: { kind: 'none', value: 0 }, other: { kind: 'none', value: 0 } } },
     // ─── Bloco 2 telas #2/#3 (2026-06-12) ───
