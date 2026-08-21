@@ -33,20 +33,21 @@ window.PAINEL_MODULES.logisticaAcoes = function () {
       }
     },
     async abrirRota() {
-      const courier = (this.rotaForm.courier_name || '').trim();
-      if (!courier) { this.logisticaMsg = { ok: false, text: 'Diga o nome do entregador.' }; return; }
+      const courierId = (this.rotaForm.courier_collaborator_id || '').trim();
+      const courier = (this.logistica?.couriers || []).find((item) => item.id === courierId);
+      if (!courier) { this.logisticaMsg = { ok: false, text: 'Escolha um entregador ativo.' }; return; }
       const ids = Object.keys(this.rotaForm.selecionadas).filter((id) => this.rotaForm.selecionadas[id]);
       // Decisão do dono 07-03c: rota não abre vazia (o backend também barra).
       if (!ids.length) { this.logisticaMsg = { ok: false, text: 'Marque pelo menos 1 entrega pra abrir a rota. Sem entrega, não abre.' }; return; }
       this.logisticaSaving = true;
       try {
         const r = await this.apiPost('/admin/api/logistica/rotas', {
-          courier_name: courier,
+          courier_collaborator_id: courierId,
           km_start: this.rotaForm.km_start === '' ? null : Number(this.rotaForm.km_start),
           order_ids: ids,
         });
-        this.logisticaMsg = { ok: true, text: `Rota aberta pra ${courier} com ${r.deliveries_count} entrega(s).` };
-        this.rotaForm = { courier_name: '', km_start: '', selecionadas: {} };
+        this.logisticaMsg = { ok: true, text: `Rota aberta pra ${courier.display_name} com ${r.deliveries_count} entrega(s).` };
+        this.rotaForm = { courier_collaborator_id: '', km_start: '', selecionadas: {} };
         await this.loadLogistica();
       } catch (err) {
         this.logisticaMsg = { ok: false, text: `Não consegui abrir a rota (${err.message}).` };

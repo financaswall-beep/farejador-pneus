@@ -23,7 +23,7 @@ export class TripHasUnresolvedDeliveriesError extends Error {
 
 export async function openMatrizTrip(
   input: {
-    courier_name: string;
+    courier_collaborator_id: string;
     km_start?: number | null;
     order_ids?: string[];
     created_by?: string | null;
@@ -32,15 +32,28 @@ export async function openMatrizTrip(
   dbPool: Pool = defaultPool,
 ): Promise<{ trip_id: string; deliveries_count: number }> {
   const environment = input.environment ?? env.FAREJADOR_ENV;
-  const courier = input.courier_name.trim();
-  if (!courier) throw new Error('courier_required');
   const client = await dbPool.connect();
   try {
     await client.query('BEGIN');
+    const courierResult = await client.query<{ display_name: string }>(
+      `SELECT mc.display_name
+         FROM network.matriz_collaborators mc
+         LEFT JOIN network.matriz_collaborator_operation_permissions op
+           ON op.environment=mc.environment AND op.collaborator_id=mc.id
+        WHERE mc.environment=$1 AND mc.id=$2 AND mc.revoked_at IS NULL
+          AND CASE WHEN op.collaborator_id IS NULL THEN mc.job='entregador'
+                   ELSE op.allow_entregas END
+        FOR SHARE OF mc`,
+      [environment, input.courier_collaborator_id],
+    );
+    if (!courierResult.rows[0]) throw new Error('courier_not_found');
+    const courier = courierResult.rows[0].display_name;
     const trip = await client.query<{ id: string }>(
-      `INSERT INTO commerce.matriz_delivery_trips (environment, courier_name, km_start, created_by)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [environment, courier, input.km_start ?? null, input.created_by ?? 'matriz-painel'],
+      `INSERT INTO commerce.matriz_delivery_trips
+         (environment,courier_name,courier_collaborator_id,km_start,created_by)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [environment, courier, input.courier_collaborator_id,
+       input.km_start ?? null, input.created_by ?? 'matriz-painel'],
     );
     const tripId = trip.rows[0]!.id;
     let count = 0;
@@ -101,8 +114,8 @@ export async function attachOrderToMatrizTrip(
     `UPDATE commerce.orders o
         SET trip_id = $3, delivery_status = 'dispatched',
             dispatched_at = COALESCE(o.dispatched_at, now()),
-            delivery_courier = COALESCE(o.delivery_courier,
-              (SELECT courier_name FROM commerce.matriz_delivery_trips WHERE id = $3 AND environment = $1)),
+            delivery_courier =
+              (SELECT courier_name FROM commerce.matriz_delivery_trips WHERE id = $3 AND environment = $1),
             updated_at = now()
       WHERE o.id = $2 AND o.environment = $1
         AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
@@ -168,7 +181,7 @@ export async function requeueMatrizDelivery(
   const r = await dbPool.query<{ order_id: string }>(
     `UPDATE commerce.orders o
         SET delivery_status = 'pending', delivery_failure_reason = NULL,
-            trip_id = NULL, updated_at = now()
+            trip_id = NULL, delivery_courier = NULL, updated_at = now()
       WHERE o.id = $2 AND o.environment = $1
         AND o.status <> 'cancelled' AND o.delivery_status = 'failed'
         AND ${MAIN_DELIVERY_GUARD}

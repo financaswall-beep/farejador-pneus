@@ -171,11 +171,11 @@ function painelApp() {
     logisticaMsg: null,
     logisticaDialog: { open: false, kind: null, delivery: null, reason: '' },
     logisticaTab: 'visao',
-    logisticaRotaSelecionadaId: null, // detalhe financeiro aberto dentro da subaba Rotas
+    logisticaRotaSelecionadaId: null, logisticaRotaAbertaId: null, // detalhe e rota operacional escolhida
     logisticaPeriodo: 'hoje',
     logisticaFiltro: 'todas',
     logisticaBusca: '',
-    rotaForm: { courier_name: '', km_start: '', selecionadas: {} },
+    rotaForm: { courier_collaborator_id: '', km_start: '', selecionadas: {} },
     fecharForm: { km_end: '', notes: '' },
     logisticaCouriers: {}, // rascunho de entregador por pedido (entrega avulsa)
     logisticaPays: {},     // forma de pagamento por pedido (só no Entregue)

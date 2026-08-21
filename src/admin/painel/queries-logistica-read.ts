@@ -34,7 +34,8 @@ export async function getMatrizLogistica(
      WHERE o.environment = $1 AND ${MAIN_DELIVERY_GUARD}`;
 
   const tripSelect = `
-    SELECT t.id, t.trip_number, t.courier_name, t.status, t.km_start::text, t.km_end::text,
+    SELECT t.id, t.trip_number, t.courier_name, t.courier_collaborator_id,
+           t.status, t.km_start::text, t.km_end::text,
            t.fuel_spent::text, t.fuel_expense_id, t.notes, t.started_at, t.ended_at,
            commerce.matriz_trip_financial_status(t.id,t.environment) AS financial_status,
            (SELECT COALESCE(sum(x.amount),0)::text FROM (
@@ -203,7 +204,7 @@ export async function getMatrizLogistica(
       FROM commerce.matriz_delivery_trips t
      WHERE t.environment = $1 AND t.deleted_at IS NULL`;
 
-  const [abertas, reportadas, finalizadas, rotasAbertas, rotasRecentes] = await Promise.all([
+  const [abertas, reportadas, finalizadas, rotasAbertas, rotasRecentes, couriers] = await Promise.all([
     dbPool.query<MatrizDeliveryRow>(
       `${deliverySelect} AND o.status <> 'cancelled' AND o.delivery_status IN ('pending','dispatched')
        ORDER BY scheduled_date ASC, o.created_at ASC`, [environment]),
@@ -213,11 +214,25 @@ export async function getMatrizLogistica(
        ORDER BY o.updated_at DESC`, [environment]),
     dbPool.query<MatrizDeliveryRow>(
       `${deliverySelect} AND (o.delivery_status = 'delivered' OR o.status = 'cancelled')
-       ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC LIMIT 30`, [environment]),
+       AND (COALESCE(o.delivered_at,o.updated_at) AT TIME ZONE 'America/Sao_Paulo')::date
+         >= (now() AT TIME ZONE 'America/Sao_Paulo')::date - 29
+       ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC`, [environment]),
     dbPool.query<MatrizTripRow>(
       `${tripSelect} AND t.status = 'open' ORDER BY t.started_at DESC`, [environment]),
     dbPool.query<MatrizTripRow>(
-      `${tripSelect} AND t.status = 'closed' ORDER BY t.started_at DESC LIMIT 10`, [environment]),
+      `${tripSelect} AND t.status = 'closed'
+       AND (COALESCE(t.ended_at,t.started_at) AT TIME ZONE 'America/Sao_Paulo')::date
+         >= (now() AT TIME ZONE 'America/Sao_Paulo')::date - 29
+       ORDER BY t.started_at DESC`, [environment]),
+    dbPool.query<{ id: string; display_name: string }>(
+      `SELECT mc.id,mc.display_name
+         FROM network.matriz_collaborators mc
+         LEFT JOIN network.matriz_collaborator_operation_permissions op
+           ON op.environment=mc.environment AND op.collaborator_id=mc.id
+        WHERE mc.environment=$1 AND mc.revoked_at IS NULL
+          AND CASE WHEN op.collaborator_id IS NULL THEN mc.job='entregador'
+                   ELSE op.allow_entregas END
+        ORDER BY mc.display_name,mc.id`, [environment]),
   ]);
   return {
     abertas: abertas.rows,
@@ -225,5 +240,6 @@ export async function getMatrizLogistica(
     finalizadas: finalizadas.rows,
     rotas_abertas: rotasAbertas.rows,
     rotas_recentes: rotasRecentes.rows,
+    couriers: couriers.rows,
   };
 }

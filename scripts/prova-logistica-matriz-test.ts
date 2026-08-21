@@ -46,6 +46,8 @@ async function main(): Promise<void> {
   let mainUnitId = '';
   const orderIds: string[] = [];
   const tripIds: string[] = [];
+  const courierIds: string[] = [];
+  const courierPersonIds: string[] = [];
   const runMarker = `PROVA-LOG-${Date.now()}`;
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo',
     year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -119,6 +121,25 @@ async function main(): Promise<void> {
        VALUES ($1::env_t, $2, $3, $4, 100, $5, $6)`, [ENV, id, productId, opts.qty ?? 1, opts.discount ?? 0, opts.unitCost ?? null]);
     orderIds.push(id);
     return id;
+  };
+  const courierId = async (displayName: string): Promise<string> => {
+    const existing = await client.query<{ id: string }>(
+      `SELECT id FROM network.matriz_collaborators
+        WHERE environment=$1 AND id=ANY($2::uuid[]) AND display_name=$3`,
+      [ENV, courierIds, displayName]);
+    if (existing.rows[0]) return existing.rows[0].id;
+    const person = await client.query<{ id: string }>(
+      `INSERT INTO network.partner_people(environment,username)
+       VALUES ($1,$2) RETURNING id`,
+      [ENV, `${runMarker}-${courierPersonIds.length + 1}`.toLowerCase()]);
+    const collaborator = await client.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area)
+       VALUES ($1,$2,$3,'entregador','Entregador','delivery') RETURNING id`,
+      [ENV, person.rows[0]!.id, displayName]);
+    courierPersonIds.push(person.rows[0]!.id);
+    courierIds.push(collaborator.rows[0]!.id);
+    return collaborator.rows[0]!.id;
   };
 
   try {
@@ -220,7 +241,7 @@ async function main(): Promise<void> {
     // ── L6: abrir rota — só a entrega válida entra ──
     const oRota = await seedOrder({ unitId: mainUnitId });
     const trip1 = await openMatrizTrip({
-      courier_name: 'Zé da Moto', km_start: 45000,
+      courier_collaborator_id: await courierId('Zé da Moto'), km_start: 45000,
       order_ids: [oRota, oPickup, oFail], // pickup e cancelado NÃO podem entrar
       environment: ENV,
     });
@@ -308,7 +329,7 @@ async function main(): Promise<void> {
         && (await despesasProva()) === antes + 1);
 
       const oTrip2 = await seedOrder({ unitId: mainUnitId });
-      const trip2 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 100,
+      const trip2 = await openMatrizTrip({ courier_collaborator_id: await courierId('Maria PROVA-LOG'), km_start: 100,
         order_ids: [oTrip2], environment: ENV }, transactionPool);
       tripIds.push(trip2.trip_id);
       const rec2 = await addMatrizTripReceipt({ trip_id: trip2.trip_id,
@@ -335,7 +356,7 @@ async function main(): Promise<void> {
         && rec.deliveries_count === 1);
 
       const oTrip3 = await seedOrder({ unitId: mainUnitId });
-      const trip3 = await openMatrizTrip({ courier_name: 'Rota-Fecha-Antes PROVA-LOG',
+      const trip3 = await openMatrizTrip({ courier_collaborator_id: await courierId('Rota-Fecha-Antes PROVA-LOG'),
         km_start: 200, order_ids: [oTrip3],
         environment: ENV }, transactionPool);
       tripIds.push(trip3.trip_id);
@@ -380,7 +401,7 @@ async function main(): Promise<void> {
 
     // ── L15: teto de comprovantes por rota (banca: anti-abuso de storage) ──
     let capped = false;
-    const trip4 = await openMatrizTrip({ courier_name: 'Maria PROVA-LOG', km_start: 1, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
+    const trip4 = await openMatrizTrip({ courier_collaborator_id: await courierId('Maria PROVA-LOG'), km_start: 1, order_ids: [await seedOrder({ unitId: mainUnitId })], environment: ENV });
     tripIds.push(trip4.trip_id);
     await client.query(
       `INSERT INTO commerce.matriz_trip_receipts (environment, trip_id, mime, size_bytes, ai_status)
@@ -397,7 +418,7 @@ async function main(): Promise<void> {
       const oB = await seedOrder({ unitId: mainUnitId, qty: 2, total: 213, unitCost: 60 });
       const oC = await seedOrder({ unitId: mainUnitId, total: 109.9, unitCost: 60 });
       const oD = await seedOrder({ unitId: mainUnitId, total: 109.9 });
-      const trip5 = await openMatrizTrip({ courier_name: 'Resumo PROVA-LOG', km_start: 500,
+      const trip5 = await openMatrizTrip({ courier_collaborator_id: await courierId('Resumo PROVA-LOG'), km_start: 500,
         order_ids: [oA, oB, oC, oD], environment: ENV }, transactionPool);
       tripIds.push(trip5.trip_id);
       await setMatrizDeliveryStatus({ order_id: oA, status: 'delivered', environment: ENV }, transactionPool);
@@ -450,7 +471,7 @@ async function main(): Promise<void> {
     // ── L17-L20: VÍNCULO PEDIDO↔ROTA (07-03c) — pendurar em rota aberta + rota não
     // abre vazia. Decisão do dono: opção 2 (botão "pôr na rota" + trava de vazia). ──
     const oBase = await seedOrder({ unitId: mainUnitId });
-    const trip6 = await openMatrizTrip({ courier_name: 'Pendura PROVA-LOG', km_start: 10, order_ids: [oBase], environment: ENV });
+    const trip6 = await openMatrizTrip({ courier_collaborator_id: await courierId('Pendura PROVA-LOG'), km_start: 10, order_ids: [oBase], environment: ENV });
     tripIds.push(trip6.trip_id);
     const oPend = await seedOrder({ unitId: mainUnitId });
     const att = await attachOrderToMatrizTrip({ order_id: oPend, trip_id: trip6.trip_id, environment: ENV });
@@ -480,7 +501,7 @@ async function main(): Promise<void> {
 
     // rota NÃO abre vazia (order_ids ausente → count 0 → rollback, nada nasce)
     let barrouVazia = false;
-    try { await openMatrizTrip({ courier_name: 'Vazia PROVA-LOG', km_start: 5, environment: ENV }); }
+    try { await openMatrizTrip({ courier_collaborator_id: await courierId('Vazia PROVA-LOG'), km_start: 5, environment: ENV }); }
     catch (e) { barrouVazia = (e as Error).message === 'trip_needs_delivery'; }
     const orphan = (await client.query(`SELECT count(*)::int AS n FROM commerce.matriz_delivery_trips WHERE environment=$1 AND courier_name='Vazia PROVA-LOG'`, [ENV])).rows[0] as { n: number };
     check('L20 abrir rota vazia é rejeitada (trip_needs_delivery) e NÃO deixa trip órfã',
@@ -621,6 +642,14 @@ async function main(): Promise<void> {
       await client.query(`DELETE FROM commerce.products WHERE id=$1`, [productId]);
     }
     if (contactId) await client.query(`DELETE FROM core.contacts WHERE id=$1`, [contactId]);
+    if (courierIds.length) {
+      await client.query(`DELETE FROM network.matriz_collaborators
+        WHERE environment=$1 AND id=ANY($2::uuid[])`, [ENV, courierIds]);
+    }
+    if (courierPersonIds.length) {
+      await client.query(`DELETE FROM network.partner_people
+        WHERE environment=$1 AND id=ANY($2::uuid[])`, [ENV, courierPersonIds]);
+    }
     client.release();
     await pool.end();
   }

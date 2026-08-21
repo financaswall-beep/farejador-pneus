@@ -8,6 +8,8 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
   let openTrip: typeof import('../../src/admin/painel/queries-logistica-rotas.js').openMatrizTrip;
   let closeTrip: typeof import('../../src/admin/painel/queries-logistica-rotas.js').closeMatrizTrip;
   let attachOrder: typeof import('../../src/admin/painel/queries-logistica-rotas.js').attachOrderToMatrizTrip;
+  let requeueDelivery: typeof import('../../src/admin/painel/queries-logistica-rotas.js').requeueMatrizDelivery;
+  let getCourierRoute: typeof import('../../src/admin/entregador/queries.js').getEntregadorRota;
   let setDelivery: typeof import('../../src/admin/painel/queries-logistica.js').setMatrizDeliveryStatus;
   let approveReceipt: typeof import('../../src/admin/painel/queries-logistica-comprovantes-decision.js').approveMatrizTripReceipt;
   let confirmDivergence: typeof import('../../src/admin/painel/queries-logistica-rotas.js').confirmMatrizTripFuelDivergence;
@@ -21,6 +23,7 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
     db = await startPostgres();
     ({ openMatrizTrip: openTrip, closeMatrizTrip: closeTrip,
       attachOrderToMatrizTrip: attachOrder,
+      requeueMatrizDelivery: requeueDelivery,
       confirmMatrizTripFuelDivergence: confirmDivergence } =
       await import('../../src/admin/painel/queries-logistica-rotas.js'));
     ({ setMatrizDeliveryStatus: setDelivery } =
@@ -29,6 +32,8 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
       await import('../../src/admin/painel/queries-logistica-read.js'));
     ({ approveMatrizTripReceipt: approveReceipt } =
       await import('../../src/admin/painel/queries-logistica-comprovantes-decision.js'));
+    ({ getEntregadorRota: getCourierRoute } =
+      await import('../../src/admin/entregador/queries.js'));
     const unit = await db.pool.query<{ id: string }>(
       `INSERT INTO core.units (environment,slug,name)
        VALUES ('test','main','Matriz Etapa 10') RETURNING id`,
@@ -55,8 +60,19 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
   }
 
   async function createTrip(label: string, orderId: string): Promise<string> {
+    const person = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.partner_people(environment,username)
+       VALUES ('test',$1) RETURNING id`,
+      [`courier-stage10-${contactSequence}-${label}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')],
+    );
+    const collaborator = await db.pool.query<{ id: string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area)
+       VALUES ('test',$1,$2,'entregador','Entregador','delivery') RETURNING id`,
+      [person.rows[0]!.id, `Entregador ${label}`],
+    );
     const trip = await openTrip({
-      courier_name: `Entregador ${label}`, order_ids: [orderId],
+      courier_collaborator_id: collaborator.rows[0]!.id, order_ids: [orderId],
       created_by: 'owner-stage10', environment: 'test',
     }, db.pool);
     return trip.trip_id;
@@ -75,6 +91,78 @@ describe('Etapa 10 - consistencia operacional e financeira da rota', () => {
     );
     await expect(closeTrip({ trip_id: pendingTrip, environment: 'test' }, db.pool))
       .rejects.toThrow('trip_has_unresolved_deliveries');
+  });
+
+  it('rota administrativa grava a identidade ativa e aparece para o entregador correto', async () => {
+    const customer = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.customers(environment,name,phone_e164)
+       VALUES ('test','Cliente Balcao Rota','+5521999999999') RETURNING id`,
+    );
+    const order = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders
+         (environment,customer_id,unit_id,total_amount,status,fulfillment_mode,delivery_address)
+       VALUES ('test',$1,$2,88,'open','delivery','Rua Balcao, 88') RETURNING id`,
+      [customer.rows[0]!.id, unitId],
+    );
+    const tripId = await createTrip('identidade', order.rows[0]!.id);
+    const trip = await db.pool.query<{
+      courier_collaborator_id: string; courier_name: string;
+    }>(
+      `SELECT courier_collaborator_id,courier_name
+         FROM commerce.matriz_delivery_trips WHERE id=$1`, [tripId],
+    );
+    expect(trip.rows[0]!.courier_collaborator_id).toBeTruthy();
+    const route = await getCourierRoute({
+      personId: 'fixture-person', collaboratorId: trip.rows[0]!.courier_collaborator_id,
+      displayName: trip.rows[0]!.courier_name,
+    }, 'test', db.pool);
+    expect(route.rota_aberta?.trip_id).toBe(tripId);
+    expect(route.rota_aberta?.entregas[0]).toMatchObject({
+      customer_name: 'Cliente Balcao Rota', customer_phone: '+5521999999999',
+    });
+  });
+
+  it('reentrega limpa o entregador anterior e herda o nome da nova rota', async () => {
+    const orderId = await seedDelivery('reentrega');
+    await db.pool.query(
+      `UPDATE commerce.orders SET delivery_status='failed',delivery_courier='Marcos Antigo'
+        WHERE id=$1`, [orderId],
+    );
+    await requeueDelivery({ order_id: orderId, environment: 'test' }, db.pool);
+    const routeAnchor = await seedDelivery('nova-rota-reentrega');
+    const tripId = await createTrip('Joao Novo', routeAnchor);
+    await attachOrder({ order_id: orderId, trip_id: tripId, environment: 'test' }, db.pool);
+    const proof = await db.pool.query<{ delivery_courier: string }>(
+      `SELECT delivery_courier FROM commerce.orders WHERE id=$1`, [orderId],
+    );
+    expect(proof.rows[0]!.delivery_courier).toBe('Entregador Joao Novo');
+  });
+
+  it('historico de 30 dias nao corta a 30a entrega nem a 10a rota', async () => {
+    contactSequence += 1;
+    const contact = await db.pool.query<{ id: string }>(
+      `INSERT INTO core.contacts(environment,chatwoot_contact_id,name)
+       VALUES ('test',$1,'Cliente Historico') RETURNING id`, [contactSequence],
+    );
+    const orders = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.orders
+         (environment,contact_id,unit_id,total_amount,status,fulfillment_mode,delivery_address,
+          delivery_status,delivered_at)
+       SELECT 'test',$2,$1,10,'delivered','delivery','Rua Historico '||n,
+              'delivered',now()-((n%7)||' hours')::interval
+         FROM generate_series(1,35) n RETURNING id`, [unitId, contact.rows[0]!.id],
+    );
+    const trips = await db.pool.query<{ id: string }>(
+      `INSERT INTO commerce.matriz_delivery_trips
+         (environment,courier_name,status,ended_at)
+       SELECT 'test','Historico '||n,'closed',now()-((n%7)||' hours')::interval
+         FROM generate_series(1,12) n RETURNING id`,
+    );
+    const logistics = await getLogistics('test', db.pool);
+    const orderIds = new Set(orders.rows.map((row) => row.id));
+    const tripIdsSet = new Set(trips.rows.map((row) => row.id));
+    expect(logistics.finalizadas.filter((row) => orderIds.has(row.order_id))).toHaveLength(35);
+    expect(logistics.rotas_recentes.filter((row) => tripIdsSet.has(row.id))).toHaveLength(12);
   });
 
   it('fecha com failed reportado, despendura sem cancelar e preserva trilha imutavel', async () => {

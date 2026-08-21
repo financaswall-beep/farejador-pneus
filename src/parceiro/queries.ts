@@ -48,6 +48,8 @@ import {
 } from './partner-finance-input.js';
 import { reversePurchaseStockCost } from './partner-stock-cost.js';
 import { partnerPurchaseTotalCents } from './purchase-schema.js';
+import { DeliveryAlreadyFinalizedError } from './delivery-return.js';
+export { DeliveryAlreadyFinalizedError, DeliveryReturnNotAwaitingError, confirmPartnerDeliveryReturn } from './delivery-return.js';
 export type { PartnerCommissionConfig } from './commission.js';
 export {
   getPartnerCommissionTeam,
@@ -1175,13 +1177,6 @@ export interface UpdatePartnerDeliveryInput {
   reason?: string | null;
 }
 
-export class DeliveryAlreadyFinalizedError extends Error {
-  readonly code = 'delivery_already_finalized';
-  constructor() {
-    super('delivery_already_finalized');
-  }
-}
-
 export class PickupAlreadyRetrievedError extends Error {
   readonly code = 'pickup_already_retrieved';
   constructor() {
@@ -1314,23 +1309,27 @@ export async function updatePartnerDeliveryStatus(
     );
     if (existing.rowCount !== 1) throw new Error('delivery_not_found');
 
-    // Integridade: uma entrega ja finalizada (dinheiro no caixa) nao pode ser
-    // "reaberta" por este endpoint — evita destravar caixa sem estorno controlado.
-    if (existing.rows[0]!.delivery_status === 'delivered' && input.delivery_status !== 'delivered') {
+    const current = existing.rows[0]!;
+
+    // Replay de estado terminal devolve o primeiro resultado sem reescrever
+    // entregador, pagamento, data financeira ou auditoria.
+    if (current.delivery_status === input.delivery_status
+        && (current.delivery_status === 'delivered' || current.delivery_status === 'failed')) {
+      return { order_id: orderId, delivery_status: current.delivery_status };
+    }
+
+    // Entregue e falha reportada só saem por operações explícitas. Pedido já
+    // cancelado também é terminal, inclusive se um dado legado estiver incoerente.
+    if (current.status === 'cancelled'
+        || current.delivery_status === 'delivered'
+        || current.delivery_status === 'failed') {
       throw new DeliveryAlreadyFinalizedError();
     }
 
-    // ── Nao entregue / devolvido: estorna estoque + cancela a receber ──
+    // ── Falha reportada: preserva reserva até o pneu voltar fisicamente ──
     if (input.delivery_status === 'failed') {
-      if (existing.rows[0]!.status !== 'cancelled') {
-        const motivoFalha = (input.reason ?? '').trim().slice(0, 500) || 'entrega nao realizada (nao entregue/devolvido)';
-        await client.query("SELECT set_config('app.partner_actor_label',$1,true)", [`partner:${ctx.slug}`]);
-        await client.query('SELECT commerce.cancel_partner_local_order($1, $2, $3)', [
-          orderId,
-          `partner:${ctx.slug}`,
-          motivoFalha,
-        ]);
-      }
+      const motivoFalha = (input.reason ?? '').trim().slice(0, 500)
+        || 'entrega nao realizada; retorno fisico pendente';
       await client.query(
         `UPDATE commerce.partner_orders
          SET delivery_status = 'failed',
@@ -1338,13 +1337,6 @@ export async function updatePartnerDeliveryStatus(
              updated_at = now()
          WHERE id = $1 AND environment = $2 AND unit_id = $3`,
         [orderId, ctx.environment, ctx.unitId, courier],
-      );
-      await client.query(
-        `UPDATE finance.partner_receivables
-         SET status = 'cancelled', deleted_at = now(), deleted_by = $4
-         WHERE source_order_id = $1 AND environment = $2 AND unit_id = $3
-           AND status = 'open' AND deleted_at IS NULL`,
-        [orderId, ctx.environment, ctx.unitId, `partner:${ctx.slug}`],
       );
       await client.query(
         `INSERT INTO audit.events (
@@ -1356,7 +1348,9 @@ export async function updatePartnerDeliveryStatus(
           ctx.environment,
           orderId,
           `partner:${ctx.slug}`,
-          JSON.stringify({ unit_id: ctx.unitId, delivery_status: 'failed', delivery_courier: courier }),
+          JSON.stringify({ unit_id: ctx.unitId, delivery_status: 'failed',
+            delivery_courier: courier, reason: motivoFalha,
+            stock_release_pending_physical_return: true }),
         ],
       );
       return { order_id: orderId, delivery_status: 'failed' };
@@ -1411,15 +1405,19 @@ export async function updatePartnerDeliveryStatus(
     // ON CONFLICT cobre o pedido LEGADO que ainda tinha 'open' (flipa pra received, sem
     // duplicar) — mesma idempotency_key da venda.
     if (input.delivery_status === 'delivered') {
-      const od = existing.rows[0]!;
+      const od = current;
       await client.query(
         `INSERT INTO finance.partner_receivables (
            environment, unit_id, customer_id, customer_name, description, source_tag, amount,
            due_date, status, received_at, payment_method, notes, created_by, idempotency_key, source_order_id
          ) VALUES ($1, $2, $3, $4, $5, '2w', $6, NULL, 'received', now(), $7, $8, $9, $10, $11)
          ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
-         DO UPDATE SET status = 'received', received_at = now(),
-                       payment_method = COALESCE(EXCLUDED.payment_method, finance.partner_receivables.payment_method)`,
+         DO UPDATE SET status = 'received', received_at = now(), deleted_at = NULL,
+                       deleted_by = NULL,
+                       payment_method = COALESCE(EXCLUDED.payment_method,
+                         finance.partner_receivables.payment_method)
+         WHERE finance.partner_receivables.status = 'open'
+           AND finance.partner_receivables.deleted_at IS NULL`,
         [
           ctx.environment, ctx.unitId, od.customer_id, od.customer_name,
           `Entrega ${orderId.slice(0, 8)}`, od.total_amount,

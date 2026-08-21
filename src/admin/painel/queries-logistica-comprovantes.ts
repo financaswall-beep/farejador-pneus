@@ -99,14 +99,16 @@ export async function addMatrizTripReceipt(
     await client.query('BEGIN');
     const trip = await client.query(
       `SELECT 1 FROM commerce.matriz_delivery_trips
-        WHERE id = $2 AND environment = $1 AND deleted_at IS NULL`,
+        WHERE id = $2 AND environment = $1 AND deleted_at IS NULL
+        FOR UPDATE`,
       [environment, input.trip_id],
     );
     if (!trip.rows[0]) throw new Error('trip_not_found');
     // Teto de comprovantes por rota (banca 07-03, anti-abuso de storage — blob é BYTEA).
     const count = await client.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM commerce.matriz_trip_receipts WHERE trip_id = $1`,
-      [input.trip_id],
+      `SELECT count(*)::int AS n FROM commerce.matriz_trip_receipts
+        WHERE environment=$1 AND trip_id=$2`,
+      [environment, input.trip_id],
     );
     if (Number(count.rows[0]!.n) >= 50) throw new Error('receipt_limit');
     const receipt = await client.query<{ id: string }>(

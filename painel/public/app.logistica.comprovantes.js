@@ -87,6 +87,9 @@ window.PAINEL_MODULES.logisticaComprovantes = function () {
       if (payload?.error === 'receipt_exact_duplicate') {
         return 'Este arquivo já foi usado em outro comprovante.';
       }
+      if (payload?.error === 'receipt_limit') {
+        return 'Esta rota já atingiu o limite de 50 comprovantes.';
+      }
       return `Não consegui subir o comprovante (${payload?.error || 'erro desconhecido'}).`;
     },
     receiptWorkflowLabel(receipt) {

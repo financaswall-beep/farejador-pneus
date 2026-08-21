@@ -165,7 +165,8 @@ export interface EntregadorRota {
 
 // SELECT do card — só campo operacional. NADA de custo/lucro/despesa/frete.
 const CARD_SELECT = `
-  SELECT o.id AS order_id, c.name AS customer_name, c.phone_e164 AS customer_phone,
+  SELECT o.id AS order_id, COALESCE(c.name,cu.name) AS customer_name,
+         COALESCE(c.phone_e164,cu.phone_e164) AS customer_phone,
          o.delivery_address, o.total_amount::text AS cobrar, o.payment_method, o.delivery_status,
          o.scheduled_delivery_date::text AS scheduled_raw,
          COALESCE(o.scheduled_delivery_date, ((o.created_at AT TIME ZONE 'America/Sao_Paulo')::date + 1))::text AS scheduled_date,
@@ -178,6 +179,8 @@ const CARD_SELECT = `
                     WHERE oi.order_id = o.id AND oi.environment = o.environment), '[]'::jsonb) AS items
     FROM commerce.orders o
     LEFT JOIN core.contacts c ON c.id = o.contact_id
+    LEFT JOIN commerce.customers cu
+      ON cu.id=o.customer_id AND cu.environment=o.environment
     LEFT JOIN LATERAL (
       SELECT prq.id AS photo_request_id
         FROM core.conversations cv

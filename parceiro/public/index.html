@@ -923,7 +923,7 @@
         </article>
         <article>
           <div class="pos-kpi-icon"><i data-lucide="package-x"></i></div>
-          <div><small>Não entregues</small><strong x-text="ordersFailedCount"></strong><span>estoque devolvido</span></div>
+          <div><small>Não entregues</small><strong x-text="ordersFailedCount"></strong><span>aguardando retorno</span></div>
         </article>
       </section>
 
@@ -973,7 +973,7 @@
                       <span x-text="'Criado ' + formatDateTime(o.created_at)"></span>
                       <span x-show="o.delivery_courier" x-text="'Entregador: ' + o.delivery_courier"></span>
                       <span x-show="o.delivered_at" x-text="'Finalizado ' + formatDateTime(o.delivered_at)"></span>
-                      <span class="pos-order-pay" x-text="o.status === 'cancelled' ? 'Cancelado — sem cobrança' : (o.delivery_status === 'delivered' ? ('Recebido' + (o.payment_method && o.payment_method !== 'A receber' ? ' · ' + o.payment_method : '')) : (o.delivery_status === 'failed' ? 'Cancelado — sem cobrança' : 'A receber na entrega'))"></span>
+                      <span class="pos-order-pay" x-text="o.status === 'cancelled' ? 'Retorno confirmado — sem cobrança' : (o.delivery_status === 'delivered' ? ('Recebido' + (o.payment_method && o.payment_method !== 'A receber' ? ' · ' + o.payment_method : '')) : (o.delivery_status === 'failed' ? 'Falha informada — estoque ainda reservado' : 'A receber na entrega'))"></span>
                     </div>
                     <strong class="pos-order-total" x-text="money(o.total_amount)"></strong>
                   </div>
@@ -1940,9 +1940,12 @@
                     <button x-show="d.delivery_status === 'dispatched'" class="act-icon undo" @click="setDeliveryStatus(d, 'pending')" :disabled="isSaving('delivery-' + d.order_id)" title="Voltar pra pendente">
                       <i data-lucide="rotate-ccw"></i>
                     </button>
-                    <!-- Nao entregue / devolvido: devolve o estoque e nao recebe nada (tem confirmacao) -->
+                    <!-- Falha reportada preserva a reserva; o retorno físico é outra confirmação. -->
                     <button x-show="d.delivery_status === 'pending' || d.delivery_status === 'dispatched'" class="act-icon failed" @click="confirmDeliveryFailed(d)" :disabled="isSaving('delivery-' + d.order_id)" title="Não entregue / devolveu">
                       <i data-lucide="package-x"></i>
+                    </button>
+                    <button x-show="d.delivery_status === 'failed'" class="act-primary done" @click="confirmDeliveryReturn(d)" :disabled="isSaving('delivery-' + d.order_id)">
+                      <i data-lucide="package-check"></i> Confirmar retorno à loja
                     </button>
                   </footer>
                 </article>
@@ -3429,7 +3432,7 @@
  <script src="./app.core.js?v=20260810-aprovacao1"></script>
 <script src="./app.auth.js?v=20260805-entrada-simples1"></script>
 <script src="./app.resumo.js?v=20260810-resumo-web1"></script>
-<script src="./app.pedidos.js?v=20260611-onda-c"></script>
+<script src="./app.pedidos.js?v=20260821-logistics-auditfix1"></script>
 <script src="./app.entregas.js?v=20260731-condicao2"></script>
 <script src="./app.arquivar.js?v=20260616-arquivar"></script>
 <script src="./app.relatorios.js?v=20260616-relatorios"></script>

@@ -14,6 +14,7 @@ export interface MatrizDeliveryRow {
 
 export interface MatrizTripRow {
   id: string; trip_number: string; courier_name: string;
+  courier_collaborator_id: string | null;
   status: 'open' | 'closed';
   km_start: string | null; km_end: string | null; fuel_spent: string | null;
   fuel_expense_id: string | null; fuel_spent_without_approved_expense: boolean;
@@ -57,4 +58,5 @@ export interface MatrizLogistica {
   finalizadas: MatrizDeliveryRow[];
   rotas_abertas: MatrizTripRow[];
   rotas_recentes: MatrizTripRow[];
+  couriers: Array<{ id: string; display_name: string }>;
 }

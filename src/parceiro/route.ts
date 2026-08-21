@@ -35,6 +35,7 @@ import {
   cancelPartnerPayable,
   cancelPartnerReceivable,
   DeliveryAlreadyFinalizedError,
+  DeliveryReturnNotAwaitingError,
   PickupAlreadyRetrievedError,
   markPartnerPickupRetrieved,
   deletePartnerPurchase,
@@ -90,6 +91,7 @@ import {
   updatePartnerPayable,
   updatePartnerReceivable,
   updatePartnerDeliveryStatus,
+  confirmPartnerDeliveryReturn,
   upsertPartnerStock,
   createPartnerFuncionario,
   resetPartnerFuncionarioPassword,
@@ -1285,6 +1287,29 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
       }
       if (err instanceof Error && err.message.includes('Entrega ja finalizada')) {
         return reply.status(409).send({ error: 'delivery_already_finalized', message: 'Esta entrega ja foi finalizada.' });
+      }
+      throw err;
+    }
+  });
+
+  // A falha apenas preserva a reserva. A baixa definitiva só acontece quando
+  // alguém da loja confirma que os pneus voltaram fisicamente.
+  fastify.post('/parceiro/:slug/api/entregas/:orderId/confirmar-retorno', { preHandler: [requirePartnerAuth, requireScreen('entregas')] }, async (request: PartnerAuthedRequest, reply) => {
+    const params = saleParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(404).send({ error: 'delivery_not_found' });
+    const body = cancelSchema.safeParse(request.body ?? {});
+    if (!body.success) return reply.status(400).send({ error: 'invalid_body' });
+    try {
+      return reply.status(200).send(await confirmPartnerDeliveryReturn(
+        getPartnerContext(request), params.data.orderId, body.data.reason,
+      ));
+    } catch (err) {
+      if (err instanceof DeliveryReturnNotAwaitingError) {
+        return reply.status(409).send({ error: err.code,
+          message: 'Esta entrega nao esta aguardando retorno fisico.' });
+      }
+      if (err instanceof Error && err.message === 'delivery_not_found') {
+        return reply.status(404).send({ error: 'delivery_not_found' });
       }
       throw err;
     }

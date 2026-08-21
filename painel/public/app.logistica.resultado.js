@@ -6,7 +6,11 @@ window.PAINEL_MODULES.logisticaResultado = function () {
       const data = this.logisticaDataOperacional(d);
       if (!data) return true;
       if (this.logisticaPeriodo === 'amanha') return data === this.amanhaISO();
-      if (this.logisticaPeriodo === '7dias') return data >= this.hojeISO() && data <= this.logisticaPeriodoFinalISO();
+      if (this.logisticaPeriodo === '7dias') {
+        return this.logisticaTab === 'historico'
+          ? data >= this.logisticaPeriodoInicioISO(7) && data <= this.hojeISO()
+          : data >= this.hojeISO() && data <= this.logisticaPeriodoFinalISO();
+      }
       if (this.logisticaPeriodo === '30dias') {
         const inicio = new Date(this.hojeISO() + 'T12:00:00-03:00');
         inicio.setUTCDate(inicio.getUTCDate() - 29);
@@ -16,7 +20,9 @@ window.PAINEL_MODULES.logisticaResultado = function () {
     },
     logisticaPeriodoLabel() {
       if (this.logisticaPeriodo === 'amanha') return 'Amanhã';
-      if (this.logisticaPeriodo === '7dias') return 'Próximos 7 dias';
+      if (this.logisticaPeriodo === '7dias') {
+        return this.logisticaTab === 'historico' ? 'Últimos 7 dias' : 'Próximos 7 dias';
+      }
       if (this.logisticaPeriodo === '30dias') return 'Últimos 30 dias';
       return 'Hoje';
     },

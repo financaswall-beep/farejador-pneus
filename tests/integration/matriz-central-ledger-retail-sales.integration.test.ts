@@ -279,15 +279,19 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
     expect(Number(proof.rows[0].balance)).toBe(0);
   });
 
-  it('entrega nasce como recebivel e so vira caixa ao ser entregue', async () => {
+  it('entrega so nasce no ledger ao ser entregue e usa a competencia da entrega', async () => {
     const f = await fixture(20);
     const sale = await registerWalkin(input(f.productId, 'dinheiro', 'delivery'), db.pool);
+    await db.pool.query(
+      `UPDATE commerce.orders SET created_at='2026-07-31T23:30:00-03:00' WHERE id=$1`,
+      [sale.order_id],
+    );
     const before = await db.pool.query<{ transaction_kind: string }>(
       `SELECT transaction_kind FROM finance.matriz_ledger_transactions
         WHERE environment='test' AND source_type='commerce.order.revenue' AND source_id=$1`,
       [sale.order_id],
     );
-    expect(before.rows[0]!.transaction_kind).toBe('sale_receivable');
+    expect(before.rows).toHaveLength(0);
 
     await setDelivery({
       environment: 'test', order_id: sale.order_id,
@@ -299,14 +303,23 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
             JOIN finance.matriz_ledger_transactions obligation
               ON obligation.id=p.obligation_transaction_id
            WHERE obligation.source_type='commerce.order.revenue'
-             AND obligation.source_id=$1) payments,
-         (SELECT finance.matriz_ledger_obligation_balance('test',id)
+             AND obligation.source_id=$1::text) payments,
+         (SELECT transaction_kind
             FROM finance.matriz_ledger_transactions
            WHERE environment='test' AND source_type='commerce.order.revenue'
-             AND source_id=$1) balance`,
+             AND source_id=$1::text) revenue_kind,
+         (SELECT competence_on::text FROM finance.matriz_ledger_transactions
+           WHERE environment='test' AND source_type='commerce.order.revenue'
+             AND source_id=$1::text) competence_on,
+         (SELECT (delivered_at AT TIME ZONE 'America/Sao_Paulo')::date::text
+            FROM commerce.orders WHERE id=$1::uuid) delivered_on`,
       [sale.order_id],
     );
-    expect(after.rows[0].payments).toBe(1);
-    expect(Number(after.rows[0].balance)).toBe(0);
+    // Venda à vista entregue nasce diretamente como venda-caixa; não precisa
+    // criar uma baixa separada contra contas a receber.
+    expect(after.rows[0].payments).toBe(0);
+    expect(after.rows[0].revenue_kind).toBe('sale_cash');
+    expect(after.rows[0].competence_on).toBe(after.rows[0].delivered_on);
+    expect(after.rows[0].competence_on).not.toBe('2026-07-31');
   });
 });

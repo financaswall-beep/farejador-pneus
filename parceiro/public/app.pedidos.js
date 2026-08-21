@@ -140,10 +140,30 @@ window.PARCEIRO_MODULES.pedidos = () => ({
     confirmDeliveryFailed(sale) {
       if (!sale || !sale.order_id) return;
       const who = sale.customer_name || 'este pedido';
-      const reason = prompt(`Marcar a entrega de ${who} como NÃO entregue?\n\nEscreva o motivo (o estoque volta e nada entra no caixa):`);
+      const reason = prompt(`Marcar a entrega de ${who} como NÃO entregue?\n\nEscreva o motivo. O estoque continuará reservado até a loja confirmar que os pneus voltaram:`);
       if (reason === null) return; // cancelou o prompt
       if (this.isTwoW(sale) && !reason.trim()) { this.flash('Escreva o motivo (pedido da Rede 2W).'); return; }
       this.setDeliveryStatus(sale, 'failed', reason.trim());
+    },
+
+    async confirmDeliveryReturn(sale) {
+      if (!sale || !sale.order_id || sale.delivery_status !== 'failed') return;
+      const who = sale.customer_name || 'este pedido';
+      const reason = prompt(`Os pneus da entrega de ${who} já voltaram fisicamente para a loja?\n\nAo confirmar, o pedido será cancelado e a reserva será liberada. Observação opcional:`);
+      if (reason === null) return;
+      const action = `delivery-${sale.order_id}`;
+      this.saving = true; this.savingAction = action;
+      try {
+        await this.api(`entregas/${sale.order_id}/confirmar-retorno`, {
+          method: 'POST', body: JSON.stringify({ reason: reason.trim() || null }),
+        });
+        await this.loadData();
+        this.flash('Retorno confirmado — pedido cancelado e estoque liberado.');
+      } catch (err) {
+        this.flash(this.errMessage(err));
+      } finally {
+        this.saving = false; this.savingAction = '';
+      }
     },
 
     async setDeliveryStatus(sale, status, reason) {
@@ -165,7 +185,7 @@ window.PARCEIRO_MODULES.pedidos = () => ({
         const flashes = {
           delivered: 'Entrega finalizada — venda registrada e dinheiro no caixa.',
           dispatched: 'Saiu pra entrega.',
-          failed: 'Marcado como não entregue — estoque devolvido, nada no caixa.',
+          failed: 'Falha registrada — o estoque continua reservado até o retorno físico.',
           pending: 'Entrega reaberta.',
         };
         this.flash(flashes[status] || 'Entrega atualizada.');
