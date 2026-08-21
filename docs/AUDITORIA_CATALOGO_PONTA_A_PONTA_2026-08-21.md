@@ -1,7 +1,7 @@
 # Auditoria do Catálogo — Matriz e parceiro
 
 **Data:** 21/08/2026
-**Estado:** aprovado em código, banco descartável e banco-alvo; migration `0197` aplicada e reconciliada. O runtime novo ainda depende de publicação e deploy manual.
+**Estado:** aprovado em código, banco descartável e banco-alvo; migration `0197` aplicada e reconciliada; código incorporado à `main`. O runtime novo depende apenas do deploy manual e smoke.
 
 ## 1. Escopo
 
@@ -116,6 +116,14 @@ reescritas silenciosas; não foram fabricados eventos retroativos.
 - reconciliação pós-commit: **8/8 controles zerados**;
 - auditoria somente leitura depois do commit: aprovada.
 
+### Publicação
+
+- commit funcional: `a350715226dc02f49895cdb2557fd5ea65f233d6`;
+- PR `#72`: aprovada e incorporada;
+- CI: run `32532288224`, aprovado em 6m04s;
+- `main` após a incorporação: `ab853b3aa8a99030c3d71e0150cfbd77a3d7042b`;
+- deploy no Coolify: não iniciado, reservado ao responsável.
+
 ## 7. Baterias executadas
 
 | Bateria | Resultado |
@@ -139,10 +147,9 @@ BANCO-ALVO E AUDITORIA SOMENTE LEITURA.** As correções de runtime ainda depend
 
 Para declarar a seção implantada ainda é obrigatório:
 
-1. publicar o código e confirmar o CI da `main`;
-2. deixar o responsável executar o deploy;
-3. fazer smoke autenticado como dono e funcionário na Matriz, e como dono e funcionário no parceiro;
-4. testar no runtime uma alteração de preço, uma venda negociada e confirmar que a venda passada não mudou.
+1. deixar o responsável executar o deploy;
+2. fazer smoke autenticado como dono e funcionário na Matriz, e como dono e funcionário no parceiro;
+3. testar no runtime uma alteração de preço, uma venda negociada e confirmar que a venda passada não mudou.
 
 Definir preço para `TEC-909018-MV` é opcional para a implantação, mas necessário se esse
 produto de teste precisar ser vendido.
