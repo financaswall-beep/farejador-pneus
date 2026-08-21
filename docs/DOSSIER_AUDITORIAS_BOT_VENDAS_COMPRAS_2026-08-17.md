@@ -779,7 +779,7 @@ no run `32489173112` e incorporada à `main` no SHA funcional
 sem mudar o runtime; o Coolify deve importar o HEAD atual da `main`, que precisa conter esse
 SHA funcional. O deploy ainda não foi iniciado.
 
-## 16. Auditoria em andamento — Clientes da Matriz e parceiro
+## 16. Auditoria e deploy — Clientes da Matriz e parceiro
 
 Clientes foi cruzado com Chatwoot, Bot, Conversas, Vendas, Estoque, Logística, Financeiro,
 Marketing, Rede e o cadastro/PDV do parceiro. Foram corrigidos o nome genérico `John Doe`, a
@@ -792,10 +792,26 @@ de venda verdadeira; nenhuma movimentação manual cria receita, baixa estoque o
 conversão artificialmente. Arquivar só limpa a fila e mantém todo o histórico. As ações são
 transacionais, idempotentes, versionadas e auditadas pela migration aditiva `0196`.
 
-**Situação:** código, build, unitários dirigidos, segurança estática, paridade e navegador
+**Situação pré-deploy:** código, build, unitários dirigidos, segurança estática, paridade e navegador
 local aprovados. Com o Docker restabelecido, as 2 suítes específicas de Clientes passaram
 4/4 cenários e a regressão PostgreSQL completa passou 264/264 testes em 50 arquivos. A
 `0196` foi aplicada no banco-alvo depois de backup validado, dry-run e reconciliação; não
-restou linha inválida, cruzada ou de teste. Clientes está aprovada para publicação; restam
-o deploy manual pelo responsável e o smoke pós-deploy. Relatório:
+restou linha inválida, cruzada ou de teste.
+
+**Publicação e ambiente:** PR `#70` aprovada e incorporada à `main`; Coolify implantou o SHA
+`22ea499c7a3bd98d81a3daf0733042f39ed87dd1` em 21/08/2026. Liveness, readiness, health,
+banco, schema, banco do parceiro, páginas da Matriz/Rio do Ouro, módulos novos e bloqueio
+sem autenticação foram aprovados. O smoke visual autenticado permanece pendente por ausência
+de sessão normal no navegador de auditoria.
+
+**Chatwoot/Facebook:** a API da conta operacional confirmou 15 contatos e 15 conversas da
+inbox Facebook `34`, todos gravados no próprio Chatwoot como `John Doe`. Todos possuem
+`source_id`, mas nenhum possui avatar, e-mail, identificador ou atributos de perfil. A inbox
+não se declara expirada, porém a evidência é compatível com falta de acesso aos dados do
+perfil na Meta. O runtime implantado ignora esse placeholder; a origem deve ser corrigida por
+reautorização da inbox. Token de API e HMAC expostos no canal devem ser rotacionados de forma
+coordenada, sem registrar seus valores neste documento.
+
+**Veredito:** Clientes aprovada em código, banco e deploy técnico. Restam reautorizar a Meta,
+rotacionar os segredos, validar um contato novo e concluir o smoke visual autenticado. Relatório:
 `docs/AUDITORIA_CLIENTES_PONTA_A_PONTA_2026-08-21.md`.
