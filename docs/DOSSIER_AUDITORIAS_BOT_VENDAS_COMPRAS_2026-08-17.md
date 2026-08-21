@@ -4,7 +4,7 @@
 **Escopo:** painel da Matriz, app do parceiro, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística, Financeiro e Equipe.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
-**Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. As migrations de Equipe `0192` e `0193` foram aplicadas e reconciliadas em 21/08/2026, antes do deploy do runtime correspondente.
+**Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. As migrations de Equipe `0192` e `0193` foram aplicadas e reconciliadas em 21/08/2026, antes do deploy do runtime correspondente. A release de código de Equipe é rastreada pela PR `#66`.
 
 **Atualização de continuidade em 20/08/2026:** o repositório está em `main` no SHA
 `2064f1a`. A migration `0189_checkout_price_negotiation.sql` foi confirmada
@@ -693,7 +693,7 @@ recursos; a bateria, os bancos descartáveis e as asserções permanecem os mesm
 produção, integração, matemática, segurança e regressão cruzada. As migrations `0192` e
 `0193` foram aplicadas em uma única transação depois de backup validado e ensaio com
 `ROLLBACK`. A reconciliação específica passou em 13/13 controles; a auditoria geral de
-produção também retornou `PASS`, inclusive ledger e RLS. Restam publicar o código, fazer o
-deploy manual e executar o smoke autenticado na Matriz e no parceiro.
+produção também retornou `PASS`, inclusive ledger e RLS. O código da entrega é rastreado
+pela PR `#66`; restam o deploy manual e o smoke autenticado na Matriz e no parceiro.
 
 Relatório reproduzível: `docs/AUDITORIA_EQUIPE_PONTA_A_PONTA_2026-08-21.md`.

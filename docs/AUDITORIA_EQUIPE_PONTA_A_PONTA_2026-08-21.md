@@ -5,7 +5,8 @@
 vínculos de trabalho, remuneração, comissão, folha, Vendas, Estoque, Logística e
 Financeiro.
 **Estado deste documento:** correções concluídas em código; migrations `0192` e
-`0193` aplicadas e reconciliadas no banco de produção; deploy ainda não iniciado.
+`0193` aplicadas e reconciliadas no banco de produção; release rastreada pela PR
+`#66`; deploy ainda não iniciado.
 
 ## O que foi cruzado
 
@@ -133,8 +134,8 @@ Estas ideias não são correções e não foram adicionadas sem decisão do dono
 **APROVADO EM CÓDIGO, BANCO DESCARTÁVEL, BANCO DE PRODUÇÃO, INTEGRAÇÃO,
 MATEMÁTICA, SEGURANÇA E REGRESSÃO CRUZADA.** Os defeitos confirmados estão corrigidos,
 cobertos por migrations e testes, e as migrations `0192` e `0193` já estão aplicadas e
-reconciliadas. Restam a publicação do código, o deploy manual e o smoke autenticado. Este
-veredito não declara o runtime novo já implantado.
+reconciliadas. O código desta entrega é rastreado pela PR `#66`. Restam o deploy manual e
+o smoke autenticado. Este veredito não declara o runtime novo já implantado.
 
 O comando `npm run test:integration` também foi estabilizado: ele renova o processo do
 Vitest a cada 12 arquivos, sequencialmente. Isso evita o encerramento tardio do worker por
