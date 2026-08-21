@@ -4,7 +4,8 @@
 **Código auditado:** `abbcab556cf2a6b32b9a4875fc0d94e9e2479d52`
 **Banco:** produção auditada, migration aplicada e PostgreSQL 17 descartável
 **Situação:** auditoria concluída; 12 correções implementadas e aprovadas; migration `0191`
-aplicada materialmente após backup validado; código ainda aguardando publicação/deploy
+aplicada materialmente após backup validado; código incorporado à `main` pela PR `#63` no
+SHA `86287042f004d8b21cbac4682e1e3a0d83bc4c2b`; deploy ainda pendente
 
 ## 1. Veredito executivo
 
@@ -360,7 +361,7 @@ encerramento intencional dos PostgreSQL descartáveis depois de cada grupo aprov
 ### Veredito pós-correção
 
 **LOGÍSTICA APROVADA EM CÓDIGO, BANCO, INTEGRAÇÃO, MATEMÁTICA, SEGURANÇA E CONCORRÊNCIA
-PARA PUBLICAÇÃO.** A migration `0191` já está aplicada e confirmada materialmente. Ainda não
-é uma aprovação do runtime novo em execução: o código precisa ser publicado/deployado pelo
-fluxo autorizado e o smoke autenticado pós-deploy precisa confirmar Matriz, entregador e
-parceiro.
+PARA DEPLOY.** A migration `0191` já está aplicada e confirmada materialmente, e o código foi
+incorporado à `main` pela PR `#63`. Ainda não é uma aprovação do runtime novo em execução: o
+responsável precisa fazer o deploy do SHA publicado e o smoke autenticado pós-deploy precisa
+confirmar Matriz, entregador e parceiro.
