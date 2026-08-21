@@ -48,6 +48,7 @@ import {
   applyPartnerPricesToProducts,
   repriceMatrizQuotedItems,
 } from './channel-pricing.js';
+import { recordGeoRoutingDecision, recordPartnerRoutingDecision } from './routing-decisions.js';
 
 // ─── Camada GEO: resolução de loja por proximidade (compartilhada) ───────────
 // FONTE ÚNICA da decisão de loja pros dois caminhos (calcular_frete e criar_pedido),
@@ -85,6 +86,7 @@ async function fillCityFromPin(
 }
 
 interface GeoOnlyFar {
+  unitId: string;
   unitName: string;
   distanceKm: number;
 }
@@ -103,6 +105,7 @@ async function decideStoreGeoOrFallback(
     municipio: string | null;
     items: { product_id: string; quantity: number }[];
     bairro: string | null | undefined;
+    modality?: 'delivery' | 'quote';
     /** Endereço completo (rua+número) digitado pelo cliente na ENTREGA — geocodifica fino. */
     fullAddress?: string | null;
   },
@@ -129,15 +132,28 @@ async function decideStoreGeoOrFallback(
         customerLocation,
         clientNeighborhoodCanonical: input.bairro ? normalizeRegion(input.bairro) : null,
       });
-      if (geo.kind === 'partner') return { routing: geo.routing };
-      if (geo.kind === 'only_far') return { routing: null, onlyFar: { unitName: geo.unitName, distanceKm: geo.distanceKm } };
+      if (geo.kind === 'partner') {
+        await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
+        return { routing: geo.routing };
+      }
+      if (geo.kind === 'only_far') {
+        await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
+        return { routing: null, onlyFar: {
+          unitId: geo.unitId,unitName: geo.unitName,distanceKm: geo.distanceKm,
+        } };
+      }
       // matriz: mede cliente→Matriz e cobra o frete por DISTÂNCIA (decisão 06-19).
       const km = await matrizDistanceKm(client, customerLocation);
+      await recordGeoRoutingDecision(client,environment,conversationId,geo,input.municipio,input.modality ?? 'delivery');
       return { routing: null, matrizFreight: matrizFreightForKm(km), matrizDistanceKm: km };
     }
     // sem coordenada → cai no fallback por cidade (caso F)
   }
   const routing = await decideStoreForItems(client, environment, { municipio: input.municipio, items: input.items });
+  await recordPartnerRoutingDecision(client, environment, conversationId, {
+    unitId: routing?.unitId ?? null,kind: routing ? 'partner' : 'matrix',
+    municipio: input.municipio,modality: input.modality ?? 'delivery',
+  });
   // matriz sem coordenada (caso F): não dá pra medir distância → frete base da rede.
   return routing ? { routing } : { routing: null, matrizFreight: matrizFreightForKm(null), matrizDistanceKm: null };
 }
@@ -172,6 +188,7 @@ async function quoteFreteFromPin(
     municipio,
     items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
     bairro: undefined,
+    modality: 'quote',
   });
   if (decision.onlyFar) {
     return JSON.stringify({
@@ -752,6 +769,7 @@ export async function executeTool(
             municipio,
             items: produtos.map((p) => ({ product_id: p.product_id, quantity: p.quantidade ?? 1 })),
             bairro: args.bairro as string | undefined,
+            modality: 'quote',
           });
           if (decision.routing) {
             return JSON.stringify({
@@ -852,6 +870,7 @@ export async function executeTool(
             customerLocation,
             clientNeighborhoodCanonical,
           });
+          await recordGeoRoutingDecision(client,environment,conversationId,geo,municipio,'pickup');
           if (geo.kind === 'partner') {
             const disp = await getUnitDisplayById(client, environment, geo.routing.unitId);
             if (disp) {
@@ -1276,6 +1295,7 @@ async function criarPedido(
   // mas com PICKUP_TO_PARTNER on + proximidade (ROUTING_GEO + coordenada) vai pro
   // parceiro mais perto RESERVANDO o pneu (decisão Wallace 2026-06-07).
   let partner: PartnerOrderRouting | null = null;
+  let pickupRoutingDecisionRecorded = false;
 
   if (modalidade === 'delivery') {
     // Município do geo (se cotou frete) OU do bairro. Sem este OR, entrega SEM
@@ -1338,6 +1358,8 @@ async function criarPedido(
           customerLocation,
           clientNeighborhoodCanonical: args.bairro ? normalizeRegion(args.bairro as string) : null,
         });
+        await recordGeoRoutingDecision(client,environment,conversationId,geo,municipio,'pickup');
+        pickupRoutingDecisionRecorded = true;
         // Caso E (só tem longe): por padrão pergunta antes de criar (igual à entrega).
         // EXCEÇÃO — consentimento (decisão Wallace 2026-06-08): se o cliente já bancou ir
         // buscar mesmo longe (o bot marcou confirma_retirada_distante), reserva o pneu na
@@ -1362,6 +1384,12 @@ async function criarPedido(
         }
       }
     }
+  }
+
+  if (modalidade === 'pickup' && !partner && !pickupRoutingDecisionRecorded) {
+    await recordPartnerRoutingDecision(client, environment, conversationId, {
+      unitId: null,kind: 'matrix',municipio: null,modality: 'pickup',
+    });
   }
 
   let order: { id: string; order_number: string };

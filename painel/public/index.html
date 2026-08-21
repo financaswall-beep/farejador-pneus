@@ -229,7 +229,7 @@
       </button>
 
       <!-- Novo parceiro (cadastro na matriz — Etapa 1 onboarding) -->
-      <button @click="openPartnerModal()"
+      <button x-show="adminUser?.role === 'owner'" @click="openPartnerModal()"
               :class="mockTopbar
                         ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
                         : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
@@ -239,7 +239,7 @@
       </button>
 
       <!-- Candidaturas (Etapa 3) -->
-      <button @click="openApplications()"
+      <button x-show="adminUser?.role === 'owner'" @click="openApplications()"
               :class="mockTopbar
                         ? 'h-10 px-3 text-xs border-emerald-700 bg-emerald-950 text-emerald-50 hover:border-emerald-500 rounded-xl'
                         : 'px-4 py-2 text-sm bg-white border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg'"
@@ -481,7 +481,7 @@
           <div class="bg-white border border-gray-200 rounded-xl p-5">
             <div class="flex items-center justify-between mb-1">
               <h3 class="font-semibold">A receber da rede</h3>
-              <span class="text-sm font-bold text-emerald-700" x-text="formatCurrency(redeAReceberTotal())"></span>
+              <span class="text-sm font-bold text-emerald-700" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeAReceberTotal())"></span>
             </div>
             <p class="text-xs text-gray-500 mb-3" x-text="livroComissaoOn() ? 'Mensalidade do mês + comissões EM ABERTO no livro' : 'Mensalidade + comissão sobre vendas 2W · ' + redePeriodLabel()"></p>
             <div class="space-y-1.5 text-sm">
@@ -491,7 +491,7 @@
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-gray-500" x-text="livroComissaoOn() ? 'Comissão (em aberto)' : 'Comissão 2W'"></span>
-                <span class="font-medium" x-text="formatCurrency(redeComissaoAReceber())"></span>
+                <span class="font-medium" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeComissaoAReceber())"></span>
               </div>
             </div>
             <a href="#" @click.prevent="currentPage = 'rede'" class="mt-4 flex items-center justify-between text-sm text-gray-900 hover:underline">
@@ -562,6 +562,16 @@
             </template>
           </div>
         </div>
+      </div>
+
+      <div x-show="comissoesUnavailable" x-cloak
+           class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        Não foi possível consultar o livro de comissões. Os valores a receber ficam indisponíveis para não exibir estimativas como se fossem cobranças reais.
+      </div>
+      <div x-show="redeFunnelUnassigned > 0" x-cloak
+           class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <strong x-text="redeFunnelUnassigned"></strong>
+        atendimento(s) do bot ainda não têm unidade atribuída no período e aparecem separados do funil dos parceiros.
       </div>
 
       <!-- Operação e saúde aprovada em 23/07 e promovida para produção.
@@ -658,9 +668,9 @@
 
             <div class="mt-4 grid grid-cols-1 items-center gap-4 sm:grid-cols-[190px_minmax(0,1fr)]">
               <div class="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full p-3"
-                   :style="`background: conic-gradient(#047857 0 ${redeAReceberTotal() > 0 ? Math.round((redeTotalMensalidade() / redeAReceberTotal()) * 100) : 0}%, #6ee7b7 0 100%)`">
+                   :style="`background: conic-gradient(#047857 0 ${!comissoesUnavailable && redeAReceberTotal() > 0 ? Math.round((redeTotalMensalidade() / redeAReceberTotal()) * 100) : 0}%, #6ee7b7 0 100%)`">
                 <div class="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
-                  <strong class="text-xl font-bold tracking-tight text-gray-950" x-text="formatCurrency(redeAReceberTotal())"></strong>
+                  <strong class="text-xl font-bold tracking-tight text-gray-950" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeAReceberTotal())"></strong>
                   <span class="mt-0.5 text-[10px] text-gray-500">total em aberto</span>
                 </div>
               </div>
@@ -680,7 +690,7 @@
                   </span>
                   <div class="min-w-0">
                     <p class="text-[11px] text-gray-500" x-text="livroComissaoOn() ? 'Comissões em aberto' : 'Comissões 2W'"></p>
-                    <p class="text-lg font-bold text-emerald-800 tabular-nums" x-text="formatCurrency(redeComissaoAReceber())"></p>
+                    <p class="text-lg font-bold text-emerald-800 tabular-nums" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeComissaoAReceber())"></p>
                   </div>
                 </div>
               </div>
@@ -1160,7 +1170,7 @@
             <p class="text-xs text-gray-500 mt-0.5" x-text="livroComissaoOn() ? 'Mensalidade do mês + comissões EM ABERTO no livro' : 'Mensalidade + comissão sobre vendas 2W · ' + redePeriodLabel()"></p>
           </div>
           <span class="text-sm font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
-                x-text="formatCurrency(redeAReceberTotal())"></span>
+                x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeAReceberTotal())"></span>
         </div>
         <div class="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -1169,7 +1179,7 @@
           </div>
           <div>
             <div class="text-xs text-gray-500 mb-1" x-text="livroComissaoOn() ? 'Comissões em aberto' : 'Comissões 2W'"></div>
-            <div class="font-semibold" x-text="formatCurrency(redeComissaoAReceber())"></div>
+            <div class="font-semibold" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(redeComissaoAReceber())"></div>
           </div>
         </div>
         <p class="text-[11px] text-gray-400 mt-3" x-text="livroComissaoOn() ? 'Comissão = lançamentos em aberto no livro; a baixa é feita exclusivamente no Financeiro. Frete fica fora. Mensalidade é valor fixo do mês.' : 'Comissão incide só sobre vendas de origem 2W (clientes que a matriz trouxe). Mensalidade é valor fixo do mês.'"></p>
@@ -2029,7 +2039,7 @@
               </div>
               <div class="flex items-center justify-between gap-3 border-t border-slate-200 pt-2.5 text-sm">
                 <span class="font-semibold text-slate-900">Total devido</span>
-                <span class="font-bold text-emerald-700" x-text="formatCurrency(parceiroAReceberTotal(selectedParceiro()))"></span>
+                <span class="font-bold text-emerald-700" x-text="comissoesUnavailable ? 'Indisponível' : formatCurrency(parceiroAReceberTotal(selectedParceiro()))"></span>
               </div>
             </div>
           </div>
@@ -9022,7 +9032,7 @@
   </div>
 </div>
 
-<div x-show="applicationsModalOpen" x-cloak
+<div x-show="applicationsModalOpen && adminUser?.role === 'owner'" x-cloak
      @keydown.escape.window="applicationsModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
      style="display:none;">
@@ -9047,7 +9057,8 @@
 
     <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div x-show="applicationsLoading" class="text-sm text-gray-500 text-center py-6">Carregando...</div>
-      <div x-show="!applicationsLoading && applications.length === 0" class="lg:col-span-2 rounded-xl border border-dashed border-gray-200 text-sm text-gray-500 text-center py-12">
+      <div x-show="applicationsError" class="lg:col-span-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700" x-text="applicationsError"></div>
+      <div x-show="!applicationsLoading && !applicationsError && applications.length === 0" class="lg:col-span-2 rounded-xl border border-dashed border-gray-200 text-sm text-gray-500 text-center py-12">
         Nenhuma candidatura pendente. A fila está em dia.
       </div>
 
@@ -9081,7 +9092,7 @@
                          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
                 </div>
                 <div>
-                  <label class="text-xs font-medium text-gray-700 block mb-1">Comissão (%)</label>
+                  <label class="text-xs font-medium text-gray-700 block mb-1">Comissão (%) *</label>
                   <input x-model="approveForm.commission_percent" type="number" min="0" max="100" step="0.5"
                          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500" />
                 </div>
@@ -9130,7 +9141,7 @@
 <!-- ═══════════════════════════════════════════════
      MODAL: Novo parceiro (Etapa 1 onboarding)
      ═══════════════════════════════════════════════ -->
-<div x-show="partnerModalOpen"
+<div x-show="partnerModalOpen && adminUser?.role === 'owner'"
      x-cloak
      @keydown.escape.window="partnerModalOpen = false"
      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
@@ -9156,11 +9167,17 @@
           <div class="text-sm font-semibold text-emerald-800 mb-1">Parceiro criado</div>
           <div class="text-xs text-emerald-700">Endereço de acesso: <span class="font-mono" x-text="partnerResult.slug"></span></div>
         </div>
-        <div class="rounded-xl bg-amber-50 border border-amber-200 p-5">
+        <div x-show="partnerResult.token" class="rounded-xl bg-amber-50 border border-amber-200 p-5">
           <div class="text-xs font-semibold text-amber-800 mb-1">⚠️ Login (copie agora — não será mostrado de novo)</div>
           <div class="font-mono text-xs break-all bg-white border border-amber-200 rounded p-2" x-text="partnerResult.token"></div>
           <button @click="navigator.clipboard && navigator.clipboard.writeText(partnerResult.token)"
                   class="mt-2 text-xs px-3 py-1.5 bg-amber-600 text-white rounded-lg">Copiar login</button>
+        </div>
+        <div x-show="!partnerResult.token" class="rounded-xl bg-amber-50 border border-amber-200 p-5 text-sm text-amber-800">
+          O parceiro foi criado, mas a chave pura não pode ser recuperada com segurança.
+          <button @click="reissuePartnerResultToken()" :disabled="partnerSubmitting"
+                  class="mt-3 w-full rounded-lg bg-amber-600 px-3 py-2 text-white disabled:opacity-50"
+                  x-text="partnerSubmitting ? 'Gerando...' : 'Gerar nova chave auditada'"></button>
         </div>
         <div class="lg:col-span-2 text-xs text-gray-500">O parceiro entra em <span class="font-mono" x-text="'/parceiro/' + partnerResult.slug + '/'"></span> com esse login.</div>
         <button @click="partnerModalOpen = false" class="lg:col-span-2 w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-sm">Concluir</button>
@@ -9202,7 +9219,7 @@
             <input x-model="partnerForm.email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
           </div>
           <div>
-            <label class="text-xs font-medium text-gray-700 mb-1 block">Comissão (%)</label>
+            <label class="text-xs font-medium text-gray-700 mb-1 block">Comissão (%) *</label>
             <input x-model="partnerForm.commission_percent" type="number" min="0" max="100" step="0.5" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
           </div>
         </div>

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { getAdminContext, requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
-import { getCommissionLedger, getPainelPedidosSalesHistory, getSalesBrandRanking, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, listWholesaleSalesHistory, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, sweepCommissionEntries, updatePartnerCommercialTerms } from './queries.js';
+import { getCommissionLedger, getPainelPedidosSalesHistory, getSalesBrandRanking, getVarejoResumo, getWholesaleRanking, getWholesaleResumo, listMatrizPartnerMonthlyFees, listPartnerPendingCosts, listWholesaleBuyers, listWholesaleMeasures, listWholesaleSalesHistory, reconcilePartnerItemCost, registerWholesaleSale, settleCommissionEntries, settleCommissionRefund, settleMatrizPartnerMonthlyFee, updatePartnerCommercialTerms } from './queries.js';
 import { dashboardPayload, mapWriteError, operatorLabel } from './route-helpers.js';
 import { financePeriodQuerySchema, partnerIdParamSchema, partnerTermsSchema, registerWholesaleSaleSchema, settleComissaoSchema, settleCommissionRefundSchema, settleMonthlyFeeSchema } from './route-schemas.js';
 
@@ -131,15 +131,13 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
   });
 
   // ── REDE — COMISSÕES COMO LANÇAMENTO (0118, flag NETWORK_COMMISSION_LEDGER) ──
-  // O GET roda a VARREDURA (cria lançamento de venda 2W realizada; estorna o de venda
-  // cancelada) e devolve o livro. Flag off → {enabled:false} e a UI some (nada é gravado).
+  // Consulta estritamente read-only. A reconciliacao idempotente roda no scheduler.
   fastify.get('/admin/api/rede/comissoes', { preHandler: requireAdminAuth }, async (_request, reply) => {
     if (!env.NETWORK_COMMISSION_LEDGER) {
       return reply.status(200).send({ ...dashboardPayload([]), enabled: false });
     }
-    const sweep = await sweepCommissionEntries();
     const ledger = await getCommissionLedger();
-    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, sweep, ...ledger });
+    return reply.status(200).send({ ...dashboardPayload([]), enabled: true, ...ledger });
   });
 
   // "Recebi": quita todos os lançamentos em aberto do parceiro.
@@ -191,7 +189,6 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
     if (!env.MATRIZ_CENTRAL_LEDGER) {
       return reply.status(409).send({ error: 'central_ledger_disabled' });
     }
-    await sweepCommissionEntries();
     return reply.status(200).send({
       enabled: true, entries: await listMatrizPartnerMonthlyFees(),
     });

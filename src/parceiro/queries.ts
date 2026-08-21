@@ -3717,7 +3717,11 @@ export async function setOwnPartnerCredentials(
     // 1) O vínculo desta unidade (regra de overwrite intacta: só token cru sobrescreve).
     const res = await client.query<{ person_id: string | null }>(
       `UPDATE network.partner_access_tokens
-          SET login_username = $4, login_password_hash = $5, login_password_set_at = now()
+          SET login_username = $4, login_password_hash = $5,
+              login_password_set_at = now(),
+              raw_access_consumed_at=COALESCE(raw_access_consumed_at,now()),
+              recovery_token_consumed_at=CASE WHEN recovery_token_hash IS NULL
+                THEN recovery_token_consumed_at ELSE COALESCE(recovery_token_consumed_at,now()) END
         WHERE id = $1 AND environment = $2 AND partner_unit_id = $3
           AND revoked_at IS NULL
           AND ($6 OR login_password_hash IS NULL)

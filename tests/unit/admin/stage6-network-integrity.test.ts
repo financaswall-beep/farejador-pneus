@@ -10,7 +10,8 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 describe('Etapa 6 — candidatura atômica', () => {
   it('exige chave de idempotência na borda HTTP', () => {
-    const base = { municipios: ['Niterói'] };
+    const base = { municipios: ['Niterói'],commercial_model: 'commission',
+      commission_percent: 0,monthly_fee: null };
     expect(approveApplicationSchema.safeParse(base).success).toBe(false);
     expect(approveApplicationSchema.safeParse({ ...base, idempotency_key: 'approve-key-123' }).success).toBe(true);
   });

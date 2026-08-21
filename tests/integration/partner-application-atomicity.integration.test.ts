@@ -60,11 +60,11 @@ describe('Etapa 6 — aprovação de candidatura', () => {
     }, db.pool);
     const first = await q.approvePartnerApplication({
       application_id: app.id, actor_label: 'teste', municipios: ['Maricá'],
-      idempotency_key: `approve-first-${suffix}`,
+      idempotency_key: `approve-first-${suffix}`,commission_percent: 0,
     }, db.pool);
     const second = await q.approvePartnerApplication({
       application_id: app.id, actor_label: 'teste', municipios: ['Maricá'],
-      idempotency_key: `approve-second-${suffix}`,
+      idempotency_key: `approve-second-${suffix}`,commission_percent: 0,
     }, db.pool);
     expect(second.partner_unit_id).toBe(first.partner_unit_id);
     expect(second.token).toBeUndefined();

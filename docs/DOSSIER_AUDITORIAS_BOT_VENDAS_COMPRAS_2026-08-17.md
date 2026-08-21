@@ -21,6 +21,13 @@ aplicada com backup e reconciliação `PASS`; o código foi incorporado pela PR 
 no SHA `92ae93d73a33780adf801b0e2a33fb16a7f78906`. A aprovação atual cobre código e banco,
 mas ainda não substitui o deploy e o smoke pós-deploy.
 
+**Auditoria atual da Rede e Parceiros:** concluída em código e banco limpo em 21/08/2026.
+O relatório completo está em `docs/AUDITORIA_REDE_PONTA_A_PONTA_2026-08-21.md`. A migration
+`0194` foi aplicada e reconciliada em produção após backup completo validado. Nesta rodada passaram 1.244
+testes unitários e 258 cenários de integração, além de tipagem, build, paridade do painel,
+fiscal de tamanho, auditoria de dependências e validação visual local. O deploy continua
+reservado ao responsável.
+
 ## Como ler o veredito
 
 - **Aprovado em código:** implementação, migrations e testes locais estão coerentes.

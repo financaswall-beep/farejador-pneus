@@ -5,6 +5,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../../shared/business-time.js';
 import { assertWholesaleSaleMoney } from './sales-money.js';
+import { assertPartnerCommercialTerms } from './partner-commercial-terms.js';
 
 const idempotencyKeySchema = z.string().min(8).max(200);
 const tireConditionSchema = z.enum(['meia_vida', 'novo', 'remold']);
@@ -23,6 +24,7 @@ export const resolveIntegrityOperationSchema = z.object({
     'stock.manual_decrement',
     'stock.physical_count',
     'stock.condition_transfer',
+    'partner.create',
   ]),
   idempotency_key: idempotencyKeySchema,
 });
@@ -55,7 +57,7 @@ export {
 // Onboarding de parceiro (Etapa 1). Termos comerciais são definidos pela matriz aqui,
 // não pelo candidato. municipios = cobertura inicial; slug opcional (gerado do nome).
 export const createPartnerSchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
+  idempotency_key: idempotencyKeySchema,
   trade_name: z.string().min(2),
   legal_name: z.string().min(1).nullable().optional(),
   document_number: z.string().min(1).nullable().optional(),
@@ -63,11 +65,21 @@ export const createPartnerSchema = z.object({
   whatsapp_phone: z.string().min(1).nullable().optional(),
   email: z.string().email().nullable().optional(),
   address: z.string().min(1).nullable().optional(),
-  commercial_model: z.string().min(1).nullable().optional(),
+  commercial_model: z.enum(['commission', 'monthly', 'hybrid']).default('commission'),
   commission_percent: z.number().min(0).max(100).nullable().optional(),
   monthly_fee: z.number().min(0).nullable().optional(),
   municipios: z.array(z.string().min(1)).default([]),
   slug: z.string().min(1).nullable().optional(),
+}).superRefine((body, ctx) => {
+  try {
+    assertPartnerCommercialTerms({
+      commercial_model: body.commercial_model,
+      commission_percent: body.commission_percent ?? null,
+      monthly_fee: body.monthly_fee ?? null,
+    });
+  } catch (error) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+  }
 });
 
 // Raio de entrega que a MATRIZ define pra um parceiro (proximidade-primeiro Fase 2).
@@ -76,7 +88,6 @@ export const setDeliveryRadiusParamsSchema = z.object({
   partnerUnitId: z.string().uuid(),
 });
 export const setDeliveryRadiusBodySchema = z.object({
-  environment: z.enum(['prod', 'test']).optional(),
   delivery_radius_km: z.number().positive().max(9999.99).nullable(),
 });
 
@@ -264,8 +275,18 @@ export const approveApplicationSchema = z.object({
   municipios: z.array(z.string().min(1)).min(1),
   commission_percent: z.number().min(0).max(100).nullable().optional(),
   monthly_fee: z.number().min(0).nullable().optional(),
-  commercial_model: z.string().min(1).nullable().optional(),
+  commercial_model: z.enum(['commission', 'monthly', 'hybrid']).default('commission'),
   slug: z.string().min(1).nullable().optional(),
+}).superRefine((body, ctx) => {
+  try {
+    assertPartnerCommercialTerms({
+      commercial_model: body.commercial_model,
+      commission_percent: body.commission_percent ?? null,
+      monthly_fee: body.monthly_fee ?? null,
+    });
+  } catch (error) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: (error as Error).message });
+  }
 });
 
 export * from './route-schemas-orders.js';

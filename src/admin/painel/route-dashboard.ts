@@ -28,9 +28,11 @@ export async function registerPainelDashboard(fastify: FastifyInstance): Promise
   fastify.get('/admin/api/dashboard/rede', { preHandler: requireAdminAuth }, async (request, reply) => {
     const parsed = redeQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_query' });
-    const [rows, funnel] = await Promise.all([getPainelRede(parsed.data.period), getRedeFunnel()]);
+    const [rows, funnel] = await Promise.all([
+      getPainelRede(parsed.data.period), getRedeFunnel(parsed.data.period),
+    ]);
     const funilByUnit = new Map(
-      funnel
+      funnel.rows
         .filter((f) => f.unit_id)
         .map((f) => [String(f.unit_id), { tentou: f.tentou, pediu: f.pediu, efetivou: f.efetivou }] as const),
     );
@@ -38,7 +40,9 @@ export async function registerPainelDashboard(fastify: FastifyInstance): Promise
       ...r,
       funil: funilByUnit.get(String(r.unit_id)) ?? { tentou: 0, pediu: 0, efetivou: 0 },
     }));
-    return reply.status(200).send(dashboardPayload(merged));
+    return reply.status(200).send({
+      ...dashboardPayload(merged), funnel_unassigned: funnel.unassigned,
+    });
   });
 
   // Resumo do dono (cockpit da matriz): performance do bot/tráfego + leads a

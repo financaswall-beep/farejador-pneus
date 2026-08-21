@@ -102,6 +102,10 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
     },
 
     openPartnerModal() {
+      if (this.adminUser?.role !== 'owner') {
+        this.partnerError = 'Somente o proprietário pode cadastrar parceiros.';
+        return;
+      }
       this.partnerError = null;
       this.partnerResult = null;
       this.partnerForm = { trade_name: '', responsible_name: '', whatsapp_phone: '', email: '', address: '', commission_percent: '', municipios: '', slug: '' };
@@ -110,23 +114,31 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
 
     async submitNewPartner() {
       if (this.partnerSubmitting) return;
+      if (this.adminUser?.role !== 'owner') { this.partnerError = 'Somente o proprietário pode cadastrar parceiros.'; return; }
       if (!this.partnerForm.trade_name.trim()) { this.partnerError = 'Informe o nome do parceiro.'; return; }
+      if (this.partnerForm.commission_percent === '') { this.partnerError = 'Informe a comissão, mesmo quando for 0%.'; return; }
       const municipios = this.partnerForm.municipios.split(',').map((s) => s.trim()).filter(Boolean);
       if (municipios.length === 0) { this.partnerError = 'Informe ao menos uma cidade de cobertura.'; return; }
       this.partnerSubmitting = true;
       this.partnerError = null;
+      const integrityScope = 'form';
+      const idempotencyKey = window.PAINEL_INTEGRITY.operation('partner-create', integrityScope).key;
       try {
         const result = await this.apiPost('/admin/api/partners', {
+          idempotency_key: idempotencyKey,
           trade_name: this.partnerForm.trade_name.trim(),
           responsible_name: this.partnerForm.responsible_name.trim() || null,
           whatsapp_phone: this.partnerForm.whatsapp_phone.trim() || null,
           email: this.partnerForm.email.trim() || null,
           address: this.partnerForm.address.trim() || null,
+          commercial_model: 'commission',
           commission_percent: this.partnerForm.commission_percent === '' ? null : Number(this.partnerForm.commission_percent),
+          monthly_fee: null,
           municipios,
           slug: this.partnerForm.slug.trim() || null,
         });
         this.partnerResult = result; // { slug, token, ... } — token (login) mostrado UMA vez
+        window.PAINEL_INTEGRITY.complete('partner-create', integrityScope);
         await this.loadRealData();
       } catch (err) {
         this.partnerError = err instanceof Error ? err.message : String(err);
@@ -137,19 +149,22 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
 
     // ── Etapa 3: candidaturas de parceiro ──
     async loadApplications() {
-      if (!this.adminAuthenticated) return;
+      if (!this.adminAuthenticated || this.adminUser?.role !== 'owner') return;
       this.applicationsLoading = true;
+      this.applicationsError = null;
       try {
         const payload = await this.apiGet('/admin/api/partner-applications?status=pending');
         this.applications = Array.isArray(payload) ? payload : (payload.rows || []);
       } catch (err) {
         this.applications = [];
+        this.applicationsError = 'Não foi possível carregar as candidaturas. Tente novamente.';
       } finally {
         this.applicationsLoading = false;
       }
     },
 
     async openApplications() {
+      if (this.adminUser?.role !== 'owner') return;
       this.approvingApp = null;
       this.approveResult = null;
       this.approveError = null;
@@ -158,6 +173,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
     },
 
     startApprove(app) {
+      if (this.adminUser?.role !== 'owner') return;
       this.approvingApp = app;
       this.approveResult = null;
       this.approveError = null;
@@ -167,15 +183,19 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
 
     async confirmApprove() {
       if (this.approveSubmitting || !this.approvingApp) return;
+      if (this.adminUser?.role !== 'owner') { this.approveError = 'Somente o proprietário pode aprovar candidaturas.'; return; }
       const municipios = (this.approveForm.municipios || '').split(',').map((s) => s.trim()).filter(Boolean);
       if (municipios.length === 0) { this.approveError = 'Informe ao menos uma cidade de cobertura.'; return; }
+      if (this.approveForm.commission_percent === '') { this.approveError = 'Informe a comissão, mesmo quando for 0%.'; return; }
       this.approveSubmitting = true;
       this.approveError = null;
       try {
         const result = await this.apiPost(`/admin/api/partner-applications/${this.approvingApp.id}/approve`, {
           idempotency_key: this.approveForm.idempotency_key,
           municipios,
+          commercial_model: 'commission',
           commission_percent: this.approveForm.commission_percent === '' ? null : Number(this.approveForm.commission_percent),
+          monthly_fee: null,
           slug: this.approveForm.slug.trim() || null,
         });
         this.approveResult = result; // { slug, token, ... } — login mostrado UMA vez
@@ -189,6 +209,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
 
     async reissueApproveToken() {
       if (this.approveSubmitting || !this.approveResult?.partner_unit_id) return;
+      if (this.adminUser?.role !== 'owner') { this.approveError = 'Somente o proprietário pode reemitir credenciais.'; return; }
       this.approveSubmitting = true;
       this.approveError = null;
       const current = this.approveResult;
@@ -215,11 +236,40 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
     },
 
     async rejectApplication(app) {
+      if (this.adminUser?.role !== 'owner') return;
       try {
         await this.apiPost(`/admin/api/partner-applications/${app.id}/reject`, {});
         await this.loadApplications();
       } catch (err) {
-        // silencioso — recusar é best-effort
+        this.applicationsError = 'Não foi possível recusar a candidatura. Nada foi alterado.';
+      }
+    },
+
+    async reissuePartnerResultToken() {
+      if (this.partnerSubmitting || !this.partnerResult?.partner_unit_id) return;
+      if (this.adminUser?.role !== 'owner') return;
+      this.partnerSubmitting = true;
+      this.partnerError = null;
+      const current = this.partnerResult;
+      current._reissueKey = current._reissueKey
+        || `partner-credential-${current.partner_unit_id}-${crypto.randomUUID()}`;
+      try {
+        const result = await this.apiPost(
+          `/admin/api/partner-units/${current.partner_unit_id}/reissue-token`, {
+            idempotency_key: current._reissueKey,
+            reason: 'Reemissão solicitada após cadastro sem token recuperável',
+          });
+        if (!result.token) {
+          delete current._reissueKey;
+          this.partnerError = 'A chave anterior não é recuperável. Clique novamente para gerar outra.';
+          return;
+        }
+        this.partnerResult = { ...current, ...result, credential_reissue_required: false };
+        delete this.partnerResult._reissueKey;
+      } catch (err) {
+        this.partnerError = err instanceof Error ? err.message : String(err);
+      } finally {
+        this.partnerSubmitting = false;
       }
     },
 

@@ -30,7 +30,10 @@ window.PAINEL_MODULES.core = function () {
 
       if (val(pedidos)) this.applyPedidos(pedidos.value.rows);
       if (val(produtos)) this.applyProdutos(produtos.value.rows);
-      if (val(rede)) this.applyRede(rede.value.rows);
+      if (val(rede)) {
+        this.applyRede(rede.value.rows);
+        this.redeFunnelUnassigned = Number(rede.value.funnel_unassigned || 0);
+      }
       if (val(resumo)) this.applyMatrizResumo(resumo.value);
 
       // "real" se qualquer bloco respondeu; só cai pro mock se TUDO falhou.
@@ -56,6 +59,7 @@ window.PAINEL_MODULES.core = function () {
         this.chatwootBaseUrl = rede.chatwoot_base_url || this.chatwootBaseUrl;
         this.chatwootAccountId = rede.chatwoot_account_id || this.chatwootAccountId;
         this.applyRede(rede.rows);
+        this.redeFunnelUnassigned = Number(rede.funnel_unassigned || 0);
         this.apiStatus = 'real';
         this.apiError = null;
         this.$nextTick(() => {
@@ -80,7 +84,7 @@ window.PAINEL_MODULES.core = function () {
       if (!(await this.ensureCredentials())) return;
       void this.loadRealData();
       // Livro de comissões já no boot: o card "A receber da rede" do RESUMO lê ele
-      // (flag off = resposta enabled:false, barata; a página Rede re-varre ao entrar).
+      // (flag off = resposta enabled:false, barata; a consulta é somente leitura).
       void this.loadComissoes();
       // Sino (2026-07-06): notificações reais já no boot.
       void this.loadSino();
@@ -118,7 +122,7 @@ window.PAINEL_MODULES.core = function () {
         // Clientes: consolida Chatwoot, balcão, compradores, VIPs e parceiros existentes.
         if (page === 'clientes') { void this.loadClientes(); this.startClientesLive(); }
         else this.stopClientesLive();
-        // Rede: o livro de comissões (0118) — o GET roda a varredura no servidor.
+        // Rede: consulta o livro de comissões; a reconciliação roda no scheduler.
         if (page === 'rede') void this.loadComissoes();
         // Colaboradores (0124): o staff da matriz — vendedor/entregador.
         if (page === 'colaboradores') void this.loadColaboradores();
@@ -177,7 +181,10 @@ window.PAINEL_MODULES.core = function () {
           this.apiGet('/admin/api/dashboard/matriz-resumo?period=7d'),
           this.apiGet('/admin/api/dashboard/pedidos?limit=50'),
         ]);
-        if (rede.status === 'fulfilled') this.applyRede(rede.value.rows);
+        if (rede.status === 'fulfilled') {
+          this.applyRede(rede.value.rows);
+          this.redeFunnelUnassigned = Number(rede.value.funnel_unassigned || 0);
+        }
         if (resumo.status === 'fulfilled') this.applyMatrizResumo(resumo.value);
         if (pedidos.status === 'fulfilled') this.applyPedidos(pedidos.value.rows);
         if (this.currentPage === 'vendas') await this.loadVendasData();
