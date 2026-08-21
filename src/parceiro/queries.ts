@@ -22,7 +22,6 @@
  * Testes que precisarem usar pool customizado devem usar testWithPartnerContext
  * (futuro helper de teste).
  */
-
 import { randomBytes } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { withPartnerContext } from './db.js';
@@ -49,6 +48,7 @@ import {
 import { reversePurchaseStockCost } from './partner-stock-cost.js';
 import { partnerPurchaseTotalCents } from './purchase-schema.js';
 import { DeliveryAlreadyFinalizedError } from './delivery-return.js';
+import { normalizeMunicipalityKey } from '../network/municipality-catalog.js';
 import {
   assertStrongNewPassword, isUsernameConflict, PartnerUsernameConflictError,
   type CreatedFuncionario, type PartnerTokenRow,
@@ -4047,7 +4047,7 @@ export async function updatePartnerArea(
   ctx: PartnerContext,
   input: PartnerAreaInput,
 ): Promise<{ updated: boolean; municipio: string; city_wide: boolean; neighborhoods: string[] }> {
-  const municipio = input.municipio.trim().toLowerCase();
+  const municipio = normalizeMunicipalityKey(input.municipio);
   if (!municipio) throw new Error('municipio_required');
 
   // Dedup + normaliza bairros (só quando não é cidade inteira).

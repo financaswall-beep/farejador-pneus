@@ -704,3 +704,71 @@ produção também retornou `PASS`, inclusive ledger e RLS. O código da entrega
 pela PR `#66`; restam o deploy manual e o smoke autenticado na Matriz e no parceiro.
 
 Relatório reproduzível: `docs/AUDITORIA_EQUIPE_PONTA_A_PONTA_2026-08-21.md`.
+
+## 15. Adendo — cidades atendidas sem erro de digitação
+
+Em 21/08/2026, a configuração de cobertura da Rede deixou de depender de texto livre.
+O problema era operacional: `Niterói`, `Niteroi`, `Niteróii` ou espaços extras podiam virar
+valores diferentes e impedir que o roteamento reconhecesse uma unidade que realmente atende
+a cidade. A correção percorreu candidatura pública, aprovação, cadastro direto, edição pela
+Matriz, configuração pelo dono do parceiro, API, normalização, banco e leitura da aba Rede.
+
+### Contrato entregue
+
+- o usuário escolhe a cidade em uma lista oficial dos **92 municípios do RJ**;
+- cada escolha aparece como um quadradinho com um `×` pequeno e acessível para remover;
+- a cidade removida volta à lista e não pode aparecer duplicada;
+- pelo menos uma cidade é obrigatória no cadastro, na aprovação e na edição da cobertura;
+- Matriz e dono do parceiro podem editar uma cobertura já cadastrada;
+- bairros configurados de cidades mantidas são preservados; remover uma cidade apaga apenas
+  as linhas de cobertura dela; cidade nova entra como cobertura da cidade inteira;
+- a alteração é transacional, idempotente e gera `audit.events` somente quando houve mudança;
+- funcionário não altera cobertura: as duas APIs de escrita exigem dono;
+- a API aceita variação segura de caixa/acento, devolve o nome oficial e recusa município
+  inexistente;
+- a migration `0195_network_municipality_catalog.sql` protege também a escrita direta no
+  banco para `environment='prod'`, sem bloquear cidades sintéticas usadas nos testes.
+
+O catálogo público contém apenas nomes de municípios, sem dados pessoais. O gatilho usa
+`SECURITY DEFINER`, `search_path` fixo e execução pública revogada; a tabela também não
+concede acesso ao papel público. O frontend não recebe credenciais nem consulta diretamente
+o banco.
+
+### Evidência executada
+
+| Bateria | Resultado |
+|---|---|
+| Unitários completos | **1.250/1.250**, 250 arquivos |
+| Integração completa PostgreSQL 17 | **260/260**, 48 arquivos em quatro lotes |
+| Integração específica da `0195` | catálogo 92/92; erro em produção bloqueado com `23514`; fixture de teste preservada |
+| TypeScript e build | aprovados |
+| Migrations | **196 verificadas**; última `0195`; gap histórico `0071` documentado |
+| Prova dos painéis | parceiro 596 propriedades; Matriz 1.084; 93 contratos de rede; 238 rotas; fiscal aprovado |
+| Dependências | `npm audit --audit-level=high`: **0 vulnerabilidades** |
+| Navegador local | adicionar `Niterói`, renderizar chip, remover no `×` e devolver opção à lista: aprovado na Matriz e candidatura |
+
+Uma execução dos unitários em paralelo com build, prova dos painéis e auditoria de
+dependências provocou timeout de cinco segundos em um teste antigo do dispatcher. O mesmo
+conjunto foi repetido sozinho imediatamente e passou **1.250/1.250** em 9,87 segundos; não
+houve falha de asserção nem alteração de produto relacionada.
+
+### Produção e recuperação
+
+- backup pré-`0195`: `farejador-prod-pre-0195-20260821-103305.dump`;
+- tamanho: **5.005.916 bytes**; **2.632 entradas** legíveis pelo `pg_restore`;
+- SHA-256: `35f8aa3cc5fbd13f2c39631bbe3e5a75c68e3b4d15de7fca70f29fe20cb2de1b`;
+- dry-run integral da `0195` com `ROLLBACK`: aprovado;
+- aplicação com `COMMIT`: aprovada;
+- verificação material pós-commit: tabela e gatilho presentes, 92 cidades ativas,
+  `public_table_access=false`, `public_function_execute=false`;
+- reconciliação: zero cobertura de produção inválida, zero chave duplicada, zero município
+  fora do RJ e zero linha inativa.
+
+### Veredito deste adendo
+
+**APROVADO EM CÓDIGO, BANCO, INTERFACE, INTEGRAÇÃO, SEGURANÇA E REGRESSÃO.** A migration
+`0195` já está aplicada materialmente em produção. O deploy continua sendo manual pelo
+responsável; depois dele, o smoke deve conferir cadastro, aprovação e edição das cidades na
+Matriz, candidatura pública e edição pelo dono do parceiro. O escopo atual é deliberadamente
+o Estado do Rio de Janeiro; expansão para outro estado exige ampliar o catálogo em mudança
+auditada, não reabrir texto livre.

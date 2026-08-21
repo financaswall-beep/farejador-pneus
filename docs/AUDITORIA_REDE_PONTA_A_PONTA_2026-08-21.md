@@ -125,3 +125,27 @@ paridade, auditoria de dependências e prova visual.
 
 Essas melhorias não bloqueiam a correção dos defeitos confirmados e não foram
 misturadas ao pacote atual.
+
+## Adendo — cobertura por catálogo oficial (`0195`)
+
+A cobertura de parceiros foi fechada contra erros de digitação. Cadastro direto,
+candidatura, aprovação e edição na Matriz e no portal do parceiro agora usam os 92
+municípios oficiais do RJ. As cidades selecionadas aparecem como chips removíveis por `×`;
+lista vazia, duplicata e município inventado são recusados. A edição preserva bairros das
+cidades mantidas, remove somente a cidade excluída, inclui cidade nova como `city` e registra
+auditoria somente quando o estado realmente muda.
+
+A proteção existe em três camadas: seletor na interface, schemas no servidor e gatilho no
+banco. A migration `0195_network_municipality_catalog.sql` foi ensaiada com rollback e
+aplicada em produção depois de backup validado. A reconciliação pós-commit confirmou 92
+cidades ativas e zero cobertura inválida, duplicada, inativa ou fora do RJ. A função do
+gatilho é `SECURITY DEFINER` com `search_path` fixo; tabela e função não têm privilégio
+público.
+
+Provas finais: **1.250 unitários**, **260 integrações**, build, 196 migrations, paridade dos
+dois painéis, 93 contratos, 238 rotas e `npm audit` sem vulnerabilidade. Backup:
+`farejador-prod-pre-0195-20260821-103305.dump`, 5.005.916 bytes, 2.632 entradas, SHA-256
+`35f8aa3cc5fbd13f2c39631bbe3e5a75c68e3b4d15de7fca70f29fe20cb2de1b`.
+
+**Veredito:** cobertura por cidade aprovada para deploy; banco de produção já preparado.
+O deploy e o smoke autenticado continuam sob responsabilidade do dono.

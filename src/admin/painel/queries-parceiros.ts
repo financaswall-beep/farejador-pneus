@@ -12,6 +12,7 @@ import {
 import {
   assertPartnerCommercialTerms, type PartnerCommercialModel,
 } from './partner-commercial-terms.js';
+import { normalizeMunicipalityKey } from '../../network/municipality-catalog.js';
 
 export interface CreatePartnerInput {
   environment?: 'prod' | 'test';
@@ -49,10 +50,6 @@ function slugify(s: string): string {
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().trim()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-function normalizeMunicipio(s: string): string {
-  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 }
 
 /**
@@ -140,7 +137,7 @@ export async function createPartnerUnitWithClient(
     );
 
   for (const m of input.municipios) {
-    const mn = normalizeMunicipio(m);
+    const mn = normalizeMunicipalityKey(m);
     if (!mn) continue;
     await client.query(
         // ON CONFLICT casa com o índice funcional de 4 colunas da 0087

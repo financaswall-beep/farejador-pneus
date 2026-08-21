@@ -12,6 +12,10 @@
  */
 import type { Pool } from 'pg';
 import { pool as defaultPool } from '../../persistence/db.js';
+import {
+  normalizeMunicipalityKey,
+  resolveNetworkMunicipality,
+} from '../../network/municipality-catalog.js';
 
 export interface SetNetworkOrdersResult {
   updated: boolean;
@@ -82,6 +86,99 @@ export async function setPartnerUnitNetworkOrders(
     );
     await client.query('COMMIT');
     return { updated: true, changed: true, accepts_network_orders: acceptsNetworkOrders };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export interface SetPartnerCoverageResult {
+  updated: boolean;
+  changed?: boolean;
+  reason?: 'not_found';
+  municipios?: string[];
+}
+
+/**
+ * Atualiza as cidades atendidas sem apagar a configuração de bairros das cidades
+ * que continuam selecionadas. Cidade removida perde todas as linhas; cidade nova
+ * entra como cobertura da cidade inteira.
+ */
+export async function setPartnerUnitCoverage(
+  environment: 'prod' | 'test',
+  partnerUnitId: string,
+  municipalities: readonly string[],
+  actorLabel: string,
+  dbPool: Pool = defaultPool,
+): Promise<SetPartnerCoverageResult> {
+  const desiredKeys = [...new Set(municipalities.map(normalizeMunicipalityKey))].sort();
+  const desiredNames = desiredKeys.map((key) => resolveNetworkMunicipality(key)?.name ?? key);
+  const client = await dbPool.connect();
+  try {
+    await client.query('BEGIN');
+    const unit = await client.query<{ unit_id: string; slug: string }>(
+      `SELECT unit_id,slug
+         FROM network.partner_units
+        WHERE id=$1 AND environment=$2 AND deleted_at IS NULL
+        FOR UPDATE`,
+      [partnerUnitId, environment],
+    );
+    if (unit.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return { updated: false, reason: 'not_found' };
+    }
+
+    const current = await client.query<{ municipio: string }>(
+      `SELECT DISTINCT municipio
+         FROM network.unit_coverage
+        WHERE environment=$1 AND unit_id=$2
+        ORDER BY municipio`,
+      [environment, unit.rows[0]!.unit_id],
+    );
+    const previousKeys = current.rows.map((row) => row.municipio);
+    const unchanged = previousKeys.length === desiredKeys.length
+      && previousKeys.every((value, index) => value === desiredKeys[index]);
+    if (unchanged) {
+      await client.query('COMMIT');
+      return { updated: true, changed: false, municipios: desiredNames };
+    }
+
+    await client.query(
+      `DELETE FROM network.unit_coverage
+        WHERE environment=$1 AND unit_id=$2
+          AND NOT (municipio=ANY($3::text[]))`,
+      [environment, unit.rows[0]!.unit_id, desiredKeys],
+    );
+    const previousSet = new Set(previousKeys);
+    for (const municipality of desiredKeys) {
+      if (previousSet.has(municipality)) continue;
+      await client.query(
+        `INSERT INTO network.unit_coverage
+           (environment,unit_id,municipio,neighborhood_canonical,coverage_kind)
+         VALUES ($1,$2,$3,NULL,'city')
+         ON CONFLICT (environment,unit_id,municipio,coalesce(neighborhood_canonical,''))
+         DO NOTHING`,
+        [environment, unit.rows[0]!.unit_id, municipality],
+      );
+    }
+    await client.query(
+      `INSERT INTO audit.events
+         (environment,domain,entity_table,entity_id,event_type,actor_label,
+          payload_before,payload_after)
+       VALUES ($1,'network','network.partner_units',$2,'partner_coverage_updated',$3,
+               $4::jsonb,$5::jsonb)`,
+      [
+        environment,
+        partnerUnitId,
+        actorLabel,
+        JSON.stringify({ municipios: previousKeys }),
+        JSON.stringify({ municipios: desiredKeys, slug: unit.rows[0]!.slug }),
+      ],
+    );
+    await client.query('COMMIT');
+    return { updated: true, changed: true, municipios: desiredNames };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

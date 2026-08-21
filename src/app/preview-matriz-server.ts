@@ -17,6 +17,7 @@ import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { registerAdminLoginRoute } from '../admin/login.route.js';
 import { startClientesKanbanNotifyHub } from '../shared/clientes-kanban.notify.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
+import { registerMunicipalityCatalogRoute } from '../network/municipality-catalog.route.js';
 
 const fastify = Fastify({ logger: loggerOptions, genReqId: createRequestId });
 registerRequestContext(fastify);
@@ -37,6 +38,7 @@ fastify.addContentTypeParser(
 
 async function start(): Promise<void> {
   await registerAdminLoginRoute(fastify);
+  await registerMunicipalityCatalogRoute(fastify);
   await registerPainelRoute(fastify);
   await registerCaixaRoute(fastify);
   startClientesKanbanNotifyHub();

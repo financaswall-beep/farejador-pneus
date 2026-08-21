@@ -56,6 +56,53 @@
   .phone { top: 24.96%; }
   .email { top: 37.44%; }
   .cities { top: 49.92%; }
+  .city-picker {
+    position: absolute;
+    left: 0;
+    top: 49.92%;
+    width: 100%;
+    height: 6.9%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .city-chips { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+  .city-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 29px;
+    padding: 0 8px;
+    border: 1px solid rgba(255, 212, 0, .45);
+    border-radius: 6px;
+    background: rgba(255, 212, 0, .12);
+    color: #fff7c2;
+    font: 700 12px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+    white-space: nowrap;
+  }
+  .city-chip button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #ffd400;
+    cursor: pointer;
+    font: 800 17px/1 sans-serif;
+  }
+  .city-select {
+    min-width: 190px;
+    height: 32px;
+    flex: 1 0 190px;
+    border: 0;
+    outline: 0;
+    background: rgba(0, 0, 0, .15);
+    color: #f7f7f1;
+    font: 500 14px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+  .city-select option { color: #111; background: #fff; }
   .address { top: 62.4%; }
   .message {
     top: 75.04%;
@@ -187,8 +234,14 @@
       <label class="hp" for="email">E-mail</label>
       <input class="field email" id="email" name="email" type="text" maxlength="160" placeholder="opcional" autocomplete="email" inputmode="email" />
 
-      <label class="hp" for="municipios">Cidade(s) que você atende</label>
-      <input class="field cities" id="municipios" name="municipios" maxlength="200" placeholder="Ex: Niterói, São Gonçalo" autocomplete="address-level2" />
+      <label class="hp" for="citySelect">Cidade(s) que você atende</label>
+      <input type="hidden" id="municipios" name="municipios" />
+      <div class="city-picker">
+        <div class="city-chips" id="cityChips"></div>
+        <select class="city-select" id="citySelect" aria-label="Adicionar cidade atendida" disabled>
+          <option value="">Carregando cidades…</option>
+        </select>
+      </div>
 
       <label class="hp" for="address">Endereço da borracharia</label>
       <input class="field address" id="address" name="address" maxlength="200" placeholder="Rua, número, bairro" autocomplete="street-address" />
@@ -226,6 +279,61 @@
     const okCard = document.getElementById('okCard');
     const errCard = document.getElementById('errCard');
     const errMsg = document.getElementById('errMsg');
+    const citySelect = document.getElementById('citySelect');
+    const cityChips = document.getElementById('cityChips');
+    const municipalitiesInput = document.getElementById('municipios');
+    let municipalityCatalog = [];
+    let selectedMunicipalities = [];
+
+    function renderMunicipalities() {
+      cityChips.replaceChildren(...selectedMunicipalities.map((municipality) => {
+        const chip = document.createElement('span');
+        chip.className = 'city-chip';
+        const label = document.createElement('span');
+        label.textContent = municipality;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', 'Remover ' + municipality);
+        remove.addEventListener('click', () => {
+          selectedMunicipalities = selectedMunicipalities.filter((item) => item !== municipality);
+          renderMunicipalities();
+        });
+        chip.append(label, remove);
+        return chip;
+      }));
+      municipalitiesInput.value = selectedMunicipalities.join(', ');
+      citySelect.replaceChildren();
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = selectedMunicipalities.length ? 'Adicionar outra cidade…' : 'Escolha uma cidade…';
+      citySelect.append(placeholder);
+      for (const municipality of municipalityCatalog.filter((item) => !selectedMunicipalities.includes(item))) {
+        const option = document.createElement('option');
+        option.value = municipality;
+        option.textContent = municipality;
+        citySelect.append(option);
+      }
+      citySelect.value = '';
+    }
+
+    citySelect.addEventListener('change', () => {
+      if (citySelect.value && !selectedMunicipalities.includes(citySelect.value)) {
+        selectedMunicipalities.push(citySelect.value);
+      }
+      renderMunicipalities();
+    });
+
+    fetch('/api/network/municipalities')
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('api_' + response.status)))
+      .then((payload) => {
+        municipalityCatalog = Array.isArray(payload.municipalities) ? payload.municipalities : [];
+        citySelect.disabled = municipalityCatalog.length === 0;
+        renderMunicipalities();
+      })
+      .catch(() => {
+        citySelect.replaceChildren(new Option('Cidades indisponíveis. Recarregue a página.', ''));
+      });
 
     function payloadFromForm(formEl) {
       const data = Object.fromEntries(new FormData(formEl).entries());
@@ -244,6 +352,11 @@
       e.preventDefault();
       okCard.style.display = 'none';
       errCard.style.display = 'none';
+      if (selectedMunicipalities.length === 0) {
+        errMsg.textContent = 'Escolha ao menos uma cidade atendida.';
+        errCard.style.display = 'grid';
+        return;
+      }
       btn.disabled = true;
       btnText.textContent = 'Enviando...';
 

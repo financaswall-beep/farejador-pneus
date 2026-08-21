@@ -22,6 +22,7 @@ import { registerPartnerOperationNotificationRoutes } from '../parceiro/route-op
 import { registerCaixaRoute } from '../admin/caixa/route.js';
 import { startPartnerChatNotifyHub } from '../normalization/partner-chat.notify.js';
 import { createRequestId, registerRequestContext } from '../shared/request-context.js';
+import { registerMunicipalityCatalogRoute } from '../network/municipality-catalog.route.js';
 
 const fastify = Fastify({ logger: loggerOptions, genReqId: createRequestId });
 registerRequestContext(fastify);
@@ -41,6 +42,7 @@ fastify.addContentTypeParser(
 );
 
 async function start(): Promise<void> {
+  await registerMunicipalityCatalogRoute(fastify);
   await registerParceiroRoute(fastify);
   await registerLoginGlobalRoute(fastify);
   registerPartnerOperationStockRoutes(fastify);

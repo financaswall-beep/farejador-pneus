@@ -108,7 +108,8 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       }
       this.partnerError = null;
       this.partnerResult = null;
-      this.partnerForm = { trade_name: '', responsible_name: '', whatsapp_phone: '', email: '', address: '', commission_percent: '', municipios: '', slug: '' };
+      this.partnerForm = { trade_name: '', responsible_name: '', whatsapp_phone: '', email: '', address: '', commission_percent: '', municipios: [], slug: '' };
+      this.partnerMunicipalityChoice = '';
       this.partnerModalOpen = true;
     },
 
@@ -117,7 +118,7 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       if (this.adminUser?.role !== 'owner') { this.partnerError = 'Somente o proprietário pode cadastrar parceiros.'; return; }
       if (!this.partnerForm.trade_name.trim()) { this.partnerError = 'Informe o nome do parceiro.'; return; }
       if (this.partnerForm.commission_percent === '') { this.partnerError = 'Informe a comissão, mesmo quando for 0%.'; return; }
-      const municipios = this.partnerForm.municipios.split(',').map((s) => s.trim()).filter(Boolean);
+      const municipios = [...this.partnerForm.municipios];
       if (municipios.length === 0) { this.partnerError = 'Informe ao menos uma cidade de cobertura.'; return; }
       this.partnerSubmitting = true;
       this.partnerError = null;
@@ -177,14 +178,15 @@ window.PAINEL_MODULES.pedidosParceiros = function () {
       this.approvingApp = app;
       this.approveResult = null;
       this.approveError = null;
-      this.approveForm = { municipios: app.municipios || '', commission_percent: '', slug: '',
+      this.approveForm = { municipios: this.municipalitiesFromText(app.municipios), commission_percent: '', slug: '',
         idempotency_key: `approve-${app.id}-${crypto.randomUUID()}` };
+      this.approveMunicipalityChoice = '';
     },
 
     async confirmApprove() {
       if (this.approveSubmitting || !this.approvingApp) return;
       if (this.adminUser?.role !== 'owner') { this.approveError = 'Somente o proprietário pode aprovar candidaturas.'; return; }
-      const municipios = (this.approveForm.municipios || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const municipios = [...this.approveForm.municipios];
       if (municipios.length === 0) { this.approveError = 'Informe ao menos uma cidade de cobertura.'; return; }
       if (this.approveForm.commission_percent === '') { this.approveError = 'Informe a comissão, mesmo quando for 0%.'; return; }
       this.approveSubmitting = true;
