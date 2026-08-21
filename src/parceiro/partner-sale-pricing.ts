@@ -7,6 +7,61 @@ export interface PartnerSalePricedItem {
   reference_unit_price?: number;
 }
 
+export interface PartnerSaleMoneyItem {
+  quantity: number;
+  unit_price: number;
+  discount_amount?: number;
+}
+
+const PARTNER_SALE_MAX_CENTS = 9_999_999_999;
+
+function exactMoneyCents(value: number, field: string): number {
+  const cents = moneyCents(value);
+  if (!Number.isFinite(value) || value < 0
+      || Math.abs(value * 100 - cents) >= 1e-7) {
+    throw new Error(`${field}_invalid`);
+  }
+  return cents;
+}
+
+/**
+ * Calcula o mesmo total da function SQL, mas em centavos e antes de qualquer
+ * efeito no estoque. Impede desconto maior que a linha, total zerado e overflow
+ * do NUMERIC(10,2) de partner_orders.
+ */
+export function partnerSaleTotalCents(
+  items: PartnerSaleMoneyItem[],
+  orderDiscount = 0,
+  freight = 0,
+): number {
+  if (!items.length) throw new Error('partner_sale_items_required');
+  let itemNetCents = 0;
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 999_999) {
+      throw new Error('partner_sale_quantity_invalid');
+    }
+    const unitCents = exactMoneyCents(item.unit_price, 'partner_sale_unit_price');
+    if (unitCents <= 0) throw new Error('partner_sale_unit_price_invalid');
+    const discountCents = exactMoneyCents(item.discount_amount ?? 0, 'partner_sale_item_discount');
+    const grossCents = item.quantity * unitCents;
+    if (!Number.isSafeInteger(grossCents) || discountCents > grossCents) {
+      throw new Error('partner_sale_item_discount_exceeds_line');
+    }
+    itemNetCents += grossCents - discountCents;
+    if (!Number.isSafeInteger(itemNetCents) || itemNetCents > PARTNER_SALE_MAX_CENTS) {
+      throw new Error('partner_sale_total_too_large');
+    }
+  }
+  const orderDiscountCents = exactMoneyCents(orderDiscount, 'partner_sale_discount');
+  const freightCents = exactMoneyCents(freight, 'partner_sale_freight');
+  const totalCents = itemNetCents - orderDiscountCents + freightCents;
+  if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
+    throw new Error('partner_sale_total_must_be_positive');
+  }
+  if (totalCents > PARTNER_SALE_MAX_CENTS) throw new Error('partner_sale_total_too_large');
+  return totalCents;
+}
+
 /** Trava o preço oficial durante o fechamento e recusa catálogo obsoleto. */
 export async function lockAndValidatePartnerSalePrices(
   client: Pick<PoolClient, 'query'>,

@@ -47,6 +47,9 @@ describe('Financeiro simples do proprietario parceiro', () => {
     });
     expect(partnerQuery.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', 7]);
     expect(partnerQuery.mock.calls[0]?.[0]).toContain('range_start_at');
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain("po.delivery_status<>'delivered'");
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain('NOT po.awaiting_pickup');
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain('COALESCE(po.retrieved_at,po.created_at)');
     expect(partnerQuery.mock.calls[0]?.[0]).not.toContain('partner_access_tokens');
     expect(adminQuery.mock.calls[0]?.[1]).toEqual(['test', 'partner-unit-1']);
   });

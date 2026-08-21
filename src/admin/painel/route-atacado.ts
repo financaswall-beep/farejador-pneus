@@ -23,7 +23,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
     return reply.status(200).send({ ...dashboardPayload([]), items: await listPartnerPendingCosts() });
   });
 
-  fastify.post('/admin/api/rede/custos/reconcile', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/rede/custos/reconcile', { preHandler: requireAdminOwner }, async (request, reply) => {
     const parsed = reconcilePartnerCostSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
     try {
@@ -143,7 +143,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
   });
 
   // "Recebi": quita todos os lançamentos em aberto do parceiro.
-  fastify.post('/admin/api/rede/comissoes/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/rede/comissoes/settle', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.NETWORK_COMMISSION_LEDGER) return reply.status(409).send({ error: 'ledger_disabled' });
     const parsed = settleComissaoSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'invalid_body' });
@@ -216,7 +216,7 @@ export async function registerPainelAtacado(fastify: FastifyInstance): Promise<v
   });
 
   // Editor do modelo comercial do parceiro (SEM flag — edição de cadastro, pendência 06-01).
-  fastify.post('/admin/api/partners/:partner_id/terms', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/partners/:partner_id/terms', { preHandler: requireAdminOwner }, async (request, reply) => {
     const params = partnerIdParamSchema.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: 'invalid_params' });
     const parsed = partnerTermsSchema.safeParse(request.body);

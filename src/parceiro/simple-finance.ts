@@ -59,7 +59,15 @@ export async function getPartnerSimpleFinance(
              FROM commerce.partner_orders po,bounds b
             WHERE po.environment=$1 AND po.unit_id=$2
               AND po.status<>'cancelled' AND po.deleted_at IS NULL
-              AND po.created_at>=b.range_start_at AND po.created_at<b.range_end_at
+              AND NOT (po.fulfillment_mode='delivery'
+                AND po.delivery_status<>'delivered')
+              AND NOT po.awaiting_pickup
+              AND (CASE WHEN po.fulfillment_mode='delivery' THEN po.delivered_at
+                        ELSE COALESCE(po.retrieved_at,po.created_at) END)
+                    >=b.range_start_at
+              AND (CASE WHEN po.fulfillment_mode='delivery' THEN po.delivered_at
+                        ELSE COALESCE(po.retrieved_at,po.created_at) END)
+                    <b.range_end_at
               AND (po.payment_method IS NULL OR po.payment_method<>'A receber')),0)
            + COALESCE((SELECT sum(pre.amount)
              FROM finance.partner_receivables_effective pre,bounds b

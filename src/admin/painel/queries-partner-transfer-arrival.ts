@@ -237,7 +237,7 @@ export async function settlePartnerArrival(
     }
     await client.query(
       `UPDATE commerce.wholesale_orders
-          SET settled_total_amount=$3,partner_transfer_status='settled',status='confirmed',
+          SET settled_total_amount=$3,partner_transfer_status='settled',status='confirmed',partner_settled_at=$4::timestamptz,
               payment_status=CASE WHEN partner_payment_terms='cash_on_arrival'
                                   THEN 'paid' ELSE 'pending' END,
               paid_at=CASE WHEN partner_payment_terms='cash_on_arrival'

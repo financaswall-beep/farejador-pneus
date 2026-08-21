@@ -3,7 +3,7 @@
 // Registrada por ./route.js (porta de entrada) na ordem original.
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { env } from '../../shared/config/env.js';
 import { logger } from '../../shared/logger.js';
 import { archiveMatrizExpenseCategory, createMatrizExpense, createMatrizExpenseCategory, getMatrizExpenses, getMatrizFinanceiroVisao, listMatrizExpenseCategories, removeMatrizExpense, settleMatrizExpense, sweepCommissionEntries } from './queries.js';
@@ -69,7 +69,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
 
   // 0130: cadastrar MODALIDADE nova ("Pedágio", "Alimentação"…). Nome já ativo → 409;
   // nome arquivado → REATIVA (o "criei de novo" desfaz o arquivar).
-  fastify.post('/admin/api/matriz/despesas/categorias', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/matriz/despesas/categorias', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = matrizExpenseCategoryCreateSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -96,7 +96,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   });
 
   // 0130: arquivar modalidade CUSTOM (fábrica não arquiva; despesa antiga fica íntegra).
-  fastify.post('/admin/api/matriz/despesas/categorias/arquivar', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/matriz/despesas/categorias/arquivar', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = matrizExpenseCategoryArchiveSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -116,7 +116,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   });
 
   // Lança despesa (à vista nasce paga; a pagar nasce pending com vencimento opcional).
-  fastify.post('/admin/api/matriz/despesas', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/matriz/despesas', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = createMatrizExpenseSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -140,7 +140,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   });
 
   // Quita despesa. Replay devolve o resultado original sem sobrescrever paid_at.
-  fastify.post('/admin/api/matriz/despesas/settle', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/matriz/despesas/settle', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = matrizExpenseIdSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -165,7 +165,7 @@ export async function registerPainelFinanceiro(fastify: FastifyInstance): Promis
   });
 
   // REMOVE despesa lançada errada (soft delete — trilha preservada).
-  fastify.post('/admin/api/matriz/despesas/remove', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/matriz/despesas/remove', { preHandler: requireAdminOwner }, async (request, reply) => {
     if (!env.MATRIZ_EXPENSES) return reply.status(404).send({ error: 'expenses_disabled' });
     const parsed = matrizExpenseRemoveSchema.safeParse(request.body);
     if (!parsed.success) {

@@ -247,6 +247,11 @@ describe('Etapa 3 — varejo da Matriz no livro central', () => {
       due_date: '2026-08-15',
       settlement_mode: 'retail_sale',
     });
+    await expect(settleMatrizLedgerOpenItem({
+      obligation_id: item!.obligation_id!, amount: 1.001,
+      idempotency_key: randomUUID(), actor_label: 'owner:invalid-fraction',
+      environment: 'test',
+    }, db.pool)).rejects.toThrow('settlement_amount_cent_precision');
     await settleMatrizLedgerOpenItem({
       obligation_id: item!.obligation_id!, amount: 40,
       idempotency_key: randomUUID(), actor_label: 'owner:retail-partial',

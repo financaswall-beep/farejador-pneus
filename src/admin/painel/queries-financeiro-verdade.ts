@@ -102,7 +102,10 @@ export async function getLegacyMatrizFinancialTruth(
         GROUP BY o.id
      ), wholesale AS (
        SELECT o.id,o.created_at,COALESCE(o.settled_total_amount,o.total_amount) total_amount,
-              o.status,o.payment_status,o.paid_at,o.sold_at,o.created_by,
+              o.status,o.payment_status,o.paid_at,
+              CASE WHEN o.partner_transfer_status IN ('settled','received')
+                THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END recognized_at,
+              o.created_by,
               COALESCE(SUM(i.unit_price*CASE WHEN o.partner_transfer_status IN ('settled','received')
                 THEN COALESCE(i.accepted_quantity,0) ELSE i.quantity END),0) item_total,
               COALESCE(SUM(i.unit_cost*CASE WHEN o.partner_transfer_status IN ('settled','received')
@@ -130,9 +133,9 @@ export async function getLegacyMatrizFinancialTruth(
        COALESCE((SELECT SUM(pending_revenue) FROM retail WHERE status IN ('confirmed','paid','delivered')),0) pending_all,
        COALESCE((SELECT SUM(pending_items) FROM retail WHERE status IN ('confirmed','paid','delivered')),0)::int pending_items,
        (SELECT COUNT(*) FROM retail WHERE status IN ('confirmed','paid','delivered') AND pending_items>0)::int pending_orders,
-       COALESCE((SELECT SUM(total_amount) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_header,
-       COALESCE((SELECT SUM(item_total) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_items,
-       COALESCE((SELECT SUM(known_cost) FROM wholesale,bounds WHERE status='confirmed' AND sold_at>=month_start AND sold_at<month_end),0) wholesale_cost,
+       COALESCE((SELECT SUM(total_amount) FROM wholesale,bounds WHERE status='confirmed' AND recognized_at>=month_start AND recognized_at<month_end),0) wholesale_header,
+       COALESCE((SELECT SUM(item_total) FROM wholesale,bounds WHERE status='confirmed' AND recognized_at>=month_start AND recognized_at<month_end),0) wholesale_items,
+       COALESCE((SELECT SUM(known_cost) FROM wholesale,bounds WHERE status='confirmed' AND recognized_at>=month_start AND recognized_at<month_end),0) wholesale_cost,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries,bounds
                   WHERE environment=$1 AND realized_at>=month_start
                     AND realized_at<month_end),0) commission_revenue,
@@ -160,8 +163,8 @@ export async function getLegacyMatrizFinancialTruth(
                         AND COALESCE(closed_at,created_at)>=month_start
                         AND COALESCE(closed_at,created_at)<month_end))),0) cash_retail,
        COALESCE((SELECT SUM(total_amount) FROM wholesale,bounds WHERE status='confirmed' AND payment_status='paid'
-                  AND COALESCE(paid_at,sold_at)>=month_start
-                  AND COALESCE(paid_at,sold_at)<month_end),0) cash_wholesale,
+                   AND COALESCE(paid_at,recognized_at)>=month_start
+                   AND COALESCE(paid_at,recognized_at)<month_end),0) cash_wholesale,
        COALESCE((SELECT SUM(commission_amount) FROM network.commission_entries,bounds
                   WHERE environment=$1 AND settled_at IS NOT NULL
                     AND settled_at>=month_start AND settled_at<month_end),0) cash_commission,

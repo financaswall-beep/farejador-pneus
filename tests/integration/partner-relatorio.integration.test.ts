@@ -95,7 +95,9 @@ async function seedScenario(q: Q, f: PartnerFixture): Promise<string> {
     q.registerPartnerSale(f.ctx, {
       customer_name: 'Cliente', customer_phone: null,
       items: [{ partner_stock_id: stock, quantity: qty, unit_price: price }],
-      payment_method: 'pix', fulfillment_mode: mode,
+      payment_method: mode === 'delivery' ? 'A receber' : 'pix',
+      payment_status: mode === 'delivery' ? 'receivable' : undefined,
+      fulfillment_mode: mode,
       delivery_address: mode === 'delivery' ? 'Rua Teste, 100' : null,
       source_tag: 'porta', idempotency_key: `rel-${randomUUID()}`,
     });

@@ -45,7 +45,7 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
     const sale = await partner.registerPartnerSale(fixture.ctx, {
       customer_name: 'Cliente comissão central', customer_phone: null,
       items: [{ partner_stock_id: fixture.stockId, quantity: 1, unit_price: 200 }],
-      payment_method: 'pix', fulfillment_mode: 'delivery',
+      payment_method: 'A receber', payment_status: 'receivable', fulfillment_mode: 'delivery',
       delivery_address: 'Rua Etapa 5, 10', source_tag: '2w',
       idempotency_key: randomUUID(),
     }, db.pool);

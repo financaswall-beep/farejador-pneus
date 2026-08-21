@@ -50,5 +50,6 @@ describe('Financeiro simples da Matriz', () => {
     });
     expect(query).toHaveBeenCalledOnce();
     expect(query.mock.calls[0]?.[1]?.[0]).toBe('test');
+    expect(query.mock.calls[0]?.[0]).not.toContain('reversal_of_transaction_id=t.id');
   });
 });

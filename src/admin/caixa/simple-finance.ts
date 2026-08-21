@@ -38,8 +38,6 @@ async function getCashSummary(
        SELECT t.id
          FROM finance.matriz_ledger_transactions t
         WHERE t.environment=$1 AND t.cash_on>=$2::date AND t.cash_on<$3::date
-          AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
-            WHERE r.environment=t.environment AND r.reversal_of_transaction_id=t.id)
      )
      SELECT COALESCE(sum(e.amount) FILTER (
               WHERE e.account_code='cash' AND e.side='debit'),0)::numeric(14,2)::text entradas,

@@ -3,37 +3,14 @@
  *
  * Validacao cruzada: fulfillment_mode='delivery' exige delivery_address nao-vazio.
  *
- * Como o schema mora dentro de route.ts (nao exportado), criamos uma copia
- * minima reproduzindo as mesmas regras pra testar a logica do refine sem
- * subir Fastify.
+ * Testa o schema real compartilhado pelo endpoint.
  */
 
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
-
-// Re-implementacao minima do refine, identica ao route.ts
-const centMoneySchema = z.number().finite().nonnegative()
-  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7);
-const orderItemSchema = z.object({
-  partner_stock_id: z.string().uuid(),
-  quantity: z.number().int().positive(),
-  unit_price: centMoneySchema.refine((value) => value > 0),
-  reference_unit_price: centMoneySchema.refine((value) => value > 0).optional(),
-});
-
-const saleSchema = z.object({
-  items: z.array(orderItemSchema).min(1),
-  payment_method: z.string().min(1).nullable(),
-  fulfillment_mode: z.enum(['delivery', 'pickup']),
-  delivery_address: z.string().min(1).nullable().optional(),
-  idempotency_key: z.string().min(8),
-}).refine(
-  (data) => data.fulfillment_mode !== 'delivery' || (data.delivery_address && data.delivery_address.trim().length > 0),
-  {
-    message: 'delivery_address obrigatorio quando fulfillment_mode=delivery',
-    path: ['delivery_address'],
-  },
-);
+import {
+  partnerSaleItemSchema as orderItemSchema,
+  partnerSaleSchema as saleSchema,
+} from '../../../src/parceiro/sale-schema.js';
 
 const validItem = {
   partner_stock_id: '00000000-0000-0000-0000-000000000001',
@@ -56,7 +33,8 @@ describe('saleSchema — refine delivery_address (S6)', () => {
   it('aceita delivery com delivery_address preenchido', () => {
     const r = saleSchema.safeParse({
       items: [validItem],
-      payment_method: 'pix',
+      payment_method: 'A receber',
+      payment_status: 'receivable',
       fulfillment_mode: 'delivery',
       delivery_address: 'Rua das Flores, 123',
       idempotency_key: 'abcdefgh12',

@@ -94,7 +94,7 @@ describe('auditoria matemática formal de Vendas', () => {
     }).success).toBe(true);
   });
 
-  it('usa venda realizada e sold_at em todos os consumidores matemáticos', () => {
+  it('usa venda realizada e a competência do acerto nas cargas de parceiro', () => {
     const commission = readFileSync(resolve('src/admin/caixa/operation-commission-facts.ts'), 'utf8');
     const team = readFileSync(resolve('src/admin/painel/queries-colaboradores-gestao.ts'), 'utf8');
     const finance = readFileSync(resolve('src/admin/painel/queries-financeiro-visao.ts'), 'utf8');
@@ -105,10 +105,11 @@ describe('auditoria matemática formal de Vendas', () => {
     for (const source of [commission, team, finance, truth, caixa, marketing]) {
       expect(source).toContain("status IN ('confirmed','paid','delivered')");
     }
-    expect(commission).toContain('o.sold_at occurred_at');
-    expect(team).toContain("(o.sold_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date");
-    expect(finance).toContain("(o.sold_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}");
-    expect(truth).toContain("status='confirmed' AND sold_at>=month_start");
+    for (const source of [commission, team, finance, truth]) {
+      expect(source).toContain('COALESCE(o.partner_settled_at,o.sold_at)');
+      expect(source).toContain("o.partner_transfer_status IN ('settled','received')");
+    }
+    expect(commission).toContain('ELSE o.sold_at END occurred_at');
     expect(varejoUi).toContain("!['Cancelado', 'Aberto', 'Pendente'].includes(p.status)");
   });
 });

@@ -29,7 +29,7 @@ describe('Etapa 6 — livro causal de comissão 2W', () => {
     const sale = await partner.registerPartnerSale(f.ctx, {
       customer_name: 'Cliente 2W', customer_phone: null,
       items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 200 }],
-      payment_method: 'A receber', fulfillment_mode: 'delivery',
+      payment_method: 'A receber', payment_status: 'receivable', fulfillment_mode: 'delivery',
       delivery_address: 'Rua Teste, 1', source_tag: '2w',
       idempotency_key: `commission-sale-${randomUUID()}`,
     }, db.pool);

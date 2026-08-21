@@ -25,6 +25,9 @@ describe('transferência de estoque Matriz → parceiro', () => {
   let receivePurchase: typeof import(
     '../../src/parceiro/operation-purchase-receipt.js'
   ).receiveOperationPurchase;
+  let runStage3Backfill: typeof import(
+    '../../src/admin/painel/matriz-ledger-stage3-reconciliation.js'
+  ).runMatrizStage3LedgerBackfill;
 
   beforeAll(async () => {
     Object.assign(process.env, {
@@ -47,6 +50,8 @@ describe('transferência de estoque Matriz → parceiro', () => {
       = await import('../../src/admin/painel/queries-financeiro-integridade.js'));
     ({ receiveOperationPurchase: receivePurchase }
       = await import('../../src/parceiro/operation-purchase-receipt.js'));
+    ({ runMatrizStage3LedgerBackfill: runStage3Backfill }
+      = await import('../../src/admin/painel/matriz-ledger-stage3-reconciliation.js'));
   }, 180_000);
 
   afterAll(async () => {
@@ -56,6 +61,33 @@ describe('transferência de estoque Matriz → parceiro', () => {
 
   it('cria recebimento, acerta recusa, retorna carga e sincroniza pagamento', async () => {
     const partner = await createPartnerFixture(db.pool, { slugSuffix: 'transfer-0183' });
+    const person = await db.pool.query<{ id:string }>(
+      `INSERT INTO network.partner_people(environment,username)
+       VALUES ('test',$1) RETURNING id`,[`vendedor.transfer.${randomUUID()}`],
+    );
+    const seller = await db.pool.query<{ id:string }>(
+      `INSERT INTO network.matriz_collaborators
+         (environment,person_id,display_name,job,job_title,work_area)
+       VALUES ('test',$1,'Vendedor da carga','vendedor','Vendedor','sales')
+       RETURNING id`,[person.rows[0]!.id],
+    );
+    const periods = await db.pool.query<{
+      previous_sale_at:string; previous_start:string; current_start:string; next_start:string;
+    }>(
+      `SELECT ((date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+                  -interval '1 day') AT TIME ZONE 'America/Sao_Paulo')::text previous_sale_at,
+              (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+                  -interval '1 month')::date::text previous_start,
+              date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text current_start,
+              (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')
+                  +interval '1 month')::date::text next_start`,
+    );
+    await db.pool.query(
+      `INSERT INTO network.matriz_collaborator_commission_rules
+         (environment,collaborator_id,kind,basis,value,active,starts_on,updated_by)
+       VALUES ('test',$1,'percent','revenue',3,true,$2::date,'auditoria')`,
+      [seller.rows[0]!.id,periods.rows[0]!.previous_start],
+    );
     const measure = '92/92-19';
     const brand = 'Marca Transferência';
     const product = await db.pool.query<{ id: string }>(
@@ -81,7 +113,9 @@ describe('transferência de estoque Matriz → parceiro', () => {
       environment: 'test', partner_id: partner.partnerId,
       partner_unit_id: partner.partnerUnitId,
       items: [{ measure,brand,tire_condition:'novo',quantity:2,unit_price:150 }],
+      sold_at:periods.rows[0]!.previous_sale_at,
       payment_status:'pending',due_date:dueDate,created_by:'owner:test',
+      seller_collaborator_id:seller.rows[0]!.id,
       idempotency_key:randomUUID(),
     }, db.pool);
 
@@ -116,6 +150,33 @@ describe('transferência de estoque Matriz → parceiro', () => {
     expect(beforeArrivalLedger.rows).toEqual([{
       source_type:'commerce.wholesale_order.partner_dispatch',amount:'200.00',
     }]);
+    const inTransitBackfill = await runStage3Backfill(
+      { environment:'test',limit:100 },db.pool,
+    );
+    expect(inTransitBackfill.reconciliation).toMatchObject({
+      status:'green',total_problems:0,amount_mismatches:0,
+    });
+    await expect(db.pool.query(
+      `SELECT source_type,amount::text FROM finance.matriz_ledger_transactions
+        WHERE environment='test' AND source_id=$1 ORDER BY source_type`,
+      [original.order_id],
+    )).resolves.toMatchObject({ rows:[{
+      source_type:'commerce.wholesale_order.partner_dispatch',amount:'200.00',
+    }] });
+    await expect(db.pool.query(
+      `UPDATE commerce.wholesale_orders
+          SET status='confirmed',payment_status='paid',paid_at=now()
+        WHERE environment='test' AND id=$1`,
+      [original.order_id],
+    )).rejects.toThrow(/matrix_partner_arrival_operation_required/);
+    await expect(db.pool.query(
+      `SELECT status,payment_status,paid_at
+         FROM commerce.wholesale_orders
+        WHERE environment='test' AND id=$1`,
+      [original.order_id],
+    )).resolves.toMatchObject({ rows:[{
+      status:'pending',payment_status:'pending',paid_at:null,
+    }] });
     const originalItem = await db.pool.query<{ id: string }>(
       `SELECT id FROM commerce.wholesale_order_items WHERE order_id=$1`, [original.order_id],
     );
@@ -125,13 +186,14 @@ describe('transferência de estoque Matriz → parceiro', () => {
       items:[{ order_item_id:originalItem.rows[0]!.id,accepted_quantity:2 }],
     }, db.pool);
     const afterArrival = await db.pool.query(
-      `SELECT status,payment_status,partner_transfer_status,settled_total_amount::text
+      `SELECT status,payment_status,partner_transfer_status,settled_total_amount::text,
+              partner_settled_at IS NOT NULL AS settlement_dated
          FROM commerce.wholesale_orders WHERE environment='test' AND id=$1`,
       [original.order_id],
     );
     expect(afterArrival.rows[0]).toEqual({
       status:'confirmed',payment_status:'pending',partner_transfer_status:'settled',
-      settled_total_amount:'300.00',
+      settled_total_amount:'300.00',settlement_dated:true,
     });
     const afterArrivalLedger = await db.pool.query(
       `SELECT source_type,amount::text FROM finance.matriz_ledger_transactions
@@ -143,6 +205,49 @@ describe('transferência de estoque Matriz → parceiro', () => {
       { source_type:'commerce.wholesale_order.arrival_revenue',amount:'300.00' },
       { source_type:'commerce.wholesale_order.partner_dispatch',amount:'200.00' },
     ]);
+    const settledBackfill = await runStage3Backfill(
+      { environment:'test',limit:100 },db.pool,
+    );
+    expect(settledBackfill.processed.wholesale_sales).toBe(0);
+    expect(settledBackfill.reconciliation).toMatchObject({
+      status:'green',total_problems:0,amount_mismatches:0,
+    });
+    const { matrizCommissionFactsSql } = await import(
+      '../../src/admin/caixa/operation-commission-facts.js'
+    );
+    const currentCommission = await db.pool.query(
+      `${matrizCommissionFactsSql}
+       SELECT gross_amount::text,commission_amount::text
+         FROM ruled WHERE source_id=$4`,
+      ['test',periods.rows[0]!.current_start,periods.rows[0]!.next_start,
+        original.order_id],
+    );
+    const previousCommission = await db.pool.query(
+      `${matrizCommissionFactsSql}
+       SELECT source_id FROM ruled WHERE source_id=$4`,
+      ['test',periods.rows[0]!.previous_start,periods.rows[0]!.current_start,
+        original.order_id],
+    );
+    expect(currentCommission.rows).toEqual([{
+      gross_amount:'300.00',commission_amount:'9.00',
+    }]);
+    expect(previousCommission.rows).toHaveLength(0);
+    const { getMatrizCollaboratorManagement } = await import(
+      '../../src/admin/painel/queries-colaboradores-gestao.js'
+    );
+    const management = await getMatrizCollaboratorManagement(
+      periods.rows[0]!.current_start,'test',db.pool,
+    );
+    expect(management.collaborators.find((row) => row.id===seller.rows[0]!.id))
+      .toMatchObject({ revenue:300,commission_amount:9,sales_count:1 });
+    const { getMatrizCentralLedgerFinancialTruth } = await import(
+      '../../src/admin/painel/matriz-ledger-financial-read.js'
+    );
+    const truth = await getMatrizCentralLedgerFinancialTruth('test',db.pool);
+    expect(truth.conciliacao.origens.find((row) => row.origem==='atacado'))
+      .toEqual({
+        origem:'atacado',origem_total:'300.00',contabilizado:'300.00',diferenca:'0.00',
+      });
 
     const addition = await registerSale({
       environment:'test',parent_order_id:original.order_id,

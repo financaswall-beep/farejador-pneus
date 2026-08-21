@@ -139,7 +139,7 @@ describe('Etapa 3 — backfill e paridade do livro central', () => {
     expect(first.processed).toEqual({
       purchases: 1,
       wholesale_sales: 1,
-      retail_sales: 2,
+      retail_sales: 1,
       inventory_adjustments: 1,
     });
     expect(first.reconciliation).toMatchObject({

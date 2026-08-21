@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { requireAdminAuth } from '../auth.js';
+import { requireAdminAuth, requireAdminOwner } from '../auth.js';
 import { logger } from '../../shared/logger.js';
 import { getCatalogOverview, getCatalogPriceHistory, setCatalogPrice } from './queries-catalogo.js';
 import { getCatalogCompatibility } from './queries-catalogo-compatibilidade.js';
@@ -25,7 +25,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     return reply.status(200).send(await getCatalogOverview());
   });
 
-  fastify.post('/admin/api/catalog/products', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/catalog/products', { preHandler: requireAdminOwner }, async (request, reply) => {
     const body = createProductBody.safeParse(request.body);
     if (!body.success) return reply.status(400).send({ error: 'invalid_catalog_product' });
     try {
@@ -68,7 +68,7 @@ export async function registerPainelCatalogo(fastify: FastifyInstance): Promise<
     }
   });
 
-  fastify.post('/admin/api/catalog/:product_id/price', { preHandler: requireAdminAuth }, async (request, reply) => {
+  fastify.post('/admin/api/catalog/:product_id/price', { preHandler: requireAdminOwner }, async (request, reply) => {
     const params = productParams.safeParse(request.params);
     const body = priceBody.safeParse(request.body);
     if (!params.success || !body.success) return reply.status(400).send({ error: 'invalid_catalog_price' });

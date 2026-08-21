@@ -42,6 +42,10 @@ import {
 } from '../shared/tire-condition.js';
 import { moneyCents } from '../shared/catalog-pricing.js';
 import { lockAndValidatePartnerSalePrices } from './partner-sale-pricing.js';
+import {
+  assertPositiveCentMoney, lockPartnerSaleIdempotency, normalizePartnerCpf as normalizeCpf,
+  normalizePartnerText as normalizeText, validatePartnerSaleFinancialInput,
+} from './partner-finance-input.js';
 import { reversePurchaseStockCost } from './partner-stock-cost.js';
 import { partnerPurchaseTotalCents } from './purchase-schema.js';
 export type { PartnerCommissionConfig } from './commission.js';
@@ -545,11 +549,12 @@ export async function getPartnerRelatorioCaixa(ctx: PartnerContext, opts: Relato
          SELECT pof.total_amount,
                 CASE WHEN pof.fulfillment_mode = 'delivery'
                      THEN COALESCE(pof.delivered_at, pof.created_at)
-                     ELSE pof.created_at END AS realized_at
+                     ELSE COALESCE(pof.retrieved_at, pof.created_at) END AS realized_at
            FROM commerce.partner_orders_full pof
           WHERE pof.environment = $1 AND pof.unit_id = $2
             AND pof.status <> 'cancelled'
             AND (pof.fulfillment_mode <> 'delivery' OR pof.delivery_status = 'delivered')
+            AND NOT pof.awaiting_pickup
        ),
        vendas_periodo AS (
          SELECT * FROM vendas
@@ -926,8 +931,10 @@ export async function registerPartnerSale(
   if (Number(input.receivable_installments ?? 1) > 1) {
     throw new InstallmentsNotAllowedError();
   }
+  validatePartnerSaleFinancialInput(input);
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
     try {
+      await lockPartnerSaleIdempotency(client, ctx, input.idempotency_key);
       await lockAndValidatePartnerSalePrices(client, ctx, input.items);
 
       const normalizedPhone = normalizeBrazilianPhone(input.customer_phone);
@@ -1206,7 +1213,8 @@ export async function markPartnerPickupRetrieved(
        FROM commerce.partner_orders
        WHERE id = $1 AND environment = $2 AND unit_id = $3
          AND fulfillment_mode = 'pickup' AND deleted_at IS NULL
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [orderId, ctx.environment, ctx.unitId],
     );
     if (existing.rowCount !== 1) throw new Error('pickup_not_found');
@@ -1300,7 +1308,8 @@ export async function updatePartnerDeliveryStatus(
        FROM commerce.partner_orders
        WHERE id = $1 AND environment = $2 AND unit_id = $3
          AND fulfillment_mode = 'delivery' AND deleted_at IS NULL
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       [orderId, ctx.environment, ctx.unitId],
     );
     if (existing.rowCount !== 1) throw new Error('delivery_not_found');
@@ -1451,16 +1460,6 @@ function stockStatus(input: UpsertPartnerStockInput): string {
     return 'low_stock';
   }
   return 'in_stock';
-}
-
-function normalizeText(value: string | null | undefined): string | null {
-  const text = value?.trim();
-  return text ? text : null;
-}
-
-function normalizeCpf(value: string | null | undefined): string | null {
-  const digits = value?.replace(/\D/g, '') ?? '';
-  return digits.length === 11 ? digits : null;
 }
 
 export async function upsertPartnerCustomerWithClient(
@@ -2233,6 +2232,7 @@ export async function registerPartnerExpense(
   input: RegisterPartnerExpenseInput,
 ): Promise<{ expense_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const amount = assertPositiveCentMoney(input.amount);
     const expenseDate = assertNotFutureBusinessDay(
       input.expense_date, new Date(), 'expense_date_future',
     );
@@ -2255,7 +2255,7 @@ export async function registerPartnerExpense(
         expenseDate ?? null,
         input.category,
         input.description,
-        input.amount,
+        amount,
         input.payment_method ?? null,
         `partner:${ctx.slug}`,
         input.idempotency_key ?? null,
@@ -2279,7 +2279,7 @@ export async function registerPartnerExpense(
           unit_id: ctx.unitId,
           category: input.category,
           description: input.description,
-          amount: input.amount,
+          amount,
           expense_date: expenseDate,
         }),
       ],
@@ -2336,6 +2336,7 @@ export async function registerPartnerPayable(
   input: RegisterPartnerPayableInput,
 ): Promise<{ payable_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const amount = assertPositiveCentMoney(input.amount);
     const wantedStatus = input.status ?? 'open';
     // SEMPRE insere em 'open'. Se input.status='paid', o pagamento eh feito
     // logo abaixo via _settlePartnerPayableWithClient (caminho unico para
@@ -2355,7 +2356,7 @@ export async function registerPartnerPayable(
         normalizeText(input.counterparty_name),
         input.description,
         input.category ?? 'other',
-        input.amount,
+        amount,
         input.due_date ?? null,
         input.payment_method ?? null,
         normalizeText(input.notes),
@@ -2382,7 +2383,7 @@ export async function registerPartnerPayable(
           counterparty_name: input.counterparty_name,
           description: input.description,
           category: input.category ?? 'other',
-          amount: input.amount,
+          amount,
           due_date: input.due_date,
           status: 'open',
           requested_paid: wantedStatus === 'paid',
@@ -2582,6 +2583,7 @@ export async function updatePartnerPayable(
   input: UpdatePartnerPayableInput,
 ): Promise<{ payable_id: string; updated: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const amount = assertPositiveCentMoney(input.amount);
     await assertPayableNotManagedByMatrix(client, ctx, payableId);
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_payables
@@ -2604,7 +2606,7 @@ export async function updatePartnerPayable(
         normalizeText(input.counterparty_name),
         input.description,
         input.category ?? 'other',
-        input.amount,
+        amount,
         input.due_date ?? null,
         normalizeText(input.notes),
       ],
@@ -2626,7 +2628,7 @@ export async function updatePartnerPayable(
             counterparty_name: input.counterparty_name,
             description: input.description,
             category: input.category ?? 'other',
-            amount: input.amount,
+            amount,
             due_date: input.due_date,
           }),
         ],
@@ -2712,6 +2714,7 @@ export async function registerPartnerReceivable(
   input: RegisterPartnerReceivableInput,
 ): Promise<{ receivable_id: string }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const amount = assertPositiveCentMoney(input.amount);
     await assertPartnerReceivableCustomerScope(client, ctx, input.customer_id ?? null);
     const status = input.status ?? 'open';
     const receivedAt = status === 'received'
@@ -2735,7 +2738,7 @@ export async function registerPartnerReceivable(
         normalizeText(input.customer_name),
         input.description,
         input.source_tag ?? 'porta',
-        input.amount,
+        amount,
         status === 'open' ? input.due_date ?? null : null,
         status,
         receivedAt,
@@ -2763,7 +2766,7 @@ export async function registerPartnerReceivable(
           customer_name: input.customer_name,
           description: input.description,
           source_tag: input.source_tag ?? 'porta',
-          amount: input.amount,
+          amount,
           due_date: input.due_date,
           status,
           received_at: receivedAt,
@@ -2828,6 +2831,7 @@ export async function updatePartnerReceivable(
   input: UpdatePartnerReceivableInput,
 ): Promise<{ receivable_id: string; updated: boolean }> {
   return withPartnerContext(ctx.partnerUnitId, async (client) => {
+    const amount = assertPositiveCentMoney(input.amount);
     await assertPartnerReceivableCustomerScope(client, ctx, input.customer_id ?? null);
     const result = await client.query<{ id: string }>(
       `UPDATE finance.partner_receivables
@@ -2852,7 +2856,7 @@ export async function updatePartnerReceivable(
         normalizeText(input.customer_name),
         input.description,
         input.source_tag ?? 'porta',
-        input.amount,
+        amount,
         input.due_date ?? null,
         normalizeText(input.notes),
       ],
@@ -2874,7 +2878,7 @@ export async function updatePartnerReceivable(
             customer_name: input.customer_name,
             description: input.description,
             source_tag: input.source_tag ?? 'porta',
-            amount: input.amount,
+            amount,
             due_date: input.due_date,
           }),
         ],
