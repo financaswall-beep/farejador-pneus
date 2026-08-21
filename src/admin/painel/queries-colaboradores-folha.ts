@@ -10,74 +10,13 @@ import {
   ensureMatrizExpenseAccrual, getMatrizExpenseLedgerState,
   postMatrizExpensePayment,
 } from './matriz-ledger-expenses.js';
-import type { OperationBenefit } from '../../shared/operation-team.js';
-import type { OperationCommissionItemRules } from '../../shared/operation-team.js';
 export { reviewMatrizPayrollCausalAdjustment } from './queries-colaboradores-ajustes-causais.js';
-
-export interface MatrizCompensationInput {
-  collaborator_id: string; employment_type: 'clt' | 'mei' | 'autonomo' | 'outro';
-  base_salary: number; payment_day: number; payment_method: 'pix' | 'transferencia' | 'dinheiro' | 'outro';
-  salary_frequency?: 'weekly' | 'monthly';
-  payment_note?: string | null; starts_on: string; benefits?: OperationBenefit[];
-  environment?: 'prod' | 'test'; actor_label?: string | null;
-}
-
-export async function saveMatrizCollaboratorCompensation(input: MatrizCompensationInput, dbPool: Pool = defaultPool) {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const r = await dbPool.query(
-    `INSERT INTO network.matriz_collaborator_compensation
-       (collaborator_id, environment, employment_type, base_salary, payment_day, payment_method,
-        payment_note, starts_on, updated_by, benefits, salary_frequency)
-     SELECT mc.id, mc.environment, $3, $4, $5, $6, $7, $8::date, $9,
-            COALESCE($10::jsonb,'[]'::jsonb),COALESCE($11,'monthly')
-       FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
-     ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET
-       employment_type=EXCLUDED.employment_type, base_salary=EXCLUDED.base_salary,
-       payment_day=EXCLUDED.payment_day, payment_method=EXCLUDED.payment_method,
-       payment_note=EXCLUDED.payment_note,
-       benefits=CASE WHEN $10::jsonb IS NULL
-         THEN network.matriz_collaborator_compensation.benefits ELSE EXCLUDED.benefits END,
-       salary_frequency=CASE WHEN $11::text IS NULL THEN network.matriz_collaborator_compensation.salary_frequency ELSE EXCLUDED.salary_frequency END,
-       updated_by=EXCLUDED.updated_by, updated_at=now()
-     RETURNING collaborator_id`,
-    [environment, input.collaborator_id, input.employment_type, input.base_salary, input.payment_day,
-     input.payment_method, input.payment_note ?? null, input.starts_on, input.actor_label ?? null,
-     input.benefits === undefined ? null : JSON.stringify(input.benefits), input.salary_frequency ?? null],
-  );
-  if (!r.rows[0]) throw new Error('collaborator_not_found');
-  return { saved: true, collaborator_id: r.rows[0].collaborator_id };
-}
-
-export interface MatrizCommissionInput {
-  collaborator_id: string; kind: 'percent' | 'fixed';
-  basis: 'margin' | 'revenue' | 'sale' | 'delivery' | 'trip'; value: number;
-  starts_on: string; active?: boolean; environment?: 'prod' | 'test'; actor_label?: string | null;
-  itemized?: boolean; item_rules?: OperationCommissionItemRules;
-  settlement_frequency?: 'weekly' | 'monthly';
-}
-
-export async function saveMatrizCollaboratorCommission(input: MatrizCommissionInput, dbPool: Pool = defaultPool) {
-  const environment = input.environment ?? env.FAREJADOR_ENV;
-  const r = await dbPool.query(
-    `INSERT INTO network.matriz_collaborator_commission_rules
-       (collaborator_id, environment, kind, basis, value, starts_on, active, updated_by,
-        itemized,item_rules,settlement_frequency)
-     SELECT mc.id, mc.environment, $3, $4, $5, $6::date, $7, $8,$9,
-            COALESCE($10::jsonb,'{}'::jsonb),$11
-       FROM network.matriz_collaborators mc WHERE mc.id=$2 AND mc.environment=$1 AND mc.revoked_at IS NULL
-     ON CONFLICT (collaborator_id, starts_on) DO UPDATE SET kind=EXCLUDED.kind, basis=EXCLUDED.basis,
-       value=EXCLUDED.value, active=EXCLUDED.active,
-       itemized=EXCLUDED.itemized,item_rules=EXCLUDED.item_rules,
-       settlement_frequency=EXCLUDED.settlement_frequency,
-       updated_by=EXCLUDED.updated_by, updated_at=now()
-     RETURNING collaborator_id`,
-    [environment, input.collaborator_id, input.kind, input.basis, input.value, input.starts_on,
-     input.active ?? true, input.actor_label ?? null, input.itemized ?? false,
-     JSON.stringify(input.item_rules ?? {}), input.settlement_frequency ?? 'monthly'],
-  );
-  if (!r.rows[0]) throw new Error('collaborator_not_found');
-  return { saved: true, collaborator_id: r.rows[0].collaborator_id };
-}
+export {
+  saveMatrizCollaboratorCommission, saveMatrizCollaboratorCompensation,
+} from './queries-colaboradores-config.js';
+export type {
+  MatrizCommissionInput, MatrizCompensationInput,
+} from './queries-colaboradores-config.js';
 
 export async function addMatrizPayrollAdjustment(input: {
   collaborator_id: string; competence: string; kind: 'addition' | 'deduction';
@@ -90,8 +29,8 @@ export async function addMatrizPayrollAdjustment(input: {
      SELECT mc.environment, mc.id, $3::date, $4, $5, $6, $7
        FROM network.matriz_collaborators mc
       WHERE mc.environment=$1 AND mc.id=$2
-        AND finance.matriz_collaborator_in_competence(
-          mc.created_at,mc.revoked_at,$3::date)
+        AND finance.matriz_collaborator_employed_in_competence(
+          mc.environment,mc.id,$3::date)
         AND NOT EXISTS (SELECT 1 FROM finance.matriz_payroll_periods p WHERE p.environment=$1 AND p.competence=$3::date)
      RETURNING id`,
     [environment, input.collaborator_id, input.competence, input.kind, input.description.trim(), input.amount, input.actor_label ?? null],
@@ -118,10 +57,19 @@ function payrollDueDate(competence: string, paymentDay: number | null): string {
   return new Date(Date.UTC(year!, month!, Math.min(28, paymentDay ?? 5))).toISOString().slice(0, 10);
 }
 
+function saoPauloMonth(): string {
+  return `${new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+  }).format(new Date())}-01`;
+}
+
+function cents(value: number): number { return Math.round(value * 100) / 100; }
+
 export async function closeMatrizPayroll(input: {
   competence: string; environment?: 'prod' | 'test'; actor_label?: string | null;
 }, dbPool: Pool = defaultPool) {
   const environment = input.environment ?? env.FAREJADOR_ENV;
+  if (input.competence >= saoPauloMonth()) throw new Error('payroll_competence_not_finished');
   const client = await dbPool.connect();
   const operation = {
     environment, domain: 'matriz_payroll.close',
@@ -142,7 +90,7 @@ export async function closeMatrizPayroll(input: {
     if (exists.rows[0]) throw new Error('period_already_closed');
     const causalReview = await client.query(
       `SELECT 1 FROM finance.matriz_payroll_adjustments
-        WHERE environment=$1 AND competence=$2::date AND deleted_at IS NULL
+        WHERE environment=$1 AND competence<=$2::date AND deleted_at IS NULL
           AND causal_status='needs_review' LIMIT 1`,
       [environment, input.competence],
     );
@@ -163,14 +111,20 @@ export async function closeMatrizPayroll(input: {
       throw new Error('payroll_has_unresolved_costs');
     }
     const eligible = overview.collaborators.filter((r) => r.eligible_in_competence
-      && r.total_due > 0
       && (r.employment_type || r.commission_active || r.additions || r.deductions));
     if (!eligible.length) throw new Error('nothing_to_close');
+    const payableRows = eligible.map((row) => {
+      const gross = cents(row.base_salary + row.benefits_total + row.commission_amount + row.additions);
+      const appliedDeductions = cents(Math.min(row.deductions, gross));
+      return { row, gross, appliedDeductions, totalDue: cents(gross - appliedDeductions) };
+    }).filter(({ gross }) => gross > 0);
+    const periodPaid = payableRows.length === 0 || payableRows.every(({ totalDue }) => totalDue === 0);
     const period = await client.query<{ id: string }>(
-      `INSERT INTO finance.matriz_payroll_periods (environment, competence, closed_by)
-       VALUES ($1,$2::date,$3) RETURNING id`, [environment, input.competence, input.actor_label ?? null]);
+      `INSERT INTO finance.matriz_payroll_periods (environment, competence, status, closed_by)
+       VALUES ($1,$2::date,$3,$4) RETURNING id`,
+      [environment, input.competence, periodPaid ? 'paid' : 'closed', input.actor_label ?? null]);
     const periodId = period.rows[0]!.id;
-    for (const row of eligible) {
+    for (const { row, gross, appliedDeductions, totalDue } of payableRows) {
       const dueDate = payrollDueDate(input.competence, row.payment_day);
       const calculation = {
         competence: input.competence,
@@ -185,34 +139,48 @@ export async function closeMatrizPayroll(input: {
           settlement_frequency: row.commission_settlement_frequency } : null,
         production: { sales: row.sales_count, revenue: row.revenue, margin: row.margin,
           items_without_cost: row.items_without_cost, deliveries: row.deliveries_count, trips: row.trips_count },
+        adjustments: { additions_applied: row.additions,
+          deductions_pending: row.deductions, deductions_applied: appliedDeductions,
+          deductions_carried_forward: cents(row.deductions - appliedDeductions) },
+        gross_before_deductions: gross,
       };
       const label = new Intl.DateTimeFormat('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${input.competence}T12:00:00Z`));
-      const expense = await client.query<{ id: string }>(
+      const expense = totalDue > 0 ? await client.query<{ id: string }>(
         `INSERT INTO commerce.matriz_expenses
           (environment,category,description,amount,occurred_at,payment_status,due_date,created_by)
          VALUES ($1,'funcionario',$2,$3,$4::date,'pending',$5,$6) RETURNING id`,
-        [environment, `Folha ${label} · ${row.display_name}`, row.total_due, input.competence, dueDate, input.actor_label ?? null]);
-      await client.query(
+        [environment, `Folha ${label} · ${row.display_name}`, totalDue, input.competence, dueDate, input.actor_label ?? null]) : null;
+      const item = await client.query<{ id: string }>(
         `INSERT INTO finance.matriz_payroll_items
           (environment,payroll_period_id,collaborator_id,job_title,employment_type,base_salary,
-           commission_amount,additions,deductions,total_due,due_date,calculation,source_expense_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)`,
+           commission_amount,additions,deductions,total_due,due_date,calculation,source_expense_id,
+           payment_status,paid_at,paid_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,
+                 CASE WHEN $14='paid' THEN now() ELSE NULL END,
+                 CASE WHEN $14='paid' THEN 'system:zero-balance' ELSE NULL END)
+         RETURNING id`,
         [environment, periodId, row.id, row.job_title, row.employment_type, row.base_salary,
-         row.commission_amount, row.additions + row.benefits_total, row.deductions, row.total_due, dueDate,
-         JSON.stringify(calculation), expense.rows[0]!.id]);
-      await ensureMatrizExpenseAccrual(
+         row.commission_amount, cents(row.additions + row.benefits_total), appliedDeductions, totalDue, dueDate,
+         JSON.stringify(calculation), expense?.rows[0]!.id ?? null, totalDue > 0 ? 'pending' : 'paid']);
+      if (row.additions > 0) await client.query(
+        `SELECT finance.allocate_matriz_payroll_adjustments($1,$2,$3,'addition',$4)`,
+        [environment, row.id, item.rows[0]!.id, row.additions]);
+      if (appliedDeductions > 0) await client.query(
+        `SELECT finance.allocate_matriz_payroll_adjustments($1,$2,$3,'deduction',$4)`,
+        [environment, row.id, item.rows[0]!.id, appliedDeductions]);
+      if (expense) await ensureMatrizExpenseAccrual(
         client,
         await getMatrizExpenseLedgerState(client, environment, expense.rows[0]!.id),
       );
     }
     const result = integrityResult({ closed: true as const, period_id: periodId,
-      items: eligible.length });
+      items: payableRows.length });
     await recordIntegrityEvent(client, { environment, domain: 'matriz_payroll',
       entityTable: 'finance.matriz_payroll_periods', entityId: periodId,
       eventType: 'payroll_closed', actorLabel: input.actor_label,
       idempotencyKey: operation.idempotencyKey,
-      after: { competence: input.competence, items: eligible.length } });
+      after: { competence: input.competence, items: payableRows.length } });
     await completeIntegrityOperation(client, operation,
       'finance.matriz_payroll_periods', periodId, result);
     await client.query('COMMIT');

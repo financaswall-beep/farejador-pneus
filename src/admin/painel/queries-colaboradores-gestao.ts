@@ -47,8 +47,8 @@ export async function getMatrizCollaboratorManagement(
     () => db.query<any>(
       `SELECT mc.id, mc.display_name, pp.username, mc.job, mc.job_title, mc.work_area,
               mc.panel_role, mc.revoked_at IS NULL AS active,
-              finance.matriz_collaborator_in_competence(
-                mc.created_at,mc.revoked_at,$2::date) AS eligible_in_competence,
+              finance.matriz_collaborator_employed_in_competence(
+                mc.environment,mc.id,$2::date) AS eligible_in_competence,
               cp.employment_type, COALESCE(cp.base_salary, 0) AS monthly_base_salary,
               CASE WHEN COALESCE(cp.salary_frequency,'monthly')='weekly' THEN 0 ELSE COALESCE(cp.base_salary,0) END AS base_salary,
               COALESCE(cp.salary_frequency,'monthly') AS salary_frequency,
@@ -161,7 +161,7 @@ export async function getMatrizCollaboratorManagement(
        ), ruled AS (
          SELECT e.*, cr.kind, cr.basis, cr.value, cr.active,cr.itemized,cr.item_rules,
                 cr.settlement_frequency,
-                CASE
+                round(CASE
                   WHEN cr.settlement_frequency='weekly' THEN 0
                   WHEN cr.active AND cr.itemized AND e.event_type='sale' AND e.sale_channel='retail'
                     THEN finance.matriz_retail_itemized_commission($1,e.source_id,cr.item_rules)
@@ -172,7 +172,7 @@ export async function getMatrizCollaboratorManagement(
                   WHEN cr.active AND cr.kind='fixed' AND cr.basis='sale' AND e.event_type='sale' THEN cr.value
                   WHEN cr.active AND cr.kind='fixed' AND cr.basis='delivery' AND e.event_type='delivery' THEN cr.value
                   WHEN cr.active AND cr.kind='fixed' AND cr.basis='trip' AND e.event_type='trip' THEN cr.value
-                  ELSE 0 END AS commission_amount
+                  ELSE 0 END,2) AS commission_amount
            FROM events e
            LEFT JOIN LATERAL (
              SELECT r.kind,r.basis,r.value,r.active,r.itemized,r.item_rules,
@@ -182,6 +182,7 @@ export async function getMatrizCollaboratorManagement(
                 AND r.starts_on <= e.event_date
               ORDER BY r.starts_on DESC LIMIT 1
            ) cr ON true
+          WHERE finance.matriz_collaborator_employed_on($1,e.id,e.event_date)
        )
        SELECT id, sum(sales_count)::int sales_count, sum(revenue) revenue, sum(margin) margin,
               sum(items_without_cost)::int items_without_cost,
@@ -193,11 +194,21 @@ export async function getMatrizCollaboratorManagement(
               round(sum(commission_amount),2) AS commission_amount
          FROM ruled GROUP BY id`, [environment, competence]),
     () => db.query<any>(
-      `SELECT collaborator_id,
+      `WITH remaining AS (
+         SELECT a.collaborator_id,a.kind,
+                a.amount-COALESCE(sum(al.amount),0) amount
+           FROM finance.matriz_payroll_adjustments a
+           LEFT JOIN finance.matriz_payroll_adjustment_allocations al
+             ON al.environment=a.environment AND al.adjustment_id=a.id
+          WHERE a.environment=$1 AND a.competence<=$2::date AND a.deleted_at IS NULL
+            AND COALESCE(a.causal_status,'ready')<>'needs_review'
+          GROUP BY a.id,a.collaborator_id,a.kind,a.amount
+         HAVING a.amount-COALESCE(sum(al.amount),0)>0
+       )
+       SELECT collaborator_id,
               COALESCE(sum(amount) FILTER (WHERE kind='addition'),0) additions,
               COALESCE(sum(amount) FILTER (WHERE kind='deduction'),0) deductions
-         FROM finance.matriz_payroll_adjustments
-        WHERE environment=$1 AND competence=$2::date AND deleted_at IS NULL GROUP BY collaborator_id`,
+         FROM remaining GROUP BY collaborator_id`,
       [environment, competence]),
     () => db.query<any>(
       `SELECT i.collaborator_id, i.id payroll_item_id, i.base_salary, i.commission_amount,
@@ -208,11 +219,17 @@ export async function getMatrizCollaboratorManagement(
          JOIN finance.matriz_payroll_items i ON i.payroll_period_id=p.id
         WHERE p.environment=$1 AND p.competence=$2::date`, [environment, competence]),
     () => db.query<any>(
-      `SELECT a.id,a.collaborator_id,a.kind,a.description,a.amount,a.created_at,
+      `SELECT a.id,a.collaborator_id,a.kind,a.description,
+              a.amount original_amount,
+              a.amount-COALESCE(sum(al.amount),0) amount,a.competence,a.created_at,
               a.source_type,a.source_id,a.source_event_at,a.original_payroll_item_id,
               a.frozen_calculation,a.causal_status,a.reviewed_by,a.reviewed_at
          FROM finance.matriz_payroll_adjustments a
-        WHERE a.environment=$1 AND a.competence=$2::date AND a.deleted_at IS NULL
+         LEFT JOIN finance.matriz_payroll_adjustment_allocations al
+           ON al.environment=a.environment AND al.adjustment_id=a.id
+        WHERE a.environment=$1 AND a.competence<=$2::date AND a.deleted_at IS NULL
+        GROUP BY a.id
+       HAVING a.amount-COALESCE(sum(al.amount),0)>0
         ORDER BY a.created_at,a.id`, [environment, competence]),
   ]);
 

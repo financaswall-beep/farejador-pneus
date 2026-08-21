@@ -59,8 +59,8 @@ window.PARCEIRO_MODULES.auth = () => ({
       const username = (this.loginUsername || '').trim();
       const password = this.loginPassword || '';
       if (!token) { this.loginError = 'Cole o código de acesso que você recebeu.'; return; }
-      if (!username || password.length < 6) {
-        this.loginError = 'Escolha um usuário e uma senha de pelo menos 6 caracteres.';
+      if (!username || password.length < 12) {
+        this.loginError = 'Escolha um usuário e uma senha de pelo menos 12 caracteres.';
         return;
       }
       this.loading = true;

@@ -4,6 +4,7 @@ import type { OperationCommissionItemRules } from './operation-team.js';
 export type OperationCommissionStatus = 'open' | 'payable' | 'paid';
 
 export interface OperationCommissionSale {
+  entry_type: 'sale' | 'adjustment';
   id: string;
   reference: string;
   occurred_at: string;

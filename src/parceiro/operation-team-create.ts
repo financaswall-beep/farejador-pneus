@@ -3,7 +3,7 @@ import { createPartnerFuncionario } from './queries.js';
 
 export async function createPartnerOperationMember(ctx: PartnerContext, input: {
   name: string; username: string; password: string;
-  role: 'vendedor' | 'estoque' | 'entregador';
+  role: 'vendedor' | 'estoque' | 'entregador' | 'colaborador';
 }) {
   const permissions: PartnerPermissions = {
     vendas: input.role === 'vendedor', estoque: input.role === 'estoque',
@@ -11,6 +11,6 @@ export async function createPartnerOperationMember(ctx: PartnerContext, input: {
     retiradas: false, batepapo: false, resumo: false, financeiro: false,
   };
   return createPartnerFuncionario(
-    ctx, input.name, input.username, input.password, permissions,
+    ctx, input.name, input.username, input.password, permissions, undefined, input.role,
   );
 }

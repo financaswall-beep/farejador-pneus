@@ -58,21 +58,23 @@ window.PARCEIRO_MODULES.config = () => ({
     async createFuncionario() {
       const username = (this.funcionarioForm.username || '').trim();
       const password = this.funcionarioForm.password || '';
-      if (!username || password.length < 6) {
-        this.flash('Informe usuário e senha (mínimo 6 caracteres).');
+      const name = (this.funcionarioForm.label || '').trim();
+      if (!name || !username || password.length < 12) {
+        this.flash('Informe nome, usuário e senha (mínimo 12 caracteres).');
         return;
       }
       this.saving = true; this.savingAction = 'funcionario';
       try {
-        await this.api('funcionarios', {
+        await this.api('equipe', {
           method: 'POST',
           body: JSON.stringify({
-            label: (this.funcionarioForm.label || '').trim() || null,
+            name,
             username,
             password,
+            role: this.funcionarioForm.role || 'vendedor',
           }),
         });
-        this.funcionarioForm = { label: '', username: '', password: '' };
+        this.funcionarioForm = { label: '', username: '', password: '', role: 'vendedor' };
         await this.loadFuncionarios();
         this.flash('Funcionário criado. Passe o usuário e a senha pra ele.');
       } catch (err) {
@@ -88,7 +90,7 @@ window.PARCEIRO_MODULES.config = () => ({
     // A senha nova vem do input no painel (this.resetSenhaValue).
     async confirmResetSenha(f) {
       const nova = this.resetSenhaValue || '';
-      if (nova.length < 6) { this.flash('A senha precisa de ao menos 6 caracteres.'); return; }
+      if (nova.length < 12) { this.flash('A senha precisa de ao menos 12 caracteres.'); return; }
       this.saving = true; this.savingAction = 'funcionario';
       try {
         await this.api(`funcionarios/${f.id}/reset-senha`, {

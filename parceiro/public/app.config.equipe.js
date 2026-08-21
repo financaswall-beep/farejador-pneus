@@ -7,9 +7,8 @@
  */
 window.PARCEIRO_MODULES = window.PARCEIRO_MODULES || {};
 window.PARCEIRO_MODULES.configEquipe = () => ({
-  // Bate-papo foi aposentado; as oito permissões abaixo refletem os portais atuais.
   get funcPermCount() {
-    const keys = ['vendas', 'estoque', 'pedidos', 'clientes', 'entregas', 'retiradas', 'resumo', 'financeiro'];
+    const keys = ['vendas', 'estoque', 'pedidos', 'clientes', 'entregas', 'retiradas', 'batepapo', 'resumo', 'financeiro'];
     return keys.reduce((n, k) => n + (this.funcPermForm && this.funcPermForm[k] ? 1 : 0), 0);
   },
 
@@ -26,10 +25,11 @@ window.PARCEIRO_MODULES.configEquipe = () => ({
       const p = perm.permissions || {};
       this.funcPermForm = {
         vendas: !!p.vendas, estoque: !!p.estoque, pedidos: !!p.pedidos, clientes: !!p.clientes,
-        entregas: !!p.entregas, retiradas: !!p.retiradas, batepapo: false,
+        entregas: !!p.entregas, retiradas: !!p.retiradas, batepapo: !!p.batepapo,
         resumo: !!p.resumo, financeiro: !!p.financeiro,
       };
       this.funcPermLocked = !!perm.locked;
+      this.funcJobRole = f.job_role || 'colaborador';
       this.funcRemForm = {
         employment_type: rem.employment_type || 'clt', base_salary: Number(rem.base_salary || 0),
         salary_frequency: rem.salary_frequency || 'monthly', payment_day: Number(rem.payment_day || 5),
@@ -70,36 +70,35 @@ window.PARCEIRO_MODULES.configEquipe = () => ({
     }
     this.saving = true; this.savingAction = 'funcConfig';
     try {
-      await this.api(`equipe/${f.id}/permissoes`, {
+      await this.api(`equipe/${f.id}/configuracao`, {
         method: 'PUT',
         body: JSON.stringify({
-          vendas: !!this.funcPermForm.vendas, estoque: !!this.funcPermForm.estoque,
-          pedidos: !!this.funcPermForm.pedidos, clientes: !!this.funcPermForm.clientes,
-          entregas: !!this.funcPermForm.entregas, retiradas: !!this.funcPermForm.retiradas,
-          batepapo: false, resumo: !!this.funcPermForm.resumo,
-          financeiro: !!this.funcPermForm.financeiro,
-        }),
-      });
-      await this.api(`equipe/${f.id}/remuneracao`, {
-        method: 'PUT', body: JSON.stringify({
-          ...this.funcRemForm, base_salary: Number(this.funcRemForm.base_salary || 0),
-          payment_day: Number(this.funcRemForm.payment_day || 5),
-          benefits: this.funcRemForm.benefits.filter((item) => String(item.name || '').trim()).map((item) => ({
-            name: String(item.name).trim(), amount: Number(item.amount || 0), active: item.active !== false,
-          })),
-        }),
-      });
-      await this.api(`equipe/${f.id}/comissao`, {
-        method: 'PUT',
-        body: JSON.stringify({
+          job_role: this.funcJobRole || 'colaborador',
+          permissions: {
+            vendas: !!this.funcPermForm.vendas, estoque: !!this.funcPermForm.estoque,
+            pedidos: !!this.funcPermForm.pedidos, clientes: !!this.funcPermForm.clientes,
+            entregas: !!this.funcPermForm.entregas, retiradas: !!this.funcPermForm.retiradas,
+            batepapo: !!this.funcPermForm.batepapo, resumo: !!this.funcPermForm.resumo,
+            financeiro: !!this.funcPermForm.financeiro,
+          },
+          compensation: {
+            ...this.funcRemForm, base_salary: Number(this.funcRemForm.base_salary || 0),
+            payment_day: Number(this.funcRemForm.payment_day || 5),
+            benefits: this.funcRemForm.benefits.filter((item) => String(item.name || '').trim()).map((item) => ({
+              name: String(item.name).trim(), amount: Number(item.amount || 0), active: item.active !== false,
+            })),
+          },
+          commission: {
           kind: this.funcCommForm.kind === 'fixed' ? 'fixed' : 'percent',
           basis: this.funcCommForm.kind === 'fixed' ? 'sale' : 'revenue',
           value: this.funcCommForm.active ? Number(this.funcCommForm.value) : 0,
           active: !!this.funcCommForm.active, starts_on: this.funcCommForm.starts_on || this.funcRemForm.starts_on,
           settlement_frequency: this.funcCommForm.settlement_frequency,
           itemized: !!this.funcCommForm.itemized, item_rules: this.funcCommForm.item_rules,
+          },
         }),
       });
+      f.job_role = this.funcJobRole;
       this.flash('Acesso, remuneração e comissão salvos.', 'success');
     } catch (err) {
       this.flash(this.errMessage(err));

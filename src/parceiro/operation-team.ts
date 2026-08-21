@@ -10,8 +10,22 @@ import type { PartnerContext } from './auth.js';
 
 type Queryable = Pick<Pool, 'query'>;
 
+export interface PartnerCompensationInput {
+  employment_type: OperationCompensationPayload['employment_type']; base_salary: number;
+  salary_frequency: OperationCompensationPayload['salary_frequency'];
+  payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
+  starts_on: string; benefits: OperationBenefit[];
+}
+
+export interface PartnerCommissionRuleInput {
+  kind: 'percent' | 'fixed'; basis: 'revenue' | 'sale'; value: number; active: boolean;
+  starts_on: string; itemized: boolean; item_rules: OperationCommissionItemRules;
+  settlement_frequency: 'weekly' | 'monthly';
+}
+
 type PartnerMemberRow = {
   id: string; name: string; username: string | null; active: boolean; role_name: string;
+  job_role: 'vendedor' | 'estoque' | 'entregador' | 'colaborador';
   base_salary: string; salary_frequency: 'weekly' | 'monthly';
   payment_day: number | null; starts_on: string | null;
   benefits: unknown; commission_kind: 'percent' | 'fixed' | null;
@@ -27,9 +41,14 @@ function localDate(): string {
 
 function memberOf(row: PartnerMemberRow): OperationTeamMember {
   const benefits = benefitsOf(row.benefits);
+  const jobRole = row.job_role ?? (row.role_name === 'Vendedor' ? 'vendedor'
+    : row.role_name === 'Entregador' ? 'entregador'
+      : row.role_name === 'Estoque' ? 'estoque' : 'colaborador');
   return {
     id: row.id, name: row.name, username: row.username, role: row.role_name,
-    work_area: row.role_name === 'Entregador' ? 'delivery' : 'sales', active: row.active,
+    work_area: jobRole === 'entregador' ? 'delivery'
+      : jobRole === 'estoque' ? 'stock'
+        : jobRole === 'vendedor' ? 'sales' : 'other', active: row.active,
     base_salary: money(row.base_salary), salary_frequency: row.salary_frequency ?? 'monthly',
     benefits_total: benefitTotal(benefits),
     payment_day: row.payment_day, compensation_starts_on: row.starts_on,
@@ -43,33 +62,30 @@ function memberOf(row: PartnerMemberRow): OperationTeamMember {
 async function rows(ctx: PartnerContext, db: Queryable): Promise<PartnerMemberRow[]> {
   const result = await db.query<PartnerMemberRow>(
     `SELECT pat.id,COALESCE(NULLIF(btrim(pat.label),''),pat.login_username,'Colaborador') name,
-            pat.login_username username,pat.revoked_at IS NULL active,
-            CASE WHEN COALESCE(ptp.allow_entregas,pup.allow_entregas,true)
-                       AND NOT COALESCE(ptp.allow_vendas,pup.allow_vendas,true) THEN 'Entregador'
-                 WHEN COALESCE(ptp.allow_vendas,pup.allow_vendas,true) THEN 'Vendedor'
-                 ELSE 'Colaborador' END role_name,
+            pat.login_username username,pat.revoked_at IS NULL active,pat.job_role,
+            CASE pat.job_role WHEN 'vendedor' THEN 'Vendedor' WHEN 'estoque' THEN 'Estoque'
+                 WHEN 'entregador' THEN 'Entregador' ELSE 'Colaborador' END role_name,
             COALESCE(comp.base_salary,0)::text base_salary,
             COALESCE(comp.salary_frequency,'monthly') salary_frequency,comp.payment_day,
             comp.starts_on,COALESCE(comp.benefits,'[]'::jsonb) benefits,
-            cfg.kind commission_kind,COALESCE(cfg.value,0)::text commission_value,
-            COALESCE(cfg.active,false) commission_active,hist.starts_on commission_starts_on,
+            COALESCE(hist.kind,legacy.kind) commission_kind,
+            COALESCE(hist.value,legacy.value,0)::text commission_value,
+            COALESCE(hist.active,legacy.active,false) commission_active,hist.starts_on commission_starts_on,
             COALESCE(facts.commission_amount,0)::text commission_amount
        FROM network.partner_access_tokens pat
-       LEFT JOIN network.partner_token_permissions ptp
-         ON ptp.environment=pat.environment AND ptp.token_id=pat.id
-       LEFT JOIN network.partner_unit_permissions pup
-         ON pup.environment=pat.environment AND pup.partner_unit_id=pat.partner_unit_id
        LEFT JOIN LATERAL (
          SELECT c.* FROM network.partner_collaborator_compensation c
           WHERE c.environment=pat.environment AND c.token_id=pat.id
-            AND c.starts_on<=current_date ORDER BY c.starts_on DESC LIMIT 1
+            AND c.starts_on<=(now() AT TIME ZONE 'America/Sao_Paulo')::date
+          ORDER BY c.starts_on DESC LIMIT 1
        ) comp ON true
-       LEFT JOIN network.partner_token_commission cfg
-         ON cfg.environment=pat.environment AND cfg.token_id=pat.id
+       LEFT JOIN network.partner_token_commission legacy
+         ON legacy.environment=pat.environment AND legacy.token_id=pat.id
        LEFT JOIN LATERAL (
-         SELECT h.starts_on FROM network.partner_token_commission_history h
+         SELECT h.kind,h.value,h.active,h.starts_on FROM network.partner_token_commission_history h
           WHERE h.environment=pat.environment AND h.token_id=pat.id
-          ORDER BY h.starts_on DESC LIMIT 1
+            AND h.starts_on<=(now() AT TIME ZONE 'America/Sao_Paulo')::date
+          ORDER BY h.starts_on DESC,h.updated_at DESC LIMIT 1
        ) hist ON true
        LEFT JOIN LATERAL (
          SELECT COALESCE(sum(x.amount),0) commission_amount FROM (
@@ -106,18 +122,28 @@ export async function getPartnerOperationCompensation(
   ctx: PartnerContext, tokenId: string, db: Queryable = defaultPool,
 ): Promise<OperationCompensationPayload | null> {
   const row = await find(ctx, tokenId, db); if (!row) return null;
-  const benefits = benefitsOf(row.benefits); const total = benefitTotal(benefits);
-  const detail = await db.query<{ employment_type: OperationCompensationPayload['employment_type']; payment_method: OperationCompensationPayload['payment_method']; salary_frequency: OperationCompensationPayload['salary_frequency'] }>(
-    `SELECT employment_type,payment_method,salary_frequency FROM network.partner_collaborator_compensation
-      WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3 AND starts_on<=current_date
+  const detail = await db.query<{
+    employment_type: OperationCompensationPayload['employment_type'];
+    payment_method: OperationCompensationPayload['payment_method'];
+    salary_frequency: OperationCompensationPayload['salary_frequency'];
+    base_salary: string; payment_day: number; starts_on: string; benefits: unknown;
+  }>(
+    `SELECT employment_type,payment_method,salary_frequency,base_salary::text,
+            payment_day,starts_on::text,benefits
+       FROM network.partner_collaborator_compensation
+      WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3
       ORDER BY starts_on DESC LIMIT 1`, [ctx.environment, ctx.partnerUnitId, tokenId],
   );
+  const configured = detail.rows[0];
+  const benefits = benefitsOf(configured?.benefits ?? row.benefits);
+  const total = benefitTotal(benefits);
+  const baseSalary = money(configured?.base_salary ?? row.base_salary);
   return {
-    unit_name: ctx.unitName, member: memberOf(row), employment_type: detail.rows[0]?.employment_type ?? 'outro',
-    base_salary: money(row.base_salary), salary_frequency: detail.rows[0]?.salary_frequency ?? 'monthly',
-    payment_day: row.payment_day ?? 5,
-    payment_method: detail.rows[0]?.payment_method ?? 'pix', starts_on: row.starts_on || localDate(), benefits,
-    benefits_total: total, fixed_total: money(money(row.base_salary) + total),
+    unit_name: ctx.unitName, member: memberOf(row), employment_type: configured?.employment_type ?? 'outro',
+    base_salary: baseSalary, salary_frequency: configured?.salary_frequency ?? 'monthly',
+    payment_day: configured?.payment_day ?? 5,
+    payment_method: configured?.payment_method ?? 'pix', starts_on: configured?.starts_on || localDate(), benefits,
+    benefits_total: total, fixed_total: money(baseSalary + total),
   };
 }
 
@@ -127,6 +153,14 @@ export async function savePartnerOperationCompensation(ctx: PartnerContext, toke
   payment_day: number; payment_method: OperationCompensationPayload['payment_method'];
   starts_on: string; benefits: OperationBenefit[];
 }, db: Pool = defaultPool): Promise<OperationCompensationPayload> {
+  await writePartnerOperationCompensation(ctx, tokenId, input, db);
+  const saved = await getPartnerOperationCompensation(ctx, tokenId, db);
+  if (!saved) throw new Error('collaborator_not_found'); return saved;
+}
+
+export async function writePartnerOperationCompensation(
+  ctx: PartnerContext, tokenId: string, input: PartnerCompensationInput, db: Queryable,
+): Promise<void> {
   const result = await db.query(
     `INSERT INTO network.partner_collaborator_compensation
        (environment,partner_unit_id,token_id,employment_type,base_salary,salary_frequency,payment_day,
@@ -145,8 +179,6 @@ export async function savePartnerOperationCompensation(ctx: PartnerContext, toke
      JSON.stringify(input.benefits), `owner:${ctx.slug}`],
   );
   if (!result.rows[0]) throw new Error('collaborator_not_found');
-  const saved = await getPartnerOperationCompensation(ctx, tokenId, db);
-  if (!saved) throw new Error('collaborator_not_found'); return saved;
 }
 
 export async function getPartnerOperationCommissionRule(
@@ -167,13 +199,15 @@ export async function getPartnerOperationCommissionRule(
       WHERE environment=$1 AND partner_unit_id=$2 AND token_id=$3`,
     [ctx.environment, ctx.partnerUnitId, tokenId],
   );
+  const latest = history.rows[0];
   return {
-    unit_name: ctx.unitName, member: memberOf(row), kind: row.commission_kind ?? 'percent',
-    basis: row.commission_kind === 'fixed' ? 'sale' : 'revenue', value: money(row.commission_value),
-    active: row.commission_active, starts_on: row.commission_starts_on || localDate(),
-    itemized: Boolean(config.rows[0]?.itemized),
-    item_rules: commissionItemRulesOf(config.rows[0]?.item_rules),
-    settlement_frequency: config.rows[0]?.settlement_frequency ?? 'monthly',
+    unit_name: ctx.unitName, member: memberOf(row), kind: latest?.kind ?? row.commission_kind ?? 'percent',
+    basis: (latest?.kind ?? row.commission_kind) === 'fixed' ? 'sale' : 'revenue',
+    value: money(latest?.value ?? row.commission_value),
+    active: latest?.active ?? row.commission_active, starts_on: latest?.starts_on || localDate(),
+    itemized: Boolean(latest?.itemized ?? config.rows[0]?.itemized),
+    item_rules: commissionItemRulesOf(latest?.item_rules ?? config.rows[0]?.item_rules),
+    settlement_frequency: latest?.settlement_frequency ?? config.rows[0]?.settlement_frequency ?? 'monthly',
     available_bases: ['revenue', 'sale'],
     history: history.rows.map((item) => ({
       ...item, value: money(item.value), basis: item.kind === 'fixed' ? 'sale' : 'revenue',
@@ -187,6 +221,20 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
   itemized: boolean; item_rules: OperationCommissionItemRules;
   settlement_frequency: 'weekly' | 'monthly';
 }, db: Pool = defaultPool): Promise<OperationCommissionRulePayload> {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await writePartnerOperationCommissionRule(ctx, tokenId, input, client);
+    await client.query('COMMIT');
+  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
+  finally { client.release(); }
+  const saved = await getPartnerOperationCommissionRule(ctx, tokenId, db);
+  if (!saved) throw new Error('collaborator_not_found'); return saved;
+}
+
+export async function writePartnerOperationCommissionRule(
+  ctx: PartnerContext, tokenId: string, input: PartnerCommissionRuleInput, db: Queryable,
+): Promise<void> {
   if (!input.itemized && ((input.kind === 'percent' && input.basis !== 'revenue') || (input.kind === 'fixed' && input.basis !== 'sale'))) {
     throw new Error('invalid_commission_basis');
   }
@@ -198,14 +246,11 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
     value: representative?.value ?? 0,
     active: Boolean(representative) && input.active,
   } : { kind: input.kind, value: input.value, active: input.active };
-  const client = await db.connect();
-  try {
-    await client.query('BEGIN');
-    const member = await client.query(`SELECT 1 FROM network.partner_access_tokens
+  const member = await db.query(`SELECT 1 FROM network.partner_access_tokens
       WHERE environment=$1 AND partner_unit_id=$2 AND id=$3 AND role='funcionario' AND revoked_at IS NULL FOR UPDATE`,
     [ctx.environment, ctx.partnerUnitId, tokenId]);
-    if (!member.rows[0]) throw new Error('collaborator_not_found');
-    await client.query(`INSERT INTO network.partner_token_commission_history
+  if (!member.rows[0]) throw new Error('collaborator_not_found');
+  await db.query(`INSERT INTO network.partner_token_commission_history
       (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by,
        itemized,item_rules,settlement_frequency)
       VALUES ($1,$2,$3,$4,$5,$6,$7::date,$8,$9,$10::jsonb,$11)
@@ -216,7 +261,7 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
     [ctx.environment, ctx.partnerUnitId, tokenId, compatibility.kind, compatibility.value,
      compatibility.active, input.starts_on, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules),
      input.settlement_frequency]);
-    await client.query(`INSERT INTO network.partner_token_commission
+  await db.query(`INSERT INTO network.partner_token_commission
       (token_id,environment,partner_unit_id,kind,value,active,updated_by,itemized,item_rules,
        settlement_frequency)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) ON CONFLICT (token_id) DO UPDATE SET
@@ -226,9 +271,4 @@ export async function savePartnerOperationCommissionRule(ctx: PartnerContext, to
     [tokenId, ctx.environment, ctx.partnerUnitId, compatibility.kind, compatibility.value,
      compatibility.active, `owner:${ctx.slug}`, input.itemized, JSON.stringify(rules),
      input.settlement_frequency]);
-    await client.query('COMMIT');
-  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
-  finally { client.release(); }
-  const saved = await getPartnerOperationCommissionRule(ctx, tokenId, db);
-  if (!saved) throw new Error('collaborator_not_found'); return saved;
 }

@@ -17,6 +17,7 @@ type Queryable = Pick<Pool, 'query'>;
 
 type TeamRow = {
   token_id: string; label: string | null; username: string | null; active: boolean;
+  job_role: 'vendedor' | 'estoque' | 'entregador' | 'colaborador';
   commission_kind: 'percent' | 'fixed' | null; commission_value: string;
   commission_itemized: boolean; commission_item_rules: unknown;
   settlement_frequency: 'weekly' | 'monthly';
@@ -56,7 +57,7 @@ async function teamRows(
                 COALESCE(sum(unsettled_count),0)::int unsettled_count
            FROM facts GROUP BY token_id
        )
-       SELECT pat.id token_id,pat.label,pat.login_username username,
+       SELECT pat.id token_id,pat.label,pat.login_username username,pat.job_role,
               pat.revoked_at IS NULL active,cfg.kind commission_kind,
               COALESCE(cfg.value,0)::text commission_value,
               COALESCE(cfg.itemized,false) commission_itemized,
@@ -67,8 +68,14 @@ async function teamRows(
               COALESCE(t.commission_amount,0)::text commission_amount,
               COALESCE(t.unsettled_count,0)::int unsettled_count
          FROM network.partner_access_tokens pat
-         LEFT JOIN network.partner_token_commission cfg
-           ON cfg.environment=pat.environment AND cfg.token_id=pat.id AND cfg.active
+         LEFT JOIN LATERAL (
+           SELECT h.kind,h.value,h.active,h.itemized,h.item_rules,h.settlement_frequency,
+                  h.token_id
+             FROM network.partner_token_commission_history h
+            WHERE h.environment=pat.environment AND h.token_id=pat.id
+              AND h.starts_on<=(now() AT TIME ZONE 'America/Sao_Paulo')::date
+            ORDER BY h.starts_on DESC,h.updated_at DESC LIMIT 1
+         ) cfg ON cfg.active
          LEFT JOIN totals t ON t.token_id=pat.id
         WHERE pat.environment=$1 AND pat.partner_unit_id=$3
           AND pat.role='funcionario'
@@ -106,7 +113,8 @@ function collaboratorOf(row: TeamRow, settlements: SettlementRow[]): OperationCo
     id: row.token_id,
     name: row.label?.trim() || row.username?.trim() || 'Colaborador',
     username: row.username,
-    role: 'Vendedor',
+    role: row.job_role === 'vendedor' ? 'Vendedor' : row.job_role === 'estoque' ? 'Estoque'
+      : row.job_role === 'entregador' ? 'Entregador' : 'Colaborador',
     active: row.active,
     sales_count: Number(row.sales_count || 0),
     gross_sales: money(row.gross_sales),
@@ -161,11 +169,13 @@ export async function getPartnerOperationCommissionDetail(
         .toISOString().slice(0, 10)
     : bounds.end;
   const result = await db.query<{
-    id: string; reference: string; occurred_at: string; payment_method: string | null;
+    entry_type: 'sale' | 'adjustment'; id: string; reference: string;
+    occurred_at: string; payment_method: string | null;
     gross_amount: string; commission_amount: string; commission_itemized: boolean;
     commission_rules: unknown;
   }>(
-    `SELECT ce.id::text id,'Pedido #'||right(ce.partner_order_id::text,6) reference,
+    `SELECT 'sale'::text entry_type,ce.id::text id,
+            'Pedido #'||right(ce.partner_order_id::text,6) reference,
             ce.realized_at occurred_at,po.payment_method,
             ce.gross_amount::text,ce.commission_amount::text,
             ce.commission_itemized,ce.commission_rules
@@ -173,11 +183,30 @@ export async function getPartnerOperationCommissionDetail(
        JOIN commerce.partner_orders po
          ON po.environment=ce.environment AND po.id=ce.partner_order_id
       WHERE ce.environment=$1 AND ce.unit_id=$2 AND ce.token_id=$3
-        AND ce.status='earned' AND ce.realized_at >= $4::date AND ce.realized_at < $5::date
-      ORDER BY ce.realized_at DESC LIMIT 200`,
-    [ctx.environment, ctx.unitId, collaboratorId, detailStart, detailEnd],
+        AND (($6::uuid IS NOT NULL AND ce.settlement_period_id=(
+               SELECT p.id FROM finance.partner_staff_commission_periods p
+                WHERE p.environment=$1 AND p.unit_id=$2 AND p.token_id=$3
+                  AND p.payable_id=$6 LIMIT 1))
+          OR ($6::uuid IS NULL AND ce.status='earned'
+            AND ce.realized_at >= $4::date AND ce.realized_at < $5::date))
+      UNION ALL
+      SELECT 'adjustment',ca.id::text,
+             COALESCE(NULLIF(btrim(ca.reason),''),'Ajuste de comissão'),ca.occurred_at,
+             NULL::text,0::numeric::text,ca.amount::text,false,'{}'::jsonb
+        FROM finance.partner_staff_commission_adjustments ca
+       WHERE ca.environment=$1 AND ca.unit_id=$2 AND ca.token_id=$3
+         AND (($6::uuid IS NOT NULL AND ca.settlement_period_id=(
+                SELECT p.id FROM finance.partner_staff_commission_periods p
+                 WHERE p.environment=$1 AND p.unit_id=$2 AND p.token_id=$3
+                   AND p.payable_id=$6 LIMIT 1))
+           OR ($6::uuid IS NULL
+             AND ca.occurred_at >= $4::date AND ca.occurred_at < $5::date))
+      ORDER BY occurred_at DESC LIMIT 200`,
+    [ctx.environment, ctx.unitId, collaboratorId, detailStart, detailEnd,
+     collaborator.payment_target_id],
   );
   const sales: OperationCommissionSale[] = result.rows.map((row) => ({
+    entry_type: row.entry_type,
     id: row.id,
     reference: row.reference,
     occurred_at: row.occurred_at,
@@ -189,7 +218,7 @@ export async function getPartnerOperationCommissionDetail(
   }));
   const detailCollaborator = collaborator.status === 'payable' ? {
     ...collaborator,
-    sales_count: sales.length,
+    sales_count: sales.filter((sale) => sale.entry_type === 'sale').length,
     gross_sales: money(sales.reduce((sum, sale) => sum + sale.gross_amount, 0)),
     commission_amount: money(sales.reduce((sum, sale) => sum + sale.commission_amount, 0)),
   } : collaborator;

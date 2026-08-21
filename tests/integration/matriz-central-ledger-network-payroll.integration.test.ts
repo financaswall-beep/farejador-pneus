@@ -121,8 +121,8 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
     );
     const collaborator = await db.pool.query<{ id: string }>(
       `INSERT INTO network.matriz_collaborators
-         (environment,person_id,display_name,job,job_title,work_area)
-       VALUES ('test',$1,'Colaborador Central','colaborador','Auxiliar','other')
+         (environment,person_id,display_name,job,job_title,work_area,created_at)
+       VALUES ('test',$1,'Colaborador Central','colaborador','Auxiliar','other','2026-07-01T00:00:00Z')
        RETURNING id`,
       [person.rows[0]!.id],
     );
@@ -132,8 +132,8 @@ describe('Etapa 5 — Rede e colaboradores no livro central', () => {
       starts_on: '2026-07-01', environment: 'test',
     }, db.pool);
     const payrollCompetence = await db.pool.query<{ competence: string }>(
-      `SELECT date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')::date::text
-              AS competence`,
+      `SELECT (date_trunc('month',now() AT TIME ZONE 'America/Sao_Paulo')-interval '1 month')::date::text
+               AS competence`,
     );
     const closed = await payroll.closeMatrizPayroll({
       competence: payrollCompetence.rows[0]!.competence,

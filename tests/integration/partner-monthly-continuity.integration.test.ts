@@ -21,6 +21,23 @@ afterAll(async () => {
 });
 
 describe('continuidade mensal do parceiro', () => {
+  it('consulta o detalhe unificado de vendas e ajustes mesmo sem movimentos', async () => {
+    const fixture = await createPartnerFixture(db.pool, { role: 'funcionario' });
+    await db.pool.query(
+      `INSERT INTO network.partner_token_commission_history
+        (environment,partner_unit_id,token_id,kind,value,active,starts_on,updated_by)
+       VALUES ('test',$1,$2,'percent',5,true,
+         (now() AT TIME ZONE 'America/Sao_Paulo')::date,'integration-test')`,
+      [fixture.partnerUnitId, fixture.tokenId],
+    );
+    const { getPartnerOperationCommissionDetail } =
+      await import('../../src/parceiro/operation-commissions.js');
+    const detail = await getPartnerOperationCommissionDetail(
+      fixture.ctx, fixture.tokenId, '30d', db.pool,
+    );
+    expect(detail).toMatchObject({ collaborator: { sales_count: 0 }, sales: [] });
+  });
+
   it('fecha comissão semanal no domingo sem misturar salário e sem duplicar', async () => {
     const partner = await import('../../src/parceiro/queries.js');
     const fixture = await createPartnerFixture(db.pool, {

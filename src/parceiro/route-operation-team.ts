@@ -12,14 +12,17 @@ import {
   getPartnerOperationPermissions,
   savePartnerOperationPermissions,
 } from './operation-team-permissions.js';
+import { savePartnerOperationConfiguration } from './operation-team-config.js';
 
 const owner = [requirePartnerAuth, requireOwner];
 const params = z.object({ collaboratorId: z.string().uuid() });
-const money = z.number().finite().min(0).max(10_000_000);
-const today = () => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-}).format(new Date());
-const startsOn = z.string().date().refine((value) => value <= today(), 'future_start_not_allowed');
+const centMoney = (maximum: number) => z.number().finite().min(0).max(maximum)
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+    'money_cent_precision');
+const money = centMoney(10_000_000);
+const percentMoney = centMoney(100);
+// Configuracao e agenda, nao fato transacional: pode ser programada para o futuro.
+const startsOn = z.string().date();
 const benefits = z.array(z.object({
   name: z.string().trim().min(2).max(60), amount: money, active: z.boolean().default(true),
 })).max(12);
@@ -28,7 +31,7 @@ const compensation = z.object({
   salary_frequency: z.enum(['weekly', 'monthly']).default('monthly'),
   payment_day: z.number().int().min(1).max(28),
   payment_method: z.enum(['pix', 'transferencia', 'dinheiro', 'outro']),
-  starts_on: z.string().date(), benefits,
+  starts_on: startsOn, benefits,
 });
 const commissionItemRule = z.object({
   kind: z.enum(['percent', 'fixed', 'none']), value: money,
@@ -52,7 +55,7 @@ const itemizedFields = {
   }),
 };
 const commission = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('percent'), basis: z.literal('revenue'), value: money.max(100), active: z.boolean(), starts_on: startsOn, ...itemizedFields }),
+  z.object({ kind: z.literal('percent'), basis: z.literal('revenue'), value: percentMoney, active: z.boolean(), starts_on: startsOn, ...itemizedFields }),
   z.object({ kind: z.literal('fixed'), basis: z.literal('sale'), value: money, active: z.boolean(), starts_on: startsOn, ...itemizedFields }),
 ]);
 const permissions = z.object({
@@ -65,7 +68,13 @@ const newMember = z.object({
   username: z.string().trim().min(3).max(60)
     .regex(/^[a-zA-Z0-9._-]+$/, 'usuario_invalido'),
   password: z.string().min(12).max(200),
-  role: z.enum(['vendedor', 'estoque', 'entregador']),
+  role: z.enum(['vendedor', 'estoque', 'entregador', 'colaborador']),
+});
+const configuration = z.object({
+  job_role: z.enum(['vendedor', 'estoque', 'entregador', 'colaborador']),
+  permissions,
+  compensation,
+  commission,
 });
 
 function bad(reply: FastifyReply, error: unknown, label: string) {
@@ -138,6 +147,19 @@ export function registerPartnerOperationTeamRoutes(fastify: FastifyInstance): vo
       const payload = await getPartnerOperationPermissions(getPartnerContext(request), id.data.collaboratorId);
       return payload ? reply.status(200).send(payload) : reply.status(404).send({ error: 'collaborator_not_found' });
     } catch (error) { return bad(reply, error, 'partner operation permissions unavailable'); }
+  });
+
+  fastify.put('/parceiro/:slug/api/equipe/:collaboratorId/configuracao', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {
+    const id = params.safeParse(request.params ?? {});
+    const body = configuration.safeParse(request.body ?? {});
+    if (!id.success || !body.success) {
+      return reply.status(400).send({ error: body.success ? 'invalid_request' : body.error.issues[0]?.message });
+    }
+    try {
+      return reply.status(200).send(await savePartnerOperationConfiguration(
+        getPartnerContext(request), id.data.collaboratorId, body.data,
+      ));
+    } catch (error) { return bad(reply, error, 'partner operation configuration save failed'); }
   });
 
   fastify.put('/parceiro/:slug/api/equipe/:collaboratorId/permissoes', { preHandler: owner }, async (request: PartnerAuthedRequest, reply) => {

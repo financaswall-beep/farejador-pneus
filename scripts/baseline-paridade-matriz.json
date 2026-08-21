@@ -1,7 +1,7 @@
 {
-  "geradoEm": "2026-08-21T04:41:07.816Z",
-  "commitBase": "correcoes-logistica-2026-08-21",
-  "total": 1060,
+  "geradoEm": "2026-08-21T07:22:16.187Z",
+  "commitBase": "dd64a35",
+  "total": 1061,
   "propriedades": {
     "abrirColabDialog": "function",
     "abrirHistoricoAtacado": "function",
@@ -257,6 +257,7 @@
     "colabComissaoRows": "getter",
     "colabCommissionLabel": "function",
     "colabCorAvatar": "function",
+    "colabCurrentMonth": "value:string",
     "colabDialog": "value:object",
     "colabDialogConfirmLabel": "function",
     "colabDialogDescription": "function",

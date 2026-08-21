@@ -149,6 +149,7 @@ export async function getMatrizOperationCommissionDetail(
     [env.FAREJADOR_ENV, detailStart, exclusiveEnd, collaboratorId],
   );
   const sales: OperationCommissionSale[] = result.rows.map((row) => ({
+    entry_type: 'sale',
     id: row.id,
     reference: row.reference,
     occurred_at: row.occurred_at,
