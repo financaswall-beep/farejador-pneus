@@ -774,5 +774,7 @@ o Estado do Rio de Janeiro; expansão para outro estado exige ampliar o catálog
 auditada, não reabrir texto livre.
 
 Publicação rastreável: commit funcional `05c76ea`; PR `#68` aprovada pelo GitHub Actions
-no run `32489173112` e incorporada à `main`. SHA final que o Coolify deve importar:
-`007f224c10b4923223990b55ed1e8dfcc15bb46b`. O deploy ainda não foi iniciado.
+no run `32489173112` e incorporada à `main` no SHA funcional
+`007f224c10b4923223990b55ed1e8dfcc15bb46b`. A PR documental `#69` pode avançar o HEAD
+sem mudar o runtime; o Coolify deve importar o HEAD atual da `main`, que precisa conter esse
+SHA funcional. O deploy ainda não foi iniciado.
