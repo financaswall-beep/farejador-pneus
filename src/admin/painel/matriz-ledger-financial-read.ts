@@ -3,19 +3,16 @@ import { pool as defaultPool } from '../../persistence/db.js';
 import { env } from '../../shared/config/env.js';
 import type { MatrizFinancialTruth } from './queries-financeiro-verdade.js';
 interface LedgerTruthRow {
-  revenue: string; known_cost: string; operating_expenses: string; inventory_gain: string; inventory_loss: string;
-  cash_in: string; cash_out: string; cash_retail: string;
-  cash_wholesale: string; cash_network: string; cash_monthly: string;
+  revenue: string; known_cost: string; operating_expenses: string; inventory_gain: string; inventory_loss: string; cash_in: string;
+  cash_out: string; cash_retail: string; cash_wholesale: string; cash_network: string; cash_monthly: string;
   cash_purchases: string; cash_expenses: string; cash_commission_refund: string;
-  pending_revenue: string; pending_items: number; pending_orders: number;
-  receivables: string; payables: string; retail_receivable: string;
+  pending_revenue: string; pending_items: number; pending_orders: number; receivables: string; payables: string; retail_receivable: string;
   cancelled_retail: number; cancelled_wholesale: number; cancelled_purchases: number;
   reversed_commissions: number; deleted_expenses: number;
   reversed_after_settlement: number; suspected_test_rows: number;
-  source_wholesale: string; ledger_wholesale: string;
-  source_retail: string; ledger_retail: string; source_freight: string;
-  source_commission: string; ledger_commission: string;
-  source_monthly: string; ledger_monthly: string;
+  source_wholesale: string; ledger_wholesale: string; source_retail: string;
+  ledger_retail: string; source_freight: string; source_commission: string;
+  ledger_commission: string; source_monthly: string; ledger_monthly: string;
   source_expenses: string; ledger_expenses: string;
   source_marketing: string; ledger_marketing: string;
   source_purchases: string; ledger_purchases: string; source_inventory: string; ledger_inventory: string;
@@ -136,8 +133,11 @@ export async function getMatrizCentralLedgerFinancialTruth(environment: 'prod' |
             AND lower(created_by||' '||description)~'(test|teste|prova|demo)'))::int
          suspected_test_rows,
        COALESCE((SELECT sum(COALESCE(o.settled_total_amount,o.total_amount)) FROM commerce.wholesale_orders o,bounds b
-         WHERE o.environment=$1 AND o.sold_at>=b.month_ts
-           AND o.sold_at<b.month_end_ts
+         WHERE o.environment=$1
+           AND (CASE WHEN o.partner_transfer_status IN ('settled','received') THEN
+             COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)>=b.month_ts
+           AND (CASE WHEN o.partner_transfer_status IN ('settled','received') THEN
+             COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)<b.month_end_ts
            AND (o.partner_transfer_status IS NULL
              OR o.partner_transfer_status IN ('settled','received'))),0)
        -COALESCE((SELECT sum(COALESCE(o.settled_total_amount,o.total_amount)) FROM commerce.wholesale_orders o,bounds b

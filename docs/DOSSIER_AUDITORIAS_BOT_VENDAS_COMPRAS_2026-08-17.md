@@ -1,10 +1,24 @@
-# Dossiê de autorização — Bot, Vendas, Compras e Estoque
+# Dossiê de autorização — Bot, Vendas, Compras, Estoque e Financeiro
 
 **Data da revisão:** 20/08/2026
 **Escopo:** painel da Matriz, APIs, banco, permissões e relações entre Bot, Conversas, Visão Geral, Demanda, Vendas, Compras, Estoque, Catálogo, Logística e Financeiro.
 **Produção implantada:** backup validado; migrations 0179–0181 aplicadas; 0177–0178 já instaladas; deploy do SHA `d95b146e30de1e1527951370df8b53a3f71e8310` concluído no Coolify em 17/08/2026; smoke técnico e auditoria somente leitura aprovados.
 
-**Pacote atual de datas:** Estoque foi implantado no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`; migrations `0182`–`0185` estão no banco. A padronização sistêmica de horário descrita no adendo 9 está aprovada em código e dry-run, mas a migration `0186` ainda não foi aplicada e o código ainda não foi publicado/implantado.
+**Pacote atual de banco:** Estoque foi implantado inicialmente no SHA `6690c46c15bf11013eea3731ad9bb6ed747b7028`. As evoluções `0182`–`0190` estão materialmente presentes no banco; a `0190` foi aplicada e reconciliada em 20/08/2026. O runtime correspondente ao pacote financeiro ainda aguarda o próximo deploy.
+
+**Atualização de continuidade em 20/08/2026:** o repositório está em `main` no SHA
+`2064f1a`. A migration `0189_checkout_price_negotiation.sql` foi confirmada
+**materialmente no banco de produção**, por consulta `REPEATABLE READ READ ONLY`: as duas
+colunas `reference_unit_price NUMERIC(10,2) NOT NULL`, as duas constraints, os dois triggers
+e o preenchimento sem nulos estão presentes. A tabela
+`supabase_migrations.schema_migrations`, porém, não registra a `0189` e está atrasada até a
+`0167`; por isso a `0189` não deve ser reaplicada. O deploy do SHA atual e o smoke autenticado
+continuam dependendo de evidência própria e não são presumidos por essa verificação de schema.
+
+**Auditoria atual do Financeiro:** concluída em código em 20/08/2026. O relatório completo
+está em `docs/AUDITORIA_FINANCEIRO_PONTA_A_PONTA_2026-08-20.md`. A migration `0190` foi
+aplicada com backup e reconciliação `PASS`; o novo código ainda não foi implantado. A
+aprovação atual cobre código e banco, mas ainda não substitui o smoke pós-deploy.
 
 ## Como ler o veredito
 
@@ -479,6 +493,8 @@ deploy; se o schema estiver antigo, a versão nova não se declara pronta.
 | Integração completa | **237/237**, 46 arquivos; 232 passaram na execução longa e o arquivo interrompido pelo worker foi coberto na repetição dos seis candidatos, 30/30 |
 | Provas direcionadas Matriz + parceiro | **40/40** em PostgreSQL 17 descartável |
 | Migration `0189` no banco de teste | Dry-run integral aprovado com rollback |
+| Migration `0189` no banco de produção | **Aplicada materialmente**: colunas, constraints e triggers presentes; 0 referência nula |
+| Histórico remoto de migrations | **Incompleto**: `supabase_migrations.schema_migrations` não registra a `0189` e apresenta como última a `0167` |
 | Manifesto | 190 migrations; última `0189`; gap histórico 0071 documentado |
 | Fiscal de tamanho | Aprovado |
 
@@ -494,14 +510,57 @@ Casos matemáticos explícitos:
 
 ### Decisão deste adendo
 
-**APROVADO EM CÓDIGO, SEGURANÇA, INTEGRAÇÃO E MATEMÁTICA. AINDA NÃO IMPLANTADO.**
+**APROVADO EM CÓDIGO, SEGURANÇA, INTEGRAÇÃO E MATEMÁTICA. BANCO DE PRODUÇÃO
+MATERIALMENTE PREPARADO; DEPLOY DO SHA ATUAL E SMOKE AUTENTICADO AINDA PRECISAM SER
+COMPROVADOS.**
 
-Ordem segura:
+Continuidade segura:
 
-1. publicar o SHA aprovado;
-2. fazer backup;
-3. aplicar `0189_checkout_price_negotiation.sql`;
-4. o responsável fazer o deploy do mesmo SHA no Coolify;
-5. smoke autenticado: dono altera preço oficial; funcionário recebe 403 nessa mesma API;
-6. vendedor fecha uma venda com desconto e outra com acréscimo; conferir comprovante,
+1. [x] publicar o SHA aprovado na `main` (`2064f1a`);
+2. [x] confirmar materialmente a `0189` em produção, sem reaplicá-la;
+3. [ ] reconciliar futuramente o histórico remoto de migrations por procedimento auditável,
+   sem executar novamente o SQL da `0189`;
+4. [ ] o responsável confirmar o deploy do SHA atual no Coolify;
+5. [ ] smoke autenticado: dono altera preço oficial; funcionário recebe 403 nessa mesma API;
+6. [ ] vendedor fecha uma venda com desconto e outra com acréscimo; conferir comprovante,
    estoque, Financeiro, comissão e Bot da Matriz.
+
+## 12. Auditoria concluída — Financeiro da Matriz e dos parceiros
+
+A auditoria percorreu o ledger central, Caixa, contas, despesas, comissões, Financeiro dos
+parceiros e as relações com Vendas, Compras, Estoque, Atacado, Logística, Colaboradores,
+Catálogo, CRM, Resumo e app.
+
+### Resultado consolidado
+
+| Bateria | Resultado |
+|---|---|
+| Unitários/regressão | **1.227/1.227**, 243 arquivos |
+| Integração PostgreSQL 17 | **243/243**, 46 arquivos |
+| TypeScript e build | aprovados |
+| Migrations | 191 verificadas; última `0190` |
+| Ledger de produção, somente leitura | 325 transações; 0 desbalanceada e 0 mistura de ambiente |
+| Integridade causal em produção | 0 fato ausente, divergente, duplicado ou órfão pela régua compatível com fatos novos e legados |
+| Backup pré-0190 | 4.953.210 bytes; 2.580 entradas restauráveis; SHA-256 validado |
+| Migration `0190` em produção | **COMMIT aprovado** em 20/08/2026 às 23:51; schema material confirmado |
+| Reconciliação pós-migration | **PASS**; todos os 21 contadores da Etapa 3 em zero |
+
+### Correções centrais
+
+- carga para parceiro só reconhece receita, CMV e comissão no acerto da chegada e pelos pneus
+  aceitos;
+- competência da carga passou a usar a data do acerto;
+- estorno passou a aparecer junto com o original, produzindo líquido correto;
+- entrega e retirada pendentes deixaram de contar como venda/caixa do parceiro;
+- venda, despesa, conta e baixa passaram a exigir centavos exatos e valor econômico válido;
+- duplo clique e baixas concorrentes produzem somente um efeito;
+- mutações financeiras e comerciais sensíveis exigem dono;
+- o banco bloqueia confirmação/pagamento direto de carga fora da operação oficial.
+
+### Veredito e continuidade
+
+**APROVADO EM CÓDIGO, BANCO, INTEGRAÇÃO, MATEMÁTICA, SEGURANÇA E CONCORRÊNCIA.** Backup,
+migration e reconciliação pós-migration foram concluídos. Restam publicar/incorporar o código,
+o responsável fazer o deploy, executar smoke autenticado e repetir a reconciliação pós-deploy.
+
+Relatório reproduzível: `docs/AUDITORIA_FINANCEIRO_PONTA_A_PONTA_2026-08-20.md`.

@@ -86,6 +86,35 @@ function createMockReply(): MockReply {
 // 1. Venda baixa estoque
 // --------------------------------------------------------------
 describe('Portal Parceiro — venda baixa estoque', () => {
+  it('serializa duplo clique simultâneo pela chave idempotente', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 10 });
+    const idempotencyKey = `concurrent-sale-${randomUUID()}`;
+    const input = {
+      customer_name: 'Cliente Duplo Clique',
+      customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 2, unit_price: 100 }],
+      payment_method: 'pix',
+      fulfillment_mode: 'pickup' as const,
+      source_tag: 'porta' as const,
+      idempotency_key: idempotencyKey,
+    };
+
+    const [first, second] = await Promise.all([
+      q.registerPartnerSale(f.ctx, input),
+      q.registerPartnerSale(f.ctx, input),
+    ]);
+
+    expect(first.order_id).toBe(second.order_id);
+    expect(await getStockQty(db.pool, f.stockId)).toBe(8);
+    const orders = await db.pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM commerce.partner_orders
+        WHERE environment='test' AND unit_id=$1 AND idempotency_key=$2`,
+      [f.unitId, idempotencyKey],
+    );
+    expect(orders.rows[0]?.count).toBe(1);
+  });
+
   it('decrementa quantity_on_hand atomicamente ao registrar venda', async () => {
     const q = await importQueries();
     const f = await createPartnerFixture(db.pool, { initialStockQty: 10 });
@@ -143,6 +172,158 @@ describe('Portal Parceiro — venda baixa estoque', () => {
     const types = audits.rows.map((r) => r.event_type);
     expect(types).toContain('partner_order_created');
     expect(types).toContain('stock_decrement_sale');
+  });
+});
+
+describe('Portal Parceiro — realização financeira de entrega e retirada reservada', () => {
+  it('não antecipa caixa e conta cada recebimento uma única vez ao finalizar', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool, { initialStockQty: 10 });
+    const delivery = await q.registerPartnerSale(f.ctx, {
+      customer_name: 'Cliente Entrega', customer_phone: null,
+      items: [{ partner_stock_id: f.stockId, quantity: 1, unit_price: 120 }],
+      payment_method: 'A receber', payment_status: 'receivable',
+      fulfillment_mode: 'delivery', delivery_address: 'Rua Financeira, 10',
+      source_tag: '2w', idempotency_key: `delivery-finance-${randomUUID()}`,
+    });
+    const pickupKey = `pickup-finance-${randomUUID()}`;
+    const pickup = await db.pool.query<{ order_id: string }>(
+      `SELECT commerce.register_partner_local_order(
+         'test',$1,'Cliente Retirada',NULL,$2::jsonb,'A receber','pickup',NULL,
+         'integration:finance',$3,'2w',0,0,true
+       ) AS order_id`,
+      [f.unitId, JSON.stringify([{
+        partner_stock_id: f.stockId, quantity: 1, unit_price: 80,
+      }]), pickupKey],
+    );
+    const pickupId = pickup.rows[0]!.order_id;
+
+    const simple = await import('../../src/parceiro/simple-finance.js');
+    const entries = await import('../../src/parceiro/finance-entries.js');
+    let summary = await db.pool.query<{ sales_month: string; cash_in_month: string }>(
+      `SELECT sales_month::text,cash_in_month::text
+         FROM network.partner_unit_summary WHERE environment='test' AND unit_id=$1`,
+      [f.unitId],
+    );
+    expect(summary.rows[0]).toMatchObject({ sales_month: '0', cash_in_month: '0' });
+    expect((await simple.getPartnerSimpleFinance(f.ctx, 'today')).cash_in).toBe(0);
+    expect((await entries.getPartnerFinanceEntries(f.ctx, 'today')).total).toBe(0);
+    expect((await q.getPartnerRelatorioCaixa(f.ctx)).vendas_total).toBe(0);
+
+    await q.updatePartnerDeliveryStatus(f.ctx, delivery.order_id, {
+      delivery_status: 'delivered', payment_method: 'Pix', delivery_courier: 'Teste',
+    });
+    await q.markPartnerPickupRetrieved(f.ctx, pickupId, { payment_method: 'Dinheiro' });
+
+    summary = await db.pool.query<{ sales_month: string; cash_in_month: string }>(
+      `SELECT sales_month::text,cash_in_month::text
+         FROM network.partner_unit_summary WHERE environment='test' AND unit_id=$1`,
+      [f.unitId],
+    );
+    expect(summary.rows[0]).toMatchObject({ sales_month: '200.00', cash_in_month: '200.00' });
+    const finance = await simple.getPartnerSimpleFinance(f.ctx, 'today');
+    expect(finance.cash_in).toBe(200);
+    const financeEntries = await entries.getPartnerFinanceEntries(f.ctx, 'today');
+    expect(financeEntries.total).toBe(200);
+    expect(financeEntries.count).toBe(2);
+    expect((await q.getPartnerRelatorioCaixa(f.ctx)).vendas_total).toBe(200);
+    const receivables = await db.pool.query<{ count: number; total: string }>(
+      `SELECT count(*)::int AS count,COALESCE(sum(amount),0)::text AS total
+         FROM finance.partner_receivables
+        WHERE environment='test' AND unit_id=$1 AND status='received'`,
+      [f.unitId],
+    );
+    expect(receivables.rows[0]).toMatchObject({ count: 2, total: '200.00' });
+  });
+});
+
+describe('Portal Parceiro — invariantes monetárias e concorrência financeira', () => {
+  it('recusa zero, negativos e frações menores que um centavo em toda entrada manual', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool);
+
+    for (const amount of [0, -1, 1.001]) {
+      await expect(q.registerPartnerExpense(f.ctx, {
+        category: 'other', description: 'Valor inválido', amount,
+        idempotency_key: `expense-invalid-${amount}-${randomUUID()}`,
+      })).rejects.toThrow('partner_finance_amount_invalid');
+      await expect(q.registerPartnerPayable(f.ctx, {
+        description: 'Valor inválido', amount,
+        idempotency_key: `payable-invalid-${amount}-${randomUUID()}`,
+      })).rejects.toThrow('partner_finance_amount_invalid');
+      await expect(q.registerPartnerReceivable(f.ctx, {
+        description: 'Valor inválido', amount,
+        idempotency_key: `receivable-invalid-${amount}-${randomUUID()}`,
+      })).rejects.toThrow('partner_finance_amount_invalid');
+    }
+  });
+
+  it('o banco também impede fatos financeiros novos com valor zero', async () => {
+    const f = await createPartnerFixture(db.pool);
+    await expect(db.pool.query(
+      `INSERT INTO commerce.partner_orders
+         (environment,unit_id,total_amount,idempotency_key)
+       VALUES ('test',$1,0,$2)`,
+      [f.unitId, `db-zero-order-${randomUUID()}`],
+    )).rejects.toThrow(/partner_orders_total_positive_finance_check/);
+    await expect(db.pool.query(
+      `INSERT INTO finance.partner_expenses
+         (environment,unit_id,category,description,amount,idempotency_key)
+       VALUES ('test',$1,'other','Zero',0,$2)`,
+      [f.unitId, `db-zero-expense-${randomUUID()}`],
+    )).rejects.toThrow(/partner_expenses_amount_positive_finance_check/);
+    await expect(db.pool.query(
+      `INSERT INTO finance.partner_payables
+         (environment,unit_id,description,amount,idempotency_key)
+       VALUES ('test',$1,'Zero',0,$2)`,
+      [f.unitId, `db-zero-payable-${randomUUID()}`],
+    )).rejects.toThrow(/partner_payables_amount_positive_finance_check/);
+    await expect(db.pool.query(
+      `INSERT INTO finance.partner_receivables
+         (environment,unit_id,description,amount,idempotency_key)
+       VALUES ('test',$1,'Zero',0,$2)`,
+      [f.unitId, `db-zero-receivable-${randomUUID()}`],
+    )).rejects.toThrow(/partner_receivables_amount_positive_finance_check/);
+  });
+
+  it('duas baixas simultâneas geram somente um recebimento ou pagamento', async () => {
+    const q = await importQueries();
+    const f = await createPartnerFixture(db.pool);
+    const payable = await q.registerPartnerPayable(f.ctx, {
+      description: 'Conta concorrente', amount: 75,
+      idempotency_key: `payable-concurrent-${randomUUID()}`,
+    });
+    const receivable = await q.registerPartnerReceivable(f.ctx, {
+      description: 'Recebível concorrente', amount: 125,
+      idempotency_key: `receivable-concurrent-${randomUUID()}`,
+    });
+
+    const payableResults = await Promise.all([
+      q.settlePartnerPayable(f.ctx, payable.payable_id, { payment_method: 'Pix' }),
+      q.settlePartnerPayable(f.ctx, payable.payable_id, { payment_method: 'Pix' }),
+    ]);
+    const receivableResults = await Promise.all([
+      q.settlePartnerReceivable(f.ctx, receivable.receivable_id, { payment_method: 'Pix' }),
+      q.settlePartnerReceivable(f.ctx, receivable.receivable_id, { payment_method: 'Pix' }),
+    ]);
+
+    expect(payableResults.filter((result) => result.paid)).toHaveLength(1);
+    expect(receivableResults.filter((result) => result.received)).toHaveLength(1);
+    const proof = await db.pool.query<{
+      expense_count: number; payable_audit_count: number; receivable_audit_count: number;
+    }>(
+      `SELECT
+         (SELECT count(*)::int FROM finance.partner_expenses
+           WHERE source_payable_id=$1 AND deleted_at IS NULL) expense_count,
+         (SELECT count(*)::int FROM audit.events
+           WHERE entity_id=$1 AND event_type='partner_payable_paid') payable_audit_count,
+         (SELECT count(*)::int FROM audit.events
+           WHERE entity_id=$2 AND event_type='partner_receivable_received') receivable_audit_count`,
+      [payable.payable_id, receivable.receivable_id],
+    );
+    expect(proof.rows[0]).toEqual({
+      expense_count: 1, payable_audit_count: 1, receivable_audit_count: 1,
+    });
   });
 });
 

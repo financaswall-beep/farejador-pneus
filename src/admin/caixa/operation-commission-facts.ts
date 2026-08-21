@@ -19,7 +19,9 @@ export const matrizCommissionFactsSql = `WITH retail AS (
      AND (o.created_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), wholesale AS (
   SELECT o.seller_collaborator_id collaborator_id,o.id::text id,
-         'Atacado #'||right(o.id::text,6) reference,o.sold_at occurred_at,
+         'Atacado #'||right(o.id::text,6) reference,
+         CASE WHEN o.partner_transfer_status IN ('settled','received')
+           THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END occurred_at,
          NULL::text payment_method,COALESCE(o.settled_total_amount,o.total_amount) gross_amount,
          COALESCE(items.margin,0) margin,COALESCE(items.items_without_cost,0) items_without_cost,
          'sale'::text event_type,'wholesale'::text sale_channel,o.id source_id
@@ -36,8 +38,12 @@ export const matrizCommissionFactsSql = `WITH retail AS (
      AND o.status='confirmed'
      AND (o.partner_transfer_status IS NULL
        OR o.partner_transfer_status IN ('settled','received'))
-     AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
-     AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < $3::date
+     AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+            THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+          AT TIME ZONE 'America/Sao_Paulo') >= $2::date
+     AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+            THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+          AT TIME ZONE 'America/Sao_Paulo') < $3::date
 ), delivery_events AS (
   SELECT t.courier_collaborator_id collaborator_id,o.id::text id,
          'Entrega #'||COALESCE(o.order_number::text,right(o.id::text,6)) reference,

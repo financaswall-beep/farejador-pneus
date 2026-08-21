@@ -11,7 +11,7 @@ vi.mock('../../../src/admin/caixa/simple-finance.js', () => ({
 import { getMatrizFinanceOutputs } from '../../../src/admin/caixa/finance-outputs.js';
 
 describe('Saídas do Financeiro operacional da Matriz', () => {
-  it('lê somente créditos de caixa válidos no livro central', async () => {
+  it('lê todos os créditos de caixa, inclusive devoluções que estornam uma entrada', async () => {
     const query = vi.fn(async () => ({ rows: [{
       id: 'ledger-2', source_type: 'commerce.matriz_expense.payment',
       description: 'Conta de energia', payment_method: 'pix', amount: '540.00',
@@ -26,6 +26,6 @@ describe('Saídas do Financeiro operacional da Matriz', () => {
     expect(payload.rows[0]).toMatchObject({ kind: 'expense', origin: 'Despesa da Matriz' });
     expect(query.mock.calls[0]?.[1]).toEqual(['test', 7]);
     expect(query.mock.calls[0]?.[0]).toContain("e.account_code='cash' AND e.side='credit'");
-    expect(query.mock.calls[0]?.[0]).toContain('reversal_of_transaction_id=t.id');
+    expect(query.mock.calls[0]?.[0]).not.toContain('reversal_of_transaction_id=t.id');
   });
 });

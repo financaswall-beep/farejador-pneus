@@ -31,10 +31,16 @@ const requiredPaymentDetailsSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+const settlementAmountSchema = z.number().positive().max(999_999_999.99)
+  .refine(
+    (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+    'settlement_amount_cent_precision',
+  );
+
 const settleLedgerItemSchema = z.object({
   obligation_id: z.string().uuid().optional(),
   account_code: z.literal('marketing_payable').optional(),
-  amount: z.number().positive().max(999_999_999.99).optional(),
+  amount: settlementAmountSchema.optional(),
   idempotency_key: z.string().trim().min(8).max(200),
 }).merge(paymentDetailsSchema).refine((body) =>
   Boolean(body.obligation_id) !== Boolean(body.account_code), {
@@ -55,7 +61,7 @@ const settleFinanceItemSchema = z.object({
   // account_code para exibição e o formulário antigo o reenviava em qualquer
   // baixa. Fora de central_account esse campo não escolhe o alvo e é ignorado.
   account_code: z.string().trim().min(1).max(80).optional(),
-  amount: z.number().positive().max(999_999_999.99).optional(),
+  amount: settlementAmountSchema.optional(),
   idempotency_key: z.string().trim().min(8).max(200),
 }).merge(requiredPaymentDetailsSchema).superRefine((body, ctx) => {
   const centralObligation = ['retail_sale', 'central_obligation']
@@ -146,7 +152,8 @@ export async function registerPainelFinanceiroLedger(
       return reply.status(200).send({ settled: true, ...result });
     } catch (error) {
       const code = error instanceof Error ? error.message : 'internal_server_error';
-      if (['settlement_amount_invalid', 'retail_payment_method_required',
+      if (['settlement_amount_invalid', 'settlement_amount_cent_precision',
+        'retail_payment_method_required',
         'central_obligation_not_actionable'].includes(code)) {
         return reply.status(400).send({ error: code });
       }
@@ -231,7 +238,8 @@ export async function registerPainelFinanceiroLedger(
       return reply.status(200).send({ settled: true, result });
     } catch (error) {
       const code = error instanceof Error ? error.message : 'internal_server_error';
-      if (['settlement_amount_invalid', 'retail_payment_method_required',
+      if (['settlement_amount_invalid', 'settlement_amount_cent_precision',
+        'retail_payment_method_required',
         'central_obligation_not_actionable'].includes(code)) {
         return reply.status(400).send({ error: code });
       }

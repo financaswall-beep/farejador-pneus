@@ -35,11 +35,14 @@ export async function getPartnerFinanceEntries(
      ), entries AS (
        SELECT po.id::text id,'sale'::text kind,
               COALESCE(NULLIF(btrim(po.customer_name),''),'Venda no balcão') title,
-              COALESCE(items.summary,'Itens da venda') subtitle,
-              'Venda'::text origin,po.payment_method,po.total_amount amount,
-              to_char(po.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') entry_date,
-              po.created_at occurred_at
-         FROM commerce.partner_orders po,bounds b
+               COALESCE(items.summary,'Itens da venda') subtitle,
+               'Venda'::text origin,po.payment_method,po.total_amount amount,
+               to_char(realized.realized_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') entry_date,
+               realized.realized_at occurred_at
+          FROM commerce.partner_orders po,bounds b
+          CROSS JOIN LATERAL (SELECT CASE
+            WHEN po.fulfillment_mode='delivery' THEN po.delivered_at
+            ELSE COALESCE(po.retrieved_at,po.created_at) END realized_at) realized
          LEFT JOIN LATERAL (
            SELECT CASE WHEN count(*)=0 THEN NULL
                   WHEN count(*)=1 THEN max(COALESCE(NULLIF(btrim(brand||' '||tire_size),''),item_name))
@@ -48,9 +51,13 @@ export async function getPartnerFinanceEntries(
              FROM commerce.partner_order_items
             WHERE environment=po.environment AND order_id=po.id
          ) items ON true
-        WHERE po.environment=$1 AND po.unit_id=$2 AND po.status<>'cancelled'
-          AND po.deleted_at IS NULL AND po.created_at>=b.start_at AND po.created_at<b.end_at
-          AND (po.payment_method IS NULL OR po.payment_method<>'A receber')
+         WHERE po.environment=$1 AND po.unit_id=$2 AND po.status<>'cancelled'
+           AND po.deleted_at IS NULL
+           AND NOT (po.fulfillment_mode='delivery'
+             AND po.delivery_status<>'delivered')
+           AND NOT po.awaiting_pickup
+           AND realized.realized_at>=b.start_at AND realized.realized_at<b.end_at
+           AND (po.payment_method IS NULL OR po.payment_method<>'A receber')
        UNION ALL
        SELECT COALESCE(pre.installment_id,pre.receivable_id)::text,'receivable'::text,
               COALESCE(NULLIF(btrim(pr.customer_name),''),'Conta recebida'),

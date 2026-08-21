@@ -28,6 +28,9 @@ describe('Entradas do Financeiro operacional do parceiro', () => {
     expect(payload.rows[0]).toMatchObject({ kind: 'sale', amount: 199.9, payment_method: 'Pix' });
     expect(partnerQuery.mock.calls[0]?.[1]).toEqual(['test', 'unit-1', 7]);
     expect(partnerQuery.mock.calls[0]?.[0]).toContain("po.payment_method<>'A receber'");
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain("po.delivery_status<>'delivered'");
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain('NOT po.awaiting_pickup');
+    expect(partnerQuery.mock.calls[0]?.[0]).toContain('realized.realized_at');
     expect(partnerQuery.mock.calls[0]?.[0]).toContain("pre.status='received'");
     expect(partnerQuery.mock.calls[0]?.[0]).toContain('sum(amount) OVER()');
   });

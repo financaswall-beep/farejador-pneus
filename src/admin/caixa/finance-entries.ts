@@ -47,12 +47,9 @@ export async function getMatrizFinanceEntries(
          JOIN finance.matriz_ledger_entries e
            ON e.environment=t.environment AND e.transaction_id=t.id
          CROSS JOIN bounds b
-        WHERE t.environment=$1 AND t.cash_on>=b.start_date AND t.cash_on<b.end_date
-          AND e.account_code='cash' AND e.side='debit'
-          AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions reversal
-            WHERE reversal.environment=t.environment
-              AND reversal.reversal_of_transaction_id=t.id)
-     ), counted AS (
+         WHERE t.environment=$1 AND t.cash_on>=b.start_date AND t.cash_on<b.end_date
+           AND e.account_code='cash' AND e.side='debit'
+      ), counted AS (
        SELECT *,sum(amount) OVER()::text total_amount,count(*) OVER()::int total_count
          FROM entries
      )

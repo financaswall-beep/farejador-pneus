@@ -101,8 +101,11 @@ export async function getMatrizCollaboratorManagement(
        ), wholesale AS (
          SELECT o.seller_collaborator_id AS id, 'sale'::text AS event_type,
                 o.id AS source_id, 'wholesale'::text AS sale_channel,
-                (o.sold_at AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
-                1::int AS sales_count, o.total_amount AS revenue, items.margin,
+                ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+                    THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+                  AT TIME ZONE 'America/Sao_Paulo')::date AS event_date,
+                1::int AS sales_count,
+                COALESCE(o.settled_total_amount,o.total_amount) AS revenue, items.margin,
                 0::int AS items_without_cost, 0::int AS deliveries_count, 0::int AS trips_count,
                 0::numeric AS distance_km, NULL::boolean AS on_time
            FROM commerce.wholesale_orders o
@@ -115,8 +118,12 @@ export async function getMatrizCollaboratorManagement(
           WHERE o.environment=$1 AND o.seller_collaborator_id IS NOT NULL AND o.status='confirmed'
             AND (o.partner_transfer_status IS NULL
               OR o.partner_transfer_status IN ('settled','received'))
-            AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') >= $2::date
-            AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
+            AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+                   THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+                 AT TIME ZONE 'America/Sao_Paulo') >= $2::date
+            AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+                   THEN COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)
+                 AT TIME ZONE 'America/Sao_Paulo') < ($2::date + interval '1 month')
        ), trip_events AS (
          SELECT t.courier_collaborator_id AS id, 'trip'::text AS event_type,
                 t.id AS source_id, NULL::text AS sale_channel,

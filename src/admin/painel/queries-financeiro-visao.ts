@@ -98,7 +98,9 @@ export async function getMatrizFinanceiroVisao(
               WHERE o.environment = $1 AND o.status = 'confirmed' AND o.payment_status = 'pending'
                 AND (o.partner_transfer_status IS NULL
                   OR o.partner_transfer_status IN ('settled','received'))
-                AND (o.sold_at AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
+                AND ((CASE WHEN o.partner_transfer_status IN ('settled','received')
+                       THEN COALESCE(o.partner_settled_at,o.sold_at)
+                       ELSE o.sold_at END) AT TIME ZONE 'America/Sao_Paulo') ${mesWhere}`,
             [environment],
           ).then((r) => r.rows[0]!.aberto)
         : Promise.resolve(null),
@@ -132,7 +134,9 @@ export async function getMatrizFinanceiroVisao(
              WHERE o.environment = $1 AND o.status = 'confirmed'
                AND (o.partner_transfer_status IS NULL
                  OR o.partner_transfer_status IN ('settled','received'))
-               AND o.sold_at >= now() - interval '30 days')
+               AND (CASE WHEN o.partner_transfer_status IN ('settled','received')
+                      THEN COALESCE(o.partner_settled_at,o.sold_at)
+                      ELSE o.sold_at END) >= now() - interval '30 days')
          + (SELECT COALESCE(SUM(oi.matriz_unit_cost * oi.quantity), 0)
               FROM commerce.orders o
               JOIN core.units u ON u.id = o.unit_id AND u.environment = o.environment AND u.slug = 'main'

@@ -31,7 +31,10 @@ export async function getWholesaleSaleLedgerState(
     partner_transfer_status: 'in_transit' | 'settled' | 'received' | null;
   }>(
     `SELECT o.buyer_id,COALESCE(o.settled_total_amount,o.total_amount) AS total_amount,
-            o.sold_at,o.payment_status,o.due_date,
+            CASE WHEN o.partner_transfer_status IN ('settled','received')
+                   THEN COALESCE(o.partner_settled_at,o.sold_at)
+                 ELSE o.sold_at END AS sold_at,
+            o.payment_status,o.due_date,
             o.paid_at,o.created_by,o.partner_transfer_status,
             COALESCE(sum((CASE WHEN o.partner_transfer_status IN ('settled','received')
               THEN i.accepted_quantity ELSE i.quantity END)*i.unit_cost),0)::numeric(14,2)::text cogs_amount
@@ -40,7 +43,7 @@ export async function getWholesaleSaleLedgerState(
          ON i.environment=o.environment AND i.order_id=o.id
       WHERE o.environment=$1 AND o.id=$2
       GROUP BY o.id,o.buyer_id,o.total_amount,o.settled_total_amount,
-               o.partner_transfer_status,o.sold_at,o.payment_status,
+               o.partner_transfer_status,o.partner_settled_at,o.sold_at,o.payment_status,
                o.due_date,o.paid_at,o.created_by`,
     [environment, orderId],
   );
@@ -73,12 +76,18 @@ export async function ensureWholesaleSaleRevenue(
   sale: WholesaleSaleLedgerState,
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
+  if (sale.partnerTransferStatus === 'in_transit') return null;
   const amount = matrizLedgerAmount(sale.totalAmount, 'sale_ledger_amount_invalid');
   if (amount === 0) return null;
-  const sourceType = sale.partnerTransferStatus
+  const partnerRecognized = sale.partnerTransferStatus === 'settled'
+    || sale.partnerTransferStatus === 'received';
+  const sourceType = partnerRecognized
     ? 'commerce.wholesale_order.arrival_revenue'
     : 'commerce.wholesale_order.revenue';
-  const existing = await existingTransaction(client, sale, sourceType);
+  const existing = await existingTransaction(client, sale, sourceType)
+    ?? (partnerRecognized
+      ? await existingTransaction(client, sale, 'commerce.wholesale_order.revenue')
+      : null);
   if (existing) return existing;
   const debitAccount = sale.paymentStatus === 'pending' ? 'accounts_receivable' : 'cash';
   return postMatrizLedgerTransaction(client, {
@@ -105,13 +114,18 @@ export async function ensureWholesaleSaleCogs(
   sale: WholesaleSaleLedgerState,
 ): Promise<string | null> {
   if (!env.MATRIZ_CENTRAL_LEDGER) return null;
+  if (sale.partnerTransferStatus === 'in_transit') return null;
   const amount = matrizLedgerAmount(sale.cogsAmount, 'sale_ledger_cogs_invalid');
   if (amount === 0) return null;
-  const partnerTransfer = Boolean(sale.partnerTransferStatus);
+  const partnerTransfer = sale.partnerTransferStatus === 'settled'
+    || sale.partnerTransferStatus === 'received';
   const sourceType = partnerTransfer
     ? 'commerce.wholesale_order.arrival_cogs'
     : 'commerce.wholesale_order.cogs';
-  const existing = await existingTransaction(client, sale, sourceType);
+  const existing = await existingTransaction(client, sale, sourceType)
+    ?? (partnerTransfer
+      ? await existingTransaction(client, sale, 'commerce.wholesale_order.cogs')
+      : null);
   if (existing) return existing;
   return postMatrizLedgerTransaction(client, {
     environment: sale.environment, sourceType, sourceId: sale.orderId,

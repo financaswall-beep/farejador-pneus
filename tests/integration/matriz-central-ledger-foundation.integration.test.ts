@@ -171,6 +171,35 @@ describe('0149 — fundacao do livro financeiro central', () => {
     });
   });
 
+  it('mantem entrada e devolucao no caixa e zera o efeito liquido do estorno', async () => {
+    const original = await post(
+      'test','finance.statement.reversal','cash-reversal-001','cash_sale',125,
+      [
+        { account_code:'cash',account_class:'asset',side:'debit',amount:125 },
+        { account_code:'sales_revenue',account_class:'revenue',side:'credit',amount:125 },
+      ],
+      { competence:'2026-09-05',cashOn:'2026-09-05' },
+    );
+    await db.pool.query(
+      `SELECT finance.reverse_matriz_ledger_transaction(
+         'test',$1,'finance.statement.reversal.cancel','cash-reversal-001-cancel',
+         '2026-09-06','Devolucao integral','owner:integration','2026-09-06','{}'::jsonb
+       )`,
+      [original],
+    );
+
+    const statement = await getStatement({
+      environment:'test',period:'2026-09',basis:'caixa',limit:200,
+    },db.pool);
+    expect(statement.summary).toEqual({
+      entradas:'125.00',saidas:'125.00',receitas:'0.00',despesas:'0.00',
+    });
+    expect(statement.rows.find((row) => row.source_id==='cash-reversal-001'))
+      .toMatchObject({ status:'estornado',direction:'entrada' });
+    expect(statement.rows.find((row) => row.source_id==='cash-reversal-001-cancel'))
+      .toMatchObject({ status:'estorno',direction:'saida' });
+  });
+
   it('bloqueia estorno direto cujas partidas nao espelham o original', async () => {
     const original = await post(
       'test', 'commerce.order.sale', 'order-bad-reversal', 'sale', 50,

@@ -204,9 +204,10 @@ export async function getWholesaleResumo(
   dbPool: Pool = defaultPool,
   period: SalesPeriod = 'tudo',
 ): Promise<WholesaleResumoRow> {
-  // A competência comercial do atacado é a data real da venda, não a data em
-  // que o registro foi digitado no painel.
-  const periodWhere = salesPeriodWhere(period, 'o.sold_at');
+  // Carga para parceiro só vira venda quando a Matriz conclui o acerto da chegada.
+  const recognizedAt = `(CASE WHEN o.partner_transfer_status IN ('settled','received') THEN
+    COALESCE(o.partner_settled_at,o.sold_at) ELSE o.sold_at END)`;
+  const periodWhere = salesPeriodWhere(period, recognizedAt);
   const r = await dbPool.query<WholesaleResumoRow>(
     `SELECT
        COALESCE(SUM(oi.unit_price * CASE WHEN o.partner_transfer_status IS NULL

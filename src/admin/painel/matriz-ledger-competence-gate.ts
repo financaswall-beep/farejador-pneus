@@ -66,8 +66,11 @@ export async function getMatrizLedgerCompetenceGate(
      ), source_values AS (
        SELECT m.competence,'atacado' origin,
          COALESCE((SELECT sum(COALESCE(settled_total_amount,total_amount)) FROM commerce.wholesale_orders
-           WHERE environment=$1 AND sold_at>=m.month_ts
-             AND sold_at<m.month_end_ts
+           WHERE environment=$1
+             AND (CASE WHEN partner_transfer_status IN ('settled','received')
+                    THEN COALESCE(partner_settled_at,sold_at) ELSE sold_at END)>=m.month_ts
+             AND (CASE WHEN partner_transfer_status IN ('settled','received')
+                    THEN COALESCE(partner_settled_at,sold_at) ELSE sold_at END)<m.month_end_ts
              AND (partner_transfer_status IS NULL
                OR partner_transfer_status IN ('settled','received'))),0)
          -COALESCE((SELECT sum(COALESCE(settled_total_amount,total_amount)) FROM commerce.wholesale_orders

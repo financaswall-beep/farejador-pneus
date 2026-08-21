@@ -123,6 +123,11 @@ export const REQUIRED_SCHEMA_SQL = `
     AND EXISTS (
       SELECT 1 FROM information_schema.columns
        WHERE table_schema='commerce' AND table_name='wholesale_orders'
+         AND column_name='partner_settled_at'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema='commerce' AND table_name='wholesale_orders'
          AND column_name='partner_payment_terms'
     )
     AND EXISTS (

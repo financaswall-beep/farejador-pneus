@@ -8,6 +8,8 @@ import { isReceivableCustomerScopeError } from './receivable-customer-scope.js';
 import {
   centMoneySchema, partnerPurchaseSchema, sixDecimalCostSchema,
 } from './purchase-schema.js';
+import { partnerSaleSchema } from './sale-schema.js';
+export { partnerSaleSchema } from './sale-schema.js';
 import { rateLimitHit, rateLimitRetryAfterSeconds } from '../shared/rate-limit.js';
 import { businessDateSaoPaulo, isNotFutureBusinessDate } from '../shared/business-time.js';
 import { reencodePhoto, PhotoRejectedError, PHOTO_MAX_UPLOAD_BYTES } from './photo-upload.js';
@@ -183,53 +185,6 @@ const receivableInstallmentParamsSchema = paramsSchema.extend({
   installmentId: z.string().uuid(),
 });
 
-// Venda local do parceiro: cada item aponta direto pro estoque local do parceiro
-// (partner_stock_levels.id), não pra commerce.products. Decisão "silo isolado" 2026-05-19.
-const orderItemSchema = z.object({
-  partner_stock_id: z.string().uuid(),
-  quantity: z.number().int().positive(),
-  unit_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive'),
-  reference_unit_price: centMoneySchema.refine((value) => value > 0, 'sale_price_must_be_positive').optional(),
-  discount_amount: centMoneySchema.optional(),
-});
-
-const saleSchema = z.object({
-  customer_id: z.string().uuid().nullable().optional(),
-  customer_name: z.string().min(1).max(200).nullable().optional(),
-  customer_phone: z.string().min(1).max(40).nullable().optional(),
-  customer_cpf: z.string().min(11).max(14).nullable().optional(),
-  items: z.array(orderItemSchema).min(1),
-  payment_method: z.string().min(1).nullable(),
-  payment_status: z.enum(['received', 'receivable']).nullable().optional(),
-  receivable_due_date: z.string().date().nullable().optional(),
-  receivable_installments: z.number().int().min(1).max(36).nullable().optional(),
-  fulfillment_mode: z.enum(['delivery', 'pickup']),
-  delivery_address: z.string().min(1).nullable().optional(),
-  notes: z.string().max(500).nullable().optional(),
-  received_amount: z.number().nonnegative().nullable().optional(),
-  discount_amount: z.number().nonnegative().nullable().optional(),
-  freight_amount: z.number().nonnegative().nullable().optional(),
-  source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).optional(),
-  idempotency_key: z.string().min(8),
-}).refine(
-  // S6 da auditoria 2026-05-21: pedido de entrega exige endereco.
-  (data) => data.fulfillment_mode !== 'delivery' || (data.delivery_address && data.delivery_address.trim().length > 0),
-  {
-    message: 'delivery_address obrigatorio quando fulfillment_mode=delivery',
-    path: ['delivery_address'],
-  },
-).refine(
-  // COD (0069): pedido de entrega "a receber" nao tem vencimento — o dinheiro vem
-  // na hora da entrega. So exige due_date pra "a receber" de retirada (pickup).
-  (data) => data.payment_status !== 'receivable'
-    || data.fulfillment_mode === 'delivery'
-    || (data.receivable_due_date && data.receivable_due_date.trim().length > 0),
-  {
-    message: 'receivable_due_date obrigatorio quando payment_status=receivable',
-    path: ['receivable_due_date'],
-  },
-);
-
 const stockSchema = z.object({
   stock_id: z.string().uuid().nullable().optional(),
   product_id: z.string().uuid().nullable().optional(),
@@ -401,7 +356,7 @@ const expenseSchema = z.object({
   ).nullable().optional(),
   category: z.enum(['employee_payment', 'rent', 'utilities', 'maintenance', 'delivery', 'tax', 'supplier_payment', 'other']),
   description: z.string().min(1).max(300),
-  amount: z.number().nonnegative(),
+  amount: centMoneySchema.refine((value) => value > 0, 'amount_must_be_positive'),
   payment_method: z.string().max(80).nullable().optional(),
   idempotency_key: z.string().min(8).nullable().optional(),
 });
@@ -413,7 +368,7 @@ const payableSchema = z.object({
   counterparty_name: z.string().max(200).nullable().optional(),
   description: z.string().min(1).max(300),
   category: z.enum(['supplier', 'employee', 'rent', 'utilities', 'tax', 'maintenance', 'other']).nullable().optional(),
-  amount: z.number().nonnegative(),
+  amount: centMoneySchema.refine((value) => value > 0, 'amount_must_be_positive'),
   due_date: z.string().date().nullable().optional(),
   status: z.enum(['open', 'paid']).nullable().optional(),
   paid_at: partnerFactDatetime('paid_at_future').nullable().optional(),
@@ -441,7 +396,7 @@ const receivableSchema = z.object({
   customer_name: z.string().max(200).nullable().optional(),
   description: z.string().min(1).max(300),
   source_tag: z.enum(['porta', '2w', 'walkin_balcao', 'walkin_telefone', 'outro']).nullable().optional(),
-  amount: z.number().nonnegative(),
+  amount: centMoneySchema.refine((value) => value > 0, 'amount_must_be_positive'),
   due_date: z.string().date().nullable().optional(),
   status: z.enum(['open', 'received']).nullable().optional(),
   received_at: partnerFactDatetime('received_at_future').nullable().optional(),
@@ -1247,7 +1202,7 @@ export async function registerParceiroRoute(fastify: FastifyInstance): Promise<v
   });
 
   fastify.post('/parceiro/:slug/api/vendas', { preHandler: [requirePartnerAuth, requireScreen('vendas')] }, async (request: PartnerAuthedRequest, reply) => {
-    const parsed = saleSchema.safeParse(request.body);
+    const parsed = partnerSaleSchema.safeParse(request.body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const path = issue?.path?.join('.') || 'body';

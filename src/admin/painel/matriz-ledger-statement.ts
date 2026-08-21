@@ -181,14 +181,11 @@ export async function getMatrizLedgerStatement(
          SELECT to_date($2,'YYYY-MM') month_start,
                 (to_date($2,'YYYY-MM')+interval '1 month')::date month_end
        ), tx AS (
-         SELECT t.id,t.reversal_of_transaction_id
-           FROM finance.matriz_ledger_transactions t,bounds b
-          WHERE t.environment=$1
-            AND ${dateColumn}>=b.month_start AND ${dateColumn}<b.month_end
-            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions r
-              WHERE r.environment=t.environment
-                AND r.reversal_of_transaction_id=t.id)
-       )
+          SELECT t.id,t.reversal_of_transaction_id
+            FROM finance.matriz_ledger_transactions t,bounds b
+           WHERE t.environment=$1
+             AND ${dateColumn}>=b.month_start AND ${dateColumn}<b.month_end
+        )
        SELECT
          COALESCE(sum(e.amount) FILTER (WHERE e.account_code='cash'
            AND e.side='debit'),0)::numeric(14,2)::text entradas,

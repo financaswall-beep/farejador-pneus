@@ -9,8 +9,8 @@ import {
 import { beginIntegrityOperation, completeIntegrityOperation, integrityResult,
   moneyCents, operationFingerprint, recordIntegrityEvent } from './stage5-integrity.js';
 type Environment = 'prod' | 'test';
-type Target = { obligation_id: string; account_code?: never }
-  | { obligation_id?: never; account_code: 'marketing_payable' };
+type Target = { obligation_id: string; account_code?: never } |
+  { obligation_id?: never; account_code: 'marketing_payable' };
 export type MatrizLedgerSettlementInput = Target & {
   amount?: number;
   payment_method?: string;
@@ -42,6 +42,7 @@ const CENTRAL_ACCOUNTS = new Set([
   'customer_refund_payable',
 ]);
 function requestedAmount(value: number | undefined, balance: number): number {
+  if (value !== undefined && Math.abs(value * 100 - Math.round(value * 100)) >= 1e-7) throw new Error('settlement_amount_cent_precision');
   const amount = value === undefined ? balance : moneyCents(value) / 100;
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('settlement_amount_invalid');
   if (moneyCents(amount) > moneyCents(balance)) {

@@ -6,10 +6,7 @@ import {
   postWholesalePurchaseCancellation, postWholesalePurchasePayment,
   postWholesalePurchaseReceipt,
 } from './matriz-ledger-purchases.js';
-import {
-  ensureWholesaleSaleCogs, ensureWholesaleSaleRevenue, getWholesaleSaleLedgerState,
-  postWholesaleSaleCancellation, postWholesaleSalePayment,
-} from './matriz-ledger-wholesale-sales.js';
+import { backfillWholesaleSales } from './matriz-ledger-stage3-wholesale-backfill.js';
 import {
   postMatrizRetailCancellation, postMatrizRetailPaymentIfRealized,
   postMatrizRetailSaleFacts,
@@ -110,93 +107,6 @@ async function backfillPurchases(
   }
   return rows.rowCount ?? 0;
 }
-async function backfillWholesaleSales(
-  client: PoolClient, environment: Environment, limit: number,
-): Promise<number> {
-  const rows = await client.query<{
-    id: string; status: string; cancelled_at: string | null;
-    cancelled_by: string | null; cancel_reason: string | null;
-  }>(
-    `SELECT o.id,o.status,o.cancelled_at,o.cancelled_by,o.cancel_reason
-       FROM commerce.wholesale_orders o
-      WHERE o.environment=$1 AND o.total_amount>0
-        AND (
-          NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
-            WHERE t.environment=o.environment
-              AND t.source_type='commerce.wholesale_order.revenue'
-              AND t.source_id=o.id::text)
-          OR (EXISTS (SELECT 1 FROM commerce.wholesale_order_items i
-                WHERE i.environment=o.environment AND i.order_id=o.id
-                GROUP BY i.order_id HAVING sum(i.quantity*i.unit_cost)>0)
-            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
-              WHERE t.environment=o.environment
-                AND t.source_type='commerce.wholesale_order.cogs'
-                AND t.source_id=o.id::text))
-          OR (o.status='cancelled' AND NOT EXISTS (
-            SELECT 1 FROM finance.matriz_ledger_transactions t
-             WHERE t.environment=o.environment
-               AND t.source_type='commerce.wholesale_order.revenue_cancel'
-               AND t.source_id=o.id::text))
-          OR (o.status='cancelled' AND EXISTS (
-            SELECT 1 FROM finance.matriz_ledger_transactions t
-             WHERE t.environment=o.environment
-               AND t.source_type='commerce.wholesale_order.cogs'
-               AND t.source_id=o.id::text)
-            AND EXISTS (SELECT 1 FROM commerce.wholesale_stock_movements m
-             WHERE m.environment=o.environment AND m.source='cancelamento_venda'
-               AND m.ref=o.id::text AND m.qty_delta>0)
-            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
-             WHERE t.environment=o.environment
-               AND t.source_type='commerce.wholesale_order.cogs_cancel'
-               AND t.source_id=o.id::text))
-          OR (o.payment_status='paid' AND EXISTS (
-            SELECT 1 FROM finance.matriz_ledger_transactions t
-             WHERE t.environment=o.environment AND t.source_id=o.id::text
-               AND t.source_type='commerce.wholesale_order.revenue'
-               AND t.transaction_kind='sale_receivable')
-            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
-             WHERE t.environment=o.environment AND t.source_id=o.id::text
-               AND t.source_type='commerce.wholesale_order.payment'))
-        )
-      ORDER BY o.sold_at,o.id LIMIT $2 FOR UPDATE OF o SKIP LOCKED`,
-    [environment, limit],
-  );
-  for (const row of rows.rows) {
-    const state = await getWholesaleSaleLedgerState(client, environment, row.id);
-    const original = await client.query<{ transaction_kind: string }>(
-      `SELECT transaction_kind FROM finance.matriz_ledger_transactions
-        WHERE environment=$1 AND source_type='commerce.wholesale_order.revenue'
-          AND source_id=$2`,
-      [environment, row.id],
-    );
-    await ensureWholesaleSaleRevenue(client, state);
-    await ensureWholesaleSaleCogs(client, state);
-    if (state.paymentStatus === 'paid'
-      && original.rows[0]?.transaction_kind === 'sale_receivable') {
-      await postWholesaleSalePayment(
-        client, state, state.paidAt ?? state.soldAt, 'system:stage3-backfill',
-      );
-    }
-    if (row.status === 'cancelled' && row.cancelled_at) {
-      const returned = await client.query<{
-        measure: string; brand: string;
-        tire_condition: 'meia_vida' | 'novo' | 'remold'; quantity: number;
-      }>(
-        `SELECT measure,brand,tire_condition,sum(qty_delta)::int quantity
-           FROM commerce.wholesale_stock_movements
-          WHERE environment=$1 AND source='cancelamento_venda'
-            AND ref=$2 AND qty_delta>0 GROUP BY measure,brand,tire_condition`,
-        [environment, row.id],
-      );
-      await postWholesaleSaleCancellation(
-        client, state, returned.rows, row.cancelled_at,
-        row.cancelled_by ?? 'system:stage3-backfill',
-        row.cancel_reason ?? 'Cancelamento historico',
-      );
-    }
-  }
-  return rows.rowCount ?? 0;
-}
 async function backfillRetailSales(
   client: PoolClient, environment: Environment, limit: number,
 ): Promise<number> {
@@ -209,9 +119,19 @@ async function backfillRetailSales(
       WHERE o.environment=$1 AND o.partner_order_id IS NULL AND o.total_amount>0
         AND o.status IN ('confirmed','paid','delivered','cancelled')
         AND (
-          NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
+          ((o.status<>'cancelled'
+              OR EXISTS (SELECT 1 FROM audit.events a
+                WHERE a.environment=o.environment AND a.entity_id=o.id
+                  AND a.event_type='matriz_galpao_decrement')
+              OR EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
+                WHERE t.environment=o.environment AND t.source_id=o.id::text
+                  AND t.source_type IN ('commerce.order.revenue','commerce.order.cogs'))
+              OR EXISTS (SELECT 1 FROM commerce.order_items i
+                WHERE i.environment=o.environment AND i.order_id=o.id
+                  AND i.matriz_unit_cost IS NOT NULL))
+            AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
             WHERE t.environment=o.environment AND t.source_type='commerce.order.revenue'
-              AND t.source_id=o.id::text)
+              AND t.source_id=o.id::text))
           OR (EXISTS (SELECT 1 FROM audit.events a
                 WHERE a.environment=o.environment AND a.entity_id=o.id
                   AND a.event_type='matriz_galpao_decrement')
@@ -223,7 +143,12 @@ async function backfillRetailSales(
             AND NOT EXISTS (SELECT 1 FROM finance.matriz_ledger_transactions t
               WHERE t.environment=o.environment AND t.source_type='commerce.order.cogs'
                 AND t.source_id=o.id::text))
-          OR (o.status='cancelled' AND NOT EXISTS (
+          OR (o.status='cancelled' AND EXISTS (
+            SELECT 1 FROM finance.matriz_ledger_transactions t
+             WHERE t.environment=o.environment
+               AND t.source_type='commerce.order.revenue'
+               AND t.source_id=o.id::text)
+            AND NOT EXISTS (
             SELECT 1 FROM finance.matriz_ledger_transactions t
              WHERE t.environment=o.environment
                AND t.source_type='commerce.order.revenue_cancel'

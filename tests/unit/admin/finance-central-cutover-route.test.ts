@@ -17,6 +17,7 @@ async function buildFinanceRoute(reason: 'disabled' | 'integration_red') {
   vi.doMock('../../../src/shared/logger.js', () => ({ logger }));
   vi.doMock('../../../src/admin/auth.js', () => ({
     requireAdminAuth: async () => undefined,
+    requireAdminOwner: async () => undefined,
   }));
   vi.doMock('../../../src/admin/painel/route-helpers.js', () => ({
     dashboardPayload: () => ({}),
